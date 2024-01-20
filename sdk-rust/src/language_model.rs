@@ -1,14 +1,12 @@
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
-
 use crate::{
     LanguageModelCapability, LanguageModelInput, LanguageModelPricing, LanguageModelResult,
     ModelResponse, PartialModelResponse,
 };
-use futures::stream::BoxStream;
-use futures_core::Stream;
+use futures::{stream::BoxStream, Stream};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct LanguageModelMetadata {

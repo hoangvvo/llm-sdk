@@ -18,7 +18,7 @@ pub fn guess_delta_index(
     // [part0 partial, part0 partial, part1 partial].
     // For the purpose of this matching, we want only
     // [part0, part1]
-    let unique_content_deltas: Vec<_> = all_content_deltas
+    let unique_content_deltas = all_content_deltas
         .iter()
         .enumerate()
         .filter(|(index, content_delta)| {
@@ -27,8 +27,8 @@ pub fn guess_delta_index(
                 .position(|find_part| find_part.index == content_delta.index)
                 == Some(*index)
         })
-        .map(|(_, content_delta)| content_delta.clone())
-        .collect();
+        .map(|(_, content_delta)| content_delta)
+        .collect::<Vec<_>>();
 
     if let (Some(tool_call_index), PartDelta::ToolCall(_)) = (tool_call_index, part) {
         // Providers like OpenAI track tool calls in a separate field, so we

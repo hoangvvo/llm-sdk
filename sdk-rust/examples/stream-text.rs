@@ -36,7 +36,7 @@ async fn main() {
 
     while let Some(partial_response) = stream.next().await {
         let partial_response = partial_response.unwrap();
-        accumulator.add_partial(&partial_response).unwrap();
+        accumulator.add_partial(partial_response.clone()).unwrap();
         println!("{partial_response:#?}");
     }
 

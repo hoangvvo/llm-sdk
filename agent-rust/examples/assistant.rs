@@ -153,7 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await?;
 
         // Update messages with response
-        messages = response.messages;
+        messages.extend(response.new_messages);
 
         println!("{:#?}", response.content);
     }

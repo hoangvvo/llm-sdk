@@ -4,7 +4,9 @@ import {
   StreamAccumulator,
   type LanguageModel,
   type LanguageModelInput,
+  type Message,
   type ModelResponse,
+  type Part,
   type ResponseFormatOption,
   type ToolMessage,
 } from "@hoangvvo/llm-sdk";
@@ -64,32 +66,21 @@ export class RunSession<TContext> {
    * return the response
    */
   private async process(
-    input: LanguageModelInput,
     modelResponse: ModelResponse,
     context: TContext,
   ): Promise<ProcessResult> {
-    const messages = [...input.messages];
-
-    messages.push({
-      role: "assistant",
-      content: modelResponse.content,
-    });
-
     const toolCallParts = modelResponse.content.filter(
       (part) => part.type === "tool-call",
     );
 
     if (!toolCallParts.length) {
-      const response: AgentResponse = {
-        messages,
-        content: modelResponse.content,
-      };
-
       return {
         type: "response",
-        response,
+        content: modelResponse.content,
       };
     }
+
+    const nextMessages: Message[] = [];
 
     const toolMessage: ToolMessage = {
       role: "tool",
@@ -118,14 +109,11 @@ export class RunSession<TContext> {
       });
     }
 
-    messages.push(toolMessage);
+    nextMessages.push(toolMessage);
 
     return {
       type: "next",
-      input: {
-        ...input,
-        messages,
-      },
+      next_messages: nextMessages,
     };
   }
 
@@ -133,17 +121,31 @@ export class RunSession<TContext> {
    * Run a non-streaming execution of the agent.
    */
   async run(request: AgentRequest<TContext>): Promise<AgentResponse> {
-    let input = this.getLlmInput(request);
+    const input = this.getLlmInput(request);
     const context = request.context;
+
+    const newMessages: Message[] = [];
 
     let response: AgentResponse | undefined;
     while (!response) {
-      const modelResponse = await this.model.generate(input);
-      const processResult = await this.process(input, modelResponse, context);
+      const modelResponse = await this.model.generate({
+        ...input,
+        messages: [...input.messages, ...newMessages],
+      });
+
+      newMessages.push({
+        role: "assistant",
+        content: modelResponse.content,
+      });
+
+      const processResult = await this.process(modelResponse, context);
       if (processResult.type === "response") {
-        response = processResult.response;
+        response = {
+          content: processResult.content,
+          new_messages: newMessages,
+        };
       } else {
-        input = processResult.input;
+        newMessages.push(...processResult.next_messages);
       }
     }
 
@@ -156,10 +158,12 @@ export class RunSession<TContext> {
   async *runStream(
     request: AgentRequest<TContext>,
   ): AsyncGenerator<AgentStreamEvent, AgentResponse> {
-    let input = this.getLlmInput(request);
+    const input = this.getLlmInput(request);
     const context = request.context;
 
     let response: AgentResponse | undefined;
+
+    const newMessages: Message[] = [];
 
     while (!response) {
       const modelStream = this.model.stream(input);
@@ -169,24 +173,40 @@ export class RunSession<TContext> {
       for await (const partial of modelStream) {
         accumulator.addPartial(partial);
         yield {
-          type: "partial-model-response",
+          type: "partial",
           ...partial,
         };
       }
 
       const modelResponse = accumulator.computeResponse();
 
-      yield {
-        type: "model-response",
-        ...modelResponse,
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: modelResponse.content,
       };
 
-      const processResult = await this.process(input, modelResponse, context);
+      newMessages.push(assistantMessage);
+
+      yield {
+        type: "message",
+        ...assistantMessage,
+      };
+
+      const processResult = await this.process(modelResponse, context);
 
       if (processResult.type === "response") {
-        response = processResult.response;
+        response = {
+          content: processResult.content,
+          new_messages: newMessages,
+        };
       } else {
-        input = processResult.input;
+        newMessages.push(...processResult.next_messages);
+        for (const message of processResult.next_messages) {
+          yield {
+            type: "message",
+            ...message,
+          };
+        }
       }
     }
 
@@ -226,10 +246,10 @@ type ProcessResult = ProcessResultResponse | ProcessResultNext;
 
 interface ProcessResultResponse {
   type: "response";
-  response: AgentResponse;
+  content: Part[];
 }
 
 interface ProcessResultNext {
   type: "next";
-  input: LanguageModelInput;
+  next_messages: Message[];
 }

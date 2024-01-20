@@ -265,11 +265,11 @@ impl StreamAccumulator {
     ///
     /// # Errors
     /// Returns an error if delta types mismatch for the same index
-    pub fn add_partial(&mut self, partial: &PartialModelResponse) -> Result<(), String> {
-        if let Some(delta) = &partial.delta {
+    pub fn add_partial(&mut self, partial: PartialModelResponse) -> Result<(), String> {
+        if let Some(delta) = partial.delta {
             self.process_delta(delta.clone())?;
         }
-        if let Some(usage) = &partial.usage {
+        if let Some(usage) = partial.usage {
             self.process_usage(usage);
         }
         Ok(())
@@ -323,7 +323,7 @@ impl StreamAccumulator {
         }
     }
 
-    fn process_usage(&mut self, usage: &ModelUsage) {
+    fn process_usage(&mut self, usage: ModelUsage) {
         let accumulated_usage = self
             .accumulated_usage
             .get_or_insert_with(ModelUsage::default);

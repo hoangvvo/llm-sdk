@@ -46,22 +46,15 @@ where
     /// return the response
     async fn process(
         &self,
-        input: LanguageModelInput,
         context: Arc<TCtx>,
         model_response: ModelResponse,
     ) -> Result<ProcessResult, AgentError> {
-        let mut messages = input.messages.clone();
-
-        messages.push(Message::Assistant(AssistantMessage {
-            content: model_response.content.clone(),
-        }));
-
-        let tool_call_parts: Vec<&ToolCallPart> = model_response
+        let tool_call_parts: Vec<ToolCallPart> = model_response
             .content
             .iter()
             .filter_map(|part| {
                 if let Part::ToolCall(tool_call) = part {
-                    Some(tool_call)
+                    Some(tool_call.clone())
                 } else {
                     None
                 }
@@ -70,60 +63,73 @@ where
 
         // If no tool calls were found, return the model response as is
         if tool_call_parts.is_empty() {
-            return Ok(ProcessResult::Response(AgentResponse {
-                messages,
-                content: model_response.content,
-            }));
+            return Ok(ProcessResult::Response(model_response.content));
         }
+
+        let mut next_messages: Vec<Message> = vec![];
 
         // Process all tool calls
         let mut tool_message = ToolMessage { content: vec![] };
 
-        for tool_call_part in tool_call_parts {
+        for tool_call_part in tool_call_parts.into_iter() {
+            let ToolCallPart {
+                tool_call_id,
+                tool_name,
+                args,
+                ..
+            } = tool_call_part;
+
             let agent_tool = self
                 .tools
                 .iter()
-                .find(|tool| tool.name == tool_call_part.tool_name)
+                .find(|tool| tool.name == *tool_name)
                 .ok_or_else(|| {
-                    AgentError::Invariant(format!(
-                        "Tool {} not found for tool call",
-                        tool_call_part.tool_name
-                    ))
+                    AgentError::Invariant(format!("Tool {} not found for tool call", tool_name))
                 })?;
 
             let tool_res = agent_tool
-                .call(tool_call_part.args.clone(), context.clone())
+                .call(args, context.clone())
                 .await
                 .map_err(|e| AgentError::ToolExecution(e.into()))?;
 
             tool_message.content.push(Part::ToolResult(ToolResultPart {
-                tool_call_id: tool_call_part.tool_call_id.clone(),
-                tool_name: tool_call_part.tool_name.clone(),
+                tool_call_id,
+                tool_name,
                 content: tool_res.content,
                 is_error: Some(tool_res.is_error),
             }));
         }
 
-        messages.push(Message::Tool(tool_message));
+        next_messages.push(Message::Tool(tool_message));
 
-        Ok(ProcessResult::Next(
-            LanguageModelInput { messages, ..input }.into(),
-        ))
+        Ok(ProcessResult::Next(next_messages))
     }
 
     /// Run a non-streaming execution of the agent.
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
-        let mut input = self.get_llm_input(&request);
-        let context = Arc::new(request.context);
+        let (input, context) = self.get_llm_input(request);
+
+        let mut new_messages = vec![];
 
         loop {
-            let model_response = self.model.generate(input.clone()).await?;
-            match self.process(input, context.clone(), model_response).await? {
-                ProcessResult::Response(response) => {
-                    return Ok(response);
+            let mut input = input.clone();
+            input.messages.append(new_messages.clone().as_mut());
+            let model_response = self.model.generate(input).await?;
+
+            new_messages.push(Message::Assistant(AssistantMessage {
+                content: model_response.content.clone(),
+            }));
+
+            match self.process(context.clone(), model_response).await? {
+                ProcessResult::Response(content) => {
+                    return Ok(AgentResponse {
+                        content,
+                        new_messages,
+                    });
                 }
-                ProcessResult::Next(next_input) => {
-                    input = *next_input;
+                ProcessResult::Next(next_messages) => {
+                    new_messages.extend(next_messages);
+                    continue;
                 }
             }
         }
@@ -131,8 +137,7 @@ where
 
     /// Run a streaming execution of the agent.
     pub fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
-        let mut input = self.get_llm_input(&request);
-        let context = Arc::new(request.context);
+        let (input, context) = self.get_llm_input(request);
 
         let session = Arc::new(Self {
             tools: self.tools.clone(),
@@ -141,34 +146,47 @@ where
             instructions: self.instructions.clone(),
         });
 
+        let mut new_messages = vec![];
+
         let stream = async_stream::try_stream! {
             loop {
-                let model_stream = session.model.stream(input.clone()).await?;
+                let mut input = input.clone();
+                input.messages.append(new_messages.clone().as_mut());
 
-                tokio::pin!(model_stream);
+                let mut model_stream = session.model.stream(input).await?;
 
                 let mut accumulator = StreamAccumulator::new();
 
                 while let Some(partial) = model_stream.next().await {
                     let partial = partial?;
 
-                    accumulator.add_partial(&partial).map_err(|e| {
+                    accumulator.add_partial(partial.clone()).map_err(|e| {
                         AgentError::Invariant(format!("Failed to accumulate stream: {e}"))
                     })?;
 
-                    yield AgentStreamEvent::PartialModelResponse(partial);
+                    yield AgentStreamEvent::Partial(partial);
                 }
 
                 let model_response = accumulator.compute_response()?;
 
-                yield AgentStreamEvent::ModelResponse(model_response.clone());
+                let assistant_message = Message::Assistant(AssistantMessage {
+                    content: model_response.content.clone(),
+                });
 
-                match session.process(input.clone(), context.clone(), model_response).await? {
-                    ProcessResult::Response(response) => {
-                        yield AgentStreamEvent::Response(response);
+                new_messages.push(assistant_message.clone());
+                yield AgentStreamEvent::Message(assistant_message);
+
+                match session.process(context.clone(), model_response).await? {
+                    ProcessResult::Response(content) => {
+                        yield AgentStreamEvent::Response(AgentResponse { new_messages, content });
+                        break;
                     }
-                    ProcessResult::Next(next_input) => {
-                        input = *next_input;
+                    ProcessResult::Next(next_messages) => {
+                        new_messages.extend(next_messages.clone());
+                        for message in next_messages {
+                            yield AgentStreamEvent::Message(message);
+                        }
+                        continue;
                     }
                 }
             }
@@ -181,21 +199,25 @@ where
         // Cleanup dependencies if needed
     }
 
-    fn get_llm_input(&self, request: &AgentRequest<TCtx>) -> LanguageModelInput {
-        LanguageModelInput {
-            messages: request.messages.clone(),
-            system_prompt: Some(instruction::get_prompt(
-                &self.instructions,
-                &request.context,
-            )),
-            tools: Some(self.tools.iter().map(Into::into).collect()),
-            response_format: Some(self.response_format.clone()),
-            ..Default::default()
-        }
+    fn get_llm_input(&self, request: AgentRequest<TCtx>) -> (LanguageModelInput, Arc<TCtx>) {
+        (
+            LanguageModelInput {
+                messages: request.messages,
+                system_prompt: Some(instruction::get_prompt(
+                    &self.instructions,
+                    &request.context,
+                )),
+                tools: Some(self.tools.iter().map(Into::into).collect()),
+                response_format: Some(self.response_format.clone()),
+                ..Default::default()
+            },
+            Arc::new(request.context),
+        )
     }
 }
 
 enum ProcessResult {
-    Response(AgentResponse),
-    Next(Box<LanguageModelInput>),
+    Response(Vec<Part>),
+    // Return when new messages need to be added to the input and continue processing
+    Next(Vec<Message>),
 }

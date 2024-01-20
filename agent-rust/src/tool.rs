@@ -1,6 +1,5 @@
 use anyhow::Error;
-use futures::FutureExt;
-use futures_core::future::BoxFuture;
+use futures::{future::BoxFuture, FutureExt};
 use llm_sdk::{Part, Tool};
 use serde::de::DeserializeOwned;
 use serde_json::Value;

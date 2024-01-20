@@ -88,14 +88,14 @@ impl LanguageModel for OpenAIModel {
 
         let json = response.json::<openai_api::ChatCompletion>().await?;
 
-        let choice = json.choices.first().ok_or_else(|| {
+        let choice = json.choices.into_iter().next().ok_or_else(|| {
             LanguageModelError::Invariant(PROVIDER, "No choices in response".to_string())
         })?;
 
         let openai_api::ChatCompletionChoice { message, .. } = choice;
 
-        if let Some(refusal) = &message.refusal {
-            return Err(LanguageModelError::Refusal(refusal.to_string()));
+        if let Some(refusal) = message.refusal {
+            return Err(LanguageModelError::Refusal(refusal));
         }
 
         let content = map_openai_message(message, &params)?;
@@ -153,7 +153,7 @@ impl LanguageModel for OpenAIModel {
                                 format!("Failed to parse stream chunk: {e}")
                             ))?;
 
-                        let choice = chunk.choices.first();
+                        let choice = chunk.choices.into_iter().next();
                         if let Some(choice) = choice {
                             if let Some(refusal_text) = &choice.delta.refusal {
                                 refusal.push_str(refusal_text);
@@ -161,22 +161,22 @@ impl LanguageModel for OpenAIModel {
 
 
                             let incoming_content_deltas = map_openai_delta(
-                                &choice.delta,
+                                choice.delta,
                                 &all_content_deltas,
                                 &params,
                             );
                             all_content_deltas.extend(incoming_content_deltas.clone());
                             for delta in incoming_content_deltas {
                                 yield PartialModelResponse {
-                                    delta: Some(delta.clone()),
+                                    delta: Some(delta),
                                     ..Default::default()
                                  }
                             }
                         }
 
-                        if let Some(usage) = &chunk.usage {
+                        if let Some(usage) = chunk.usage {
                             yield PartialModelResponse {
-                                usage: Some(usage.clone().into()),
+                                usage: Some(usage.into()),
                                 ..Default::default()
                             };
                         }
@@ -230,27 +230,24 @@ fn into_openai_create_params(
 
     Ok(openai_api::ChatCompletionCreateParams {
         model: model_id,
-        messages: into_openai_messages(&messages, system_prompt)?,
+        messages: into_openai_messages(messages, system_prompt)?,
         max_completion_tokens: max_tokens,
         temperature,
         top_p,
         presence_penalty,
         frequency_penalty,
         seed,
-        tools: tools
-            .as_ref()
-            .map(|tools| tools.iter().map(Into::into).collect()),
-        tool_choice: tool_choice.as_ref().map(Into::into),
-        response_format: response_format.as_ref().map(Into::into),
+        tools: tools.map(|tools| tools.into_iter().map(Into::into).collect()),
+        tool_choice: tool_choice.map(Into::into),
+        response_format: response_format.map(Into::into),
         modalities: input
             .modalities
-            .as_ref()
-            .map(|modalities| modalities.iter().map(Into::into).collect()),
+            .map(|modalities| modalities.into_iter().map(Into::into).collect()),
         audio: extra
             .as_ref()
-            .and_then(|extra| extra.get("audio"))
+            .and_then(|extra| extra.get("audio").cloned())
             .and_then(|value| {
-                serde_json::from_value::<openai_api::ChatCompletionAudioParam>(value.clone()).ok()
+                serde_json::from_value::<openai_api::ChatCompletionAudioParam>(value).ok()
             }),
         extra,
         ..Default::default()
@@ -260,7 +257,7 @@ fn into_openai_create_params(
 // MARK: To Provider Messages
 
 fn into_openai_messages(
-    messages: &[Message],
+    messages: Vec<Message>,
     system_prompt: Option<String>,
 ) -> LanguageModelResult<Vec<openai_api::ChatCompletionMessageParam>> {
     let mut openai_messages = vec![];
@@ -282,7 +279,7 @@ fn into_openai_messages(
             Message::User(UserMessage { content }) => {
                 let openai_message_param = openai_api::ChatCompletionUserMessageParam {
                     content: content
-                        .iter()
+                        .into_iter()
                         .map(TryInto::try_into)
                         .collect::<LanguageModelResult<_>>()?,
                     ..Default::default()
@@ -340,10 +337,10 @@ fn into_openai_messages(
 
                     openai_messages.push(openai_api::ChatCompletionMessageParam::Tool(
                         openai_api::ChatCompletionToolMessageParam {
-                            tool_call_id: tool_part.tool_call_id.to_string(),
+                            tool_call_id: tool_part.tool_call_id,
                             content: tool_part
                                 .content
-                                .iter()
+                                .into_iter()
                                 .map(|p| match p {
                                     Part::Text(part) => {
                                         Ok(openai_api::ToolContentPart::Text(part.into()))
@@ -366,10 +363,10 @@ fn into_openai_messages(
     Ok(openai_messages)
 }
 
-impl TryFrom<&Part> for openai_api::ChatCompletionContentPart {
+impl TryFrom<Part> for openai_api::ChatCompletionContentPart {
     type Error = LanguageModelError;
 
-    fn try_from(part: &Part) -> Result<Self, Self::Error> {
+    fn try_from(part: Part) -> Result<Self, Self::Error> {
         match part {
             Part::Text(part) => Ok(Self::Text(part.into())),
             Part::Image(part) => Ok(Self::Image(part.into())),
@@ -382,16 +379,14 @@ impl TryFrom<&Part> for openai_api::ChatCompletionContentPart {
     }
 }
 
-impl From<&TextPart> for openai_api::ChatCompletionContentPartText {
-    fn from(part: &TextPart) -> Self {
-        Self {
-            text: part.text.to_string(),
-        }
+impl From<TextPart> for openai_api::ChatCompletionContentPartText {
+    fn from(part: TextPart) -> Self {
+        Self { text: part.text }
     }
 }
 
-impl From<&ImagePart> for openai_api::ChatCompletionContentPartImage {
-    fn from(part: &ImagePart) -> Self {
+impl From<ImagePart> for openai_api::ChatCompletionContentPartImage {
+    fn from(part: ImagePart) -> Self {
         Self {
             image_url: openai_api::ChatCompletionContentPartImageImageURL {
                 url: format!("data:{};base64,{}", part.mime_type, part.image_data),
@@ -401,13 +396,13 @@ impl From<&ImagePart> for openai_api::ChatCompletionContentPartImage {
     }
 }
 
-impl TryFrom<&AudioPart> for openai_api::ChatCompletionContentPartInputAudio {
+impl TryFrom<AudioPart> for openai_api::ChatCompletionContentPartInputAudio {
     type Error = LanguageModelError;
 
-    fn try_from(part: &AudioPart) -> Result<Self, Self::Error> {
+    fn try_from(part: AudioPart) -> Result<Self, Self::Error> {
         Ok(Self {
             input_audio: openai_api::ChatCompletionContentPartInputAudioInputAudio {
-                data: part.audio_data.clone(),
+                data: part.audio_data,
                 format: match part.format {
                     AudioFormat::Wav => Ok(openai_api::AudioInputFormat::Wav),
                     AudioFormat::Mp3 => Ok(openai_api::AudioInputFormat::Mp3),
@@ -424,29 +419,29 @@ impl TryFrom<&AudioPart> for openai_api::ChatCompletionContentPartInputAudio {
     }
 }
 
-impl TryFrom<&AudioPart> for openai_api::ChatCompletionAssistantMessageParamAudio {
+impl TryFrom<AudioPart> for openai_api::ChatCompletionAssistantMessageParamAudio {
     type Error = LanguageModelError;
 
-    fn try_from(part: &AudioPart) -> Result<Self, Self::Error> {
-        let id = part.id.as_ref().ok_or_else(|| {
+    fn try_from(part: AudioPart) -> Result<Self, Self::Error> {
+        let id = part.id.ok_or_else(|| {
             LanguageModelError::Unsupported(
                 PROVIDER,
                 "Cannot convert audio part to OpenAI assistant message without an ID".to_string(),
             )
         })?;
 
-        Ok(Self { id: id.to_string() })
+        Ok(Self { id })
     }
 }
 
-impl TryFrom<&ToolCallPart> for openai_api::ChatCompletionMessageFunctionToolCall {
+impl TryFrom<ToolCallPart> for openai_api::ChatCompletionMessageFunctionToolCall {
     type Error = LanguageModelError;
 
-    fn try_from(part: &ToolCallPart) -> Result<Self, Self::Error> {
+    fn try_from(part: ToolCallPart) -> Result<Self, Self::Error> {
         Ok(Self {
-            id: part.tool_call_id.to_string(),
+            id: part.tool_call_id,
             function: openai_api::ChatCompletionMessageFunctionToolCallFunction {
-                name: part.tool_name.to_string(),
+                name: part.tool_name,
                 arguments: part.args.to_string(),
             },
         })
@@ -455,21 +450,21 @@ impl TryFrom<&ToolCallPart> for openai_api::ChatCompletionMessageFunctionToolCal
 
 // MARK: To Provider Tools
 
-impl From<&Tool> for openai_api::ChatCompletionTool {
-    fn from(value: &Tool) -> Self {
+impl From<Tool> for openai_api::ChatCompletionTool {
+    fn from(value: Tool) -> Self {
         Self::Function(openai_api::ChatCompletionFunctionTool {
             function: openai_api::FunctionDefinition {
-                name: value.name.clone(),
-                description: Some(value.description.clone()),
-                parameters: Some(value.parameters.clone()),
+                name: value.name,
+                description: Some(value.description),
+                parameters: Some(value.parameters),
                 strict: Some(true),
             },
         })
     }
 }
 
-impl From<&ToolChoiceOption> for openai_api::ChatCompletionToolChoiceOption {
-    fn from(tool_choice: &ToolChoiceOption) -> Self {
+impl From<ToolChoiceOption> for openai_api::ChatCompletionToolChoiceOption {
+    fn from(tool_choice: ToolChoiceOption) -> Self {
         match tool_choice {
             ToolChoiceOption::None => Self::None,
             ToolChoiceOption::Auto => Self::Auto,
@@ -477,7 +472,7 @@ impl From<&ToolChoiceOption> for openai_api::ChatCompletionToolChoiceOption {
             ToolChoiceOption::Tool(tool) => {
                 Self::Named(openai_api::ChatCompletionNamedToolChoice {
                     function: openai_api::ChatCompletionNamedToolChoiceFunction {
-                        name: tool.tool_name.clone(),
+                        name: tool.tool_name,
                     },
                     type_: "function".to_string(),
                 })
@@ -488,8 +483,8 @@ impl From<&ToolChoiceOption> for openai_api::ChatCompletionToolChoiceOption {
 
 // MARK: To Provider Response Format
 
-impl From<&ResponseFormatOption> for openai_api::ResponseFormat {
-    fn from(response_format: &ResponseFormatOption) -> Self {
+impl From<ResponseFormatOption> for openai_api::ResponseFormat {
+    fn from(response_format: ResponseFormatOption) -> Self {
         match response_format {
             ResponseFormatOption::Text => Self::Text,
             ResponseFormatOption::Json(ResponseFormatJson {
@@ -500,9 +495,9 @@ impl From<&ResponseFormatOption> for openai_api::ResponseFormat {
                 if let Some(schema) = schema {
                     Self::JsonSchema(openai_api::ResponseFormatJSONSchema {
                         json_schema: openai_api::ResponseFormatJSONSchemaJSONSchema {
-                            name: name.clone(),
-                            description: description.clone(),
-                            schema: Some(schema.clone()),
+                            name,
+                            description,
+                            schema: Some(schema),
                             strict: Some(true),
                         },
                     })
@@ -516,8 +511,8 @@ impl From<&ResponseFormatOption> for openai_api::ResponseFormat {
 
 // MARK: To Provider Modality
 
-impl From<&Modality> for openai_api::Modality {
-    fn from(modality: &Modality) -> Self {
+impl From<Modality> for openai_api::Modality {
+    fn from(modality: Modality) -> Self {
         match modality {
             Modality::Text => Self::Text,
             Modality::Audio => Self::Audio,
@@ -528,19 +523,19 @@ impl From<&Modality> for openai_api::Modality {
 // MARK: To SDK Message
 
 fn map_openai_message(
-    message: &openai_api::CompletionsCompletionsAPIChatCompletionMessage,
+    message: openai_api::CompletionsCompletionsAPIChatCompletionMessage,
     create_params: &openai_api::ChatCompletionCreateParams,
 ) -> LanguageModelResult<Vec<Part>> {
     let mut parts = vec![];
 
-    if let Some(content) = &message.content {
+    if let Some(content) = message.content {
         parts.push(Part::Text(TextPart {
-            text: content.to_string(),
+            text: content,
             id: None,
         }));
     }
 
-    if let Some(tool_calls) = &message.tool_calls {
+    if let Some(tool_calls) = message.tool_calls {
         for tool_call in tool_calls {
             match tool_call {
                 openai_api::ChatCompletionMessageToolCall::Function(function_tool_call) => {
@@ -550,9 +545,9 @@ fn map_openai_message(
         }
     }
 
-    if let Some(audio) = &message.audio {
+    if let Some(audio) = message.audio {
         let mut audio_part = AudioPart {
-            id: Some(audio.id.to_string()),
+            id: Some(audio.id),
             format: AudioFormat::from(
                 &create_params
                     .audio
@@ -566,8 +561,8 @@ fn map_openai_message(
                     })?
                     .format,
             ),
-            audio_data: audio.data.to_string(),
-            transcript: Some(audio.transcript.clone()),
+            audio_data: audio.data,
+            transcript: Some(audio.transcript),
             ..Default::default()
         };
         if matches!(audio_part.format, AudioFormat::Linear16) {
@@ -593,11 +588,11 @@ impl From<&openai_api::AudioOutputFormat> for AudioFormat {
     }
 }
 
-impl TryFrom<&openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPart {
+impl TryFrom<openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPart {
     type Error = LanguageModelError;
 
     fn try_from(
-        value: &openai_api::ChatCompletionMessageFunctionToolCall,
+        value: openai_api::ChatCompletionMessageFunctionToolCall,
     ) -> Result<Self, Self::Error> {
         let args_value: serde_json::Value = serde_json::from_str(&value.function.arguments)
             .map_err(|e| {
@@ -607,8 +602,8 @@ impl TryFrom<&openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPar
             })?;
 
         Ok(Self {
-            tool_call_id: value.id.to_string(),
-            tool_name: value.function.name.to_string(),
+            tool_call_id: value.id,
+            tool_name: value.function.name,
             args: args_value,
             id: None,
         })
@@ -618,33 +613,35 @@ impl TryFrom<&openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPar
 // MARK: To SDK Delta
 
 fn map_openai_delta(
-    delta: &openai_api::ChatCompletionChunkChoiceDelta,
+    delta: openai_api::ChatCompletionChunkChoiceDelta,
     existing_content_deltas: &[ContentDelta],
     create_params: &openai_api::ChatCompletionCreateParams,
 ) -> Vec<ContentDelta> {
     let mut content_deltas = vec![];
 
-    if let Some(content) = &delta.content {
-        let text_part = TextPartDelta {
-            text: content.clone(),
-            id: None,
-        };
-        let part = PartDelta::Text(text_part);
-        let index = stream_utils::guess_delta_index(
-            &part,
-            &[existing_content_deltas, content_deltas.as_slice()].concat(),
-            None,
-        );
-        content_deltas.push(ContentDelta { index, part });
+    if let Some(content) = delta.content {
+        if !content.is_empty() {
+            let text_part = TextPartDelta {
+                text: content,
+                id: None,
+            };
+            let part = PartDelta::Text(text_part);
+            let index = stream_utils::guess_delta_index(
+                &part,
+                &[existing_content_deltas, content_deltas.as_slice()].concat(),
+                None,
+            );
+            content_deltas.push(ContentDelta { index, part });
+        }
     }
 
-    if let Some(audio) = &delta.audio {
+    if let Some(audio) = delta.audio {
         let mut audio_part = AudioPartDelta::default();
-        if let Some(id) = &audio.id {
-            audio_part.id = Some(id.to_string());
+        if let Some(id) = audio.id {
+            audio_part.id = Some(id);
         }
-        if let Some(data) = &audio.data {
-            audio_part.audio_data = Some(data.to_string());
+        if let Some(data) = audio.data {
+            audio_part.audio_data = Some(data);
             audio_part.format = create_params
                 .audio
                 .as_ref()
@@ -653,8 +650,8 @@ fn map_openai_delta(
             audio_part.sample_rate = Some(OPENAI_AUDIO_SAMPLE_RATE);
             audio_part.channels = Some(OPENAI_AUDIO_CHANNELS);
         }
-        if let Some(transcript) = &audio.transcript {
-            audio_part.transcript = Some(transcript.to_string());
+        if let Some(transcript) = audio.transcript {
+            audio_part.transcript = Some(transcript);
         }
         let part = PartDelta::Audio(audio_part);
         let index = stream_utils::guess_delta_index(
@@ -665,18 +662,18 @@ fn map_openai_delta(
         content_deltas.push(ContentDelta { index, part });
     }
 
-    if let Some(tool_calls) = &delta.tool_calls {
+    if let Some(tool_calls) = delta.tool_calls {
         for tool_call in tool_calls {
             let mut tool_call_part = ToolCallPartDelta::default();
-            if let Some(id) = &tool_call.id {
-                tool_call_part.tool_call_id = Some(id.to_string());
+            if let Some(id) = tool_call.id {
+                tool_call_part.tool_call_id = Some(id);
             }
-            if let Some(function) = &tool_call.function {
-                if let Some(name) = &function.name {
-                    tool_call_part.tool_name = Some(name.to_string());
+            if let Some(function) = tool_call.function {
+                if let Some(name) = function.name {
+                    tool_call_part.tool_name = Some(name);
                 }
-                if let Some(args) = &function.arguments {
-                    tool_call_part.args = Some(args.to_string());
+                if let Some(args) = function.arguments {
+                    tool_call_part.args = Some(args);
                 }
             }
 
@@ -765,13 +762,12 @@ mod tests {
 
         let audio_part = response
             .content
-            .iter()
+            .into_iter()
             .find_map(|part| match part {
                 Part::Audio(audio) => Some(audio),
                 _ => None,
             })
-            .ok_or_else(|| "Audio part must be present".to_string())?
-            .clone();
+            .ok_or_else(|| "Audio part must be present".to_string())?;
 
         assert!(
             !audio_part.audio_data.is_empty(),
@@ -814,21 +810,19 @@ mod tests {
 
         while let Some(partial_response) = stream.next().await {
             let partial_response = partial_response.unwrap();
-            accumulator.add_partial(&partial_response).unwrap();
-            println!("{partial_response:#?}");
+            accumulator.add_partial(partial_response).unwrap();
         }
 
         let response = accumulator.compute_response()?;
 
         let audio_part = response
             .content
-            .iter()
+            .into_iter()
             .find_map(|part| match part {
                 Part::Audio(audio) => Some(audio),
                 _ => None,
             })
-            .ok_or_else(|| "Audio part must be present".to_string())?
-            .clone();
+            .ok_or_else(|| "Audio part must be present".to_string())?;
 
         assert!(
             !audio_part.audio_data.is_empty(),

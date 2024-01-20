@@ -1,8 +1,7 @@
-use std::error::Error;
-
 use crate::{LanguageModel, LanguageModelInput, Part, StreamAccumulator};
 use futures::stream::StreamExt;
 use regex::Regex;
+use std::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct TextPartAssertion {
@@ -149,7 +148,7 @@ pub async fn run_test_case(
 
             while let Some(partial_response) = stream.next().await {
                 let partial_response = partial_response?;
-                accumulator.add_partial(&partial_response)?;
+                accumulator.add_partial(partial_response)?;
             }
 
             let result = accumulator.compute_response()?;
