@@ -9,6 +9,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./openai": {
+      "import": "./dist/openai/index.js",
+      "types": "./dist/openai/index.d.ts"
     }
   },
   "scripts": {
@@ -28,5 +32,7 @@
   },
   "homepage": "https://github.com/hoangvvo/llm-sdk",
   "license": "MIT",
-  "dependencies": {}
+  "dependencies": {
+    "openai": "^4.51.0"
+  }
 }
