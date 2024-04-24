@@ -1,0 +1,32 @@
+{
+  "type": "module",
+  "name": "llm-sdk",
+  "version": "0.0.0",
+  "description": "A unified LLM SDK",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoangvvo/llm-sdk.git",
+    "directory": "javascript"
+  },
+  "author": "Hoang Vo (https://www.hoangvvo.com)",
+  "bugs": {
+    "url": "https://github.com/hoangvvo/llm-sdk/issues"
+  },
+  "homepage": "https://github.com/hoangvvo/llm-sdk",
+  "license": "MIT",
+  "dependencies": {}
+}
