@@ -13,6 +13,10 @@
     "./openai": {
       "import": "./dist/openai/index.js",
       "types": "./dist/openai/index.d.ts"
+    },
+    "./anthropic": {
+      "import": "./dist/anthropic/index.js",
+      "types": "./dist/anthropic/index.d.ts"
     }
   },
   "scripts": {
@@ -33,6 +37,7 @@
   "homepage": "https://github.com/hoangvvo/llm-sdk",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.21.0",
     "openai": "^4.51.0"
   }
 }
