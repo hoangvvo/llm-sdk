@@ -17,6 +17,10 @@
     "./anthropic": {
       "import": "./dist/anthropic/index.js",
       "types": "./dist/anthropic/index.d.ts"
+    },
+    "./google": {
+      "import": "./dist/google/index.js",
+      "types": "./dist/google/index.d.ts"
     }
   },
   "scripts": {
@@ -38,6 +42,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.21.0",
+    "@google/generative-ai": "^0.10.0",
     "openai": "^4.51.0"
   }
 }
