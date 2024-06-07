@@ -27,7 +27,7 @@ export class AnthropicModel implements LanguageModel {
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const response = await this.anthropic.beta.tools.messages.create({
+    const response = await this.anthropic.messages.create({
       ...convertToAnthropicParams(this.modelId, input),
       stream: false,
     });
@@ -44,7 +44,7 @@ export class AnthropicModel implements LanguageModel {
   async *stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const stream = await this.anthropic.beta.tools.messages.create({
+    const stream = await this.anthropic.messages.stream({
       ...convertToAnthropicParams(this.modelId, input),
       stream: true,
     });
@@ -53,7 +53,7 @@ export class AnthropicModel implements LanguageModel {
       inputTokens: 0,
       outputTokens: 0,
     };
-    const streamingContentBlocks: (Anthropic.Beta.Tools.ToolsBetaContentBlock & {
+    const streamingContentBlocks: (Anthropic.Messages.ContentBlock & {
       partial_json?: string;
     })[] = [];
 
@@ -131,7 +131,7 @@ export class AnthropicModel implements LanguageModel {
     }
 
     const content = streamingContentBlocks.map(
-      (block): Anthropic.Beta.Tools.ToolsBetaContentBlock => {
+      (block): Anthropic.Messages.ContentBlock => {
         if (block.type === "tool_use") {
           return {
             ...block,
@@ -152,8 +152,8 @@ export class AnthropicModel implements LanguageModel {
 function convertToAnthropicParams(
   modelId: string,
   input: LanguageModelInput,
-): Anthropic.Beta.Tools.MessageCreateParams {
-  let tool_choice: Anthropic.Beta.Tools.MessageCreateParams["tool_choice"];
+): Anthropic.Messages.MessageCreateParams {
+  let tool_choice: Anthropic.Messages.MessageCreateParams["tool_choice"];
   if (input.toolChoice) {
     if (input.toolChoice.type === "auto") {
       tool_choice = { type: "auto" };
@@ -189,13 +189,17 @@ function convertToAnthropicParams(
 
 function convertToAnthropicMessages(
   messages: Message[],
-): Anthropic.Beta.Tools.ToolsBetaMessageParam[] {
-  return messages.map((message): Anthropic.Beta.Tools.ToolsBetaMessageParam => {
+): Anthropic.Messages.MessageParam[] {
+  return messages.map((message): Anthropic.Messages.MessageParam => {
     if (message.role === "assistant") {
       return {
         role: "assistant",
         content: message.content.map(
-          (part): Anthropic.Beta.Tools.ToolsBetaContentBlock => {
+          (
+            part,
+          ):
+            | Anthropic.Messages.TextBlockParam
+            | Anthropic.Messages.ToolUseBlockParam => {
             if (part.type === "tool-call") {
               return {
                 type: "tool_use",
@@ -217,7 +221,7 @@ function convertToAnthropicMessages(
       return {
         role: "user",
         content: message.content.map(
-          (part): Anthropic.Beta.Tools.ToolResultBlockParam => ({
+          (part): Anthropic.Messages.ToolResultBlockParam => ({
             type: "tool_result",
             tool_use_id: part.toolCallId,
             content: [
@@ -236,8 +240,8 @@ function convertToAnthropicMessages(
           (
             part,
           ):
-            | Anthropic.Beta.Tools.ToolsBetaContentBlock
-            | Anthropic.ImageBlockParam => {
+            | Anthropic.Messages.TextBlockParam
+            | Anthropic.Messages.ImageBlockParam => {
             if (part.type === "image") {
               if (part.imageData) {
                 return {
@@ -246,7 +250,7 @@ function convertToAnthropicMessages(
                     data: part.imageData,
                     type: "base64",
                     media_type:
-                      part.mimeType as Anthropic.ImageBlockParam["source"]["media_type"],
+                      part.mimeType as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
                   },
                 };
               }
@@ -264,22 +268,21 @@ function convertToAnthropicMessages(
   });
 }
 
-function convertToAnthropicTools(tools: Tool[]): Anthropic.Beta.Tools.Tool[] {
+function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
-    input_schema:
-      (tool.parameters as Anthropic.Beta.Tools.Tool.InputSchema) || {
-        type: "object",
-        // anthropic tool call parameters are required
-        // so if no parameters, we define it as null
-        properties: null,
-      },
+    input_schema: (tool.parameters as Anthropic.Tool.InputSchema) || {
+      type: "object",
+      // anthropic tool call parameters are required
+      // so if no parameters, we define it as null
+      properties: null,
+    },
   }));
 }
 
 function mapAnthropicMessage(
-  content: Array<Anthropic.Beta.Tools.ToolsBetaContentBlock>,
+  content: Array<Anthropic.Messages.ContentBlock>,
 ): AssistantMessage {
   return {
     role: "assistant",
