@@ -21,9 +21,9 @@
     ],
     "target": "ES2022",
     "moduleResolution": "NodeNext",
-    "module": "NodeNext",
-    "rootDir": "src",
-    "outDir": "dist",
-    "declaration": true
-  }
+    "module": "NodeNext"
+  },
+  "exclude": [
+    "dist"
+  ]
 }

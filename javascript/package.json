@@ -24,7 +24,7 @@
     }
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc -p tsconfig.build.json"
   },
   "files": [
     "dist"
