@@ -80,7 +80,7 @@ export class AnthropicModel implements LanguageModel {
           if (chunk.delta.type === "text_delta") {
             if (!block || block.type !== "text") {
               throw new Error(
-                `anthropic: invariant: expected text block at streamingContentBlocks[${chunk.index}]`,
+                `invariant: expected text block at streamingContentBlocks[${chunk.index}]`,
               );
             }
             block.text += chunk.delta.text;
@@ -96,7 +96,7 @@ export class AnthropicModel implements LanguageModel {
           } else if (chunk.delta.type === "input_json_delta") {
             if (!block || block.type !== "tool_use") {
               throw new Error(
-                `anthropic: invariant: expected tool_use block at streamingContentBlocks[${chunk.index}]`,
+                `invariant: expected tool_use block at streamingContentBlocks[${chunk.index}]`,
               );
             }
             block.partial_json = block.partial_json ?? "";
@@ -109,7 +109,7 @@ export class AnthropicModel implements LanguageModel {
           const block = streamingContentBlocks[chunk.index];
           if (!block) {
             throw new Error(
-              `anthropic: invariant: expected block at streamingContentBlocks[${chunk.index}]`,
+              `invariant: expected block at streamingContentBlocks[${chunk.index}]`,
             );
           }
           if (block.type === "tool_use") {
@@ -243,18 +243,15 @@ function convertToAnthropicMessages(
             | Anthropic.Messages.TextBlockParam
             | Anthropic.Messages.ImageBlockParam => {
             if (part.type === "image") {
-              if (part.imageData) {
-                return {
-                  type: "image",
-                  source: {
-                    data: part.imageData,
-                    type: "base64",
-                    media_type:
-                      part.mimeType as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
-                  },
-                };
-              }
-              throw new Error("anthropic: image part must have imageData");
+              return {
+                type: "image",
+                source: {
+                  data: part.imageData,
+                  type: "base64",
+                  media_type:
+                    part.mimeType as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
+                },
+              };
             } else {
               return {
                 type: "text",

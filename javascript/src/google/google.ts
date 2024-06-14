@@ -46,7 +46,7 @@ export class GoogleModel implements LanguageModel {
 
     const candidate = result.response.candidates?.[0];
     if (!candidate) {
-      throw new Error("google: no candidates in response");
+      throw new Error("no candidates in response");
     }
 
     return {
@@ -95,9 +95,7 @@ export class GoogleModel implements LanguageModel {
               };
             }
             if (part.type !== "text") {
-              throw new Error(
-                `google: unexpected part ${part.type} at index ${i}`,
-              );
+              throw new Error(`unexpected part ${part.type} at index ${i}`);
             }
             part.text += streamingPart.text;
           } else if (streamingPart.type === "tool-call") {
@@ -232,16 +230,12 @@ function convertToGoogleMessages(messages: Message[]): Content[] {
           },
         };
       } else if (part.type === "image") {
-        if (part.imageData) {
-          return {
-            inlineData: {
-              data: part.imageData,
-              mimeType: part.mimeType,
-            },
-          };
-        } else {
-          throw new Error("google: image part must have imageData");
-        }
+        return {
+          inlineData: {
+            data: part.imageData,
+            mimeType: part.mimeType,
+          },
+        };
       } else {
         return {
           text: part.text,
@@ -347,7 +341,7 @@ function mapGoogleMessage(content: Content): AssistantMessage {
           text: part.text,
         };
       }
-      throw new Error("google: unknown part type");
+      throw new Error("unknown part type");
     }),
   };
 }

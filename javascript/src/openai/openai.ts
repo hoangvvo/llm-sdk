@@ -36,7 +36,7 @@ export class OpenAIModel implements LanguageModel {
     });
 
     if (!response.choices[0]) {
-      throw new Error("openai: no choices in response");
+      throw new Error("no choices in response");
     }
 
     return {
@@ -94,7 +94,7 @@ export class OpenAIModel implements LanguageModel {
 
           if (!streamingToolCall) {
             throw new Error(
-              `openai: invariant: streamingMessage.tool_call[${deltaToolCall.index}] is undefined`,
+              `invariant: streamingMessage.tool_call[${deltaToolCall.index}] is undefined`,
             );
           }
 
@@ -253,25 +253,12 @@ function convertToOpenAIMessages(
               content: contentParts.map(
                 (part): OpenAI.Chat.ChatCompletionContentPart => {
                   if (part.type === "image") {
-                    if (part.imageData) {
-                      return {
-                        type: "image_url",
-                        image_url: {
-                          url: `data:${part.mimeType};base64,${part.imageData}`,
-                        },
-                      };
-                    } else if (part.imageUrl) {
-                      return {
-                        type: "image_url",
-                        image_url: {
-                          url: part.imageUrl,
-                        },
-                      };
-                    } else {
-                      throw new Error(
-                        "openai: image part must have either imageUrl or imageData",
-                      );
-                    }
+                    return {
+                      type: "image_url",
+                      image_url: {
+                        url: `data:${part.mimeType};base64,${part.imageData}`,
+                      },
+                    };
                   }
                   return {
                     type: "text",

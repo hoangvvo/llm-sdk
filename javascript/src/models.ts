@@ -10,8 +10,7 @@ export interface TextPart {
 export interface ImagePart {
   type: "image";
   mimeType: string;
-  imageUrl?: string;
-  imageData?: string;
+  imageData: string;
 }
 
 export interface ToolCallPart {
