@@ -1,7 +1,10 @@
 import OpenAI from "openai";
 import type {
-  AssistantMessage,
   LanguageModel,
+  LanguageModelCapability,
+} from "../models/language-model.js";
+import type {
+  AssistantMessage,
   LanguageModelInput,
   Message,
   ModelResponse,
@@ -10,12 +13,17 @@ import type {
   TextPart,
   Tool,
   ToolCallPart,
-} from "../models.js";
+} from "../schemas/index.js";
 import type { OpenAIModelOptions } from "./types.js";
 
 export class OpenAIModel implements LanguageModel {
   provider: string;
   modelId: string;
+  capabilities: LanguageModelCapability[] = [
+    "streaming",
+    "tool",
+    "response-format-json",
+  ];
 
   private openai: OpenAI;
 
@@ -40,7 +48,7 @@ export class OpenAIModel implements LanguageModel {
     }
 
     return {
-      message: mapOpenAIMessage(response.choices[0].message),
+      content: mapOpenAIMessage(response.choices[0].message).content,
       ...(response.usage && {
         usage: {
           inputTokens: response.usage.prompt_tokens,
@@ -151,7 +159,7 @@ export class OpenAIModel implements LanguageModel {
     }
 
     return {
-      message: mapOpenAIMessage(streamingMessage),
+      content: mapOpenAIMessage(streamingMessage).content,
       ...(usage && { usage }),
     };
   }
@@ -178,6 +186,15 @@ function convertToOpenAIParams(
     }
   }
 
+  let response_format:
+    | OpenAI.Chat.Completions.ChatCompletionCreateParams.ResponseFormat
+    | undefined;
+  if (input.responseFormat?.type === "json") {
+    response_format = {
+      type: "json_object",
+    };
+  }
+
   return {
     model: modelId,
     messages: convertToOpenAIMessages(input.messages, input.systemPrompt),
@@ -197,6 +214,9 @@ function convertToOpenAIParams(
       frequency_penalty: input.frequencyPenalty,
     }),
     ...(typeof input.seed === "number" && { seed: input.seed }),
+    ...(response_format && {
+      response_format,
+    }),
   };
 }
 

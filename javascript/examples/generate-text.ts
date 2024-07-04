@@ -1,4 +1,4 @@
-import { model } from "./model.js";
+import { openaiModel as model } from "./model.js";
 
 const response = await model.generate({
   messages: [

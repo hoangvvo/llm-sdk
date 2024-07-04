@@ -1,19 +1,23 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type {
-  AssistantMessage,
   LanguageModel,
+  LanguageModelCapability,
+} from "../models/language-model.js";
+import type {
+  AssistantMessage,
   LanguageModelInput,
   Message,
   ModelResponse,
   ModelUsage,
   PartialModelResponse,
   Tool,
-} from "../models.js";
+} from "../schemas/index.js";
 import type { AnthropicModelOptions } from "./types.js";
 
 export class AnthropicModel implements LanguageModel {
   provider: string;
   modelId: string;
+  capabilities: LanguageModelCapability[] = ["streaming", "tool"];
   private anthropic: Anthropic;
 
   constructor(options: AnthropicModelOptions) {
@@ -33,7 +37,7 @@ export class AnthropicModel implements LanguageModel {
     });
 
     return {
-      message: mapAnthropicMessage(response.content),
+      content: mapAnthropicMessage(response.content).content,
       usage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
@@ -73,7 +77,9 @@ export class AnthropicModel implements LanguageModel {
             streamingContentBlocks.length,
             chunk.index + 1,
           );
-          streamingContentBlocks[chunk.index] = chunk.content_block;
+          streamingContentBlocks[chunk.index] = {
+            ...chunk.content_block,
+          };
           break;
         case "content_block_delta": {
           const block = streamingContentBlocks[chunk.index];
@@ -143,7 +149,7 @@ export class AnthropicModel implements LanguageModel {
     );
 
     return {
-      message: mapAnthropicMessage(content),
+      content: mapAnthropicMessage(content).content,
       usage,
     };
   }
@@ -294,7 +300,7 @@ function mapAnthropicMessage(
         type: "tool-call",
         toolCallId: block.id,
         toolName: block.name,
-        args: block.input,
+        args: block.input as Record<string, unknown>,
       };
     }),
   };

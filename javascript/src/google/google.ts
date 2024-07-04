@@ -1,10 +1,13 @@
 import type {
   Content,
+  FunctionDeclaration,
   FunctionDeclarationSchema,
   FunctionDeclarationsTool,
   GenerateContentRequest,
+  GenerationConfig,
   GenerativeModel,
   Part,
+  Schema,
   ToolConfig,
 } from "@google/generative-ai";
 import {
@@ -14,19 +17,27 @@ import {
 } from "@google/generative-ai";
 import { nanoid } from "nanoid";
 import type {
-  AssistantMessage,
   LanguageModel,
+  LanguageModelCapability,
+} from "../models/language-model.js";
+import type {
+  AssistantMessage,
   LanguageModelInput,
   Message,
   ModelResponse,
   PartialModelResponse,
   Tool,
-} from "../models.js";
+} from "../schemas/index.js";
 import type { GoogleModelOptions } from "./types.js";
 
 export class GoogleModel implements LanguageModel {
   provider: string;
   modelId: string;
+  capabilities: LanguageModelCapability[] = [
+    "streaming",
+    "tool",
+    "response-format-json",
+  ];
 
   private genModel: GenerativeModel;
 
@@ -41,7 +52,7 @@ export class GoogleModel implements LanguageModel {
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
     const result = await this.genModel.generateContent(
-      convertToGoogleParams(this.modelId, input),
+      convertToGoogleParams(input),
     );
 
     const candidate = result.response.candidates?.[0];
@@ -50,7 +61,7 @@ export class GoogleModel implements LanguageModel {
     }
 
     return {
-      message: mapGoogleMessage(candidate.content),
+      content: mapGoogleMessage(candidate.content).content,
       ...(result.response.usageMetadata && {
         usage: {
           inputTokens: result.response.usageMetadata.promptTokenCount,
@@ -64,7 +75,7 @@ export class GoogleModel implements LanguageModel {
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
     const { stream } = await this.genModel.generateContentStream(
-      convertToGoogleParams(this.modelId, input),
+      convertToGoogleParams(input),
     );
 
     const message: AssistantMessage = {
@@ -113,21 +124,14 @@ export class GoogleModel implements LanguageModel {
     }
 
     return {
-      message,
+      content: message.content,
     };
   }
 }
 
 function convertToGoogleParams(
-  modelId: string,
   input: LanguageModelInput,
 ): GenerateContentRequest {
-  // Gemini 1.0 does not support systemInstructions,
-  // so we inject it as a user message
-  // TODO: this assumes English in prompt, which could affect the model
-  const needInjectSystemPromptAsMessage =
-    modelId.includes("gemini-1.0") && !!input.systemPrompt;
-
   let toolConfig: ToolConfig | undefined;
   if (input.toolChoice) {
     if (input.toolChoice.type === "auto") {
@@ -158,30 +162,33 @@ function convertToGoogleParams(
     }
   }
 
+  const generationConfig: GenerationConfig = {};
+  if (typeof input.maxTokens === "number") {
+    generationConfig.maxOutputTokens = input.maxTokens;
+  }
+  if (typeof input.temperature === "number") {
+    generationConfig.temperature = input.temperature;
+  }
+  if (typeof input.topP === "number") {
+    generationConfig.topP = input.topP;
+  }
+  if (typeof input.topK === "number") {
+    generationConfig.topK = input.topK;
+  }
+  if (input.responseFormat?.type === "json") {
+    generationConfig.responseMimeType = "application/json";
+    if (input.responseFormat.schema) {
+      generationConfig.responseSchema = convertToFunctionDeclarationSchema(
+        input.responseFormat.schema,
+      ) as Schema;
+    }
+  }
+
   return {
-    ...(!needInjectSystemPromptAsMessage &&
-      !!input.systemPrompt && {
-        systemInstruction: input.systemPrompt,
-      }),
-    contents: [
-      ...(needInjectSystemPromptAsMessage
-        ? ([
-            {
-              role: "user",
-              parts: [{ text: input.systemPrompt }],
-            },
-            {
-              role: "model",
-              parts: [
-                {
-                  text: "Ok, I got it! Please continue in your native language.",
-                },
-              ],
-            },
-          ] as Content[])
-        : []),
-      ...convertToGoogleMessages(input.messages),
-    ],
+    ...(!!input.systemPrompt && {
+      systemInstruction: input.systemPrompt,
+    }),
+    contents: convertToGoogleMessages(input.messages),
     ...(input.tools && {
       tools: convertToGoogleTools(input.tools),
     }),
@@ -265,13 +272,13 @@ function convertToGoogleMessages(messages: Message[]): Content[] {
 function convertToGoogleTools(tools: Tool[]): FunctionDeclarationsTool[] {
   return [
     {
-      functionDeclarations: tools.map((tool) => {
+      functionDeclarations: tools.map((tool): FunctionDeclaration => {
         return {
           name: tool.name,
           description: tool.description,
-          schema: tool.parameters
-            ? convertToFunctionDeclarationSchema(tool.parameters)
-            : undefined,
+          ...(!!tool.parameters && {
+            parameters: convertToFunctionDeclarationSchema(tool.parameters),
+          }),
         };
       }),
     },
@@ -332,7 +339,7 @@ function mapGoogleMessage(content: Content): AssistantMessage {
           // IMPORTANT: Gemini does not generate an ID we expect for tool calls
           toolCallId: genidForToolCall(),
           toolName: part.functionCall.name,
-          args: part.functionCall.args || {},
+          args: (part.functionCall.args as Record<string, unknown>) || {},
         };
       }
       if (part.text) {
