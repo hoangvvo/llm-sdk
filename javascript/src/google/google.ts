@@ -15,7 +15,6 @@ import {
   FunctionDeclarationSchemaType,
   GoogleGenerativeAI,
 } from "@google/generative-ai";
-import { nanoid } from "nanoid";
 import type {
   LanguageModel,
   LanguageModelCapability,
@@ -354,5 +353,5 @@ function mapGoogleMessage(content: Content): AssistantMessage {
 }
 
 function genidForToolCall() {
-  return nanoid();
+  return Math.random().toString(36).substring(2, 15);
 }

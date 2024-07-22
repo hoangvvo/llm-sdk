@@ -32,19 +32,35 @@ const response = await model.generate({
         {
           type: "tool-result",
           toolCallId: "1",
-          result: null,
+          result: {
+            status: "success",
+          },
           toolName: "trade",
         },
       ],
     },
+  ],
+  tools: [
     {
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: "What did you say?",
+      name: "trade",
+      description: "Trade stocks",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            description: "The action to perform",
+          },
+          quantity: {
+            type: "number",
+            description: "The number of stocks to trade",
+          },
+          symbol: {
+            type: "string",
+            description: "The stock symbol",
+          },
         },
-      ],
+      },
     },
   ],
 });

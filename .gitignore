@@ -133,3 +133,5 @@ dist
 
 # only allow package-lock.json at root
 packages/**/package-lock.json
+
+.tshy*

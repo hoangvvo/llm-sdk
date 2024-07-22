@@ -1,31 +1,11 @@
 {
   "type": "module",
-  "name": "llm-sdk",
+  "name": "@hoangvvo/llm-sdk",
   "version": "0.0.0",
   "description": "A unified LLM SDK",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./openai": {
-      "import": "./dist/openai/index.js",
-      "types": "./dist/openai/index.d.ts"
-    },
-    "./anthropic": {
-      "import": "./dist/anthropic/index.js",
-      "types": "./dist/anthropic/index.d.ts"
-    },
-    "./google": {
-      "import": "./dist/google/index.js",
-      "types": "./dist/google/index.d.ts"
-    }
-  },
   "scripts": {
     "generate": "npx @hey-api/openapi-ts -i ../schemas/openapi.json -o ./src/schemas/ --exportCore false",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tshy",
     "lint": "eslint . --ext .ts"
   },
   "files": [
@@ -45,7 +25,62 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.22.0",
     "@google/generative-ai": "^0.12.0",
-    "nanoid": "^5.0.7",
     "openai": "^4.51.0"
-  }
+  },
+  "tshy": {
+    "exports": {
+      ".": "./src/index.ts",
+      "./openai": "./src/openai/index.ts",
+      "./anthropic": "./src/anthropic/index.ts",
+      "./google": "./src/google/index.ts",
+      "./package.json": "./package.json"
+    },
+    "project": "tsconfig.build.json"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    },
+    "./openai": {
+      "import": {
+        "types": "./dist/esm/openai/index.d.ts",
+        "default": "./dist/esm/openai/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/openai/index.d.ts",
+        "default": "./dist/commonjs/openai/index.js"
+      }
+    },
+    "./anthropic": {
+      "import": {
+        "types": "./dist/esm/anthropic/index.d.ts",
+        "default": "./dist/esm/anthropic/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/anthropic/index.d.ts",
+        "default": "./dist/commonjs/anthropic/index.js"
+      }
+    },
+    "./google": {
+      "import": {
+        "types": "./dist/esm/google/index.d.ts",
+        "default": "./dist/esm/google/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/google/index.d.ts",
+        "default": "./dist/commonjs/google/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "module": "./dist/esm/index.js"
 }
