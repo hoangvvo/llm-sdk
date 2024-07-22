@@ -65,13 +65,15 @@
           "args": {
             "type": "object",
             "additionalProperties": true,
-            "description": "The arguments to pass to the tool."
+            "description": "The arguments to pass to the tool.",
+            "nullable": true
           }
         },
         "required": [
           "type",
           "toolCallId",
-          "toolName"
+          "toolName",
+          "args"
         ]
       },
       "ToolResultPart": {
@@ -91,7 +93,14 @@
             "description": "The name of the tool that was called."
           },
           "result": {
-            "type": "object",
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "array"
+              }
+            ],
             "description": "The result of the tool call."
           },
           "isError": {
@@ -196,7 +205,8 @@
           },
           "parameters": {
             "type": "object",
-            "description": "The JSON schema of the parameters that the tool accepts. The type must be \"object\"."
+            "description": "The JSON schema of the parameters that the tool accepts. The type must be \"object\".",
+            "nullable": true
           }
         },
         "required": [

@@ -39,9 +39,9 @@ export type ToolCallPart = {
     /**
      * The arguments to pass to the tool.
      */
-    args?: {
+    args: {
         [key: string]: unknown;
-    };
+    } | null;
 };
 
 /**
@@ -61,8 +61,8 @@ export type ToolResultPart = {
      * The result of the tool call.
      */
     result: {
-        [key: string]: unknown;
-    };
+    [key: string]: unknown;
+} | unknown[];
     /**
      * Marks the tool result as an error.
      */
@@ -107,7 +107,7 @@ export type Tool = {
      */
     parameters: {
         [key: string]: unknown;
-    };
+    } | null;
 };
 
 /**

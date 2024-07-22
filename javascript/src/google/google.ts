@@ -313,6 +313,8 @@ function convertToFunctionDeclarationSchema(
   return {
     ...schema,
     type: googleType,
+    // TODO: gemini throws error if format is provided
+    format: undefined,
     ...(schema.properties && {
       properties: Object.entries(schema.properties).reduce(
         (acc, [key, value]) => ({
