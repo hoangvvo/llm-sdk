@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@hoangvvo/llm-sdk",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A unified LLM SDK",
   "scripts": {
     "generate": "npx @hey-api/openapi-ts -i ../schemas/openapi.json -o ./src/schemas/ --exportCore false",
@@ -11,32 +11,6 @@
   "files": [
     "dist"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/hoangvvo/llm-sdk.git",
-    "directory": "javascript"
-  },
-  "author": "Hoang Vo (https://www.hoangvvo.com)",
-  "bugs": {
-    "url": "https://github.com/hoangvvo/llm-sdk/issues"
-  },
-  "homepage": "https://github.com/hoangvvo/llm-sdk",
-  "license": "MIT",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.22.0",
-    "@google/generative-ai": "^0.12.0",
-    "openai": "^4.51.0"
-  },
-  "tshy": {
-    "exports": {
-      ".": "./src/index.ts",
-      "./openai": "./src/openai/index.ts",
-      "./anthropic": "./src/anthropic/index.ts",
-      "./google": "./src/google/index.ts",
-      "./package.json": "./package.json"
-    },
-    "project": "tsconfig.build.json"
-  },
   "exports": {
     ".": {
       "import": {
@@ -82,5 +56,34 @@
   },
   "main": "./dist/commonjs/index.js",
   "types": "./dist/commonjs/index.d.ts",
-  "module": "./dist/esm/index.js"
+  "module": "./dist/esm/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoangvvo/llm-sdk.git",
+    "directory": "javascript"
+  },
+  "author": "Hoang Vo (https://www.hoangvvo.com)",
+  "bugs": {
+    "url": "https://github.com/hoangvvo/llm-sdk/issues"
+  },
+  "homepage": "https://github.com/hoangvvo/llm-sdk",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.22.0",
+    "@google/generative-ai": "^0.12.0",
+    "openai": "^4.51.0"
+  },
+  "tshy": {
+    "exports": {
+      ".": "./src/index.ts",
+      "./openai": "./src/openai/index.ts",
+      "./anthropic": "./src/anthropic/index.ts",
+      "./google": "./src/google/index.ts",
+      "./package.json": "./package.json"
+    },
+    "project": "tsconfig.build.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }
