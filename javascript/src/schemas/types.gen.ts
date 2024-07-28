@@ -24,6 +24,21 @@ export type ImagePart = {
 };
 
 /**
+ * A part of the message that contains an audio.
+ */
+export type AudioPart = {
+    type: "audio";
+    /**
+     * The MIME type of the audio. E.g. "audio/mp3", "audio/wav".
+     */
+    mimeType: string;
+    /**
+     * The base64-encoded audio data.
+     */
+    audioData: string;
+};
+
+/**
  * A part of the message that represents a call to a tool the model wants to use.
  */
 export type ToolCallPart = {
@@ -74,7 +89,7 @@ export type ToolResultPart = {
  */
 export type UserMessage = {
     role: "user";
-    content: Array<(TextPart | ImagePart)>;
+    content: Array<(TextPart | ImagePart | AudioPart)>;
 };
 
 /**

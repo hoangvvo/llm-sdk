@@ -248,21 +248,27 @@ function convertToAnthropicMessages(
           ):
             | Anthropic.Messages.TextBlockParam
             | Anthropic.Messages.ImageBlockParam => {
-            if (part.type === "image") {
-              return {
-                type: "image",
-                source: {
-                  data: part.imageData,
-                  type: "base64",
-                  media_type:
-                    part.mimeType as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
-                },
-              };
-            } else {
-              return {
-                type: "text",
-                text: part.text,
-              };
+            switch (part.type) {
+              case "text": {
+                return {
+                  type: "text",
+                  text: part.text,
+                };
+              }
+              case "image": {
+                return {
+                  type: "image",
+                  source: {
+                    data: part.imageData,
+                    type: "base64",
+                    media_type:
+                      part.mimeType as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
+                  },
+                };
+              }
+              default: {
+                throw new Error(`Unsupported message part type: ${part.type}`);
+              }
             }
           },
         ),

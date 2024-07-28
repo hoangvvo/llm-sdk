@@ -35,6 +35,26 @@ export const $ImagePart = {
     required: ['type', 'mimeType', 'imageData']
 } as const;
 
+export const $AudioPart = {
+    type: 'object',
+    description: 'A part of the message that contains an audio.',
+    properties: {
+        type: {
+            type: 'string',
+            const: 'audio'
+        },
+        mimeType: {
+            type: 'string',
+            description: 'The MIME type of the audio. E.g. "audio/mp3", "audio/wav".'
+        },
+        audioData: {
+            type: 'string',
+            description: 'The base64-encoded audio data.'
+        }
+    },
+    required: ['type', 'mimeType', 'audioData']
+} as const;
+
 export const $ToolCallPart = {
     type: 'object',
     description: 'A part of the message that represents a call to a tool the model wants to use.',
@@ -113,6 +133,9 @@ export const $UserMessage = {
                     },
                     {
                         '$ref': '#/components/schemas/ImagePart'
+                    },
+                    {
+                        '$ref': '#/components/schemas/AudioPart'
                     }
                 ]
             }

@@ -265,25 +265,32 @@ function convertToOpenAIMessages(
               tool_call_id: toolResult.toolCallId,
             }));
           } else {
-            const contentParts = message.content.filter(
-              (part) => part.type === "text" || part.type === "image",
-            );
+            const contentParts = message.content;
             return {
               role: "user",
               content: contentParts.map(
                 (part): OpenAI.Chat.ChatCompletionContentPart => {
-                  if (part.type === "image") {
-                    return {
-                      type: "image_url",
-                      image_url: {
-                        url: `data:${part.mimeType};base64,${part.imageData}`,
-                      },
-                    };
+                  switch (part.type) {
+                    case "text": {
+                      return {
+                        type: "text",
+                        text: part.text,
+                      };
+                    }
+                    case "image": {
+                      return {
+                        type: "image_url",
+                        image_url: {
+                          url: `data:${part.mimeType};base64,${part.imageData}`,
+                        },
+                      };
+                    }
+                    case "audio": {
+                      throw new Error(
+                        `Unsupported message part type: ${part.type}`,
+                      );
+                    }
                   }
-                  return {
-                    type: "text",
-                    text: part.text,
-                  };
                 },
               ),
             };

@@ -133,31 +133,40 @@ function convertToGoogleParams(
 ): GenerateContentRequest {
   let toolConfig: ToolConfig | undefined;
   if (input.toolChoice) {
-    if (input.toolChoice.type === "auto") {
-      toolConfig = {
-        functionCallingConfig: {
-          mode: FunctionCallingMode.AUTO,
-        },
-      };
-    } else if (input.toolChoice.type === "required") {
-      toolConfig = {
-        functionCallingConfig: {
-          mode: FunctionCallingMode.ANY,
-        },
-      };
-    } else if (input.toolChoice.type === "none") {
-      toolConfig = {
-        functionCallingConfig: {
-          mode: FunctionCallingMode.NONE,
-        },
-      };
-    } else if (input.toolChoice.type === "tool") {
-      toolConfig = {
-        functionCallingConfig: {
-          mode: FunctionCallingMode.ANY,
-          allowedFunctionNames: [input.toolChoice.toolName],
-        },
-      };
+    switch (input.toolChoice.type) {
+      case "auto": {
+        toolConfig = {
+          functionCallingConfig: {
+            mode: FunctionCallingMode.AUTO,
+          },
+        };
+        break;
+      }
+      case "required": {
+        toolConfig = {
+          functionCallingConfig: {
+            mode: FunctionCallingMode.ANY,
+          },
+        };
+        break;
+      }
+      case "none": {
+        toolConfig = {
+          functionCallingConfig: {
+            mode: FunctionCallingMode.NONE,
+          },
+        };
+        break;
+      }
+      case "tool": {
+        toolConfig = {
+          functionCallingConfig: {
+            mode: FunctionCallingMode.ANY,
+            allowedFunctionNames: [input.toolChoice.toolName],
+          },
+        };
+        break;
+      }
     }
   }
 
@@ -213,39 +222,52 @@ function convertToGoogleParams(
 function convertToGoogleMessages(messages: Message[]): Content[] {
   return messages.map((message): Content => {
     const parts = message.content.map((part): Part => {
-      if (part.type === "tool-result") {
-        let response = part.result as object;
-
-        if (Array.isArray(response)) {
-          // NOTE: Gemini does not work with Array
-          response = { result: response };
+      switch (part.type) {
+        case "text": {
+          return {
+            text: part.text,
+          };
         }
+        case "image": {
+          return {
+            inlineData: {
+              data: part.imageData,
+              mimeType: part.mimeType,
+            },
+          };
+        }
+        case "audio": {
+          return {
+            inlineData: {
+              data: part.audioData,
+              mimeType: part.mimeType,
+            },
+          };
+        }
+        case "tool-call": {
+          return {
+            functionCall: {
+              name: part.toolName,
+              args: part.args || {},
+            },
+          };
+        }
+        case "tool-result": {
+          let response = part.result as object;
 
-        // NOTE: Gemini does not accept a tool call id
-        return {
-          functionResponse: {
-            name: part.toolName,
-            response,
-          },
-        };
-      } else if (part.type === "tool-call") {
-        return {
-          functionCall: {
-            name: part.toolName,
-            args: part.args || {},
-          },
-        };
-      } else if (part.type === "image") {
-        return {
-          inlineData: {
-            data: part.imageData,
-            mimeType: part.mimeType,
-          },
-        };
-      } else {
-        return {
-          text: part.text,
-        };
+          if (Array.isArray(response)) {
+            // NOTE: Gemini does not work with Array
+            response = { result: response };
+          }
+
+          // NOTE: Gemini does not accept a tool call id
+          return {
+            functionResponse: {
+              name: part.toolName,
+              response,
+            },
+          };
+        }
       }
     });
 

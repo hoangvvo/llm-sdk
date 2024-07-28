@@ -46,6 +46,29 @@
           "imageData"
         ]
       },
+      "AudioPart": {
+        "type": "object",
+        "description": "A part of the message that contains an audio.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "audio"
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "The MIME type of the audio. E.g. \"audio/mp3\", \"audio/wav\"."
+          },
+          "audioData": {
+            "type": "string",
+            "description": "The base64-encoded audio data."
+          }
+        },
+        "required": [
+          "type",
+          "mimeType",
+          "audioData"
+        ]
+      },
       "ToolCallPart": {
         "type": "object",
         "description": "A part of the message that represents a call to a tool the model wants to use.",
@@ -132,6 +155,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ImagePart"
+                },
+                {
+                  "$ref": "#/components/schemas/AudioPart"
                 }
               ]
             }
