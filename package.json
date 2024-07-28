@@ -20,5 +20,10 @@
     "tshy": "^3.0.2",
     "tsx": "^4.15.4",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
+    "@google/generative-ai": "^0.16.0",
+    "openai": "^4.53.2"
   }
 }

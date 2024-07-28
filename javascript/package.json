@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@hoangvvo/llm-sdk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A unified LLM SDK",
   "scripts": {
     "generate": "npx @hey-api/openapi-ts -i ../schemas/openapi.json -o ./src/schemas/ --exportCore false",
@@ -68,10 +68,10 @@
   },
   "homepage": "https://github.com/hoangvvo/llm-sdk",
   "license": "MIT",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.22.0",
-    "@google/generative-ai": "^0.12.0",
-    "openai": "^4.51.0"
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "*",
+    "@google/generative-ai": "*",
+    "openai": "*"
   },
   "tshy": {
     "exports": {
