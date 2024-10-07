@@ -14,6 +14,7 @@ import type {
   Tool,
   ToolCallPart,
 } from "../schemas/index.js";
+import { OpenAIRefusedError } from "./errors.js";
 import type { OpenAIModelOptions } from "./types.js";
 
 export class OpenAIModel implements LanguageModel {
@@ -27,7 +28,7 @@ export class OpenAIModel implements LanguageModel {
 
   private openai: OpenAI;
 
-  constructor(options: OpenAIModelOptions) {
+  constructor(public options: OpenAIModelOptions) {
     this.provider = "openai";
     this.modelId = options.modelId;
 
@@ -39,7 +40,7 @@ export class OpenAIModel implements LanguageModel {
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
     const response = await this.openai.chat.completions.create({
-      ...convertToOpenAIParams(this.modelId, input),
+      ...convertToOpenAIParams(this.modelId, input, this.options),
       stream: false,
     });
 
@@ -47,8 +48,14 @@ export class OpenAIModel implements LanguageModel {
       throw new Error("no choices in response");
     }
 
+    const choice = response.choices[0];
+
+    if (choice.message.refusal) {
+      throw new OpenAIRefusedError(choice.message.refusal);
+    }
+
     return {
-      content: mapOpenAIMessage(response.choices[0].message).content,
+      content: mapOpenAIMessage(choice.message).content,
       ...(response.usage && {
         usage: {
           inputTokens: response.usage.prompt_tokens,
@@ -62,7 +69,7 @@ export class OpenAIModel implements LanguageModel {
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
     const stream = await this.openai.chat.completions.create({
-      ...convertToOpenAIParams(this.modelId, input),
+      ...convertToOpenAIParams(this.modelId, input, this.options),
       stream: true,
       stream_options: {
         include_usage: true,
@@ -74,12 +81,18 @@ export class OpenAIModel implements LanguageModel {
     const streamingMessage: OpenAI.Chat.ChatCompletionMessage = {
       content: null,
       role: "assistant",
+      refusal: null,
     };
 
     for await (const chunk of stream) {
       const completion = chunk.choices?.[0] as
         | OpenAI.Chat.Completions.ChatCompletionChunk.Choice
         | undefined;
+
+      if (completion?.delta.refusal) {
+        streamingMessage.refusal = streamingMessage.refusal || "";
+        streamingMessage.refusal += completion.delta.refusal;
+      }
 
       if (completion?.delta.tool_calls) {
         // only the first delta has both `id` and `index`, the rest only have `index`
@@ -144,6 +157,10 @@ export class OpenAIModel implements LanguageModel {
       }
     }
 
+    if (streamingMessage.refusal) {
+      throw new OpenAIRefusedError(streamingMessage.refusal);
+    }
+
     // yield each tool call as a partial response
     // to guarantee that the caller can see the tool call
     const message = mapOpenAIMessage(streamingMessage);
@@ -168,6 +185,7 @@ export class OpenAIModel implements LanguageModel {
 function convertToOpenAIParams(
   modelId: string,
   input: LanguageModelInput,
+  options: OpenAIModelOptions,
 ): OpenAI.Chat.ChatCompletionCreateParams {
   let tool_choice:
     | OpenAI.Chat.Completions.ChatCompletionToolChoiceOption
@@ -187,19 +205,37 @@ function convertToOpenAIParams(
   }
 
   let response_format:
-    | OpenAI.Chat.Completions.ChatCompletionCreateParams.ResponseFormat
+    | OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
     | undefined;
   if (input.responseFormat?.type === "json") {
-    response_format = {
-      type: "json_object",
-    };
+    if (options.structuredOutputs && input.responseFormat.schema) {
+      const schemaTitle = input.responseFormat.schema["title"] as
+        | string
+        | undefined;
+      const schemaDescription = input.responseFormat.schema["description"] as
+        | string
+        | undefined;
+      response_format = {
+        type: "json_schema",
+        json_schema: {
+          strict: true,
+          name: schemaTitle || "response",
+          ...(schemaDescription && { description: schemaDescription }),
+          schema: input.responseFormat.schema,
+        },
+      };
+    } else {
+      response_format = {
+        type: "json_object",
+      };
+    }
   }
 
   return {
     model: modelId,
     messages: convertToOpenAIMessages(input.messages, input.systemPrompt),
     ...(input.tools && {
-      tools: convertToOpenAITools(input.tools),
+      tools: convertToOpenAITools(input.tools, options),
     }),
     ...(tool_choice && { tool_choice }),
     ...(typeof input.maxTokens === "number" && { max_tokens: input.maxTokens }),
@@ -303,11 +339,15 @@ function convertToOpenAIMessages(
 
 function convertToOpenAITools(
   tools: Tool[],
+  options: OpenAIModelOptions,
 ): OpenAI.Chat.Completions.ChatCompletionTool[] {
   return tools.map(
     (tool): OpenAI.Chat.Completions.ChatCompletionTool => ({
       type: "function",
       function: {
+        ...(options.structuredOutputs && {
+          strict: true,
+        }),
         name: tool.name,
         description: tool.description,
         parameters: (tool.parameters as OpenAI.FunctionParameters) || undefined,
