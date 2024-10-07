@@ -75,9 +75,9 @@ export type ToolResultPart = {
     /**
      * The result of the tool call.
      */
-    result: {
+    result: ({
     [key: string]: unknown;
-} | unknown[];
+} | unknown[]);
     /**
      * Marks the tool result as an error.
      */
@@ -102,7 +102,7 @@ export type AssistantMessage = {
 
 export type ContentDelta = {
     index: number;
-    part: TextPart | ToolCallPart;
+    part: (TextPart | ToolCallPart);
 };
 
 /**
@@ -214,11 +214,11 @@ export type LanguageModelInput = {
     /**
      * Determines how the model should choose which tool to use. "auto" - The model will automatically choose the tool to use or not use any tools. "none" - The model will not use any tools. "required" - The model will be forced to use a tool. { type: "tool", toolName: "toolName" } - The model will use the specified tool.
      */
-    toolChoice?: ToolChoiceAuto | ToolChoiceNone | ToolChoiceRequired | ToolChoiceTool;
+    toolChoice?: (ToolChoiceAuto | ToolChoiceNone | ToolChoiceRequired | ToolChoiceTool);
     /**
      * The format that the model must output
      */
-    responseFormat?: ResponseFormatJson | ResponseFormatText;
+    responseFormat?: (ResponseFormatJson | ResponseFormatText);
     /**
      * The maximum number of tokens that can be generated in the chat completion.
      */
