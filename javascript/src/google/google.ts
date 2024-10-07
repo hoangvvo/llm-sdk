@@ -127,66 +127,7 @@ export class GoogleModel implements LanguageModel {
 export function convertToGoogleParams(
   input: LanguageModelInput,
 ): GenerateContentRequest {
-  let toolConfig: ToolConfig | undefined;
-  if (input.toolChoice) {
-    switch (input.toolChoice.type) {
-      case "auto": {
-        toolConfig = {
-          functionCallingConfig: {
-            mode: FunctionCallingMode.AUTO,
-          },
-        };
-        break;
-      }
-      case "required": {
-        toolConfig = {
-          functionCallingConfig: {
-            mode: FunctionCallingMode.ANY,
-          },
-        };
-        break;
-      }
-      case "none": {
-        toolConfig = {
-          functionCallingConfig: {
-            mode: FunctionCallingMode.NONE,
-          },
-        };
-        break;
-      }
-      case "tool": {
-        toolConfig = {
-          functionCallingConfig: {
-            mode: FunctionCallingMode.ANY,
-            allowedFunctionNames: [input.toolChoice.toolName],
-          },
-        };
-        break;
-      }
-    }
-  }
-
-  const generationConfig: GenerationConfig = {};
-  if (typeof input.maxTokens === "number") {
-    generationConfig.maxOutputTokens = input.maxTokens;
-  }
-  if (typeof input.temperature === "number") {
-    generationConfig.temperature = input.temperature;
-  }
-  if (typeof input.topP === "number") {
-    generationConfig.topP = input.topP;
-  }
-  if (typeof input.topK === "number") {
-    generationConfig.topK = input.topK;
-  }
-  if (input.responseFormat?.type === "json") {
-    generationConfig.responseMimeType = "application/json";
-    if (input.responseFormat.schema) {
-      generationConfig.responseSchema = convertToFunctionDeclarationSchema(
-        input.responseFormat.schema,
-      ) as Schema;
-    }
-  }
+  const toolConfig = convertToGoogleToolConfig(input.toolChoice);
 
   return {
     ...(!!input.systemPrompt && {
@@ -198,6 +139,7 @@ export function convertToGoogleParams(
     }),
     ...(toolConfig && { toolConfig }),
     generationConfig: {
+      ...(convertToGoogleResponseFormat(input.responseFormat) || {}),
       // TODO: this does not consider input tokens
       ...(typeof input.maxTokens === "number" && {
         maxOutputTokens: input.maxTokens,
@@ -286,6 +228,46 @@ export function convertToGoogleMessages(messages: Message[]): Content[] {
   });
 }
 
+export function convertToGoogleToolConfig(
+  toolChoice: LanguageModelInput["toolChoice"],
+): ToolConfig | undefined {
+  if (!toolChoice) {
+    return undefined;
+  }
+
+  switch (toolChoice.type) {
+    case "auto": {
+      return {
+        functionCallingConfig: {
+          mode: FunctionCallingMode.AUTO,
+        },
+      };
+    }
+    case "required": {
+      return {
+        functionCallingConfig: {
+          mode: FunctionCallingMode.ANY,
+        },
+      };
+    }
+    case "none": {
+      return {
+        functionCallingConfig: {
+          mode: FunctionCallingMode.NONE,
+        },
+      };
+    }
+    case "tool": {
+      return {
+        functionCallingConfig: {
+          mode: FunctionCallingMode.ANY,
+          allowedFunctionNames: [toolChoice.toolName],
+        },
+      };
+    }
+  }
+}
+
 export function convertToGoogleTools(
   tools: Tool[],
 ): FunctionDeclarationsTool[] {
@@ -325,6 +307,22 @@ function convertToFunctionDeclarationSchema(
       items: convertToFunctionDeclarationSchema(schema.items),
     }),
   };
+}
+
+export function convertToGoogleResponseFormat(
+  responseFormat: LanguageModelInput["responseFormat"],
+): GenerationConfig | undefined {
+  if (responseFormat?.type === "json") {
+    const generationConfig: GenerationConfig = {
+      responseMimeType: "application/json",
+    };
+    if (responseFormat.schema) {
+      generationConfig.responseSchema = convertToFunctionDeclarationSchema(
+        responseFormat.schema,
+      ) as Schema;
+    }
+  }
+  return undefined;
 }
 
 export function mapGoogleMessage(content: Content): AssistantMessage {

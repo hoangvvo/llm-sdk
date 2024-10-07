@@ -159,21 +159,7 @@ export function convertToAnthropicParams(
   modelId: string,
   input: LanguageModelInput,
 ): Anthropic.Messages.MessageCreateParams {
-  let tool_choice: Anthropic.Messages.MessageCreateParams["tool_choice"];
-  if (input.toolChoice) {
-    if (input.toolChoice.type === "auto") {
-      tool_choice = { type: "auto" };
-    } else if (input.toolChoice.type === "required") {
-      tool_choice = {
-        type: "any",
-      };
-    } else if (input.toolChoice.type === "tool") {
-      tool_choice = {
-        type: "tool",
-        name: input.toolChoice.toolName,
-      };
-    }
-  }
+  const tool_choice = convertToAnthropicToolChoice(input.toolChoice);
 
   return {
     model: modelId,
@@ -275,6 +261,25 @@ export function convertToAnthropicMessages(
       };
     }
   });
+}
+
+export function convertToAnthropicToolChoice(
+  toolChoice: LanguageModelInput["toolChoice"],
+): Anthropic.Messages.MessageCreateParams["tool_choice"] {
+  if (!toolChoice) {
+    return undefined;
+  }
+  if (toolChoice.type === "auto") {
+    return { type: "auto" };
+  } else if (toolChoice.type === "required") {
+    return { type: "any" };
+  } else if (toolChoice.type === "tool") {
+    return {
+      type: "tool",
+      name: toolChoice.toolName,
+    };
+  }
+  return undefined;
 }
 
 export function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {

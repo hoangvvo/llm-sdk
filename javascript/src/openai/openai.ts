@@ -187,49 +187,12 @@ export function convertToOpenAIParams(
   input: LanguageModelInput,
   options: OpenAIModelOptions,
 ): OpenAI.Chat.ChatCompletionCreateParams {
-  let tool_choice:
-    | OpenAI.Chat.Completions.ChatCompletionToolChoiceOption
-    | undefined;
-  if (input.toolChoice) {
-    if (input.toolChoice.type === "tool") {
-      tool_choice = {
-        type: "function",
-        function: {
-          name: input.toolChoice.toolName,
-        },
-      };
-    } else {
-      // 1-1 mapping with openai tool choice
-      tool_choice = input.toolChoice.type;
-    }
-  }
+  const tool_choice = convertToOpenAIToolChoice(input.toolChoice);
 
-  let response_format:
-    | OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
-    | undefined;
-  if (input.responseFormat?.type === "json") {
-    if (options.structuredOutputs && input.responseFormat.schema) {
-      const schemaTitle = input.responseFormat.schema["title"] as
-        | string
-        | undefined;
-      const schemaDescription = input.responseFormat.schema["description"] as
-        | string
-        | undefined;
-      response_format = {
-        type: "json_schema",
-        json_schema: {
-          strict: true,
-          name: schemaTitle || "response",
-          ...(schemaDescription && { description: schemaDescription }),
-          schema: input.responseFormat.schema,
-        },
-      };
-    } else {
-      response_format = {
-        type: "json_object",
-      };
-    }
-  }
+  const response_format = convertToOpenAIResponseFormat(
+    input.responseFormat,
+    options,
+  );
 
   return {
     model: modelId,
@@ -337,6 +300,25 @@ export function convertToOpenAIMessages(
   ];
 }
 
+export function convertToOpenAIToolChoice(
+  toolChoice: LanguageModelInput["toolChoice"],
+): OpenAI.Chat.Completions.ChatCompletionToolChoiceOption | undefined {
+  if (toolChoice) {
+    if (toolChoice.type === "tool") {
+      return {
+        type: "function",
+        function: {
+          name: toolChoice.toolName,
+        },
+      };
+    } else {
+      // 1-1 mapping with openai tool choice
+      return toolChoice.type;
+    }
+  }
+  return undefined;
+}
+
 export function convertToOpenAITools(
   tools: Tool[],
   options: OpenAIModelOptions,
@@ -354,6 +336,36 @@ export function convertToOpenAITools(
       },
     }),
   );
+}
+
+export function convertToOpenAIResponseFormat(
+  responseFormat: LanguageModelInput["responseFormat"],
+  options: Pick<OpenAIModelOptions, "structuredOutputs">,
+):
+  | OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
+  | undefined {
+  if (responseFormat?.type === "json") {
+    if (options.structuredOutputs && responseFormat.schema) {
+      const schemaTitle = responseFormat.schema["title"] as string | undefined;
+      const schemaDescription = responseFormat.schema["description"] as
+        | string
+        | undefined;
+      return {
+        type: "json_schema",
+        json_schema: {
+          strict: true,
+          name: schemaTitle || "response",
+          ...(schemaDescription && { description: schemaDescription }),
+          schema: responseFormat.schema,
+        },
+      };
+    } else {
+      return {
+        type: "json_object",
+      };
+    }
+  }
+  return undefined;
 }
 
 export function mapOpenAIMessage(
