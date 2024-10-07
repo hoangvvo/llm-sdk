@@ -155,7 +155,7 @@ export class AnthropicModel implements LanguageModel {
   }
 }
 
-function convertToAnthropicParams(
+export function convertToAnthropicParams(
   modelId: string,
   input: LanguageModelInput,
 ): Anthropic.Messages.MessageCreateParams {
@@ -193,7 +193,7 @@ function convertToAnthropicParams(
   };
 }
 
-function convertToAnthropicMessages(
+export function convertToAnthropicMessages(
   messages: Message[],
 ): Anthropic.Messages.MessageParam[] {
   return messages.map((message): Anthropic.Messages.MessageParam => {
@@ -277,7 +277,7 @@ function convertToAnthropicMessages(
   });
 }
 
-function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {
+export function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
@@ -290,7 +290,7 @@ function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {
   }));
 }
 
-function mapAnthropicMessage(
+export function mapAnthropicMessage(
   content: Array<Anthropic.Messages.ContentBlock>,
 ): AssistantMessage {
   return {

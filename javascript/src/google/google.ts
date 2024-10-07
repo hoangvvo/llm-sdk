@@ -124,7 +124,7 @@ export class GoogleModel implements LanguageModel {
   }
 }
 
-function convertToGoogleParams(
+export function convertToGoogleParams(
   input: LanguageModelInput,
 ): GenerateContentRequest {
   let toolConfig: ToolConfig | undefined;
@@ -215,7 +215,7 @@ function convertToGoogleParams(
   };
 }
 
-function convertToGoogleMessages(messages: Message[]): Content[] {
+export function convertToGoogleMessages(messages: Message[]): Content[] {
   return messages.map((message): Content => {
     const parts = message.content.map((part): Part => {
       switch (part.type) {
@@ -286,7 +286,9 @@ function convertToGoogleMessages(messages: Message[]): Content[] {
   });
 }
 
-function convertToGoogleTools(tools: Tool[]): FunctionDeclarationsTool[] {
+export function convertToGoogleTools(
+  tools: Tool[],
+): FunctionDeclarationsTool[] {
   return [
     {
       functionDeclarations: tools.map((tool): FunctionDeclaration => {
@@ -325,7 +327,7 @@ function convertToFunctionDeclarationSchema(
   };
 }
 
-function mapGoogleMessage(content: Content): AssistantMessage {
+export function mapGoogleMessage(content: Content): AssistantMessage {
   return {
     role: "assistant",
     content: content.parts.map((part): AssistantMessage["content"][number] => {

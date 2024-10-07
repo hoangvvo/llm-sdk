@@ -182,7 +182,7 @@ export class OpenAIModel implements LanguageModel {
   }
 }
 
-function convertToOpenAIParams(
+export function convertToOpenAIParams(
   modelId: string,
   input: LanguageModelInput,
   options: OpenAIModelOptions,
@@ -256,7 +256,7 @@ function convertToOpenAIParams(
   };
 }
 
-function convertToOpenAIMessages(
+export function convertToOpenAIMessages(
   messages: Message[],
   systemPrompt?: string,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
@@ -337,7 +337,7 @@ function convertToOpenAIMessages(
   ];
 }
 
-function convertToOpenAITools(
+export function convertToOpenAITools(
   tools: Tool[],
   options: OpenAIModelOptions,
 ): OpenAI.Chat.Completions.ChatCompletionTool[] {
@@ -356,7 +356,7 @@ function convertToOpenAITools(
   );
 }
 
-function mapOpenAIMessage(
+export function mapOpenAIMessage(
   message: OpenAI.Chat.Completions.ChatCompletionMessage,
 ): AssistantMessage {
   return {
