@@ -10,11 +10,7 @@ import type {
   Schema,
   ToolConfig,
 } from "@google/generative-ai";
-import {
-  FunctionCallingMode,
-  FunctionDeclarationSchemaType,
-  GoogleGenerativeAI,
-} from "@google/generative-ai";
+import { FunctionCallingMode, GoogleGenerativeAI } from "@google/generative-ai";
 import type {
   LanguageModel,
   LanguageModelCapability,
@@ -306,35 +302,12 @@ function convertToGoogleTools(tools: Tool[]): FunctionDeclarationsTool[] {
   ];
 }
 
-// Google has their own type values instead of standard JSONSchema types
-const GOOGLE_SCHEMA_TYPE_TO_OPENAPI_MAPPING: Record<
-  FunctionDeclarationSchemaType,
-  string
-> = {
-  [FunctionDeclarationSchemaType.STRING]: "string",
-  [FunctionDeclarationSchemaType.NUMBER]: "number",
-  [FunctionDeclarationSchemaType.INTEGER]: "integer",
-  [FunctionDeclarationSchemaType.BOOLEAN]: "boolean",
-  [FunctionDeclarationSchemaType.ARRAY]: "array",
-  [FunctionDeclarationSchemaType.OBJECT]: "object",
-};
-const OPENAPI_SCHEMA_TYPE_TO_GOOGLE_MAPPING = Object.fromEntries(
-  Object.entries(GOOGLE_SCHEMA_TYPE_TO_OPENAPI_MAPPING).map(([key, value]) => [
-    value,
-    key,
-  ]),
-) as Record<string, FunctionDeclarationSchemaType>;
 function convertToFunctionDeclarationSchema(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema: any,
 ): FunctionDeclarationSchema {
-  const googleType = OPENAPI_SCHEMA_TYPE_TO_GOOGLE_MAPPING[schema.type];
-  if (!googleType) {
-    throw new Error(`Unsupported schema type: ${schema.type}`);
-  }
   return {
     ...schema,
-    type: googleType,
     // TODO: gemini throws error if format is provided
     format: undefined,
     ...(schema.properties && {
