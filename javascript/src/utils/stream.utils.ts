@@ -25,15 +25,15 @@ export function mergeContentDeltas(
         incomingDelta.part.type === "tool-call"
       ) {
         if (incomingDelta.part.toolName) {
-          existingDelta.part.toolName = incomingDelta.part.toolName || "";
+          existingDelta.part.toolName = existingDelta.part.toolName || "";
           existingDelta.part.toolName += incomingDelta.part.toolName;
         }
         if (incomingDelta.part.toolCallId) {
-          existingDelta.part.toolCallId = incomingDelta.part.toolCallId || "";
+          existingDelta.part.toolCallId = existingDelta.part.toolCallId || "";
           existingDelta.part.toolCallId += incomingDelta.part.toolCallId;
         }
         if (incomingDelta.part.args) {
-          existingDelta.part.args = incomingDelta.part.args || "";
+          existingDelta.part.args = existingDelta.part.args || "";
           existingDelta.part.args += incomingDelta.part.args;
         }
       }
