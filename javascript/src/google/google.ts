@@ -17,12 +17,14 @@ import type {
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
+  ContentDelta,
   LanguageModelInput,
   Message,
   ModelResponse,
   PartialModelResponse,
   Tool,
 } from "../schemas/index.js";
+import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
 import type { GoogleModelOptions } from "./types.js";
 
 export class GoogleModel implements LanguageModel {
@@ -73,53 +75,26 @@ export class GoogleModel implements LanguageModel {
       convertToGoogleParams(input),
     );
 
-    const message: AssistantMessage = {
-      role: "assistant",
-      content: [],
-    };
+    let contentDeltas: ContentDelta[] = [];
 
     for await (const chunk of stream) {
       const candidate = chunk.candidates?.[0];
 
       if (candidate?.content) {
-        const streamingMessage = mapGoogleMessage(candidate.content);
-
-        message.content.length = Math.max(
-          message.content.length,
-          streamingMessage.content.length,
+        const incomingContentDeltas = mapGoogleDelta(candidate.content);
+        contentDeltas = mergeContentDeltas(
+          contentDeltas,
+          incomingContentDeltas,
         );
 
-        for (let i = 0; i < streamingMessage.content.length; i++) {
-          const streamingPart = streamingMessage.content[i]!;
-
-          if (streamingPart.type === "text") {
-            let part = message.content[i];
-            if (!part) {
-              part = message.content[i] = {
-                type: "text",
-                text: "",
-              };
-            }
-            if (part.type !== "text") {
-              throw new Error(`unexpected part ${part.type} at index ${i}`);
-            }
-            part.text += streamingPart.text;
-          } else if (streamingPart.type === "tool-call") {
-            message.content[i] = streamingPart;
-          }
-
-          yield {
-            delta: {
-              index: i,
-              part: streamingPart,
-            },
-          };
+        for (const delta of incomingContentDeltas) {
+          yield { delta };
         }
       }
     }
 
     return {
-      content: message.content,
+      content: mapContentDeltas(contentDeltas),
     };
   }
 }
@@ -347,6 +322,27 @@ export function mapGoogleMessage(content: Content): AssistantMessage {
       throw new Error("unknown part type");
     }),
   };
+}
+
+export function mapGoogleDelta(content: Content): ContentDelta[] {
+  // google does not stream partials for tool calls so it is safe to do this
+  const streamingMessage = mapGoogleMessage(content);
+  return streamingMessage.content.map((part, index): ContentDelta => {
+    if (part.type === "tool-call") {
+      return {
+        index,
+        part: {
+          ...part,
+          // our ToolCallPartDelta only accepts text
+          args: part.args ? JSON.stringify(part.args) : "",
+        },
+      };
+    }
+    return {
+      index,
+      part,
+    };
+  });
 }
 
 function genidForToolCall() {

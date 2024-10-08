@@ -5,6 +5,7 @@ import type {
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
+  ContentDelta,
   LanguageModelInput,
   Message,
   ModelResponse,
@@ -12,6 +13,7 @@ import type {
   PartialModelResponse,
   Tool,
 } from "../schemas/index.js";
+import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
 import type { AnthropicModelOptions } from "./types.js";
 
 export class AnthropicModel implements LanguageModel {
@@ -57,9 +59,8 @@ export class AnthropicModel implements LanguageModel {
       inputTokens: 0,
       outputTokens: 0,
     };
-    const streamingContentBlocks: (Anthropic.Messages.ContentBlock & {
-      partial_json?: string;
-    })[] = [];
+
+    let contentDeltas: ContentDelta[] = [];
 
     for await (const chunk of stream) {
       // https://docs.anthropic.com/claude/reference/messages-streaming#raw-http-stream-response
@@ -73,83 +74,23 @@ export class AnthropicModel implements LanguageModel {
           usage.outputTokens += chunk.usage.output_tokens;
           break;
         case "content_block_start":
-          streamingContentBlocks.length = Math.max(
-            streamingContentBlocks.length,
-            chunk.index + 1,
-          );
-          streamingContentBlocks[chunk.index] = {
-            ...chunk.content_block,
-          };
-          break;
         case "content_block_delta": {
-          const block = streamingContentBlocks[chunk.index];
-          if (chunk.delta.type === "text_delta") {
-            if (!block || block.type !== "text") {
-              throw new Error(
-                `invariant: expected text block at streamingContentBlocks[${chunk.index}]`,
-              );
-            }
-            block.text += chunk.delta.text;
-            yield {
-              delta: {
-                index: chunk.index,
-                part: {
-                  type: "text",
-                  text: chunk.delta.text,
-                },
-              },
-            };
-          } else if (chunk.delta.type === "input_json_delta") {
-            if (!block || block.type !== "tool_use") {
-              throw new Error(
-                `invariant: expected tool_use block at streamingContentBlocks[${chunk.index}]`,
-              );
-            }
-            block.partial_json = block.partial_json ?? "";
-            block.partial_json += chunk.delta.partial_json;
-          }
-          break;
-        }
-        case "content_block_stop": {
-          // if a tool call block is completed, we can yield it
-          const block = streamingContentBlocks[chunk.index];
-          if (!block) {
-            throw new Error(
-              `invariant: expected block at streamingContentBlocks[${chunk.index}]`,
-            );
-          }
-          if (block.type === "tool_use") {
-            yield {
-              delta: {
-                index: chunk.index,
-                part: {
-                  type: "tool-call",
-                  toolCallId: block.id,
-                  args: JSON.parse(block.partial_json ?? "{}"),
-                  toolName: block.name,
-                },
-              },
-            };
+          const incomingContentDeltas = mapAnthropicStreamEvent(chunk);
+          contentDeltas = mergeContentDeltas(
+            contentDeltas,
+            incomingContentDeltas,
+          );
+
+          for (const delta of incomingContentDeltas) {
+            yield { delta };
           }
           break;
         }
       }
     }
 
-    const content = streamingContentBlocks.map(
-      (block): Anthropic.Messages.ContentBlock => {
-        if (block.type === "tool_use") {
-          return {
-            ...block,
-            input: JSON.parse(block.partial_json ?? "{}"),
-          };
-        }
-        return block;
-      },
-    );
-
     return {
-      content: mapAnthropicMessage(content).content,
+      content: mapContentDeltas(contentDeltas),
       usage,
     };
   }
@@ -315,4 +256,70 @@ export function mapAnthropicMessage(
       };
     }),
   };
+}
+
+export function mapAnthropicStreamEvent(
+  chunk: Anthropic.Messages.RawMessageStreamEvent,
+): ContentDelta[] {
+  if (chunk.type === "content_block_start") {
+    if (chunk.content_block.type === "text") {
+      return [
+        {
+          index: chunk.index,
+          part: {
+            type: "text",
+            text: chunk.content_block.text,
+          },
+        },
+      ];
+    }
+    if (chunk.content_block.type === "tool_use") {
+      return [
+        {
+          index: chunk.index,
+          part: {
+            type: "tool-call",
+            toolCallId: chunk.content_block.id,
+            toolName: chunk.content_block.name,
+            args: chunk.content_block.input
+              ? typeof chunk.content_block.input !== "string"
+                ? JSON.stringify(chunk.content_block.input)
+                : chunk.content_block.input
+              : "",
+          },
+        },
+      ];
+    }
+    throw new Error(
+      `Unsupported content block type: ${(chunk.content_block as { type: string }).type}`,
+    );
+  }
+  if (chunk.type === "content_block_delta") {
+    if (chunk.delta.type === "text_delta") {
+      return [
+        {
+          index: chunk.index,
+          part: {
+            type: "text",
+            text: chunk.delta.text,
+          },
+        },
+      ];
+    }
+    if (chunk.delta.type === "input_json_delta") {
+      return [
+        {
+          index: chunk.index,
+          part: {
+            type: "tool-call",
+            args: chunk.delta.partial_json,
+          },
+        },
+      ];
+    }
+    throw new Error(
+      `Unsupported delta type: ${(chunk.delta as { type: "string" }).type}`,
+    );
+  }
+  return [];
 }

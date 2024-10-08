@@ -18,10 +18,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "text"
-        ]
+        "required": ["type", "text"]
       },
       "ImagePart": {
         "type": "object",
@@ -40,11 +37,7 @@
             "description": "The base64-encoded image data."
           }
         },
-        "required": [
-          "type",
-          "mimeType",
-          "imageData"
-        ]
+        "required": ["type", "mimeType", "imageData"]
       },
       "AudioPart": {
         "type": "object",
@@ -63,11 +56,7 @@
             "description": "The base64-encoded audio data."
           }
         },
-        "required": [
-          "type",
-          "mimeType",
-          "audioData"
-        ]
+        "required": ["type", "mimeType", "audioData"]
       },
       "ToolCallPart": {
         "type": "object",
@@ -92,12 +81,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "type",
-          "toolCallId",
-          "toolName",
-          "args"
-        ]
+        "required": ["type", "toolCallId", "toolName", "args"]
       },
       "ToolResultPart": {
         "type": "object",
@@ -131,12 +115,7 @@
             "description": "Marks the tool result as an error."
           }
         },
-        "required": [
-          "type",
-          "toolCallId",
-          "toolName",
-          "result"
-        ]
+        "required": ["type", "toolCallId", "toolName", "result"]
       },
       "UserMessage": {
         "type": "object",
@@ -163,10 +142,7 @@
             }
           }
         },
-        "required": [
-          "role",
-          "content"
-        ]
+        "required": ["role", "content"]
       },
       "AssistantMessage": {
         "type": "object",
@@ -190,10 +166,41 @@
             }
           }
         },
-        "required": [
-          "role",
-          "content"
-        ]
+        "required": ["role", "content"]
+      },
+      "TextPartDelta": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "text"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "text"]
+      },
+      "ToolCallPartDelta": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "tool-call"
+          },
+          "toolCallId": {
+            "type": "string",
+            "description": "The ID of the tool call, used to match the tool result with the tool call."
+          },
+          "toolName": {
+            "type": "string",
+            "description": "The name of the tool to call."
+          },
+          "args": {
+            "type": "string",
+            "description": "The partial JSON string of the arguments to pass to the tool."
+          }
+        }
       },
       "ContentDelta": {
         "type": "object",
@@ -204,18 +211,15 @@
           "part": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/TextPart"
+                "$ref": "#/components/schemas/TextPartDelta"
               },
               {
-                "$ref": "#/components/schemas/ToolCallPart"
+                "$ref": "#/components/schemas/ToolCallPartDelta"
               }
             ]
           }
         },
-        "required": [
-          "index",
-          "part"
-        ]
+        "required": ["index", "part"]
       },
       "Tool": {
         "type": "object",
@@ -235,11 +239,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "name",
-          "description",
-          "parameters"
-        ]
+        "required": ["name", "description", "parameters"]
       },
       "ToolMessage": {
         "type": "object",
@@ -256,10 +256,7 @@
             }
           }
         },
-        "required": [
-          "role",
-          "content"
-        ]
+        "required": ["role", "content"]
       },
       "Message": {
         "oneOf": [
@@ -285,10 +282,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "inputTokens",
-          "outputTokens"
-        ]
+        "required": ["inputTokens", "outputTokens"]
       },
       "ModelResponse": {
         "type": "object",
@@ -311,9 +305,7 @@
             "$ref": "#/components/schemas/ModelUsage"
           }
         },
-        "required": [
-          "content"
-        ]
+        "required": ["content"]
       },
       "PartialModelResponse": {
         "type": "object",
@@ -322,9 +314,7 @@
             "$ref": "#/components/schemas/ContentDelta"
           }
         },
-        "required": [
-          "delta"
-        ]
+        "required": ["delta"]
       },
       "ToolChoiceAuto": {
         "type": "object",
@@ -335,9 +325,7 @@
             "const": "auto"
           }
         },
-        "required": [
-          "type"
-        ]
+        "required": ["type"]
       },
       "ToolChoiceNone": {
         "type": "object",
@@ -348,9 +336,7 @@
             "const": "none"
           }
         },
-        "required": [
-          "type"
-        ]
+        "required": ["type"]
       },
       "ToolChoiceRequired": {
         "type": "object",
@@ -361,9 +347,7 @@
             "const": "required"
           }
         },
-        "required": [
-          "type"
-        ]
+        "required": ["type"]
       },
       "ToolChoiceTool": {
         "type": "object",
@@ -377,10 +361,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "toolName"
-        ]
+        "required": ["type", "toolName"]
       },
       "ResponseFormatText": {
         "type": "object",
@@ -390,9 +371,7 @@
             "const": "text"
           }
         },
-        "required": [
-          "type"
-        ]
+        "required": ["type"]
       },
       "ResponseFormatJson": {
         "type": "object",
@@ -406,9 +385,7 @@
             "description": "The JSON schema of the response that the model must output. Not all models support this option."
           }
         },
-        "required": [
-          "type"
-        ]
+        "required": ["type"]
       },
       "LanguageModelInput": {
         "type": "object",
@@ -488,9 +465,7 @@
             "description": "The seed (integer), if set and supported by the model, to enable deterministic results."
           }
         },
-        "required": [
-          "messages"
-        ]
+        "required": ["messages"]
       }
     }
   }

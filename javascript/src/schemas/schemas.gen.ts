@@ -169,6 +169,42 @@ export const AssistantMessageSchema = {
     required: ['role', 'content']
 } as const;
 
+export const TextPartDeltaSchema = {
+    type: 'object',
+    properties: {
+        type: {
+            type: 'string',
+            const: 'text'
+        },
+        text: {
+            type: 'string'
+        }
+    },
+    required: ['type', 'text']
+} as const;
+
+export const ToolCallPartDeltaSchema = {
+    type: 'object',
+    properties: {
+        type: {
+            type: 'string',
+            const: 'tool-call'
+        },
+        toolCallId: {
+            type: 'string',
+            description: 'The ID of the tool call, used to match the tool result with the tool call.'
+        },
+        toolName: {
+            type: 'string',
+            description: 'The name of the tool to call.'
+        },
+        args: {
+            type: 'string',
+            description: 'The partial JSON string of the arguments to pass to the tool.'
+        }
+    }
+} as const;
+
 export const ContentDeltaSchema = {
     type: 'object',
     properties: {
@@ -178,10 +214,10 @@ export const ContentDeltaSchema = {
         part: {
             oneOf: [
                 {
-                    '$ref': '#/components/schemas/TextPart'
+                    '$ref': '#/components/schemas/TextPartDelta'
                 },
                 {
-                    '$ref': '#/components/schemas/ToolCallPart'
+                    '$ref': '#/components/schemas/ToolCallPartDelta'
                 }
             ]
         }

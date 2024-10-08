@@ -15,15 +15,10 @@
     "checkJs": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
+    "lib": ["ESNext", "DOM"],
     "target": "ES2022",
     "moduleResolution": "NodeNext",
     "module": "NodeNext"
   },
-  "exclude": [
-    "dist"
-  ]
+  "exclude": ["dist"]
 }

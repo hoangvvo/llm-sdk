@@ -100,9 +100,30 @@ export type AssistantMessage = {
     content: Array<(TextPart | ToolCallPart)>;
 };
 
+export type TextPartDelta = {
+    type: "text";
+    text: string;
+};
+
+export type ToolCallPartDelta = {
+    type?: "tool-call";
+    /**
+     * The ID of the tool call, used to match the tool result with the tool call.
+     */
+    toolCallId?: string;
+    /**
+     * The name of the tool to call.
+     */
+    toolName?: string;
+    /**
+     * The partial JSON string of the arguments to pass to the tool.
+     */
+    args?: string;
+};
+
 export type ContentDelta = {
     index: number;
-    part: (TextPart | ToolCallPart);
+    part: (TextPartDelta | ToolCallPartDelta);
 };
 
 /**
