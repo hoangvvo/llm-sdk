@@ -21,6 +21,7 @@ import type {
   LanguageModelInput,
   Message,
   ModelResponse,
+  ModelUsage,
   PartialModelResponse,
   Tool,
 } from "../schemas/index.js";
@@ -38,7 +39,7 @@ export class GoogleModel implements LanguageModel {
 
   private genModel: GenerativeModel;
 
-  constructor(options: GoogleModelOptions) {
+  constructor(private options: GoogleModelOptions) {
     this.provider = "google";
     this.modelId = options.modelId;
     const genAI = new GoogleGenerativeAI(options.apiKey);
@@ -57,14 +58,18 @@ export class GoogleModel implements LanguageModel {
       throw new Error("no candidates in response");
     }
 
-    return {
-      content: mapGoogleMessage(candidate.content).content,
-      ...(result.response.usageMetadata && {
-        usage: {
+    const usage: ModelUsage | undefined = result.response.usageMetadata
+      ? {
           inputTokens: result.response.usageMetadata.promptTokenCount,
           outputTokens: result.response.usageMetadata.candidatesTokenCount,
-        },
-      }),
+        }
+      : undefined;
+
+    return {
+      content: mapGoogleMessage(candidate.content).content,
+      ...(usage && { usage }),
+      ...(this.options.pricing &&
+        usage && { cost: calculateGoogleCost(usage, this.options.pricing) }),
     };
   }
 
@@ -347,4 +352,14 @@ export function mapGoogleDelta(content: Content): ContentDelta[] {
 
 function genidForToolCall() {
   return Math.random().toString(36).substring(2, 15);
+}
+
+function calculateGoogleCost(
+  usage: ModelUsage,
+  pricing: NonNullable<GoogleModelOptions["pricing"]>,
+): number {
+  return (
+    usage.inputTokens * pricing.inputTokensCost +
+    usage.outputTokens * pricing.outputTokensCost
+  );
 }

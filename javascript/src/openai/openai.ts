@@ -56,14 +56,20 @@ export class OpenAIModel implements LanguageModel {
       throw new OpenAIRefusedError(choice.message.refusal);
     }
 
-    return {
-      content: mapOpenAIMessage(choice.message).content,
-      ...(response.usage && {
-        usage: {
+    const usage: ModelUsage | undefined = response.usage
+      ? {
           inputTokens: response.usage.prompt_tokens,
           outputTokens: response.usage.completion_tokens,
-        },
-      }),
+        }
+      : undefined;
+
+    return {
+      content: mapOpenAIMessage(choice.message).content,
+      ...(usage && { usage }),
+      ...(this.options.pricing &&
+        usage && {
+          cost: calculateOpenAICost(usage, this.options.pricing),
+        }),
     };
   }
 
@@ -122,6 +128,10 @@ export class OpenAIModel implements LanguageModel {
     return {
       content: mapContentDeltas(contentDeltas),
       ...(usage && { usage }),
+      ...(this.options.pricing &&
+        usage && {
+          cost: calculateOpenAICost(usage, this.options.pricing),
+        }),
     };
   }
 }
@@ -389,4 +399,14 @@ export function mapOpenAIDelta(
     }));
   }
   return [];
+}
+
+function calculateOpenAICost(
+  usage: ModelUsage,
+  pricing: NonNullable<OpenAIModelOptions["pricing"]>,
+) {
+  return (
+    usage.inputTokens * pricing.inputTokensCost +
+    usage.outputTokens * pricing.outputTokensCost
+  );
 }

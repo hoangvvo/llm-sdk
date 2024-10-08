@@ -327,6 +327,10 @@ export const ModelResponseSchema = {
     usage: {
       $ref: "#/components/schemas/ModelUsage",
     },
+    cost: {
+      type: "number",
+      description: "The cost of the response.",
+    },
   },
   required: ["content"],
 } as const;

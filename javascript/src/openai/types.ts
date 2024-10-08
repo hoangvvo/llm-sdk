@@ -7,4 +7,8 @@ export interface OpenAIModelOptions {
    * https://platform.openai.com/docs/guides/structured-outputs
    */
   structuredOutputs?: boolean;
+  pricing?: {
+    inputTokensCost: number;
+    outputTokensCost: number;
+  };
 }

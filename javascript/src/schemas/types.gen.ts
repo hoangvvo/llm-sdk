@@ -180,6 +180,10 @@ export type ModelUsage = {
 export type ModelResponse = {
   content: Array<TextPart | ToolCallPart>;
   usage?: ModelUsage;
+  /**
+   * The cost of the response.
+   */
+  cost?: number;
 };
 
 export type PartialModelResponse = {

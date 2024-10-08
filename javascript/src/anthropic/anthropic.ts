@@ -22,7 +22,7 @@ export class AnthropicModel implements LanguageModel {
   capabilities: LanguageModelCapability[] = ["streaming", "tool"];
   private anthropic: Anthropic;
 
-  constructor(options: AnthropicModelOptions) {
+  constructor(private options: AnthropicModelOptions) {
     this.provider = "anthropic";
     this.modelId = options.modelId;
 
@@ -38,12 +38,17 @@ export class AnthropicModel implements LanguageModel {
       stream: false,
     });
 
+    const usage: ModelUsage = {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    };
+
     return {
       content: mapAnthropicMessage(response.content).content,
-      usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-      },
+      usage,
+      ...(this.options.pricing && {
+        cost: calculateAnthropicCost(usage, this.options.pricing),
+      }),
     };
   }
 
@@ -92,6 +97,9 @@ export class AnthropicModel implements LanguageModel {
     return {
       content: mapContentDeltas(contentDeltas),
       usage,
+      ...(this.options.pricing && {
+        cost: calculateAnthropicCost(usage, this.options.pricing),
+      }),
     };
   }
 }
@@ -322,4 +330,14 @@ export function mapAnthropicStreamEvent(
     );
   }
   return [];
+}
+
+function calculateAnthropicCost(
+  usage: ModelUsage,
+  pricing: NonNullable<AnthropicModelOptions["pricing"]>,
+): number {
+  return (
+    usage.inputTokens * pricing.inputTokensCost +
+    usage.outputTokens * pricing.outputTokensCost
+  );
 }
