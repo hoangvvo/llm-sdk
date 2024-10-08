@@ -54,6 +54,14 @@
           "audioData": {
             "type": "string",
             "description": "The base64-encoded audio data."
+          },
+          "bitDepth": {
+            "type": "integer",
+            "description": "The bit depth of the audio. E.g. 16, 24."
+          },
+          "sampleRate": {
+            "type": "integer",
+            "description": "The sample rate of the audio. E.g. 44100, 48000."
           }
         },
         "required": ["type", "mimeType", "audioData"]
