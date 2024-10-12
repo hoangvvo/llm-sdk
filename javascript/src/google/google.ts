@@ -7,7 +7,6 @@ import type {
   GenerationConfig,
   GenerativeModel,
   Part,
-  Schema,
   ToolConfig,
 } from "@google/generative-ai";
 import { FunctionCallingMode, GoogleGenerativeAI } from "@google/generative-ai";
@@ -258,35 +257,12 @@ export function convertToGoogleTools(
           name: tool.name,
           description: tool.description,
           ...(!!tool.parameters && {
-            parameters: convertToFunctionDeclarationSchema(tool.parameters),
+            parameters: tool.parameters as unknown as FunctionDeclarationSchema,
           }),
         };
       }),
     },
   ];
-}
-
-function convertToFunctionDeclarationSchema(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any,
-): FunctionDeclarationSchema {
-  return {
-    ...schema,
-    // TODO: gemini throws error if format is provided
-    format: undefined,
-    ...(schema.properties && {
-      properties: Object.entries(schema.properties).reduce(
-        (acc, [key, value]) => ({
-          ...acc,
-          [key]: convertToFunctionDeclarationSchema(value),
-        }),
-        {} as Record<string, FunctionDeclarationSchema>,
-      ),
-    }),
-    ...(schema.items && {
-      items: convertToFunctionDeclarationSchema(schema.items),
-    }),
-  };
 }
 
 export function convertToGoogleResponseFormat(
@@ -297,9 +273,7 @@ export function convertToGoogleResponseFormat(
       responseMimeType: "application/json",
     };
     if (responseFormat.schema) {
-      generationConfig.responseSchema = convertToFunctionDeclarationSchema(
-        responseFormat.schema,
-      ) as Schema;
+      generationConfig.responseSchema = responseFormat.schema;
     }
   }
   return undefined;

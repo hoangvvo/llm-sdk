@@ -141,18 +141,24 @@ export function convertToAnthropicMessages(
           ):
             | Anthropic.Messages.TextBlockParam
             | Anthropic.Messages.ToolUseBlockParam => {
-            if (part.type === "tool-call") {
-              return {
-                type: "tool_use",
-                id: part.toolCallId,
-                name: part.toolName,
-                input: part.args,
-              };
-            } else {
-              return {
-                type: "text",
-                text: part.text,
-              };
+            switch (part.type) {
+              case "tool-call": {
+                return {
+                  type: "tool_use",
+                  id: part.toolCallId,
+                  name: part.toolName,
+                  input: part.args,
+                };
+              }
+              case "text": {
+                return {
+                  type: "text",
+                  text: part.text,
+                };
+              }
+              default: {
+                throw new Error(`Unsupported message part type: ${part.type}`);
+              }
             }
           },
         ),

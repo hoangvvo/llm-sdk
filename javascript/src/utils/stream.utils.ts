@@ -38,7 +38,10 @@ export function mergeContentDeltas(
         }
       }
     } else {
-      mergedDeltas.push(incomingDelta);
+      mergedDeltas.push({
+        ...incomingDelta,
+        part: { ...incomingDelta.part },
+      });
     }
   }
   return mergedDeltas.sort((a, b) => a.index - b.index);
@@ -68,7 +71,7 @@ export function mapContentDeltas(
       };
     }
     throw new Error(
-      `unexpected part ${delta.part.type} at index ${delta.index}`,
+      `unexpected part ${(delta.part as { type: string }).type} at index ${delta.index}`,
     );
   });
 }

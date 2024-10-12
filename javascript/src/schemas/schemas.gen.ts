@@ -60,6 +60,10 @@ export const AudioPartSchema = {
       type: "integer",
       description: "The sample rate of the audio. E.g. 44100, 48000.",
     },
+    channels: {
+      type: "integer",
+      description: "The number of channels of the audio. E.g. 1, 2.",
+    },
   },
   required: ["type", "mimeType", "audioData"],
 } as const;
@@ -174,6 +178,9 @@ export const AssistantMessageSchema = {
           {
             $ref: "#/components/schemas/ToolCallPart",
           },
+          {
+            $ref: "#/components/schemas/AudioPart",
+          },
         ],
       },
     },
@@ -219,6 +226,37 @@ export const ToolCallPartDeltaSchema = {
   },
 } as const;
 
+export const AudioPartDeltaSchema = {
+  type: "object",
+  properties: {
+    type: {
+      type: "string",
+      const: "audio",
+    },
+    mimeType: {
+      type: "string",
+      description: 'The MIME type of the audio. E.g. "audio/mp3", "audio/wav".',
+    },
+    audioData: {
+      type: "string",
+      description: "The base64-encoded audio data.",
+    },
+    bitDepth: {
+      type: "integer",
+      description: "The bit depth of the audio. E.g. 16, 24.",
+    },
+    sampleRate: {
+      type: "integer",
+      description: "The sample rate of the audio. E.g. 44100, 48000.",
+    },
+    channels: {
+      type: "integer",
+      description: "The number of channels of the audio. E.g. 1, 2.",
+    },
+  },
+  required: ["type", "mimeType", "audioData"],
+} as const;
+
 export const ContentDeltaSchema = {
   type: "object",
   properties: {
@@ -232,6 +270,9 @@ export const ContentDeltaSchema = {
         },
         {
           $ref: "#/components/schemas/ToolCallPartDelta",
+        },
+        {
+          $ref: "#/components/schemas/AudioPartDelta",
         },
       ],
     },
@@ -320,6 +361,9 @@ export const ModelResponseSchema = {
           },
           {
             $ref: "#/components/schemas/ToolCallPart",
+          },
+          {
+            $ref: "#/components/schemas/AudioPart",
           },
         ],
       },
