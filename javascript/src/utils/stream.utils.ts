@@ -1,4 +1,9 @@
 import type { ContentDelta, ModelResponse } from "../schemas/index.js";
+import {
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  mergeInt16Arrays,
+} from "./audio.utils.js";
 
 export function mergeContentDeltas(
   deltas: ContentDelta[],
@@ -20,6 +25,32 @@ export function mergeContentDeltas(
         incomingDelta.part.type === "text"
       ) {
         existingDelta.part.text += incomingDelta.part.text;
+      } else if (
+        existingDelta.part.type === "audio" &&
+        incomingDelta.part.type === "audio"
+      ) {
+        if (incomingDelta.part.audioData) {
+          if (incomingDelta.part.encoding !== "linear16") {
+            throw new Error(
+              `only linear16 encoding is supported for audio. got ${existingDelta.part.encoding}`,
+            );
+          }
+          const existingDeltaBuffer = existingDelta.part.audioData
+            ? base64ToArrayBuffer(existingDelta.part.audioData)
+            : null;
+          const incomingDeltaBuffer = base64ToArrayBuffer(
+            incomingDelta.part.audioData,
+          );
+
+          const mergedAudioData = existingDeltaBuffer
+            ? mergeInt16Arrays(existingDeltaBuffer, incomingDeltaBuffer)
+            : incomingDeltaBuffer;
+
+          existingDelta.part.encoding =
+            incomingDelta.part.encoding ?? existingDelta.part.encoding;
+
+          existingDelta.part.audioData = arrayBufferToBase64(mergedAudioData);
+        }
       } else if (
         existingDelta.part.type === "tool-call" &&
         incomingDelta.part.type === "tool-call"
@@ -51,27 +82,42 @@ export function mapContentDeltas(
   deltas: ContentDelta[],
 ): ModelResponse["content"] {
   return deltas.map((delta) => {
-    if (delta.part.type === "text") {
-      return {
-        type: "text",
-        text: delta.part.text,
-      };
-    } else if (delta.part.type === "tool-call") {
-      if (!delta.part.toolCallId || !delta.part.toolName) {
+    switch (delta.part.type) {
+      case "text":
+        return {
+          type: "text",
+          text: delta.part.text,
+        };
+      case "audio":
+        if (!delta.part.encoding) {
+          throw new Error(
+            `missing encoding at index ${delta.index}. encoding: ${delta.part.encoding}`,
+          );
+        }
+        return {
+          type: "audio",
+          audioData: delta.part.audioData || "",
+          encoding: delta.part.encoding,
+          ...(delta.part.sampleRate && { sampleRate: delta.part.sampleRate }),
+          ...(delta.part.channels && { channels: delta.part.channels }),
+          ...(delta.part.transcript && { transcript: delta.part.transcript }),
+        };
+      case "tool-call":
+        if (!delta.part.toolCallId || !delta.part.toolName) {
+          throw new Error(
+            `missing toolCallId or toolName at index ${delta.index}. toolCallId: ${delta.part.toolCallId}, toolName: ${delta.part.toolName}`,
+          );
+        }
+        return {
+          type: "tool-call",
+          toolCallId: delta.part.toolCallId,
+          args: delta.part.args ? JSON.parse(delta.part.args) : null,
+          toolName: delta.part.toolName,
+        };
+      default:
         throw new Error(
-          `missing toolCallId or toolName at index ${delta.index}. toolCallId: ${delta.part.toolCallId}, toolName: ${delta.part.toolName}`,
+          `unexpected part ${(delta.part as { type: string }).type} at index ${delta.index}`,
         );
-      }
-
-      return {
-        type: "tool-call",
-        toolCallId: delta.part.toolCallId,
-        args: delta.part.args ? JSON.parse(delta.part.args) : null,
-        toolName: delta.part.toolName,
-      };
     }
-    throw new Error(
-      `unexpected part ${(delta.part as { type: string }).type} at index ${delta.index}`,
-    );
   });
 }

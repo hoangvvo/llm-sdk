@@ -6,6 +6,10 @@ export const openaiModel = new OpenAIModel({
   modelId: "gpt-4o",
   apiKey: process.env["OPENAI_API_KEY"] as string,
 });
+export const openaiAudioModel = new OpenAIModel({
+  modelId: "gpt-4o-audio-preview",
+  apiKey: process.env["OPENAI_API_KEY"] as string,
+});
 export const anthropicModel = new AnthropicModel({
   modelId: "claude-3-opus-20240229",
   apiKey: process.env["ANTHROPIC_API_KEY"] as string,

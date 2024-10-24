@@ -24,22 +24,20 @@ export type ImagePart = {
 };
 
 /**
+ * The encoding of the audio.
+ */
+export type AudioEncoding = "linear16" | "flac" | "mulaw" | "mp3" | "opus";
+
+/**
  * A part of the message that contains an audio.
  */
 export type AudioPart = {
   type: "audio";
   /**
-   * The MIME type of the audio. E.g. "audio/mp3", "audio/wav".
-   */
-  mimeType: string;
-  /**
    * The base64-encoded audio data.
    */
   audioData: string;
-  /**
-   * The bit depth of the audio. E.g. 16, 24.
-   */
-  bitDepth?: number;
+  encoding: AudioEncoding;
   /**
    * The sample rate of the audio. E.g. 44100, 48000.
    */
@@ -48,6 +46,10 @@ export type AudioPart = {
    * The number of channels of the audio. E.g. 1, 2.
    */
   channels?: number;
+  /**
+   * The transcript of the audio.
+   */
+  transcript?: string;
 };
 
 /**
@@ -138,17 +140,10 @@ export type ToolCallPartDelta = {
 export type AudioPartDelta = {
   type: "audio";
   /**
-   * The MIME type of the audio. E.g. "audio/mp3", "audio/wav".
-   */
-  mimeType: string;
-  /**
    * The base64-encoded audio data.
    */
-  audioData: string;
-  /**
-   * The bit depth of the audio. E.g. 16, 24.
-   */
-  bitDepth?: number;
+  audioData?: string;
+  encoding?: AudioEncoding;
   /**
    * The sample rate of the audio. E.g. 44100, 48000.
    */
@@ -157,6 +152,10 @@ export type AudioPartDelta = {
    * The number of channels of the audio. E.g. 1, 2.
    */
   channels?: number;
+  /**
+   * The transcript of the audio.
+   */
+  transcript?: string;
 };
 
 export type ContentDelta = {
@@ -261,6 +260,8 @@ export type ResponseFormatJson = {
   };
 };
 
+export type Modality = "text" | "audio";
+
 export type LanguageModelInput = {
   /**
    * A system prompt is a way of providing context and instructions to the model
@@ -314,6 +315,16 @@ export type LanguageModelInput = {
    * The seed (integer), if set and supported by the model, to enable deterministic results.
    */
   seed?: number;
+  /**
+   * The modalities that the model should support.
+   */
+  modalities?: Array<Modality>;
+  /**
+   * Extra options that the model may support.
+   */
+  extra?: {
+    [key: string]: unknown;
+  };
 };
 
 export type $OpenApiTs = unknown;

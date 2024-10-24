@@ -16,6 +16,7 @@ import type {
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
+  AudioEncoding,
   ContentDelta,
   LanguageModelInput,
   Message,
@@ -26,6 +27,10 @@ import type {
 } from "../schemas/index.js";
 import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
 import type { GoogleModelOptions } from "./types.js";
+
+type GoogleLanguageModelInput = LanguageModelInput & {
+  extra?: Partial<GenerateContentRequest>;
+};
 
 export class GoogleModel implements LanguageModel {
   provider: string;
@@ -47,7 +52,7 @@ export class GoogleModel implements LanguageModel {
     });
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(input: GoogleLanguageModelInput): Promise<ModelResponse> {
     const result = await this.genModel.generateContent(
       convertToGoogleParams(input),
     );
@@ -104,9 +109,11 @@ export class GoogleModel implements LanguageModel {
 }
 
 export function convertToGoogleParams(
-  input: LanguageModelInput,
+  input: GoogleLanguageModelInput,
 ): GenerateContentRequest {
   const toolConfig = convertToGoogleToolConfig(input.toolChoice);
+
+  const samplingParams = convertToGoogleSamplingParams(input);
 
   return {
     ...(!!input.systemPrompt && {
@@ -118,21 +125,12 @@ export function convertToGoogleParams(
     }),
     ...(toolConfig && { toolConfig }),
     generationConfig: {
+      ...samplingParams,
+      ...input.extra?.["generationConfig"],
       ...(convertToGoogleResponseFormat(input.responseFormat) || {}),
       // TODO: this does not consider input tokens
-      ...(typeof input.maxTokens === "number" && {
-        maxOutputTokens: input.maxTokens,
-      }),
-      ...(typeof input.temperature === "number" && {
-        temperature: input.temperature,
-      }),
-      ...(typeof input.topP === "number" && {
-        topP: input.topP,
-      }),
-      ...(typeof input.topK === "number" && {
-        topK: input.topK,
-      }),
     },
+    ...input.extra,
   };
 }
 
@@ -157,7 +155,7 @@ export function convertToGoogleMessages(messages: Message[]): Content[] {
           return {
             inlineData: {
               data: part.audioData,
-              mimeType: part.mimeType,
+              mimeType: convertToAudioMimeType(part.encoding),
             },
           };
         }
@@ -205,6 +203,25 @@ export function convertToGoogleMessages(messages: Message[]): Content[] {
       };
     }
   });
+}
+
+export function convertToGoogleSamplingParams(
+  input: Partial<LanguageModelInput>,
+) {
+  return {
+    ...(typeof input.maxTokens === "number" && {
+      maxOutputTokens: input.maxTokens,
+    }),
+    ...(typeof input.temperature === "number" && {
+      temperature: input.temperature,
+    }),
+    ...(typeof input.topP === "number" && {
+      topP: input.topP,
+    }),
+    ...(typeof input.topK === "number" && {
+      topK: input.topK,
+    }),
+  } satisfies GenerationConfig;
 }
 
 export function convertToGoogleToolConfig(
@@ -277,6 +294,23 @@ export function convertToGoogleResponseFormat(
     }
   }
   return undefined;
+}
+
+export function convertToAudioMimeType(encoding: AudioEncoding): string {
+  switch (encoding) {
+    case "linear16":
+      return "audio/wav";
+    case "flac":
+      return "audio/flac";
+    case "mp3":
+      return "audio/mpeg";
+    case "mulaw":
+      return "audio/x-wav";
+    case "opus":
+      return "audio/ogg";
+    default:
+      throw new Error(`unsupported audio encoding: ${encoding}`);
+  }
 }
 
 export function mapGoogleMessage(content: Content): AssistantMessage {

@@ -16,6 +16,10 @@ import type {
 import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
 import type { AnthropicModelOptions } from "./types.js";
 
+type AnthropicLanguageModelInput = LanguageModelInput & {
+  extra?: Partial<Anthropic.Messages.MessageCreateParams>;
+};
+
 export class AnthropicModel implements LanguageModel {
   provider: string;
   modelId: string;
@@ -32,7 +36,7 @@ export class AnthropicModel implements LanguageModel {
     });
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(input: AnthropicLanguageModelInput): Promise<ModelResponse> {
     const response = await this.anthropic.messages.create({
       ...convertToAnthropicParams(this.modelId, input),
       stream: false,
@@ -53,7 +57,7 @@ export class AnthropicModel implements LanguageModel {
   }
 
   async *stream(
-    input: LanguageModelInput,
+    input: AnthropicLanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
     const stream = await this.anthropic.messages.stream({
       ...convertToAnthropicParams(this.modelId, input),
@@ -110,6 +114,8 @@ export function convertToAnthropicParams(
 ): Anthropic.Messages.MessageCreateParams {
   const tool_choice = convertToAnthropicToolChoice(input.toolChoice);
 
+  const sampleParams = convertToAnthropicSamplingParams(input);
+
   return {
     model: modelId,
     messages: convertToAnthropicMessages(input.messages),
@@ -119,12 +125,9 @@ export function convertToAnthropicParams(
         tools: convertToAnthropicTools(input.tools),
       }),
     ...(tool_choice && { tool_choice }),
-    max_tokens: input.maxTokens ?? 4096,
-    ...(typeof input.temperature === "number" && {
-      temperature: input.temperature,
-    }),
-    ...(typeof input.topP === "number" && { top_p: input.topP }),
-    ...(typeof input.topK === "number" && { top_k: input.topK }),
+    ...sampleParams,
+    max_tokens: sampleParams.max_tokens || 4096,
+    ...input.extra,
   };
 }
 
@@ -216,6 +219,19 @@ export function convertToAnthropicMessages(
       };
     }
   });
+}
+
+export function convertToAnthropicSamplingParams(
+  input: Partial<LanguageModelInput>,
+) {
+  return {
+    ...(input.maxTokens && { max_tokens: input.maxTokens || 4096 }),
+    ...(typeof input.temperature === "number" && {
+      temperature: input.temperature,
+    }),
+    ...(typeof input.topP === "number" && { top_p: input.topP }),
+    ...(typeof input.topK === "number" && { top_k: input.topK }),
+  } satisfies Partial<Anthropic.Messages.MessageCreateParams>;
 }
 
 export function convertToAnthropicToolChoice(

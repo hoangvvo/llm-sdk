@@ -36,6 +36,12 @@ export const ImagePartSchema = {
   required: ["type", "mimeType", "imageData"],
 } as const;
 
+export const AudioEncodingSchema = {
+  type: "string",
+  enum: ["linear16", "flac", "mulaw", "mp3", "opus"],
+  description: "The encoding of the audio.",
+} as const;
+
 export const AudioPartSchema = {
   type: "object",
   description: "A part of the message that contains an audio.",
@@ -44,17 +50,12 @@ export const AudioPartSchema = {
       type: "string",
       const: "audio",
     },
-    mimeType: {
-      type: "string",
-      description: 'The MIME type of the audio. E.g. "audio/mp3", "audio/wav".',
-    },
     audioData: {
       type: "string",
       description: "The base64-encoded audio data.",
     },
-    bitDepth: {
-      type: "integer",
-      description: "The bit depth of the audio. E.g. 16, 24.",
+    encoding: {
+      $ref: "#/components/schemas/AudioEncoding",
     },
     sampleRate: {
       type: "integer",
@@ -64,8 +65,12 @@ export const AudioPartSchema = {
       type: "integer",
       description: "The number of channels of the audio. E.g. 1, 2.",
     },
+    transcript: {
+      type: "string",
+      description: "The transcript of the audio.",
+    },
   },
-  required: ["type", "mimeType", "audioData"],
+  required: ["type", "encoding", "audioData"],
 } as const;
 
 export const ToolCallPartSchema = {
@@ -233,17 +238,12 @@ export const AudioPartDeltaSchema = {
       type: "string",
       const: "audio",
     },
-    mimeType: {
-      type: "string",
-      description: 'The MIME type of the audio. E.g. "audio/mp3", "audio/wav".',
-    },
     audioData: {
       type: "string",
       description: "The base64-encoded audio data.",
     },
-    bitDepth: {
-      type: "integer",
-      description: "The bit depth of the audio. E.g. 16, 24.",
+    encoding: {
+      $ref: "#/components/schemas/AudioEncoding",
     },
     sampleRate: {
       type: "integer",
@@ -253,8 +253,12 @@ export const AudioPartDeltaSchema = {
       type: "integer",
       description: "The number of channels of the audio. E.g. 1, 2.",
     },
+    transcript: {
+      type: "string",
+      description: "The transcript of the audio.",
+    },
   },
-  required: ["type", "mimeType", "audioData"],
+  required: ["type"],
 } as const;
 
 export const ContentDeltaSchema = {
@@ -468,6 +472,11 @@ export const ResponseFormatJsonSchema = {
   required: ["type"],
 } as const;
 
+export const ModalitySchema = {
+  type: "string",
+  enum: ["text", "audio"],
+} as const;
+
 export const LanguageModelInputSchema = {
   type: "object",
   properties: {
@@ -553,6 +562,17 @@ export const LanguageModelInputSchema = {
       type: "integer",
       description:
         "The seed (integer), if set and supported by the model, to enable deterministic results.",
+    },
+    modalities: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Modality",
+      },
+      description: "The modalities that the model should support.",
+    },
+    extra: {
+      type: "object",
+      description: "Extra options that the model may support.",
     },
   },
   required: ["messages"],

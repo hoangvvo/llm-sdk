@@ -5,6 +5,8 @@ import type {
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
+  AudioEncoding,
+  AudioPart,
   ContentDelta,
   LanguageModelInput,
   Message,
@@ -18,6 +20,14 @@ import type {
 import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
 import { OpenAIRefusedError } from "./errors.js";
 import type { OpenAIModelOptions } from "./types.js";
+
+// TODO: no official documentation on this
+const OPENAI_AUDIO_SAMPLE_RATE = 24_000;
+const OPENAI_AUDIO_CHANNELS = 1;
+
+type OpenAILanguageModelInput = LanguageModelInput & {
+  extra?: Partial<OpenAI.Chat.Completions.ChatCompletionCreateParams>;
+};
 
 export class OpenAIModel implements LanguageModel {
   provider: string;
@@ -40,7 +50,7 @@ export class OpenAIModel implements LanguageModel {
     });
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(input: OpenAILanguageModelInput): Promise<ModelResponse> {
     const response = await this.openai.chat.completions.create({
       ...convertToOpenAIParams(this.modelId, input, this.options),
       stream: false,
@@ -64,7 +74,7 @@ export class OpenAIModel implements LanguageModel {
       : undefined;
 
     return {
-      content: mapOpenAIMessage(choice.message).content,
+      content: mapOpenAIMessage(choice.message, input.extra).content,
       ...(usage && { usage }),
       ...(this.options.pricing &&
         usage && {
@@ -74,7 +84,7 @@ export class OpenAIModel implements LanguageModel {
   }
 
   async *stream(
-    input: LanguageModelInput,
+    input: OpenAILanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
     const stream = await this.openai.chat.completions.create({
       ...convertToOpenAIParams(this.modelId, input, this.options),
@@ -103,6 +113,7 @@ export class OpenAIModel implements LanguageModel {
 
       if (completion?.delta) {
         const incomingContentDeltas = mapOpenAIDelta(completion.delta);
+
         contentDeltas = mergeContentDeltas(
           contentDeltas,
           incomingContentDeltas,
@@ -148,6 +159,8 @@ export function convertToOpenAIParams(
     options,
   );
 
+  const samplingParams = convertToOpenAISamplingParams(input);
+
   return {
     model: modelId,
     messages: convertToOpenAIMessages(input.messages, input.systemPrompt),
@@ -155,21 +168,14 @@ export function convertToOpenAIParams(
       tools: convertToOpenAITools(input.tools, options),
     }),
     ...(tool_choice && { tool_choice }),
-    ...(typeof input.maxTokens === "number" && { max_tokens: input.maxTokens }),
-    ...(typeof input.temperature === "number" && {
-      temperature: input.temperature,
-    }),
-    ...(typeof input.topP === "number" && { top_p: input.topP }),
-    ...(typeof input.presencePenalty === "number" && {
-      presence_penalty: input.presencePenalty,
-    }),
-    ...(typeof input.frequencyPenalty === "number" && {
-      frequency_penalty: input.frequencyPenalty,
-    }),
-    ...(typeof input.seed === "number" && { seed: input.seed }),
+    ...samplingParams,
     ...(response_format && {
       response_format,
     }),
+    ...(input.modalities && {
+      modalities: input.modalities,
+    }),
+    ...input.extra,
   };
 }
 
@@ -177,10 +183,15 @@ export function convertToOpenAIMessages(
   messages: Message[],
   systemPrompt?: string,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
+  const systemMessage: OpenAI.Chat.ChatCompletionSystemMessageParam | null =
+    systemPrompt
+      ? {
+          role: "system",
+          content: systemPrompt,
+        }
+      : null;
   return [
-    ...(systemPrompt
-      ? ([{ role: "system", content: systemPrompt }] as const)
-      : []),
+    ...(systemMessage ? [systemMessage] : []),
     ...messages
       .map(
         (
@@ -189,36 +200,59 @@ export function convertToOpenAIMessages(
           | OpenAI.Chat.ChatCompletionMessageParam
           | OpenAI.Chat.ChatCompletionMessageParam[] => {
           if (message.role === "assistant") {
-            const openaiMessageParam: OpenAI.Chat.ChatCompletionMessageParam = {
-              role: "assistant",
-              content:
-                null as Array<OpenAI.Chat.ChatCompletionContentPartText> | null,
-            };
+            const openaiMessageParam: OpenAI.Chat.ChatCompletionAssistantMessageParam =
+              {
+                role: "assistant",
+                content: null,
+              };
             message.content.forEach((part) => {
-              if (part.type === "text") {
-                openaiMessageParam.content = [
-                  ...(openaiMessageParam.content || []),
-                  {
-                    type: "text",
-                    text: part.text,
-                  },
-                ] as Array<OpenAI.Chat.ChatCompletionContentPartText>;
-              } else if (part.type === "tool-call") {
-                openaiMessageParam.tool_calls = [
-                  ...(openaiMessageParam.tool_calls || []),
-                  {
-                    type: "function",
-                    id: part.toolCallId,
-                    function: {
-                      name: part.toolName,
-                      arguments: JSON.stringify(part.args),
+              switch (part.type) {
+                case "text": {
+                  openaiMessageParam.content = [
+                    ...(openaiMessageParam.content || []),
+                    {
+                      type: "text",
+                      text: part.text,
                     },
-                  },
-                ];
-              } else {
-                throw new Error(
-                  `Unsupported message part type: ${(part as { type: string }).type}`,
-                );
+                  ] as Array<OpenAI.Chat.ChatCompletionContentPartText>;
+                  break;
+                }
+                case "audio": {
+                  // openai does support feeding back the audio by using
+                  // their internal ID, but being a more generic API, we
+                  // don't want to bring that ID into our API. However,
+                  // AudioPart does contain a transcript, so we can use that
+                  // as TextPart
+                  if (part.transcript) {
+                    openaiMessageParam.content = [
+                      ...(openaiMessageParam.content || []),
+                      {
+                        type: "text",
+                        text: part.transcript,
+                      },
+                    ] as Array<OpenAI.Chat.ChatCompletionContentPartText>;
+                  }
+                  break;
+                }
+                case "tool-call": {
+                  openaiMessageParam.tool_calls = [
+                    ...(openaiMessageParam.tool_calls || []),
+                    {
+                      type: "function",
+                      id: part.toolCallId,
+                      function: {
+                        name: part.toolName,
+                        arguments: JSON.stringify(part.args),
+                      },
+                    },
+                  ];
+                  break;
+                }
+                default: {
+                  throw new Error(
+                    `Unsupported message part type: ${(part as { type: string }).type}`,
+                  );
+                }
               }
             });
             return openaiMessageParam;
@@ -249,9 +283,21 @@ export function convertToOpenAIMessages(
                         },
                       };
                     }
+                    case "audio": {
+                      return {
+                        type: "input_audio",
+                        input_audio: {
+                          // this as assertion is not correct, but we will rely on OpenAI to throw an error
+                          format: convertToOpenAIAudioFormat(
+                            part.encoding,
+                          ) as OpenAI.ChatCompletionContentPartInputAudio.InputAudio["format"],
+                          data: part.audioData,
+                        },
+                      };
+                    }
                     default: {
                       throw new Error(
-                        `Unsupported message part type: ${part.type}`,
+                        `Unsupported message part type: ${(part as { type: string }).type}`,
                       );
                     }
                   }
@@ -263,6 +309,25 @@ export function convertToOpenAIMessages(
       )
       .flat(),
   ];
+}
+
+export function convertToOpenAISamplingParams(
+  input: Partial<LanguageModelInput>,
+) {
+  return {
+    ...(typeof input.maxTokens === "number" && { max_tokens: input.maxTokens }),
+    ...(typeof input.temperature === "number" && {
+      temperature: input.temperature,
+    }),
+    ...(typeof input.topP === "number" && { top_p: input.topP }),
+    ...(typeof input.presencePenalty === "number" && {
+      presence_penalty: input.presencePenalty,
+    }),
+    ...(typeof input.frequencyPenalty === "number" && {
+      frequency_penalty: input.frequencyPenalty,
+    }),
+    ...(typeof input.seed === "number" && { seed: input.seed }),
+  } satisfies Partial<OpenAI.Chat.ChatCompletionCreateParams>;
 }
 
 export function convertToOpenAIToolChoice(
@@ -301,6 +366,24 @@ export function convertToOpenAITools(
       },
     }),
   );
+}
+
+export function convertToOpenAIAudioFormat(
+  encoding: AudioEncoding,
+): OpenAI.Chat.ChatCompletionAudioParam["format"] {
+  switch (encoding) {
+    case "linear16":
+      return "pcm16";
+    case "flac":
+      return "flac";
+    case "mp3":
+      return "mp3";
+    case "opus":
+      return "opus";
+    default: {
+      throw new Error(`Unsupported audio encoding: ${encoding}`);
+    }
+  }
 }
 
 export function convertToOpenAIResponseFormat(
@@ -343,14 +426,51 @@ export function convertToOpenAIResponseFormat(
   }
 }
 
+export function mapOpenAIAudioFormat(
+  format: OpenAI.Chat.ChatCompletionAudioParam["format"],
+): AudioEncoding {
+  switch (format) {
+    case "wav":
+      return "linear16";
+    case "mp3":
+      return "mp3";
+    case "flac":
+      return "flac";
+    case "opus":
+      return "opus";
+    case "pcm16":
+      return "linear16";
+    default: {
+      throw new Error(`Unsupported audio format: ${format}`);
+    }
+  }
+}
+
 export function mapOpenAIMessage(
   message: OpenAI.Chat.Completions.ChatCompletionMessage,
+  options?: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
 ): AssistantMessage {
   return {
     role: "assistant",
     content: [
       ...(message.content
         ? [{ type: "text", text: message.content } as TextPart]
+        : []),
+      ...(message.audio
+        ? [
+            {
+              type: "audio",
+              encoding: options?.audio?.format
+                ? mapOpenAIAudioFormat(options.audio.format)
+                : "linear16",
+              ...(options?.audio?.format === "pcm16" && {
+                sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
+                channels: OPENAI_AUDIO_CHANNELS,
+              }),
+              audioData: message.audio.data,
+              transcript: message.audio.transcript,
+            } satisfies AudioPart,
+          ]
         : []),
       // tool call and content of openai are separate, so we define
       // an order here where the text content comes first, followed by
@@ -370,35 +490,60 @@ export function mapOpenAIMessage(
 }
 
 export function mapOpenAIDelta(
-  delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta,
+  delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
+    audio?: {
+      id?: string;
+      data?: string;
+      transcript?: string;
+    };
+  },
+  options?: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
 ): ContentDelta[] {
+  const contentDeltas: ContentDelta[] = [];
   if (delta.content) {
-    return [
-      {
-        // It should be safe to assume the index is always 0
-        // because openai does not send text content for tool calling
-        index: 0,
-        part: {
-          type: "text",
-          text: delta.content,
-        },
+    contentDeltas.push({
+      // It should be safe to assume the index is always 0
+      // because openai does not send text content for tool calling
+      index: 0,
+      part: {
+        type: "text",
+        text: delta.content,
       },
-    ];
+    });
+  }
+  if (delta.audio) {
+    contentDeltas.push({
+      index: 0,
+      part: {
+        type: "audio",
+        ...(delta.audio.data && {
+          audioData: delta.audio.data,
+          encoding: options?.audio?.format
+            ? mapOpenAIAudioFormat(options.audio.format)
+            : "linear16",
+          sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
+          channels: OPENAI_AUDIO_CHANNELS,
+        }),
+        ...(delta.audio.transcript && { transcript: delta.audio.transcript }),
+      },
+    });
   }
   if (delta.tool_calls) {
-    return delta.tool_calls.map((toolCall) => ({
-      index: toolCall.index,
-      part: {
-        type: "tool-call",
-        ...(toolCall.id && { toolCallId: toolCall.id }),
-        ...(toolCall.function?.name && { toolName: toolCall.function.name }),
-        ...(toolCall.function?.arguments && {
-          args: toolCall.function?.arguments,
-        }),
-      },
-    }));
+    for (const toolCall of delta.tool_calls) {
+      contentDeltas.push({
+        index: toolCall.index,
+        part: {
+          type: "tool-call",
+          ...(toolCall.id && { toolCallId: toolCall.id }),
+          ...(toolCall.function?.name && { toolName: toolCall.function.name }),
+          ...(toolCall.function?.arguments && {
+            args: toolCall.function?.arguments,
+          }),
+        },
+      });
+    }
   }
-  return [];
+  return contentDeltas;
 }
 
 function calculateOpenAICost(
