@@ -11,6 +11,7 @@ import type {
   LanguageModelInput,
   Message,
   ModelResponse,
+  ModelTokensDetail,
   ModelUsage,
   PartialModelResponse,
   TextPart,
@@ -20,7 +21,11 @@ import type {
 import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import { OpenAIRefusedError } from "./errors.js";
-import type { OpenAIModelOptions } from "./types.js";
+import type {
+  OpenAIModelOptions,
+  OpenAIPatchedCompletionTokenDetails,
+  OpenAIPatchedPromptTokensDetails,
+} from "./types.js";
 
 // TODO: no official documentation on this
 const OPENAI_AUDIO_SAMPLE_RATE = 24_000;
@@ -67,12 +72,7 @@ export class OpenAIModel implements LanguageModel {
       throw new OpenAIRefusedError(choice.message.refusal);
     }
 
-    const usage: ModelUsage | undefined = response.usage
-      ? {
-          inputTokens: response.usage.prompt_tokens,
-          outputTokens: response.usage.completion_tokens,
-        }
-      : undefined;
+    const usage = response.usage ? mapOpenAIUsage(response.usage) : undefined;
 
     return {
       content: mapOpenAIMessage(choice.message, input.extra).content,
@@ -126,10 +126,8 @@ export class OpenAIModel implements LanguageModel {
       }
 
       if (chunk.usage) {
-        usage = {
-          inputTokens: chunk.usage.prompt_tokens,
-          outputTokens: chunk.usage.completion_tokens,
-        };
+        usage = mapOpenAIUsage(chunk.usage);
+        console.log(chunk.usage, this.metadata?.pricing);
       }
     }
 
@@ -545,4 +543,39 @@ export function mapOpenAIDelta(
     }
   }
   return contentDeltas;
+}
+
+export function mapOpenAIUsage(usage: OpenAI.CompletionUsage): ModelUsage {
+  return {
+    inputTokens: usage.prompt_tokens,
+    outputTokens: usage.completion_tokens,
+    ...(usage.prompt_tokens_details && {
+      inputTokensDetail: mapOpenAIPromptTokensDetails(
+        usage.prompt_tokens_details as OpenAIPatchedPromptTokensDetails,
+      ),
+      outputTokensDetail: mapOpenAICompletionTokenDetails(
+        usage.completion_tokens_details as OpenAIPatchedCompletionTokenDetails,
+      ),
+    }),
+  };
+}
+
+export function mapOpenAIPromptTokensDetails(
+  details: OpenAIPatchedPromptTokensDetails,
+): ModelTokensDetail {
+  return {
+    textTokens: details.text_tokens,
+    imageTokens: details.image_tokens,
+    audioTokens: details.audio_tokens,
+  };
+}
+
+export function mapOpenAICompletionTokenDetails(
+  details: OpenAIPatchedCompletionTokenDetails,
+): ModelTokensDetail {
+  return {
+    textTokens: details.text_tokens,
+    audioTokens: details.audio_tokens,
+    // note: reasoning_tokens is included in output_tokens
+  };
 }

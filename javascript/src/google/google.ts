@@ -8,6 +8,7 @@ import type {
   GenerativeModel,
   Part,
   ToolConfig,
+  UsageMetadata,
 } from "@google/generative-ai";
 import { FunctionCallingMode, GoogleGenerativeAI } from "@google/generative-ai";
 import type {
@@ -62,10 +63,7 @@ export class GoogleModel implements LanguageModel {
     }
 
     const usage: ModelUsage | undefined = result.response.usageMetadata
-      ? {
-          inputTokens: result.response.usageMetadata.promptTokenCount,
-          outputTokens: result.response.usageMetadata.candidatesTokenCount,
-        }
+      ? mapGoogleUsage(result.response.usageMetadata)
       : undefined;
 
     return {
@@ -84,6 +82,7 @@ export class GoogleModel implements LanguageModel {
     );
 
     let contentDeltas: ContentDelta[] = [];
+    let usage: ModelUsage | undefined;
 
     for await (const chunk of stream) {
       const candidate = chunk.candidates?.[0];
@@ -99,10 +98,15 @@ export class GoogleModel implements LanguageModel {
           yield { delta };
         }
       }
+
+      if (chunk.usageMetadata) {
+        usage = mapGoogleUsage(chunk.usageMetadata);
+      }
     }
 
     return {
       content: mapContentDeltas(contentDeltas),
+      ...(usage && { usage }),
     };
   }
 }
@@ -355,6 +359,13 @@ export function mapGoogleDelta(content: Content): ContentDelta[] {
       part,
     };
   });
+}
+
+function mapGoogleUsage(usage: UsageMetadata): ModelUsage {
+  return {
+    inputTokens: usage.promptTokenCount,
+    outputTokens: usage.candidatesTokenCount,
+  };
 }
 
 function genidForToolCall() {

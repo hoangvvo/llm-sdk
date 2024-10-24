@@ -11,8 +11,12 @@ export type LanguageModelCapability =
   | "audio";
 
 export type LanguageModelPricing = {
-  inputTokensCost: number;
-  outputTokensCost: number;
+  inputCostPerTextToken?: number;
+  outputCostPerTextToken?: number;
+  inputCostPerAudioToken?: number;
+  outputCostPerAudioToken?: number;
+  inputCostPerImageToken?: number;
+  outputCostPerImageToken?: number;
 };
 
 export type LanguageModelMetadata = {
@@ -23,7 +27,7 @@ export type LanguageModelMetadata = {
   /**
    * The capabilities of the model.
    */
-  capabilities: LanguageModelCapability[];
+  capabilities?: LanguageModelCapability[];
 };
 
 export interface LanguageModel {

@@ -8,3 +8,18 @@ export interface OpenAIModelOptions {
    */
   structuredOutputs?: boolean;
 }
+
+// documented type is wrong
+export type OpenAIPatchedPromptTokensDetails = {
+  cached_tokens: number;
+  text_tokens: number;
+  image_tokens: number;
+  audio_tokens: number;
+};
+
+// documented type is wrong
+export type OpenAIPatchedCompletionTokenDetails = {
+  reasoning_tokens: 0;
+  text_tokens: 63;
+  audio_tokens: 286;
+};

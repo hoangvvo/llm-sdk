@@ -1,14 +1,9 @@
 import Speaker from "speaker";
-import { OpenAIModel } from "../src/openai/openai.js";
+import { openaiAudioModel } from "./model.js";
 
 let speaker: Speaker | undefined;
 
-const openaiModel = new OpenAIModel({
-  modelId: "gpt-4o-audio-preview",
-  apiKey: process.env["OPENAI_API_KEY"] as string,
-});
-
-const response = await openaiModel.stream({
+const response = await openaiAudioModel.stream({
   extra: {
     audio: {
       voice: "alloy",

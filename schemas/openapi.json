@@ -322,6 +322,21 @@
           }
         ]
       },
+      "ModelTokensDetail": {
+        "type": "object",
+        "description": "Represents the token usage of the model.",
+        "properties": {
+          "textTokens": {
+            "type": "integer"
+          },
+          "audioTokens": {
+            "type": "integer"
+          },
+          "imageTokens": {
+            "type": "integer"
+          }
+        }
+      },
       "ModelUsage": {
         "type": "object",
         "description": "Represents the token usage of the model.",
@@ -331,6 +346,12 @@
           },
           "outputTokens": {
             "type": "integer"
+          },
+          "inputTokensDetail": {
+            "$ref": "#/components/schemas/ModelTokensDetail"
+          },
+          "outputTokensDetail": {
+            "$ref": "#/components/schemas/ModelTokensDetail"
           }
         },
         "required": ["inputTokens", "outputTokens"]

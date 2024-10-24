@@ -1,8 +1,6 @@
 import audioContext from "audio-context";
 import decodeAudio from "audio-decode";
 import play from "audio-play";
-import { mkdir } from "fs/promises";
-import { join } from "path";
 import { openaiAudioModel } from "./model.js";
 
 const response = await openaiAudioModel.generate({
@@ -26,9 +24,7 @@ const response = await openaiAudioModel.generate({
   ],
 });
 
-const tempDir = join(import.meta.dirname, "temp");
-
-await mkdir(tempDir, { recursive: true });
+console.dir(response, { depth: null });
 
 const audioPart = response.content.find((part) => part.type === "audio");
 
