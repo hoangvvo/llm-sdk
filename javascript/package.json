@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@hoangvvo/llm-sdk",
-  "version": "0.0.7",
+  "version": "0.1.0",
   "description": "A unified LLM SDK",
   "scripts": {
     "generate": "npx @hey-api/openapi-ts -i ../schemas/openapi.json -o ./src/schemas/ --exportCore false --services false --client @hey-api/client-fetch",
