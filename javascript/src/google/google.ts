@@ -12,7 +12,7 @@ import type {
 import { FunctionCallingMode, GoogleGenerativeAI } from "@google/generative-ai";
 import type {
   LanguageModel,
-  LanguageModelCapability,
+  LanguageModelMetadata,
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
@@ -26,6 +26,7 @@ import type {
   Tool,
 } from "../schemas/index.js";
 import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
+import { calculateCost } from "../utils/usage.utils.js";
 import type { GoogleModelOptions } from "./types.js";
 
 type GoogleLanguageModelInput = LanguageModelInput & {
@@ -35,17 +36,15 @@ type GoogleLanguageModelInput = LanguageModelInput & {
 export class GoogleModel implements LanguageModel {
   provider: string;
   modelId: string;
-  capabilities: LanguageModelCapability[] = [
-    "streaming",
-    "tool",
-    "response-format-json",
-  ];
+  metadata?: LanguageModelMetadata;
 
   private genModel: GenerativeModel;
 
-  constructor(private options: GoogleModelOptions) {
+  constructor(options: GoogleModelOptions, metadata?: LanguageModelMetadata) {
     this.provider = "google";
     this.modelId = options.modelId;
+    if (metadata) this.metadata = metadata;
+
     const genAI = new GoogleGenerativeAI(options.apiKey);
     this.genModel = genAI.getGenerativeModel({
       model: options.modelId,
@@ -72,8 +71,8 @@ export class GoogleModel implements LanguageModel {
     return {
       content: mapGoogleMessage(candidate.content).content,
       ...(usage && { usage }),
-      ...(this.options.pricing &&
-        usage && { cost: calculateGoogleCost(usage, this.options.pricing) }),
+      ...(this.metadata?.pricing &&
+        usage && { cost: calculateCost(usage, this.metadata.pricing) }),
     };
   }
 
@@ -360,14 +359,4 @@ export function mapGoogleDelta(content: Content): ContentDelta[] {
 
 function genidForToolCall() {
   return Math.random().toString(36).substring(2, 15);
-}
-
-function calculateGoogleCost(
-  usage: ModelUsage,
-  pricing: NonNullable<GoogleModelOptions["pricing"]>,
-): number {
-  return (
-    usage.inputTokens * pricing.inputTokensCost +
-    usage.outputTokens * pricing.outputTokensCost
-  );
 }

@@ -7,7 +7,24 @@ import type {
 export type LanguageModelCapability =
   | "streaming"
   | "tool"
-  | "response-format-json";
+  | "response-format-json"
+  | "audio";
+
+export type LanguageModelPricing = {
+  inputTokensCost: number;
+  outputTokensCost: number;
+};
+
+export type LanguageModelMetadata = {
+  /**
+   * The pricing per single token for the model. Used to calculate the cost of a response.
+   */
+  pricing?: LanguageModelPricing;
+  /**
+   * The capabilities of the model.
+   */
+  capabilities: LanguageModelCapability[];
+};
 
 export interface LanguageModel {
   /**
@@ -19,9 +36,9 @@ export interface LanguageModel {
    */
   modelId: string;
   /**
-   * The capabilities of the model.
+   * The metadata of the model.
    */
-  capabilities: LanguageModelCapability[];
+  metadata?: LanguageModelMetadata;
   /**
    * Generates a response to the given input.
    */

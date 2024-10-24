@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type {
   LanguageModel,
-  LanguageModelCapability,
+  LanguageModelMetadata,
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
@@ -14,6 +14,7 @@ import type {
   Tool,
 } from "../schemas/index.js";
 import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
+import { calculateCost } from "../utils/usage.utils.js";
 import type { AnthropicModelOptions } from "./types.js";
 
 type AnthropicLanguageModelInput = LanguageModelInput & {
@@ -23,12 +24,16 @@ type AnthropicLanguageModelInput = LanguageModelInput & {
 export class AnthropicModel implements LanguageModel {
   provider: string;
   modelId: string;
-  capabilities: LanguageModelCapability[] = ["streaming", "tool"];
   private anthropic: Anthropic;
+  public metadata?: LanguageModelMetadata;
 
-  constructor(private options: AnthropicModelOptions) {
+  constructor(
+    options: AnthropicModelOptions,
+    metadata?: LanguageModelMetadata,
+  ) {
     this.provider = "anthropic";
     this.modelId = options.modelId;
+    if (metadata) this.metadata = metadata;
 
     this.anthropic = new Anthropic({
       baseURL: options.baseURL,
@@ -50,8 +55,8 @@ export class AnthropicModel implements LanguageModel {
     return {
       content: mapAnthropicMessage(response.content).content,
       usage,
-      ...(this.options.pricing && {
-        cost: calculateAnthropicCost(usage, this.options.pricing),
+      ...(this.metadata?.pricing && {
+        cost: calculateCost(usage, this.metadata?.pricing),
       }),
     };
   }
@@ -101,8 +106,8 @@ export class AnthropicModel implements LanguageModel {
     return {
       content: mapContentDeltas(contentDeltas),
       usage,
-      ...(this.options.pricing && {
-        cost: calculateAnthropicCost(usage, this.options.pricing),
+      ...(this.metadata?.pricing && {
+        cost: calculateCost(usage, this.metadata?.pricing),
       }),
     };
   }
@@ -352,14 +357,4 @@ export function mapAnthropicStreamEvent(
     );
   }
   return [];
-}
-
-function calculateAnthropicCost(
-  usage: ModelUsage,
-  pricing: NonNullable<AnthropicModelOptions["pricing"]>,
-): number {
-  return (
-    usage.inputTokens * pricing.inputTokensCost +
-    usage.outputTokens * pricing.outputTokensCost
-  );
 }

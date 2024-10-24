@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import type {
   LanguageModel,
-  LanguageModelCapability,
+  LanguageModelMetadata,
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
@@ -18,6 +18,7 @@ import type {
   ToolCallPart,
 } from "../schemas/index.js";
 import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
+import { calculateCost } from "../utils/usage.utils.js";
 import { OpenAIRefusedError } from "./errors.js";
 import type { OpenAIModelOptions } from "./types.js";
 
@@ -32,17 +33,17 @@ type OpenAILanguageModelInput = LanguageModelInput & {
 export class OpenAIModel implements LanguageModel {
   provider: string;
   modelId: string;
-  capabilities: LanguageModelCapability[] = [
-    "streaming",
-    "tool",
-    "response-format-json",
-  ];
+  metadata?: LanguageModelMetadata;
 
   private openai: OpenAI;
 
-  constructor(public options: OpenAIModelOptions) {
+  constructor(
+    public options: OpenAIModelOptions,
+    metadata?: LanguageModelMetadata,
+  ) {
     this.provider = "openai";
     this.modelId = options.modelId;
+    if (metadata) this.metadata = metadata;
 
     this.openai = new OpenAI({
       baseURL: options.baseURL,
@@ -76,9 +77,9 @@ export class OpenAIModel implements LanguageModel {
     return {
       content: mapOpenAIMessage(choice.message, input.extra).content,
       ...(usage && { usage }),
-      ...(this.options.pricing &&
+      ...(this.metadata?.pricing &&
         usage && {
-          cost: calculateOpenAICost(usage, this.options.pricing),
+          cost: calculateCost(usage, this.metadata.pricing),
         }),
     };
   }
@@ -139,9 +140,9 @@ export class OpenAIModel implements LanguageModel {
     return {
       content: mapContentDeltas(contentDeltas),
       ...(usage && { usage }),
-      ...(this.options.pricing &&
+      ...(this.metadata?.pricing &&
         usage && {
-          cost: calculateOpenAICost(usage, this.options.pricing),
+          cost: calculateCost(usage, this.metadata.pricing),
         }),
     };
   }
@@ -544,14 +545,4 @@ export function mapOpenAIDelta(
     }
   }
   return contentDeltas;
-}
-
-function calculateOpenAICost(
-  usage: ModelUsage,
-  pricing: NonNullable<OpenAIModelOptions["pricing"]>,
-) {
-  return (
-    usage.inputTokens * pricing.inputTokensCost +
-    usage.outputTokens * pricing.outputTokensCost
-  );
 }
