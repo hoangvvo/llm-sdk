@@ -7,8 +7,11 @@ import type {
 export type LanguageModelCapability =
   | "streaming"
   | "tool"
-  | "response-format-json"
-  | "audio";
+  | "structured-output"
+  | "structured-output-strict" // openai-specific
+  | "audio-input"
+  | "audio-output"
+  | "image-input";
 
 export type LanguageModelPricing = {
   inputCostPerTextToken?: number;
