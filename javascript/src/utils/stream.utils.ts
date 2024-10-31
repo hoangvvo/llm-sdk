@@ -17,7 +17,7 @@ export function mergeContentDeltas(
     if (existingDelta) {
       if (existingDelta.part.type !== incomingDelta.part.type) {
         throw new Error(
-          `unexpected part ${existingDelta.part.type} at index ${existingDelta.index}`,
+          `unexpected part ${incomingDelta.part.type} at index ${incomingDelta.index}. existing part has type ${incomingDelta.part.type}`,
         );
       }
       if (
@@ -89,14 +89,19 @@ export function mapContentDeltas(
           text: delta.part.text,
         };
       case "audio":
+        if (!delta.part.audioData) {
+          throw new Error(
+            `missing audioData at index ${delta.index} for audio part. audioData: ${delta.part.audioData}`,
+          );
+        }
         if (!delta.part.encoding) {
           throw new Error(
-            `missing encoding at index ${delta.index}. encoding: ${delta.part.encoding}`,
+            `missing encoding at index ${delta.index} for audio part. encoding: ${delta.part.encoding}`,
           );
         }
         return {
           type: "audio",
-          audioData: delta.part.audioData || "",
+          audioData: delta.part.audioData,
           encoding: delta.part.encoding,
           ...(delta.part.sampleRate && { sampleRate: delta.part.sampleRate }),
           ...(delta.part.channels && { channels: delta.part.channels }),

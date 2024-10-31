@@ -31,7 +31,7 @@ import type {
 const OPENAI_AUDIO_SAMPLE_RATE = 24_000;
 const OPENAI_AUDIO_CHANNELS = 1;
 
-type OpenAILanguageModelInput = LanguageModelInput & {
+export type OpenAILanguageModelInput = LanguageModelInput & {
   extra?: Partial<OpenAI.Chat.Completions.ChatCompletionCreateParams>;
 };
 
@@ -57,10 +57,12 @@ export class OpenAIModel implements LanguageModel {
   }
 
   async generate(input: OpenAILanguageModelInput): Promise<ModelResponse> {
-    const response = await this.openai.chat.completions.create({
+    const openaiInput = {
       ...convertToOpenAIParams(this.modelId, input, this.options),
       stream: false,
-    });
+    } satisfies OpenAI.Chat.ChatCompletionCreateParams;
+
+    const response = await this.openai.chat.completions.create(openaiInput);
 
     if (!response.choices[0]) {
       throw new Error("no choices in response");
@@ -75,7 +77,7 @@ export class OpenAIModel implements LanguageModel {
     const usage = response.usage ? mapOpenAIUsage(response.usage) : undefined;
 
     return {
-      content: mapOpenAIMessage(choice.message, input.extra).content,
+      content: mapOpenAIMessage(choice.message, openaiInput).content,
       ...(usage && { usage }),
       ...(this.metadata?.pricing &&
         usage && {
@@ -87,13 +89,15 @@ export class OpenAIModel implements LanguageModel {
   async *stream(
     input: OpenAILanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const stream = await this.openai.chat.completions.create({
+    const openaiInput = {
       ...convertToOpenAIParams(this.modelId, input, this.options),
       stream: true,
       stream_options: {
         include_usage: true,
       },
-    });
+    } satisfies OpenAI.Chat.ChatCompletionCreateParams;
+
+    const stream = await this.openai.chat.completions.create(openaiInput);
 
     let usage: ModelUsage | undefined;
 
@@ -113,7 +117,11 @@ export class OpenAIModel implements LanguageModel {
       }
 
       if (completion?.delta) {
-        const incomingContentDeltas = mapOpenAIDelta(completion.delta);
+        const incomingContentDeltas = mapOpenAIDelta(
+          completion.delta,
+          openaiInput,
+          contentDeltas,
+        );
 
         contentDeltas = mergeContentDeltas(
           contentDeltas,
@@ -127,7 +135,6 @@ export class OpenAIModel implements LanguageModel {
 
       if (chunk.usage) {
         usage = mapOpenAIUsage(chunk.usage);
-        console.log(chunk.usage, this.metadata?.pricing);
       }
     }
 
@@ -497,13 +504,26 @@ export function mapOpenAIDelta(
     };
   },
   options?: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
+  existingContentDeltas?: ContentDelta[],
 ): ContentDelta[] {
   const contentDeltas: ContentDelta[] = [];
+
+  // OpenAI will only either have text, audio, or tool_calls
+  // so we can assume that the first non-tool call index is 0
+  const nonToolCallIndex = 0;
+
+  // However, it has been noticed that OpenAI will sometimes
+  // responds with a tool call after responding with text parts
+  // therefore, we must increase the indexes of tool calls by this
+  // TODO: we need to find a better solution here to map the indexes
+  // correctly
+  const nonToolCallCount =
+    existingContentDeltas?.filter((delta) => delta.part.type !== "tool-call")
+      .length || 0;
+
   if (delta.content) {
     contentDeltas.push({
-      // It should be safe to assume the index is always 0
-      // because openai does not send text content for tool calling
-      index: 0,
+      index: nonToolCallIndex,
       part: {
         type: "text",
         text: delta.content,
@@ -512,7 +532,7 @@ export function mapOpenAIDelta(
   }
   if (delta.audio) {
     contentDeltas.push({
-      index: 0,
+      index: nonToolCallIndex,
       part: {
         type: "audio",
         ...(delta.audio.data && {
@@ -530,7 +550,7 @@ export function mapOpenAIDelta(
   if (delta.tool_calls) {
     for (const toolCall of delta.tool_calls) {
       contentDeltas.push({
-        index: toolCall.index,
+        index: nonToolCallCount + toolCall.index,
         part: {
           type: "tool-call",
           ...(toolCall.id && { toolCallId: toolCall.id }),

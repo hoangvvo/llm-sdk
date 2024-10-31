@@ -17,7 +17,7 @@ import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import type { AnthropicModelOptions } from "./types.js";
 
-type AnthropicLanguageModelInput = LanguageModelInput & {
+export type AnthropicLanguageModelInput = LanguageModelInput & {
   extra?: Partial<Anthropic.Messages.MessageCreateParams>;
 };
 

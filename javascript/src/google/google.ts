@@ -30,7 +30,7 @@ import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import type { GoogleModelOptions } from "./types.js";
 
-type GoogleLanguageModelInput = LanguageModelInput & {
+export type GoogleLanguageModelInput = LanguageModelInput & {
   extra?: Partial<GenerateContentRequest>;
 };
 

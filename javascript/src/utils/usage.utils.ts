@@ -5,7 +5,6 @@ export function calculateCost(
   usage: ModelUsage,
   pricing: LanguageModelPricing,
 ) {
-  console.log("here?");
   let cost = 0;
   if (usage.inputTokensDetail) {
     // use detailed token counts if available
