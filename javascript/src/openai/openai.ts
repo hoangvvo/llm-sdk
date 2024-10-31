@@ -18,7 +18,7 @@ import type {
   Tool,
   ToolCallPart,
 } from "../schemas/index.js";
-import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
+import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import { OpenAIRefusedError } from "./errors.js";
 import type {
@@ -103,7 +103,7 @@ export class OpenAIModel implements LanguageModel {
 
     let refusal = "";
 
-    let contentDeltas: ContentDelta[] = [];
+    const accumulator = new ContentDeltaAccumulator();
 
     for await (const chunk of stream) {
       const choice = chunk.choices?.[0];
@@ -120,13 +120,10 @@ export class OpenAIModel implements LanguageModel {
         const incomingContentDeltas = mapOpenAIDelta(
           completion.delta,
           openaiInput,
-          contentDeltas,
+          accumulator.deltas,
         );
 
-        contentDeltas = mergeContentDeltas(
-          contentDeltas,
-          incomingContentDeltas,
-        );
+        accumulator.addChunks(incomingContentDeltas);
 
         for (const delta of incomingContentDeltas) {
           yield { delta };
@@ -143,7 +140,7 @@ export class OpenAIModel implements LanguageModel {
     }
 
     return {
-      content: mapContentDeltas(contentDeltas),
+      content: accumulator.computeContent(),
       ...(usage && { usage }),
       ...(this.metadata?.pricing &&
         usage && {

@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@hoangvvo/llm-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A unified LLM SDK",
   "scripts": {
     "generate": "npx @hey-api/openapi-ts -i ../schemas/openapi.json -o ./src/schemas/ --exportCore false --services false --client @hey-api/client-fetch",
@@ -52,6 +52,16 @@
         "default": "./dist/commonjs/google/index.js"
       }
     },
+    "./utils": {
+      "import": {
+        "types": "./dist/esm/utils/index.d.ts",
+        "default": "./dist/esm/utils/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/utils/index.d.ts",
+        "default": "./dist/commonjs/utils/index.js"
+      }
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/commonjs/index.js",
@@ -79,6 +89,7 @@
       "./openai": "./src/openai/index.ts",
       "./anthropic": "./src/anthropic/index.ts",
       "./google": "./src/google/index.ts",
+      "./utils": "./src/utils/index.ts",
       "./package.json": "./package.json"
     },
     "project": "tsconfig.build.json"

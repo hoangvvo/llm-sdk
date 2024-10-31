@@ -26,7 +26,7 @@ import type {
   PartialModelResponse,
   Tool,
 } from "../schemas/index.js";
-import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
+import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import type { GoogleModelOptions } from "./types.js";
 
@@ -81,18 +81,16 @@ export class GoogleModel implements LanguageModel {
       convertToGoogleParams(input),
     );
 
-    let contentDeltas: ContentDelta[] = [];
     let usage: ModelUsage | undefined;
+
+    const accumulator = new ContentDeltaAccumulator();
 
     for await (const chunk of stream) {
       const candidate = chunk.candidates?.[0];
 
       if (candidate?.content) {
         const incomingContentDeltas = mapGoogleDelta(candidate.content);
-        contentDeltas = mergeContentDeltas(
-          contentDeltas,
-          incomingContentDeltas,
-        );
+        accumulator.addChunks(incomingContentDeltas);
 
         for (const delta of incomingContentDeltas) {
           yield { delta };
@@ -105,7 +103,7 @@ export class GoogleModel implements LanguageModel {
     }
 
     return {
-      content: mapContentDeltas(contentDeltas),
+      content: accumulator.computeContent(),
       ...(usage && { usage }),
     };
   }

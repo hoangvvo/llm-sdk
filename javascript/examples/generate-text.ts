@@ -1,6 +1,6 @@
-import { openaiAudioModel } from "./model.js";
+import { openaiModel } from "./model.js";
 
-const response = await openaiAudioModel.generate({
+const response = await openaiModel.generate({
   messages: [
     {
       role: "user",

@@ -13,7 +13,7 @@ import type {
   PartialModelResponse,
   Tool,
 } from "../schemas/index.js";
-import { mapContentDeltas, mergeContentDeltas } from "../utils/stream.utils.js";
+import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import type { AnthropicModelOptions } from "./types.js";
 
@@ -74,7 +74,7 @@ export class AnthropicModel implements LanguageModel {
       outputTokens: 0,
     };
 
-    let contentDeltas: ContentDelta[] = [];
+    const accumulator = new ContentDeltaAccumulator();
 
     for await (const chunk of stream) {
       // https://docs.anthropic.com/claude/reference/messages-streaming#raw-http-stream-response
@@ -90,10 +90,7 @@ export class AnthropicModel implements LanguageModel {
         case "content_block_start":
         case "content_block_delta": {
           const incomingContentDeltas = mapAnthropicStreamEvent(chunk);
-          contentDeltas = mergeContentDeltas(
-            contentDeltas,
-            incomingContentDeltas,
-          );
+          accumulator.addChunks(incomingContentDeltas);
 
           for (const delta of incomingContentDeltas) {
             yield { delta };
@@ -104,7 +101,7 @@ export class AnthropicModel implements LanguageModel {
     }
 
     return {
-      content: mapContentDeltas(contentDeltas),
+      content: accumulator.computeContent(),
       usage,
       ...(this.metadata?.pricing && {
         cost: calculateCost(usage, this.metadata?.pricing),

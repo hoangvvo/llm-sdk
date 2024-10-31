@@ -5,7 +5,19 @@ import {
   mergeInt16Arrays,
 } from "./audio.utils.js";
 
-export function mergeContentDeltas(
+export class ContentDeltaAccumulator {
+  deltas: ContentDelta[] = [];
+
+  addChunks(deltas: ContentDelta[]) {
+    this.deltas = mergeContentDeltas(this.deltas, deltas);
+  }
+
+  computeContent(): ModelResponse["content"] {
+    return mapContentDeltas(this.deltas);
+  }
+}
+
+function mergeContentDeltas(
   deltas: ContentDelta[],
   incomingDeltas: ContentDelta[],
 ) {
@@ -51,6 +63,10 @@ export function mergeContentDeltas(
 
           existingDelta.part.audioData = arrayBufferToBase64(mergedAudioData);
         }
+        if (incomingDelta.part.transcript) {
+          existingDelta.part.transcript = existingDelta.part.transcript || "";
+          existingDelta.part.transcript += incomingDelta.part.transcript;
+        }
       } else if (
         existingDelta.part.type === "tool-call" &&
         incomingDelta.part.type === "tool-call"
@@ -78,9 +94,7 @@ export function mergeContentDeltas(
   return mergedDeltas.sort((a, b) => a.index - b.index);
 }
 
-export function mapContentDeltas(
-  deltas: ContentDelta[],
-): ModelResponse["content"] {
+function mapContentDeltas(deltas: ContentDelta[]): ModelResponse["content"] {
   return deltas.map((delta) => {
     switch (delta.part.type) {
       case "text":
