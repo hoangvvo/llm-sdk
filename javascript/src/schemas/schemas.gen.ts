@@ -239,7 +239,8 @@ export const ToolCallPartDeltaSchema = {
             type: 'string',
             description: 'The partial JSON string of the arguments to pass to the tool.'
         }
-    }
+    },
+    required: ['type']
 } as const;
 
 export const AudioPartDeltaSchema = {

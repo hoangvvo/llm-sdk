@@ -262,7 +262,7 @@ export type ToolCallPart = {
 };
 
 export type ToolCallPartDelta = {
-    type?: "tool-call";
+    type: "tool-call";
     /**
      * The ID of the tool call, used to match the tool result with the tool call.
      */
