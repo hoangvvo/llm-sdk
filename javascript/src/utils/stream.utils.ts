@@ -1,142 +1,145 @@
-import type { ContentDelta, ModelResponse } from "../schemas/index.js";
+import type {
+  AudioPartDelta,
+  ContentDelta,
+  ModelResponse,
+  TextPartDelta,
+  ToolCallPartDelta,
+} from "../schemas/index.js";
 import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
   mergeInt16Arrays,
 } from "./audio.utils.js";
 
-export class ContentDeltaAccumulator {
-  deltas: ContentDelta[] = [];
+export type InternalAudioPartDelta = Omit<AudioPartDelta, "audioData"> & {
+  audioData: ArrayBuffer[];
+};
 
-  addChunks(deltas: ContentDelta[]) {
-    this.deltas = mergeContentDeltas(this.deltas, deltas);
+export interface InternalContentDelta {
+  index: number;
+  part: TextPartDelta | ToolCallPartDelta | InternalAudioPartDelta;
+}
+
+export class ContentDeltaAccumulator {
+  deltas: InternalContentDelta[] = [];
+
+  addChunks(incomingDeltas: ContentDelta[]) {
+    for (const incomingDelta of incomingDeltas) {
+      const existingDelta = this.deltas.find(
+        (delta) => delta.index === incomingDelta.index,
+      );
+
+      if (existingDelta) {
+        if (
+          existingDelta.part.type === "text" &&
+          incomingDelta.part.type === "text"
+        ) {
+          existingDelta.part.text += incomingDelta.part.text;
+        } else if (
+          existingDelta.part.type === "tool-call" &&
+          incomingDelta.part.type === "tool-call"
+        ) {
+          if (incomingDelta.part.toolName) {
+            existingDelta.part.toolName =
+              (existingDelta.part.toolName || "") + incomingDelta.part.toolName;
+          }
+          if (incomingDelta.part.toolCallId) {
+            existingDelta.part.toolCallId = incomingDelta.part.toolCallId;
+          }
+          if (incomingDelta.part.args) {
+            existingDelta.part.args =
+              (existingDelta.part.args || "") + incomingDelta.part.args;
+          }
+        } else if (
+          existingDelta.part.type === "audio" &&
+          incomingDelta.part.type === "audio"
+        ) {
+          if (incomingDelta.part.audioData) {
+            const incomingAudioData = base64ToArrayBuffer(
+              incomingDelta.part.audioData,
+            );
+            // keep an array of audioBuffer internally and concat at the end
+            existingDelta.part.audioData.push(incomingAudioData);
+          }
+          if (incomingDelta.part.encoding) {
+            existingDelta.part.encoding = incomingDelta.part.encoding;
+          }
+          if (incomingDelta.part.sampleRate) {
+            existingDelta.part.sampleRate = incomingDelta.part.sampleRate;
+          }
+          if (incomingDelta.part.channels) {
+            existingDelta.part.channels = incomingDelta.part.channels;
+          }
+          if (incomingDelta.part.transcript) {
+            existingDelta.part.transcript =
+              (existingDelta.part.transcript || "") +
+              incomingDelta.part.transcript;
+          }
+        } else {
+          throw new Error(
+            `unexpected part at index ${incomingDelta.index}. existing part has type ${existingDelta.part.type}, incoming part has type ${incomingDelta.part.type}`,
+          );
+        }
+      } else {
+        this.deltas.push({
+          index: incomingDelta.index,
+          part: {
+            ...(incomingDelta.part.type === "audio"
+              ? {
+                  ...incomingDelta.part,
+                  audioData: incomingDelta.part.audioData
+                    ? [base64ToArrayBuffer(incomingDelta.part.audioData)]
+                    : [],
+                }
+              : incomingDelta.part),
+          },
+        });
+      }
+    }
   }
 
   computeContent(): ModelResponse["content"] {
-    return mapContentDeltas(this.deltas);
-  }
-}
-
-function mergeContentDeltas(
-  deltas: ContentDelta[],
-  incomingDeltas: ContentDelta[],
-) {
-  const mergedDeltas = deltas.slice();
-  for (const incomingDelta of incomingDeltas) {
-    const existingDelta = mergedDeltas.find(
-      (delta) => delta.index === incomingDelta.index,
-    );
-    if (existingDelta) {
-      if (existingDelta.part.type !== incomingDelta.part.type) {
-        throw new Error(
-          `unexpected part ${incomingDelta.part.type} at index ${incomingDelta.index}. existing part has type ${incomingDelta.part.type}`,
-        );
-      }
-      if (
-        existingDelta.part.type === "text" &&
-        incomingDelta.part.type === "text"
-      ) {
-        existingDelta.part.text += incomingDelta.part.text;
-      } else if (
-        existingDelta.part.type === "audio" &&
-        incomingDelta.part.type === "audio"
-      ) {
-        if (incomingDelta.part.audioData) {
-          if (incomingDelta.part.encoding !== "linear16") {
+    return this.deltas.map((delta): ModelResponse["content"][number] => {
+      switch (delta.part.type) {
+        case "text":
+          return {
+            type: "text",
+            text: delta.part.text,
+          };
+        case "tool-call":
+          if (!delta.part.toolCallId || !delta.part.toolName) {
             throw new Error(
-              `only linear16 encoding is supported for audio. got ${existingDelta.part.encoding}`,
+              `missing toolCallId or toolName at index ${delta.index}. toolCallId: ${delta.part.toolCallId}, toolName: ${delta.part.toolName}`,
             );
           }
-          const existingDeltaBuffer = existingDelta.part.audioData
-            ? base64ToArrayBuffer(existingDelta.part.audioData)
-            : null;
-          const incomingDeltaBuffer = base64ToArrayBuffer(
-            incomingDelta.part.audioData,
+          return {
+            type: "tool-call",
+            toolCallId: delta.part.toolCallId,
+            args: delta.part.args ? JSON.parse(delta.part.args) : null,
+            toolName: delta.part.toolName,
+          };
+        case "audio": {
+          if (delta.part.encoding !== "linear16") {
+            throw new Error(
+              `only linear16 encoding is supported for audio concatenation. encoding: ${delta.part.encoding}`,
+            );
+          }
+          const concatenatedAudioData = mergeInt16Arrays(delta.part.audioData);
+          return {
+            type: "audio",
+            audioData: arrayBufferToBase64(concatenatedAudioData),
+            encoding: delta.part.encoding,
+            ...(delta.part.container && { container: delta.part.container }),
+            ...(delta.part.sampleRate && { sampleRate: delta.part.sampleRate }),
+            ...(delta.part.channels && { channels: delta.part.channels }),
+            ...(delta.part.transcript && { transcript: delta.part.transcript }),
+          };
+        }
+        default:
+          throw new Error(
+            `unexpected part ${(delta.part as { type: string }).type} at index ${delta.index}`,
           );
-
-          const mergedAudioData = existingDeltaBuffer
-            ? mergeInt16Arrays(existingDeltaBuffer, incomingDeltaBuffer)
-            : incomingDeltaBuffer;
-
-          existingDelta.part.encoding =
-            incomingDelta.part.encoding ?? existingDelta.part.encoding;
-
-          existingDelta.part.audioData = arrayBufferToBase64(mergedAudioData);
-        }
-        if (incomingDelta.part.transcript) {
-          existingDelta.part.transcript = existingDelta.part.transcript || "";
-          existingDelta.part.transcript += incomingDelta.part.transcript;
-        }
-      } else if (
-        existingDelta.part.type === "tool-call" &&
-        incomingDelta.part.type === "tool-call"
-      ) {
-        if (incomingDelta.part.toolName) {
-          existingDelta.part.toolName = existingDelta.part.toolName || "";
-          existingDelta.part.toolName += incomingDelta.part.toolName;
-        }
-        if (incomingDelta.part.toolCallId) {
-          existingDelta.part.toolCallId = existingDelta.part.toolCallId || "";
-          existingDelta.part.toolCallId += incomingDelta.part.toolCallId;
-        }
-        if (incomingDelta.part.args) {
-          existingDelta.part.args = existingDelta.part.args || "";
-          existingDelta.part.args += incomingDelta.part.args;
-        }
       }
-    } else {
-      mergedDeltas.push({
-        ...incomingDelta,
-        part: { ...incomingDelta.part },
-      });
-    }
+    });
   }
-  return mergedDeltas.sort((a, b) => a.index - b.index);
-}
-
-function mapContentDeltas(deltas: ContentDelta[]): ModelResponse["content"] {
-  return deltas.map((delta) => {
-    switch (delta.part.type) {
-      case "text":
-        return {
-          type: "text",
-          text: delta.part.text,
-        };
-      case "audio":
-        if (!delta.part.audioData) {
-          throw new Error(
-            `missing audioData at index ${delta.index} for audio part. audioData: ${delta.part.audioData}`,
-          );
-        }
-        if (!delta.part.encoding) {
-          throw new Error(
-            `missing encoding at index ${delta.index} for audio part. encoding: ${delta.part.encoding}`,
-          );
-        }
-        return {
-          type: "audio",
-          audioData: delta.part.audioData,
-          encoding: delta.part.encoding,
-          ...(delta.part.sampleRate && { sampleRate: delta.part.sampleRate }),
-          ...(delta.part.channels && { channels: delta.part.channels }),
-          ...(delta.part.transcript && { transcript: delta.part.transcript }),
-        };
-      case "tool-call":
-        if (!delta.part.toolCallId || !delta.part.toolName) {
-          throw new Error(
-            `missing toolCallId or toolName at index ${delta.index}. toolCallId: ${delta.part.toolCallId}, toolName: ${delta.part.toolName}`,
-          );
-        }
-        return {
-          type: "tool-call",
-          toolCallId: delta.part.toolCallId,
-          args: delta.part.args ? JSON.parse(delta.part.args) : null,
-          toolName: delta.part.toolName,
-        };
-      default:
-        throw new Error(
-          `unexpected part ${(delta.part as { type: string }).type} at index ${delta.index}`,
-        );
-    }
-  });
 }

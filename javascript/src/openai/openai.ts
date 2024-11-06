@@ -5,6 +5,7 @@ import type {
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
+  AudioContainer,
   AudioEncoding,
   AudioPart,
   ContentDelta,
@@ -18,6 +19,7 @@ import type {
   Tool,
   ToolCallPart,
 } from "../schemas/index.js";
+import type { InternalContentDelta } from "../utils/stream.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import { OpenAIRefusedError } from "./errors.js";
@@ -222,8 +224,8 @@ export function convertToOpenAIMessages(
                 }
                 case "audio": {
                   // openai does support feeding back the audio by using
-                  // their internal ID, but being a more generic API, we
-                  // don't want to bring that ID into our API. However,
+                  // their internal ID, but being a more generic abstraction, we
+                  // don't want to bring that ID into our abstraction. However,
                   // AudioPart does contain a transcript, so we can use that
                   // as TextPart
                   if (part.transcript) {
@@ -291,9 +293,11 @@ export function convertToOpenAIMessages(
                         type: "input_audio",
                         input_audio: {
                           // this as assertion is not correct, but we will rely on OpenAI to throw an error
-                          format: convertToOpenAIAudioFormat(
+                          format: (convertToOpenAIAudioFormat(
+                            part.container,
                             part.encoding,
-                          ) as OpenAI.ChatCompletionContentPartInputAudio.InputAudio["format"],
+                          ) ||
+                            "wav") as OpenAI.ChatCompletionContentPartInputAudio.InputAudio["format"],
                           data: part.audioData,
                         },
                       };
@@ -371,22 +375,56 @@ export function convertToOpenAITools(
   );
 }
 
+// based on:
+// - OpenAI.Chat.ChatCompletionAudioParam["format"]
+// - https://platform.openai.com/docs/guides/speech-to-text
+// - https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
+// The returned type might not match the current specification on the OpenAI API
+// but we still return in case future support is added
+type PossibleOpenAIAudioFormat =
+  | "wav"
+  | "mp3"
+  | "flac"
+  | "opus"
+  | "pcm16"
+  | "g711_ulaw"
+  | "g711_alaw";
+
+/**
+ * Maps the audio container and encoding to the OpenAI audio format.
+ * Loosely maps based on either container or encoding when defined.
+ */
 export function convertToOpenAIAudioFormat(
-  encoding: AudioEncoding,
-): OpenAI.Chat.ChatCompletionAudioParam["format"] {
-  switch (encoding) {
-    case "linear16":
-      return "pcm16";
-    case "flac":
-      return "flac";
-    case "mp3":
-      return "mp3";
-    case "opus":
-      return "opus";
-    default: {
-      throw new Error(`Unsupported audio encoding: ${encoding}`);
-    }
+  container: AudioContainer | undefined,
+  encoding: AudioEncoding | undefined,
+): PossibleOpenAIAudioFormat | undefined {
+  if (!container && !encoding) return undefined;
+
+  const encodingMapping: {
+    [key in AudioEncoding]?: PossibleOpenAIAudioFormat | undefined;
+  } = {
+    flac: "flac",
+    mp3: "mp3",
+    opus: "opus",
+    linear16: "pcm16",
+    mulaw: "g711_ulaw",
+    vorbis: undefined,
+  };
+  const containerMapping: {
+    [key in AudioContainer]: PossibleOpenAIAudioFormat | undefined;
+  } = {
+    wav: "wav",
+    ogg: "opus",
+    flac: "flac",
+    webm: undefined,
+  };
+  if (container && containerMapping[container]) {
+    return containerMapping[container];
   }
+  if (encoding && encodingMapping[encoding]) {
+    return encodingMapping[encoding];
+  }
+  return undefined;
 }
 
 export function convertToOpenAIResponseFormat(
@@ -431,18 +469,36 @@ export function convertToOpenAIResponseFormat(
 
 export function mapOpenAIAudioFormat(
   format: OpenAI.Chat.ChatCompletionAudioParam["format"],
-): AudioEncoding {
+): {
+  mimeType: string;
+  encoding?: AudioEncoding;
+} {
   switch (format) {
     case "wav":
-      return "linear16";
+      return {
+        mimeType: "audio/wav",
+        encoding: "linear16",
+      };
     case "mp3":
-      return "mp3";
+      return {
+        mimeType: "audio/mpeg",
+        encoding: "mp3",
+      };
     case "flac":
-      return "flac";
+      return {
+        mimeType: "audio/flac",
+        encoding: "flac",
+      };
     case "opus":
-      return "opus";
+      return {
+        mimeType: "audio/ogg",
+        encoding: "opus",
+      };
     case "pcm16":
-      return "linear16";
+      return {
+        mimeType: "audio/L16",
+        encoding: "linear16",
+      };
     default: {
       throw new Error(`Unsupported audio format: ${format}`);
     }
@@ -463,9 +519,7 @@ export function mapOpenAIMessage(
         ? [
             {
               type: "audio",
-              encoding: options?.audio?.format
-                ? mapOpenAIAudioFormat(options.audio.format)
-                : "linear16",
+              ...mapOpenAIAudioFormat(options?.audio?.format || "pcm16"),
               ...(options?.audio?.format === "pcm16" && {
                 sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
                 channels: OPENAI_AUDIO_CHANNELS,
@@ -494,6 +548,7 @@ export function mapOpenAIMessage(
 
 export function mapOpenAIDelta(
   delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
+    // openai has not yet updated their types to include audio
     audio?: {
       id?: string;
       data?: string;
@@ -501,7 +556,7 @@ export function mapOpenAIDelta(
     };
   },
   options?: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
-  existingContentDeltas?: ContentDelta[],
+  existingContentDeltas?: InternalContentDelta[],
 ): ContentDelta[] {
   const contentDeltas: ContentDelta[] = [];
 
@@ -534,9 +589,7 @@ export function mapOpenAIDelta(
         type: "audio",
         ...(delta.audio.data && {
           audioData: delta.audio.data,
-          encoding: options?.audio?.format
-            ? mapOpenAIAudioFormat(options.audio.format)
-            : "linear16",
+          ...mapOpenAIAudioFormat(options?.audio?.format || "pcm16"),
           sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
           channels: OPENAI_AUDIO_CHANNELS,
         }),

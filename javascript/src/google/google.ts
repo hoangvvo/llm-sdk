@@ -17,7 +17,6 @@ import type {
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
-  AudioEncoding,
   ContentDelta,
   LanguageModelInput,
   Message,
@@ -26,6 +25,7 @@ import type {
   PartialModelResponse,
   Tool,
 } from "../schemas/index.js";
+import { mapAudioFormatToMimeType } from "../utils/audio.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import type { GoogleModelOptions } from "./types.js";
@@ -156,7 +156,7 @@ export function convertToGoogleMessages(messages: Message[]): Content[] {
           return {
             inlineData: {
               data: part.audioData,
-              mimeType: convertToAudioMimeType(part.encoding),
+              mimeType: mapAudioFormatToMimeType(part),
             },
           };
         }
@@ -295,23 +295,6 @@ export function convertToGoogleResponseFormat(
     }
   }
   return undefined;
-}
-
-export function convertToAudioMimeType(encoding: AudioEncoding): string {
-  switch (encoding) {
-    case "linear16":
-      return "audio/wav";
-    case "flac":
-      return "audio/flac";
-    case "mp3":
-      return "audio/mpeg";
-    case "mulaw":
-      return "audio/x-wav";
-    case "opus":
-      return "audio/ogg";
-    default:
-      throw new Error(`unsupported audio encoding: ${encoding}`);
-  }
 }
 
 export function mapGoogleMessage(content: Content): AssistantMessage {

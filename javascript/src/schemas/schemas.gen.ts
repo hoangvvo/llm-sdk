@@ -30,6 +30,14 @@ export const ImagePartSchema = {
         imageData: {
             type: 'string',
             description: 'The base64-encoded image data.'
+        },
+        width: {
+            type: 'integer',
+            description: 'The width of the image in pixels.'
+        },
+        height: {
+            type: 'integer',
+            description: 'The height of the image in pixels.'
         }
     },
     required: ['type', 'mimeType', 'imageData']
@@ -37,8 +45,14 @@ export const ImagePartSchema = {
 
 export const AudioEncodingSchema = {
     type: 'string',
-    enum: ['linear16', 'flac', 'mulaw', 'mp3', 'opus'],
+    enum: ['linear16', 'flac', 'mulaw', 'mp3', 'opus', 'vorbis'],
     description: 'The encoding of the audio.'
+} as const;
+
+export const AudioContainerSchema = {
+    type: 'string',
+    enum: ['wav', 'ogg', 'flac', 'webm'],
+    description: 'The container format of the audio.'
 } as const;
 
 export const AudioPartSchema = {
@@ -48,6 +62,9 @@ export const AudioPartSchema = {
         type: {
             type: 'string',
             const: 'audio'
+        },
+        container: {
+            '$ref': '#/components/schemas/AudioContainer'
         },
         audioData: {
             type: 'string',
@@ -69,7 +86,7 @@ export const AudioPartSchema = {
             description: 'The transcript of the audio.'
         }
     },
-    required: ['type', 'encoding', 'audioData']
+    required: ['type', 'audioData']
 } as const;
 
 export const ToolCallPartSchema = {
@@ -235,6 +252,9 @@ export const AudioPartDeltaSchema = {
         audioData: {
             type: 'string',
             description: 'The base64-encoded audio data.'
+        },
+        container: {
+            '$ref': '#/components/schemas/AudioContainer'
         },
         encoding: {
             '$ref': '#/components/schemas/AudioEncoding'
