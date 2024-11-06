@@ -469,41 +469,43 @@ export function convertToOpenAIResponseFormat(
   }
 }
 
-export function mapOpenAIAudioFormat(
-  format: OpenAI.Chat.ChatCompletionAudioParam["format"],
-): {
-  mimeType: string;
+export function mapOpenAIAudioFormat(format: PossibleOpenAIAudioFormat): {
+  container?: AudioContainer;
   encoding?: AudioEncoding;
 } {
   switch (format) {
     case "wav":
       return {
-        mimeType: "audio/wav",
+        container: "wav",
         encoding: "linear16",
       };
     case "mp3":
       return {
-        mimeType: "audio/mpeg",
         encoding: "mp3",
       };
     case "flac":
       return {
-        mimeType: "audio/flac",
+        container: "flac",
         encoding: "flac",
       };
     case "opus":
       return {
-        mimeType: "audio/ogg",
         encoding: "opus",
       };
     case "pcm16":
       return {
-        mimeType: "audio/L16",
         encoding: "linear16",
       };
-    default: {
-      throw new Error(`Unsupported audio format: ${format}`);
-    }
+    case "aac":
+      return {
+        encoding: "aac",
+      };
+    case "g711_ulaw":
+      return {
+        encoding: "mulaw",
+      };
+    default:
+      return {};
   }
 }
 
