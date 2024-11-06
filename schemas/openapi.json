@@ -49,7 +49,7 @@
       },
       "AudioEncoding": {
         "type": "string",
-        "enum": ["linear16", "flac", "mulaw", "mp3", "opus", "vorbis"],
+        "enum": ["linear16", "flac", "mulaw", "aac", "mp3", "opus"],
         "description": "The encoding of the audio."
       },
       "AudioContainer": {

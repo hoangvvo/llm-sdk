@@ -16,7 +16,7 @@ export type AudioContainer = 'wav' | 'ogg' | 'flac' | 'webm';
 /**
  * The encoding of the audio.
  */
-export type AudioEncoding = 'linear16' | 'flac' | 'mulaw' | 'mp3' | 'opus' | 'vorbis';
+export type AudioEncoding = 'linear16' | 'flac' | 'mulaw' | 'aac' | 'mp3' | 'opus';
 
 /**
  * A part of the message that contains an audio.

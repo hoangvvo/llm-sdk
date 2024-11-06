@@ -72,8 +72,8 @@ export function mapAudioFormatToMimeType({
     mulaw: "audio/basic",
     mp3: "audio/mpeg",
     opus: 'audio/ogg; codecs="opus"',
-    vorbis: "audio/vorbis",
     webm: "audio/webm",
+    aac: "audio/aac",
   };
 
   if (container && mimeTypes[container]) {

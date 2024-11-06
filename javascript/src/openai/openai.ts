@@ -379,6 +379,7 @@ export function convertToOpenAITools(
 // - OpenAI.Chat.ChatCompletionAudioParam["format"]
 // - https://platform.openai.com/docs/guides/speech-to-text
 // - https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
+// - https://platform.openai.com/docs/guides/text-to-speech#supported-output-formats
 // The returned type might not match the current specification on the OpenAI API
 // but we still return in case future support is added
 type PossibleOpenAIAudioFormat =
@@ -386,6 +387,7 @@ type PossibleOpenAIAudioFormat =
   | "mp3"
   | "flac"
   | "opus"
+  | "aac"
   | "pcm16"
   | "g711_ulaw"
   | "g711_alaw";
@@ -408,7 +410,7 @@ export function convertToOpenAIAudioFormat(
     opus: "opus",
     linear16: "pcm16",
     mulaw: "g711_ulaw",
-    vorbis: undefined,
+    aac: "aac",
   };
   const containerMapping: {
     [key in AudioContainer]: PossibleOpenAIAudioFormat | undefined;
