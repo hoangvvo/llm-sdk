@@ -341,7 +341,7 @@ export function convertToGoogleSchema(schema: Record<string, unknown>): Schema {
     ...(!!schema["type"] && { type: schema["type"] as SchemaType }),
     ...(typeof schema["format"] === "string" &&
       allowedFormatValues.includes(schema["format"]) && {
-        format: schema["format"] as string,
+        format: schema["format"],
       }),
     ...(!!schema["description"] && {
       description: schema["description"] as string,
@@ -420,7 +420,8 @@ export function mapGooglePart(part: GooglePart): Part {
       type: "tool-call",
       toolCallId: genidForToolCall(),
       toolName: part.functionCall.name,
-      args: (part.functionCall.args as Record<string, unknown>) || {},
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      args: (part.functionCall.args as Record<string, unknown>) || null,
     };
   }
   if (part.codeExecutionResult) {
@@ -437,11 +438,14 @@ export function mapGooglePart(part: GooglePart): Part {
   if (part.fileData) {
     throw new Error("fileData is not supported");
   }
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (part.executableCode) {
     throw new Error("executableCode is not supported");
   }
   const exhaustiveCheck: never = part;
-  throw new Error("unknown part properties: " + Object.keys(exhaustiveCheck));
+  throw new Error(
+    "unknown part properties: " + Object.keys(exhaustiveCheck).join(", "),
+  );
 }
 
 export function mapGoogleDelta(

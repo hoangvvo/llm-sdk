@@ -105,10 +105,12 @@ export class OpenAIModel implements LanguageModel {
     const accumulator = new ContentDeltaAccumulator();
 
     for await (const chunk of stream) {
-      const choice = chunk.choices?.[0];
-      const completion = choice as
-        | OpenAI.Chat.Completions.ChatCompletionChunk.Choice
-        | undefined;
+      const choice = (
+        chunk.choices as
+          | OpenAI.Chat.Completions.ChatCompletionChunk.Choice[]
+          | undefined
+      )?.[0];
+      const completion = choice;
 
       if (completion?.delta.refusal) {
         refusal += completion.delta.refusal;
@@ -364,7 +366,9 @@ export function convertToOpenAITools(
         }),
         name: tool.name,
         description: tool.description,
-        parameters: (tool.parameters as OpenAI.FunctionParameters) || undefined,
+        ...(tool.parameters && {
+          parameters: tool.parameters,
+        }),
       },
     }),
   );
@@ -415,10 +419,10 @@ export function convertToOpenAIAudioFormat(
     flac: "flac",
     webm: undefined,
   };
-  if (container && containerMapping[container]) {
+  if (container) {
     return containerMapping[container];
   }
-  if (encoding && encodingMapping[encoding]) {
+  if (encoding) {
     return encodingMapping[encoding];
   }
   return undefined;
@@ -486,7 +490,7 @@ export function mapOpenAIAudioFormat(format: PossibleOpenAIAudioFormat): {
       return { encoding: "alaw" };
     default: {
       const exhaustiveCheck: never = format;
-      throw new Error(`Unsupported audio format: ${exhaustiveCheck}`);
+      throw new Error(`Unsupported audio format: ${exhaustiveCheck as string}`);
     }
   }
 }
@@ -524,7 +528,9 @@ export function mapOpenAIMessage(
               type: "tool-call",
               toolCallId: toolCall.id,
               toolName: toolCall.function.name,
-              args: JSON.parse(toolCall.function.arguments),
+              args: JSON.parse(toolCall.function.arguments) as {
+                [key: string]: unknown;
+              },
             }),
           )
         : []),
@@ -584,7 +590,7 @@ export function mapOpenAIDelta(
           ...(toolCall.id && { toolCallId: toolCall.id }),
           ...(toolCall.function?.name && { toolName: toolCall.function.name }),
           ...(toolCall.function?.arguments && {
-            args: toolCall.function?.arguments,
+            args: toolCall.function.arguments,
           }),
         },
       });

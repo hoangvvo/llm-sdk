@@ -6,7 +6,7 @@
   "scripts": {
     "generate": "npx @hey-api/openapi-ts",
     "build": "tshy",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint src"
   },
   "files": [
     "dist"

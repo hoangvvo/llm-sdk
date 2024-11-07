@@ -45,7 +45,9 @@ export function mergeInt16Arrays(arrayBuffers: unknown[]) {
     if (arrayBuffer instanceof Int16Array) {
       return arrayBuffer;
     }
-    throw new Error(`Item at index ${index} must be ArrayBuffer or Int16Array`);
+    throw new Error(
+      `Item at index ${String(index)} must be ArrayBuffer or Int16Array`,
+    );
   });
   const totalLength = int16Arrays.reduce((acc, cur) => acc + cur.length, 0);
   const newValues = new Int16Array(totalLength);

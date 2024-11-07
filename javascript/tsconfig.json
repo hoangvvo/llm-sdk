@@ -20,5 +20,6 @@
     "moduleResolution": "NodeNext",
     "module": "NodeNext"
   },
+  "include": ["src"],
   "exclude": ["dist"]
 }

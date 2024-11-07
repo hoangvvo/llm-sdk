@@ -77,7 +77,7 @@ export class ContentDeltaAccumulator {
           }
         } else {
           throw new Error(
-            `unexpected part at index ${incomingDelta.index}. existing part has type ${existingDelta.part.type}, incoming part has type ${incomingDelta.part.type}`,
+            `unexpected part at index ${String(incomingDelta.index)}. existing part has type ${existingDelta.part.type}, incoming part has type ${incomingDelta.part.type}`,
           );
         }
       } else {
@@ -109,19 +109,21 @@ export class ContentDeltaAccumulator {
         case "tool-call":
           if (!delta.part.toolCallId || !delta.part.toolName) {
             throw new Error(
-              `missing toolCallId or toolName at index ${delta.index}. toolCallId: ${delta.part.toolCallId}, toolName: ${delta.part.toolName}`,
+              `missing toolCallId or toolName at index ${String(delta.index)}. toolCallId: ${delta.part.toolCallId || "undefined"}, toolName: ${delta.part.toolName || "undefined"}`,
             );
           }
           return {
             type: "tool-call",
             toolCallId: delta.part.toolCallId,
-            args: delta.part.args ? JSON.parse(delta.part.args) : null,
+            args: delta.part.args
+              ? (JSON.parse(delta.part.args) as Record<string, unknown>)
+              : null,
             toolName: delta.part.toolName,
           };
         case "audio": {
           if (delta.part.encoding !== "linear16") {
             throw new Error(
-              `only linear16 encoding is supported for audio concatenation. encoding: ${delta.part.encoding}`,
+              `only linear16 encoding is supported for audio concatenation. encoding: ${delta.part.encoding || "undefined"}`,
             );
           }
           const concatenatedAudioData = mergeInt16Arrays(delta.part.audioData);
@@ -137,7 +139,7 @@ export class ContentDeltaAccumulator {
         }
         default:
           throw new Error(
-            `unexpected part ${(delta.part as { type: string }).type} at index ${delta.index}`,
+            `unexpected part ${(delta.part as { type: string }).type} at index ${String(delta.index)}`,
           );
       }
     });

@@ -59,7 +59,7 @@ export class AnthropicModel implements LanguageModel {
       content: mapAnthropicMessage(response.content).content,
       usage,
       ...(this.metadata?.pricing && {
-        cost: calculateCost(usage, this.metadata?.pricing),
+        cost: calculateCost(usage, this.metadata.pricing),
       }),
     };
   }
@@ -67,7 +67,7 @@ export class AnthropicModel implements LanguageModel {
   async *stream(
     input: AnthropicLanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const stream = await this.anthropic.messages.stream({
+    const stream = this.anthropic.messages.stream({
       ...convertToAnthropicParams(this.modelId, input, this.options),
       stream: true,
     });
@@ -107,7 +107,7 @@ export class AnthropicModel implements LanguageModel {
       content: accumulator.computeContent(),
       usage,
       ...(this.metadata?.pricing && {
-        cost: calculateCost(usage, this.metadata?.pricing),
+        cost: calculateCost(usage, this.metadata.pricing),
       }),
     };
   }
@@ -150,38 +150,36 @@ export function convertToAnthropicMessages(
       case "assistant": {
         return {
           role: "assistant",
-          content: message.content
-            .map(
-              (
-                part,
-              ):
-                | Anthropic.Messages.TextBlockParam
-                | Anthropic.Messages.ToolUseBlockParam => {
-                switch (part.type) {
-                  case "text":
-                    return {
-                      type: "text",
-                      text: part.text,
-                    };
-                  case "tool-call":
-                    return {
-                      type: "tool_use",
-                      id: part.toolCallId,
-                      name: part.toolName,
-                      input: part.args,
-                    };
-                  case "audio":
-                    throw new Error("Audio parts are not supported");
-                  default: {
-                    const exhaustiveCheck: never = part;
-                    throw new Error(
-                      `Unsupported message part type: ${(exhaustiveCheck as { type: string }).type}`,
-                    );
-                  }
+          content: message.content.map(
+            (
+              part,
+            ):
+              | Anthropic.Messages.TextBlockParam
+              | Anthropic.Messages.ToolUseBlockParam => {
+              switch (part.type) {
+                case "text":
+                  return {
+                    type: "text",
+                    text: part.text,
+                  };
+                case "tool-call":
+                  return {
+                    type: "tool_use",
+                    id: part.toolCallId,
+                    name: part.toolName,
+                    input: part.args,
+                  };
+                case "audio":
+                  throw new Error("Audio parts are not supported");
+                default: {
+                  const exhaustiveCheck: never = part;
+                  throw new Error(
+                    `Unsupported message part type: ${(exhaustiveCheck as { type: string }).type}`,
+                  );
                 }
-              },
-            )
-            .filter((block) => !!block),
+              }
+            },
+          ),
         };
       }
 
@@ -300,6 +298,7 @@ export function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     input_schema: (tool.parameters as Anthropic.Tool.InputSchema) || {
       type: "object",
       // anthropic tool call parameters are required
