@@ -1,7 +1,0 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/deepmap/oapi-codegen/HEAD/configuration-schema.json
-package: llm_sdk
-output: schemas.go
-generate:
-  models: true
-output-options:
-  skip-prune: true
