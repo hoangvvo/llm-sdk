@@ -150,6 +150,26 @@ export const ToolResultPartSchema = {
     required: ['type', 'toolCallId', 'toolName', 'result']
 } as const;
 
+export const PartSchema = {
+    oneOf: [
+        {
+            '$ref': '#/components/schemas/TextPart'
+        },
+        {
+            '$ref': '#/components/schemas/ImagePart'
+        },
+        {
+            '$ref': '#/components/schemas/AudioPart'
+        },
+        {
+            '$ref': '#/components/schemas/ToolCallPart'
+        },
+        {
+            '$ref': '#/components/schemas/ToolResultPart'
+        }
+    ]
+} as const;
+
 export const UserMessageSchema = {
     type: 'object',
     description: 'Represents a message sent by the user.',

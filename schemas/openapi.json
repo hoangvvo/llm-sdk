@@ -149,6 +149,25 @@
         },
         "required": ["type", "toolCallId", "toolName", "result"]
       },
+      "Part": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TextPart"
+          },
+          {
+            "$ref": "#/components/schemas/ImagePart"
+          },
+          {
+            "$ref": "#/components/schemas/AudioPart"
+          },
+          {
+            "$ref": "#/components/schemas/ToolCallPart"
+          },
+          {
+            "$ref": "#/components/schemas/ToolResultPart"
+          }
+        ]
+      },
       "UserMessage": {
         "type": "object",
         "description": "Represents a message sent by the user.",

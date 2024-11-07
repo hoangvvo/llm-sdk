@@ -189,6 +189,8 @@ export type ModelUsage = {
     outputTokensDetail?: ModelTokensDetail;
 };
 
+export type Part = TextPart | ImagePart | AudioPart | ToolCallPart | ToolResultPart;
+
 export type PartialModelResponse = {
     delta: ContentDelta;
 };

@@ -3,10 +3,13 @@ import type {
   FunctionDeclaration,
   FunctionDeclarationSchema,
   FunctionDeclarationsTool,
+  GenerateContentCandidate,
   GenerateContentRequest,
   GenerationConfig,
   GenerativeModel,
-  Part,
+  Part as GooglePart,
+  Schema,
+  SchemaType,
   ToolConfig,
   UsageMetadata,
 } from "@google/generative-ai";
@@ -22,6 +25,7 @@ import type {
   Message,
   ModelResponse,
   ModelUsage,
+  Part,
   PartialModelResponse,
   Tool,
 } from "../schemas/index.js";
@@ -67,7 +71,7 @@ export class GoogleModel implements LanguageModel {
       : undefined;
 
     return {
-      content: mapGoogleMessage(candidate.content).content,
+      content: mapGoogleMessage(candidate).content,
       ...(usage && { usage }),
       ...(this.metadata?.pricing &&
         usage && { cost: calculateCost(usage, this.metadata.pricing) }),
@@ -137,7 +141,7 @@ export function convertToGoogleParams(
 
 export function convertToGoogleMessages(messages: Message[]): Content[] {
   return messages.map((message): Content => {
-    const parts = message.content.map((part): Part => {
+    const parts = message.content.map((part): GooglePart => {
       switch (part.type) {
         case "text": {
           return {
@@ -275,7 +279,9 @@ export function convertToGoogleTools(
           name: tool.name,
           description: tool.description,
           ...(!!tool.parameters && {
-            parameters: tool.parameters as unknown as FunctionDeclarationSchema,
+            parameters: convertToGoogleSchema(
+              tool.parameters,
+            ) as FunctionDeclarationSchema,
           }),
         };
       }),
@@ -291,40 +297,115 @@ export function convertToGoogleResponseFormat(
       responseMimeType: "application/json",
     };
     if (responseFormat.schema) {
-      generationConfig.responseSchema = responseFormat.schema;
+      generationConfig.responseSchema = convertToGoogleSchema(
+        responseFormat.schema,
+      );
     }
   }
   return undefined;
 }
 
-export function mapGoogleMessage(content: Content): AssistantMessage {
+export function convertToGoogleSchema(schema: Record<string, unknown>): Schema {
+  // Google only supports a subset of JSON Schema
+  // https://ai.google.dev/api/caching#Schema
+
+  const allowedFormatValues = ["float", "double", "int32", "int64", "enum"];
+
+  let enumValue = schema["enum"] as string[] | undefined;
+  if (typeof schema["const"] === "string") {
+    enumValue = [...(enumValue || []), schema["const"]];
+  }
+
   return {
-    role: "assistant",
-    content: content.parts.map((part): AssistantMessage["content"][number] => {
-      if (part.functionCall) {
-        return {
-          type: "tool-call",
-          // IMPORTANT: Gemini does not generate an ID we expect for tool calls
-          toolCallId: genidForToolCall(),
-          toolName: part.functionCall.name,
-          args: (part.functionCall.args as Record<string, unknown>) || {},
-        };
-      }
-      if (part.text) {
-        return {
-          type: "text",
-          text: part.text,
-        };
-      }
-      throw new Error("unknown part type");
+    ...(!!schema["type"] && { type: schema["type"] as SchemaType }),
+    ...(typeof schema["format"] === "string" &&
+      allowedFormatValues.includes(schema["format"]) && {
+        format: schema["format"] as string,
+      }),
+    ...(!!schema["description"] && {
+      description: schema["description"] as string,
+    }),
+    ...(!!enumValue && { enum: enumValue }),
+    ...(!!schema["maxItems"] && { maxItems: schema["maxItems"] as number }),
+    ...(!!schema["minItems"] && { minItems: schema["minItems"] as number }),
+    ...(!!schema["properties"] && {
+      properties: Object.fromEntries(
+        Object.entries(schema["properties"]).map(([key, value]) => [
+          key,
+          convertToGoogleSchema(value as Record<string, unknown>),
+        ]),
+      ),
+    }),
+    ...(!!schema["required"] && { required: schema["required"] as string[] }),
+    ...(!!schema["items"] && {
+      items: convertToGoogleSchema(schema["items"] as Record<string, unknown>),
+    }),
+    ...(!!schema["allOf"] && {
+      allOf: (schema["allOf"] as Record<string, unknown>[]).map((value) =>
+        convertToGoogleSchema(value),
+      ),
+    }),
+    ...(!!schema["anyOf"] && {
+      anyOf: (schema["anyOf"] as Record<string, unknown>[]).map((value) =>
+        convertToGoogleSchema(value),
+      ),
+    }),
+    ...(!!schema["oneOf"] && {
+      oneOf: (schema["oneOf"] as Record<string, unknown>[]).map((value) =>
+        convertToGoogleSchema(value),
+      ),
     }),
   };
 }
 
+export function mapGoogleMessage(
+  candidate: GenerateContentCandidate,
+): AssistantMessage {
+  return {
+    role: "assistant",
+    content: candidate.content.parts.map(
+      mapGooglePart,
+    ) as AssistantMessage["content"],
+  };
+}
+
+export function mapGooglePart(part: GooglePart): Part {
+  if (typeof part.text === "string") {
+    return {
+      type: "text",
+      text: part.text,
+    };
+  }
+  if (part.inlineData) {
+    if (part.inlineData.mimeType.startsWith("image/")) {
+      return {
+        type: "image",
+        imageData: part.inlineData.data,
+        mimeType: part.inlineData.mimeType,
+      };
+    }
+    if (part.inlineData.mimeType.startsWith("audio/")) {
+      return {
+        type: "audio",
+        audioData: part.inlineData.data,
+      };
+    }
+  }
+  if (part.functionCall) {
+    return {
+      type: "tool-call",
+      // IMPORTANT: Gemini does not generate an ID we expect for tool calls
+      toolCallId: genidForToolCall(),
+      toolName: part.functionCall.name,
+      args: (part.functionCall.args as Record<string, unknown>) || {},
+    };
+  }
+  throw new Error("unknown part type");
+}
+
 export function mapGoogleDelta(content: Content): ContentDelta[] {
   // google does not stream partials for tool calls so it is safe to do this
-  const streamingMessage = mapGoogleMessage(content);
-  return streamingMessage.content.map((part, index): ContentDelta => {
+  return content.parts.map(mapGooglePart).map((part, index): ContentDelta => {
     if (part.type === "tool-call") {
       return {
         index,
@@ -338,11 +419,11 @@ export function mapGoogleDelta(content: Content): ContentDelta[] {
     return {
       index,
       part,
-    };
+    } as ContentDelta;
   });
 }
 
-function mapGoogleUsage(usage: UsageMetadata): ModelUsage {
+export function mapGoogleUsage(usage: UsageMetadata): ModelUsage {
   return {
     inputTokens: usage.promptTokenCount,
     outputTokens: usage.candidatesTokenCount,

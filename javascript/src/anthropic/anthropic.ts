@@ -11,7 +11,9 @@ import type {
   ModelResponse,
   ModelUsage,
   PartialModelResponse,
+  TextPart,
   Tool,
+  ToolCallPart,
 } from "../schemas/index.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
@@ -284,21 +286,28 @@ export function mapAnthropicMessage(
 ): AssistantMessage {
   return {
     role: "assistant",
-    content: content.map((block): AssistantMessage["content"][number] => {
-      if (block.type === "text") {
-        return {
-          type: "text",
-          text: block.text,
-        };
-      }
-      return {
-        type: "tool-call",
-        toolCallId: block.id,
-        toolName: block.name,
-        args: block.input as Record<string, unknown>,
-      };
-    }),
+    content: content.map(mapAnthropicBlock),
   };
+}
+
+export function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock) {
+  if (block.type === "text") {
+    return {
+      type: "text",
+      text: block.text,
+    } satisfies TextPart;
+  }
+  if (block.type === "tool_use") {
+    return {
+      type: "tool-call",
+      toolCallId: block.id,
+      toolName: block.name,
+      args: block.input as Record<string, unknown>,
+    } satisfies ToolCallPart;
+  }
+  throw new Error(
+    `Unsupported block type: ${(block as { type: string }).type}`,
+  );
 }
 
 export function mapAnthropicStreamEvent(
