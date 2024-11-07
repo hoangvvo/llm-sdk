@@ -13,6 +13,7 @@ import type {
   PartialModelResponse,
   Tool,
 } from "../schemas/index.js";
+import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import type { AnthropicModelOptions } from "./types.js";
@@ -28,7 +29,7 @@ export class AnthropicModel implements LanguageModel {
   public metadata?: LanguageModelMetadata;
 
   constructor(
-    options: AnthropicModelOptions,
+    public options: AnthropicModelOptions,
     metadata?: LanguageModelMetadata,
   ) {
     this.provider = "anthropic";
@@ -43,7 +44,7 @@ export class AnthropicModel implements LanguageModel {
 
   async generate(input: AnthropicLanguageModelInput): Promise<ModelResponse> {
     const response = await this.anthropic.messages.create({
-      ...convertToAnthropicParams(this.modelId, input),
+      ...convertToAnthropicParams(this.modelId, input, this.options),
       stream: false,
     });
 
@@ -65,7 +66,7 @@ export class AnthropicModel implements LanguageModel {
     input: AnthropicLanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
     const stream = await this.anthropic.messages.stream({
-      ...convertToAnthropicParams(this.modelId, input),
+      ...convertToAnthropicParams(this.modelId, input, this.options),
       stream: true,
     });
 
@@ -113,6 +114,7 @@ export class AnthropicModel implements LanguageModel {
 export function convertToAnthropicParams(
   modelId: string,
   input: LanguageModelInput,
+  options: AnthropicModelOptions,
 ): Anthropic.Messages.MessageCreateParams {
   const tool_choice = convertToAnthropicToolChoice(input.toolChoice);
 
@@ -120,7 +122,7 @@ export function convertToAnthropicParams(
 
   return {
     model: modelId,
-    messages: convertToAnthropicMessages(input.messages),
+    messages: convertToAnthropicMessages(input.messages, options),
     ...(input.systemPrompt && { system: input.systemPrompt }),
     ...(input.tools &&
       input.toolChoice?.type !== "none" && {
@@ -135,38 +137,47 @@ export function convertToAnthropicParams(
 
 export function convertToAnthropicMessages(
   messages: Message[],
+  options: AnthropicModelOptions,
 ): Anthropic.Messages.MessageParam[] {
+  if (options.convertAudioPartsToTextParts) {
+    messages = messages.map((message) => convertAudioPartsToTextParts(message));
+  }
+
   return messages.map((message): Anthropic.Messages.MessageParam => {
     if (message.role === "assistant") {
       return {
         role: "assistant",
-        content: message.content.map(
-          (
-            part,
-          ):
-            | Anthropic.Messages.TextBlockParam
-            | Anthropic.Messages.ToolUseBlockParam => {
-            switch (part.type) {
-              case "tool-call": {
-                return {
-                  type: "tool_use",
-                  id: part.toolCallId,
-                  name: part.toolName,
-                  input: part.args,
-                };
+        content: message.content
+          .map(
+            (
+              part,
+            ):
+              | Anthropic.Messages.TextBlockParam
+              | Anthropic.Messages.ToolUseBlockParam => {
+              switch (part.type) {
+                case "text": {
+                  return {
+                    type: "text",
+                    text: part.text,
+                  };
+                }
+                case "tool-call": {
+                  return {
+                    type: "tool_use",
+                    id: part.toolCallId,
+                    name: part.toolName,
+                    input: part.args,
+                  };
+                }
+                default: {
+                  throw new Error(
+                    `Unsupported message part type: ${(part as { type: string }).type}`,
+                  );
+                }
               }
-              case "text": {
-                return {
-                  type: "text",
-                  text: part.text,
-                };
-              }
-              default: {
-                throw new Error(`Unsupported message part type: ${part.type}`);
-              }
-            }
-          },
-        ),
+            },
+          )
+          .filter((block) => !!block),
       };
     } else if (message.role === "tool") {
       // anthropic does not have a dedicated tool message type
