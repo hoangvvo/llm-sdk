@@ -1,6 +1,6 @@
 import { openaiModel as model } from "./model.js";
 
-const response = await model.stream({
+const response = model.stream({
   messages: [
     {
       role: "user",

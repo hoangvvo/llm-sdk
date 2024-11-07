@@ -3,7 +3,7 @@ import { openaiAudioModel } from "./model.js";
 
 let speaker: Speaker | undefined;
 
-const response = await openaiAudioModel.stream({
+const response = openaiAudioModel.stream({
   extra: {
     audio: {
       voice: "alloy",
