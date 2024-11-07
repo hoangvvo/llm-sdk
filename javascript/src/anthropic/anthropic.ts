@@ -46,7 +46,7 @@ export class AnthropicModel implements LanguageModel {
 
   async generate(input: AnthropicLanguageModelInput): Promise<ModelResponse> {
     const response = await this.anthropic.messages.create({
-      ...convertToAnthropicParams(this.modelId, input, this.options),
+      ...convertToAnthropicParams(input, this.options),
       stream: false,
     });
 
@@ -68,7 +68,7 @@ export class AnthropicModel implements LanguageModel {
     input: AnthropicLanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
     const stream = this.anthropic.messages.stream({
-      ...convertToAnthropicParams(this.modelId, input, this.options),
+      ...convertToAnthropicParams(input, this.options),
       stream: true,
     });
 
@@ -114,7 +114,6 @@ export class AnthropicModel implements LanguageModel {
 }
 
 export function convertToAnthropicParams(
-  modelId: string,
   input: LanguageModelInput,
   options: AnthropicModelOptions,
 ): Anthropic.Messages.MessageCreateParams {
@@ -123,12 +122,12 @@ export function convertToAnthropicParams(
   const sampleParams = convertToAnthropicSamplingParams(input);
 
   return {
-    model: modelId,
+    model: options.modelId,
     messages: convertToAnthropicMessages(input.messages, options),
     ...(input.systemPrompt && { system: input.systemPrompt }),
     ...(input.tools &&
       input.toolChoice?.type !== "none" && {
-        tools: convertToAnthropicTools(input.tools),
+        tools: input.tools.map(convertToAnthropicTool),
       }),
     ...(tool_choice && { tool_choice }),
     ...sampleParams,
@@ -294,8 +293,8 @@ export function convertToAnthropicToolChoice(
   }
 }
 
-export function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {
-  return tools.map((tool) => ({
+export function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
+  return {
     name: tool.name,
     description: tool.description,
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -305,7 +304,7 @@ export function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {
       // so if no parameters, we define it as null
       properties: null,
     },
-  }));
+  };
 }
 
 export function mapAnthropicMessage(
@@ -356,7 +355,7 @@ export function mapAnthropicStreamEvent(
               },
             },
           ];
-        case "tool_use":
+        case "tool_use": {
           return [
             {
               index: chunk.index,
@@ -364,14 +363,10 @@ export function mapAnthropicStreamEvent(
                 type: "tool-call",
                 toolCallId: chunk.content_block.id,
                 toolName: chunk.content_block.name,
-                args: chunk.content_block.input
-                  ? typeof chunk.content_block.input !== "string"
-                    ? JSON.stringify(chunk.content_block.input)
-                    : chunk.content_block.input
-                  : "",
               },
             },
           ];
+        }
         default: {
           const exhaustiveCheck: never = chunk.content_block;
           throw new Error(

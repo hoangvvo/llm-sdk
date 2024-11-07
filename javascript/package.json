@@ -6,7 +6,8 @@
   "scripts": {
     "generate": "npx @hey-api/openapi-ts",
     "build": "tshy",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "tsx --test"
   },
   "files": [
     "dist"
@@ -52,6 +53,16 @@
         "default": "./dist/commonjs/google/index.js"
       }
     },
+    "./cohere": {
+      "import": {
+        "types": "./dist/esm/cohere/index.d.ts",
+        "default": "./dist/esm/cohere/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/cohere/index.d.ts",
+        "default": "./dist/commonjs/cohere/index.js"
+      }
+    },
     "./utils": {
       "import": {
         "types": "./dist/esm/utils/index.d.ts",
@@ -78,17 +89,13 @@
   },
   "homepage": "https://github.com/hoangvvo/llm-sdk",
   "license": "MIT",
-  "optionalDependencies": {
-    "@anthropic-ai/sdk": "*",
-    "@google/generative-ai": "*",
-    "openai": "*"
-  },
   "tshy": {
     "exports": {
       ".": "./src/index.ts",
       "./openai": "./src/openai/index.ts",
       "./anthropic": "./src/anthropic/index.ts",
       "./google": "./src/google/index.ts",
+      "./cohere": "./src/cohere/index.ts",
       "./utils": "./src/utils/index.ts",
       "./package.json": "./package.json"
     },

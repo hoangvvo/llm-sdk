@@ -18,6 +18,8 @@ import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
 import { GoogleModel } from "@hoangvvo/llm-sdk/google";
 // or
 import { AnthropicModel } from "@hoangvvo/llm-sdk/anthropic";
+// or
+import { CohereModel } from "@hoangvvo/llm-sdk/cohere";
 
 const model = new OpenAIModel({
   apiKey: "openai-api-key",

@@ -7,16 +7,13 @@ import type {
   AssistantMessage,
   AudioContainer,
   AudioEncoding,
-  AudioPart,
   ContentDelta,
   LanguageModelInput,
   ModelResponse,
   ModelTokensDetail,
   ModelUsage,
   PartialModelResponse,
-  TextPart,
   Tool,
-  ToolCallPart,
 } from "../schemas/index.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import type { InternalContentDelta } from "../utils/stream.utils.js";
@@ -165,7 +162,7 @@ export function convertToOpenAIParams(
     model: options.modelId,
     messages: convertToOpenAIMessages(input, options),
     ...(input.tools && {
-      tools: convertToOpenAITools(input.tools, options),
+      tools: input.tools.map((tool) => convertToOpenAITool(tool, options)),
     }),
     ...(tool_choice && { tool_choice }),
     ...samplingParams,
@@ -353,25 +350,23 @@ export function convertToOpenAIToolChoice(
   }
 }
 
-export function convertToOpenAITools(
-  tools: Tool[],
+export function convertToOpenAITool(
+  tool: Tool,
   options: OpenAIModelOptions,
-): OpenAI.Chat.Completions.ChatCompletionTool[] {
-  return tools.map(
-    (tool): OpenAI.Chat.Completions.ChatCompletionTool => ({
-      type: "function",
-      function: {
-        ...(options.structuredOutputs && {
-          strict: true,
-        }),
-        name: tool.name,
-        description: tool.description,
-        ...(tool.parameters && {
-          parameters: tool.parameters,
-        }),
-      },
-    }),
-  );
+): OpenAI.Chat.Completions.ChatCompletionTool {
+  return {
+    type: "function",
+    function: {
+      ...(options.structuredOutputs && {
+        strict: true,
+      }),
+      name: tool.name,
+      description: tool.description,
+      ...(tool.parameters && {
+        parameters: tool.parameters,
+      }),
+    },
+  };
 }
 // based on:
 // - OpenAI.Chat.ChatCompletionAudioParam["format"]
@@ -499,42 +494,44 @@ export function mapOpenAIMessage(
   message: OpenAI.Chat.Completions.ChatCompletionMessage,
   options?: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
 ): AssistantMessage {
+  const content: AssistantMessage["content"] = [];
+
+  if (message.content) {
+    content.push({
+      type: "text",
+      text: message.content,
+    });
+  }
+
+  if (message.audio) {
+    content.push({
+      type: "audio",
+      ...mapOpenAIAudioFormat(options?.audio?.format || "pcm16"),
+      ...(options?.audio?.format === "pcm16" && {
+        sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
+        channels: OPENAI_AUDIO_CHANNELS,
+      }),
+      audioData: message.audio.data,
+      transcript: message.audio.transcript,
+    });
+  }
+
+  if (message.tool_calls) {
+    message.tool_calls.forEach((toolCall) => {
+      content.push({
+        type: "tool-call",
+        toolCallId: toolCall.id,
+        toolName: toolCall.function.name,
+        args: JSON.parse(toolCall.function.arguments) as {
+          [key: string]: unknown;
+        },
+      });
+    });
+  }
+
   return {
     role: "assistant",
-    content: [
-      ...(message.content
-        ? [{ type: "text", text: message.content } as TextPart]
-        : []),
-      ...(message.audio
-        ? [
-            {
-              type: "audio",
-              ...mapOpenAIAudioFormat(options?.audio?.format || "pcm16"),
-              ...(options?.audio?.format === "pcm16" && {
-                sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
-                channels: OPENAI_AUDIO_CHANNELS,
-              }),
-              audioData: message.audio.data,
-              transcript: message.audio.transcript,
-            } satisfies AudioPart,
-          ]
-        : []),
-      // tool call and content of openai are separate, so we define
-      // an order here where the text content comes first, followed by
-      // tool calls.
-      ...(message.tool_calls
-        ? message.tool_calls.map(
-            (toolCall): ToolCallPart => ({
-              type: "tool-call",
-              toolCallId: toolCall.id,
-              toolName: toolCall.function.name,
-              args: JSON.parse(toolCall.function.arguments) as {
-                [key: string]: unknown;
-              },
-            }),
-          )
-        : []),
-    ],
+    content,
   };
 }
 
@@ -582,7 +579,7 @@ export function mapOpenAIDelta(
     });
   }
   if (delta.tool_calls) {
-    for (const toolCall of delta.tool_calls) {
+    delta.tool_calls.forEach((toolCall) => {
       contentDeltas.push({
         index: nonToolCallCount + toolCall.index,
         part: {
@@ -594,7 +591,7 @@ export function mapOpenAIDelta(
           }),
         },
       });
-    }
+    });
   }
   return contentDeltas;
 }
