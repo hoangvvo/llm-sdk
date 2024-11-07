@@ -45,7 +45,7 @@ export const ImagePartSchema = {
 
 export const AudioEncodingSchema = {
     type: 'string',
-    enum: ['linear16', 'flac', 'mulaw', 'aac', 'mp3', 'opus'],
+    enum: ['linear16', 'flac', 'mulaw', 'alaw', 'aac', 'mp3', 'opus'],
     description: 'The encoding of the audio.'
 } as const;
 

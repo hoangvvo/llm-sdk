@@ -31,7 +31,7 @@ export function floatTo16BitPCM(float32Array: Float32Array): ArrayBuffer {
   const view = new DataView(buffer);
   let offset = 0;
   for (let i = 0; i < float32Array.length; i++, offset += 2) {
-    const s = Math.max(-1, Math.min(1, float32Array[i]!));
+    const s = Math.max(-1, Math.min(1, float32Array[i] as number));
     view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
   return buffer;

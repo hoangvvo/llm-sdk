@@ -146,92 +146,109 @@ export function convertToAnthropicMessages(
   }
 
   return messages.map((message): Anthropic.Messages.MessageParam => {
-    if (message.role === "assistant") {
-      return {
-        role: "assistant",
-        content: message.content
-          .map(
+    switch (message.role) {
+      case "assistant": {
+        return {
+          role: "assistant",
+          content: message.content
+            .map(
+              (
+                part,
+              ):
+                | Anthropic.Messages.TextBlockParam
+                | Anthropic.Messages.ToolUseBlockParam => {
+                switch (part.type) {
+                  case "text":
+                    return {
+                      type: "text",
+                      text: part.text,
+                    };
+                  case "tool-call":
+                    return {
+                      type: "tool_use",
+                      id: part.toolCallId,
+                      name: part.toolName,
+                      input: part.args,
+                    };
+                  case "audio":
+                    throw new Error("Audio parts are not supported");
+                  default: {
+                    const exhaustiveCheck: never = part;
+                    throw new Error(
+                      `Unsupported message part type: ${(exhaustiveCheck as { type: string }).type}`,
+                    );
+                  }
+                }
+              },
+            )
+            .filter((block) => !!block),
+        };
+      }
+
+      case "tool": {
+        // anthropic does not have a dedicated tool message type
+        return {
+          role: "user",
+          content: message.content.map(
+            (part): Anthropic.Messages.ToolResultBlockParam => ({
+              type: "tool_result",
+              tool_use_id: part.toolCallId,
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(part.result),
+                },
+              ],
+            }),
+          ),
+        };
+      }
+
+      case "user": {
+        return {
+          role: "user",
+          content: message.content.map(
             (
               part,
             ):
               | Anthropic.Messages.TextBlockParam
-              | Anthropic.Messages.ToolUseBlockParam => {
+              | Anthropic.Messages.ImageBlockParam => {
               switch (part.type) {
-                case "text": {
+                case "text":
                   return {
                     type: "text",
                     text: part.text,
                   };
-                }
-                case "tool-call": {
+                case "image":
                   return {
-                    type: "tool_use",
-                    id: part.toolCallId,
-                    name: part.toolName,
-                    input: part.args,
+                    type: "image",
+                    source: {
+                      data: part.imageData,
+                      type: "base64",
+                      media_type:
+                        part.mimeType as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
+                    },
                   };
-                }
+                case "audio":
+                  throw new Error("Audio parts are not supported");
                 default: {
+                  const exhaustiveCheck: never = part;
                   throw new Error(
-                    `Unsupported message part type: ${(part as { type: string }).type}`,
+                    `Unsupported message part type: ${(exhaustiveCheck as { type: string }).type}`,
                   );
                 }
               }
             },
-          )
-          .filter((block) => !!block),
-      };
-    } else if (message.role === "tool") {
-      // anthropic does not have a dedicated tool message type
-      return {
-        role: "user",
-        content: message.content.map(
-          (part): Anthropic.Messages.ToolResultBlockParam => ({
-            type: "tool_result",
-            tool_use_id: part.toolCallId,
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify(part.result),
-              },
-            ],
-          }),
-        ),
-      };
-    } else {
-      return {
-        role: "user",
-        content: message.content.map(
-          (
-            part,
-          ):
-            | Anthropic.Messages.TextBlockParam
-            | Anthropic.Messages.ImageBlockParam => {
-            switch (part.type) {
-              case "text": {
-                return {
-                  type: "text",
-                  text: part.text,
-                };
-              }
-              case "image": {
-                return {
-                  type: "image",
-                  source: {
-                    data: part.imageData,
-                    type: "base64",
-                    media_type:
-                      part.mimeType as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
-                  },
-                };
-              }
-              default: {
-                throw new Error(`Unsupported message part type: ${part.type}`);
-              }
-            }
-          },
-        ),
-      };
+          ),
+        };
+      }
+
+      default: {
+        const exhaustiveCheck: never = message;
+        throw new Error(
+          `Unsupported message role: ${(exhaustiveCheck as { role: string }).role}`,
+        );
+      }
     }
   });
 }
@@ -255,17 +272,28 @@ export function convertToAnthropicToolChoice(
   if (!toolChoice) {
     return undefined;
   }
-  if (toolChoice.type === "auto") {
-    return { type: "auto" };
-  } else if (toolChoice.type === "required") {
-    return { type: "any" };
-  } else if (toolChoice.type === "tool") {
-    return {
-      type: "tool",
-      name: toolChoice.toolName,
-    };
+
+  switch (toolChoice.type) {
+    case "auto":
+      return { type: "auto" };
+    case "required":
+      return { type: "any" };
+    case "tool":
+      return {
+        type: "tool",
+        name: toolChoice.toolName,
+      };
+    case "none": {
+      // already handled in convertToAnthropicParams
+      return undefined;
+    }
+    default: {
+      const exhaustiveCheck: never = toolChoice;
+      throw new Error(
+        `Unsupported tool choice type: ${(exhaustiveCheck as { type: string }).type}`,
+      );
+    }
   }
-  return undefined;
 }
 
 export function convertToAnthropicTools(tools: Tool[]): Anthropic.Tool[] {
@@ -291,87 +319,97 @@ export function mapAnthropicMessage(
 }
 
 export function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock) {
-  if (block.type === "text") {
-    return {
-      type: "text",
-      text: block.text,
-    } satisfies TextPart;
+  switch (block.type) {
+    case "text":
+      return {
+        type: "text",
+        text: block.text,
+      } satisfies TextPart;
+    case "tool_use":
+      return {
+        type: "tool-call",
+        toolCallId: block.id,
+        toolName: block.name,
+        args: block.input as Record<string, unknown>,
+      } satisfies ToolCallPart;
+    default: {
+      const exhaustiveCheck: never = block;
+      throw new Error(
+        `Unsupported block type: ${(exhaustiveCheck as { type: string }).type}`,
+      );
+    }
   }
-  if (block.type === "tool_use") {
-    return {
-      type: "tool-call",
-      toolCallId: block.id,
-      toolName: block.name,
-      args: block.input as Record<string, unknown>,
-    } satisfies ToolCallPart;
-  }
-  throw new Error(
-    `Unsupported block type: ${(block as { type: string }).type}`,
-  );
 }
 
 export function mapAnthropicStreamEvent(
   chunk: Anthropic.Messages.RawMessageStreamEvent,
 ): ContentDelta[] {
-  if (chunk.type === "content_block_start") {
-    if (chunk.content_block.type === "text") {
-      return [
-        {
-          index: chunk.index,
-          part: {
-            type: "text",
-            text: chunk.content_block.text,
-          },
-        },
-      ];
-    }
-    if (chunk.content_block.type === "tool_use") {
-      return [
-        {
-          index: chunk.index,
-          part: {
-            type: "tool-call",
-            toolCallId: chunk.content_block.id,
-            toolName: chunk.content_block.name,
-            args: chunk.content_block.input
-              ? typeof chunk.content_block.input !== "string"
-                ? JSON.stringify(chunk.content_block.input)
-                : chunk.content_block.input
-              : "",
-          },
-        },
-      ];
-    }
-    throw new Error(
-      `Unsupported content block type: ${(chunk.content_block as { type: string }).type}`,
-    );
+  switch (chunk.type) {
+    case "content_block_start":
+      switch (chunk.content_block.type) {
+        case "text":
+          return [
+            {
+              index: chunk.index,
+              part: {
+                type: "text",
+                text: chunk.content_block.text,
+              },
+            },
+          ];
+        case "tool_use":
+          return [
+            {
+              index: chunk.index,
+              part: {
+                type: "tool-call",
+                toolCallId: chunk.content_block.id,
+                toolName: chunk.content_block.name,
+                args: chunk.content_block.input
+                  ? typeof chunk.content_block.input !== "string"
+                    ? JSON.stringify(chunk.content_block.input)
+                    : chunk.content_block.input
+                  : "",
+              },
+            },
+          ];
+        default: {
+          const exhaustiveCheck: never = chunk.content_block;
+          throw new Error(
+            `Unsupported content block type: ${(exhaustiveCheck as { type: string }).type}`,
+          );
+        }
+      }
+    case "content_block_delta":
+      switch (chunk.delta.type) {
+        case "text_delta":
+          return [
+            {
+              index: chunk.index,
+              part: {
+                type: "text",
+                text: chunk.delta.text,
+              },
+            },
+          ];
+        case "input_json_delta":
+          return [
+            {
+              index: chunk.index,
+              part: {
+                type: "tool-call",
+                args: chunk.delta.partial_json,
+              },
+            },
+          ];
+        default: {
+          const exhaustiveCheck: never = chunk.delta;
+          throw new Error(
+            `Unsupported delta type: ${(exhaustiveCheck as { type: string }).type}`,
+          );
+        }
+      }
+    default:
+      return [];
   }
-  if (chunk.type === "content_block_delta") {
-    if (chunk.delta.type === "text_delta") {
-      return [
-        {
-          index: chunk.index,
-          part: {
-            type: "text",
-            text: chunk.delta.text,
-          },
-        },
-      ];
-    }
-    if (chunk.delta.type === "input_json_delta") {
-      return [
-        {
-          index: chunk.index,
-          part: {
-            type: "tool-call",
-            args: chunk.delta.partial_json,
-          },
-        },
-      ];
-    }
-    throw new Error(
-      `Unsupported delta type: ${(chunk.delta as { type: "string" }).type}`,
-    );
-  }
-  return [];
 }

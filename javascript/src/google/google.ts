@@ -28,8 +28,10 @@ import type {
   Part,
   PartialModelResponse,
   Tool,
+  ToolResultPart,
 } from "../schemas/index.js";
 import { mapAudioFormatToMimeType } from "../utils/audio.utils.js";
+import type { InternalContentDelta } from "../utils/stream.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import type { GoogleModelOptions } from "./types.js";
@@ -93,7 +95,11 @@ export class GoogleModel implements LanguageModel {
       const candidate = chunk.candidates?.[0];
 
       if (candidate?.content) {
-        const incomingContentDeltas = mapGoogleDelta(candidate.content);
+        const incomingContentDeltas = mapGoogleDelta(
+          candidate.content,
+          accumulator.deltas,
+        );
+
         accumulator.addChunks(incomingContentDeltas);
 
         for (const delta of incomingContentDeltas) {
@@ -107,7 +113,13 @@ export class GoogleModel implements LanguageModel {
     }
 
     return {
-      content: accumulator.computeContent(),
+      content: accumulator.computeContent().filter((part) => {
+        // It is observed that Google sometimes sends empty text parts
+        if (part.type === "text" && part.text === "") {
+          return false;
+        }
+        return true;
+      }),
       ...(usage && { usage }),
     };
   }
@@ -143,35 +155,31 @@ export function convertToGoogleMessages(messages: Message[]): Content[] {
   return messages.map((message): Content => {
     const parts = message.content.map((part): GooglePart => {
       switch (part.type) {
-        case "text": {
+        case "text":
           return {
             text: part.text,
           };
-        }
-        case "image": {
+        case "image":
           return {
             inlineData: {
               data: part.imageData,
               mimeType: part.mimeType,
             },
           };
-        }
-        case "audio": {
+        case "audio":
           return {
             inlineData: {
               data: part.audioData,
               mimeType: mapAudioFormatToMimeType(part),
             },
           };
-        }
-        case "tool-call": {
+        case "tool-call":
           return {
             functionCall: {
               name: part.toolName,
               args: part.args || {},
             },
           };
-        }
         case "tool-result": {
           let response = part.result as object;
 
@@ -188,24 +196,37 @@ export function convertToGoogleMessages(messages: Message[]): Content[] {
             },
           };
         }
+        default: {
+          const exhaustiveCheck: never = part;
+          throw new Error(
+            `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
+          );
+        }
       }
     });
 
-    if (message.role === "assistant") {
-      return {
-        role: "model",
-        parts,
-      };
-    } else if (message.role === "tool") {
-      return {
-        role: "function",
-        parts,
-      };
-    } else {
-      return {
-        role: "user",
-        parts,
-      };
+    switch (message.role) {
+      case "assistant":
+        return {
+          role: "model",
+          parts,
+        };
+      case "tool":
+        return {
+          role: "function",
+          parts,
+        };
+      case "user":
+        return {
+          role: "user",
+          parts,
+        };
+      default: {
+        const exhaustiveCheck: never = message;
+        throw new Error(
+          `Unsupported message role: ${(exhaustiveCheck as { role: string }).role}`,
+        );
+      }
     }
   });
 }
@@ -237,34 +258,36 @@ export function convertToGoogleToolConfig(
   }
 
   switch (toolChoice.type) {
-    case "auto": {
+    case "auto":
       return {
         functionCallingConfig: {
           mode: FunctionCallingMode.AUTO,
         },
       };
-    }
-    case "required": {
+    case "required":
       return {
         functionCallingConfig: {
           mode: FunctionCallingMode.ANY,
         },
       };
-    }
-    case "none": {
+    case "none":
       return {
         functionCallingConfig: {
           mode: FunctionCallingMode.NONE,
         },
       };
-    }
-    case "tool": {
+    case "tool":
       return {
         functionCallingConfig: {
           mode: FunctionCallingMode.ANY,
           allowedFunctionNames: [toolChoice.toolName],
         },
       };
+    default: {
+      const exhaustiveCheck: never = toolChoice;
+      throw new Error(
+        `Unsupported tool choice type: ${(exhaustiveCheck as { type: string }).type}`,
+      );
     }
   }
 }
@@ -274,8 +297,8 @@ export function convertToGoogleTools(
 ): FunctionDeclarationsTool[] {
   return [
     {
-      functionDeclarations: tools.map((tool): FunctionDeclaration => {
-        return {
+      functionDeclarations: tools.map(
+        (tool): FunctionDeclaration => ({
           name: tool.name,
           description: tool.description,
           ...(!!tool.parameters && {
@@ -283,8 +306,8 @@ export function convertToGoogleTools(
               tool.parameters,
             ) as FunctionDeclarationSchema,
           }),
-        };
-      }),
+        }),
+      ),
     },
   ];
 }
@@ -301,14 +324,12 @@ export function convertToGoogleResponseFormat(
         responseFormat.schema,
       );
     }
+    return generationConfig;
   }
   return undefined;
 }
 
 export function convertToGoogleSchema(schema: Record<string, unknown>): Schema {
-  // Google only supports a subset of JSON Schema
-  // https://ai.google.dev/api/caching#Schema
-
   const allowedFormatValues = ["float", "double", "int32", "int64", "enum"];
 
   let enumValue = schema["enum"] as string[] | undefined;
@@ -390,36 +411,91 @@ export function mapGooglePart(part: GooglePart): Part {
         audioData: part.inlineData.data,
       };
     }
+    throw new Error(
+      "unsupported inlineData mimeType: " + part.inlineData.mimeType,
+    );
   }
   if (part.functionCall) {
     return {
       type: "tool-call",
-      // IMPORTANT: Gemini does not generate an ID we expect for tool calls
       toolCallId: genidForToolCall(),
       toolName: part.functionCall.name,
       args: (part.functionCall.args as Record<string, unknown>) || {},
     };
   }
-  throw new Error("unknown part type");
+  if (part.codeExecutionResult) {
+    throw new Error("codeExecutionResult is not supported");
+  }
+  if (part.functionResponse) {
+    return {
+      type: "tool-result",
+      toolCallId: genidForToolCall(),
+      toolName: part.functionResponse.name,
+      result: part.functionResponse.response as ToolResultPart["result"],
+    };
+  }
+  if (part.fileData) {
+    throw new Error("fileData is not supported");
+  }
+  if (part.executableCode) {
+    throw new Error("executableCode is not supported");
+  }
+  const exhaustiveCheck: never = part;
+  throw new Error("unknown part properties: " + Object.keys(exhaustiveCheck));
 }
 
-export function mapGoogleDelta(content: Content): ContentDelta[] {
+export function mapGoogleDelta(
+  content: Content,
+  existingDeltas: InternalContentDelta[],
+): ContentDelta[] {
   // google does not stream partials for tool calls so it is safe to do this
-  return content.parts.map(mapGooglePart).map((part, index): ContentDelta => {
-    if (part.type === "tool-call") {
-      return {
-        index,
-        part: {
-          ...part,
-          // our ToolCallPartDelta only accepts text
-          args: part.args ? JSON.stringify(part.args) : "",
-        },
-      };
+  return content.parts.map(mapGooglePart).map((part): ContentDelta => {
+    const partOfSameTypeIndex = existingDeltas.findIndex(
+      (delta) => delta.part.type === part.type,
+    );
+    switch (part.type) {
+      case "tool-call": {
+        let index: number;
+        if (partOfSameTypeIndex === -1) {
+          index = existingDeltas.length;
+        } else {
+          const sameToolNameIndex = existingDeltas.findIndex(
+            (delta) =>
+              delta.part.type === "tool-call" &&
+              delta.part.toolName === part.toolName,
+          );
+          index =
+            sameToolNameIndex === -1
+              ? existingDeltas.length
+              : sameToolNameIndex;
+        }
+        return {
+          index,
+          part: {
+            ...part,
+            args: part.args ? JSON.stringify(part.args) : "",
+          },
+        };
+      }
+      case "text":
+      case "audio":
+        return {
+          index:
+            partOfSameTypeIndex === -1
+              ? existingDeltas.length
+              : partOfSameTypeIndex,
+          part,
+        };
+      case "image":
+      case "tool-result":
+        throw new Error(`Unsupported part type for delta: ${part.type}`);
+      default: {
+        const exhaustiveCheck: never = part;
+        throw new Error(
+          `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
+        );
+      }
     }
-    return {
-      index,
-      part,
-    } as ContentDelta;
   });
 }
 
