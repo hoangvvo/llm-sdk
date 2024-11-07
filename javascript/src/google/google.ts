@@ -31,6 +31,7 @@ import type {
   ToolResultPart,
 } from "../schemas/index.js";
 import { mapAudioFormatToMimeType } from "../utils/audio.utils.js";
+import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import type { InternalContentDelta } from "../utils/stream.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
@@ -47,7 +48,10 @@ export class GoogleModel implements LanguageModel {
 
   private genModel: GenerativeModel;
 
-  constructor(options: GoogleModelOptions, metadata?: LanguageModelMetadata) {
+  constructor(
+    public options: GoogleModelOptions,
+    metadata?: LanguageModelMetadata,
+  ) {
     this.provider = "google";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
@@ -60,7 +64,7 @@ export class GoogleModel implements LanguageModel {
 
   async generate(input: GoogleLanguageModelInput): Promise<ModelResponse> {
     const result = await this.genModel.generateContent(
-      convertToGoogleParams(input),
+      convertToGoogleParams(input, this.options),
     );
 
     const candidate = result.response.candidates?.[0];
@@ -84,7 +88,7 @@ export class GoogleModel implements LanguageModel {
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
     const { stream } = await this.genModel.generateContentStream(
-      convertToGoogleParams(input),
+      convertToGoogleParams(input, this.options),
     );
 
     let usage: ModelUsage | undefined;
@@ -127,6 +131,7 @@ export class GoogleModel implements LanguageModel {
 
 export function convertToGoogleParams(
   input: GoogleLanguageModelInput,
+  options: GoogleModelOptions,
 ): GenerateContentRequest {
   const toolConfig = convertToGoogleToolConfig(input.toolChoice);
 
@@ -136,7 +141,7 @@ export function convertToGoogleParams(
     ...(!!input.systemPrompt && {
       systemInstruction: input.systemPrompt,
     }),
-    contents: convertToGoogleMessages(input.messages),
+    contents: convertToGoogleMessages(input.messages, options),
     ...(input.tools && {
       tools: convertToGoogleTools(input.tools),
     }),
@@ -151,7 +156,13 @@ export function convertToGoogleParams(
   };
 }
 
-export function convertToGoogleMessages(messages: Message[]): Content[] {
+export function convertToGoogleMessages(
+  messages: Message[],
+  options: GoogleModelOptions,
+): Content[] {
+  if (options.convertAudioPartsToTextParts) {
+    messages = messages.map(convertAudioPartsToTextParts);
+  }
   return messages.map((message): Content => {
     const parts = message.content.map((part): GooglePart => {
       switch (part.type) {
