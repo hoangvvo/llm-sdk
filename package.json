@@ -27,6 +27,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@google/generative-ai": "^0.21.0",
+    "@mistralai/mistralai": "^1.3.0",
     "audio-context": "^1.0.3",
     "audio-decode": "^2.2.2",
     "audio-play": "^2.3.1",

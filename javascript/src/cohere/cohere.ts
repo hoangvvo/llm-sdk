@@ -24,10 +24,11 @@ export type CohereLanguageModelInput = LanguageModelInput & {
 };
 
 export class CohereModel implements LanguageModel {
-  provider: string;
-  modelId: string;
-  private cohere: CohereClientV2;
+  public provider: string;
+  public modelId: string;
   public metadata?: LanguageModelMetadata;
+
+  private cohere: CohereClientV2;
 
   constructor(
     public options: CohereModelOptions,

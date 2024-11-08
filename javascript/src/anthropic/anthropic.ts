@@ -25,10 +25,11 @@ export type AnthropicLanguageModelInput = LanguageModelInput & {
 };
 
 export class AnthropicModel implements LanguageModel {
-  provider: string;
-  modelId: string;
-  private anthropic: Anthropic;
+  public provider: string;
+  public modelId: string;
   public metadata?: LanguageModelMetadata;
+
+  private anthropic: Anthropic;
 
   constructor(
     public options: AnthropicModelOptions,

@@ -20,6 +20,8 @@ import { GoogleModel } from "@hoangvvo/llm-sdk/google";
 import { AnthropicModel } from "@hoangvvo/llm-sdk/anthropic";
 // or
 import { CohereModel } from "@hoangvvo/llm-sdk/cohere";
+// or
+import { MistralModel } from "@hoangvvo/llm-sdk/mistral";
 
 const model = new OpenAIModel({
   apiKey: "openai-api-key",
@@ -27,7 +29,7 @@ const model = new OpenAIModel({
 });
 ```
 
-See [examples](./examples/) for detailed usage.
+See [examples](./examples/) or [test cases](./test/) for more details.
 
 ## License
 

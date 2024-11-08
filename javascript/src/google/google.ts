@@ -117,13 +117,7 @@ export class GoogleModel implements LanguageModel {
     }
 
     return {
-      content: accumulator.computeContent().filter((part) => {
-        // It is observed that Google sometimes sends empty text parts
-        if (part.type === "text" && part.text === "") {
-          return false;
-        }
-        return true;
-      }),
+      content: accumulator.computeContent(),
       ...(usage && { usage }),
     };
   }
@@ -395,14 +389,14 @@ export function mapGoogleMessage(
 ): AssistantMessage {
   return {
     role: "assistant",
-    content: candidate.content.parts.map(
-      mapGooglePart,
-    ) as AssistantMessage["content"],
+    content: candidate.content.parts
+      .map(mapGooglePart)
+      .filter((part): part is AssistantMessage["content"][number] => !!part),
   };
 }
 
-export function mapGooglePart(part: GooglePart): Part {
-  if (typeof part.text === "string") {
+export function mapGooglePart(part: GooglePart): Part | undefined {
+  if (typeof part.text === "string" && part.text) {
     return {
       type: "text",
       text: part.text,
@@ -453,10 +447,7 @@ export function mapGooglePart(part: GooglePart): Part {
   if (part.executableCode) {
     throw new Error("executableCode is not supported");
   }
-  const exhaustiveCheck: never = part;
-  throw new Error(
-    "unknown part properties: " + Object.keys(exhaustiveCheck).join(", "),
-  );
+  return undefined;
 }
 
 export function mapGoogleDelta(
@@ -464,54 +455,57 @@ export function mapGoogleDelta(
   existingDeltas: InternalContentDelta[],
 ): ContentDelta[] {
   // google does not stream partials for tool calls so it is safe to do this
-  return content.parts.map(mapGooglePart).map((part): ContentDelta => {
-    const partOfSameTypeIndex = existingDeltas.findIndex(
-      (delta) => delta.part.type === part.type,
-    );
-    switch (part.type) {
-      case "tool-call": {
-        let index: number;
-        if (partOfSameTypeIndex === -1) {
-          index = existingDeltas.length;
-        } else {
-          const sameToolNameIndex = existingDeltas.findIndex(
-            (delta) =>
-              delta.part.type === "tool-call" &&
-              delta.part.toolName === part.toolName,
-          );
-          index =
-            sameToolNameIndex === -1
-              ? existingDeltas.length
-              : sameToolNameIndex;
+  return content.parts
+    .map(mapGooglePart)
+    .filter((part) => !!part)
+    .map((part): ContentDelta => {
+      const partOfSameTypeIndex = existingDeltas.findIndex(
+        (delta) => delta.part.type === part.type,
+      );
+      switch (part.type) {
+        case "tool-call": {
+          let index: number;
+          if (partOfSameTypeIndex === -1) {
+            index = existingDeltas.length;
+          } else {
+            const sameToolNameIndex = existingDeltas.findIndex(
+              (delta) =>
+                delta.part.type === "tool-call" &&
+                delta.part.toolName === part.toolName,
+            );
+            index =
+              sameToolNameIndex === -1
+                ? existingDeltas.length
+                : sameToolNameIndex;
+          }
+          return {
+            index,
+            part: {
+              ...part,
+              args: part.args ? JSON.stringify(part.args) : "",
+            },
+          };
         }
-        return {
-          index,
-          part: {
-            ...part,
-            args: part.args ? JSON.stringify(part.args) : "",
-          },
-        };
+        case "text":
+        case "audio":
+          return {
+            index:
+              partOfSameTypeIndex === -1
+                ? existingDeltas.length
+                : partOfSameTypeIndex,
+            part,
+          };
+        case "image":
+        case "tool-result":
+          throw new Error(`Unsupported part type for delta: ${part.type}`);
+        default: {
+          const exhaustiveCheck: never = part;
+          throw new Error(
+            `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
+          );
+        }
       }
-      case "text":
-      case "audio":
-        return {
-          index:
-            partOfSameTypeIndex === -1
-              ? existingDeltas.length
-              : partOfSameTypeIndex,
-          part,
-        };
-      case "image":
-      case "tool-result":
-        throw new Error(`Unsupported part type for delta: ${part.type}`);
-      default: {
-        const exhaustiveCheck: never = part;
-        throw new Error(
-          `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
-        );
-      }
-    }
-  });
+    });
 }
 
 export function mapGoogleUsage(usage: UsageMetadata): ModelUsage {

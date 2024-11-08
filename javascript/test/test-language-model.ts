@@ -258,7 +258,7 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "tool-call",
-              toolCallId: "call-0",
+              toolCallId: "0mbnj08nt",
               toolName: "get_weather",
               args: {
                 location: "Boston",
@@ -271,7 +271,7 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "tool-result",
-              toolCallId: "call-0",
+              toolCallId: "0mbnj08nt",
               toolName: "get_weather",
               result: {
                 temperature: 70,
@@ -310,7 +310,7 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "tool-call",
-              toolCallId: "call-0",
+              toolCallId: "0mbnj08nt",
               toolName: "get_weather",
               args: {
                 location: "Boston",
@@ -323,7 +323,7 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "tool-result",
-              toolCallId: "call-0",
+              toolCallId: "0mbnj08nt",
               toolName: "get_weather",
               result: {
                 temperature: 70,

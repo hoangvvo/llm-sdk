@@ -116,8 +116,8 @@ export class OpenAIModel implements LanguageModel {
       if (completion?.delta) {
         const incomingContentDeltas = mapOpenAIDelta(
           completion.delta,
-          openaiInput,
           accumulator.deltas,
+          openaiInput,
         );
 
         accumulator.addChunks(incomingContentDeltas);
@@ -151,23 +151,21 @@ export function convertToOpenAIParams(
   input: LanguageModelInput,
   options: OpenAIModelOptions,
 ): OpenAI.Chat.ChatCompletionCreateParams {
-  const tool_choice = convertToOpenAIToolChoice(input.toolChoice);
-  const response_format = convertToOpenAIResponseFormat(
-    input.responseFormat,
-    options,
-  );
-  const samplingParams = convertToOpenAISamplingParams(input);
-
   return {
     model: options.modelId,
     messages: convertToOpenAIMessages(input, options),
     ...(input.tools && {
       tools: input.tools.map((tool) => convertToOpenAITool(tool, options)),
     }),
-    ...(tool_choice && { tool_choice }),
-    ...samplingParams,
-    ...(response_format && {
-      response_format,
+    ...(input.toolChoice && {
+      tool_choice: convertToOpenAIToolChoice(input.toolChoice),
+    }),
+    ...convertToOpenAISamplingParams(input),
+    ...(input.responseFormat && {
+      response_format: convertToOpenAIResponseFormat(
+        input.responseFormat,
+        options,
+      ),
     }),
     ...(input.modalities && {
       modalities: input.modalities,
@@ -215,17 +213,16 @@ export function convertToOpenAIMessages(
               break;
             }
             case "tool-call": {
-              openaiMessageParam.tool_calls = [
-                ...(openaiMessageParam.tool_calls || []),
-                {
-                  type: "function",
-                  id: part.toolCallId,
-                  function: {
-                    name: part.toolName,
-                    arguments: JSON.stringify(part.args),
-                  },
+              openaiMessageParam.tool_calls =
+                openaiMessageParam.tool_calls || [];
+              openaiMessageParam.tool_calls.push({
+                type: "function",
+                id: part.toolCallId,
+                function: {
+                  name: part.toolName,
+                  arguments: JSON.stringify(part.args),
                 },
-              ];
+              });
               break;
             }
             case "audio": {
@@ -332,10 +329,8 @@ export function convertToOpenAISamplingParams(
 }
 
 export function convertToOpenAIToolChoice(
-  toolChoice: LanguageModelInput["toolChoice"],
-): OpenAI.Chat.Completions.ChatCompletionToolChoiceOption | undefined {
-  if (!toolChoice) return undefined;
-
+  toolChoice: NonNullable<LanguageModelInput["toolChoice"]>,
+): OpenAI.Chat.Completions.ChatCompletionToolChoiceOption {
   switch (toolChoice.type) {
     case "tool":
       return {
@@ -424,13 +419,11 @@ export function convertToOpenAIAudioFormat(
 }
 
 export function convertToOpenAIResponseFormat(
-  responseFormat: LanguageModelInput["responseFormat"],
+  responseFormat: NonNullable<LanguageModelInput["responseFormat"]>,
   options: Pick<OpenAIModelOptions, "structuredOutputs">,
-):
-  | OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
-  | undefined {
-  if (!responseFormat) return undefined;
-
+): NonNullable<
+  OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
+> {
   switch (responseFormat.type) {
     case "json":
       if (options.structuredOutputs && responseFormat.schema) {
@@ -539,38 +532,31 @@ export function mapOpenAIDelta(
   delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
     audio?: { id?: string; data?: string; transcript?: string };
   },
-  options?: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
-  existingContentDeltas?: InternalContentDelta[],
+  existingContentDeltas: InternalContentDelta[],
+  options: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
 ): ContentDelta[] {
   const contentDeltas: ContentDelta[] = [];
 
-  // OpenAI will only either have text, audio, or tool_calls
-  // so we can assume that the first non-tool call index is 0
-  const nonToolCallIndex = 0;
-
-  // However, it has been noticed that OpenAI will sometimes
-  // responds with a tool call after responding with text parts
-  // therefore, we must increase the indexes of tool calls by this
-  // TODO: we need to find a better solution here to map the indexes
-  // correctly
-  const nonToolCallCount =
-    existingContentDeltas?.filter((delta) => delta.part.type !== "tool-call")
-      .length || 0;
-
   if (delta.content) {
+    const existingDelta = existingContentDeltas.findLast(
+      (delta) => delta.part.type === "text",
+    );
     contentDeltas.push({
-      index: nonToolCallIndex,
+      index: existingDelta ? existingDelta.index : contentDeltas.length,
       part: { type: "text", text: delta.content },
     });
   }
   if (delta.audio) {
+    const existingDelta = existingContentDeltas.findLast(
+      (delta) => delta.part.type === "audio",
+    );
     contentDeltas.push({
-      index: nonToolCallIndex,
+      index: existingDelta ? existingDelta.index : contentDeltas.length,
       part: {
         type: "audio",
         ...(delta.audio.data && {
           audioData: delta.audio.data,
-          ...mapOpenAIAudioFormat(options?.audio?.format || "pcm16"),
+          ...mapOpenAIAudioFormat(options.audio?.format || "pcm16"),
           sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
           channels: OPENAI_AUDIO_CHANNELS,
         }),
@@ -579,9 +565,13 @@ export function mapOpenAIDelta(
     });
   }
   if (delta.tool_calls) {
+    const allExistingToolCalls = existingContentDeltas.filter(
+      (delta) => delta.part.type === "tool-call",
+    );
     delta.tool_calls.forEach((toolCall) => {
+      const existingDelta = allExistingToolCalls[toolCall.index];
       contentDeltas.push({
-        index: nonToolCallCount + toolCall.index,
+        index: existingDelta ? existingDelta.index : contentDeltas.length,
         part: {
           type: "tool-call",
           ...(toolCall.id && { toolCallId: toolCall.id }),
@@ -593,6 +583,7 @@ export function mapOpenAIDelta(
       });
     });
   }
+
   return contentDeltas;
 }
 

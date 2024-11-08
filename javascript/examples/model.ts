@@ -1,6 +1,7 @@
 import { AnthropicModel } from "../src/anthropic/anthropic.js";
 import { CohereModel } from "../src/cohere/cohere.js";
 import { GoogleModel } from "../src/google/google.js";
+import { MistralModel } from "../src/mistral/mistral.js";
 import { OpenAIModel } from "../src/openai/openai.js";
 
 export const openaiModel = new OpenAIModel(
@@ -61,6 +62,18 @@ export const cohereModel = new CohereModel(
   {
     pricing: {
       inputCostPerTextToken: 0.16 / 1_000_000,
+      outputCostPerTextToken: 0.6 / 1_000_000,
+    },
+  },
+);
+export const mistralModel = new MistralModel(
+  {
+    modelId: "mistral-small-2409",
+    apiKey: process.env["MISTRAL_API_KEY"] as string,
+  },
+  {
+    pricing: {
+      inputCostPerTextToken: 0.2 / 1_000_000,
       outputCostPerTextToken: 0.6 / 1_000_000,
     },
   },
