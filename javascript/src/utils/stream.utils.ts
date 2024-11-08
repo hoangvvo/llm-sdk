@@ -3,6 +3,7 @@ import type {
   ContentDelta,
   ModelResponse,
   TextPartDelta,
+  ToolCallPart,
   ToolCallPartDelta,
 } from "../schemas/index.js";
 import {
@@ -144,4 +145,38 @@ export class ContentDeltaAccumulator {
       }
     });
   }
+}
+
+// Because of difference in mapping, especially in
+// openai cases, where text and audio part does not have indexes
+// or google cases, where no parts have indexes
+// we need to guess the index of the incoming delta
+export function guessDeltaIndex(
+  part: ContentDelta["part"] | ToolCallPart,
+  allContentDeltas: (ContentDelta | InternalContentDelta)[],
+  existingMatchingDelta?: ContentDelta | InternalContentDelta,
+) {
+  let matchingDelta = existingMatchingDelta;
+  if (!matchingDelta) {
+    matchingDelta = allContentDeltas.findLast((contentDelta) => {
+      if (part.type === "text" || part.type === "audio") {
+        return contentDelta.part.type === part.type;
+      } else {
+        // we won't be able to reliably match tool calls
+        // because there can be multiple tool calls with the same tool name
+        return (
+          contentDelta.part.type === "tool-call" &&
+          part.toolName === contentDelta.part.toolName
+        );
+      }
+    });
+  }
+  if (matchingDelta) {
+    return matchingDelta.index;
+  }
+  const maxIndex = Math.max(
+    ...allContentDeltas.map((contentDelta) => contentDelta.index),
+    -1,
+  );
+  return maxIndex + 1;
 }

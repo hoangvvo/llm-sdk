@@ -92,6 +92,7 @@ export class CohereModel implements LanguageModel {
           if (event.delta?.usage) {
             usage = mapCohereUsage(event.delta.usage);
           }
+          break;
         }
       }
     }
@@ -149,7 +150,7 @@ export function convertToCohereMessages(
     });
   }
 
-  for (const message of messages) {
+  messages.forEach((message) => {
     const { content, toolCalls, toolResults } = convertToCohereMessageParam(
       message.content,
     );
@@ -192,7 +193,7 @@ export function convertToCohereMessages(
         );
       }
     }
-  }
+  });
 
   return cohereMessages;
 }
@@ -206,7 +207,7 @@ export function convertToCohereMessageParam(parts: Part[]): {
   let toolCalls: Cohere.ToolCallV2[] | undefined;
   let toolResults: Cohere.ToolMessageV2[] | undefined;
 
-  for (const part of parts) {
+  parts.forEach((part) => {
     switch (part.type) {
       case "text": {
         content = content ?? [];
@@ -256,7 +257,7 @@ export function convertToCohereMessageParam(parts: Part[]): {
         );
       }
     }
-  }
+  });
 
   return {
     ...(content && { content }),

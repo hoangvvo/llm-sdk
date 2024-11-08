@@ -401,6 +401,100 @@ export function testLanguageModel(languageModel: LanguageModel) {
   });
 }
 
+export function testParallelToolCalls(languageModel: LanguageModel) {
+  test("generate parallel tool calls", async (t) => {
+    const response = await languageModel.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Get me the weather in Boston and the stock price of AAPL.",
+            },
+          ],
+        },
+      ],
+      tools,
+    });
+
+    log(response);
+
+    const toolCallParts = response.content.filter(
+      (part) => part.type === "tool-call",
+    );
+
+    t.assert.equal(toolCallParts.length, 2);
+
+    const weatherCall = toolCallParts.find(
+      (part) => part.toolName === "get_weather",
+    );
+
+    t.assert.equal(
+      (weatherCall?.args?.["location"] as string).includes("Boston"),
+      true,
+    );
+
+    const stockCall = toolCallParts.find(
+      (part) => part.toolName === "get_stock_price",
+    );
+
+    t.assert.equal(
+      (stockCall?.args?.["symbol"] as string).includes("AAPL"),
+      true,
+    );
+  });
+
+  test("stream parallel tool calls", async (t) => {
+    const response = languageModel.stream({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Get me the weather in Boston and the stock price of AAPL.",
+            },
+          ],
+        },
+      ],
+      tools,
+    });
+
+    let current = await response.next();
+    while (!current.done) {
+      log(current.value);
+      current = await response.next();
+    }
+
+    log(current.value);
+
+    const toolCallParts = current.value.content.filter(
+      (part) => part.type === "tool-call",
+    );
+
+    t.assert.equal(toolCallParts.length, 2);
+
+    const weatherCall = toolCallParts.find(
+      (part) => part.toolName === "get_weather",
+    );
+
+    t.assert.equal(
+      (weatherCall?.args?.["location"] as string).includes("Boston"),
+      true,
+    );
+
+    const stockCall = toolCallParts.find(
+      (part) => part.toolName === "get_stock_price",
+    );
+
+    t.assert.equal(
+      (stockCall?.args?.["symbol"] as string).includes("AAPL"),
+      true,
+    );
+  });
+}
+
 export function log(value: ModelResponse | PartialModelResponse) {
   if (!interactive) {
     return;

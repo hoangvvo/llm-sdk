@@ -33,7 +33,10 @@ import type {
 import { mapAudioFormatToMimeType } from "../utils/audio.utils.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import type { InternalContentDelta } from "../utils/stream.utils.js";
-import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
+import {
+  ContentDeltaAccumulator,
+  guessDeltaIndex,
+} from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import type { GoogleModelOptions } from "./types.js";
 
@@ -426,7 +429,11 @@ export function mapGooglePart(part: GooglePart): Part | undefined {
       toolCallId: genidForToolCall(),
       toolName: part.functionCall.name,
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      args: (part.functionCall.args as Record<string, unknown>) || null,
+      args: part.functionCall.args
+        ? ({
+            ...part.functionCall.args,
+          } as Record<string, unknown>)
+        : null,
     };
   }
   if (part.codeExecutionResult) {
@@ -454,58 +461,49 @@ export function mapGoogleDelta(
   content: Content,
   existingDeltas: InternalContentDelta[],
 ): ContentDelta[] {
-  // google does not stream partials for tool calls so it is safe to do this
-  return content.parts
-    .map(mapGooglePart)
-    .filter((part) => !!part)
-    .map((part): ContentDelta => {
-      const partOfSameTypeIndex = existingDeltas.findIndex(
-        (delta) => delta.part.type === part.type,
-      );
-      switch (part.type) {
-        case "tool-call": {
-          let index: number;
-          if (partOfSameTypeIndex === -1) {
-            index = existingDeltas.length;
-          } else {
-            const sameToolNameIndex = existingDeltas.findIndex(
-              (delta) =>
-                delta.part.type === "tool-call" &&
-                delta.part.toolName === part.toolName,
-            );
-            index =
-              sameToolNameIndex === -1
-                ? existingDeltas.length
-                : sameToolNameIndex;
-          }
-          return {
-            index,
-            part: {
-              ...part,
-              args: part.args ? JSON.stringify(part.args) : "",
-            },
-          };
-        }
-        case "text":
-        case "audio":
-          return {
-            index:
-              partOfSameTypeIndex === -1
-                ? existingDeltas.length
-                : partOfSameTypeIndex,
-            part,
-          };
-        case "image":
-        case "tool-result":
-          throw new Error(`Unsupported part type for delta: ${part.type}`);
-        default: {
-          const exhaustiveCheck: never = part;
-          throw new Error(
-            `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
-          );
-        }
+  const contentDeltas: ContentDelta[] = [];
+
+  content.parts.forEach((googlePart) => {
+    const part = mapGooglePart(googlePart);
+
+    if (!part) {
+      return;
+    }
+
+    switch (part.type) {
+      case "tool-result":
+      case "image":
+        throw new Error(`Unexpected part type for delta: ${part.type}`);
+      case "text":
+      case "audio":
+        contentDeltas.push({
+          index: guessDeltaIndex(part, [...existingDeltas, ...contentDeltas]),
+          part,
+        });
+        break;
+      case "tool-call": {
+        const o = {
+          index: guessDeltaIndex(part, [...existingDeltas, ...contentDeltas]),
+          part: {
+            ...part,
+            args: part.args ? JSON.stringify(part.args) : "",
+          },
+        };
+        contentDeltas.push(o);
+        break;
       }
-    });
+      default: {
+        const exhaustiveCheck: never = part;
+        throw new Error(
+          `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
+        );
+      }
+    }
+
+    return contentDeltas;
+  });
+
+  return contentDeltas;
 }
 
 export function mapGoogleUsage(usage: UsageMetadata): ModelUsage {

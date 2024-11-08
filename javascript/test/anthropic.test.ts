@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import test, { suite } from "node:test";
 import { AnthropicModel } from "../src/anthropic/anthropic.js";
-import { log, testLanguageModel } from "./test-language-model.js";
+import {
+  log,
+  testLanguageModel,
+  testParallelToolCalls,
+} from "./test-language-model.js";
 
 const model = new AnthropicModel(
   {
@@ -18,6 +22,8 @@ const model = new AnthropicModel(
 
 suite("AnthropicModel", () => {
   testLanguageModel(model);
+
+  testParallelToolCalls(model);
 
   test("convert audio part to text part if enabled", async () => {
     const model = new AnthropicModel({

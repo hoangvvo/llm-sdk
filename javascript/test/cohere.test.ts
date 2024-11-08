@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import test, { suite } from "node:test";
 import { CohereModel } from "../src/cohere/cohere.js";
-import { log, testLanguageModel } from "./test-language-model.js";
+import {
+  log,
+  testLanguageModel,
+  testParallelToolCalls,
+} from "./test-language-model.js";
 
 const model = new CohereModel(
   {
@@ -18,6 +22,8 @@ const model = new CohereModel(
 
 suite("CohereModel", () => {
   testLanguageModel(model);
+
+  testParallelToolCalls(model);
 
   test("convert audio part to text part if enabled", async () => {
     const model = new CohereModel({

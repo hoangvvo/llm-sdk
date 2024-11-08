@@ -156,7 +156,7 @@ export function convertToMistralMessages(
     });
   }
 
-  for (const message of messages) {
+  messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
         const mistralMessageParam: MistralComponents.AssistantMessage = {
@@ -255,7 +255,7 @@ export function convertToMistralMessages(
         );
       }
     }
-  }
+  });
 
   return mistralMessages;
 }
@@ -336,7 +336,7 @@ export function mapMistralMessage(
     });
   }
   if (Array.isArray(message.content)) {
-    for (const chunk of message.content) {
+    message.content.forEach((chunk) => {
       switch (chunk.type) {
         case "text":
           content.push({
@@ -353,7 +353,7 @@ export function mapMistralMessage(
           );
         }
       }
-    }
+    });
   }
 
   if (message.toolCalls) {
@@ -402,7 +402,7 @@ export function mapMistralDelta(
     });
   }
   if (Array.isArray(delta.content)) {
-    for (const chunk of delta.content) {
+    delta.content.forEach((chunk) => {
       switch (chunk.type) {
         case "text": {
           const existingDelta = existingContentDeltas.find(
@@ -423,7 +423,7 @@ export function mapMistralDelta(
           );
         }
       }
-    }
+    });
   }
   if (delta.toolCalls) {
     delta.toolCalls.forEach((toolCall) => {

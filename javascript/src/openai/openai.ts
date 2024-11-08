@@ -7,17 +7,23 @@ import type {
   AssistantMessage,
   AudioContainer,
   AudioEncoding,
+  AudioPartDelta,
   ContentDelta,
   LanguageModelInput,
   ModelResponse,
   ModelTokensDetail,
   ModelUsage,
   PartialModelResponse,
+  TextPartDelta,
   Tool,
+  ToolCallPartDelta,
 } from "../schemas/index.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import type { InternalContentDelta } from "../utils/stream.utils.js";
-import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
+import {
+  ContentDeltaAccumulator,
+  guessDeltaIndex,
+} from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import { OpenAIRefusedError } from "./errors.js";
 import type {
@@ -192,7 +198,7 @@ export function convertToOpenAIMessages(
     });
   }
 
-  for (const message of messages) {
+  messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
         const openaiMessageParam: OpenAI.Chat.ChatCompletionAssistantMessageParam =
@@ -304,7 +310,7 @@ export function convertToOpenAIMessages(
         );
       }
     }
-  }
+  });
 
   return openaiMessages;
 }
@@ -538,30 +544,32 @@ export function mapOpenAIDelta(
   const contentDeltas: ContentDelta[] = [];
 
   if (delta.content) {
-    const existingDelta = existingContentDeltas.findLast(
-      (delta) => delta.part.type === "text",
-    );
+    const part: TextPartDelta = { type: "text", text: delta.content };
     contentDeltas.push({
-      index: existingDelta ? existingDelta.index : contentDeltas.length,
-      part: { type: "text", text: delta.content },
+      index: guessDeltaIndex(part, [
+        ...existingContentDeltas,
+        ...contentDeltas,
+      ]),
+      part,
     });
   }
   if (delta.audio) {
-    const existingDelta = existingContentDeltas.findLast(
-      (delta) => delta.part.type === "audio",
-    );
+    const part: AudioPartDelta = {
+      type: "audio",
+      ...(delta.audio.data && {
+        audioData: delta.audio.data,
+        ...mapOpenAIAudioFormat(options.audio?.format || "pcm16"),
+        sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
+        channels: OPENAI_AUDIO_CHANNELS,
+      }),
+      ...(delta.audio.transcript && { transcript: delta.audio.transcript }),
+    };
     contentDeltas.push({
-      index: existingDelta ? existingDelta.index : contentDeltas.length,
-      part: {
-        type: "audio",
-        ...(delta.audio.data && {
-          audioData: delta.audio.data,
-          ...mapOpenAIAudioFormat(options.audio?.format || "pcm16"),
-          sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
-          channels: OPENAI_AUDIO_CHANNELS,
-        }),
-        ...(delta.audio.transcript && { transcript: delta.audio.transcript }),
-      },
+      index: guessDeltaIndex(part, [
+        ...existingContentDeltas,
+        ...contentDeltas,
+      ]),
+      part,
     });
   }
   if (delta.tool_calls) {
@@ -570,16 +578,22 @@ export function mapOpenAIDelta(
     );
     delta.tool_calls.forEach((toolCall) => {
       const existingDelta = allExistingToolCalls[toolCall.index];
+
+      const part: ToolCallPartDelta = {
+        type: "tool-call",
+        ...(toolCall.id && { toolCallId: toolCall.id }),
+        ...(toolCall.function?.name && { toolName: toolCall.function.name }),
+        ...(toolCall.function?.arguments && {
+          args: toolCall.function.arguments,
+        }),
+      };
       contentDeltas.push({
-        index: existingDelta ? existingDelta.index : contentDeltas.length,
-        part: {
-          type: "tool-call",
-          ...(toolCall.id && { toolCallId: toolCall.id }),
-          ...(toolCall.function?.name && { toolName: toolCall.function.name }),
-          ...(toolCall.function?.arguments && {
-            args: toolCall.function.arguments,
-          }),
-        },
+        index: guessDeltaIndex(
+          part,
+          [...existingContentDeltas, ...contentDeltas],
+          existingDelta,
+        ),
+        part,
       });
     });
   }

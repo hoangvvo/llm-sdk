@@ -2,7 +2,11 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import test, { suite } from "node:test";
 import { OpenAIModel } from "../src/openai/openai.js";
-import { log, testLanguageModel } from "./test-language-model.js";
+import {
+  log,
+  testLanguageModel,
+  testParallelToolCalls,
+} from "./test-language-model.js";
 
 const model = new OpenAIModel(
   {
@@ -24,6 +28,8 @@ const audioModel = new OpenAIModel({
 
 suite("OpenAIModel", () => {
   testLanguageModel(model);
+
+  testParallelToolCalls(model);
 
   test("convert audio part to text part if enabled", async () => {
     const model = new OpenAIModel({
