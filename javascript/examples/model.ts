@@ -29,15 +29,39 @@ export const openaiAudioModel = new OpenAIModel(
     },
   },
 );
-export const anthropicModel = new AnthropicModel({
-  modelId: "claude-3-5-sonnet-20241022",
-  apiKey: process.env["ANTHROPIC_API_KEY"] as string,
-});
-export const googleModel = new GoogleModel({
-  modelId: "gemini-1.5-pro",
-  apiKey: process.env["GOOGLE_API_KEY"] as string,
-});
-export const cohereModel = new CohereModel({
-  modelId: "command-r-08-2024",
-  apiKey: process.env["CO_API_KEY"] as string,
-});
+export const anthropicModel = new AnthropicModel(
+  {
+    modelId: "claude-3-5-sonnet-20241022",
+    apiKey: process.env["ANTHROPIC_API_KEY"] as string,
+  },
+  {
+    pricing: {
+      inputCostPerTextToken: 3.0 / 1_000_000,
+      outputCostPerTextToken: 15.0 / 1_000_000,
+    },
+  },
+);
+export const googleModel = new GoogleModel(
+  {
+    modelId: "gemini-1.5-pro",
+    apiKey: process.env["GOOGLE_API_KEY"] as string,
+  },
+  {
+    pricing: {
+      inputCostPerTextToken: 1.25 / 1_000_000,
+      outputCostPerTextToken: 5.0 / 1_000_000,
+    },
+  },
+);
+export const cohereModel = new CohereModel(
+  {
+    modelId: "command-r-08-2024",
+    apiKey: process.env["CO_API_KEY"] as string,
+  },
+  {
+    pricing: {
+      inputCostPerTextToken: 0.16 / 1_000_000,
+      outputCostPerTextToken: 0.6 / 1_000_000,
+    },
+  },
+);

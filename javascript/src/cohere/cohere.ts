@@ -14,6 +14,7 @@ import {
   Tool,
   ToolCallPart,
 } from "../schemas/types.gen.js";
+import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
 import { CohereModelOptions } from "./types.js";
@@ -114,7 +115,7 @@ export function convertToCohereParams(
 
   return {
     model: options.modelId,
-    messages: convertToCohereMessages(input),
+    messages: convertToCohereMessages(input, options),
     ...(input.tools && { tools: input.tools.map(convertToCohereTool) }),
     ...samplingParams,
     ...(response_format && {
@@ -126,10 +127,14 @@ export function convertToCohereParams(
 
 export function convertToCohereMessages(
   input: Pick<CohereLanguageModelInput, "messages" | "systemPrompt">,
+  options: CohereModelOptions,
 ): Cohere.ChatMessageV2[] {
   const cohereMessages: Cohere.ChatMessageV2[] = [];
 
-  const messages = input.messages;
+  let messages = input.messages;
+  if (options.convertAudioPartsToTextParts) {
+    messages = messages.map(convertAudioPartsToTextParts);
+  }
 
   if (input.systemPrompt) {
     cohereMessages.push({

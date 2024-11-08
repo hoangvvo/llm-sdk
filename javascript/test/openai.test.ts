@@ -1,15 +1,21 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import test, { suite } from "node:test";
 import { OpenAIModel } from "../src/openai/openai.js";
-import {
-  getAudioLanguageModelTests,
-  getLanguageModelTests,
-} from "./test-language-model.js";
+import { log, testLanguageModel } from "./test-language-model.js";
 
-const model = new OpenAIModel({
-  apiKey: process.env["OPENAI_API_KEY"] as string,
-  modelId: "gpt-4o",
-});
+const model = new OpenAIModel(
+  {
+    apiKey: process.env["OPENAI_API_KEY"] as string,
+    modelId: "gpt-4o",
+  },
+  {
+    pricing: {
+      inputCostPerTextToken: 2.5 / 1_000_000,
+      outputCostPerTextToken: 10 / 1_000_000,
+    },
+  },
+);
 
 const audioModel = new OpenAIModel({
   modelId: "gpt-4o-audio-preview",
@@ -17,15 +23,125 @@ const audioModel = new OpenAIModel({
 });
 
 suite("OpenAIModel", () => {
-  const tests = getLanguageModelTests(model);
-  tests.forEach(({ name, fn }) => {
-    test(name, fn);
-  });
-});
+  testLanguageModel(model);
 
-suite("OpenAIModel/audio", () => {
-  const tests = getAudioLanguageModelTests(audioModel);
-  tests.forEach(({ name, fn }) => {
-    test(name, fn);
+  test("convert audio part to text part if enabled", async () => {
+    const model = new OpenAIModel({
+      apiKey: process.env["OPENAI_API_KEY"] as string,
+      // not an audio model
+      modelId: "gpt-4o",
+      convertAudioPartsToTextParts: true,
+    });
+
+    const response = await model.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Hello",
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "audio",
+              audioData: "",
+              transcript: "Hi there, how can I help you?",
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Goodbye",
+            },
+          ],
+        },
+      ],
+    });
+
+    log(response);
+
+    // it should not throw a part unsupported error
+  });
+
+  test("generate audio", async (t) => {
+    const response = await audioModel.generate({
+      modalities: ["text", "audio"],
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Hello",
+            },
+          ],
+        },
+      ],
+      extra: {
+        audio: {
+          voice: "alloy",
+          format: "mp3",
+        },
+      },
+    });
+
+    log(response);
+
+    const audioPart = response.content.find((part) => part.type === "audio");
+
+    t.assert.equal(!!audioPart, true);
+    t.assert.equal(audioPart?.type, "audio");
+    t.assert.equal(audioPart!.audioData.length > 0, true);
+    t.assert.equal(audioPart!.encoding!.length > 0, true);
+    t.assert.equal(audioPart!.transcript!.length > 0, true);
+  });
+
+  test("stream audio", async (t) => {
+    const response = audioModel.stream({
+      modalities: ["text", "audio"],
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Hello",
+            },
+          ],
+        },
+      ],
+      extra: {
+        audio: {
+          voice: "alloy",
+          format: "pcm16",
+        },
+      },
+    });
+
+    let current = await response.next();
+    while (!current.done) {
+      log(current.value);
+      current = await response.next();
+    }
+
+    log(current.value);
+
+    const audioPart = current.value.content.find(
+      (part) => part.type === "audio",
+    );
+
+    t.assert.equal(!!audioPart, true);
+    t.assert.equal(audioPart?.type, "audio");
+    t.assert.equal(audioPart!.audioData.length > 0, true);
+    t.assert.equal(audioPart!.encoding!.length > 0, true);
+    t.assert.equal(audioPart!.transcript!.length > 0, true);
   });
 });

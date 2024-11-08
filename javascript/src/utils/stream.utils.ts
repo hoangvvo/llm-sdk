@@ -109,7 +109,7 @@ export class ContentDeltaAccumulator {
         case "tool-call":
           if (!delta.part.toolCallId || !delta.part.toolName) {
             throw new Error(
-              `missing toolCallId or toolName at index ${String(delta.index)}. toolCallId: ${delta.part.toolCallId || "undefined"}, toolName: ${delta.part.toolName || "undefined"}`,
+              `missing toolCallId or toolName at index ${String(delta.index)}. toolCallId: ${String(delta.part.toolCallId)}, toolName: ${String(delta.part.toolName)}`,
             );
           }
           return {
@@ -123,7 +123,7 @@ export class ContentDeltaAccumulator {
         case "audio": {
           if (delta.part.encoding !== "linear16") {
             throw new Error(
-              `only linear16 encoding is supported for audio concatenation. encoding: ${delta.part.encoding || "undefined"}`,
+              `only linear16 encoding is supported for audio concatenation. encoding: ${String(delta.part.encoding)}`,
             );
           }
           const concatenatedAudioData = mergeInt16Arrays(delta.part.audioData);

@@ -1,29 +1,29 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import test, { suite } from "node:test";
-import { AnthropicModel } from "../src/anthropic/anthropic.js";
+import { GoogleModel } from "../src/google/google.js";
 import { log, testLanguageModel } from "./test-language-model.js";
 
-const model = new AnthropicModel(
+const model = new GoogleModel(
   {
-    apiKey: process.env["ANTHROPIC_API_KEY"] as string,
-    modelId: "claude-3-5-sonnet-20241022",
+    apiKey: process.env["GOOGLE_API_KEY"] as string,
+    modelId: "gemini-1.5-pro",
   },
   {
     pricing: {
-      inputCostPerTextToken: 3.0 / 1_000_000,
-      outputCostPerTextToken: 15.0 / 1_000_000,
+      inputCostPerTextToken: 1.25 / 1_000_000,
+      outputCostPerTextToken: 5.0 / 1_000_000,
     },
   },
 );
 
-suite("AnthropicModel", () => {
+suite("GoogleModel", () => {
   testLanguageModel(model);
 
   test("convert audio part to text part if enabled", async () => {
-    const model = new AnthropicModel({
-      apiKey: process.env["ANTHROPIC_API_KEY"] as string,
+    const model = new GoogleModel({
+      apiKey: process.env["GOOGLE_API_KEY"] as string,
       // not an audio model
-      modelId: "claude-3-5-sonnet-20241022",
+      modelId: "gemini-1.5-pro",
       convertAudioPartsToTextParts: true,
     });
 

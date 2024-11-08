@@ -141,7 +141,7 @@ export function convertToAnthropicMessages(
   options: AnthropicModelOptions,
 ): Anthropic.Messages.MessageParam[] {
   if (options.convertAudioPartsToTextParts) {
-    messages = messages.map((message) => convertAudioPartsToTextParts(message));
+    messages = messages.map(convertAudioPartsToTextParts);
   }
 
   return messages.map((message): Anthropic.Messages.MessageParam => {

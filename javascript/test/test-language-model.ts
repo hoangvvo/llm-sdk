@@ -1,14 +1,19 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-floating-promises */
-import { TestContext } from "node:test";
-import { LanguageModel, TextPart, Tool } from "../src/index.js";
+import test from "node:test";
+import {
+  ContentDelta,
+  LanguageModel,
+  Message,
+  ModelResponse,
+  PartialModelResponse,
+  TextPart,
+  Tool,
+} from "../src/index.js";
 
-export interface LanguageModelTest {
-  name: string;
-  fn: (t: TestContext) => Promise<void> | void;
-}
+const interactive = !!process.env["INTERACTIVE"];
 
-const tools: Tool[] = [
+export const tools: Tool[] = [
   {
     name: "get_weather",
     description: "Get the weather",
@@ -37,7 +42,7 @@ const tools: Tool[] = [
 /**
  * A tool with a complex parameter schema.
  */
-const complexTool: Tool = {
+export const complexTool: Tool = {
   name: "register_user",
   description: "Register a user",
   parameters: {
@@ -111,373 +116,353 @@ const complexTool: Tool = {
   },
 };
 
-export function getLanguageModelTests(
-  languageModel: LanguageModel,
-): LanguageModelTest[] {
-  return [
-    {
-      name: "generate text",
-      fn: async (t) => {
-        const response = await languageModel.generate({
-          messages: [
+export function testLanguageModel(languageModel: LanguageModel) {
+  test("generate text", async (t) => {
+    const response = await languageModel.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Hello",
-                },
-              ],
+              type: "text",
+              text: "Hello",
             },
           ],
-        });
+        },
+      ],
+    });
 
-        console.log(response);
+    log(response);
 
-        const part = response.content[0];
+    const part = response.content[0];
 
-        t.assert.equal(part?.type, "text");
-        t.assert.equal((part as TextPart).text.length > 0, true);
-      },
-    },
-    {
-      name: "stream text",
-      fn: async (t) => {
-        const response = languageModel.stream({
-          messages: [
+    t.assert.equal(part?.type, "text");
+    t.assert.equal((part as TextPart).text.length > 0, true);
+  });
+
+  test("stream text", async (t) => {
+    const response = languageModel.stream({
+      messages: [
+        {
+          role: "user",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Hello",
-                },
-              ],
+              type: "text",
+              text: "Hello",
             },
           ],
-        });
+        },
+      ],
+    });
 
-        let current = await response.next();
-        while (!current.done) {
-          console.log(current.value);
-          t.assert.deepEqual(current.value.delta.part.type, "text");
-          current = await response.next();
-        }
+    let current = await response.next();
+    while (!current.done) {
+      log(current.value);
+      t.assert.deepEqual(current.value.delta.part.type, "text");
+      current = await response.next();
+    }
 
-        console.log(current.value);
+    log(current.value);
 
-        const part = current.value.content[0];
+    const part = current.value.content[0];
 
-        t.assert.equal(part?.type, "text");
-        t.assert.equal((part as TextPart).text.length > 0, true);
-      },
-    },
-    {
-      name: "generate tool call",
-      fn: async (t) => {
-        const response = await languageModel.generate({
-          messages: [
+    t.assert.equal(part?.type, "text");
+    t.assert.equal((part as TextPart).text.length > 0, true);
+  });
+
+  test("generate tool call", async (t) => {
+    const response = await languageModel.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "What's the weather like in Boston today?",
-                },
-              ],
+              type: "text",
+              text: "What's the weather like in Boston today?",
             },
           ],
-          tools,
-        });
+        },
+      ],
+      tools,
+    });
 
-        console.log(response);
+    log(response);
 
-        const toolCallPart = response.content.find(
-          (part) => part.type === "tool-call",
-        );
+    const toolCallPart = response.content.find(
+      (part) => part.type === "tool-call",
+    );
 
-        t.assert.equal(toolCallPart!.toolCallId.length > 0, true);
+    t.assert.equal(toolCallPart!.toolCallId.length > 0, true);
 
-        t.assert.equal(toolCallPart?.toolName, "get_weather");
-        t.assert.equal(
-          (toolCallPart?.args?.["location"] as string).includes("Boston"),
-          true,
-        );
-      },
-    },
-    {
-      name: "stream tool call",
-      fn: async (t) => {
-        const response = languageModel.stream({
-          messages: [
+    t.assert.equal(toolCallPart?.toolName, "get_weather");
+    t.assert.equal(
+      (toolCallPart?.args?.["location"] as string).includes("Boston"),
+      true,
+    );
+  });
+
+  test("stream tool call", async (t) => {
+    const response = languageModel.stream({
+      messages: [
+        {
+          role: "user",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "What's the weather like in Boston today?",
-                },
-              ],
+              type: "text",
+              text: "What's the weather like in Boston today?",
             },
           ],
-          tools,
-        });
+        },
+      ],
+      tools,
+    });
 
-        let current = await response.next();
-        while (!current.done) {
-          console.log(current.value);
-          current = await response.next();
-        }
+    let current = await response.next();
+    while (!current.done) {
+      log(current.value);
+      current = await response.next();
+    }
 
-        console.log(current.value);
+    log(current.value);
 
-        const toolCallPart = current.value.content.find(
-          (part) => part.type === "tool-call",
-        );
+    const toolCallPart = current.value.content.find(
+      (part) => part.type === "tool-call",
+    );
 
-        t.assert.equal(
-          !!toolCallPart?.toolCallId && toolCallPart.toolCallId.length > 0,
-          true,
-        );
+    t.assert.equal(
+      !!toolCallPart?.toolCallId && toolCallPart.toolCallId.length > 0,
+      true,
+    );
 
-        t.assert.equal(toolCallPart?.toolName, "get_weather");
-        t.assert.equal(
-          (toolCallPart?.args?.["location"] as string).includes("Boston"),
-          true,
-        );
-      },
-    },
-    {
-      name: "generate text from tool result",
-      fn: async (t) => {
-        const response = await languageModel.generate({
-          messages: [
+    t.assert.equal(toolCallPart?.toolName, "get_weather");
+    t.assert.equal(
+      (toolCallPart?.args?.["location"] as string).includes("Boston"),
+      true,
+    );
+  });
+
+  test("generate text from tool result", async (t) => {
+    const response = await languageModel.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "What's the weather like in Boston today?",
-                },
-              ],
-            },
-            {
-              role: "assistant",
-              content: [
-                {
-                  type: "tool-call",
-                  toolCallId: "call-0",
-                  toolName: "get_weather",
-                  args: {
-                    location: "Boston",
-                  },
-                },
-              ],
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "call-0",
-                  toolName: "get_weather",
-                  result: {
-                    temperature: 70,
-                    unit: "f",
-                    description: "Sunny",
-                  },
-                },
-              ],
+              type: "text",
+              text: "What's the weather like in Boston today?",
             },
           ],
-          tools,
-        });
-
-        console.log(response);
-
-        const part = response.content[0];
-
-        t.assert.equal(part?.type, "text");
-        t.assert.equal((part as TextPart).text.length > 0, true);
-      },
-    },
-    {
-      name: "stream text from tool result",
-      fn: async (t) => {
-        const response = languageModel.stream({
-          messages: [
+        },
+        {
+          role: "assistant",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "What's the weather like in Boston today?",
-                },
-              ],
-            },
-            {
-              role: "assistant",
-              content: [
-                {
-                  type: "tool-call",
-                  toolCallId: "call-0",
-                  toolName: "get_weather",
-                  args: {
-                    location: "Boston",
-                  },
-                },
-              ],
-            },
-            {
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: "call-0",
-                  toolName: "get_weather",
-                  result: {
-                    temperature: 70,
-                    unit: "f",
-                    description: "Sunny",
-                  },
-                },
-              ],
+              type: "tool-call",
+              toolCallId: "call-0",
+              toolName: "get_weather",
+              args: {
+                location: "Boston",
+              },
             },
           ],
-          tools,
-        });
-
-        let current = await response.next();
-        while (!current.done) {
-          console.log(current.value);
-          current = await response.next();
-        }
-
-        console.log(current.value);
-
-        const part = current.value.content[0];
-
-        t.assert.equal(part?.type, "text");
-        t.assert.equal((part as TextPart).text.length > 0, true);
-      },
-    },
-    {
-      name: "generate text from complex tool result",
-      fn: async (t) => {
-        const response = await languageModel.generate({
-          messages: [
+        },
+        {
+          role: "tool",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "I would like to register. You must fill in random details. Do it anyway.",
-                },
-              ],
+              type: "tool-result",
+              toolCallId: "call-0",
+              toolName: "get_weather",
+              result: {
+                temperature: 70,
+                unit: "f",
+                description: "Sunny",
+              },
             },
           ],
-          tools: [complexTool],
-        });
+        },
+      ],
+      tools,
+    });
 
-        console.log(response);
+    log(response);
 
-        const toolCallPart = response.content.find(
-          (part) => part.type === "tool-call",
-        );
+    const part = response.content[0];
 
-        t.assert.equal(
-          !!toolCallPart?.toolCallId && toolCallPart.toolCallId.length > 0,
-          true,
-        );
-        t.assert.equal(toolCallPart?.toolName, "register_user");
-      },
-    },
-  ];
+    t.assert.equal(part?.type, "text");
+    t.assert.equal((part as TextPart).text.length > 0, true);
+  });
+
+  test("stream text from tool result", async (t) => {
+    const response = languageModel.stream({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "What's the weather like in Boston today?",
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              toolCallId: "call-0",
+              toolName: "get_weather",
+              args: {
+                location: "Boston",
+              },
+            },
+          ],
+        },
+        {
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              toolCallId: "call-0",
+              toolName: "get_weather",
+              result: {
+                temperature: 70,
+                unit: "f",
+                description: "Sunny",
+              },
+            },
+          ],
+        },
+      ],
+      tools,
+    });
+
+    let current = await response.next();
+    while (!current.done) {
+      log(current.value);
+      current = await response.next();
+    }
+
+    log(current.value);
+
+    const part = current.value.content[0];
+
+    t.assert.equal(part?.type, "text");
+    t.assert.equal((part as TextPart).text.length > 0, true);
+  });
+
+  test("generate tool call for complex schema", async (t) => {
+    const response = await languageModel.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Register a user. You must always fill in random details for all fields.",
+            },
+          ],
+        },
+      ],
+      tools: [complexTool],
+    });
+
+    log(response);
+
+    const toolCallPart = response.content.find(
+      (part) => part.type === "tool-call",
+    );
+
+    t.assert.equal(
+      !!toolCallPart?.toolCallId && toolCallPart.toolCallId.length > 0,
+      true,
+    );
+    t.assert.equal(toolCallPart?.toolName, "register_user");
+  });
+
+  test("calculate usage and cost", async (t) => {
+    const response = await languageModel.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Hello",
+            },
+          ],
+        },
+      ],
+    });
+
+    t.assert.equal(response.usage!.inputTokens > 0, true);
+    t.assert.equal(response.usage!.outputTokens > 0, true);
+    t.assert.equal(typeof response.cost, "number");
+  });
 }
 
-export function getAudioLanguageModelTests(
-  languageModel: LanguageModel,
-): LanguageModelTest[] {
-  return [
-    {
-      name: "generate audio",
-      fn: async (t) => {
-        const response = await languageModel.generate({
-          modalities: ["text", "audio"],
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Hello",
-                },
-              ],
-            },
-          ],
-          extra: {
-            audio: {
-              voice: "alloy",
-              format: "mp3",
-            },
-          },
-        });
+export function log(value: ModelResponse | PartialModelResponse) {
+  if (!interactive) {
+    return;
+  }
 
-        console.log(response);
+  let obj: unknown;
 
-        const audioPart = response.content.find(
-          (part) => part.type === "audio",
-        );
-
-        t.assert.equal(!!audioPart, true);
-        t.assert.equal(audioPart?.type, "audio");
-        t.assert.equal(audioPart!.audioData.length > 0, true);
-        t.assert.equal(audioPart!.encoding!.length > 0, true);
-        t.assert.equal(audioPart!.transcript!.length > 0, true);
+  if ("content" in value) {
+    obj = {
+      ...value,
+      content: value.content.map(cleanContentPartObjectForDisplay),
+    };
+  } else {
+    obj = {
+      ...value,
+      delta: {
+        ...value.delta,
+        part: cleanContentPartObjectForDisplay(value.delta.part),
       },
-    },
-    {
-      name: "stream audio",
-      fn: async (t) => {
-        const response = languageModel.stream({
-          modalities: ["text", "audio"],
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Hello",
-                },
-              ],
-            },
-          ],
-          extra: {
-            audio: {
-              voice: "alloy",
-              format: "pcm16",
-            },
-          },
-        });
+    };
+  }
 
-        let current = await response.next();
-        while (!current.done) {
-          console.log(current.value);
-          current = await response.next();
-        }
+  console.log(obj);
+}
 
-        console.log(current.value);
+function cleanContentPartObjectForDisplay(
+  part: Message["content"][number] | ContentDelta["part"],
+) {
+  switch (part.type) {
+    case "audio": {
+      return {
+        ...part,
+        audioData: part.audioData
+          ? `<<${String(base64ByteLength(part.audioData))} bytes>>`
+          : undefined,
+      };
+    }
+    case "image":
+      return {
+        ...part,
+        imageData: part.imageData
+          ? `<<${String(base64ByteLength(part.imageData))} bytes>>`
+          : undefined,
+      };
+    case "tool-result": {
+      const toolResultStr = JSON.stringify(part.result);
+      return {
+        ...part,
+        // put in same line to avoid scrolling
+        result: toolResultStr,
+      };
+    }
+    default:
+      return part;
+  }
+}
 
-        const audioPart = current.value.content.find(
-          (part) => part.type === "audio",
-        );
+function base64ByteLength(base64: string) {
+  let padding = 0;
+  if (base64.endsWith("==")) padding = 2;
+  else if (base64.endsWith("=")) padding = 1;
 
-        t.assert.equal(!!audioPart, true);
-        t.assert.equal(audioPart?.type, "audio");
-        t.assert.equal(audioPart!.audioData.length > 0, true);
-        t.assert.equal(audioPart!.encoding!.length > 0, true);
-        t.assert.equal(audioPart!.transcript!.length > 0, true);
-      },
-    },
-  ];
+  // Each base64 character represents 6 bits (3/4 of a byte).
+  return (base64.length * 3) / 4 - padding;
 }

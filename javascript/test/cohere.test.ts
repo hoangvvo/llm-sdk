@@ -1,16 +1,67 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
-import { describe, it } from "node:test";
+import test, { suite } from "node:test";
 import { CohereModel } from "../src/cohere/cohere.js";
-import { getLanguageModelTests } from "./test-language-model.js";
+import { log, testLanguageModel } from "./test-language-model.js";
 
-const model = new CohereModel({
-  apiKey: process.env["CO_API_KEY"] as string,
-  modelId: "command-r-08-2024",
-});
+const model = new CohereModel(
+  {
+    apiKey: process.env["CO_API_KEY"] as string,
+    modelId: "command-r-08-2024",
+  },
+  {
+    pricing: {
+      inputCostPerTextToken: 0.16 / 1_000_000,
+      outputCostPerTextToken: 0.6 / 1_000_000,
+    },
+  },
+);
 
-describe("CohereModel", () => {
-  const tests = getLanguageModelTests(model);
-  tests.forEach(({ name, fn }) => {
-    it(name, fn);
+suite("CohereModel", () => {
+  testLanguageModel(model);
+
+  test("convert audio part to text part if enabled", async () => {
+    const model = new CohereModel({
+      apiKey: process.env["CO_API_KEY"] as string,
+      // not an audio model
+      modelId: "command-r-08-2024",
+      convertAudioPartsToTextParts: true,
+    });
+
+    const response = await model.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Hello",
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "audio",
+              audioData: "",
+              transcript: "Hi there, how can I help you?",
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Goodbye",
+            },
+          ],
+        },
+      ],
+    });
+
+    log(response);
+
+    // it should not throw a part unsupported error
   });
 });
