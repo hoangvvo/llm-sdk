@@ -170,6 +170,31 @@ export function testLanguageModel(languageModel: LanguageModel) {
     t.assert.equal((part as TextPart).text.length > 0, true);
   });
 
+  test("generate with system prompt", async (t) => {
+    const response = await languageModel.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Hello",
+            },
+          ],
+        },
+      ],
+      systemPrompt: 'You must always start your message with "🤖"',
+    });
+
+    log(response);
+
+    const part = response.content[0];
+
+    t.assert.equal(part?.type, "text");
+    t.assert.equal((part as TextPart).text.length > 0, true);
+    t.assert.equal((part as TextPart).text.startsWith("🤖"), true);
+  });
+
   test("generate tool call", async (t) => {
     const response = await languageModel.generate({
       messages: [
@@ -359,7 +384,7 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "text",
-              text: "Register a user. You must always fill in random details for all fields.",
+              text: "Register a user. You must always fill in random details for all fields. Do not ask for real information.",
             },
           ],
         },
