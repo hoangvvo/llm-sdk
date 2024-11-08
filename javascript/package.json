@@ -7,7 +7,7 @@
     "generate": "npx @hey-api/openapi-ts",
     "build": "tshy",
     "lint": "eslint src",
-    "test": "tsx --test"
+    "test": "tsx --test --experimental-test-coverage --env-file=../.env \"**/*.test.ts\""
   },
   "files": [
     "dist"

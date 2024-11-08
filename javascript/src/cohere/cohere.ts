@@ -46,10 +46,6 @@ export class CohereModel implements LanguageModel {
       convertToCohereParams(input, this.options),
     );
 
-    console.dir(convertToCohereParams(input, this.options), {
-      depth: null,
-    });
-
     if (!response.message) {
       throw new Error("Response is missing message");
     }
@@ -113,6 +109,7 @@ export function convertToCohereParams(
   input: LanguageModelInput,
   options: CohereModelOptions,
 ): Cohere.V2ChatRequest {
+  const response_format = convertToCohereResponseFormat(input.responseFormat);
   const samplingParams = convertToCohereSamplingParams(input);
 
   return {
@@ -120,6 +117,9 @@ export function convertToCohereParams(
     messages: convertToCohereMessages(input),
     ...(input.tools && { tools: input.tools.map(convertToCohereTool) }),
     ...samplingParams,
+    ...(response_format && {
+      responseFormat: response_format,
+    }),
     ...input.extra,
   };
 }
@@ -284,9 +284,75 @@ export function convertToCohereTool(tool: Tool): Cohere.ToolV2 {
     function: {
       name: tool.name,
       description: tool.description,
-      ...(tool.parameters && { parameters: tool.parameters }),
+      ...(tool.parameters && {
+        parameters: convertToCohereSchema(tool.parameters),
+      }),
     },
   };
+}
+
+export function convertToCohereSchema(
+  schema: Record<string, unknown>,
+): Record<string, unknown> {
+  const newSchema = {
+    ...schema,
+    ...(!!schema["properties"] && {
+      properties: convertToCohereSchema(
+        schema["properties"] as Record<string, unknown>,
+      ),
+    }),
+    ...(!!schema["items"] && {
+      items: convertToCohereSchema(schema["items"] as Record<string, unknown>),
+    }),
+    ...(!!schema["anyOf"] && {
+      anyOf: (schema["anyOf"] as Record<string, unknown>[]).map(
+        convertToCohereSchema,
+      ),
+    }),
+    ...(!!schema["allOf"] && {
+      allOf: (schema["allOf"] as Record<string, unknown>[]).map(
+        convertToCohereSchema,
+      ),
+    }),
+    ...(!!schema["oneOf"] && {
+      oneOf: (schema["oneOf"] as Record<string, unknown>[]).map(
+        convertToCohereSchema,
+      ),
+    }),
+  } as Record<string, unknown>;
+  // additionalProperties is known to not be supported by Cohere
+  if ("additionalProperties" in newSchema) {
+    delete newSchema["additionalProperties"];
+  }
+  return newSchema;
+}
+
+export function convertToCohereResponseFormat(
+  responseFormat: LanguageModelInput["responseFormat"],
+): Cohere.ResponseFormatV2 | undefined {
+  if (!responseFormat) return undefined;
+
+  switch (responseFormat.type) {
+    case "json":
+      return {
+        type: "json_object",
+        ...(responseFormat.schema && {
+          jsonSchema: convertToCohereSchema(responseFormat.schema),
+        }),
+      };
+    case "text":
+      return {
+        type: "text",
+      };
+    default: {
+      const exhaustiveCheck: never = responseFormat;
+      throw new Error(
+        `Unsupported response format type: ${
+          (exhaustiveCheck as { type: string }).type
+        }`,
+      );
+    }
+  }
 }
 
 export function mapCohereMessage(
