@@ -164,10 +164,7 @@ export function guessDeltaIndex(
       } else {
         // we won't be able to reliably match tool calls
         // because there can be multiple tool calls with the same tool name
-        return (
-          contentDelta.part.type === "tool-call" &&
-          part.toolName === contentDelta.part.toolName
-        );
+        return false;
       }
     });
   }
