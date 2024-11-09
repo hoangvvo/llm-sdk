@@ -384,7 +384,7 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "text",
-              text: "Register a user. You must always fill in random details for all fields. Do not ask for real information.",
+              text: 'Hi, create a user with the id "a1b2c3", name "John Doe", email "john.doe@example.com", birthDate "1990-05-15", age 34, isActive true, role "user", accountBalance 500.75, phoneNumber "+1234567890123", tags ["developer", "gamer"], and lastLogin "2024-11-09T10:30:00Z".',
             },
           ],
         },
@@ -517,6 +517,50 @@ export function testParallelToolCalls(languageModel: LanguageModel) {
       (stockCall?.args?.["symbol"] as string).includes("AAPL"),
       true,
     );
+  });
+
+  test("stream parallel tool calls of same name", async (t) => {
+    const response = languageModel.stream({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Get me the weather in Boston and the weather in New York.",
+            },
+          ],
+        },
+      ],
+      tools,
+    });
+
+    let current = await response.next();
+    while (!current.done) {
+      log(current.value);
+      current = await response.next();
+    }
+
+    log(current.value);
+
+    const toolCallParts = current.value.content.filter(
+      (part) => part.type === "tool-call",
+    );
+
+    t.assert.equal(toolCallParts.length, 2);
+    const weatherCall1 = toolCallParts.find(
+      (part) =>
+        part.toolName === "get_weather" &&
+        (part.args?.["location"] as string).includes("Boston"),
+    );
+    const weatherCall2 = toolCallParts.find(
+      (part) =>
+        part.toolName === "get_weather" &&
+        (part.args?.["location"] as string).includes("New York"),
+    );
+
+    t.assert.equal(!!weatherCall1, true);
+    t.assert.equal(!!weatherCall2, true);
   });
 }
 

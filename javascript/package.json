@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@firefliesai/llm-sdk",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A unified LLM SDK",
   "scripts": {
     "generate": "npx @hey-api/openapi-ts",
