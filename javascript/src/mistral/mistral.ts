@@ -13,7 +13,7 @@ import {
   PartialModelResponse,
   Tool,
   ToolCallPart,
-} from "../schemas/types.gen.js";
+} from "../schema/index.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import {
   ContentDeltaAccumulator,

@@ -5,7 +5,7 @@ import type {
   TextPartDelta,
   ToolCallPart,
   ToolCallPartDelta,
-} from "../schemas/index.js";
+} from "../schema/index.js";
 import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
@@ -161,11 +161,10 @@ export function guessDeltaIndex(
     matchingDelta = allContentDeltas.findLast((contentDelta) => {
       if (part.type === "text" || part.type === "audio") {
         return contentDelta.part.type === part.type;
-      } else {
-        // we won't be able to reliably match tool calls
-        // because there can be multiple tool calls with the same tool name
-        return false;
       }
+      // we won't be able to reliably match tool calls
+      // because there can be multiple tool calls with the same tool name
+      return false;
     });
   }
   if (matchingDelta) {

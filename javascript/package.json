@@ -4,7 +4,7 @@
   "version": "0.1.6",
   "description": "A unified LLM SDK",
   "scripts": {
-    "generate": "npx @hey-api/openapi-ts",
+    "generate": "json2ts --bannerComment=false --unreachableDefinitions=true -i ../schema/schema.json -o src/schema/schema.ts",
     "build": "tshy",
     "lint": "eslint src",
     "test": "tsx --test --experimental-test-coverage --env-file=../.env \"**/*.test.ts\""
