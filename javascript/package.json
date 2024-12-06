@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@hoangvvo/llm-sdk",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "A unified LLM SDK",
   "scripts": {
     "generate": "node generate.js",

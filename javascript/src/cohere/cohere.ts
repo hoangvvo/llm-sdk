@@ -52,10 +52,6 @@ export class CohereModel implements LanguageModel {
       convertToCohereParams(input, this.options),
     );
 
-    if (!response.message) {
-      throw new Error("Response is missing message");
-    }
-
     const usage = response.usage ? mapCohereUsage(response.usage) : undefined;
 
     return {
