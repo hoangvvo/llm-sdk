@@ -6,34 +6,34 @@
   ],
   "scripts": {
     "format": "prettier --write .",
-    "lint:schema": "lint-openapi schemas/openapi.json"
+    "postinstall": "patch-package"
   },
   "devDependencies": {
-    "@eslint/js": "^9.14.0",
-    "@hey-api/openapi-ts": "^0.55.0",
+    "@eslint/js": "^9.16.0",
     "@types/audio-context": "^1.0.3",
     "@types/audio-play": "^2.3.2",
-    "@types/node": "^22.9.0",
-    "eslint": "^8.57.1",
+    "@types/node": "^22.10.1",
+    "eslint": "^9.16.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
-    "globals": "^15.12.0",
-    "ibm-openapi-validator": "^1.25.0",
-    "prettier": "^3.3.3",
+    "globals": "^15.13.0",
+    "json-schema-to-typescript": "^15.0.3",
+    "patch-package": "^8.0.0",
+    "prettier": "^3.4.2",
     "tshy": "^3.0.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3",
-    "typescript-eslint": "^8.13.0"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.17.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@google/generative-ai": "^0.21.0",
-    "@mistralai/mistralai": "^1.3.0",
+    "@mistralai/mistralai": "^1.3.5",
     "audio-context": "^1.0.3",
     "audio-decode": "^2.2.2",
     "audio-play": "^2.3.1",
-    "cohere-ai": "^7.14.0",
-    "openai": "^4.71.1"
+    "cohere-ai": "^7.15.0",
+    "openai": "^4.76.0"
   },
   "optionalDependencies": {
     "speaker": "^0.5.5"

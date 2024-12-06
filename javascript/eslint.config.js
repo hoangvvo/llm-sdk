@@ -14,7 +14,7 @@ export default [
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["*.js", "*.mjs", "openapi-ts.config.ts"],
+          allowDefaultProject: ["*.js", "*.mjs"],
         },
         tsconfigRootDir: import.meta.dirname,
       },

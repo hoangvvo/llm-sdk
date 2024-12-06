@@ -1,4 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  InvalidValueError,
+  ModelUnsupportedMessagePart,
+  NotImplementedError,
+} from "../errors/errors.js";
 import type {
   LanguageModel,
   LanguageModelMetadata,
@@ -14,7 +19,7 @@ import type {
   TextPart,
   Tool,
   ToolCallPart,
-} from "../schemas/index.js";
+} from "../schema/index.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
@@ -170,11 +175,12 @@ export function convertToAnthropicMessages(
                     input: part.args,
                   };
                 case "audio":
-                  throw new Error("Audio parts are not supported");
+                  throw new ModelUnsupportedMessagePart("anthropic", part.type);
                 default: {
                   const exhaustiveCheck: never = part;
-                  throw new Error(
-                    `Unsupported message part type: ${(exhaustiveCheck as { type: string }).type}`,
+                  throw new InvalidValueError(
+                    "part.type",
+                    (exhaustiveCheck as { type: string }).type,
                   );
                 }
               }
@@ -228,11 +234,12 @@ export function convertToAnthropicMessages(
                     },
                   };
                 case "audio":
-                  throw new Error("Audio parts are not supported");
+                  throw new ModelUnsupportedMessagePart("anthropic", part.type);
                 default: {
                   const exhaustiveCheck: never = part;
-                  throw new Error(
-                    `Unsupported message part type: ${(exhaustiveCheck as { type: string }).type}`,
+                  throw new InvalidValueError(
+                    "part.type",
+                    (exhaustiveCheck as { type: string }).type,
                   );
                 }
               }
@@ -243,8 +250,9 @@ export function convertToAnthropicMessages(
 
       default: {
         const exhaustiveCheck: never = message;
-        throw new Error(
-          `Unsupported message role: ${(exhaustiveCheck as { role: string }).role}`,
+        throw new InvalidValueError(
+          "message.role",
+          (exhaustiveCheck as { role: string }).role,
         );
       }
     }
@@ -287,8 +295,9 @@ export function convertToAnthropicToolChoice(
     }
     default: {
       const exhaustiveCheck: never = toolChoice;
-      throw new Error(
-        `Unsupported tool choice type: ${(exhaustiveCheck as { type: string }).type}`,
+      throw new InvalidValueError(
+        "toolChoice.type",
+        (exhaustiveCheck as { type: string }).type,
       );
     }
   }
@@ -333,8 +342,9 @@ export function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock) {
       } satisfies ToolCallPart;
     default: {
       const exhaustiveCheck: never = block;
-      throw new Error(
-        `Unsupported block type: ${(exhaustiveCheck as { type: string }).type}`,
+      throw new NotImplementedError(
+        "block.type",
+        (exhaustiveCheck as { type: string }).type,
       );
     }
   }
@@ -370,8 +380,9 @@ export function mapAnthropicStreamEvent(
         }
         default: {
           const exhaustiveCheck: never = chunk.content_block;
-          throw new Error(
-            `Unsupported content block type: ${(exhaustiveCheck as { type: string }).type}`,
+          throw new NotImplementedError(
+            "content_block.type",
+            (exhaustiveCheck as { type: string }).type,
           );
         }
       }
@@ -399,8 +410,9 @@ export function mapAnthropicStreamEvent(
           ];
         default: {
           const exhaustiveCheck: never = chunk.delta;
-          throw new Error(
-            `Unsupported delta type: ${(exhaustiveCheck as { type: string }).type}`,
+          throw new NotImplementedError(
+            "delta.type",
+            (exhaustiveCheck as { type: string }).type,
           );
         }
       }

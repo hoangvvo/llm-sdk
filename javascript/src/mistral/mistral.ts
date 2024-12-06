@@ -1,6 +1,11 @@
 import { Mistral } from "@mistralai/mistralai";
 import * as MistralComponents from "@mistralai/mistralai/models/components/index.js";
 import {
+  InvalidValueError,
+  ModelUnsupportedMessagePart,
+  NotImplementedError,
+} from "../errors/errors.js";
+import {
   LanguageModel,
   LanguageModelMetadata,
 } from "../models/language-model.js";
@@ -13,7 +18,7 @@ import {
   PartialModelResponse,
   Tool,
   ToolCallPart,
-} from "../schemas/types.gen.js";
+} from "../schema/index.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import {
   ContentDeltaAccumulator,
@@ -159,20 +164,23 @@ export function convertToMistralMessages(
   messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
-        const mistralMessageParam: MistralComponents.AssistantMessage = {
+        const mistralMessageParam: Omit<
+          MistralComponents.AssistantMessage,
+          "content"
+        > & {
+          content: MistralComponents.ContentChunk[] | null;
+        } = {
           role: "assistant",
           content: null,
         };
         message.content.forEach((part) => {
           switch (part.type) {
             case "text": {
-              mistralMessageParam.content = [
-                ...(mistralMessageParam.content || []),
-                {
-                  type: "text",
-                  text: part.text,
-                },
-              ] as Array<MistralComponents.ContentChunk>;
+              mistralMessageParam.content = mistralMessageParam.content || [];
+              mistralMessageParam.content.push({
+                type: "text",
+                text: part.text,
+              });
               break;
             }
             case "tool-call": {
@@ -189,11 +197,13 @@ export function convertToMistralMessages(
               break;
             }
             case "audio": {
-              throw new Error("Audio parts are not supported");
+              throw new ModelUnsupportedMessagePart("mistral", "audio");
             }
             default: {
-              throw new Error(
-                `Unsupported message part type: ${(part as { type: string }).type}`,
+              const exhaustiveCheck: never = part;
+              throw new InvalidValueError(
+                "part.type",
+                (exhaustiveCheck as { type: string }).type,
               );
             }
           }
@@ -236,11 +246,13 @@ export function convertToMistralMessages(
                 };
               }
               case "audio": {
-                throw new Error("Audio parts are not supported");
+                throw new ModelUnsupportedMessagePart("mistral", "audio");
               }
               default: {
-                throw new Error(
-                  `Unsupported message part type: ${(part as { type: string }).type}`,
+                const exhaustiveCheck: never = part;
+                throw new InvalidValueError(
+                  "part.type",
+                  (exhaustiveCheck as { type: string }).type,
                 );
               }
             }
@@ -250,8 +262,9 @@ export function convertToMistralMessages(
       }
       default: {
         const exhaustiveCheck: never = message;
-        throw new Error(
-          `Unsupported message role: ${(exhaustiveCheck as { role: string }).role}`,
+        throw new InvalidValueError(
+          "message.role",
+          (exhaustiveCheck as { role: string }).role,
         );
       }
     }
@@ -317,8 +330,9 @@ export function convertToMistralResponseFormat(
       return { type: "text" };
     default: {
       const exhaustiveCheck: never = responseFormat;
-      throw new Error(
-        `Unsupported response format: ${(exhaustiveCheck as { type: string }).type}`,
+      throw new InvalidValueError(
+        "responseFormat.type",
+        (exhaustiveCheck as { type: string }).type,
       );
     }
   }
@@ -345,11 +359,13 @@ export function mapMistralMessage(
           });
           break;
         case "image_url":
-          throw new Error("Image URL chunks are not supported");
+        case "reference":
+          throw new NotImplementedError("message.part", chunk.type);
         default: {
           const exhaustiveCheck: never = chunk;
-          throw new Error(
-            `Unsupported message part type: ${(exhaustiveCheck as { type: string }).type}`,
+          throw new NotImplementedError(
+            "message.part",
+            (exhaustiveCheck as { type: string }).type,
           );
         }
       }
@@ -415,11 +431,13 @@ export function mapMistralDelta(
           break;
         }
         case "image_url":
-          throw new Error("Image URL chunks are not supported");
+        case "reference":
+          throw new NotImplementedError("message.part", chunk.type);
         default: {
           const exhaustiveCheck: never = chunk;
-          throw new Error(
-            `Unsupported message part type: ${(exhaustiveCheck as { type: string }).type}`,
+          throw new NotImplementedError(
+            "message.part",
+            (exhaustiveCheck as { type: string }).type,
           );
         }
       }
