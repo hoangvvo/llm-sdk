@@ -12,6 +12,10 @@
         },
         "text": {
           "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "description": "The optional ID of the part."
         }
       },
       "required": ["type", "text"],
@@ -40,6 +44,10 @@
         "height": {
           "type": "integer",
           "description": "The height of the image in pixels."
+        },
+        "id": {
+          "type": "string",
+          "description": "The optional ID of the part."
         }
       },
       "required": ["type", "mimeType", "imageData"],
@@ -84,6 +92,10 @@
         "transcript": {
           "type": "string",
           "description": "The transcript of the audio."
+        },
+        "id": {
+          "type": "string",
+          "description": "The optional ID of the part."
         }
       },
       "required": ["type", "audioData"],
@@ -115,6 +127,10 @@
             }
           ],
           "description": "The arguments to pass to the tool."
+        },
+        "id": {
+          "type": "string",
+          "description": "The optional ID of the part. This might not be the same as the toolCallId."
         }
       },
       "required": ["type", "toolCallId", "toolName", "args"],
@@ -239,6 +255,10 @@
         },
         "text": {
           "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "description": "The optional ID of the part."
         }
       },
       "required": ["type", "text"],
@@ -262,6 +282,10 @@
         "args": {
           "type": "string",
           "description": "The partial JSON string of the arguments to pass to the tool."
+        },
+        "id": {
+          "type": "string",
+          "description": "The optional ID of the part. This might not be the same as the toolCallId."
         }
       },
       "required": ["type"],
@@ -295,6 +319,10 @@
         "transcript": {
           "type": "string",
           "description": "The transcript of the audio."
+        },
+        "id": {
+          "type": "string",
+          "description": "The optional ID of the part."
         }
       },
       "required": ["type"],

@@ -52,6 +52,10 @@ export interface LlmSdk {
 export interface TextPart {
   type: "text";
   text: string;
+  /**
+   * The optional ID of the part.
+   */
+  id?: string;
 }
 /**
  * A part of the message that contains an image.
@@ -77,6 +81,10 @@ export interface ImagePart {
    * The height of the image in pixels.
    */
   height?: number;
+  /**
+   * The optional ID of the part.
+   */
+  id?: string;
 }
 /**
  * A part of the message that contains an audio.
@@ -104,6 +112,10 @@ export interface AudioPart {
    * The transcript of the audio.
    */
   transcript?: string;
+  /**
+   * The optional ID of the part.
+   */
+  id?: string;
 }
 /**
  * A part of the message that represents a call to a tool the model wants to use.
@@ -127,6 +139,10 @@ export interface ToolCallPart {
   args: {
     [k: string]: unknown;
   } | null;
+  /**
+   * The optional ID of the part. This might not be the same as the toolCallId.
+   */
+  id?: string;
 }
 /**
  * A part of the message that represents the result of a tool call.
@@ -184,6 +200,10 @@ export interface AssistantMessage {
 export interface TextPartDelta {
   type: "text";
   text: string;
+  /**
+   * The optional ID of the part.
+   */
+  id?: string;
 }
 /**
  * This interface was referenced by `LlmSdk`'s JSON-Schema
@@ -203,6 +223,10 @@ export interface ToolCallPartDelta {
    * The partial JSON string of the arguments to pass to the tool.
    */
   args?: string;
+  /**
+   * The optional ID of the part. This might not be the same as the toolCallId.
+   */
+  id?: string;
 }
 /**
  * This interface was referenced by `LlmSdk`'s JSON-Schema
@@ -228,6 +252,10 @@ export interface AudioPartDelta {
    * The transcript of the audio.
    */
   transcript?: string;
+  /**
+   * The optional ID of the part.
+   */
+  id?: string;
 }
 /**
  * This interface was referenced by `LlmSdk`'s JSON-Schema

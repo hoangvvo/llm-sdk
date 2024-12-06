@@ -108,6 +108,7 @@ suite("OpenAIModel", () => {
     t.assert.equal(audioPart!.audioData.length > 0, true);
     t.assert.equal(audioPart!.encoding!.length > 0, true);
     t.assert.equal(audioPart!.transcript!.length > 0, true);
+    t.assert.equal(!!audioPart?.id, true);
   });
 
   test("stream audio", async (t) => {
@@ -149,5 +150,62 @@ suite("OpenAIModel", () => {
     t.assert.equal(audioPart!.audioData.length > 0, true);
     t.assert.equal(audioPart!.encoding!.length > 0, true);
     t.assert.equal(audioPart!.transcript!.length > 0, true);
+    t.assert.equal(!!audioPart?.id, true);
+  });
+
+  test("generate with assistant audio part", async (t) => {
+    const response = await audioModel.generate({
+      modalities: ["text", "audio"],
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Hello",
+            },
+          ],
+        },
+      ],
+      extra: {
+        audio: {
+          voice: "alloy",
+          format: "mp3",
+        },
+      },
+    });
+
+    const audioPart = response.content.find((part) => part.type === "audio");
+    t.assert.equal(!!audioPart?.id, true);
+
+    const response2 = await audioModel.generate({
+      modalities: ["text", "audio"],
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Hello",
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: response.content,
+        },
+      ],
+      extra: {
+        audio: {
+          voice: "alloy",
+          format: "mp3",
+        },
+      },
+    });
+
+    log(response2);
+
+    const audioPart2 = response2.content.find((part) => part.type === "audio");
+    t.assert.equal(!!audioPart2, true);
   });
 });

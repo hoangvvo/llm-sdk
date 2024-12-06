@@ -31,6 +31,10 @@ export class ContentDeltaAccumulator {
       );
 
       if (existingDelta) {
+        if (incomingDelta.part.id) {
+          existingDelta.part.id = incomingDelta.part.id;
+        }
+
         if (
           existingDelta.part.type === "text" &&
           incomingDelta.part.type === "text"
@@ -104,6 +108,7 @@ export class ContentDeltaAccumulator {
       switch (delta.part.type) {
         case "text":
           return {
+            ...(delta.part.id && { id: delta.part.id }),
             type: "text",
             text: delta.part.text,
           };
@@ -115,6 +120,7 @@ export class ContentDeltaAccumulator {
           }
           return {
             type: "tool-call",
+            ...(delta.part.id && { id: delta.part.id }),
             toolCallId: delta.part.toolCallId,
             args: delta.part.args
               ? (JSON.parse(delta.part.args) as Record<string, unknown>)
@@ -130,6 +136,7 @@ export class ContentDeltaAccumulator {
           const concatenatedAudioData = mergeInt16Arrays(delta.part.audioData);
           return {
             type: "audio",
+            ...(delta.part.id && { id: delta.part.id }),
             audioData: arrayBufferToBase64(concatenatedAudioData),
             encoding: delta.part.encoding,
             ...(delta.part.container && { container: delta.part.container }),

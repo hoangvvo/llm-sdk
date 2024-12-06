@@ -235,10 +235,13 @@ export function convertToOpenAIMessages(
               break;
             }
             case "audio": {
-              throw new Error(
-                "Audio parts are not supported in assistant messages. Use options.convertAudioPartsToTextParts" +
-                  " to convert audio parts to text parts.",
-              );
+              if (!part.id) {
+                throw new Error("audio part must have an id");
+              }
+              openaiMessageParam.audio = {
+                id: part.id,
+              };
+              break;
             }
             default: {
               const exhaustiveCheck: never = part;
@@ -517,6 +520,7 @@ export function mapOpenAIMessage(
   if (message.audio) {
     content.push({
       type: "audio",
+      id: message.audio.id,
       ...mapOpenAIAudioFormat(options?.audio?.format || "pcm16"),
       ...(options?.audio?.format === "pcm16" && {
         sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
@@ -556,7 +560,10 @@ export function mapOpenAIDelta(
   const contentDeltas: ContentDelta[] = [];
 
   if (delta.content) {
-    const part: TextPartDelta = { type: "text", text: delta.content };
+    const part: TextPartDelta = {
+      type: "text",
+      text: delta.content,
+    };
     contentDeltas.push({
       index: guessDeltaIndex(part, [
         ...existingContentDeltas,
@@ -568,6 +575,7 @@ export function mapOpenAIDelta(
   if (delta.audio) {
     const part: AudioPartDelta = {
       type: "audio",
+      ...(delta.audio.id && { id: delta.audio.id }),
       ...(delta.audio.data && {
         audioData: delta.audio.data,
         ...mapOpenAIAudioFormat(options.audio?.format || "pcm16"),
