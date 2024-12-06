@@ -14,6 +14,7 @@ import type {
   UsageMetadata,
 } from "@google/generative-ai";
 import { FunctionCallingMode, GoogleGenerativeAI } from "@google/generative-ai";
+import { InvalidValueError, NotImplementedError } from "../errors/errors.js";
 import type {
   LanguageModel,
   LanguageModelMetadata,
@@ -206,9 +207,7 @@ export function convertToGoogleMessages(
         }
         default: {
           const exhaustiveCheck: never = part;
-          throw new Error(
-            `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
-          );
+          throw new InvalidValueError("part.type", exhaustiveCheck);
         }
       }
     });
@@ -231,9 +230,7 @@ export function convertToGoogleMessages(
         };
       default: {
         const exhaustiveCheck: never = message;
-        throw new Error(
-          `Unsupported message role: ${(exhaustiveCheck as { role: string }).role}`,
-        );
+        throw new InvalidValueError("message.role", exhaustiveCheck);
       }
     }
   });
@@ -293,9 +290,7 @@ export function convertToGoogleToolConfig(
       };
     default: {
       const exhaustiveCheck: never = toolChoice;
-      throw new Error(
-        `Unsupported tool choice type: ${(exhaustiveCheck as { type: string }).type}`,
-      );
+      throw new InvalidValueError("toolChoice.type", exhaustiveCheck);
     }
   }
 }
@@ -419,8 +414,9 @@ export function mapGooglePart(part: GooglePart): Part | undefined {
         audioData: part.inlineData.data,
       };
     }
-    throw new Error(
-      "unsupported inlineData mimeType: " + part.inlineData.mimeType,
+    throw new NotImplementedError(
+      "inlineData.mimeType",
+      part.inlineData.mimeType,
     );
   }
   if (part.functionCall) {
@@ -437,7 +433,10 @@ export function mapGooglePart(part: GooglePart): Part | undefined {
     };
   }
   if (part.codeExecutionResult) {
-    throw new Error("codeExecutionResult is not supported");
+    throw new NotImplementedError(
+      "part.codeExecutionResult",
+      part.codeExecutionResult,
+    );
   }
   if (part.functionResponse) {
     return {
@@ -448,12 +447,13 @@ export function mapGooglePart(part: GooglePart): Part | undefined {
     };
   }
   if (part.fileData) {
-    throw new Error("fileData is not supported");
+    throw new NotImplementedError("part.fileData", part.fileData);
   }
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
   if (part.executableCode) {
-    throw new Error("executableCode is not supported");
+    throw new NotImplementedError("part.executableCode", part.executableCode);
   }
+
   return undefined;
 }
 
@@ -494,8 +494,9 @@ export function mapGoogleDelta(
       }
       default: {
         const exhaustiveCheck: never = part;
-        throw new Error(
-          `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
+        throw new NotImplementedError(
+          "part.type",
+          (exhaustiveCheck as { type: string }).type,
         );
       }
     }

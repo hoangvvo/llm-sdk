@@ -1,4 +1,4 @@
-import type { AudioContainer, AudioEncoding } from "../schema/types.gen.js";
+import type { AudioContainer, AudioEncoding } from "../schema/index.js";
 
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binaryString = atob(base64);
@@ -10,11 +10,13 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-export function arrayBufferToBase64(arrayBuffer: ArrayBuffer): string {
+export function arrayBufferToBase64(
+  arrayBuffer: ArrayBuffer | Float32Array | Int16Array,
+): string {
   if (arrayBuffer instanceof Float32Array) {
     arrayBuffer = floatTo16BitPCM(arrayBuffer);
   } else if (arrayBuffer instanceof Int16Array) {
-    arrayBuffer = arrayBuffer.buffer;
+    arrayBuffer = arrayBuffer.buffer as ArrayBuffer;
   }
   let binary = "";
   const bytes = new Uint8Array(arrayBuffer);

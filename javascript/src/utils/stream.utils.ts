@@ -138,10 +138,12 @@ export class ContentDeltaAccumulator {
             ...(delta.part.transcript && { transcript: delta.part.transcript }),
           };
         }
-        default:
+        default: {
+          const exhaustiveCheck: never = delta.part;
           throw new Error(
-            `unexpected part ${(delta.part as { type: string }).type} at index ${String(delta.index)}`,
+            `unexpected part ${String(exhaustiveCheck)} at index ${String(delta.index)}`,
           );
+        }
       }
     });
   }

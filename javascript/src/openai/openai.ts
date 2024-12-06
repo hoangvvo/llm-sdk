@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { InvalidValueError, NotImplementedError } from "../errors/errors.js";
 import type {
   LanguageModel,
   LanguageModelMetadata,
@@ -238,8 +239,10 @@ export function convertToOpenAIMessages(
               );
             }
             default: {
-              throw new Error(
-                `Unsupported message part type: ${(part as { type: string }).type}`,
+              const exhaustiveCheck: never = part;
+              throw new InvalidValueError(
+                "message.part.type",
+                (exhaustiveCheck as { type: string }).type,
               );
             }
           }
@@ -293,8 +296,10 @@ export function convertToOpenAIMessages(
                   };
                 }
                 default: {
-                  throw new Error(
-                    `Unsupported message part type: ${(part as { type: string }).type}`,
+                  const exhaustiveCheck: never = part;
+                  throw new InvalidValueError(
+                    "message.part.type",
+                    (exhaustiveCheck as { type: string }).type,
                   );
                 }
               }
@@ -305,8 +310,9 @@ export function convertToOpenAIMessages(
       }
       default: {
         const exhaustiveCheck: never = message;
-        throw new Error(
-          `Unsupported message role: ${(exhaustiveCheck as { role: string }).role}`,
+        throw new InvalidValueError(
+          "message.role",
+          (exhaustiveCheck as { role: string }).role,
         );
       }
     }
@@ -454,8 +460,9 @@ export function convertToOpenAIResponseFormat(
       return { type: "text" };
     default: {
       const exhaustiveCheck: never = responseFormat;
-      throw new Error(
-        `Unsupported response format: ${(exhaustiveCheck as { type: string }).type}`,
+      throw new InvalidValueError(
+        "responseFormat.type",
+        (exhaustiveCheck as { type: string }).type,
       );
     }
   }
@@ -484,7 +491,10 @@ export function mapOpenAIAudioFormat(format: PossibleOpenAIAudioFormat): {
       return { encoding: "alaw" };
     default: {
       const exhaustiveCheck: never = format;
-      throw new Error(`Unsupported audio format: ${exhaustiveCheck as string}`);
+      throw new NotImplementedError(
+        "format",
+        (exhaustiveCheck as { type: string }).type,
+      );
     }
   }
 }
