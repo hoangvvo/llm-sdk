@@ -202,21 +202,23 @@ export function convertToOpenAIMessages(
   messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
-        const openaiMessageParam: OpenAI.Chat.ChatCompletionAssistantMessageParam =
-          {
-            role: "assistant",
-            content: null,
-          };
+        const openaiMessageParam: Omit<
+          OpenAI.Chat.ChatCompletionAssistantMessageParam,
+          "content"
+        > & {
+          content: Array<OpenAI.Chat.ChatCompletionContentPartText> | null;
+        } = {
+          role: "assistant",
+          content: null,
+        };
         message.content.forEach((part) => {
           switch (part.type) {
             case "text": {
-              openaiMessageParam.content = [
-                ...(openaiMessageParam.content || []),
-                {
-                  type: "text",
-                  text: part.text,
-                },
-              ] as Array<OpenAI.Chat.ChatCompletionContentPartText>;
+              openaiMessageParam.content = openaiMessageParam.content || [];
+              openaiMessageParam.content.push({
+                type: "text",
+                text: part.text,
+              });
               break;
             }
             case "tool-call": {

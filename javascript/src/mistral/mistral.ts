@@ -164,20 +164,23 @@ export function convertToMistralMessages(
   messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
-        const mistralMessageParam: MistralComponents.AssistantMessage = {
+        const mistralMessageParam: Omit<
+          MistralComponents.AssistantMessage,
+          "content"
+        > & {
+          content: MistralComponents.ContentChunk[] | null;
+        } = {
           role: "assistant",
           content: null,
         };
         message.content.forEach((part) => {
           switch (part.type) {
             case "text": {
-              mistralMessageParam.content = [
-                ...(mistralMessageParam.content || []),
-                {
-                  type: "text",
-                  text: part.text,
-                },
-              ] as Array<MistralComponents.ContentChunk>;
+              mistralMessageParam.content = mistralMessageParam.content || [];
+              mistralMessageParam.content.push({
+                type: "text",
+                text: part.text,
+              });
               break;
             }
             case "tool-call": {

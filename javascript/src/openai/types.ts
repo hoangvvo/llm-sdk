@@ -31,7 +31,7 @@ export type OpenAIPatchedPromptTokensDetails = {
 
 // documented type is wrong
 export type OpenAIPatchedCompletionTokenDetails = {
-  reasoning_tokens: 0;
-  text_tokens: 63;
-  audio_tokens: 286;
+  reasoning_tokens: number;
+  text_tokens: number;
+  audio_tokens: number;
 };
