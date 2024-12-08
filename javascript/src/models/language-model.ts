@@ -2,7 +2,7 @@ import type {
   LanguageModelInput,
   ModelResponse,
   PartialModelResponse,
-} from "../schemas/index.js";
+} from "../schema/index.js";
 
 export type LanguageModelCapability =
   | "streaming"

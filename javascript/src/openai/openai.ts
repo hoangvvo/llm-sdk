@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { InvalidValueError, NotImplementedError } from "../errors/errors.js";
 import type {
   LanguageModel,
   LanguageModelMetadata,
@@ -17,7 +18,7 @@ import type {
   TextPartDelta,
   Tool,
   ToolCallPartDelta,
-} from "../schemas/index.js";
+} from "../schema/index.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import type { InternalContentDelta } from "../utils/stream.utils.js";
 import {
@@ -201,21 +202,23 @@ export function convertToOpenAIMessages(
   messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
-        const openaiMessageParam: OpenAI.Chat.ChatCompletionAssistantMessageParam =
-          {
-            role: "assistant",
-            content: null,
-          };
+        const openaiMessageParam: Omit<
+          OpenAI.Chat.ChatCompletionAssistantMessageParam,
+          "content"
+        > & {
+          content: Array<OpenAI.Chat.ChatCompletionContentPartText> | null;
+        } = {
+          role: "assistant",
+          content: null,
+        };
         message.content.forEach((part) => {
           switch (part.type) {
             case "text": {
-              openaiMessageParam.content = [
-                ...(openaiMessageParam.content || []),
-                {
-                  type: "text",
-                  text: part.text,
-                },
-              ] as Array<OpenAI.Chat.ChatCompletionContentPartText>;
+              openaiMessageParam.content = openaiMessageParam.content || [];
+              openaiMessageParam.content.push({
+                type: "text",
+                text: part.text,
+              });
               break;
             }
             case "tool-call": {
@@ -232,14 +235,19 @@ export function convertToOpenAIMessages(
               break;
             }
             case "audio": {
-              throw new Error(
-                "Audio parts are not supported in assistant messages. Use options.convertAudioPartsToTextParts" +
-                  " to convert audio parts to text parts.",
-              );
+              if (!part.id) {
+                throw new Error("audio part must have an id");
+              }
+              openaiMessageParam.audio = {
+                id: part.id,
+              };
+              break;
             }
             default: {
-              throw new Error(
-                `Unsupported message part type: ${(part as { type: string }).type}`,
+              const exhaustiveCheck: never = part;
+              throw new InvalidValueError(
+                "message.part.type",
+                (exhaustiveCheck as { type: string }).type,
               );
             }
           }
@@ -293,8 +301,10 @@ export function convertToOpenAIMessages(
                   };
                 }
                 default: {
-                  throw new Error(
-                    `Unsupported message part type: ${(part as { type: string }).type}`,
+                  const exhaustiveCheck: never = part;
+                  throw new InvalidValueError(
+                    "message.part.type",
+                    (exhaustiveCheck as { type: string }).type,
                   );
                 }
               }
@@ -305,8 +315,9 @@ export function convertToOpenAIMessages(
       }
       default: {
         const exhaustiveCheck: never = message;
-        throw new Error(
-          `Unsupported message role: ${(exhaustiveCheck as { role: string }).role}`,
+        throw new InvalidValueError(
+          "message.role",
+          (exhaustiveCheck as { role: string }).role,
         );
       }
     }
@@ -454,8 +465,9 @@ export function convertToOpenAIResponseFormat(
       return { type: "text" };
     default: {
       const exhaustiveCheck: never = responseFormat;
-      throw new Error(
-        `Unsupported response format: ${(exhaustiveCheck as { type: string }).type}`,
+      throw new InvalidValueError(
+        "responseFormat.type",
+        (exhaustiveCheck as { type: string }).type,
       );
     }
   }
@@ -484,7 +496,10 @@ export function mapOpenAIAudioFormat(format: PossibleOpenAIAudioFormat): {
       return { encoding: "alaw" };
     default: {
       const exhaustiveCheck: never = format;
-      throw new Error(`Unsupported audio format: ${exhaustiveCheck as string}`);
+      throw new NotImplementedError(
+        "format",
+        (exhaustiveCheck as { type: string }).type,
+      );
     }
   }
 }
@@ -505,6 +520,7 @@ export function mapOpenAIMessage(
   if (message.audio) {
     content.push({
       type: "audio",
+      id: message.audio.id,
       ...mapOpenAIAudioFormat(options?.audio?.format || "pcm16"),
       ...(options?.audio?.format === "pcm16" && {
         sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
@@ -544,7 +560,10 @@ export function mapOpenAIDelta(
   const contentDeltas: ContentDelta[] = [];
 
   if (delta.content) {
-    const part: TextPartDelta = { type: "text", text: delta.content };
+    const part: TextPartDelta = {
+      type: "text",
+      text: delta.content,
+    };
     contentDeltas.push({
       index: guessDeltaIndex(part, [
         ...existingContentDeltas,
@@ -556,6 +575,7 @@ export function mapOpenAIDelta(
   if (delta.audio) {
     const part: AudioPartDelta = {
       type: "audio",
+      ...(delta.audio.id && { id: delta.audio.id }),
       ...(delta.audio.data && {
         audioData: delta.audio.data,
         ...mapOpenAIAudioFormat(options.audio?.format || "pcm16"),

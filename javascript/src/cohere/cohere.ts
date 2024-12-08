@@ -1,5 +1,9 @@
 import { Cohere, CohereClientV2 } from "cohere-ai";
 import {
+  InvalidValueError,
+  ModelUnsupportedMessagePart,
+} from "../errors/errors.js";
+import {
   LanguageModel,
   LanguageModelMetadata,
 } from "../models/language-model.js";
@@ -13,7 +17,7 @@ import {
   PartialModelResponse,
   Tool,
   ToolCallPart,
-} from "../schemas/types.gen.js";
+} from "../schema/index.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
@@ -47,10 +51,6 @@ export class CohereModel implements LanguageModel {
     const response = await this.cohere.chat(
       convertToCohereParams(input, this.options),
     );
-
-    if (!response.message) {
-      throw new Error("Response is missing message");
-    }
 
     const usage = response.usage ? mapCohereUsage(response.usage) : undefined;
 
@@ -188,8 +188,9 @@ export function convertToCohereMessages(
       }
       default: {
         const exhaustiveCheck: never = message;
-        throw new Error(
-          `Unsupport message role: ${(exhaustiveCheck as { role: string }).role}`,
+        throw new InvalidValueError(
+          "message.role",
+          (exhaustiveCheck as { role: string }).role,
         );
       }
     }
@@ -217,12 +218,9 @@ export function convertToCohereMessageParam(parts: Part[]): {
         });
         break;
       }
-      case "audio": {
-        throw new Error("Audio is not supported");
-      }
-      case "image": {
-        throw new Error("Image is not supported");
-      }
+      case "audio":
+      case "image":
+        throw new ModelUnsupportedMessagePart("cohere", part.type);
       case "tool-call": {
         toolCalls = toolCalls ?? [];
         toolCalls.push({
@@ -252,8 +250,9 @@ export function convertToCohereMessageParam(parts: Part[]): {
       }
       default: {
         const exhaustiveCheck: never = part;
-        throw new Error(
-          `Unsupported part type: ${(exhaustiveCheck as { type: string }).type}`,
+        throw new InvalidValueError(
+          "part.type",
+          (exhaustiveCheck as { type: string }).type,
         );
       }
     }
@@ -353,10 +352,9 @@ export function convertToCohereResponseFormat(
       };
     default: {
       const exhaustiveCheck: never = responseFormat;
-      throw new Error(
-        `Unsupported response format type: ${
-          (exhaustiveCheck as { type: string }).type
-        }`,
+      throw new InvalidValueError(
+        "responseFormat.type",
+        (exhaustiveCheck as { type: string }).type,
       );
     }
   }
