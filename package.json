@@ -9,11 +9,11 @@
     "postinstall": "patch-package"
   },
   "devDependencies": {
-    "@eslint/js": "^9.16.0",
+    "@eslint/js": "^9.17.0",
     "@types/audio-context": "^1.0.3",
     "@types/audio-play": "^2.3.2",
-    "@types/node": "^22.10.1",
-    "eslint": "^9.16.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "globals": "^15.13.0",
@@ -23,7 +23,7 @@
     "tshy": "^3.0.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.17.0"
+    "typescript-eslint": "^8.18.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -33,7 +33,7 @@
     "audio-decode": "^2.2.2",
     "audio-play": "^2.3.1",
     "cohere-ai": "^7.15.0",
-    "openai": "^4.76.0"
+    "openai": "^4.76.3"
   },
   "optionalDependencies": {
     "speaker": "^0.5.5"

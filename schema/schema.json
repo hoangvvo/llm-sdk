@@ -422,10 +422,19 @@
         "textTokens": {
           "type": "integer"
         },
+        "cachedTextTokens": {
+          "type": "integer"
+        },
         "audioTokens": {
           "type": "integer"
         },
+        "cachedAudioTokens": {
+          "type": "integer"
+        },
         "imageTokens": {
+          "type": "integer"
+        },
+        "cachedImageTokens": {
           "type": "integer"
         }
       },
@@ -663,6 +672,62 @@
         }
       },
       "required": ["messages"],
+      "additionalProperties": false
+    },
+    "LanguageModelCapability": {
+      "type": "string",
+      "description": "A metadata property that describes the capability of the model.",
+      "enum": [
+        "structured-output",
+        "function-calling",
+        "structured-output-strict",
+        "audio-input",
+        "audio-output",
+        "image-input",
+        "image-output"
+      ]
+    },
+    "LanguageModelPricing": {
+      "type": "object",
+      "description": "A metadata property that describes the pricing of the model.",
+      "properties": {
+        "inputCostPerTextToken": {
+          "type": "number",
+          "description": "The cost in USD per single text token for input."
+        },
+        "inputCostPerCachedTextToken": {
+          "type": "number",
+          "description": "The cost in USD per single cached text token for input."
+        },
+        "outputCostPerTextToken": {
+          "type": "number",
+          "description": "The cost in USD per single text token for output."
+        },
+        "inputCostPerAudioToken": {
+          "type": "number",
+          "description": "The cost in USD per single audio token for input."
+        },
+        "inputCostPerCachedAudioToken": {
+          "type": "number",
+          "description": "The cost in USD per single cached audio token for input."
+        },
+        "outputCostPerAudioToken": {
+          "type": "number",
+          "description": "The cost in USD per single audio token for output."
+        },
+        "inputCostPerImageToken": {
+          "type": "number",
+          "description": "The cost in USD per single image token for input."
+        },
+        "inputCostPerCachedImageToken": {
+          "type": "number",
+          "description": "The cost in USD per single cached image token for input."
+        },
+        "outputCostPerImageToken": {
+          "type": "number",
+          "description": "The cost in USD per single image token for output."
+        }
+      },
       "additionalProperties": false
     }
   }

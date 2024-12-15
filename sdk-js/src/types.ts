@@ -21,6 +21,17 @@ export type Part =
   | ToolResultPart;
 export type Message = UserMessage | AssistantMessage | ToolMessage;
 export type Modality = "text" | "audio";
+/**
+ * A metadata property that describes the capability of the model.
+ */
+export type LanguageModelCapability =
+  | "structured-output"
+  | "function-calling"
+  | "structured-output-strict"
+  | "audio-input"
+  | "audio-output"
+  | "image-input"
+  | "image-output";
 
 export interface LlmSdk {
   [k: string]: unknown;
@@ -245,8 +256,11 @@ export interface ToolMessage {
  */
 export interface ModelTokensDetail {
   textTokens?: number;
+  cachedTextTokens?: number;
   audioTokens?: number;
+  cachedAudioTokens?: number;
   imageTokens?: number;
+  cachedImageTokens?: number;
 }
 /**
  * Represents the token usage of the model.
@@ -366,4 +380,45 @@ export interface LanguageModelInput {
   extra?: {
     [k: string]: unknown;
   };
+}
+/**
+ * A metadata property that describes the pricing of the model.
+ */
+export interface LanguageModelPricing {
+  /**
+   * The cost in USD per single text token for input.
+   */
+  inputCostPerTextToken?: number;
+  /**
+   * The cost in USD per single cached text token for input.
+   */
+  inputCostPerCachedTextToken?: number;
+  /**
+   * The cost in USD per single text token for output.
+   */
+  outputCostPerTextToken?: number;
+  /**
+   * The cost in USD per single audio token for input.
+   */
+  inputCostPerAudioToken?: number;
+  /**
+   * The cost in USD per single cached audio token for input.
+   */
+  inputCostPerCachedAudioToken?: number;
+  /**
+   * The cost in USD per single audio token for output.
+   */
+  outputCostPerAudioToken?: number;
+  /**
+   * The cost in USD per single image token for input.
+   */
+  inputCostPerImageToken?: number;
+  /**
+   * The cost in USD per single cached image token for input.
+   */
+  inputCostPerCachedImageToken?: number;
+  /**
+   * The cost in USD per single image token for output.
+   */
+  outputCostPerImageToken?: number;
 }

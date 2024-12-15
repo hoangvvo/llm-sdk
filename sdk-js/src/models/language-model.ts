@@ -1,26 +1,10 @@
 import type {
+  LanguageModelCapability,
   LanguageModelInput,
+  LanguageModelPricing,
   ModelResponse,
   PartialModelResponse,
 } from "../types.js";
-
-export type LanguageModelCapability =
-  | "streaming"
-  | "tool"
-  | "structured-output"
-  | "structured-output-strict" // openai-specific
-  | "audio-input"
-  | "audio-output"
-  | "image-input";
-
-export type LanguageModelPricing = {
-  inputCostPerTextToken?: number;
-  outputCostPerTextToken?: number;
-  inputCostPerAudioToken?: number;
-  outputCostPerAudioToken?: number;
-  inputCostPerImageToken?: number;
-  outputCostPerImageToken?: number;
-};
 
 export type LanguageModelMetadata = {
   /**

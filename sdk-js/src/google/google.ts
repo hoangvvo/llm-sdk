@@ -77,7 +77,7 @@ export class GoogleModel implements LanguageModel {
     }
 
     const usage: ModelUsage | undefined = result.response.usageMetadata
-      ? mapGoogleUsage(result.response.usageMetadata)
+      ? mapGoogleUsage(result.response.usageMetadata, input)
       : undefined;
 
     return {
@@ -116,7 +116,7 @@ export class GoogleModel implements LanguageModel {
       }
 
       if (chunk.usageMetadata) {
-        usage = mapGoogleUsage(chunk.usageMetadata);
+        usage = mapGoogleUsage(chunk.usageMetadata, input);
       }
     }
 
@@ -507,10 +507,25 @@ export function mapGoogleDelta(
   return contentDeltas;
 }
 
-export function mapGoogleUsage(usage: UsageMetadata): ModelUsage {
+export function mapGoogleUsage(
+  usage: UsageMetadata,
+  input: GoogleLanguageModelInput,
+): ModelUsage {
+  const cachedContentTokenCount = usage.cachedContentTokenCount;
+
+  const hasAudioPart = input.messages.some(
+    (s) => s.role === "user" && s.content.some((p) => p.type === "audio"),
+  );
+
   return {
     inputTokens: usage.promptTokenCount,
     outputTokens: usage.candidatesTokenCount,
+    ...(typeof cachedContentTokenCount === "number" && {
+      inputTokensDetail: {
+        [hasAudioPart ? "cachedAudioTokens" : "cachedTextTokens"]:
+          cachedContentTokenCount,
+      },
+    }),
   };
 }
 

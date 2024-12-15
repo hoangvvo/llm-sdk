@@ -79,7 +79,9 @@ export class OpenAIModel implements LanguageModel {
       throw new OpenAIRefusedError(choice.message.refusal);
     }
 
-    const usage = response.usage ? mapOpenAIUsage(response.usage) : undefined;
+    const usage = response.usage
+      ? mapOpenAIUsage(response.usage, input)
+      : undefined;
 
     return {
       content: mapOpenAIMessage(choice.message, openaiInput).content,
@@ -135,7 +137,7 @@ export class OpenAIModel implements LanguageModel {
       }
 
       if (chunk.usage) {
-        usage = mapOpenAIUsage(chunk.usage);
+        usage = mapOpenAIUsage(chunk.usage, input);
       }
     }
 
@@ -621,13 +623,17 @@ export function mapOpenAIDelta(
   return contentDeltas;
 }
 
-export function mapOpenAIUsage(usage: OpenAI.CompletionUsage): ModelUsage {
+export function mapOpenAIUsage(
+  usage: OpenAI.CompletionUsage,
+  input: OpenAILanguageModelInput,
+): ModelUsage {
   return {
     inputTokens: usage.prompt_tokens,
     outputTokens: usage.completion_tokens,
     ...(usage.prompt_tokens_details && {
       inputTokensDetail: mapOpenAIPromptTokensDetails(
         usage.prompt_tokens_details as OpenAIPatchedPromptTokensDetails,
+        input,
       ),
       outputTokensDetail: mapOpenAICompletionTokenDetails(
         usage.completion_tokens_details as OpenAIPatchedCompletionTokenDetails,
@@ -638,11 +644,36 @@ export function mapOpenAIUsage(usage: OpenAI.CompletionUsage): ModelUsage {
 
 export function mapOpenAIPromptTokensDetails(
   details: OpenAIPatchedPromptTokensDetails,
+  input: OpenAILanguageModelInput,
 ): ModelTokensDetail {
+  const textTokens = details.text_tokens;
+  const audioTokens = details.audio_tokens;
+  const imageTokens = details.image_tokens;
+
+  const hasTextPart = input.messages.some(
+    (s) => s.role === "user" && s.content.some((p) => p.type === "text"),
+  );
+  const hasAudioPart = input.messages.some(
+    (s) => s.role === "user" && s.content.some((p) => p.type === "audio"),
+  );
+
+  const cachedTextTokens =
+    details.cached_tokens_details?.text_tokens ??
+    // Guess that cached tokens are for text if there are text messages
+    (hasTextPart && details.cached_tokens) ??
+    undefined;
+  const cachedAudioTokens =
+    details.cached_tokens_details?.audio_tokens ??
+    // Guess that cached tokens are for audio if there are audio messages
+    (hasAudioPart && details.cached_tokens) ??
+    undefined;
+
   return {
-    textTokens: details.text_tokens,
-    imageTokens: details.image_tokens,
-    audioTokens: details.audio_tokens,
+    ...(typeof textTokens === "number" && { textTokens }),
+    ...(typeof audioTokens === "number" && { audioTokens }),
+    ...(typeof imageTokens === "number" && { imageTokens }),
+    ...(typeof cachedTextTokens === "number" && { cachedTextTokens }),
+    ...(typeof cachedAudioTokens === "number" && { cachedAudioTokens }),
   };
 }
 
@@ -650,8 +681,7 @@ export function mapOpenAICompletionTokenDetails(
   details: OpenAIPatchedCompletionTokenDetails,
 ): ModelTokensDetail {
   return {
-    textTokens: details.text_tokens,
-    audioTokens: details.audio_tokens,
-    // note: reasoning_tokens is included in output_tokens
+    ...(details.text_tokens && { textTokens: details.text_tokens }),
+    ...(details.audio_tokens && { audioTokens: details.audio_tokens }),
   };
 }
