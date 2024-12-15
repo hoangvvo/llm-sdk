@@ -4,7 +4,14 @@
  * This interface was referenced by `LlmSdk`'s JSON-Schema
  * via the `definition` "AudioEncoding".
  */
-export type AudioEncoding = "linear16" | "flac" | "mulaw" | "alaw" | "aac" | "mp3" | "opus";
+export type AudioEncoding =
+  | "linear16"
+  | "flac"
+  | "mulaw"
+  | "alaw"
+  | "aac"
+  | "mp3"
+  | "opus";
 /**
  * The container format of the audio.
  *
@@ -16,7 +23,12 @@ export type AudioContainer = "wav" | "ogg" | "flac" | "webm";
  * This interface was referenced by `LlmSdk`'s JSON-Schema
  * via the `definition` "Part".
  */
-export type Part = TextPart | ImagePart | AudioPart | ToolCallPart | ToolResultPart;
+export type Part =
+  | TextPart
+  | ImagePart
+  | AudioPart
+  | ToolCallPart
+  | ToolResultPart;
 /**
  * This interface was referenced by `LlmSdk`'s JSON-Schema
  * via the `definition` "Message".
@@ -408,7 +420,11 @@ export interface LanguageModelInput {
   /**
    * Determines how the model should choose which tool to use. "auto" - The model will automatically choose the tool to use or not use any tools. "none" - The model will not use any tools. "required" - The model will be forced to use a tool. { type: "tool", toolName: "toolName" } - The model will use the specified tool.
    */
-  toolChoice?: ToolChoiceAuto | ToolChoiceNone | ToolChoiceRequired | ToolChoiceTool;
+  toolChoice?:
+    | ToolChoiceAuto
+    | ToolChoiceNone
+    | ToolChoiceRequired
+    | ToolChoiceTool;
   /**
    * The format that the model must output
    */
