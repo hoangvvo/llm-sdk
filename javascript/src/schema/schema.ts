@@ -4,14 +4,7 @@
  * This interface was referenced by `LlmSdk`'s JSON-Schema
  * via the `definition` "AudioEncoding".
  */
-export type AudioEncoding =
-  | "linear16"
-  | "flac"
-  | "mulaw"
-  | "alaw"
-  | "aac"
-  | "mp3"
-  | "opus";
+export type AudioEncoding = "linear16" | "flac" | "mulaw" | "alaw" | "aac" | "mp3" | "opus";
 /**
  * The container format of the audio.
  *
@@ -23,12 +16,7 @@ export type AudioContainer = "wav" | "ogg" | "flac" | "webm";
  * This interface was referenced by `LlmSdk`'s JSON-Schema
  * via the `definition` "Part".
  */
-export type Part =
-  | TextPart
-  | ImagePart
-  | AudioPart
-  | ToolCallPart
-  | ToolResultPart;
+export type Part = TextPart | ImagePart | AudioPart | ToolCallPart | ToolResultPart;
 /**
  * This interface was referenced by `LlmSdk`'s JSON-Schema
  * via the `definition` "Message".
@@ -53,7 +41,7 @@ export interface TextPart {
   type: "text";
   text: string;
   /**
-   * The optional ID of the part.
+   * The ID of the part, if applicable.
    */
   id?: string;
 }
@@ -82,7 +70,7 @@ export interface ImagePart {
    */
   height?: number;
   /**
-   * The optional ID of the part.
+   * The ID of the part, if applicable.
    */
   id?: string;
 }
@@ -113,7 +101,7 @@ export interface AudioPart {
    */
   transcript?: string;
   /**
-   * The optional ID of the part.
+   * The ID of the part, if applicable.
    */
   id?: string;
 }
@@ -140,7 +128,7 @@ export interface ToolCallPart {
     [k: string]: unknown;
   } | null;
   /**
-   * The optional ID of the part. This might not be the same as the toolCallId.
+   * The ID of the part, if applicable. This might not be the same as the toolCallId.
    */
   id?: string;
 }
@@ -201,7 +189,7 @@ export interface TextPartDelta {
   type: "text";
   text: string;
   /**
-   * The optional ID of the part.
+   * The ID of the part, if applicable.
    */
   id?: string;
 }
@@ -224,7 +212,7 @@ export interface ToolCallPartDelta {
    */
   args?: string;
   /**
-   * The optional ID of the part. This might not be the same as the toolCallId.
+   * The ID of the part, if applicable. This might not be the same as the toolCallId.
    */
   id?: string;
 }
@@ -253,7 +241,7 @@ export interface AudioPartDelta {
    */
   transcript?: string;
   /**
-   * The optional ID of the part.
+   * The ID of the part, if applicable.
    */
   id?: string;
 }
@@ -420,11 +408,7 @@ export interface LanguageModelInput {
   /**
    * Determines how the model should choose which tool to use. "auto" - The model will automatically choose the tool to use or not use any tools. "none" - The model will not use any tools. "required" - The model will be forced to use a tool. { type: "tool", toolName: "toolName" } - The model will use the specified tool.
    */
-  toolChoice?:
-    | ToolChoiceAuto
-    | ToolChoiceNone
-    | ToolChoiceRequired
-    | ToolChoiceTool;
+  toolChoice?: ToolChoiceAuto | ToolChoiceNone | ToolChoiceRequired | ToolChoiceTool;
   /**
    * The format that the model must output
    */

@@ -15,7 +15,7 @@
         },
         "id": {
           "type": "string",
-          "description": "The optional ID of the part."
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type", "text"],
@@ -47,7 +47,7 @@
         },
         "id": {
           "type": "string",
-          "description": "The optional ID of the part."
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type", "mimeType", "imageData"],
@@ -95,7 +95,7 @@
         },
         "id": {
           "type": "string",
-          "description": "The optional ID of the part."
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type", "audioData"],
@@ -120,7 +120,8 @@
         "args": {
           "oneOf": [
             {
-              "type": "object"
+              "type": "object",
+              "additionalProperties": true
             },
             {
               "type": "null"
@@ -130,7 +131,7 @@
         },
         "id": {
           "type": "string",
-          "description": "The optional ID of the part. This might not be the same as the toolCallId."
+          "description": "The ID of the part, if applicable. This might not be the same as the toolCallId."
         }
       },
       "required": ["type", "toolCallId", "toolName", "args"],
@@ -258,7 +259,7 @@
         },
         "id": {
           "type": "string",
-          "description": "The optional ID of the part."
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type", "text"],
@@ -285,7 +286,7 @@
         },
         "id": {
           "type": "string",
-          "description": "The optional ID of the part. This might not be the same as the toolCallId."
+          "description": "The ID of the part, if applicable. This might not be the same as the toolCallId."
         }
       },
       "required": ["type"],
@@ -322,7 +323,7 @@
         },
         "id": {
           "type": "string",
-          "description": "The optional ID of the part."
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type"],
@@ -353,7 +354,8 @@
     },
     "JSONSchema": {
       "type": "object",
-      "description": "Represents a JSON schema."
+      "description": "Represents a JSON schema.",
+      "additionalProperties": true
     },
     "Tool": {
       "type": "object",
@@ -656,7 +658,8 @@
         },
         "extra": {
           "type": "object",
-          "description": "Extra options that the model may support."
+          "description": "Extra options that the model may support.",
+          "additionalProperties": true
         }
       },
       "required": ["messages"],
