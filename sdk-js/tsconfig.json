@@ -18,8 +18,9 @@
     "lib": ["ESNext", "DOM"],
     "target": "ES2022",
     "moduleResolution": "NodeNext",
-    "module": "NodeNext"
+    "module": "NodeNext",
+    "noEmit": true
   },
-  "include": ["src", "examples", "test"],
+  "include": ["src", "examples", "test", "scripts"],
   "exclude": ["dist"]
 }

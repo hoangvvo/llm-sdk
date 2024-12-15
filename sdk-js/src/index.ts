@@ -1,2 +1,2 @@
 export * from "./models/language-model.js";
-export * from "./schema/schema.js";
+export * from "./types.js";

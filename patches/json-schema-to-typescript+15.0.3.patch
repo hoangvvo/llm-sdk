@@ -1,16 +1,29 @@
 diff --git a/node_modules/json-schema-to-typescript/dist/src/parser.js b/node_modules/json-schema-to-typescript/dist/src/parser.js
-index c9c6779..89de019 100644
+index c9c6779..4d9697b 100644
 --- a/node_modules/json-schema-to-typescript/dist/src/parser.js
 +++ b/node_modules/json-schema-to-typescript/dist/src/parser.js
-@@ -318,7 +318,7 @@ function parseSchema(schema, options, processed, usedNames, parentSchemaName) {
+@@ -316,9 +316,7 @@ function parseSchema(schema, options, processed, usedNames, parentSchemaName) {
+         singlePatternProperty = !schema.additionalProperties && Object.keys(schema.patternProperties).length === 1;
+         asts = asts.concat((0, lodash_1.map)(schema.patternProperties, (value, key) => {
              const ast = parse(value, options, key, processed, usedNames);
-             const comment = `This interface was referenced by \`${parentSchemaName}\`'s JSON-Schema definition
- via the \`patternProperty\` "${key.replace('*/', '*\\/')}".`;
+-            const comment = `This interface was referenced by \`${parentSchemaName}\`'s JSON-Schema definition
+-via the \`patternProperty\` "${key.replace('*/', '*\\/')}".`;
 -            ast.comment = ast.comment ? `${ast.comment}\n\n${comment}` : comment;
-+            ast.comment = ast.comment ? `${ast.comment}\n\n${comment}` : '';
++            ast.comment = ast.comment ? `${ast.comment}` : '';
              return {
                  ast,
                  isPatternProperty: !singlePatternProperty,
+@@ -331,9 +329,7 @@ via the \`patternProperty\` "${key.replace('*/', '*\\/')}".`;
+     if (options.unreachableDefinitions) {
+         asts = asts.concat((0, lodash_1.map)(schema.$defs, (value, key) => {
+             const ast = parse(value, options, key, processed, usedNames);
+-            const comment = `This interface was referenced by \`${parentSchemaName}\`'s JSON-Schema
+-via the \`definition\` "${key}".`;
+-            ast.comment = ast.comment ? `${ast.comment}\n\n${comment}` : comment;
++            ast.comment = ast.comment ? `${ast.comment}` : '';
+             return {
+                 ast,
+                 isPatternProperty: false,
 diff --git a/node_modules/json-schema-to-typescript/src/parser.ts b/node_modules/json-schema-to-typescript/src/parser.ts
 index 92acdeb..14009ee 100644
 --- a/node_modules/json-schema-to-typescript/src/parser.ts

@@ -30,7 +30,7 @@ import type {
   PartialModelResponse,
   Tool,
   ToolResultPart,
-} from "../schema/index.js";
+} from "../types.js";
 import { mapAudioFormatToMimeType } from "../utils/audio.utils.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import type { InternalContentDelta } from "../utils/stream.utils.js";

@@ -18,7 +18,7 @@ import type {
   TextPartDelta,
   Tool,
   ToolCallPartDelta,
-} from "../schema/index.js";
+} from "../types.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import type { InternalContentDelta } from "../utils/stream.utils.js";
 import {

@@ -19,7 +19,7 @@ import type {
   TextPart,
   Tool,
   ToolCallPart,
-} from "../schema/index.js";
+} from "../types.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";

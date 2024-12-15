@@ -1,4 +1,4 @@
-import type { AudioContainer, AudioEncoding } from "../schema/index.js";
+import type { AudioContainer, AudioEncoding } from "../types.js";
 
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binaryString = atob(base64);

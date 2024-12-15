@@ -12,6 +12,10 @@
         },
         "text": {
           "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type", "text"],
@@ -40,6 +44,10 @@
         "height": {
           "type": "integer",
           "description": "The height of the image in pixels."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type", "mimeType", "imageData"],
@@ -84,6 +92,10 @@
         "transcript": {
           "type": "string",
           "description": "The transcript of the audio."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type", "audioData"],
@@ -108,13 +120,18 @@
         "args": {
           "oneOf": [
             {
-              "type": "object"
+              "type": "object",
+              "additionalProperties": true
             },
             {
               "type": "null"
             }
           ],
           "description": "The arguments to pass to the tool."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable. This might not be the same as the toolCallId."
         }
       },
       "required": ["type", "toolCallId", "toolName", "args"],
@@ -239,6 +256,10 @@
         },
         "text": {
           "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type", "text"],
@@ -262,6 +283,10 @@
         "args": {
           "type": "string",
           "description": "The partial JSON string of the arguments to pass to the tool."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable. This might not be the same as the toolCallId."
         }
       },
       "required": ["type"],
@@ -295,6 +320,10 @@
         "transcript": {
           "type": "string",
           "description": "The transcript of the audio."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
         }
       },
       "required": ["type"],
@@ -325,7 +354,8 @@
     },
     "JSONSchema": {
       "type": "object",
-      "description": "Represents a JSON schema."
+      "description": "Represents a JSON schema.",
+      "additionalProperties": true
     },
     "Tool": {
       "type": "object",
@@ -628,7 +658,8 @@
         },
         "extra": {
           "type": "object",
-          "description": "Extra options that the model may support."
+          "description": "Extra options that the model may support.",
+          "additionalProperties": true
         }
       },
       "required": ["messages"],

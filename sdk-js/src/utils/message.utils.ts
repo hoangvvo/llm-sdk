@@ -1,4 +1,4 @@
-import type { Message } from "../schema/index.js";
+import type { Message } from "../types.js";
 
 export function convertAudioPartsToTextParts<T extends Message>(message: T): T {
   return {

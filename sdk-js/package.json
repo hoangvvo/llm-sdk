@@ -4,8 +4,7 @@
   "version": "0.1.7",
   "description": "A unified LLM SDK",
   "scripts": {
-    "generate": "node generate.js",
-    "build": "tshy && cp src/schema/schema.json dist/esm/schema/schema.json && cp src/schema/schema.json dist/commonjs/schema/schema.json",
+    "build": "tshy",
     "lint": "eslint src",
     "test": "tsx --test --experimental-test-coverage --env-file=../.env \"**/*.test.ts\""
   },
@@ -84,16 +83,7 @@
       }
     },
     "./package.json": "./package.json",
-    "./schema/schema.json": {
-      "import": {
-        "types": "./dist/esm/schema/schema.json",
-        "default": "./dist/esm/schema/schema.json"
-      },
-      "require": {
-        "types": "./dist/commonjs/schema/schema.json",
-        "default": "./dist/commonjs/schema/schema.json"
-      }
-    }
+    "./schema.json": "./schema.json"
   },
   "main": "./dist/commonjs/index.js",
   "types": "./dist/commonjs/index.d.ts",
@@ -119,7 +109,7 @@
       "./mistral": "./src/mistral/index.ts",
       "./utils": "./src/utils/index.ts",
       "./package.json": "./package.json",
-      "./schema/schema.json": "./src/schema/schema.json"
+      "./schema.json": "./schema.json"
     },
     "project": "tsconfig.build.json"
   },

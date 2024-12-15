@@ -1,5 +1,5 @@
 import type { LanguageModelPricing } from "../models/language-model.js";
-import type { ModelUsage } from "../schema/index.js";
+import type { ModelUsage } from "../types.js";
 
 export function calculateCost(
   usage: ModelUsage,

@@ -4,6 +4,7 @@
     "javascript"
   ],
   "scripts": {
+    "generate": "node sdk-js/scripts/generate.js",
     "format": "prettier --write .",
     "postinstall": "patch-package"
   },

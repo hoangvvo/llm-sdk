@@ -5,7 +5,7 @@ import type {
   TextPartDelta,
   ToolCallPart,
   ToolCallPartDelta,
-} from "../schema/index.js";
+} from "../types.js";
 import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
