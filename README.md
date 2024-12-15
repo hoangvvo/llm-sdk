@@ -1,6 +1,12 @@
 # llm-sdk
 
-A unified LLM API.
+Access the LLM API of different providers using a unified SDK.
+
+## Features
+
+- Supports multiple LLM providers: OpenAI, Anthropic, Google Gemini, Cohere, Mistral
+- Supports multi modalities (text, image, audio), including OpenAI newest audio generation capabilities.
+- Supports reporting the token usage and calculating cost of a request if given the model's pricing information.
 
 ## Specification
 
