@@ -15,10 +15,8 @@ import type {
 } from "@google/generative-ai";
 import { FunctionCallingMode, GoogleGenerativeAI } from "@google/generative-ai";
 import { InvalidValueError, NotImplementedError } from "../errors/errors.js";
-import type {
-  LanguageModel,
-  LanguageModelMetadata,
-} from "../models/language-model.js";
+import type { LanguageModelMetadata } from "../models/language-model.js";
+import { LanguageModel } from "../models/language-model.js";
 import type {
   AssistantMessage,
   ContentDelta,
@@ -45,7 +43,7 @@ export type GoogleLanguageModelInput = LanguageModelInput & {
   extra?: Partial<GenerateContentRequest>;
 };
 
-export class GoogleModel implements LanguageModel {
+export class GoogleModel extends LanguageModel {
   provider: string;
   modelId: string;
   metadata?: LanguageModelMetadata;
@@ -56,6 +54,7 @@ export class GoogleModel implements LanguageModel {
     public options: GoogleModelOptions,
     metadata?: LanguageModelMetadata,
   ) {
+    super();
     this.provider = "google";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;

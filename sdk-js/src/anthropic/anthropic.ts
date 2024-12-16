@@ -4,9 +4,9 @@ import {
   ModelUnsupportedMessagePart,
   NotImplementedError,
 } from "../errors/errors.js";
-import type {
+import {
   LanguageModel,
-  LanguageModelMetadata,
+  type LanguageModelMetadata,
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
@@ -29,7 +29,7 @@ export type AnthropicLanguageModelInput = LanguageModelInput & {
   extra?: Partial<Anthropic.Messages.MessageCreateParams>;
 };
 
-export class AnthropicModel implements LanguageModel {
+export class AnthropicModel extends LanguageModel {
   public provider: string;
   public modelId: string;
   public metadata?: LanguageModelMetadata;
@@ -40,6 +40,7 @@ export class AnthropicModel implements LanguageModel {
     public options: AnthropicModelOptions,
     metadata?: LanguageModelMetadata,
   ) {
+    super();
     this.provider = "anthropic";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
@@ -85,9 +86,11 @@ export class AnthropicModel implements LanguageModel {
 
     const accumulator = new ContentDeltaAccumulator();
 
-    for await (const chunk of stream) {
-      // https://docs.anthropic.com/claude/reference/messages-streaming#raw-http-stream-response
+    for await (const _chunk of stream) {
+      // TODO: type error from library
+      const chunk = _chunk as Anthropic.Messages.MessageStreamEvent;
 
+      // https://docs.anthropic.com/claude/reference/messages-streaming#raw-http-stream-response
       switch (chunk.type) {
         case "message_start":
           usage.inputTokens += chunk.message.usage.input_tokens;
@@ -408,6 +411,8 @@ export function mapAnthropicStreamEvent(
               },
             },
           ];
+        case "citations_delta":
+          return [];
         default: {
           const exhaustiveCheck: never = chunk.delta;
           throw new NotImplementedError(

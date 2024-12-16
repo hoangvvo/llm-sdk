@@ -1,5 +1,5 @@
 import { Mistral } from "@mistralai/mistralai";
-import * as MistralComponents from "@mistralai/mistralai/models/components/index.js";
+import type * as MistralComponents from "@mistralai/mistralai/models/components/index.js";
 import {
   InvalidValueError,
   ModelUnsupportedMessagePart,
@@ -7,9 +7,9 @@ import {
 } from "../errors/errors.js";
 import {
   LanguageModel,
-  LanguageModelMetadata,
+  type LanguageModelMetadata,
 } from "../models/language-model.js";
-import {
+import type {
   AssistantMessage,
   ContentDelta,
   LanguageModelInput,
@@ -20,18 +20,16 @@ import {
   ToolCallPart,
 } from "../types.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
-import {
-  ContentDeltaAccumulator,
-  InternalContentDelta,
-} from "../utils/stream.utils.js";
+import type { InternalContentDelta } from "../utils/stream.utils.js";
+import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
-import { MistralModelOptions } from "./types.js";
+import type { MistralModelOptions } from "./types.js";
 
 export type MistralLanguageModelInput = LanguageModelInput & {
   extra?: Partial<MistralComponents.ChatCompletionRequest>;
 };
 
-export class MistralModel implements LanguageModel {
+export class MistralModel extends LanguageModel {
   public provider: string;
   public modelId: string;
   public metadata?: LanguageModelMetadata;
@@ -42,6 +40,7 @@ export class MistralModel implements LanguageModel {
     public options: MistralModelOptions,
     metadata?: LanguageModelMetadata,
   ) {
+    super();
     this.provider = "mistral";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;

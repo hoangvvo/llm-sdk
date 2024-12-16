@@ -1,13 +1,14 @@
-import { Cohere, CohereClientV2 } from "cohere-ai";
+import type { Cohere } from "cohere-ai";
+import { CohereClientV2 } from "cohere-ai";
 import {
   InvalidValueError,
   ModelUnsupportedMessagePart,
 } from "../errors/errors.js";
 import {
   LanguageModel,
-  LanguageModelMetadata,
+  type LanguageModelMetadata,
 } from "../models/language-model.js";
-import {
+import type {
   AssistantMessage,
   ContentDelta,
   LanguageModelInput,
@@ -21,13 +22,13 @@ import {
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
 import { calculateCost } from "../utils/usage.utils.js";
-import { CohereModelOptions } from "./types.js";
+import type { CohereModelOptions } from "./types.js";
 
 export type CohereLanguageModelInput = LanguageModelInput & {
   extra?: Partial<Cohere.V2ChatRequest>;
 };
 
-export class CohereModel implements LanguageModel {
+export class CohereModel extends LanguageModel {
   public provider: string;
   public modelId: string;
   public metadata?: LanguageModelMetadata;
@@ -38,6 +39,7 @@ export class CohereModel implements LanguageModel {
     public options: CohereModelOptions,
     metadata?: LanguageModelMetadata,
   ) {
+    super();
     this.provider = "cohere";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
@@ -431,18 +433,8 @@ export function mapCohereContentDelta(
       };
     }
     case "tool-call-start": {
-      const toolCall =
-        event.delta?.toolCall ||
-        // sdk has wrong type
-        (
-          event.delta as
-            | {
-                message?: {
-                  tool_calls: Cohere.ChatToolCallStartEventDeltaToolCall;
-                };
-              }
-            | undefined
-        )?.message?.tool_calls;
+      const toolCall = event.delta?.message?.toolCalls;
+
       return {
         index: event.index,
         part: {
@@ -460,17 +452,7 @@ export function mapCohereContentDelta(
       };
     }
     case "tool-call-delta": {
-      const toolCall =
-        event.delta?.toolCall ||
-        (
-          event.delta as
-            | {
-                message?: {
-                  tool_calls: Cohere.ChatToolCallDeltaEventDeltaToolCall;
-                };
-              }
-            | undefined
-        )?.message?.tool_calls;
+      const toolCall = event.delta?.message?.toolCalls;
 
       return {
         index: event.index,

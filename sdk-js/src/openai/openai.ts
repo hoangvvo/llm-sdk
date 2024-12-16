@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import { InvalidValueError, NotImplementedError } from "../errors/errors.js";
-import type {
+import {
   LanguageModel,
-  LanguageModelMetadata,
+  type LanguageModelMetadata,
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
@@ -40,7 +40,7 @@ export type OpenAILanguageModelInput = LanguageModelInput & {
   extra?: Partial<OpenAI.Chat.Completions.ChatCompletionCreateParams>;
 };
 
-export class OpenAIModel implements LanguageModel {
+export class OpenAIModel extends LanguageModel {
   provider: string;
   modelId: string;
   metadata?: LanguageModelMetadata;
@@ -51,6 +51,7 @@ export class OpenAIModel implements LanguageModel {
     public options: OpenAIModelOptions,
     metadata?: LanguageModelMetadata,
   ) {
+    super();
     this.provider = "openai";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
