@@ -26,9 +26,9 @@ jobs:
         run: npm ci
 
       - name: Run lint
-        working-directory: javascript
+        working-directory: sdk-js
         run: npm run lint
 
       - name: Run build
-        working-directory: javascript
+        working-directory: sdk-js
         run: npm run build
