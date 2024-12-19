@@ -189,7 +189,8 @@
         {
           "$ref": "#/definitions/ToolResultPart"
         }
-      ]
+      ],
+      "description": "A part of the message."
     },
     "UserMessageContentPart": {
       "oneOf": [
@@ -202,7 +203,8 @@
         {
           "$ref": "#/definitions/AudioPart"
         }
-      ]
+      ],
+      "description": "Content parts that a user message can include."
     },
     "UserMessage": {
       "type": "object",
@@ -233,7 +235,8 @@
         {
           "$ref": "#/definitions/AudioPart"
         }
-      ]
+      ],
+      "description": "Content parts that an assistant message can include."
     },
     "AssistantMessage": {
       "type": "object",
@@ -255,6 +258,7 @@
     },
     "TextPartDelta": {
       "type": "object",
+      "description": "A delta update for a text part, used in streaming or incremental updates of a message.",
       "properties": {
         "type": {
           "type": "string",
@@ -273,6 +277,7 @@
     },
     "ToolCallPartDelta": {
       "type": "object",
+      "description": "A delta update for a tool call part, used in streaming of a tool invocation.",
       "properties": {
         "type": {
           "type": "string",
@@ -300,6 +305,7 @@
     },
     "AudioPartDelta": {
       "type": "object",
+      "description": "A delta update for an audio part, used in streaming of an audio message.",
       "properties": {
         "type": {
           "type": "string",
@@ -346,10 +352,12 @@
         {
           "$ref": "#/definitions/AudioPartDelta"
         }
-      ]
+      ],
+      "description": "Delta parts used in partial updates."
     },
     "ContentDelta": {
       "type": "object",
+      "description": "Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.",
       "properties": {
         "index": {
           "type": "integer"
@@ -422,7 +430,8 @@
         {
           "$ref": "#/definitions/ToolMessage"
         }
-      ]
+      ],
+      "description": "A message in an LLM conversation history."
     },
     "ModelTokensDetails": {
       "type": "object",
@@ -492,6 +501,7 @@
     },
     "PartialModelResponse": {
       "type": "object",
+      "description": "Represents a partial response from the language model, useful for streaming output via async generator.",
       "properties": {
         "delta": {
           "$ref": "#/definitions/ContentDelta"
@@ -553,6 +563,7 @@
     },
     "ResponseFormatText": {
       "type": "object",
+      "description": "Specifies that the model response should be in plain text format.",
       "properties": {
         "type": {
           "type": "string",
@@ -564,6 +575,7 @@
     },
     "ResponseFormatJson": {
       "type": "object",
+      "description": "Specifies that the model response should be in JSON format adhering to a specified schema.",
       "properties": {
         "type": {
           "type": "string",
@@ -578,7 +590,8 @@
     },
     "Modality": {
       "type": "string",
-      "enum": ["text", "audio"]
+      "enum": ["text", "audio"],
+      "description": "Defines the modality of content (e.g., text or audio) in LLM responses."
     },
     "ToolChoiceOption": {
       "oneOf": [
@@ -606,10 +619,11 @@
           "$ref": "#/definitions/ResponseFormatJson"
         }
       ],
-      "description": "The format that the model must output"
+      "description": "The format that the model must output."
     },
     "LanguageModelInput": {
       "type": "object",
+      "description": "Defines the input parameters for the language model completion.",
       "properties": {
         "system_prompt": {
           "type": "string",
@@ -645,11 +659,11 @@
         },
         "top_p": {
           "type": "number",
-          "description": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass Ranges from 0.0 to 1.0"
+          "description": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. Ranges from 0.0 to 1.0"
         },
         "top_k": {
           "type": "number",
-          "description": "Only sample from the top K options for each subsequent token. Used to remove \"long tail\" low probability responses. Ranges from 0.0 to 1.0"
+          "description": "Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Ranges from 0.0 to 1.0"
         },
         "presence_penalty": {
           "type": "number",

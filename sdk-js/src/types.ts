@@ -13,19 +13,37 @@ export type AudioEncoding =
  * The container format of the audio.
  */
 export type AudioContainer = "wav" | "ogg" | "flac" | "webm";
+/**
+ * A part of the message.
+ */
 export type Part =
   | TextPart
   | ImagePart
   | AudioPart
   | ToolCallPart
   | ToolResultPart;
+/**
+ * Content parts that a user message can include.
+ */
 export type UserMessageContentPart = TextPart | ImagePart | AudioPart;
+/**
+ * Content parts that an assistant message can include.
+ */
 export type AssistantMessageContentPart = TextPart | ToolCallPart | AudioPart;
+/**
+ * Delta parts used in partial updates.
+ */
 export type ContentDeltaPart =
   | TextPartDelta
   | ToolCallPartDelta
   | AudioPartDelta;
+/**
+ * A message in an LLM conversation history.
+ */
 export type Message = UserMessage | AssistantMessage | ToolMessage;
+/**
+ * Defines the modality of content (e.g., text or audio) in LLM responses.
+ */
 export type Modality = "text" | "audio";
 /**
  * Determines how the model should choose which tool to use. "auto" - The model will automatically choose the tool to use or not use any tools. "none" - The model will not use any tools. "required" - The model will be forced to use a tool. { type: "tool", toolName: "toolName" } - The model will use the specified tool.
@@ -36,7 +54,7 @@ export type ToolChoiceOption =
   | ToolChoiceRequired
   | ToolChoiceTool;
 /**
- * The format that the model must output
+ * The format that the model must output.
  */
 export type ResponseFormatOption = ResponseFormatText | ResponseFormatJson;
 /**
@@ -183,6 +201,9 @@ export interface AssistantMessage {
   role: "assistant";
   content: AssistantMessageContentPart[];
 }
+/**
+ * A delta update for a text part, used in streaming or incremental updates of a message.
+ */
 export interface TextPartDelta {
   type: "text";
   text: string;
@@ -191,6 +212,9 @@ export interface TextPartDelta {
    */
   id?: string;
 }
+/**
+ * A delta update for a tool call part, used in streaming of a tool invocation.
+ */
 export interface ToolCallPartDelta {
   type: "tool-call";
   /**
@@ -210,6 +234,9 @@ export interface ToolCallPartDelta {
    */
   id?: string;
 }
+/**
+ * A delta update for an audio part, used in streaming of an audio message.
+ */
 export interface AudioPartDelta {
   type: "audio";
   /**
@@ -235,6 +262,9 @@ export interface AudioPartDelta {
    */
   id?: string;
 }
+/**
+ * Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.
+ */
 export interface ContentDelta {
   index: number;
   part: ContentDeltaPart;
@@ -300,6 +330,9 @@ export interface ModelResponse {
    */
   cost?: number;
 }
+/**
+ * Represents a partial response from the language model, useful for streaming output via async generator.
+ */
 export interface PartialModelResponse {
   delta: ContentDelta;
 }
@@ -328,13 +361,22 @@ export interface ToolChoiceTool {
   type: "tool";
   tool_name: string;
 }
+/**
+ * Specifies that the model response should be in plain text format.
+ */
 export interface ResponseFormatText {
   type: "text";
 }
+/**
+ * Specifies that the model response should be in JSON format adhering to a specified schema.
+ */
 export interface ResponseFormatJson {
   type: "json";
   schema?: JSONSchema;
 }
+/**
+ * Defines the input parameters for the language model completion.
+ */
 export interface LanguageModelInput {
   /**
    * A system prompt is a way of providing context and instructions to the model
@@ -359,11 +401,11 @@ export interface LanguageModelInput {
    */
   temperature?: number;
   /**
-   * An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass Ranges from 0.0 to 1.0
+   * An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. Ranges from 0.0 to 1.0
    */
   top_p?: number;
   /**
-   * Only sample from the top K options for each subsequent token. Used to remove "long tail" low probability responses. Ranges from 0.0 to 1.0
+   * Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Ranges from 0.0 to 1.0
    */
   top_k?: number;
   /**
