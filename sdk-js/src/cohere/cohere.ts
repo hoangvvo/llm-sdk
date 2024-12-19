@@ -18,6 +18,7 @@ import type {
   PartialModelResponse,
   Tool,
   ToolCallPart,
+  ToolCallPartDelta,
 } from "../types.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
@@ -56,14 +57,17 @@ export class CohereModel extends LanguageModel {
 
     const usage = response.usage ? mapCohereUsage(response.usage) : undefined;
 
-    return {
+    const result: ModelResponse = {
       content: mapCohereMessage(response.message).content,
-      ...(usage && { usage }),
-      ...(this.metadata?.pricing &&
-        usage && {
-          cost: calculateCost(usage, this.metadata.pricing),
-        }),
     };
+    if (usage) {
+      result.usage = usage;
+      if (this.metadata?.pricing) {
+        result.cost = calculateCost(usage, this.metadata.pricing);
+      }
+    }
+
+    return result;
   }
 
   async *stream(
@@ -99,14 +103,17 @@ export class CohereModel extends LanguageModel {
       }
     }
 
-    return {
+    const result: ModelResponse = {
       content: accumulator.computeContent(),
-      ...(usage && { usage }),
-      ...(this.metadata?.pricing &&
-        usage && {
-          cost: calculateCost(usage, this.metadata.pricing),
-        }),
     };
+    if (usage) {
+      result.usage = usage;
+      if (this.metadata?.pricing) {
+        result.cost = calculateCost(usage, this.metadata.pricing);
+      }
+    }
+
+    return result;
   }
 }
 
@@ -114,23 +121,26 @@ export function convertToCohereParams(
   input: LanguageModelInput,
   options: CohereModelOptions,
 ): Cohere.V2ChatRequest {
-  const response_format = convertToCohereResponseFormat(input.responseFormat);
+  const response_format = convertToCohereResponseFormat(input.response_format);
   const samplingParams = convertToCohereSamplingParams(input);
 
-  return {
+  const params: Cohere.V2ChatRequest = {
     model: options.modelId,
     messages: convertToCohereMessages(input, options),
-    ...(input.tools && { tools: input.tools.map(convertToCohereTool) }),
     ...samplingParams,
-    ...(response_format && {
-      responseFormat: response_format,
-    }),
     ...input.extra,
   };
+  if (input.tools) {
+    params.tools = input.tools.map(convertToCohereTool);
+  }
+  if (response_format) {
+    params.responseFormat = response_format;
+  }
+  return params;
 }
 
 export function convertToCohereMessages(
-  input: Pick<CohereLanguageModelInput, "messages" | "systemPrompt">,
+  input: Pick<CohereLanguageModelInput, "messages" | "system_prompt">,
   options: CohereModelOptions,
 ): Cohere.ChatMessageV2[] {
   const cohereMessages: Cohere.ChatMessageV2[] = [];
@@ -140,13 +150,13 @@ export function convertToCohereMessages(
     messages = messages.map(convertAudioPartsToTextParts);
   }
 
-  if (input.systemPrompt) {
+  if (input.system_prompt) {
     cohereMessages.push({
       role: "system",
       content: [
         {
           type: "text",
-          text: input.systemPrompt,
+          text: input.system_prompt,
         },
       ],
     });
@@ -168,11 +178,14 @@ export function convertToCohereMessages(
         break;
       }
       case "assistant": {
-        cohereMessages.push({
-          role: "assistant",
-          ...(content && { content }),
-          ...(toolCalls && { toolCalls }),
-        });
+        const assistantMessage: Cohere.ChatMessageV2 = { role: "assistant" };
+        if (content) {
+          assistantMessage.content = content;
+        }
+        if (toolCalls) {
+          assistantMessage.toolCalls = toolCalls;
+        }
+        cohereMessages.push(assistantMessage);
         break;
       }
       case "tool": {
@@ -226,13 +239,11 @@ export function convertToCohereMessageParam(parts: Part[]): {
       case "tool-call": {
         toolCalls = toolCalls ?? [];
         toolCalls.push({
-          id: part.toolCallId,
+          id: part.tool_call_id,
           type: "function",
           function: {
-            name: part.toolName,
-            ...(part.args && {
-              arguments: JSON.stringify(part.args),
-            }),
+            name: part.tool_name,
+            ...(part.args ? { arguments: JSON.stringify(part.args) } : {}),
           },
         });
         break;
@@ -240,7 +251,7 @@ export function convertToCohereMessageParam(parts: Part[]): {
       case "tool-result": {
         toolResults = toolResults ?? [];
         toolResults.push({
-          toolCallId: part.toolCallId,
+          toolCallId: part.tool_call_id,
           content: [
             {
               type: "text",
@@ -260,75 +271,92 @@ export function convertToCohereMessageParam(parts: Part[]): {
     }
   });
 
-  return {
-    ...(content && { content }),
-    ...(toolCalls && { toolCalls }),
-    ...(toolResults && { toolResults }),
-  };
+  const result: {
+    content?: Cohere.Content[];
+    toolCalls?: Cohere.ToolCallV2[];
+    toolResults?: Cohere.ToolMessageV2[];
+  } = {};
+  if (content) {
+    result.content = content;
+  }
+  if (toolCalls) {
+    result.toolCalls = toolCalls;
+  }
+  if (toolResults) {
+    result.toolResults = toolResults;
+  }
+  return result;
 }
 
 export function convertToCohereSamplingParams(
   input: Partial<LanguageModelInput>,
-) {
-  return {
-    ...(typeof input.maxTokens === "number" && { maxTokens: input.maxTokens }),
-    ...(typeof input.temperature === "number" && {
-      temperature: input.temperature,
-    }),
-    ...(typeof input.topP === "number" && { p: input.topP }),
-    ...(typeof input.presencePenalty === "number" && {
-      presencePenalty: input.presencePenalty,
-    }),
-    ...(typeof input.frequencyPenalty === "number" && {
-      frequencyPenalty: input.frequencyPenalty,
-    }),
-    ...(typeof input.seed === "number" && { seed: input.seed }),
-  } satisfies Partial<Cohere.V2ChatRequest>;
+): Partial<Cohere.V2ChatRequest> {
+  const params: Partial<Cohere.V2ChatRequest> = {};
+  if (typeof input.max_tokens === "number") {
+    params.maxTokens = input.max_tokens;
+  }
+  if (typeof input.temperature === "number") {
+    params.temperature = input.temperature;
+  }
+  if (typeof input.top_p === "number") {
+    params.p = input.top_p;
+  }
+  if (typeof input.presence_penalty === "number") {
+    params.presencePenalty = input.presence_penalty;
+  }
+  if (typeof input.frequency_penalty === "number") {
+    params.frequencyPenalty = input.frequency_penalty;
+  }
+  if (typeof input.seed === "number") {
+    params.seed = input.seed;
+  }
+  return params;
 }
 
 export function convertToCohereTool(tool: Tool): Cohere.ToolV2 {
-  return {
+  const toolParams: Cohere.ToolV2 = {
     type: "function",
     function: {
       name: tool.name,
       description: tool.description,
-      ...(tool.parameters && {
-        parameters: convertToCohereSchema(tool.parameters),
-      }),
     },
   };
+
+  if (tool.parameters && toolParams.function) {
+    toolParams.function.parameters = convertToCohereSchema(tool.parameters);
+  }
+  return toolParams;
 }
 
 export function convertToCohereSchema(
   schema: Record<string, unknown>,
 ): Record<string, unknown> {
-  const newSchema = {
-    ...schema,
-    ...(!!schema["properties"] && {
-      properties: convertToCohereSchema(
-        schema["properties"] as Record<string, unknown>,
-      ),
-    }),
-    ...(!!schema["items"] && {
-      items: convertToCohereSchema(schema["items"] as Record<string, unknown>),
-    }),
-    ...(!!schema["anyOf"] && {
-      anyOf: (schema["anyOf"] as Record<string, unknown>[]).map(
-        convertToCohereSchema,
-      ),
-    }),
-    ...(!!schema["allOf"] && {
-      allOf: (schema["allOf"] as Record<string, unknown>[]).map(
-        convertToCohereSchema,
-      ),
-    }),
-    ...(!!schema["oneOf"] && {
-      oneOf: (schema["oneOf"] as Record<string, unknown>[]).map(
-        convertToCohereSchema,
-      ),
-    }),
-  } as Record<string, unknown>;
-  // additionalProperties is known to not be supported by Cohere
+  const newSchema: Record<string, unknown> = { ...schema };
+  if (newSchema["properties"]) {
+    newSchema["properties"] = convertToCohereSchema(
+      newSchema["properties"] as Record<string, unknown>,
+    );
+  }
+  if (newSchema["items"]) {
+    newSchema["items"] = convertToCohereSchema(
+      newSchema["items"] as Record<string, unknown>,
+    );
+  }
+  if (newSchema["anyOf"]) {
+    newSchema["anyOf"] = (newSchema["anyOf"] as Record<string, unknown>[]).map(
+      convertToCohereSchema,
+    );
+  }
+  if (newSchema["allOf"]) {
+    newSchema["allOf"] = (newSchema["allOf"] as Record<string, unknown>[]).map(
+      convertToCohereSchema,
+    );
+  }
+  if (newSchema["oneOf"]) {
+    newSchema["oneOf"] = (newSchema["oneOf"] as Record<string, unknown>[]).map(
+      convertToCohereSchema,
+    );
+  }
   if ("additionalProperties" in newSchema) {
     delete newSchema["additionalProperties"];
   }
@@ -336,22 +364,22 @@ export function convertToCohereSchema(
 }
 
 export function convertToCohereResponseFormat(
-  responseFormat: LanguageModelInput["responseFormat"],
+  responseFormat: LanguageModelInput["response_format"],
 ): Cohere.ResponseFormatV2 | undefined {
   if (!responseFormat) return undefined;
 
   switch (responseFormat.type) {
-    case "json":
-      return {
+    case "json": {
+      const format: Cohere.ResponseFormatV2 = {
         type: "json_object",
-        ...(responseFormat.schema && {
-          jsonSchema: convertToCohereSchema(responseFormat.schema),
-        }),
       };
+      if (responseFormat.schema) {
+        format.jsonSchema = convertToCohereSchema(responseFormat.schema);
+      }
+      return format;
+    }
     case "text":
-      return {
-        type: "text",
-      };
+      return { type: "text" };
     default: {
       const exhaustiveCheck: never = responseFormat;
       throw new InvalidValueError(
@@ -399,8 +427,8 @@ export function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
   const functionArguments = toolCall.function?.arguments;
   return {
     type: "tool-call",
-    toolCallId: toolCall.id,
-    toolName: functionName,
+    tool_call_id: toolCall.id,
+    tool_name: functionName,
     args: functionArguments
       ? (JSON.parse(functionArguments) as Record<string, unknown>)
       : null,
@@ -434,34 +462,32 @@ export function mapCohereContentDelta(
     }
     case "tool-call-start": {
       const toolCall = event.delta?.message?.toolCalls;
-
+      const part: ToolCallPartDelta = {
+        type: "tool-call",
+      };
+      if (toolCall?.id) {
+        part.tool_call_id = toolCall.id;
+      }
+      if (toolCall?.function?.name) {
+        part.tool_name = toolCall.function.name;
+      }
+      if (toolCall?.function?.arguments) {
+        part.args = toolCall.function.arguments;
+      }
       return {
         index: event.index,
-        part: {
-          type: "tool-call",
-          ...(toolCall?.id && {
-            toolCallId: toolCall.id,
-          }),
-          ...(toolCall?.function?.name && {
-            toolName: toolCall.function.name,
-          }),
-          ...(toolCall?.function?.arguments && {
-            args: toolCall.function.arguments,
-          }),
-        },
+        part,
       };
     }
     case "tool-call-delta": {
       const toolCall = event.delta?.message?.toolCalls;
-
+      const part: ToolCallPartDelta = { type: "tool-call" };
+      if (toolCall?.function?.arguments) {
+        part.args = toolCall.function.arguments;
+      }
       return {
         index: event.index,
-        part: {
-          type: "tool-call",
-          ...(toolCall?.function?.arguments && {
-            args: toolCall.function.arguments,
-          }),
-        },
+        part,
       };
     }
   }
@@ -472,7 +498,7 @@ export function mapCohereUsage(usage: Cohere.Usage): ModelUsage | undefined {
     return undefined;
   }
   return {
-    inputTokens: usage.tokens.inputTokens || 0,
-    outputTokens: usage.tokens.outputTokens || 0,
+    input_tokens: usage.tokens.inputTokens || 0,
+    output_tokens: usage.tokens.outputTokens || 0,
   };
 }

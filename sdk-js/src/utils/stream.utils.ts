@@ -44,12 +44,13 @@ export class ContentDeltaAccumulator {
           existingDelta.part.type === "tool-call" &&
           incomingDelta.part.type === "tool-call"
         ) {
-          if (incomingDelta.part.toolName) {
-            existingDelta.part.toolName =
-              (existingDelta.part.toolName || "") + incomingDelta.part.toolName;
+          if (incomingDelta.part.tool_name) {
+            existingDelta.part.tool_name =
+              (existingDelta.part.tool_name || "") +
+              incomingDelta.part.tool_name;
           }
-          if (incomingDelta.part.toolCallId) {
-            existingDelta.part.toolCallId = incomingDelta.part.toolCallId;
+          if (incomingDelta.part.tool_call_id) {
+            existingDelta.part.tool_call_id = incomingDelta.part.tool_call_id;
           }
           if (incomingDelta.part.args) {
             existingDelta.part.args =
@@ -59,9 +60,9 @@ export class ContentDeltaAccumulator {
           existingDelta.part.type === "audio" &&
           incomingDelta.part.type === "audio"
         ) {
-          if (incomingDelta.part.audioData) {
+          if (incomingDelta.part.audio_data) {
             const incomingAudioData = base64ToArrayBuffer(
-              incomingDelta.part.audioData,
+              incomingDelta.part.audio_data,
             );
             // keep an array of audioBuffer internally and concat at the end
             existingDelta.part.audioData.push(incomingAudioData);
@@ -69,8 +70,8 @@ export class ContentDeltaAccumulator {
           if (incomingDelta.part.encoding) {
             existingDelta.part.encoding = incomingDelta.part.encoding;
           }
-          if (incomingDelta.part.sampleRate) {
-            existingDelta.part.sampleRate = incomingDelta.part.sampleRate;
+          if (incomingDelta.part.sample_rate) {
+            existingDelta.part.sample_rate = incomingDelta.part.sample_rate;
           }
           if (incomingDelta.part.channels) {
             existingDelta.part.channels = incomingDelta.part.channels;
@@ -92,8 +93,8 @@ export class ContentDeltaAccumulator {
             ...(incomingDelta.part.type === "audio"
               ? {
                   ...incomingDelta.part,
-                  audioData: incomingDelta.part.audioData
-                    ? [base64ToArrayBuffer(incomingDelta.part.audioData)]
+                  audioData: incomingDelta.part.audio_data
+                    ? [base64ToArrayBuffer(incomingDelta.part.audio_data)]
                     : [],
                 }
               : incomingDelta.part),
@@ -113,19 +114,19 @@ export class ContentDeltaAccumulator {
             text: delta.part.text,
           };
         case "tool-call":
-          if (!delta.part.toolCallId || !delta.part.toolName) {
+          if (!delta.part.tool_call_id || !delta.part.tool_name) {
             throw new Error(
-              `missing toolCallId or toolName at index ${String(delta.index)}. toolCallId: ${String(delta.part.toolCallId)}, toolName: ${String(delta.part.toolName)}`,
+              `missing tool_call_id or tool_name at index ${String(delta.index)}. tool_call_id: ${String(delta.part.tool_call_id)}, tool_name: ${String(delta.part.tool_name)}`,
             );
           }
           return {
             type: "tool-call",
             ...(delta.part.id && { id: delta.part.id }),
-            toolCallId: delta.part.toolCallId,
+            tool_call_id: delta.part.tool_call_id,
             args: delta.part.args
               ? (JSON.parse(delta.part.args) as Record<string, unknown>)
               : null,
-            toolName: delta.part.toolName,
+            tool_name: delta.part.tool_name,
           };
         case "audio": {
           if (delta.part.encoding !== "linear16") {
@@ -137,10 +138,12 @@ export class ContentDeltaAccumulator {
           return {
             type: "audio",
             ...(delta.part.id && { id: delta.part.id }),
-            audioData: arrayBufferToBase64(concatenatedAudioData),
+            audio_data: arrayBufferToBase64(concatenatedAudioData),
             encoding: delta.part.encoding,
             ...(delta.part.container && { container: delta.part.container }),
-            ...(delta.part.sampleRate && { sampleRate: delta.part.sampleRate }),
+            ...(delta.part.sample_rate && {
+              sample_rate: delta.part.sample_rate,
+            }),
             ...(delta.part.channels && { channels: delta.part.channels }),
             ...(delta.part.transcript && { transcript: delta.part.transcript }),
           };

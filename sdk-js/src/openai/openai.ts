@@ -8,11 +8,12 @@ import type {
   AssistantMessage,
   AudioContainer,
   AudioEncoding,
+  AudioPart,
   AudioPartDelta,
   ContentDelta,
   LanguageModelInput,
   ModelResponse,
-  ModelTokensDetail,
+  ModelTokensDetails,
   ModelUsage,
   PartialModelResponse,
   TextPartDelta,
@@ -84,26 +85,29 @@ export class OpenAIModel extends LanguageModel {
       ? mapOpenAIUsage(response.usage, input)
       : undefined;
 
-    return {
+    const result: ModelResponse = {
       content: mapOpenAIMessage(choice.message, openaiInput).content,
-      ...(usage && { usage }),
-      ...(this.metadata?.pricing &&
-        usage && {
-          cost: calculateCost(usage, this.metadata.pricing),
-        }),
     };
+    if (usage) {
+      result.usage = usage;
+      if (this.metadata?.pricing) {
+        result.cost = calculateCost(usage, this.metadata.pricing);
+      }
+    }
+
+    return result;
   }
 
   async *stream(
     input: OpenAILanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const openaiInput = {
+    const openaiInput: OpenAI.Chat.ChatCompletionCreateParams = {
       ...convertToOpenAIParams(input, this.options),
       stream: true,
       stream_options: {
         include_usage: true,
       },
-    } satisfies OpenAI.Chat.ChatCompletionCreateParams;
+    };
 
     const stream = await this.openai.chat.completions.create(openaiInput);
 
@@ -112,31 +116,24 @@ export class OpenAIModel extends LanguageModel {
     const accumulator = new ContentDeltaAccumulator();
 
     for await (const chunk of stream) {
-      const choice = (
-        chunk.choices as
-          | OpenAI.Chat.Completions.ChatCompletionChunk.Choice[]
-          | undefined
-      )?.[0];
-      const completion = choice;
-
-      if (completion?.delta.refusal) {
-        refusal += completion.delta.refusal;
+      const choices = chunk.choices as
+        | OpenAI.Chat.Completions.ChatCompletionChunk.Choice[]
+        | undefined;
+      const choice = choices ? choices[0] : undefined;
+      if (choice && choice.delta.refusal) {
+        refusal += choice.delta.refusal;
       }
-
-      if (completion?.delta) {
+      if (choice?.delta) {
         const incomingContentDeltas = mapOpenAIDelta(
-          completion.delta,
+          choice.delta,
           accumulator.deltas,
           openaiInput,
         );
-
         accumulator.addChunks(incomingContentDeltas);
-
         for (const delta of incomingContentDeltas) {
           yield { delta };
         }
       }
-
       if (chunk.usage) {
         usage = mapOpenAIUsage(chunk.usage, input);
       }
@@ -146,14 +143,17 @@ export class OpenAIModel extends LanguageModel {
       throw new OpenAIRefusedError(refusal);
     }
 
-    return {
+    const finalResult: ModelResponse = {
       content: accumulator.computeContent(),
-      ...(usage && { usage }),
-      ...(this.metadata?.pricing &&
-        usage && {
-          cost: calculateCost(usage, this.metadata.pricing),
-        }),
     };
+    if (usage) {
+      finalResult.usage = usage;
+      if (this.metadata?.pricing) {
+        finalResult.cost = calculateCost(usage, this.metadata.pricing);
+      }
+    }
+
+    return finalResult;
   }
 }
 
@@ -161,47 +161,47 @@ export function convertToOpenAIParams(
   input: LanguageModelInput,
   options: OpenAIModelOptions,
 ): OpenAI.Chat.ChatCompletionCreateParams {
-  return {
+  const params: OpenAI.Chat.ChatCompletionCreateParams = {
     model: options.modelId,
     messages: convertToOpenAIMessages(input, options),
-    ...(input.tools && {
-      tools: input.tools.map((tool) => convertToOpenAITool(tool, options)),
-    }),
-    ...(input.toolChoice && {
-      tool_choice: convertToOpenAIToolChoice(input.toolChoice),
-    }),
     ...convertToOpenAISamplingParams(input),
-    ...(input.responseFormat && {
-      response_format: convertToOpenAIResponseFormat(
-        input.responseFormat,
-        options,
-      ),
-    }),
-    ...(input.modalities && {
-      modalities: input.modalities,
-    }),
     ...input.extra,
   };
+  if (input.tools) {
+    params.tools = input.tools.map((tool) =>
+      convertToOpenAITool(tool, options),
+    );
+  }
+  if (input.tool_choice) {
+    params.tool_choice = convertToOpenAIToolChoice(input.tool_choice);
+  }
+  if (input.response_format) {
+    params.response_format = convertToOpenAIResponseFormat(
+      input.response_format,
+      options,
+    );
+  }
+  if (input.modalities) {
+    params.modalities = input.modalities;
+  }
+  return params;
 }
 
 export function convertToOpenAIMessages(
-  input: Pick<LanguageModelInput, "messages" | "systemPrompt">,
+  input: Pick<LanguageModelInput, "messages" | "system_prompt">,
   options: OpenAIModelOptions,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
   const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   let messages = input.messages;
-
   if (options.convertAudioPartsToTextParts) {
     messages = messages.map(convertAudioPartsToTextParts);
   }
-
-  if (input.systemPrompt) {
+  if (input.system_prompt) {
     openaiMessages.push({
       role: "system",
-      content: input.systemPrompt,
+      content: input.system_prompt,
     });
   }
-
   messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
@@ -229,9 +229,9 @@ export function convertToOpenAIMessages(
                 openaiMessageParam.tool_calls || [];
               openaiMessageParam.tool_calls.push({
                 type: "function",
-                id: part.toolCallId,
+                id: part.tool_call_id,
                 function: {
-                  name: part.toolName,
+                  name: part.tool_name,
                   arguments: JSON.stringify(part.args),
                 },
               });
@@ -241,9 +241,7 @@ export function convertToOpenAIMessages(
               if (!part.id) {
                 throw new Error("audio part must have an id");
               }
-              openaiMessageParam.audio = {
-                id: part.id,
-              };
+              openaiMessageParam.audio = { id: part.id };
               break;
             }
             default: {
@@ -263,7 +261,7 @@ export function convertToOpenAIMessages(
           openaiMessages.push({
             role: "tool",
             content: JSON.stringify(toolResult.result),
-            tool_call_id: toolResult.toolCallId,
+            tool_call_id: toolResult.tool_call_id,
           });
         });
         break;
@@ -285,7 +283,7 @@ export function convertToOpenAIMessages(
                   return {
                     type: "image_url",
                     image_url: {
-                      url: `data:${part.mimeType};base64,${part.imageData}`,
+                      url: `data:${part.mime_type};base64,${part.image_data}`,
                     },
                   };
                 }
@@ -299,7 +297,7 @@ export function convertToOpenAIMessages(
                         part.encoding,
                       ) ||
                         "wav") as OpenAI.ChatCompletionContentPartInputAudio.InputAudio["format"],
-                      data: part.audioData,
+                      data: part.audio_data,
                     },
                   };
                 }
@@ -325,42 +323,46 @@ export function convertToOpenAIMessages(
       }
     }
   });
-
   return openaiMessages;
 }
 
 export function convertToOpenAISamplingParams(
   input: Partial<LanguageModelInput>,
-) {
-  return {
-    ...(typeof input.maxTokens === "number" && { max_tokens: input.maxTokens }),
-    ...(typeof input.temperature === "number" && {
-      temperature: input.temperature,
-    }),
-    ...(typeof input.topP === "number" && { top_p: input.topP }),
-    ...(typeof input.presencePenalty === "number" && {
-      presence_penalty: input.presencePenalty,
-    }),
-    ...(typeof input.frequencyPenalty === "number" && {
-      frequency_penalty: input.frequencyPenalty,
-    }),
-    ...(typeof input.seed === "number" && { seed: input.seed }),
-  } satisfies Partial<OpenAI.Chat.ChatCompletionCreateParams>;
+): Partial<OpenAI.Chat.ChatCompletionCreateParams> {
+  const sampling: Partial<OpenAI.Chat.ChatCompletionCreateParams> = {};
+  if (typeof input.max_tokens === "number") {
+    sampling.max_tokens = input.max_tokens;
+  }
+  if (typeof input.temperature === "number") {
+    sampling.temperature = input.temperature;
+  }
+  if (typeof input.top_p === "number") {
+    sampling.top_p = input.top_p;
+  }
+  if (typeof input.presence_penalty === "number") {
+    sampling.presence_penalty = input.presence_penalty;
+  }
+  if (typeof input.frequency_penalty === "number") {
+    sampling.frequency_penalty = input.frequency_penalty;
+  }
+  if (typeof input.seed === "number") {
+    sampling.seed = input.seed;
+  }
+  return sampling;
 }
 
 export function convertToOpenAIToolChoice(
-  toolChoice: NonNullable<LanguageModelInput["toolChoice"]>,
+  toolChoice: NonNullable<LanguageModelInput["tool_choice"]>,
 ): OpenAI.Chat.Completions.ChatCompletionToolChoiceOption {
   switch (toolChoice.type) {
     case "tool":
       return {
         type: "function",
         function: {
-          name: toolChoice.toolName,
+          name: toolChoice.tool_name,
         },
       };
     default:
-      // 1-1 mapping with openai tool choice
       return toolChoice.type;
   }
 }
@@ -369,20 +371,22 @@ export function convertToOpenAITool(
   tool: Tool,
   options: OpenAIModelOptions,
 ): OpenAI.Chat.Completions.ChatCompletionTool {
-  return {
+  const openaiTool: OpenAI.Chat.Completions.ChatCompletionTool = {
     type: "function",
     function: {
-      ...(options.structuredOutputs && {
-        strict: true,
-      }),
       name: tool.name,
       description: tool.description,
-      ...(tool.parameters && {
-        parameters: tool.parameters,
-      }),
     },
   };
+  if (options.structuredOutputs) {
+    openaiTool.function.strict = true;
+  }
+  if (tool.parameters) {
+    openaiTool.function.parameters = tool.parameters;
+  }
+  return openaiTool;
 }
+
 // based on:
 // - OpenAI.Chat.ChatCompletionAudioParam["format"]
 // - https://platform.openai.com/docs/guides/speech-to-text
@@ -410,17 +414,16 @@ export function convertToOpenAIAudioFormat(
 ): PossibleOpenAIAudioFormat | undefined {
   if (!container && !encoding) return undefined;
 
-  const encodingMapping: {
-    [key in AudioEncoding]: PossibleOpenAIAudioFormat;
-  } = {
-    flac: "flac",
-    mp3: "mp3",
-    opus: "opus",
-    linear16: "pcm16",
-    mulaw: "g711_ulaw",
-    alaw: "g711_alaw",
-    aac: "aac",
-  };
+  const encodingMapping: { [key in AudioEncoding]: PossibleOpenAIAudioFormat } =
+    {
+      flac: "flac",
+      mp3: "mp3",
+      opus: "opus",
+      linear16: "pcm16",
+      mulaw: "g711_ulaw",
+      alaw: "g711_alaw",
+      aac: "aac",
+    };
   const containerMapping: {
     [key in AudioContainer]: PossibleOpenAIAudioFormat | undefined;
   } = {
@@ -439,8 +442,8 @@ export function convertToOpenAIAudioFormat(
 }
 
 export function convertToOpenAIResponseFormat(
-  responseFormat: NonNullable<LanguageModelInput["responseFormat"]>,
-  options: Pick<OpenAIModelOptions, "structuredOutputs">,
+  responseFormat: NonNullable<LanguageModelInput["response_format"]>,
+  options: OpenAIModelOptions,
 ): NonNullable<
   OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
 > {
@@ -453,14 +456,17 @@ export function convertToOpenAIResponseFormat(
         const schemaDescription = responseFormat.schema["description"] as
           | string
           | undefined;
+        const json_schema: OpenAI.ResponseFormatJSONSchema["json_schema"] = {
+          strict: true,
+          name: schemaTitle || "response",
+          schema: responseFormat.schema,
+        };
+        if (schemaDescription) {
+          json_schema.description = schemaDescription;
+        }
         return {
           type: "json_schema",
-          json_schema: {
-            strict: true,
-            name: schemaTitle || "response",
-            ...(schemaDescription && { description: schemaDescription }),
-            schema: responseFormat.schema,
-          },
+          json_schema,
         };
       }
       return { type: "json_object" };
@@ -521,28 +527,34 @@ export function mapOpenAIMessage(
   }
 
   if (message.audio) {
-    content.push({
-      type: "audio",
-      id: message.audio.id,
-      ...mapOpenAIAudioFormat(options?.audio?.format || "pcm16"),
-      ...(options?.audio?.format === "pcm16" && {
-        sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
-        channels: OPENAI_AUDIO_CHANNELS,
-      }),
-      audioData: message.audio.data,
-      transcript: message.audio.transcript,
-    });
+    const audioPart: AudioPart = { type: "audio", audio_data: "" };
+    audioPart.id = message.audio.id;
+    const audioFormat = mapOpenAIAudioFormat(options?.audio?.format || "pcm16");
+    if (audioFormat.container) {
+      audioPart.container = audioFormat.container;
+    }
+    if (audioFormat.encoding) {
+      audioPart.encoding = audioFormat.encoding;
+    }
+    if (options?.audio?.format === "pcm16") {
+      audioPart.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
+      audioPart.channels = OPENAI_AUDIO_CHANNELS;
+    }
+    audioPart.audio_data = message.audio.data;
+    audioPart.transcript = message.audio.transcript;
+    content.push(audioPart);
   }
 
   if (message.tool_calls) {
     message.tool_calls.forEach((toolCall) => {
+      const args = JSON.parse(toolCall.function.arguments) as {
+        [key: string]: unknown;
+      };
       content.push({
         type: "tool-call",
-        toolCallId: toolCall.id,
-        toolName: toolCall.function.name,
-        args: JSON.parse(toolCall.function.arguments) as {
-          [key: string]: unknown;
-        },
+        tool_call_id: toolCall.id,
+        tool_name: toolCall.function.name,
+        args,
       });
     });
   }
@@ -576,17 +588,27 @@ export function mapOpenAIDelta(
     });
   }
   if (delta.audio) {
-    const part: AudioPartDelta = {
-      type: "audio",
-      ...(delta.audio.id && { id: delta.audio.id }),
-      ...(delta.audio.data && {
-        audioData: delta.audio.data,
-        ...mapOpenAIAudioFormat(options.audio?.format || "pcm16"),
-        sampleRate: OPENAI_AUDIO_SAMPLE_RATE,
-        channels: OPENAI_AUDIO_CHANNELS,
-      }),
-      ...(delta.audio.transcript && { transcript: delta.audio.transcript }),
-    };
+    const part: AudioPartDelta = { type: "audio" };
+    if (delta.audio.id) {
+      part.id = delta.audio.id;
+    }
+    if (delta.audio.data) {
+      part.audio_data = delta.audio.data;
+      const audioFormat = mapOpenAIAudioFormat(
+        options.audio?.format || "pcm16",
+      );
+      if (audioFormat.container) {
+        part.container = audioFormat.container;
+      }
+      if (audioFormat.encoding) {
+        part.encoding = audioFormat.encoding;
+      }
+      part.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
+      part.channels = OPENAI_AUDIO_CHANNELS;
+    }
+    if (delta.audio.transcript) {
+      part.transcript = delta.audio.transcript;
+    }
     contentDeltas.push({
       index: guessDeltaIndex(part, [
         ...existingContentDeltas,
@@ -602,14 +624,16 @@ export function mapOpenAIDelta(
     delta.tool_calls.forEach((toolCall) => {
       const existingDelta = allExistingToolCalls[toolCall.index];
 
-      const part: ToolCallPartDelta = {
-        type: "tool-call",
-        ...(toolCall.id && { toolCallId: toolCall.id }),
-        ...(toolCall.function?.name && { toolName: toolCall.function.name }),
-        ...(toolCall.function?.arguments && {
-          args: toolCall.function.arguments,
-        }),
-      };
+      const part: ToolCallPartDelta = { type: "tool-call" };
+      if (toolCall.id) {
+        part.tool_call_id = toolCall.id;
+      }
+      if (toolCall.function?.name) {
+        part.tool_name = toolCall.function.name;
+      }
+      if (toolCall.function?.arguments) {
+        part.args = toolCall.function.arguments;
+      }
       contentDeltas.push({
         index: guessDeltaIndex(
           part,
@@ -620,7 +644,6 @@ export function mapOpenAIDelta(
       });
     });
   }
-
   return contentDeltas;
 }
 
@@ -628,61 +651,71 @@ export function mapOpenAIUsage(
   usage: OpenAI.CompletionUsage,
   input: OpenAILanguageModelInput,
 ): ModelUsage {
-  return {
-    inputTokens: usage.prompt_tokens,
-    outputTokens: usage.completion_tokens,
-    ...(usage.prompt_tokens_details && {
-      inputTokensDetail: mapOpenAIPromptTokensDetails(
-        usage.prompt_tokens_details as OpenAIPatchedPromptTokensDetails,
-        input,
-      ),
-      outputTokensDetail: mapOpenAICompletionTokenDetails(
-        usage.completion_tokens_details as OpenAIPatchedCompletionTokenDetails,
-      ),
-    }),
+  const result: ModelUsage = {
+    input_tokens: usage.prompt_tokens,
+    output_tokens: usage.completion_tokens,
   };
+  if (usage.prompt_tokens_details) {
+    result.input_tokens_details = mapOpenAIPromptTokensDetails(
+      usage.prompt_tokens_details as OpenAIPatchedPromptTokensDetails,
+      input,
+    );
+    result.output_tokens_details = mapOpenAICompletionTokenDetails(
+      usage.completion_tokens_details as OpenAIPatchedCompletionTokenDetails,
+    );
+  }
+  return result;
 }
 
 export function mapOpenAIPromptTokensDetails(
   details: OpenAIPatchedPromptTokensDetails,
   input: OpenAILanguageModelInput,
-): ModelTokensDetail {
+): ModelTokensDetails {
   const textTokens = details.text_tokens;
   const audioTokens = details.audio_tokens;
   const imageTokens = details.image_tokens;
-
   const hasTextPart = input.messages.some(
     (s) => s.role === "user" && s.content.some((p) => p.type === "text"),
   );
   const hasAudioPart = input.messages.some(
     (s) => s.role === "user" && s.content.some((p) => p.type === "audio"),
   );
-
   const cachedTextTokens =
     details.cached_tokens_details?.text_tokens ??
     // Guess that cached tokens are for text if there are text messages
-    (hasTextPart && details.cached_tokens) ??
-    undefined;
+    (hasTextPart ? details.cached_tokens : undefined);
   const cachedAudioTokens =
     details.cached_tokens_details?.audio_tokens ??
     // Guess that cached tokens are for audio if there are audio messages
-    (hasAudioPart && details.cached_tokens) ??
-    undefined;
-
-  return {
-    ...(typeof textTokens === "number" && { textTokens }),
-    ...(typeof audioTokens === "number" && { audioTokens }),
-    ...(typeof imageTokens === "number" && { imageTokens }),
-    ...(typeof cachedTextTokens === "number" && { cachedTextTokens }),
-    ...(typeof cachedAudioTokens === "number" && { cachedAudioTokens }),
-  };
+    (hasAudioPart ? details.cached_tokens : undefined);
+  const result: ModelTokensDetails = {};
+  if (typeof textTokens === "number") {
+    result.text_tokens = textTokens;
+  }
+  if (typeof audioTokens === "number") {
+    result.audio_tokens = audioTokens;
+  }
+  if (typeof imageTokens === "number") {
+    result.image_tokens = imageTokens;
+  }
+  if (typeof cachedTextTokens === "number") {
+    result.cached_text_tokens = cachedTextTokens;
+  }
+  if (typeof cachedAudioTokens === "number") {
+    result.cached_audio_tokens = cachedAudioTokens;
+  }
+  return result;
 }
 
 export function mapOpenAICompletionTokenDetails(
   details: OpenAIPatchedCompletionTokenDetails,
-): ModelTokensDetail {
-  return {
-    ...(details.text_tokens && { textTokens: details.text_tokens }),
-    ...(details.audio_tokens && { audioTokens: details.audio_tokens }),
-  };
+): ModelTokensDetails {
+  const result: ModelTokensDetails = {};
+  if (details.text_tokens) {
+    result.text_tokens = details.text_tokens;
+  }
+  if (details.audio_tokens) {
+    result.audio_tokens = details.audio_tokens;
+  }
+  return result;
 }

@@ -14,8 +14,8 @@ const model = new CohereModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 0.16 / 1_000_000,
-      outputCostPerTextToken: 0.6 / 1_000_000,
+      input_cost_per_text_token: 0.16 / 1_000_000,
+      output_cost_per_text_token: 0.6 / 1_000_000,
     },
   },
 );
@@ -49,7 +49,7 @@ suite("CohereModel", () => {
           content: [
             {
               type: "audio",
-              audioData: "",
+              audio_data: "",
               transcript: "Hi there, how can I help you?",
             },
           ],
