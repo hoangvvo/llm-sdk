@@ -106,7 +106,7 @@ suite("OpenAIModel", () => {
     t.assert.equal(!!audioPart, true);
     t.assert.equal(audioPart?.type, "audio");
     t.assert.equal(audioPart!.audio_data.length > 0, true);
-    t.assert.equal(audioPart!.encoding!.length > 0, true);
+    t.assert.equal(audioPart!.format!.length > 0, true);
     t.assert.equal(audioPart!.transcript!.length > 0, true);
     t.assert.equal(!!audioPart?.id, true);
   });
@@ -148,7 +148,7 @@ suite("OpenAIModel", () => {
     t.assert.equal(!!audioPart, true);
     t.assert.equal(audioPart?.type, "audio");
     t.assert.equal(audioPart!.audio_data.length > 0, true);
-    t.assert.equal(audioPart!.encoding!.length > 0, true);
+    t.assert.equal(audioPart!.format!.length > 0, true);
     t.assert.equal(audioPart!.transcript!.length > 0, true);
     t.assert.equal(!!audioPart?.id, true);
   });
@@ -207,5 +207,79 @@ suite("OpenAIModel", () => {
 
     const audioPart2 = response2.content.find((part) => part.type === "audio");
     t.assert.equal(!!audioPart2, true);
+  });
+
+  test("generate response format json", async (t) => {
+    const strictModel = new OpenAIModel(
+      {
+        apiKey: process.env["OPENAI_API_KEY"] as string,
+        modelId: "gpt-4o",
+        structuredOutputs: true,
+      },
+      {
+        pricing: {
+          input_cost_per_text_token: 2.5 / 1_000_000,
+          output_cost_per_text_token: 10 / 1_000_000,
+        },
+      },
+    );
+
+    const response = await strictModel.generate({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: 'Hi, create a user with the id "a1b2c3", name "John Doe", email "john.doe@example.com", birthDate "1990-05-15", age 34, isActive true, role "user", accountBalance 500.75, phoneNumber "+1234567890123", tags ["developer", "gamer"], and lastLogin "2024-11-09T10:30:00Z".',
+            },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json",
+        name: "user",
+        schema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            email: { type: "string" },
+            birthDate: { type: "string" },
+            age: { type: "integer" },
+            isActive: { type: "boolean" },
+            role: { type: "string" },
+            accountBalance: { type: "number" },
+            phoneNumber: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            lastLogin: { type: "string" },
+          },
+          required: [
+            "id",
+            "name",
+            "email",
+            "birthDate",
+            "age",
+            "isActive",
+            "role",
+            "accountBalance",
+            "phoneNumber",
+            "tags",
+            "lastLogin",
+          ],
+          additionalProperties: false,
+        },
+      },
+    });
+
+    log(response);
+
+    const textPart = response.content.find((part) => part.type === "text");
+    t.assert.equal(textPart?.type, "text");
+
+    const json = JSON.parse(textPart?.text || "") as Record<string, unknown>;
+    t.assert.equal(json["id"], "a1b2c3");
+    t.assert.equal(json["name"], "John Doe");
+    t.assert.equal(json["email"], "john.doe@example.com");
   });
 });

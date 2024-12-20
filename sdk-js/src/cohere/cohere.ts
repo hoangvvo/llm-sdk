@@ -12,9 +12,9 @@ import type {
   AssistantMessage,
   ContentDelta,
   LanguageModelInput,
+  Message,
   ModelResponse,
   ModelUsage,
-  Part,
   PartialModelResponse,
   Tool,
   ToolCallPart,
@@ -163,9 +163,8 @@ export function convertToCohereMessages(
   }
 
   messages.forEach((message) => {
-    const { content, toolCalls, toolResults } = convertToCohereMessageParam(
-      message.content,
-    );
+    const { content, toolCalls, toolResults } =
+      convertToCohereMessageParam(message);
     switch (message.role) {
       case "user": {
         if (!content) {
@@ -214,7 +213,7 @@ export function convertToCohereMessages(
   return cohereMessages;
 }
 
-export function convertToCohereMessageParam(parts: Part[]): {
+export function convertToCohereMessageParam(message: Message): {
   content?: Cohere.Content[];
   toolCalls?: Cohere.ToolCallV2[];
   toolResults?: Cohere.ToolMessageV2[];
@@ -223,7 +222,7 @@ export function convertToCohereMessageParam(parts: Part[]): {
   let toolCalls: Cohere.ToolCallV2[] | undefined;
   let toolResults: Cohere.ToolMessageV2[] | undefined;
 
-  parts.forEach((part) => {
+  message.content.forEach((part) => {
     switch (part.type) {
       case "text": {
         content = content ?? [];
@@ -235,7 +234,7 @@ export function convertToCohereMessageParam(parts: Part[]): {
       }
       case "audio":
       case "image":
-        throw new ModelUnsupportedMessagePart("cohere", part.type);
+        throw new ModelUnsupportedMessagePart("cohere", message, part);
       case "tool-call": {
         toolCalls = toolCalls ?? [];
         toolCalls.push({

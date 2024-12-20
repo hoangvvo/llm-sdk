@@ -1,6 +1,14 @@
+import type { Message, Part } from "../types.js";
+
 export class ModelUnsupportedMessagePart extends Error {
-  constructor(provider: string, part: string) {
-    super(`${provider} does not support message part: ${part}`);
+  constructor(
+    provider: string,
+    public llmMessage: Message,
+    public part: Part,
+  ) {
+    super(
+      `${provider} does not support message part type = ${part.type} for role = ${llmMessage.role}`,
+    );
   }
 }
 

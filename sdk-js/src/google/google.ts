@@ -192,10 +192,13 @@ export function convertToGoogleMessages(
             },
           };
         case "audio":
+          if (!part.format) {
+            throw new InvalidValueError("part.format", part.format);
+          }
           return {
             inlineData: {
               data: part.audio_data,
-              mimeType: mapAudioFormatToMimeType(part),
+              mimeType: mapAudioFormatToMimeType(part.format),
             },
           };
         case "tool-call":
@@ -367,12 +370,6 @@ export function convertToGoogleSchema(schema: Record<string, unknown>): Schema {
   if (enumValue) {
     result.enum = enumValue;
   }
-  // if (schema["maxItems"]) {
-  //   result.maxItems = schema["maxItems"] as number;
-  // }
-  // if (schema["minItems"]) {
-  //   result.minItems = schema["minItems"] as number;
-  // }
   if (schema["properties"]) {
     result.properties = Object.fromEntries(
       Object.entries(schema["properties"]).map(([key, value]) => [
@@ -389,21 +386,6 @@ export function convertToGoogleSchema(schema: Record<string, unknown>): Schema {
       schema["items"] as Record<string, unknown>,
     );
   }
-  // if (schema["allOf"]) {
-  //   result.allOf = (schema["allOf"] as Record<string, unknown>[]).map((value) =>
-  //     convertToGoogleSchema(value),
-  //   );
-  // }
-  // if (schema["anyOf"]) {
-  //   result.anyOf = (schema["anyOf"] as Record<string, unknown>[]).map((value) =>
-  //     convertToGoogleSchema(value),
-  //   );
-  // }
-  // if (schema["oneOf"]) {
-  //   result.oneOf = (schema["oneOf"] as Record<string, unknown>[]).map((value) =>
-  //     convertToGoogleSchema(value),
-  //   );
-  // }
   return result;
 }
 

@@ -53,15 +53,19 @@
       "required": ["type", "mime_type", "image_data"],
       "additionalProperties": false
     },
-    "AudioEncoding": {
+    "AudioFormat": {
       "type": "string",
-      "enum": ["linear16", "flac", "mulaw", "alaw", "aac", "mp3", "opus"],
-      "description": "The encoding of the audio."
-    },
-    "AudioContainer": {
-      "type": "string",
-      "enum": ["wav", "ogg", "flac", "webm"],
-      "description": "The container format of the audio."
+      "enum": [
+        "wav",
+        "mp3",
+        "linear16",
+        "flac",
+        "mulaw",
+        "alaw",
+        "aac",
+        "opus"
+      ],
+      "description": "Loosely describe audio format. Some values (e.g., 'wav') denote containers; others (e.g., 'linear16') specify encoding only; cannot describe containers that can contain different audio encodings."
     },
     "AudioPart": {
       "type": "object",
@@ -71,15 +75,12 @@
           "type": "string",
           "const": "audio"
         },
-        "container": {
-          "$ref": "#/definitions/AudioContainer"
-        },
         "audio_data": {
           "type": "string",
           "description": "The base64-encoded audio data."
         },
-        "encoding": {
-          "$ref": "#/definitions/AudioEncoding"
+        "format": {
+          "$ref": "#/definitions/AudioFormat"
         },
         "sample_rate": {
           "type": "integer",
@@ -192,20 +193,6 @@
       ],
       "description": "A part of the message."
     },
-    "UserMessageContentPart": {
-      "oneOf": [
-        {
-          "$ref": "#/definitions/TextPart"
-        },
-        {
-          "$ref": "#/definitions/ImagePart"
-        },
-        {
-          "$ref": "#/definitions/AudioPart"
-        }
-      ],
-      "description": "Content parts that a user message can include."
-    },
     "UserMessage": {
       "type": "object",
       "description": "Represents a message sent by the user.",
@@ -217,26 +204,12 @@
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/UserMessageContentPart"
+            "$ref": "#/definitions/Part"
           }
         }
       },
       "required": ["role", "content"],
       "additionalProperties": false
-    },
-    "AssistantMessageContentPart": {
-      "oneOf": [
-        {
-          "$ref": "#/definitions/TextPart"
-        },
-        {
-          "$ref": "#/definitions/ToolCallPart"
-        },
-        {
-          "$ref": "#/definitions/AudioPart"
-        }
-      ],
-      "description": "Content parts that an assistant message can include."
     },
     "AssistantMessage": {
       "type": "object",
@@ -249,7 +222,7 @@
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/AssistantMessageContentPart"
+            "$ref": "#/definitions/Part"
           }
         }
       },
@@ -315,11 +288,8 @@
           "type": "string",
           "description": "The base64-encoded audio data."
         },
-        "container": {
-          "$ref": "#/definitions/AudioContainer"
-        },
-        "encoding": {
-          "$ref": "#/definitions/AudioEncoding"
+        "format": {
+          "$ref": "#/definitions/AudioFormat"
         },
         "sample_rate": {
           "type": "integer",
@@ -485,7 +455,7 @@
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/AssistantMessageContentPart"
+            "$ref": "#/definitions/Part"
           }
         },
         "usage": {
@@ -581,11 +551,19 @@
           "type": "string",
           "const": "json"
         },
+        "name": {
+          "type": "string",
+          "description": "The name of the schema."
+        },
+        "description": {
+          "type": "string",
+          "description": "The description of the schema."
+        },
         "schema": {
           "$ref": "#/definitions/JSONSchema"
         }
       },
-      "required": ["type"],
+      "required": ["type", "name"],
       "additionalProperties": false
     },
     "Modality": {
