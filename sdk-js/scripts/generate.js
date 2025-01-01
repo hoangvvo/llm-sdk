@@ -5,7 +5,7 @@ import * as prettier from "prettier";
 
 const __dirname = import.meta.dirname;
 
-const originalSchemaPath = join(__dirname, "..", "..", "schema", "schema.json");
+const originalSchemaPath = join(__dirname, "..", "..", "schema", "sdk.json");
 const outputSchemaPath = join(__dirname, "..", "schema.json");
 const outputTypesPath = join(__dirname, "..", "src", "types.ts");
 

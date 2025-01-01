@@ -154,23 +154,19 @@
           "type": "string",
           "description": "The name of the tool that was called."
         },
-        "result": {
-          "anyOf": [
-            {
-              "type": "object"
-            },
-            {
-              "type": "array"
-            }
-          ],
-          "description": "The result of the tool call."
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          },
+          "description": "The content of the tool result."
         },
         "is_error": {
           "type": "boolean",
           "description": "Marks the tool result as an error."
         }
       },
-      "required": ["type", "tool_call_id", "tool_name", "result"],
+      "required": ["type", "tool_call_id", "tool_name"],
       "additionalProperties": false
     },
     "Part": {
@@ -661,6 +657,13 @@
             "$ref": "#/definitions/Modality"
           },
           "description": "The modalities that the model should support."
+        },
+        "metadata": {
+          "type": "object",
+          "description": "A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.",
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "extra": {
           "type": "object",
