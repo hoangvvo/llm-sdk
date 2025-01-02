@@ -1,4 +1,2 @@
-mod openai;
-mod openai_api;
-
-pub use openai::*;
+mod api;
+mod model;

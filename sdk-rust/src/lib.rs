@@ -1,8 +1,8 @@
 mod errors;
 mod language_model;
 pub mod openai;
-pub mod registry;
 mod types;
+mod usage;
 
 pub use errors::*;
 pub use language_model::LanguageModel;

@@ -8,9 +8,13 @@ pub enum LanguageModelError {
     /// failed.
     #[error("HTTP error: {0}")]
     Request(#[from] reqwest::Error),
-    /// The provider returns a 4xx or 5xx error.
-    #[error("Client error: {0}")]
-    ClientError(String),
+    /// The request returns a non-OK status code
+    #[error("HTTP status error: {0}")]
+    StatusCode(reqwest::StatusCode, reqwest::Response),
+    /// The input is not supported by or is incompatible with the model
+    /// (e.g. using non text for assistant message parts)
+    #[error("Unsupported feature: {0}")]
+    Unsupported(String),
     /// The response from the provider was unexpected. (e.g. no choices returned
     /// in an OpenAI completion)
     #[error("Invariant: {0}")]
