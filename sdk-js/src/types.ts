@@ -58,9 +58,6 @@ export type LanguageModelCapability =
   | "image-input"
   | "image-output";
 
-export interface LlmSdk {
-  [k: string]: unknown;
-}
 /**
  * A part of the message that contains text.
  */
@@ -163,13 +160,9 @@ export interface ToolResultPart {
    */
   tool_name: string;
   /**
-   * The result of the tool call.
+   * The content of the tool result.
    */
-  result:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[];
+  content: Part[];
   /**
    * Marks the tool result as an error.
    */
@@ -277,7 +270,7 @@ export interface Tool {
   /**
    * The JSON schema of the parameters that the tool accepts. The type must be "object".
    */
-  parameters: JSONSchema | null;
+  parameters: JSONSchema;
 }
 /**
  * Represents tool result in the message history.

@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-/// Loosely describe audio format. Some values (e.g., 'wav') denote containers; others (e.g., 'linear16') specify encoding only; cannot describe containers that can contain different audio encodings.
+/// Loosely describe audio format. Some values (e.g., 'wav') denote containers;
+/// others (e.g., 'linear16') specify encoding only; cannot describe containers
+/// that can contain different audio encodings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AudioFormat {
@@ -53,11 +55,16 @@ pub enum Modality {
     Audio,
 }
 
-/// Determines how the model should choose which tool to use. "auto" - The model will automatically choose the tool to use or not use any tools. "none" - The model will not use any tools. "required" - The model will be forced to use a tool. { type: "tool", toolName: "toolName" } - The model will use the specified tool.
+/// Determines how the model should choose which tool to use. "auto" - The model
+/// will automatically choose the tool to use or not use any tools. "none" - The
+/// model will not use any tools. "required" - The model will be forced to use a
+/// tool. { type: "tool", toolName: "toolName" } - The model will use the
+/// specified tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ToolChoiceOption {
-    /// The model will automatically choose the tool to use or not use any tools.
+    /// The model will automatically choose the tool to use or not use any
+    /// tools.
     Auto,
     /// The model will not use any tools.
     None,
@@ -90,7 +97,7 @@ pub enum LanguageModelCapability {
 }
 
 /// A part of the message that contains text.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TextPart {
     pub text: String,
     /// The ID of the part, if applicable.
@@ -99,7 +106,7 @@ pub struct TextPart {
 }
 
 /// A part of the message that contains an image.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ImagePart {
     /// The MIME type of the image. E.g. "image/jpeg", "image/png".
     pub mime_type: String,
@@ -117,7 +124,7 @@ pub struct ImagePart {
 }
 
 /// A part of the message that contains an audio.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AudioPart {
     /// The base64-encoded audio data.
     pub audio_data: String,
@@ -137,22 +144,25 @@ pub struct AudioPart {
     pub id: Option<String>,
 }
 
-/// A part of the message that represents a call to a tool the model wants to use.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A part of the message that represents a call to a tool the model wants to
+/// use.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolCallPart {
-    /// The ID of the tool call, used to match the tool result with the tool call.
+    /// The ID of the tool call, used to match the tool result with the tool
+    /// call.
     pub tool_call_id: String,
     /// The name of the tool to call.
     pub tool_name: String,
     /// The arguments to pass to the tool.
     pub args: Value,
-    /// The ID of the part, if applicable. This might not be the same as the tool_call_id.
+    /// The ID of the part, if applicable. This might not be the same as the
+    /// `tool_call_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
 }
 
 /// A part of the message that represents the result of a tool call.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolResultPart {
     /// The ID of the tool call from previous assistant message.
     pub tool_call_id: String,
@@ -177,8 +187,9 @@ pub struct AssistantMessage {
     pub content: Vec<Part>,
 }
 
-/// A delta update for a text part, used in streaming or incremental updates of a message.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A delta update for a text part, used in streaming or incremental updates of
+/// a message.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TextPartDelta {
     pub text: String,
     /// The ID of the part, if applicable.
@@ -187,9 +198,10 @@ pub struct TextPartDelta {
 }
 
 /// A delta update for a tool call part, used in streaming of a tool invocation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolCallPartDelta {
-    /// The ID of the tool call, used to match the tool result with the tool call.
+    /// The ID of the tool call, used to match the tool result with the tool
+    /// call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
     /// The name of the tool to call.
@@ -198,13 +210,14 @@ pub struct ToolCallPartDelta {
     /// The partial JSON string of the arguments to pass to the tool.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
-    /// The ID of the part, if applicable. This might not be the same as the tool_call_id.
+    /// The ID of the part, if applicable. This might not be the same as the
+    /// `tool_call_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
 }
 
 /// A delta update for an audio part, used in streaming of an audio message.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AudioPartDelta {
     /// The base64-encoded audio data.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -225,7 +238,8 @@ pub struct AudioPartDelta {
     pub id: Option<String>,
 }
 
-/// Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.
+/// Represents a delta update in a message's content, enabling partial streaming
+/// updates in LLM responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentDelta {
     pub index: usize,
@@ -242,7 +256,8 @@ pub struct Tool {
     pub name: String,
     /// A description of the tool.
     pub description: String,
-    /// The JSON schema of the parameters that the tool accepts. The type must be "object".
+    /// The JSON schema of the parameters that the tool accepts. The type must
+    /// be "object".
     pub parameters: JSONSchema,
 }
 
@@ -256,24 +271,24 @@ pub struct ToolMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelTokensDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub text_tokens: Option<i32>,
+    pub text_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cached_text_tokens: Option<i32>,
+    pub cached_text_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audio_tokens: Option<i32>,
+    pub audio_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cached_audio_tokens: Option<i32>,
+    pub cached_audio_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub image_tokens: Option<i32>,
+    pub image_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cached_image_tokens: Option<i32>,
+    pub cached_image_tokens: Option<u32>,
 }
 
 /// Represents the token usage of the model.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ModelUsage {
-    pub input_tokens: i32,
-    pub output_tokens: i32,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_tokens_details: Option<ModelTokensDetails>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -291,7 +306,8 @@ pub struct ModelResponse {
     pub cost: Option<f64>,
 }
 
-/// Represents a partial response from the language model, useful for streaming output via async generator.
+/// Represents a partial response from the language model, useful for streaming
+/// output via async generator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PartialModelResponse {
     pub delta: ContentDelta,
@@ -303,7 +319,8 @@ pub struct ToolChoiceTool {
     pub tool_name: String,
 }
 
-/// Specifies that the model response should be in JSON format adhering to a specified schema.
+/// Specifies that the model response should be in JSON format adhering to a
+/// specified schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponseFormatJson {
     /// The name of the schema.
@@ -318,7 +335,8 @@ pub struct ResponseFormatJson {
 /// Defines the input parameters for the language model completion.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanguageModelInput {
-    /// A system prompt is a way of providing context and instructions to the model
+    /// A system prompt is a way of providing context and instructions to the
+    /// model
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_prompt: Option<String>,
     /// A list of messages comprising the conversation so far.
@@ -330,31 +348,40 @@ pub struct LanguageModelInput {
     pub tool_choice: Option<ToolChoiceOption>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResponseFormatOption>,
-    /// The maximum number of tokens that can be generated in the chat completion.
+    /// The maximum number of tokens that can be generated in the chat
+    /// completion.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_tokens: Option<i32>,
+    pub max_tokens: Option<u32>,
     /// Amount of randomness injected into the response. Ranges from 0.0 to 1.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
-    /// An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. Ranges from 0.0 to 1.0
+    /// An alternative to sampling with temperature, called nucleus sampling,
+    /// where the model considers the results of the tokens with `top_p`
+    /// probability mass. Ranges from 0.0 to 1.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
-    /// Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Ranges from 0.0 to 1.0
+    /// Only sample from the top K options for each subsequent token. Used to
+    /// remove 'long tail' low probability responses. Ranges from 0.0 to 1.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<f64>,
-    /// Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.
+    /// Positive values penalize new tokens based on whether they appear in the
+    /// text so far, increasing the model's likelihood to talk about new topics.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub presence_penalty: Option<f64>,
-    /// Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
+    /// Positive values penalize new tokens based on their existing frequency in
+    /// the text so far, decreasing the model's likelihood to repeat the same
+    /// line verbatim.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frequency_penalty: Option<f64>,
-    /// The seed (integer), if set and supported by the model, to enable deterministic results.
+    /// The seed (integer), if set and supported by the model, to enable
+    /// deterministic results.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
     /// The modalities that the model should support.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modalities: Option<Vec<Modality>>,
-    /// A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.
+    /// A set of key/value pairs that store additional information about the
+    /// request. This is forwarded to the model provider if supported.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, String>>,
     /// Extra options that the model may support.

@@ -1,8 +1,9 @@
 mod errors;
 mod language_model;
 pub mod openai;
+mod stream_utils;
 mod types;
-mod usage;
+mod usage_utils;
 
 pub use errors::*;
 pub use language_model::LanguageModel;
