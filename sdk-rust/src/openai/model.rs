@@ -1,6 +1,6 @@
 use crate::{
     language_model::{LanguageModelMetadata, LanguageModelStream},
-    openai::api as openai_api,
+    openai::{self, api as openai_api},
     stream_utils,
     usage_utils::calculate_cost,
     AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ContentDeltaPart,
@@ -81,7 +81,7 @@ impl LanguageModel for OpenAIModel {
         let choice = json
             .choices
             .first()
-            .ok_or_else(|| LanguageModelError::Invariant("no choices in response".to_string()))?;
+            .ok_or_else(|| LanguageModelError::Invariant("No choices in response".to_string()))?;
 
         let openai_api::ChatCompletionChoice { message, .. } = choice;
 
@@ -250,6 +250,14 @@ fn into_openai_messages(
                                 .get_or_insert_default()
                                 .push(openai_api::AssistantContentPart::Text(part.into()));
                         }
+                        Part::ToolCall(part) => {
+                            openai_message_param
+                                .tool_calls
+                                .get_or_insert_default()
+                                .push(openai_api::ChatCompletionMessageToolCall::Function(
+                                    part.into(),
+                                ));
+                        }
                         Part::Audio(part) => {
                             openai_message_param.audio = Some(part.try_into()?);
                         }
@@ -266,9 +274,17 @@ fn into_openai_messages(
 
             Message::Tool(ToolMessage { content }) => {
                 for part in content {
+                    let tool_part = match part {
+                        Part::ToolResult(part) => part,
+                        _ => Err(LanguageModelError::InvalidInput(format!(
+                            "ToolMessage content must only contain ToolResult parts"
+                        )))?,
+                    };
+
                     openai_messages.push(openai_api::ChatCompletionMessageParam::Tool(
                         openai_api::ChatCompletionToolMessageParam {
-                            content: part
+                            tool_call_id: tool_part.tool_call_id.to_string(),
+                            content: tool_part
                                 .content
                                 .iter()
                                 .map(|p| match p {
@@ -278,32 +294,35 @@ fn into_openai_messages(
                                     ))),
                                 })
                                 .collect::<LanguageModelResult<_>>()?,
-                            tool_call_id: part.tool_call_id.to_string(),
                         },
                     ));
                 }
             }
 
             Message::User(UserMessage { content }) => {
-                let mut openai_message_param =
-                    openai_api::ChatCompletionUserMessageParam::default();
-
-                for part in content {
-                    match part {
-                        Part::Text(part) => openai_message_param
-                            .content
-                            .push(openai_api::ChatCompletionContentPart::Text(part.into())),
-                        Part::Image(part) => openai_message_param
-                            .content
-                            .push(openai_api::ChatCompletionContentPart::Image(part.into())),
-                        Part::Audio(part) => openai_message_param.content.push(
-                            openai_api::ChatCompletionContentPart::InputAudio(part.try_into()?),
-                        ),
-                        _ => Err(LanguageModelError::Unsupported(format!(
-                            "Unsupported part in user message {part:?}"
-                        )))?,
-                    }
-                }
+                let openai_message_param = openai_api::ChatCompletionUserMessageParam {
+                    content: content
+                        .iter()
+                        .map(|part| match part {
+                            Part::Text(part) => {
+                                Ok(openai_api::ChatCompletionContentPart::Text(part.into()))
+                            }
+                            Part::Image(part) => {
+                                Ok(openai_api::ChatCompletionContentPart::Image(part.into()))
+                            }
+                            Part::Audio(part) => Ok(
+                                openai_api::ChatCompletionContentPart::InputAudio(part.try_into()?),
+                            ),
+                            _ => Err(LanguageModelError::Unsupported(format!(
+                                "Unsupported part in user message {part:?}"
+                            ))),
+                        })
+                        .collect::<LanguageModelResult<_>>()?,
+                    ..Default::default()
+                };
+                openai_messages.push(openai_api::ChatCompletionMessageParam::User(
+                    openai_message_param,
+                ));
             }
         }
     }
@@ -362,6 +381,19 @@ impl TryFrom<&AudioPart> for openai_api::ChatCompletionAssistantMessageParamAudi
         })?;
 
         Ok(Self { id: id.to_string() })
+    }
+}
+
+impl From<&ToolCallPart> for openai_api::ChatCompletionMessageFunctionToolCall {
+    fn from(part: &ToolCallPart) -> Self {
+        Self {
+            id: part.tool_call_id.to_string(),
+            function: openai_api::ChatCompletionMessageFunctionToolCallFunction {
+                name: part.tool_name.to_string(),
+                arguments: serde_json::from_value(part.args.clone())
+                    .map_err(|e| LanguageModelError::InvalidInput(e.to_string()))?,
+            },
+        }
     }
 }
 
@@ -447,16 +479,8 @@ fn map_openai_message(
     if let Some(tool_calls) = &message.tool_calls {
         for tool_call in tool_calls {
             match tool_call {
-                openai_api::ChatCompletionMessageToolCall::Function(
-                    openai_api::ChatCompletionMessageFunctionToolCall { id, function },
-                ) => {
-                    parts.push(Part::ToolCall(ToolCallPart {
-                        tool_call_id: id.to_string(),
-                        tool_name: function.name.to_string(),
-                        args: serde_json::to_value(&function.arguments)
-                            .map_err(|e| LanguageModelError::InvalidInput(e.to_string()))?,
-                        id: None,
-                    }));
+                openai_api::ChatCompletionMessageToolCall::Function(function_tool_call) => {
+                    parts.push(Part::ToolCall(function_tool_call.try_into()?));
                 }
             }
         }
@@ -470,12 +494,14 @@ fn map_openai_message(
                 .as_ref()
                 .map(|audio_param| &audio_param.format)
                 .map(AudioFormat::from),
+            audio_data: audio.data.to_string(),
             ..Default::default()
         };
         if matches!(audio_part.format, Some(AudioFormat::Linear16)) {
             audio_part.sample_rate = Some(OPENAI_AUDIO_SAMPLE_RATE);
             audio_part.channels = Some(OPENAI_AUDIO_CHANNELS);
         }
+        parts.push(Part::Audio(audio_part));
     }
 
     Ok(parts)
@@ -502,6 +528,22 @@ impl From<&openai_api::AudioOutputFormat> for AudioFormat {
             openai_api::AudioOutputFormat::Opus => Self::Opus,
             openai_api::AudioOutputFormat::Pcm16 => Self::Linear16,
         }
+    }
+}
+
+impl TryFrom<&openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPart {
+    type Error = LanguageModelError;
+
+    fn try_from(
+        value: &openai_api::ChatCompletionMessageFunctionToolCall,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            tool_call_id: value.id.to_string(),
+            tool_name: value.function.name.to_string(),
+            args: serde_json::to_value(&value.function.arguments)
+                .map_err(|e| LanguageModelError::InvalidInput(e.to_string()))?,
+            id: None,
+        })
     }
 }
 

@@ -274,10 +274,11 @@ export interface Tool {
 }
 /**
  * Represents tool result in the message history.
+ * Only ToolResultPart should be included in the content.
  */
 export interface ToolMessage {
   role: "tool";
-  content: ToolResultPart[];
+  content: Part[];
 }
 /**
  * Represents the token usage of the model.

@@ -262,9 +262,10 @@ pub struct Tool {
 }
 
 /// Represents tool result in the message history.
+/// The only parts of ToolMessage should be Part(ToolResultPart).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolMessage {
-    pub content: Vec<ToolResultPart>,
+    pub content: Vec<Part>,
 }
 
 /// Represents the token usage of the model.
@@ -333,7 +334,7 @@ pub struct ResponseFormatJson {
 }
 
 /// Defines the input parameters for the language model completion.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LanguageModelInput {
     /// A system prompt is a way of providing context and instructions to the
     /// model
