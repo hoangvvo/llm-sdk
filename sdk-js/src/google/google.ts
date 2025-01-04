@@ -132,35 +132,50 @@ export class GoogleModel extends LanguageModel {
 function convertToGenerateContentRequest(
   input: LanguageModelInput,
 ): GenerateContentRequest {
+  const {
+    messages,
+    system_prompt,
+    max_tokens,
+    temperature,
+    top_p,
+    top_k,
+    presence_penalty,
+    frequency_penalty,
+    tools,
+    tool_choice,
+    response_format,
+    extra,
+  } = input;
+
   return {
-    contents: input.messages.map(convertToGoogleContent),
-    ...(input.system_prompt && { systemInstruction: input.system_prompt }),
-    ...(input.tools && {
-      tools: convertToGoogleFunctionDeclarationTools(input.tools),
+    contents: messages.map(convertToGoogleContent),
+    ...(system_prompt && { systemInstruction: system_prompt }),
+    ...(tools && {
+      tools: convertToGoogleFunctionDeclarationTools(tools),
     }),
-    ...(input.tool_choice && {
-      toolConfig: convertToGoogleToolConfig(input.tool_choice),
+    ...(tool_choice && {
+      toolConfig: convertToGoogleToolConfig(tool_choice),
     }),
     generationConfig: {
-      ...(typeof input.max_tokens === "number" && {
-        maxOutputTokens: input.max_tokens,
+      ...(typeof max_tokens === "number" && {
+        maxOutputTokens: max_tokens,
       }),
-      ...(typeof input.temperature === "number" && {
-        temperature: input.temperature,
+      ...(typeof temperature === "number" && {
+        temperature,
       }),
-      ...(typeof input.top_p === "number" && { topP: input.top_p }),
-      ...(typeof input.top_k === "number" && { topK: input.top_k }),
-      ...(typeof input.presence_penalty === "number" && {
-        presencePenalty: input.presence_penalty,
+      ...(typeof top_p === "number" && { topP: top_p }),
+      ...(typeof top_k === "number" && { topK: top_k }),
+      ...(typeof presence_penalty === "number" && {
+        presencePenalty: presence_penalty,
       }),
-      ...(typeof input.frequency_penalty === "number" && {
-        frequencyPenalty: input.frequency_penalty,
+      ...(typeof frequency_penalty === "number" && {
+        frequencyPenalty: frequency_penalty,
       }),
-      ...(input.response_format &&
-        convertResponseFormatToGoogleGenerationConfig(input.response_format)),
-      ...(input.extra?.["generationConfig"] as GenerationConfig),
+      ...(response_format &&
+        convertResponseFormatToGoogleGenerationConfig(response_format)),
+      ...(extra?.["generationConfig"] as GenerationConfig),
     },
-    ...input.extra,
+    ...extra,
   };
 }
 

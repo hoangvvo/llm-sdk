@@ -111,21 +111,33 @@ function convertToAnthropicCreateParams(
   input: LanguageModelInput,
   modelId: string,
 ): Omit<Anthropic.Messages.MessageCreateParams, "stream"> {
+  const {
+    messages,
+    system_prompt,
+    max_tokens,
+    temperature,
+    top_p,
+    top_k,
+    tools,
+    tool_choice,
+    extra,
+  } = input;
+
   return {
     model: modelId,
-    messages: convertToAnthropicMessages(input.messages),
-    max_tokens: input.max_tokens ?? 4096,
-    ...(typeof input.temperature === "number" && {
-      temperature: input.temperature,
+    messages: convertToAnthropicMessages(messages),
+    ...(system_prompt && { system: system_prompt }),
+    max_tokens: max_tokens ?? 4096,
+    ...(typeof temperature === "number" && {
+      temperature,
     }),
-    ...(typeof input.top_p === "number" && { top_p: input.top_p }),
-    ...(typeof input.top_k === "number" && { top_k: input.top_k }),
-    ...(input.system_prompt && { system: input.system_prompt }),
-    ...(input.tools && { tools: input.tools.map(convertToAnthropicTool) }),
-    ...(input.tool_choice && {
-      tool_choice: convertToAnthropicToolChoice(input.tool_choice),
+    ...(typeof top_p === "number" && { top_p }),
+    ...(typeof top_k === "number" && { top_k }),
+    ...(tools && { tools: tools.map(convertToAnthropicTool) }),
+    ...(tool_choice && {
+      tool_choice: convertToAnthropicToolChoice(tool_choice),
     }),
-    ...input.extra,
+    ...extra,
   };
 }
 

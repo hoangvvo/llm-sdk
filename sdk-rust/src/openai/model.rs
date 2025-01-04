@@ -65,7 +65,7 @@ impl LanguageModel for OpenAIModel {
     }
 
     async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
-        let params = into_openai_params(&input, self.model_id.clone())?;
+        let params = into_openai_params(input, self.model_id.clone())?;
 
         let response = self
             .client
@@ -113,7 +113,7 @@ impl LanguageModel for OpenAIModel {
     }
 
     async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream> {
-        let mut params = into_openai_params(&input, self.model_id.clone())?;
+        let mut params = into_openai_params(input, self.model_id.clone())?;
         params.stream = Some(true);
 
         let mut openai_stream = self
@@ -200,30 +200,44 @@ impl LanguageModel for OpenAIModel {
 }
 
 fn into_openai_params(
-    input: &LanguageModelInput,
+    input: LanguageModelInput,
     model_id: String,
 ) -> LanguageModelResult<openai_api::ChatCompletionCreateParams> {
+    let LanguageModelInput {
+        messages,
+        system_prompt,
+        max_tokens,
+        temperature,
+        top_p,
+        presence_penalty,
+        frequency_penalty,
+        seed,
+        response_format,
+        tools,
+        tool_choice,
+        extra,
+        ..
+    } = input;
+
     Ok(openai_api::ChatCompletionCreateParams {
         model: model_id,
-        messages: into_openai_messages(input)?,
-        max_completion_tokens: input.max_tokens,
-        temperature: input.temperature,
-        top_p: input.top_p,
-        presence_penalty: input.presence_penalty,
-        frequency_penalty: input.frequency_penalty,
-        seed: input.seed,
-        tools: input
-            .tools
+        messages: into_openai_messages(messages, system_prompt)?,
+        max_completion_tokens: max_tokens.clone(),
+        temperature,
+        top_p,
+        presence_penalty,
+        frequency_penalty,
+        seed,
+        tools: tools
             .as_ref()
             .map(|tools| tools.iter().map(Into::into).collect()),
-        tool_choice: input.tool_choice.as_ref().map(Into::into),
-        response_format: input.response_format.as_ref().map(Into::into),
+        tool_choice: tool_choice.as_ref().map(Into::into),
+        response_format: response_format.as_ref().map(Into::into),
         modalities: input
             .modalities
             .as_ref()
             .map(|modalities| modalities.iter().map(Into::into).collect()),
-        audio: input
-            .extra
+        audio: extra
             .as_ref()
             .and_then(|extra| extra.get("audio"))
             .and_then(|value| {
@@ -234,11 +248,12 @@ fn into_openai_params(
 }
 
 fn into_openai_messages(
-    input: &LanguageModelInput,
+    messages: Vec<Message>,
+    system_prompt: Option<String>,
 ) -> LanguageModelResult<Vec<openai_api::ChatCompletionMessageParam>> {
     let mut openai_messages = vec![];
 
-    if let Some(system_prompt) = &input.system_prompt {
+    if let Some(system_prompt) = system_prompt {
         openai_messages.push(openai_api::ChatCompletionMessageParam::System(
             openai_api::ChatCompletionSystemMessageParam {
                 content: vec![openai_api::ChatCompletionContentPartText {
@@ -248,7 +263,7 @@ fn into_openai_messages(
         ));
     }
 
-    for message in &input.messages {
+    for message in &messages {
         match message {
             Message::Assistant(AssistantMessage { content }) => {
                 let mut openai_message_param =

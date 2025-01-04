@@ -17,6 +17,7 @@ import type {
   ContentDelta,
   ImagePart,
   LanguageModelInput,
+  Message,
   ModelResponse,
   ModelTokensDetails,
   ModelUsage,
@@ -152,40 +153,56 @@ function convertToOpenAICreateParams(
   input: LanguageModelInput,
   modelId: string,
 ): Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> {
+  const {
+    messages,
+    system_prompt,
+    max_tokens,
+    temperature,
+    top_p,
+    presence_penalty,
+    frequency_penalty,
+    seed,
+    response_format,
+    tools,
+    tool_choice,
+    modalities,
+    extra,
+  } = input;
   return {
     model: modelId,
-    messages: convertToOpenAIMessages(input),
-    max_tokens: input.max_tokens ?? null,
-    temperature: input.temperature ?? null,
-    top_p: input.top_p ?? null,
-    presence_penalty: input.presence_penalty ?? null,
-    frequency_penalty: input.frequency_penalty ?? null,
-    seed: input.seed ?? null,
-    ...(input.tools && {
-      tools: input.tools.map(convertToOpenAITool),
+    messages: convertToOpenAIMessages(messages, system_prompt),
+    max_tokens: max_tokens ?? null,
+    temperature: temperature ?? null,
+    top_p: top_p ?? null,
+    presence_penalty: presence_penalty ?? null,
+    frequency_penalty: frequency_penalty ?? null,
+    seed: seed ?? null,
+    ...(tools && {
+      tools: tools.map(convertToOpenAITool),
     }),
-    ...(input.tool_choice && {
-      tool_choice: convertToOpenAIToolChoice(input.tool_choice),
+    ...(tool_choice && {
+      tool_choice: convertToOpenAIToolChoice(tool_choice),
     }),
-    ...(input.response_format && {
-      response_format: convertToOpenAIResponseFormat(input.response_format),
+    ...(response_format && {
+      response_format: convertToOpenAIResponseFormat(response_format),
     }),
-    modalities: input.modalities ?? null,
-    ...input.extra,
+    modalities: modalities ?? null,
+    ...extra,
   };
 }
 
 function convertToOpenAIMessages(
-  input: LanguageModelInput,
+  messages: Message[],
+  systemPrompt: string | undefined,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
   const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  if (input.system_prompt) {
+  if (systemPrompt) {
     openaiMessages.push({
       role: "system",
-      content: input.system_prompt,
+      content: systemPrompt,
     });
   }
-  input.messages.forEach((message) => {
+  messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
         const openaiMessageParam: Omit<
