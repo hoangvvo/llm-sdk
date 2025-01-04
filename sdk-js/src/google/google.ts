@@ -3,45 +3,58 @@ import type {
   FunctionDeclaration,
   FunctionDeclarationSchema,
   FunctionDeclarationsTool,
-  GenerateContentCandidate,
   GenerateContentRequest,
   GenerationConfig,
-  GenerativeModel,
+  FunctionCallPart as GoogleFunctionCallPart,
+  FunctionResponsePart as GoogleFunctionResponsePart,
+  InlineDataPart as GoogleInlineDataPart,
   Part as GooglePart,
-  Schema,
-  SchemaType,
+  ResponseSchema as GoogleResponseSchema,
+  TextPart as GoogleTextPart,
   ToolConfig,
   UsageMetadata,
 } from "@google/generative-ai";
-import { FunctionCallingMode, GoogleGenerativeAI } from "@google/generative-ai";
-import { InvalidValueError, NotImplementedError } from "../errors/errors.js";
-import type { LanguageModelMetadata } from "../models/language-model.js";
-import { LanguageModel } from "../models/language-model.js";
+import {
+  FunctionCallingMode,
+  GoogleGenerativeAI,
+  type GenerativeModel,
+} from "@google/generative-ai";
+import { mapAudioFormatToMimeType } from "../audio.utils.js";
+import {
+  InvalidInputError,
+  InvariantError,
+  NotImplementedError,
+  UnsupportedError,
+} from "../errors.js";
+import type { LanguageModelMetadata } from "../language-model.js";
+import { LanguageModel } from "../language-model.js";
+import {
+  guessDeltaIndex,
+  looselyConvertPartToPartDelta,
+} from "../stream.utils.js";
 import type {
-  AssistantMessage,
+  AudioPart,
   ContentDelta,
+  ImagePart,
   LanguageModelInput,
   Message,
   ModelResponse,
   ModelUsage,
   Part,
   PartialModelResponse,
+  ResponseFormatOption,
+  TextPart,
   Tool,
+  ToolCallPart,
+  ToolChoiceOption,
   ToolResultPart,
 } from "../types.js";
-import { mapAudioFormatToMimeType } from "../utils/audio.utils.js";
-import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
-import type { InternalContentDelta } from "../utils/stream.utils.js";
-import {
-  ContentDeltaAccumulator,
-  guessDeltaIndex,
-} from "../utils/stream.utils.js";
-import { calculateCost } from "../utils/usage.utils.js";
-import type { GoogleModelOptions } from "./types.js";
+import { calculateCost } from "../usage.utils.js";
 
-export type GoogleLanguageModelInput = LanguageModelInput & {
-  extra?: Partial<GenerateContentRequest>;
-};
+export interface GoogleModelOptions {
+  apiKey: string;
+  modelId: string;
+}
 
 export class GoogleModel extends LanguageModel {
   provider: string;
@@ -60,58 +73,48 @@ export class GoogleModel extends LanguageModel {
     if (metadata) this.metadata = metadata;
 
     const genAI = new GoogleGenerativeAI(options.apiKey);
-    this.genModel = genAI.getGenerativeModel({
-      model: options.modelId,
-    });
+    this.genModel = genAI.getGenerativeModel({ model: options.modelId });
   }
 
-  async generate(input: GoogleLanguageModelInput): Promise<ModelResponse> {
-    const result = await this.genModel.generateContent(
-      convertToGoogleParams(input, this.options),
-    );
+  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+    const request = convertToGenerateContentRequest(input);
+    const { response } = await this.genModel.generateContent(request);
 
-    const candidate = result.response.candidates?.[0];
+    const candidate = response.candidates?.[0];
     if (!candidate) {
-      throw new Error("no candidates in response");
+      throw new InvariantError("No candidate in response");
     }
 
-    const usage: ModelUsage | undefined = result.response.usageMetadata
-      ? mapGoogleUsage(result.response.usageMetadata, input)
-      : undefined;
-
-    const response: ModelResponse = {
-      content: mapGoogleMessage(candidate).content,
-    };
-    if (usage) {
-      response.usage = usage;
+    const content = mapGoogleContent(candidate.content);
+    const result: ModelResponse = { content };
+    if (response.usageMetadata) {
+      result.usage = mapGoogleUsageMetadata(response.usageMetadata, input);
       if (this.metadata?.pricing) {
-        response.cost = calculateCost(usage, this.metadata.pricing);
+        result.cost = calculateCost(result.usage, this.metadata.pricing);
       }
     }
-    return response;
+
+    return result;
   }
 
   async *stream(
     input: LanguageModelInput,
-  ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const { stream } = await this.genModel.generateContentStream(
-      convertToGoogleParams(input, this.options),
-    );
+  ): AsyncGenerator<PartialModelResponse> {
+    const request = convertToGenerateContentRequest(input);
+    const { stream } = await this.genModel.generateContentStream(request);
 
-    let usage: ModelUsage | undefined;
-
-    const accumulator = new ContentDeltaAccumulator();
+    const allContentDeltas: ContentDelta[] = [];
 
     for await (const chunk of stream) {
       const candidate = chunk.candidates?.[0];
 
       if (candidate?.content) {
-        const incomingContentDeltas = mapGoogleDelta(
+        const incomingContentDeltas = mapGoogleContentToDelta(
           candidate.content,
-          accumulator.deltas,
+          allContentDeltas,
         );
 
-        accumulator.addChunks(incomingContentDeltas);
+        allContentDeltas.push(...incomingContentDeltas);
 
         for (const delta of incomingContentDeltas) {
           yield { delta };
@@ -119,164 +122,190 @@ export class GoogleModel extends LanguageModel {
       }
 
       if (chunk.usageMetadata) {
-        usage = mapGoogleUsage(chunk.usageMetadata, input);
+        const usage = mapGoogleUsageMetadata(chunk.usageMetadata, input);
+        yield { usage };
       }
     }
-
-    const response: ModelResponse = {
-      content: accumulator.computeContent(),
-    };
-    if (usage) {
-      response.usage = usage;
-    }
-    return response;
   }
 }
 
-export function convertToGoogleParams(
-  input: GoogleLanguageModelInput,
-  options: GoogleModelOptions,
+function convertToGenerateContentRequest(
+  input: LanguageModelInput,
 ): GenerateContentRequest {
-  const toolConfig = convertToGoogleToolConfig(input.tool_choice);
-  const samplingParams = convertToGoogleSamplingParams(input);
-
-  const params: GenerateContentRequest = {
-    contents: convertToGoogleMessages(input.messages, options),
+  return {
+    contents: input.messages.map(convertToGoogleContent),
+    ...(input.system_prompt && { systemInstruction: input.system_prompt }),
+    ...(input.tools && {
+      tools: convertToGoogleFunctionDeclarationTools(input.tools),
+    }),
+    ...(input.tool_choice && {
+      toolConfig: convertToGoogleToolConfig(input.tool_choice),
+    }),
     generationConfig: {
-      ...samplingParams,
-      ...input.extra?.["generationConfig"],
+      ...(typeof input.max_tokens === "number" && {
+        maxOutputTokens: input.max_tokens,
+      }),
+      ...(typeof input.temperature === "number" && {
+        temperature: input.temperature,
+      }),
+      ...(typeof input.top_p === "number" && { topP: input.top_p }),
+      ...(typeof input.top_k === "number" && { topK: input.top_k }),
+      ...(typeof input.presence_penalty === "number" && {
+        presencePenalty: input.presence_penalty,
+      }),
+      ...(typeof input.frequency_penalty === "number" && {
+        frequencyPenalty: input.frequency_penalty,
+      }),
+      ...(input.response_format &&
+        convertResponseFormatToGoogleGenerationConfig(input.response_format)),
+      ...(input.extra?.["generationConfig"] as GenerationConfig),
     },
     ...input.extra,
   };
-
-  if (input.system_prompt) {
-    params.systemInstruction = input.system_prompt;
-  }
-  if (input.tools) {
-    params.tools = convertToGoogleTools(input.tools);
-  }
-  if (toolConfig) {
-    params.toolConfig = toolConfig;
-  }
-  const responseFormatConfig = convertToGoogleResponseFormat(
-    input.response_format,
-  );
-  if (responseFormatConfig) {
-    params.generationConfig = {
-      ...params.generationConfig,
-      ...responseFormatConfig,
-    };
-  }
-  return params;
 }
 
-export function convertToGoogleMessages(
-  messages: Message[],
-  options: GoogleModelOptions,
-): Content[] {
-  if (options.convertAudioPartsToTextParts) {
-    messages = messages.map(convertAudioPartsToTextParts);
-  }
-  return messages.map((message): Content => {
-    const parts = message.content.map((part): GooglePart => {
-      switch (part.type) {
-        case "text":
-          return {
-            text: part.text,
-          };
-        case "image":
-          return {
-            inlineData: {
-              data: part.image_data,
-              mimeType: part.mime_type,
-            },
-          };
-        case "audio":
-          if (!part.format) {
-            throw new InvalidValueError("part.format", part.format);
-          }
-          return {
-            inlineData: {
-              data: part.audio_data,
-              mimeType: mapAudioFormatToMimeType(part.format),
-            },
-          };
-        case "tool-call":
-          return {
-            functionCall: {
-              name: part.tool_name,
-              args: part.args || {},
-            },
-          };
-        case "tool-result": {
-          let responseObj = part.result as object;
-          if (Array.isArray(responseObj)) {
-            responseObj = { result: responseObj };
-          }
-          return {
-            functionResponse: {
-              name: part.tool_name,
-              response: responseObj,
-            },
-          };
-        }
-        default: {
-          const exhaustiveCheck: never = part;
-          throw new InvalidValueError("part.type", exhaustiveCheck);
-        }
-      }
-    });
-
-    switch (message.role) {
-      case "assistant":
-        return {
-          role: "model",
-          parts,
-        };
-      case "tool":
-        return {
-          role: "function",
-          parts,
-        };
-      case "user":
-        return {
-          role: "user",
-          parts,
-        };
-      default: {
-        const exhaustiveCheck: never = message;
-        throw new InvalidValueError("message.role", exhaustiveCheck);
-      }
+function convertToGoogleContent(message: Message): Content {
+  const parts = message.content.map(convertToGooglePart);
+  switch (message.role) {
+    case "assistant": {
+      return {
+        role: "model",
+        parts,
+      };
     }
-  });
+    case "tool": {
+      return {
+        role: "function",
+        parts,
+      };
+    }
+    case "user": {
+      return {
+        role: "user",
+        parts,
+      };
+    }
+  }
 }
 
-export function convertToGoogleSamplingParams(
-  input: Partial<LanguageModelInput>,
-): GenerationConfig {
-  const config: GenerationConfig = {};
-  if (typeof input.max_tokens === "number") {
-    config.maxOutputTokens = input.max_tokens;
+function convertToGooglePart(part: Part): GooglePart {
+  switch (part.type) {
+    case "text":
+      return convertToGoogleTextPart(part);
+    case "image":
+    case "audio":
+      return convertToGoogleInlineData(part);
+    case "tool-call":
+      return convertToGoogleFunctionCallPart(part);
+    case "tool-result":
+      return convertToGoogleFunctionResponsePart(part);
   }
-  if (typeof input.temperature === "number") {
-    config.temperature = input.temperature;
-  }
-  if (typeof input.top_p === "number") {
-    config.topP = input.top_p;
-  }
-  if (typeof input.top_k === "number") {
-    config.topK = input.top_k;
-  }
-  return config;
 }
 
-export function convertToGoogleToolConfig(
-  toolChoice: LanguageModelInput["tool_choice"],
-): ToolConfig | undefined {
-  if (!toolChoice) {
-    return undefined;
+function convertToGoogleTextPart(part: TextPart): GoogleTextPart {
+  return { text: part.text };
+}
+
+function convertToGoogleInlineData(
+  part: ImagePart | AudioPart,
+): GoogleInlineDataPart {
+  switch (part.type) {
+    case "image":
+      return {
+        inlineData: {
+          data: part.image_data,
+          mimeType: part.mime_type,
+        },
+      };
+    case "audio": {
+      if (!part.format) {
+        throw new InvalidInputError("Audio part must have a format");
+      }
+      return {
+        inlineData: {
+          data: part.audio_data,
+          mimeType: mapAudioFormatToMimeType(part.format),
+        },
+      };
+    }
+  }
+}
+
+function convertToGoogleFunctionCallPart(
+  part: ToolCallPart,
+): GoogleFunctionCallPart {
+  return {
+    functionCall: {
+      name: part.tool_name,
+      args: part.args,
+    },
+  };
+}
+
+function convertToGoogleFunctionResponsePart(
+  part: ToolResultPart,
+): GoogleFunctionResponsePart {
+  const textParts = part.content.filter((part) => part.type === "text");
+
+  let response: object;
+  const firstTextPart = textParts[0];
+  if (!firstTextPart) {
+    throw new UnsupportedError("Tool result must have at least one text part");
+  }
+  if (textParts.length === 1) {
+    response = {
+      results: textParts.map((textPart) =>
+        tryConvertToGoogleFunctionResponseResponse(textPart.text),
+      ),
+    };
+  } else {
+    response = tryConvertToGoogleFunctionResponseResponse(firstTextPart.text);
   }
 
+  return {
+    functionResponse: {
+      name: part.tool_name,
+      response,
+    },
+  };
+}
+
+function tryConvertToGoogleFunctionResponseResponse(
+  text: string,
+): Record<string, unknown> {
+  try {
+    const obj = JSON.parse(text) as Record<string, unknown>;
+    // Google does not support array in response
+    if (Array.isArray(obj)) {
+      return {
+        result: obj,
+      };
+    }
+    return obj;
+  } catch {
+    return { result: text };
+  }
+}
+
+function convertToGoogleFunctionDeclarationTools(
+  tools: Tool[],
+): FunctionDeclarationsTool[] {
+  return [
+    {
+      functionDeclarations: tools.map((tool): FunctionDeclaration => {
+        const declaration: FunctionDeclaration = {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters as unknown as FunctionDeclarationSchema,
+        };
+
+        return declaration;
+      }),
+    },
+  ];
+}
+
+function convertToGoogleToolConfig(toolChoice: ToolChoiceOption): ToolConfig {
   switch (toolChoice.type) {
     case "auto":
       return {
@@ -303,209 +332,88 @@ export function convertToGoogleToolConfig(
           allowedFunctionNames: [toolChoice.tool_name],
         },
       };
-    default: {
-      const exhaustiveCheck: never = toolChoice;
-      throw new InvalidValueError("toolChoice.type", exhaustiveCheck);
+  }
+}
+
+function convertResponseFormatToGoogleGenerationConfig(
+  responseFormat: ResponseFormatOption,
+): GenerationConfig {
+  switch (responseFormat.type) {
+    case "json": {
+      return {
+        responseMimeType: "application/json",
+        ...(responseFormat.schema && {
+          responseSchema:
+            responseFormat.schema as unknown as GoogleResponseSchema,
+        }),
+      };
+    }
+    case "text": {
+      return {};
     }
   }
 }
 
-export function convertToGoogleTools(
-  tools: Tool[],
-): FunctionDeclarationsTool[] {
-  return [
-    {
-      functionDeclarations: tools.map((tool): FunctionDeclaration => {
-        const declaration: FunctionDeclaration = {
-          name: tool.name,
-          description: tool.description,
-        };
-        if (tool.parameters) {
-          declaration.parameters = convertToGoogleSchema(
-            tool.parameters,
-          ) as FunctionDeclarationSchema;
-        }
-        return declaration;
-      }),
-    },
-  ];
+function mapGoogleContent(content: Content): Part[] {
+  return content.parts.map(mapGooglePart);
 }
 
-export function convertToGoogleResponseFormat(
-  responseFormat: LanguageModelInput["response_format"],
-): GenerationConfig | undefined {
-  if (responseFormat?.type === "json") {
-    const generationConfig: GenerationConfig = {
-      responseMimeType: "application/json",
-    };
-    if (responseFormat.schema) {
-      generationConfig.responseSchema = convertToGoogleSchema(
-        responseFormat.schema,
-      );
-    }
-    return generationConfig;
-  }
-  return undefined;
+function mapGooglePart(part: GooglePart): Part {
+  if (part.text) return mapGoogleTextPart(part);
+  if (part.inlineData) return mapGoogleInlineData(part);
+  if (part.functionCall) return mapGoogleFunctionCall(part);
+  throw new NotImplementedError(
+    `Unsupported Google part: ${Object.keys(part)
+      .filter((key) => !!part[key as keyof GooglePart])
+      .join(", ")}`,
+  );
 }
 
-export function convertToGoogleSchema(schema: Record<string, unknown>): Schema {
-  const allowedFormatValues = ["float", "double", "int32", "int64", "enum"];
-  let enumValue = schema["enum"] as string[] | undefined;
-  if (typeof schema["const"] === "string") {
-    enumValue = [...(enumValue || []), schema["const"]];
-  }
-  const result: Schema = {};
-  if (schema["type"]) {
-    result.type = schema["type"] as SchemaType;
-  }
-  if (
-    typeof schema["format"] === "string" &&
-    allowedFormatValues.includes(schema["format"])
-  ) {
-    result.format = schema["format"];
-  }
-  if (schema["description"]) {
-    result.description = schema["description"] as string;
-  }
-  if (enumValue) {
-    result.enum = enumValue;
-  }
-  if (schema["properties"]) {
-    result.properties = Object.fromEntries(
-      Object.entries(schema["properties"]).map(([key, value]) => [
-        key,
-        convertToGoogleSchema(value as Record<string, unknown>),
-      ]),
-    );
-  }
-  if (schema["required"]) {
-    result.required = schema["required"] as string[];
-  }
-  if (schema["items"]) {
-    result.items = convertToGoogleSchema(
-      schema["items"] as Record<string, unknown>,
-    );
-  }
-  return result;
-}
-
-export function mapGoogleMessage(
-  candidate: GenerateContentCandidate,
-): AssistantMessage {
+function mapGoogleTextPart(part: GoogleTextPart): TextPart {
   return {
-    role: "assistant",
-    content: candidate.content.parts
-      .map(mapGooglePart)
-      .filter((part): part is AssistantMessage["content"][number] => !!part),
+    type: "text",
+    text: part.text,
   };
 }
 
-export function mapGooglePart(part: GooglePart): Part | undefined {
-  if (typeof part.text === "string" && part.text) {
+function mapGoogleInlineData(
+  part: GoogleInlineDataPart,
+): ImagePart | AudioPart {
+  if (part.inlineData.mimeType.startsWith("image/")) {
     return {
-      type: "text",
-      text: part.text,
+      type: "image",
+      image_data: part.inlineData.data,
+      mime_type: part.inlineData.mimeType,
     };
   }
-  if (part.inlineData) {
-    if (part.inlineData.mimeType.startsWith("image/")) {
-      return {
-        type: "image",
-        image_data: part.inlineData.data,
-        mime_type: part.inlineData.mimeType,
-      };
-    }
-    if (part.inlineData.mimeType.startsWith("audio/")) {
-      return {
-        type: "audio",
-        audio_data: part.inlineData.data,
-      };
-    }
-    throw new NotImplementedError(
-      "inlineData.mimeType",
-      part.inlineData.mimeType,
-    );
-  }
-  if (part.functionCall) {
+  if (part.inlineData.mimeType.startsWith("audio/")) {
     return {
-      type: "tool-call",
-      tool_call_id: genidForToolCall(),
-      tool_name: part.functionCall.name,
-      args: part.functionCall.args as Record<string, unknown>,
+      type: "audio",
+      audio_data: part.inlineData.data,
     };
   }
-  if (part.codeExecutionResult) {
-    throw new NotImplementedError(
-      "part.codeExecutionResult",
-      part.codeExecutionResult,
-    );
-  }
-  if (part.functionResponse) {
-    return {
-      type: "tool-result",
-      tool_call_id: genidForToolCall(),
-      tool_name: part.functionResponse.name,
-      result: part.functionResponse.response as ToolResultPart["result"],
-    };
-  }
-  if (part.fileData) {
-    throw new NotImplementedError("part.fileData", part.fileData);
-  }
-  if (part.executableCode) {
-    throw new NotImplementedError("part.executableCode", part.executableCode);
-  }
-  return undefined;
+  throw new UnsupportedError(
+    `Unsupported inline data mime type: ${part.inlineData.mimeType}`,
+  );
 }
 
-export function mapGoogleDelta(
-  content: Content,
-  existingDeltas: InternalContentDelta[],
-): ContentDelta[] {
-  const contentDeltas: ContentDelta[] = [];
-
-  content.parts.forEach((googlePart) => {
-    const part = mapGooglePart(googlePart);
-    if (!part) {
-      return;
-    }
-    switch (part.type) {
-      case "tool-result":
-      case "image":
-        throw new Error(`Unexpected part type for delta: ${part.type}`);
-      case "text":
-      case "audio": {
-        contentDeltas.push({
-          index: guessDeltaIndex(part, [...existingDeltas, ...contentDeltas]),
-          part,
-        });
-        break;
-      }
-      case "tool-call": {
-        contentDeltas.push({
-          index: guessDeltaIndex(part, [...existingDeltas, ...contentDeltas]),
-          part: {
-            ...part,
-            args: part.args ? JSON.stringify(part.args) : "",
-          },
-        });
-        break;
-      }
-      default: {
-        const exhaustiveCheck: never = part;
-        throw new NotImplementedError(
-          "part.type",
-          (exhaustiveCheck as { type: string }).type,
-        );
-      }
-    }
-  });
-
-  return contentDeltas;
+function mapGoogleFunctionCall(part: GoogleFunctionCallPart): ToolCallPart {
+  return {
+    type: "tool-call",
+    tool_call_id: genidForToolCall(),
+    tool_name: part.functionCall.name,
+    args: part.functionCall.args as Record<string, unknown>,
+  };
 }
 
-export function mapGoogleUsage(
+// Google function calls do not have ids so we need to generate ones
+function genidForToolCall() {
+  return Math.random().toString(36).substring(2, 15);
+}
+
+function mapGoogleUsageMetadata(
   usage: UsageMetadata,
-  input: GoogleLanguageModelInput,
+  input: LanguageModelInput,
 ): ModelUsage {
   const cachedContentTokenCount = usage.cachedContentTokenCount;
   const hasAudioPart = input.messages.some(
@@ -524,6 +432,23 @@ export function mapGoogleUsage(
   return result;
 }
 
-function genidForToolCall() {
-  return Math.random().toString(36).substring(2, 15);
+function mapGoogleContentToDelta(
+  content: Content,
+  existingContentDeltas: ContentDelta[],
+): ContentDelta[] {
+  const contentDeltas: ContentDelta[] = [];
+
+  content.parts.forEach((googlePart) => {
+    const part = looselyConvertPartToPartDelta(mapGooglePart(googlePart));
+    const index = guessDeltaIndex(part, [
+      ...existingContentDeltas,
+      ...contentDeltas,
+    ]);
+    contentDeltas.push({
+      index,
+      part,
+    });
+  });
+
+  return contentDeltas;
 }

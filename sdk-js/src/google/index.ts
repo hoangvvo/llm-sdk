@@ -1,2 +1,1 @@
-export * from "./google.js";
-export * from "./types.js";
+export { GoogleModel, type GoogleModelOptions } from "./google.js";

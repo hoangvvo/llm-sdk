@@ -1,5 +1,5 @@
 // documented type is wrong
-export type OpenAIPatchedPromptTokensDetails = {
+export interface OpenAIPatchedPromptTokensDetails {
   cached_tokens?: number;
   text_tokens?: number;
   image_tokens?: number;
@@ -9,11 +9,11 @@ export type OpenAIPatchedPromptTokensDetails = {
     text_tokens?: number;
     audio_tokens?: number;
   };
-};
+}
 
 // documented type is wrong
-export type OpenAIPatchedCompletionTokenDetails = {
+export interface OpenAIPatchedCompletionTokenDetails {
   reasoning_tokens?: number;
   text_tokens?: number;
   audio_tokens?: number;
-};
+}
