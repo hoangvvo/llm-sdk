@@ -32,7 +32,7 @@ pub enum Part {
 /// Delta parts used in partial updates.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
-pub enum ContentDeltaPart {
+pub enum DeltaPart {
     Text(TextPartDelta),
     ToolCall(ToolCallPartDelta),
     Audio(AudioPartDelta),
@@ -243,7 +243,7 @@ pub struct AudioPartDelta {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentDelta {
     pub index: usize,
-    pub part: ContentDeltaPart,
+    pub part: DeltaPart,
 }
 
 /// Represents a JSON schema.

@@ -1,4 +1,4 @@
-use crate::{ContentDelta, ContentDeltaPart};
+use crate::{ContentDelta, DeltaPart};
 
 /// Because of the difference in mapping, especially in `OpenAI` cases,
 /// where text and audio part does not have indexes
@@ -6,7 +6,7 @@ use crate::{ContentDelta, ContentDeltaPart};
 /// we need to guess an index for the incoming delta
 /// which is required in our unified interface.
 pub fn guess_delta_index(
-    part: &ContentDeltaPart,
+    part: &DeltaPart,
     all_content_deltas: &[ContentDelta],
     existing_matching_delta: Option<&ContentDelta>,
 ) -> usize {
@@ -20,8 +20,8 @@ pub fn guess_delta_index(
         match (&content_delta.part, part) {
             // For text and audio parts, they are the matching delta
             // if their types are the same
-            (ContentDeltaPart::Text(_), ContentDeltaPart::Text(_))
-            | (ContentDeltaPart::Audio(_), ContentDeltaPart::Audio(_)) => true,
+            (DeltaPart::Text(_), DeltaPart::Text(_))
+            | (DeltaPart::Audio(_), DeltaPart::Audio(_)) => true,
 
             // For tool calls, we can't reliably match them
             // because there can be multiple tool calls with the same tool name

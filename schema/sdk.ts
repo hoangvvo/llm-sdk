@@ -22,10 +22,7 @@ export type Part =
 /**
  * Delta parts used in partial updates.
  */
-export type ContentDeltaPart =
-  | TextPartDelta
-  | ToolCallPartDelta
-  | AudioPartDelta;
+export type PartDelta = TextPartDelta | ToolCallPartDelta | AudioPartDelta;
 /**
  * A message in an LLM conversation history.
  */
@@ -140,7 +137,7 @@ export interface ToolCallPart {
    */
   args: {
     [k: string]: unknown;
-  } | null;
+  };
   /**
    * The ID of the part, if applicable. This might not be the same as the tool_call_id.
    */
@@ -247,7 +244,7 @@ export interface AudioPartDelta {
  */
 export interface ContentDelta {
   index: number;
-  part: ContentDeltaPart;
+  part: PartDelta;
 }
 /**
  * Represents a JSON schema.

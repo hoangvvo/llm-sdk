@@ -1,33 +1,33 @@
 import Anthropic from "@anthropic-ai/sdk";
-import {
-  InvalidValueError,
-  ModelUnsupportedMessagePart,
-  NotImplementedError,
-} from "../errors/errors.js";
-import {
-  LanguageModel,
-  type LanguageModelMetadata,
-} from "../models/language-model.js";
+import { NotImplementedError, UnsupportedError } from "../errors.js";
+import type { LanguageModelMetadata } from "../language-model.js";
+import { LanguageModel } from "../language-model.js";
+import { looselyConvertPartToPartDelta } from "../stream.utils.js";
 import type {
-  AssistantMessage,
   ContentDelta,
+  ImagePart,
   LanguageModelInput,
   Message,
   ModelResponse,
   ModelUsage,
+  Part,
+  PartDelta,
   PartialModelResponse,
   TextPart,
+  TextPartDelta,
   Tool,
   ToolCallPart,
+  ToolCallPartDelta,
+  ToolChoiceOption,
+  ToolResultPart,
 } from "../types.js";
-import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
-import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
-import { calculateCost } from "../utils/usage.utils.js";
-import type { AnthropicModelOptions } from "./types.js";
+import { calculateCost } from "../usage.utils.js";
 
-export type AnthropicLanguageModelInput = LanguageModelInput & {
-  extra?: Partial<Anthropic.Messages.MessageCreateParams>;
-};
+export interface AnthropicModelOptions {
+  baseURL?: string;
+  apiKey: string;
+  modelId: string;
+}
 
 export class AnthropicModel extends LanguageModel {
   public provider: string;
@@ -44,67 +44,59 @@ export class AnthropicModel extends LanguageModel {
     this.provider = "anthropic";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
-
     this.anthropic = new Anthropic({
       baseURL: options.baseURL,
       apiKey: options.apiKey,
     });
   }
 
-  async generate(input: AnthropicLanguageModelInput): Promise<ModelResponse> {
-    const response = await this.anthropic.messages.create({
-      ...convertToAnthropicParams(input, this.options),
-      stream: false,
-    });
+  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+    const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    const usage: ModelUsage = {
-      input_tokens: response.usage.input_tokens,
-      output_tokens: response.usage.output_tokens,
-    };
+    const response = await this.anthropic.messages.create(createParams);
 
-    const result: ModelResponse = {
-      content: mapAnthropicMessage(response.content).content,
-      usage,
-    };
+    const content = mapAnthropicMessage(response.content);
+    const usage = mapAnthropicUsage(response.usage);
+
+    const result: ModelResponse = { content, usage };
+
     if (this.metadata?.pricing) {
       result.cost = calculateCost(usage, this.metadata.pricing);
     }
+
     return result;
   }
 
   async *stream(
-    input: AnthropicLanguageModelInput,
-  ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const stream = this.anthropic.messages.stream({
-      ...convertToAnthropicParams(input, this.options),
-      stream: true,
-    });
+    input: LanguageModelInput,
+  ): AsyncGenerator<PartialModelResponse> {
+    const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    const usage: ModelUsage = {
-      input_tokens: 0,
-      output_tokens: 0,
-    };
+    const stream = this.anthropic.messages.stream(createParams);
 
-    const accumulator = new ContentDeltaAccumulator();
-
-    for await (const _chunk of stream) {
-      // TODO: type error from library
-      const chunk = _chunk as Anthropic.Messages.MessageStreamEvent;
-
-      // https://docs.anthropic.com/claude/reference/messages-streaming#raw-http-stream-response
+    for await (const chunk of stream) {
       switch (chunk.type) {
-        case "message_start":
-          usage.input_tokens += chunk.message.usage.input_tokens;
-          usage.output_tokens += chunk.message.usage.output_tokens;
+        case "message_start": {
+          const usage = mapAnthropicUsage(chunk.message.usage);
+          yield { usage };
           break;
-        case "message_delta":
-          usage.output_tokens += chunk.usage.output_tokens;
+        }
+        case "message_delta": {
+          const usage = mapAnthropicMessageDeltaUsage(chunk.usage);
+          yield { usage };
           break;
-        case "content_block_start":
+        }
+        case "content_block_start": {
+          const incomingContentDeltas =
+            mapAnthropicRawContentBlockStartEvent(chunk);
+          for (const delta of incomingContentDeltas) {
+            yield { delta };
+          }
+          break;
+        }
         case "content_block_delta": {
-          const incomingContentDeltas = mapAnthropicStreamEvent(chunk);
-          accumulator.addChunks(incomingContentDeltas);
-
+          const incomingContentDeltas =
+            mapAnthropicRawContentBlockDeltaEvent(chunk);
           for (const delta of incomingContentDeltas) {
             yield { delta };
           }
@@ -112,340 +104,262 @@ export class AnthropicModel extends LanguageModel {
         }
       }
     }
-
-    const result: ModelResponse = {
-      content: accumulator.computeContent(),
-      usage,
-    };
-    if (this.metadata?.pricing) {
-      result.cost = calculateCost(usage, this.metadata.pricing);
-    }
-    return result;
   }
 }
 
-export function convertToAnthropicParams(
+function convertToAnthropicCreateParams(
   input: LanguageModelInput,
-  options: AnthropicModelOptions,
-): Anthropic.Messages.MessageCreateParams {
-  const tool_choice = convertToAnthropicToolChoice(input.tool_choice);
-
-  const sampleParams = convertToAnthropicSamplingParams(input);
-
-  const params: Anthropic.Messages.MessageCreateParams = {
-    model: options.modelId,
-    messages: convertToAnthropicMessages(input.messages, options),
-    ...sampleParams,
-    max_tokens: sampleParams.max_tokens || 4096,
+  modelId: string,
+): Omit<Anthropic.Messages.MessageCreateParams, "stream"> {
+  return {
+    model: modelId,
+    messages: convertToAnthropicMessages(input.messages),
+    max_tokens: input.max_tokens ?? 4096,
+    ...(typeof input.temperature === "number" && {
+      temperature: input.temperature,
+    }),
+    ...(typeof input.top_p === "number" && { top_p: input.top_p }),
+    ...(typeof input.top_k === "number" && { top_k: input.top_k }),
+    ...(input.system_prompt && { system: input.system_prompt }),
+    ...(input.tools && { tools: input.tools.map(convertToAnthropicTool) }),
+    ...(input.tool_choice && {
+      tool_choice: convertToAnthropicToolChoice(input.tool_choice),
+    }),
     ...input.extra,
   };
-  if (input.system_prompt) {
-    params.system = input.system_prompt;
-  }
-  if (input.tools && input.tool_choice?.type !== "none") {
-    params.tools = input.tools.map(convertToAnthropicTool);
-  }
-  if (tool_choice) {
-    params.tool_choice = tool_choice;
-  }
-  return params;
 }
 
-export function convertToAnthropicMessages(
+function convertToAnthropicMessages(
   messages: Message[],
-  options: AnthropicModelOptions,
 ): Anthropic.Messages.MessageParam[] {
-  if (options.convertAudioPartsToTextParts) {
-    messages = messages.map(convertAudioPartsToTextParts);
-  }
-
   return messages.map((message): Anthropic.Messages.MessageParam => {
     switch (message.role) {
-      case "assistant": {
+      case "assistant":
         return {
           role: "assistant",
-          content: message.content.map(
-            (
-              part,
-            ):
-              | Anthropic.Messages.TextBlockParam
-              | Anthropic.Messages.ToolUseBlockParam => {
-              switch (part.type) {
-                case "text":
-                  return {
-                    type: "text",
-                    text: part.text,
-                  };
-                case "tool-call":
-                  return {
-                    type: "tool_use",
-                    id: part.tool_call_id,
-                    name: part.tool_name,
-                    input: part.args,
-                  };
-                case "audio":
-                case "image":
-                case "tool-result":
-                  throw new ModelUnsupportedMessagePart(
-                    "anthropic",
-                    message,
-                    part,
-                  );
-                default: {
-                  const exhaustiveCheck: never = part;
-                  throw new InvalidValueError(
-                    "part.type",
-                    (exhaustiveCheck as { type: string }).type,
-                  );
-                }
-              }
-            },
-          ),
+          content: message.content.map(convertToAnthropicContentBlockParam),
         };
-      }
-
-      case "tool": {
-        // anthropic does not have a dedicated tool message type
+      case "user":
+      case "tool": //  anthropic does not have a dedicated tool message role
         return {
           role: "user",
-          content: message.content.map(
-            (part): Anthropic.Messages.ToolResultBlockParam => ({
-              type: "tool_result",
-              tool_use_id: part.tool_call_id,
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(part.result),
-                },
-              ],
-            }),
-          ),
+          content: message.content.map(convertToAnthropicContentBlockParam),
         };
-      }
-
-      case "user": {
-        return {
-          role: "user",
-          content: message.content.map(
-            (
-              part,
-            ):
-              | Anthropic.Messages.TextBlockParam
-              | Anthropic.Messages.ImageBlockParam => {
-              switch (part.type) {
-                case "text":
-                  return {
-                    type: "text",
-                    text: part.text,
-                  };
-                case "image":
-                  return {
-                    type: "image",
-                    source: {
-                      data: part.image_data,
-                      type: "base64",
-                      media_type:
-                        part.mime_type as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
-                    },
-                  };
-                case "audio":
-                case "tool-call":
-                case "tool-result":
-                  throw new ModelUnsupportedMessagePart(
-                    "anthropic",
-                    message,
-                    part,
-                  );
-                default: {
-                  const exhaustiveCheck: never = part;
-                  throw new InvalidValueError(
-                    "part.type",
-                    (exhaustiveCheck as { type: string }).type,
-                  );
-                }
-              }
-            },
-          ),
-        };
-      }
-
-      default: {
-        const exhaustiveCheck: never = message;
-        throw new InvalidValueError(
-          "message.role",
-          (exhaustiveCheck as { role: string }).role,
-        );
-      }
     }
   });
 }
 
-export function convertToAnthropicSamplingParams(
-  input: Partial<LanguageModelInput>,
-): Partial<Anthropic.Messages.MessageCreateParams> {
-  const params: Partial<Anthropic.Messages.MessageCreateParams> = {};
-  if (input.max_tokens) {
-    params.max_tokens = input.max_tokens || 4096;
-  }
-  if (typeof input.temperature === "number") {
-    params.temperature = input.temperature;
-  }
-  if (typeof input.top_p === "number") {
-    params.top_p = input.top_p;
-  }
-  if (typeof input.top_k === "number") {
-    params.top_k = input.top_k;
-  }
-  return params;
-}
-
-export function convertToAnthropicToolChoice(
-  toolChoice: LanguageModelInput["tool_choice"],
-): Anthropic.Messages.MessageCreateParams["tool_choice"] {
-  if (!toolChoice) {
-    return undefined;
-  }
-
-  switch (toolChoice.type) {
-    case "auto":
-      return { type: "auto" };
-    case "required":
-      return { type: "any" };
-    case "tool":
-      return {
-        type: "tool",
-        name: toolChoice.tool_name,
-      };
-    case "none": {
-      // already handled in convertToAnthropicParams
-      return undefined;
-    }
-    default: {
-      const exhaustiveCheck: never = toolChoice;
-      throw new InvalidValueError(
-        "toolChoice.type",
-        (exhaustiveCheck as { type: string }).type,
+function convertToAnthropicContentBlockParam(
+  part: Part,
+): Anthropic.ContentBlockParam {
+  switch (part.type) {
+    case "text":
+      return convertToAnthropicTextBlockParam(part);
+    case "image":
+      return convertToAnthropicImageBlockParam(part);
+    case "tool-call":
+      return convertToAnthropicToolUseBlockParam(part);
+    case "tool-result":
+      return convertToAnthropicToolResultBlockParam(part);
+    default:
+      throw new UnsupportedError(
+        `Unsupported content block type: ${part.type}`,
       );
-    }
   }
 }
 
-export function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
+function convertToAnthropicTextBlockParam(
+  part: TextPart,
+): Anthropic.TextBlockParam {
   return {
-    name: tool.name,
-    description: tool.description,
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    input_schema: (tool.parameters as Anthropic.Tool.InputSchema) || {
-      type: "object",
-      // anthropic tool call parameters are required
-      // so if no parameters, we define it as null
-      properties: null,
+    type: "text",
+    text: part.text,
+  };
+}
+
+function convertToAnthropicImageBlockParam(
+  part: ImagePart,
+): Anthropic.ImageBlockParam {
+  return {
+    type: "image",
+    source: {
+      data: part.image_data,
+      type: "base64",
+      media_type:
+        part.mime_type as Anthropic.Messages.Base64ImageSource["media_type"],
     },
   };
 }
 
-export function mapAnthropicMessage(
-  content: Array<Anthropic.Messages.ContentBlock>,
-): AssistantMessage {
+function convertToAnthropicToolUseBlockParam(
+  part: ToolCallPart,
+): Anthropic.ToolUseBlockParam {
   return {
-    role: "assistant",
-    content: content.map(mapAnthropicBlock),
+    type: "tool_use",
+    id: part.tool_call_id,
+    name: part.tool_name,
+    input: part.args,
   };
 }
 
-export function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock) {
+function convertToAnthropicToolResultBlockParam(
+  part: ToolResultPart,
+): Anthropic.ToolResultBlockParam {
+  return {
+    type: "tool_result",
+    tool_use_id: part.tool_call_id,
+    content: part.content.map((part) => {
+      const blockParam = convertToAnthropicContentBlockParam(part);
+      if (blockParam.type !== "text" && blockParam.type !== "image") {
+        throw new UnsupportedError(
+          `Unsupported content block type in tool result: ${blockParam.type}`,
+        );
+      }
+      return blockParam;
+    }),
+    is_error: part.is_error ?? false,
+  };
+}
+
+function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
+  return {
+    name: tool.name,
+    description: tool.description,
+    input_schema: tool.parameters as Anthropic.Tool.InputSchema,
+  };
+}
+
+function convertToAnthropicToolChoice(
+  toolChoice: ToolChoiceOption,
+): Anthropic.ToolChoice {
+  switch (toolChoice.type) {
+    case "auto":
+      return {
+        type: "auto",
+      };
+    case "required":
+      return {
+        type: "any",
+      };
+    case "tool": {
+      return {
+        type: "tool",
+        name: toolChoice.tool_name,
+      };
+    }
+    case "none": {
+      return {
+        type: "none",
+      };
+    }
+  }
+}
+
+function mapAnthropicMessage(
+  contentBlocks: Anthropic.Messages.ContentBlock[],
+): Part[] {
+  return contentBlocks.map(mapAnthropicBlock);
+}
+
+function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock): Part {
   switch (block.type) {
     case "text":
-      return {
-        type: "text",
-        text: block.text,
-      } satisfies TextPart;
+      return mapAnthropicTextBlock(block);
     case "tool_use":
-      return {
-        type: "tool-call",
-        tool_call_id: block.id,
-        tool_name: block.name,
-        args: block.input as Record<string, unknown>,
-      } satisfies ToolCallPart;
-    default: {
-      const exhaustiveCheck: never = block;
+      return mapAnthropicToolUseBlock(block);
+    default:
       throw new NotImplementedError(
-        "block.type",
-        (exhaustiveCheck as { type: string }).type,
+        `Unsupported content block type: ${block.type}`,
+      );
+  }
+}
+
+function mapAnthropicTextBlock(block: Anthropic.Messages.TextBlock): TextPart {
+  return {
+    type: "text",
+    text: block.text,
+  };
+}
+
+function mapAnthropicToolUseBlock(
+  block: Anthropic.Messages.ToolUseBlock,
+): ToolCallPart {
+  return {
+    type: "tool-call",
+    tool_call_id: block.id,
+    tool_name: block.name,
+    args: block.input as Record<string, unknown>,
+  };
+}
+
+function mapAnthropicUsage(usage: Anthropic.Usage): ModelUsage {
+  return {
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+  };
+}
+
+function mapAnthropicMessageDeltaUsage(usage: Anthropic.MessageDeltaUsage) {
+  return {
+    input_tokens: 0,
+    output_tokens: usage.output_tokens,
+  };
+}
+
+function mapAnthropicRawContentBlockStartEvent(
+  event: Anthropic.RawContentBlockStartEvent,
+): ContentDelta[] {
+  const part = looselyConvertPartToPartDelta(
+    mapAnthropicBlock(event.content_block),
+  );
+  return [
+    {
+      index: event.index,
+      part,
+    },
+  ];
+}
+
+function mapAnthropicRawContentBlockDeltaEvent(
+  event: Anthropic.RawContentBlockDeltaEvent,
+): ContentDelta[] {
+  const partDelta = mapAnthropicRawContentBlockDelta(event.delta);
+  return [
+    {
+      index: event.index,
+      part: partDelta,
+    },
+  ];
+}
+
+function mapAnthropicRawContentBlockDelta(
+  delta: Anthropic.RawContentBlockDelta,
+): PartDelta {
+  switch (delta.type) {
+    case "text_delta":
+      return mapAnthropicTextDelta(delta);
+    case "input_json_delta":
+      return mapAnthropicInputJSONDelta(delta);
+    default: {
+      throw new NotImplementedError(
+        `Unsupported content block delta type: ${delta.type}`,
       );
     }
   }
 }
 
-export function mapAnthropicStreamEvent(
-  chunk: Anthropic.Messages.RawMessageStreamEvent,
-): ContentDelta[] {
-  switch (chunk.type) {
-    case "content_block_start":
-      switch (chunk.content_block.type) {
-        case "text":
-          return [
-            {
-              index: chunk.index,
-              part: {
-                type: "text",
-                text: chunk.content_block.text,
-              },
-            },
-          ];
-        case "tool_use": {
-          return [
-            {
-              index: chunk.index,
-              part: {
-                type: "tool-call",
-                tool_call_id: chunk.content_block.id,
-                tool_name: chunk.content_block.name,
-              },
-            },
-          ];
-        }
-        default: {
-          const exhaustiveCheck: never = chunk.content_block;
-          throw new NotImplementedError(
-            "content_block.type",
-            (exhaustiveCheck as { type: string }).type,
-          );
-        }
-      }
-    case "content_block_delta":
-      switch (chunk.delta.type) {
-        case "text_delta":
-          return [
-            {
-              index: chunk.index,
-              part: {
-                type: "text",
-                text: chunk.delta.text,
-              },
-            },
-          ];
-        case "input_json_delta":
-          return [
-            {
-              index: chunk.index,
-              part: {
-                type: "tool-call",
-                args: chunk.delta.partial_json,
-              },
-            },
-          ];
-        case "citations_delta":
-          return [];
-        default: {
-          const exhaustiveCheck: never = chunk.delta;
-          throw new NotImplementedError(
-            "delta.type",
-            (exhaustiveCheck as { type: string }).type,
-          );
-        }
-      }
-    default:
-      return [];
-  }
+function mapAnthropicTextDelta(delta: Anthropic.TextDelta): TextPartDelta {
+  return {
+    type: "text",
+    text: delta.text,
+  };
+}
+
+function mapAnthropicInputJSONDelta(
+  delta: Anthropic.InputJSONDelta,
+): ToolCallPartDelta {
+  return {
+    type: "tool-call",
+    args: delta.partial_json,
+  };
 }

@@ -3,9 +3,9 @@ use crate::{
     openai::api as openai_api,
     stream_utils,
     usage_utils::calculate_cost,
-    AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ContentDeltaPart,
-    ImagePart, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult, Message,
-    Modality, ModelResponse, ModelUsage, Part, PartialModelResponse, ResponseFormatJson,
+    AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, DeltaPart, ImagePart,
+    LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult, Message, Modality,
+    ModelResponse, ModelUsage, Part, PartialModelResponse, ResponseFormatJson,
     ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
     ToolChoiceOption, ToolMessage, UserMessage,
 };
@@ -573,7 +573,7 @@ fn map_openai_delta(
             text: content.clone(),
             id: None,
         };
-        let part = ContentDeltaPart::Text(text_part);
+        let part = DeltaPart::Text(text_part);
         let index = stream_utils::guess_delta_index(
             &part,
             &[existing_content_deltas, content_deltas.as_slice()].concat(),
@@ -600,7 +600,7 @@ fn map_openai_delta(
         if let Some(transcript) = &audio.transcript {
             audio_part.transcript = Some(transcript.to_string());
         }
-        let part = ContentDeltaPart::Audio(audio_part);
+        let part = DeltaPart::Audio(audio_part);
         let index = stream_utils::guess_delta_index(
             &part,
             &[existing_content_deltas, content_deltas.as_slice()].concat(),
@@ -612,7 +612,7 @@ fn map_openai_delta(
     if let Some(tool_calls) = &delta.tool_calls {
         let all_existing_tool_calls = existing_content_deltas
             .iter()
-            .filter(|delta| matches!(delta.part, ContentDeltaPart::ToolCall(_)))
+            .filter(|delta| matches!(delta.part, DeltaPart::ToolCall(_)))
             .collect::<Vec<_>>();
         for tool_call in tool_calls {
             let existing_delta = all_existing_tool_calls.get(tool_call.index);
@@ -630,7 +630,7 @@ fn map_openai_delta(
                 }
             }
 
-            let part = ContentDeltaPart::ToolCall(tool_call_part);
+            let part = DeltaPart::ToolCall(tool_call_part);
             let index = stream_utils::guess_delta_index(
                 &part,
                 &[existing_content_deltas, content_deltas.as_slice()].concat(),
