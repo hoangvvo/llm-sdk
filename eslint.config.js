@@ -14,6 +14,7 @@ export default [
   },
   pluginJs.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
   {
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },

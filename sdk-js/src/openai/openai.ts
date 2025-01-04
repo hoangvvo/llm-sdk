@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import {
   InvalidInputError,
+  InvariantError,
   RefusalError,
   UnsupportedError,
 } from "../errors.js";
@@ -31,13 +32,18 @@ import type {
 } from "../types.js";
 import { calculateCost } from "../usage.utils.js";
 import type {
-  OpenAIModelOptions,
   OpenAIPatchedCompletionTokenDetails,
   OpenAIPatchedPromptTokensDetails,
 } from "./types.js";
 
 const OPENAI_AUDIO_SAMPLE_RATE = 24_000;
 const OPENAI_AUDIO_CHANNELS = 1;
+
+export interface OpenAIModelOptions {
+  baseURL?: string;
+  apiKey: string;
+  modelId: string;
+}
 
 export class OpenAIModel extends LanguageModel {
   provider: string;
@@ -48,12 +54,12 @@ export class OpenAIModel extends LanguageModel {
 
   constructor(
     public options: OpenAIModelOptions,
-    metadata: LanguageModelMetadata,
+    metadata?: LanguageModelMetadata,
   ) {
     super();
     this.provider = "openai";
     this.modelId = options.modelId;
-    this.metadata = metadata;
+    if (metadata) this.metadata = metadata;
     this.openai = new OpenAI({
       baseURL: options.baseURL,
       apiKey: options.apiKey,
@@ -61,7 +67,7 @@ export class OpenAIModel extends LanguageModel {
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const createParams = convertToOpenAIParams(input, this.modelId);
+    const createParams = convertToOpenAICreateParams(input, this.modelId);
 
     const response = await this.openai.chat.completions.create({
       ...createParams,
@@ -70,7 +76,7 @@ export class OpenAIModel extends LanguageModel {
 
     const choice = response.choices[0];
     if (!choice) {
-      throw new InvalidInputError("No choices in response");
+      throw new InvariantError("No choices in response");
     }
     const { message } = choice;
 
@@ -97,11 +103,14 @@ export class OpenAIModel extends LanguageModel {
   async *stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
-    const createParams = convertToOpenAIParams(input, this.modelId);
+    const createParams = convertToOpenAICreateParams(input, this.modelId);
 
     const stream = await this.openai.chat.completions.create({
       ...createParams,
       stream: true,
+      stream_options: {
+        include_usage: true,
+      },
     });
 
     let refusal = "";
@@ -127,6 +136,10 @@ export class OpenAIModel extends LanguageModel {
           yield { delta };
         }
       }
+      if (chunk.usage) {
+        const usage = mapOpenAIUsage(chunk.usage, input);
+        yield { usage };
+      }
     }
 
     if (refusal) {
@@ -135,7 +148,7 @@ export class OpenAIModel extends LanguageModel {
   }
 }
 
-function convertToOpenAIParams(
+function convertToOpenAICreateParams(
   input: LanguageModelInput,
   modelId: string,
 ): Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> {
@@ -179,7 +192,7 @@ function convertToOpenAIMessages(
           OpenAI.Chat.ChatCompletionAssistantMessageParam,
           "content"
         > & {
-          content: Array<OpenAI.Chat.ChatCompletionContentPartText> | null;
+          content: OpenAI.Chat.ChatCompletionContentPartText[] | null;
         } = {
           role: "assistant",
           content: null,
@@ -187,7 +200,7 @@ function convertToOpenAIMessages(
         message.content.forEach((part) => {
           switch (part.type) {
             case "text": {
-              openaiMessageParam.content = openaiMessageParam.content || [];
+              openaiMessageParam.content = openaiMessageParam.content ?? [];
               openaiMessageParam.content.push(
                 convertToOpenAIContentPartText(part),
               );
@@ -195,7 +208,7 @@ function convertToOpenAIMessages(
             }
             case "tool-call": {
               openaiMessageParam.tool_calls =
-                openaiMessageParam.tool_calls || [];
+                openaiMessageParam.tool_calls ?? [];
               openaiMessageParam.tool_calls.push(convertToOpenAIToolCall(part));
               break;
             }
@@ -393,7 +406,7 @@ function convertToOpenAIContentPartInputAudio(
       format = "wav";
       break;
     default:
-      throw new InvalidInputError(`Unsupported audio format: ${part.format}`);
+      throw new UnsupportedError(`Unsupported audio format: ${part.format}`);
   }
   return {
     type: "input_audio",
@@ -448,9 +461,10 @@ function mapOpenAIFunctionToolCall(
     type: "tool-call",
     tool_call_id: messageToolCall.id,
     tool_name: messageToolCall.function.name,
-    args: JSON.parse(messageToolCall.function.arguments) as {
-      [k: string]: unknown;
-    },
+    args: JSON.parse(messageToolCall.function.arguments) as Record<
+      string,
+      unknown
+    >,
   };
 }
 

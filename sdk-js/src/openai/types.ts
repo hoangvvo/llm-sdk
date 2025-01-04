@@ -1,9 +1,3 @@
-export interface OpenAIModelOptions {
-  baseURL?: string;
-  apiKey: string;
-  modelId: string;
-}
-
 // documented type is wrong
 export type OpenAIPatchedPromptTokensDetails = {
   cached_tokens?: number;

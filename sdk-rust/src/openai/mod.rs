@@ -1,4 +1,4 @@
 mod api;
 mod model;
 
-pub use model::OpenAIModel;
+pub use model::{OpenAIModel, OpenAIModelOptions};

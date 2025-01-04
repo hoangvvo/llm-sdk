@@ -17,6 +17,13 @@ use reqwest::Client;
 const OPENAI_AUDIO_SAMPLE_RATE: u32 = 24_000;
 const OPENAI_AUDIO_CHANNELS: u32 = 1;
 
+#[derive(Debug, Clone, Default)]
+pub struct OpenAIModelOptions {
+    pub base_url: Option<String>,
+    pub api_key: String,
+    pub model_id: String,
+}
+
 pub struct OpenAIModel {
     model_id: String,
     api_key: String,
@@ -26,9 +33,12 @@ pub struct OpenAIModel {
 }
 
 impl OpenAIModel {
-    #[must_use]
-    pub fn new(model_id: String, api_key: String) -> Self {
+    pub fn new(options: OpenAIModelOptions) -> Self {
         let client = Client::new();
+
+        let model_id = options.model_id;
+        let api_key = options.api_key;
+
         Self {
             model_id,
             api_key,
@@ -38,13 +48,6 @@ impl OpenAIModel {
         }
     }
 
-    #[must_use]
-    pub fn with_base_url(mut self, base_url: String) -> Self {
-        self.base_url = base_url;
-        self
-    }
-
-    #[must_use]
     pub fn with_metadata(mut self, metadata: LanguageModelMetadata) -> Self {
         self.metadata = Some(metadata);
         self
@@ -157,8 +160,18 @@ impl LanguageModel for OpenAIModel {
                             );
                             all_content_deltas.extend(incoming_content_deltas.clone());
                             for delta in incoming_content_deltas {
-                                yield PartialModelResponse { delta: delta.clone() }
+                                yield PartialModelResponse {
+                                    delta: Some(delta.clone()),
+                                    ..Default::default()
+                                 }
                             }
+                        }
+
+                        if let Some(usage) = &chunk.usage {
+                            yield PartialModelResponse {
+                                usage: Some(usage.clone().into()),
+                                ..Default::default()
+                            };
                         }
                     }
                     Err(e) => {

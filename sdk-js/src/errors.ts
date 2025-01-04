@@ -4,8 +4,21 @@
  */
 export class UnsupportedError extends Error {
   constructor(message: string) {
-    super(message);
+    super(`An input is not supported by the model: ${message}`);
     this.name = "Unsupported";
+  }
+}
+
+/**
+ * An output from the model is not recognized by the library.
+ * Please report this issue to the library maintainers.
+ */
+export class NotImplementedError extends Error {
+  constructor(message: string) {
+    super(
+      `An output from the model is not recognized by the library: ${message}. Please report this issue to the library maintainers.`,
+    );
+    this.name = "NotImplemented";
   }
 }
 
@@ -25,7 +38,7 @@ export class InvalidInputError extends Error {
  */
 export class InvariantError extends Error {
   constructor(message: string) {
-    super(message);
+    super(`Unexpected response from the model: ${message}`);
     this.name = "Invariant";
   }
 }

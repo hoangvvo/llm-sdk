@@ -309,9 +309,10 @@ pub struct ModelResponse {
 
 /// Represents a partial response from the language model, useful for streaming
 /// output via async generator.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PartialModelResponse {
-    pub delta: ContentDelta,
+    pub delta: Option<ContentDelta>,
+    pub usage: Option<ModelUsage>,
 }
 
 /// The model will use the specified tool.
