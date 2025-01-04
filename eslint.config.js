@@ -7,15 +7,18 @@ import tseslint from "typescript-eslint";
 export default [
   {
     files: ["**/*.{js,mjs,cjs,ts}"],
-    ignores: ["**/node_modules/**"],
+    ignores: ["**/node_modules/**", "**/dist/**"],
     rules: {
       "@typescript-eslint/consistent-type-imports": "error",
     },
   },
+  pluginJs.configs.recommended,
+  ...tseslint.configs.strictTypeChecked,
   {
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
+        project: ["./schema/tsconfig.json", "./sdk-js/tsconfig.json"],
         projectService: {
           allowDefaultProject: ["*.js", "*.mjs"],
         },
@@ -23,7 +26,9 @@ export default [
       },
     },
   },
-  pluginJs.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
+  {
+    ...tseslint.configs.disableTypeChecked,
+    files: ["**/*.js"],
+  },
   eslintPluginPrettierRecommended,
 ];

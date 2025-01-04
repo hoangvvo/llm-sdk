@@ -1,36 +1,35 @@
 import OpenAI from "openai";
 import {
-  InvalidValueError,
-  ModelUnsupportedMessagePart,
-  NotImplementedError,
-} from "../errors/errors.js";
+  InvalidInputError,
+  RefusalError,
+  UnsupportedError,
+} from "../errors.js";
 import {
   LanguageModel,
   type LanguageModelMetadata,
-} from "../models/language-model.js";
+} from "../language-model.js";
+import { guessDeltaIndex } from "../stream.utils.js";
 import type {
-  AssistantMessage,
   AudioFormat,
   AudioPart,
   AudioPartDelta,
   ContentDelta,
+  ImagePart,
   LanguageModelInput,
   ModelResponse,
   ModelTokensDetails,
   ModelUsage,
+  Part,
   PartialModelResponse,
+  ResponseFormatOption,
+  TextPart,
   TextPartDelta,
   Tool,
+  ToolCallPart,
   ToolCallPartDelta,
+  ToolChoiceOption,
 } from "../types.js";
-import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
-import type { InternalContentDelta } from "../utils/stream.utils.js";
-import {
-  ContentDeltaAccumulator,
-  guessDeltaIndex,
-} from "../utils/stream.utils.js";
-import { calculateCost } from "../utils/usage.utils.js";
-import { OpenAIRefusedError } from "./errors.js";
+import { calculateCost } from "../usage.utils.js";
 import type {
   OpenAIModelOptions,
   OpenAIPatchedCompletionTokenDetails,
@@ -39,10 +38,6 @@ import type {
 
 const OPENAI_AUDIO_SAMPLE_RATE = 24_000;
 const OPENAI_AUDIO_CHANNELS = 1;
-
-export type OpenAILanguageModelInput = LanguageModelInput & {
-  extra?: Partial<OpenAI.Chat.Completions.ChatCompletionCreateParams>;
-};
 
 export class OpenAIModel extends LanguageModel {
   provider: string;
@@ -53,48 +48,46 @@ export class OpenAIModel extends LanguageModel {
 
   constructor(
     public options: OpenAIModelOptions,
-    metadata?: LanguageModelMetadata,
+    metadata: LanguageModelMetadata,
   ) {
     super();
     this.provider = "openai";
     this.modelId = options.modelId;
-    if (metadata) this.metadata = metadata;
-
+    this.metadata = metadata;
     this.openai = new OpenAI({
       baseURL: options.baseURL,
       apiKey: options.apiKey,
     });
   }
 
-  async generate(input: OpenAILanguageModelInput): Promise<ModelResponse> {
-    const openaiInput = {
-      ...convertToOpenAIParams(input, this.options),
+  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+    const createParams = convertToOpenAIParams(input, this.modelId);
+
+    const response = await this.openai.chat.completions.create({
+      ...createParams,
       stream: false,
-    } satisfies OpenAI.Chat.ChatCompletionCreateParams;
-
-    const response = await this.openai.chat.completions.create(openaiInput);
-
-    if (!response.choices[0]) {
-      throw new Error("no choices in response");
-    }
+    });
 
     const choice = response.choices[0];
+    if (!choice) {
+      throw new InvalidInputError("No choices in response");
+    }
+    const { message } = choice;
 
-    if (choice.message.refusal) {
-      throw new OpenAIRefusedError(choice.message.refusal);
+    if (message.refusal) {
+      throw new RefusalError(message.refusal);
     }
 
-    const usage = response.usage
-      ? mapOpenAIUsage(response.usage, input)
-      : undefined;
+    const content = mapOpenAIMessage(message, createParams);
 
     const result: ModelResponse = {
-      content: mapOpenAIMessage(choice.message, openaiInput).content,
+      content,
     };
-    if (usage) {
-      result.usage = usage;
+
+    if (response.usage) {
+      result.usage = mapOpenAIUsage(response.usage, input);
       if (this.metadata?.pricing) {
-        result.cost = calculateCost(usage, this.metadata.pricing);
+        result.cost = calculateCost(result.usage, this.metadata.pricing);
       }
     }
 
@@ -102,113 +95,84 @@ export class OpenAIModel extends LanguageModel {
   }
 
   async *stream(
-    input: OpenAILanguageModelInput,
-  ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const openaiInput: OpenAI.Chat.ChatCompletionCreateParams = {
-      ...convertToOpenAIParams(input, this.options),
+    input: LanguageModelInput,
+  ): AsyncGenerator<PartialModelResponse> {
+    const createParams = convertToOpenAIParams(input, this.modelId);
+
+    const stream = await this.openai.chat.completions.create({
+      ...createParams,
       stream: true,
-      stream_options: {
-        include_usage: true,
-      },
-    };
+    });
 
-    const stream = await this.openai.chat.completions.create(openaiInput);
-
-    let usage: ModelUsage | undefined;
     let refusal = "";
-    const accumulator = new ContentDeltaAccumulator();
+
+    const allContentDeltas: ContentDelta[] = [];
 
     for await (const chunk of stream) {
-      const choices = chunk.choices as
-        | OpenAI.Chat.Completions.ChatCompletionChunk.Choice[]
-        | undefined;
-      const choice = choices ? choices[0] : undefined;
-      if (choice && choice.delta.refusal) {
-        refusal += choice.delta.refusal;
-      }
-      if (choice?.delta) {
+      const choice = chunk.choices[0];
+      if (choice) {
+        if (choice.delta.refusal) {
+          refusal += choice.delta.refusal;
+        }
+
         const incomingContentDeltas = mapOpenAIDelta(
           choice.delta,
-          accumulator.deltas,
-          openaiInput,
+          allContentDeltas,
+          createParams,
         );
-        accumulator.addChunks(incomingContentDeltas);
+
+        allContentDeltas.push(...incomingContentDeltas);
+
         for (const delta of incomingContentDeltas) {
           yield { delta };
         }
       }
-      if (chunk.usage) {
-        usage = mapOpenAIUsage(chunk.usage, input);
-      }
     }
 
     if (refusal) {
-      throw new OpenAIRefusedError(refusal);
+      throw new RefusalError(refusal);
     }
-
-    const finalResult: ModelResponse = {
-      content: accumulator.computeContent(),
-    };
-    if (usage) {
-      finalResult.usage = usage;
-      if (this.metadata?.pricing) {
-        finalResult.cost = calculateCost(usage, this.metadata.pricing);
-      }
-    }
-
-    return finalResult;
   }
 }
 
-export function convertToOpenAIParams(
+function convertToOpenAIParams(
   input: LanguageModelInput,
-  options: OpenAIModelOptions,
-): OpenAI.Chat.ChatCompletionCreateParams {
-  const params: OpenAI.Chat.ChatCompletionCreateParams = {
-    model: options.modelId,
-    messages: convertToOpenAIMessages(input, options),
-    ...convertToOpenAISamplingParams(input),
+  modelId: string,
+): Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> {
+  return {
+    model: modelId,
+    messages: convertToOpenAIMessages(input),
+    max_tokens: input.max_tokens ?? null,
+    temperature: input.temperature ?? null,
+    top_p: input.top_p ?? null,
+    presence_penalty: input.presence_penalty ?? null,
+    frequency_penalty: input.frequency_penalty ?? null,
+    seed: input.seed ?? null,
+    ...(input.tools && {
+      tools: input.tools.map(convertToOpenAITool),
+    }),
+    ...(input.tool_choice && {
+      tool_choice: convertToOpenAIToolChoice(input.tool_choice),
+    }),
+    ...(input.response_format && {
+      response_format: convertToOpenAIResponseFormat(input.response_format),
+    }),
+    modalities: input.modalities ?? null,
     ...input.extra,
   };
-  if (input.tools) {
-    params.tools = input.tools.map((tool) =>
-      convertToOpenAITool(tool, options),
-    );
-  }
-  if (input.tool_choice) {
-    params.tool_choice = convertToOpenAIToolChoice(input.tool_choice);
-  }
-  if (input.response_format) {
-    params.response_format = convertToOpenAIResponseFormat(
-      input.response_format,
-      options,
-    );
-  }
-  if (input.modalities) {
-    params.modalities = input.modalities;
-  }
-  if (input.metadata) {
-    params.metadata = input.metadata;
-  }
-  return params;
 }
 
-export function convertToOpenAIMessages(
-  input: Pick<LanguageModelInput, "messages" | "system_prompt">,
-  options: OpenAIModelOptions,
+function convertToOpenAIMessages(
+  input: LanguageModelInput,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
   const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  let messages = input.messages;
-  if (options.convertAudioPartsToTextParts) {
-    messages = messages.map(convertAudioPartsToTextParts);
-  }
   if (input.system_prompt) {
     openaiMessages.push({
       role: "system",
       content: input.system_prompt,
     });
   }
-  messages.forEach((message) => {
+  input.messages.forEach((message) => {
     switch (message.role) {
       case "assistant": {
         const openaiMessageParam: Omit<
@@ -224,41 +188,25 @@ export function convertToOpenAIMessages(
           switch (part.type) {
             case "text": {
               openaiMessageParam.content = openaiMessageParam.content || [];
-              openaiMessageParam.content.push({
-                type: "text",
-                text: part.text,
-              });
+              openaiMessageParam.content.push(
+                convertToOpenAIContentPartText(part),
+              );
               break;
             }
             case "tool-call": {
               openaiMessageParam.tool_calls =
                 openaiMessageParam.tool_calls || [];
-              openaiMessageParam.tool_calls.push({
-                type: "function",
-                id: part.tool_call_id,
-                function: {
-                  name: part.tool_name,
-                  arguments: JSON.stringify(part.args),
-                },
-              });
+              openaiMessageParam.tool_calls.push(convertToOpenAIToolCall(part));
               break;
             }
             case "audio": {
-              if (!part.id) {
-                throw new Error("audio part must have an id");
-              }
-              openaiMessageParam.audio = { id: part.id };
+              openaiMessageParam.audio =
+                convertToOpenAIAssistantMessageParamAudio(part);
               break;
             }
-            case "image":
-            case "tool-result":
-              throw new ModelUnsupportedMessagePart("openai", message, part);
-
             default: {
-              const exhaustiveCheck: never = part;
-              throw new InvalidValueError(
-                "message.part.type",
-                (exhaustiveCheck as { type: string }).type,
+              throw new UnsupportedError(
+                `Unsupported part in assistant message: ${part.type}`,
               );
             }
           }
@@ -266,216 +214,248 @@ export function convertToOpenAIMessages(
         openaiMessages.push(openaiMessageParam);
         break;
       }
+
       case "tool": {
-        message.content.forEach((toolResult) => {
+        message.content.forEach((part) => {
+          if (part.type !== "tool-result") {
+            throw new InvalidInputError(
+              "Tool messages must contain tool result parts",
+            );
+          }
+
           openaiMessages.push({
             role: "tool",
-            content: JSON.stringify(toolResult.result),
-            tool_call_id: toolResult.tool_call_id,
+            tool_call_id: part.tool_call_id,
+            content: part.content.map((part) => {
+              if (part.type === "text") {
+                return convertToOpenAIContentPartText(part);
+              }
+              throw new UnsupportedError(
+                `Unsupported part in tool message: ${part.type}`,
+              );
+            }),
           });
         });
         break;
       }
+
       case "user": {
-        const contentParts = message.content;
-        openaiMessages.push({
+        const openaiMessageParam: OpenAI.Chat.ChatCompletionUserMessageParam = {
           role: "user",
-          content: contentParts.map(
-            (part): OpenAI.Chat.ChatCompletionContentPart => {
-              switch (part.type) {
-                case "text": {
-                  return {
-                    type: "text",
-                    text: part.text,
-                  };
-                }
-                case "image": {
-                  return {
-                    type: "image_url",
-                    image_url: {
-                      url: `data:${part.mime_type};base64,${part.image_data}`,
-                    },
-                  };
-                }
-                case "audio": {
-                  if (!part.format) {
-                    throw new Error("audio part must have a format");
-                  }
-                  return {
-                    type: "input_audio",
-                    input_audio: {
-                      // this as assertion is not correct, but we will rely on OpenAI to throw an error
-                      format: (AUDIO_FORMAT_MAP[part.format] ||
-                        "wav") as OpenAI.ChatCompletionContentPartInputAudio.InputAudio["format"],
-                      data: part.audio_data,
-                    },
-                  };
-                }
-                case "tool-call":
-                case "tool-result":
-                  throw new ModelUnsupportedMessagePart(
-                    "openai",
-                    message,
-                    part,
-                  );
-                default: {
-                  const exhaustiveCheck: never = part;
-                  throw new InvalidValueError(
-                    "message.part.type",
-                    (exhaustiveCheck as { type: string }).type,
-                  );
-                }
-              }
-            },
-          ),
-        });
+          content: message.content.map((part) => {
+            switch (part.type) {
+              case "text":
+                return convertToOpenAIContentPartText(part);
+              case "image":
+                return convertToOpenAIContentPartImage(part);
+              case "audio":
+                return convertToOpenAIContentPartInputAudio(part);
+              default:
+                throw new UnsupportedError(
+                  `Unsupported part in user message: ${part.type}`,
+                );
+            }
+          }),
+        };
+
+        openaiMessages.push(openaiMessageParam);
         break;
-      }
-      default: {
-        const exhaustiveCheck: never = message;
-        throw new InvalidValueError(
-          "message.role",
-          (exhaustiveCheck as { role: string }).role,
-        );
       }
     }
   });
   return openaiMessages;
 }
 
-export function convertToOpenAISamplingParams(
-  input: Partial<LanguageModelInput>,
-): Partial<OpenAI.Chat.ChatCompletionCreateParams> {
-  const sampling: Partial<OpenAI.Chat.ChatCompletionCreateParams> = {};
-  if (typeof input.max_tokens === "number") {
-    sampling.max_tokens = input.max_tokens;
-  }
-  if (typeof input.temperature === "number") {
-    sampling.temperature = input.temperature;
-  }
-  if (typeof input.top_p === "number") {
-    sampling.top_p = input.top_p;
-  }
-  if (typeof input.presence_penalty === "number") {
-    sampling.presence_penalty = input.presence_penalty;
-  }
-  if (typeof input.frequency_penalty === "number") {
-    sampling.frequency_penalty = input.frequency_penalty;
-  }
-  if (typeof input.seed === "number") {
-    sampling.seed = input.seed;
-  }
-  return sampling;
+function convertToOpenAITool(
+  tool: Tool,
+): OpenAI.Chat.Completions.ChatCompletionTool {
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+      strict: true,
+    },
+  };
 }
 
-export function convertToOpenAIToolChoice(
-  toolChoice: NonNullable<LanguageModelInput["tool_choice"]>,
+function convertToOpenAIToolChoice(
+  toolChoice: ToolChoiceOption,
 ): OpenAI.Chat.Completions.ChatCompletionToolChoiceOption {
   switch (toolChoice.type) {
-    case "tool":
+    case "tool": {
       return {
         type: "function",
         function: {
           name: toolChoice.tool_name,
         },
       };
-    default:
-      return toolChoice.type;
-  }
-}
-
-export function convertToOpenAITool(
-  tool: Tool,
-  options: OpenAIModelOptions,
-): OpenAI.Chat.Completions.ChatCompletionTool {
-  const openaiTool: OpenAI.Chat.Completions.ChatCompletionTool = {
-    type: "function",
-    function: {
-      name: tool.name,
-      description: tool.description,
-    },
-  };
-  if (options.structuredOutputs) {
-    openaiTool.function.strict = true;
-  }
-  if (tool.parameters) {
-    openaiTool.function.parameters = tool.parameters;
-  }
-  return openaiTool;
-}
-
-// based on:
-// - OpenAI.Chat.ChatCompletionAudioParam["format"]
-// - https://platform.openai.com/docs/guides/speech-to-text
-// - https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
-// - https://platform.openai.com/docs/guides/text-to-speech#supported-output-formats
-// The returned type might not match the current specification on the OpenAI API
-// but we still return in case future support is added
-type PossibleOpenAIAudioFormat =
-  | "wav"
-  | "mp3"
-  | "flac"
-  | "opus"
-  | "aac"
-  | "pcm16"
-  | "g711_ulaw"
-  | "g711_alaw";
-
-/**
- * Maps the audio format to the OpenAI audio format.
- */
-const AUDIO_FORMAT_MAP: Record<
-  AudioFormat,
-  PossibleOpenAIAudioFormat | undefined
-> = {
-  wav: "wav",
-  mp3: "mp3",
-  linear16: "pcm16",
-  flac: "flac",
-  mulaw: "g711_ulaw",
-  alaw: "g711_alaw",
-  aac: "aac",
-  opus: "opus",
-};
-
-export function convertToOpenAIResponseFormat(
-  responseFormat: NonNullable<LanguageModelInput["response_format"]>,
-  options: OpenAIModelOptions,
-): NonNullable<
-  OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
-> {
-  switch (responseFormat.type) {
-    case "json":
-      if (options.structuredOutputs && responseFormat.schema) {
-        const schemaDescription = responseFormat.description;
-        const json_schema: OpenAI.ResponseFormatJSONSchema["json_schema"] = {
-          strict: true,
-          name: responseFormat.name,
-          schema: responseFormat.schema,
-        };
-        if (schemaDescription) {
-          json_schema.description = schemaDescription;
-        }
-        return {
-          type: "json_schema",
-          json_schema,
-        };
-      }
-      return { type: "json_object" };
-    case "text":
-      return { type: "text" };
-    default: {
-      const exhaustiveCheck: never = responseFormat;
-      throw new InvalidValueError(
-        "responseFormat.type",
-        (exhaustiveCheck as { type: string }).type,
-      );
+    }
+    case "auto": {
+      return "auto";
+    }
+    case "none": {
+      return "none";
+    }
+    case "required": {
+      return "required";
     }
   }
 }
 
-export function mapOpenAIAudioFormat(
-  format: PossibleOpenAIAudioFormat,
+function convertToOpenAIResponseFormat(
+  responseFormat: ResponseFormatOption,
+): NonNullable<
+  OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
+> {
+  switch (responseFormat.type) {
+    case "json": {
+      if (responseFormat.schema) {
+        return {
+          type: "json_schema",
+          json_schema: {
+            name: responseFormat.name,
+            ...(responseFormat.description && {
+              description: responseFormat.description,
+            }),
+            schema: responseFormat.schema,
+            strict: true,
+          },
+        };
+      }
+      return {
+        type: "json_object",
+      };
+    }
+    case "text": {
+      return { type: "text" };
+    }
+  }
+}
+
+function convertToOpenAIContentPartText(
+  part: TextPart,
+): OpenAI.Chat.ChatCompletionContentPartText {
+  return {
+    type: "text",
+    text: part.text,
+  };
+}
+
+function convertToOpenAIToolCall(
+  part: ToolCallPart,
+): OpenAI.Chat.Completions.ChatCompletionMessageToolCall {
+  return {
+    type: "function",
+    id: part.tool_call_id,
+    function: {
+      name: part.tool_name,
+      arguments: JSON.stringify(part.args),
+    },
+  };
+}
+
+function convertToOpenAIAssistantMessageParamAudio(
+  part: AudioPart,
+): OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam.Audio {
+  if (!part.id) {
+    throw new UnsupportedError("OpenAI audio parts must have an id");
+  }
+  return {
+    id: part.id,
+  };
+}
+
+function convertToOpenAIContentPartImage(
+  part: ImagePart,
+): OpenAI.Chat.ChatCompletionContentPartImage {
+  return {
+    type: "image_url",
+    image_url: {
+      url: `data:${part.mime_type};base64,${part.image_data}`,
+    },
+  };
+}
+
+function convertToOpenAIContentPartInputAudio(
+  part: AudioPart,
+): OpenAI.Chat.ChatCompletionContentPartInputAudio {
+  if (!part.format) {
+    throw new InvalidInputError("Audio part must have a format");
+  }
+  let format: OpenAI.Chat.ChatCompletionContentPartInputAudio.InputAudio["format"];
+  switch (part.format) {
+    case "mp3":
+      format = "mp3";
+      break;
+    case "wav":
+      format = "wav";
+      break;
+    default:
+      throw new InvalidInputError(`Unsupported audio format: ${part.format}`);
+  }
+  return {
+    type: "input_audio",
+    input_audio: {
+      data: part.audio_data,
+      format,
+    },
+  };
+}
+
+function mapOpenAIMessage(
+  message: OpenAI.Chat.Completions.ChatCompletionMessage,
+  createParams: OpenAI.Chat.Completions.ChatCompletionCreateParams,
+): Part[] {
+  const parts: Part[] = [];
+
+  if (message.content) {
+    parts.push({
+      type: "text",
+      text: message.content,
+    });
+  }
+
+  if (message.tool_calls) {
+    message.tool_calls.forEach((toolCall) => {
+      parts.push(mapOpenAIFunctionToolCall(toolCall));
+    });
+  }
+
+  if (message.audio) {
+    const audioPart: AudioPart = {
+      type: "audio",
+      audio_data: message.audio.data,
+    };
+    if (createParams.audio) {
+      audioPart.format = mapOpenAIAudioFormat(createParams.audio.format);
+    }
+    if (audioPart.format == "linear16") {
+      audioPart.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
+      audioPart.channels = OPENAI_AUDIO_CHANNELS;
+    }
+    parts.push(audioPart);
+  }
+
+  return parts;
+}
+
+function mapOpenAIFunctionToolCall(
+  messageToolCall: OpenAI.Chat.Completions.ChatCompletionMessageToolCall,
+): ToolCallPart {
+  return {
+    type: "tool-call",
+    tool_call_id: messageToolCall.id,
+    tool_name: messageToolCall.function.name,
+    args: JSON.parse(messageToolCall.function.arguments) as {
+      [k: string]: unknown;
+    },
+  };
+}
+
+function mapOpenAIAudioFormat(
+  format: OpenAI.Chat.Completions.ChatCompletionAudioParam["format"],
 ): AudioFormat {
   switch (format) {
     case "wav":
@@ -490,143 +470,12 @@ export function mapOpenAIAudioFormat(
       return "linear16";
     case "aac":
       return "aac";
-    case "g711_ulaw":
-      return "mulaw";
-    case "g711_alaw":
-      return "alaw";
-    default: {
-      const exhaustiveCheck: never = format;
-      throw new NotImplementedError(
-        "format",
-        (exhaustiveCheck as { type: string }).type,
-      );
-    }
   }
 }
 
-export function mapOpenAIMessage(
-  message: OpenAI.Chat.Completions.ChatCompletionMessage,
-  options?: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
-): AssistantMessage {
-  const content: AssistantMessage["content"] = [];
-
-  if (message.content) {
-    content.push({
-      type: "text",
-      text: message.content,
-    });
-  }
-
-  if (message.audio) {
-    const audioPart: AudioPart = { type: "audio", audio_data: "" };
-    audioPart.id = message.audio.id;
-    audioPart.format = mapOpenAIAudioFormat(options?.audio?.format || "pcm16");
-    if (audioPart.format === "linear16") {
-      audioPart.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
-      audioPart.channels = OPENAI_AUDIO_CHANNELS;
-    }
-    audioPart.audio_data = message.audio.data;
-    audioPart.transcript = message.audio.transcript;
-    content.push(audioPart);
-  }
-
-  if (message.tool_calls) {
-    message.tool_calls.forEach((toolCall) => {
-      const args = JSON.parse(toolCall.function.arguments) as {
-        [key: string]: unknown;
-      };
-      content.push({
-        type: "tool-call",
-        tool_call_id: toolCall.id,
-        tool_name: toolCall.function.name,
-        args,
-      });
-    });
-  }
-
-  return {
-    role: "assistant",
-    content,
-  };
-}
-
-export function mapOpenAIDelta(
-  delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
-    audio?: { id?: string; data?: string; transcript?: string };
-  },
-  existingContentDeltas: InternalContentDelta[],
-  options: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
-): ContentDelta[] {
-  const contentDeltas: ContentDelta[] = [];
-
-  if (delta.content) {
-    const part: TextPartDelta = {
-      type: "text",
-      text: delta.content,
-    };
-    contentDeltas.push({
-      index: guessDeltaIndex(part, [
-        ...existingContentDeltas,
-        ...contentDeltas,
-      ]),
-      part,
-    });
-  }
-  if (delta.audio) {
-    const part: AudioPartDelta = { type: "audio" };
-    if (delta.audio.id) {
-      part.id = delta.audio.id;
-    }
-    if (delta.audio.data) {
-      part.audio_data = delta.audio.data;
-      part.format = mapOpenAIAudioFormat(options.audio?.format || "pcm16");
-      part.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
-      part.channels = OPENAI_AUDIO_CHANNELS;
-    }
-    if (delta.audio.transcript) {
-      part.transcript = delta.audio.transcript;
-    }
-    contentDeltas.push({
-      index: guessDeltaIndex(part, [
-        ...existingContentDeltas,
-        ...contentDeltas,
-      ]),
-      part,
-    });
-  }
-  if (delta.tool_calls) {
-    const allExistingToolCalls = existingContentDeltas.filter(
-      (delta) => delta.part.type === "tool-call",
-    );
-    delta.tool_calls.forEach((toolCall) => {
-      const existingDelta = allExistingToolCalls[toolCall.index];
-
-      const part: ToolCallPartDelta = { type: "tool-call" };
-      if (toolCall.id) {
-        part.tool_call_id = toolCall.id;
-      }
-      if (toolCall.function?.name) {
-        part.tool_name = toolCall.function.name;
-      }
-      if (toolCall.function?.arguments) {
-        part.args = toolCall.function.arguments;
-      }
-      contentDeltas.push({
-        index: guessDeltaIndex(
-          part,
-          [...existingContentDeltas, ...contentDeltas],
-          existingDelta,
-        ),
-        part,
-      });
-    });
-  }
-  return contentDeltas;
-}
-
-export function mapOpenAIUsage(
+function mapOpenAIUsage(
   usage: OpenAI.CompletionUsage,
-  input: OpenAILanguageModelInput,
+  input: LanguageModelInput,
 ): ModelUsage {
   const result: ModelUsage = {
     input_tokens: usage.prompt_tokens,
@@ -644,9 +493,9 @@ export function mapOpenAIUsage(
   return result;
 }
 
-export function mapOpenAIPromptTokensDetails(
+function mapOpenAIPromptTokensDetails(
   details: OpenAIPatchedPromptTokensDetails,
-  input: OpenAILanguageModelInput,
+  input: LanguageModelInput,
 ): ModelTokensDetails {
   const textTokens = details.text_tokens;
   const audioTokens = details.audio_tokens;
@@ -684,7 +533,7 @@ export function mapOpenAIPromptTokensDetails(
   return result;
 }
 
-export function mapOpenAICompletionTokenDetails(
+function mapOpenAICompletionTokenDetails(
   details: OpenAIPatchedCompletionTokenDetails,
 ): ModelTokensDetails {
   const result: ModelTokensDetails = {};
@@ -695,4 +544,82 @@ export function mapOpenAICompletionTokenDetails(
     result.audio_tokens = details.audio_tokens;
   }
   return result;
+}
+
+function mapOpenAIDelta(
+  delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
+    audio?: { id?: string; data?: string; transcript?: string };
+  },
+  existingContentDeltas: ContentDelta[],
+  createParams: Partial<OpenAI.Chat.ChatCompletionCreateParams>,
+): ContentDelta[] {
+  const contentDeltas: ContentDelta[] = [];
+
+  if (delta.content) {
+    const part: TextPartDelta = {
+      type: "text",
+      text: delta.content,
+    };
+    const index = guessDeltaIndex(part, [
+      ...existingContentDeltas,
+      ...contentDeltas,
+    ]);
+    contentDeltas.push({
+      part,
+      index,
+    });
+  }
+
+  if (delta.audio) {
+    const part: AudioPartDelta = { type: "audio" };
+    if (delta.audio.id) {
+      part.id = delta.audio.id;
+    }
+    if (delta.audio.data) {
+      part.audio_data = delta.audio.data;
+      if (createParams.audio?.format) {
+        part.format = mapOpenAIAudioFormat(createParams.audio.format);
+      }
+    }
+    if (delta.audio.transcript) {
+      part.transcript = delta.audio.transcript;
+    }
+    contentDeltas.push({
+      part,
+      index: guessDeltaIndex(part, [
+        ...existingContentDeltas,
+        ...contentDeltas,
+      ]),
+    });
+  }
+
+  if (delta.tool_calls) {
+    const allExistingToolCalls = existingContentDeltas.filter(
+      (delta) => delta.part.type === "tool-call",
+    );
+    delta.tool_calls.forEach((toolCall) => {
+      const existingDelta = allExistingToolCalls[toolCall.index];
+
+      const part: ToolCallPartDelta = { type: "tool-call" };
+      if (toolCall.id) {
+        part.tool_call_id = toolCall.id;
+      }
+      if (toolCall.function?.name) {
+        part.tool_name = toolCall.function.name;
+      }
+      if (toolCall.function?.arguments) {
+        part.args = toolCall.function.arguments;
+      }
+      contentDeltas.push({
+        index: guessDeltaIndex(
+          part,
+          [...existingContentDeltas, ...contentDeltas],
+          existingDelta,
+        ),
+        part,
+      });
+    });
+  }
+
+  return contentDeltas;
 }

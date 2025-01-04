@@ -1,6 +1,6 @@
 use crate::{
     language_model::{LanguageModelMetadata, LanguageModelStream},
-    openai::{self, api as openai_api},
+    openai::api as openai_api,
     stream_utils,
     usage_utils::calculate_cost,
     AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ContentDeltaPart,
@@ -93,7 +93,6 @@ impl LanguageModel for OpenAIModel {
 
         let usage: Option<ModelUsage> = json.usage.map(Into::into);
 
-        // Calculate cost if both usage and self.metadata.pricing are available
         let cost = if let (Some(usage), Some(pricing)) = (
             usage.as_ref(),
             self.metadata.as_ref().and_then(|m| m.pricing.as_ref()),
@@ -255,7 +254,7 @@ fn into_openai_messages(
                                 .tool_calls
                                 .get_or_insert_default()
                                 .push(openai_api::ChatCompletionMessageToolCall::Function(
-                                    part.into(),
+                                    part.try_into()?,
                                 ));
                         }
                         Part::Audio(part) => {
@@ -384,16 +383,18 @@ impl TryFrom<&AudioPart> for openai_api::ChatCompletionAssistantMessageParamAudi
     }
 }
 
-impl From<&ToolCallPart> for openai_api::ChatCompletionMessageFunctionToolCall {
-    fn from(part: &ToolCallPart) -> Self {
-        Self {
+impl TryFrom<&ToolCallPart> for openai_api::ChatCompletionMessageFunctionToolCall {
+    type Error = LanguageModelError;
+
+    fn try_from(part: &ToolCallPart) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: part.tool_call_id.to_string(),
             function: openai_api::ChatCompletionMessageFunctionToolCallFunction {
                 name: part.tool_name.to_string(),
                 arguments: serde_json::from_value(part.args.clone())
                     .map_err(|e| LanguageModelError::InvalidInput(e.to_string()))?,
             },
-        }
+        })
     }
 }
 

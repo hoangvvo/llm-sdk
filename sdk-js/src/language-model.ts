@@ -4,7 +4,7 @@ import type {
   LanguageModelPricing,
   ModelResponse,
   PartialModelResponse,
-} from "../types.js";
+} from "./types.js";
 
 export type LanguageModelMetadata = {
   /**
@@ -39,5 +39,5 @@ export abstract class LanguageModel {
    */
   abstract stream(
     input: LanguageModelInput,
-  ): AsyncGenerator<PartialModelResponse, ModelResponse>;
+  ): AsyncGenerator<PartialModelResponse>;
 }

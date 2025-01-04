@@ -1,3 +1,2 @@
-export * from "./errors.js";
-export * from "./openai.js";
-export * from "./types.js";
+export { OpenAIModel } from "./openai.js";
+export type { OpenAIModelOptions } from "./types.js";
