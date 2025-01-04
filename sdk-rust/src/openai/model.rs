@@ -243,6 +243,7 @@ fn into_openai_params(
             .and_then(|value| {
                 serde_json::from_value::<openai_api::ChatCompletionAudioParam>(value.clone()).ok()
             }),
+        extra,
         ..Default::default()
     })
 }

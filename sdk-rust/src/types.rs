@@ -388,8 +388,10 @@ pub struct LanguageModelInput {
     pub metadata: Option<HashMap<String, String>>,
     /// Extra options that the model may support.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub extra: Option<HashMap<String, Value>>,
+    pub extra: Option<LanguageModelInputExtra>,
 }
+
+pub type LanguageModelInputExtra = Value;
 
 /// A metadata property that describes the pricing of the model.
 #[derive(Debug, Clone, Serialize, Deserialize)]

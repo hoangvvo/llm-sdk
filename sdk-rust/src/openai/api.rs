@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::JSONSchema;
+use crate::{JSONSchema, LanguageModelInputExtra};
 
 // https://platform.openai.com/docs/api-reference/chat
 
@@ -132,6 +132,9 @@ pub struct ChatCompletionCreateParams {
     /// We generally recommend altering this or `temperature` but not both.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
+
+    #[serde(skip_serializing_if = "Option::is_none", flatten)]
+    pub extra: Option<LanguageModelInputExtra>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
