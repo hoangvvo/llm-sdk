@@ -18,6 +18,12 @@ pub enum AudioFormat {
     Opus,
 }
 
+impl Default for AudioFormat {
+    fn default() -> Self {
+        AudioFormat::Linear16
+    }
+}
+
 /// A part of the message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
@@ -128,8 +134,8 @@ pub struct ImagePart {
 pub struct AudioPart {
     /// The base64-encoded audio data.
     pub audio_data: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<AudioFormat>,
+    /// The format of the audio.
+    pub format: AudioFormat,
     /// The sample rate of the audio. E.g. 44100, 48000.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sample_rate: Option<u32>,

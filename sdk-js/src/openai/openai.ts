@@ -319,9 +319,6 @@ function convertToOpenAIContentPartImage(
 function convertToOpenAIContentPartInputAudio(
   part: AudioPart,
 ): OpenAI.Chat.ChatCompletionContentPartInputAudio {
-  if (!part.format) {
-    throw new InvalidInputError("Audio part must have a format");
-  }
   let format: OpenAI.Chat.ChatCompletionContentPartInputAudio.InputAudio["format"];
   switch (part.format) {
     case "mp3":
@@ -487,13 +484,16 @@ function mapOpenAIMessage(
   }
 
   if (message.audio) {
+    if (!createParams.audio) {
+      throw new InvariantError(
+        "Audio returned from OpenAI API but no audio parameter was provided",
+      );
+    }
     const audioPart: AudioPart = {
       type: "audio",
       audio_data: message.audio.data,
+      format: mapOpenAIAudioFormat(createParams.audio.format),
     };
-    if (createParams.audio) {
-      audioPart.format = mapOpenAIAudioFormat(createParams.audio.format);
-    }
     if (audioPart.format == "linear16") {
       audioPart.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
       audioPart.channels = OPENAI_AUDIO_CHANNELS;

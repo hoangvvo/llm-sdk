@@ -101,7 +101,10 @@ export interface AudioPart {
    * The base64-encoded audio data.
    */
   audio_data: string;
-  format?: AudioFormat;
+  /**
+   * The format of the audio data.
+   */
+  format: AudioFormat;
   /**
    * The sample rate of the audio. E.g. 44100, 48000.
    */

@@ -391,11 +391,8 @@ impl TryFrom<&AudioPart> for openai_api::ChatCompletionContentPartInputAudio {
             input_audio: openai_api::ChatCompletionContentPartInputAudioInputAudio {
                 data: part.audio_data.clone(),
                 format: match part.format {
-                    None => Err(LanguageModelError::InvalidInput(
-                        "Audio part must have a format".to_string(),
-                    )),
-                    Some(AudioFormat::Wav) => Ok(openai_api::AudioInputFormat::Wav),
-                    Some(AudioFormat::Mp3) => Ok(openai_api::AudioInputFormat::Mp3),
+                    AudioFormat::Wav => Ok(openai_api::AudioInputFormat::Wav),
+                    AudioFormat::Mp3 => Ok(openai_api::AudioInputFormat::Mp3),
                     _ => Err(LanguageModelError::Unsupported(format!(
                         "Cannot convert audio format to OpenAI InputAudio format for format {:?}",
                         part.format
@@ -535,15 +532,22 @@ fn map_openai_message(
     if let Some(audio) = &message.audio {
         let mut audio_part = AudioPart {
             id: Some(audio.id.to_string()),
-            format: create_params
-                .audio
-                .as_ref()
-                .map(|audio_param| &audio_param.format)
-                .map(AudioFormat::from),
+            format: AudioFormat::from(
+                &create_params
+                    .audio
+                    .as_ref()
+                    .ok_or_else(|| {
+                        LanguageModelError::Invariant(
+                            "Audio returned from OpenAI API but no audio parameter was provided"
+                                .to_string(),
+                        )
+                    })?
+                    .format,
+            ),
             audio_data: audio.data.to_string(),
             ..Default::default()
         };
-        if matches!(audio_part.format, Some(AudioFormat::Linear16)) {
+        if matches!(audio_part.format, AudioFormat::Linear16) {
             audio_part.sample_rate = Some(OPENAI_AUDIO_SAMPLE_RATE);
             audio_part.channels = Some(OPENAI_AUDIO_CHANNELS);
         }

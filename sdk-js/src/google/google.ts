@@ -19,9 +19,11 @@ import {
   GoogleGenerativeAI,
   type GenerativeModel,
 } from "@google/generative-ai";
-import { mapAudioFormatToMimeType } from "../audio.utils.js";
 import {
-  InvalidInputError,
+  mapAudioFormatToMimeType,
+  mapMimeTypeToAudioFormat,
+} from "../audio.utils.js";
+import {
   InvariantError,
   NotImplementedError,
   UnsupportedError,
@@ -235,9 +237,6 @@ function convertToGoogleInlineData(
         },
       };
     case "audio": {
-      if (!part.format) {
-        throw new InvalidInputError("Audio part must have a format");
-      }
       return {
         inlineData: {
           data: part.audio_data,
@@ -414,6 +413,7 @@ function mapGoogleInlineData(
   if (part.inlineData.mimeType.startsWith("audio/")) {
     return {
       type: "audio",
+      format: mapMimeTypeToAudioFormat(part.inlineData.mimeType),
       audio_data: part.inlineData.data,
     };
   }

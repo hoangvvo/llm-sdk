@@ -15,6 +15,10 @@ pub enum LanguageModelError {
     /// (e.g. using non text for assistant message parts)
     #[error("Unsupported feature: {0}")]
     Unsupported(String),
+    /// An output from the model is not recognized by the library.
+    /// Please report this issue to the library maintainers.
+    #[error("Unimplemented feature: {0}")]
+    NotImplemented(String),
     /// The response from the provider was unexpected. (e.g. no choices returned
     /// in an `OpenAI` completion)
     #[error("Invariant: {0}")]
