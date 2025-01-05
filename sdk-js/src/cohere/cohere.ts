@@ -1,33 +1,29 @@
-import type { Cohere } from "cohere-ai";
-import { CohereClientV2 } from "cohere-ai";
-import {
-  InvalidValueError,
-  ModelUnsupportedMessagePart,
-} from "../errors/errors.js";
-import {
-  LanguageModel,
-  type LanguageModelMetadata,
-} from "../models/language-model.js";
+import { Cohere, CohereClientV2 } from "cohere-ai";
+import { InvalidInputError, UnsupportedError } from "../errors.js";
+import type { LanguageModelMetadata } from "../language-model.js";
+import { LanguageModel } from "../language-model.js";
 import type {
-  AssistantMessage,
   ContentDelta,
+  ImagePart,
   LanguageModelInput,
   Message,
   ModelResponse,
   ModelUsage,
+  Part,
   PartialModelResponse,
+  ResponseFormatOption,
+  TextPart,
   Tool,
   ToolCallPart,
   ToolCallPartDelta,
+  ToolChoiceOption,
 } from "../types.js";
-import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
-import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
-import { calculateCost } from "../utils/usage.utils.js";
-import type { CohereModelOptions } from "./types.js";
+import { calculateCost } from "../usage.utils.js";
 
-export type CohereLanguageModelInput = LanguageModelInput & {
-  extra?: Partial<Cohere.V2ChatRequest>;
-};
+export interface CohereModelOptions {
+  apiKey: string;
+  modelId: string;
+}
 
 export class CohereModel extends LanguageModel {
   public provider: string;
@@ -44,26 +40,22 @@ export class CohereModel extends LanguageModel {
     this.provider = "cohere";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
-
     this.cohere = new CohereClientV2({
       token: options.apiKey,
     });
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const response = await this.cohere.chat(
-      convertToCohereParams(input, this.options),
-    );
+    const request = convertToCohereChatRequest(input, this.modelId);
+    const response = await this.cohere.chat(request);
 
-    const usage = response.usage ? mapCohereUsage(response.usage) : undefined;
+    const content = mapCohereMessageResponse(response.message);
+    const result: ModelResponse = { content };
 
-    const result: ModelResponse = {
-      content: mapCohereMessage(response.message).content,
-    };
-    if (usage) {
-      result.usage = usage;
+    if (response.usage) {
+      result.usage = mapCohereUsage(response.usage);
       if (this.metadata?.pricing) {
-        result.cost = calculateCost(usage, this.metadata.pricing);
+        result.cost = calculateCost(result.usage, this.metadata.pricing);
       }
     }
 
@@ -72,140 +64,163 @@ export class CohereModel extends LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
-  ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const stream = await this.cohere.chatStream(
-      convertToCohereParams(input, this.options),
-    );
-
-    let usage: ModelUsage | undefined;
-
-    const accumulator = new ContentDeltaAccumulator();
+  ): AsyncGenerator<PartialModelResponse> {
+    const request = convertToCohereChatRequest(input, this.modelId);
+    const stream = await this.cohere.chatStream(request);
 
     for await (const event of stream) {
       switch (event.type) {
         case "content-start":
-        case "content-delta":
-        case "tool-call-start":
+        case "content-delta": {
+          const incomingContentDelta = mapCohereStreamedContent(event);
+          if (incomingContentDelta) {
+            yield { delta: incomingContentDelta };
+          }
+          break;
+        }
+        case "tool-call-start": {
+          const incomingContentDelta = mapCohereToolCallStartEvent(event);
+          if (incomingContentDelta) {
+            yield { delta: incomingContentDelta };
+          }
+          break;
+        }
         case "tool-call-delta": {
-          const delta = mapCohereContentDelta(event);
-          if (delta) {
-            yield { delta };
-            accumulator.addChunks([delta]);
+          const incomingContentDelta = mapCohereToolCallDeltaEvent(event);
+          if (incomingContentDelta) {
+            yield { delta: incomingContentDelta };
           }
-          break;
-        }
-        case "message-end": {
-          if (event.delta?.usage) {
-            usage = mapCohereUsage(event.delta.usage);
-          }
-          break;
         }
       }
     }
-
-    const result: ModelResponse = {
-      content: accumulator.computeContent(),
-    };
-    if (usage) {
-      result.usage = usage;
-      if (this.metadata?.pricing) {
-        result.cost = calculateCost(usage, this.metadata.pricing);
-      }
-    }
-
-    return result;
   }
 }
 
-export function convertToCohereParams(
+function convertToCohereChatRequest(
   input: LanguageModelInput,
-  options: CohereModelOptions,
+  modelId: string,
 ): Cohere.V2ChatRequest {
-  const response_format = convertToCohereResponseFormat(input.response_format);
-  const samplingParams = convertToCohereSamplingParams(input);
+  const {
+    messages,
+    system_prompt,
+    max_tokens,
+    temperature,
+    top_p,
+    top_k,
+    presence_penalty,
+    frequency_penalty,
+    seed,
+    tools,
+    tool_choice,
+    response_format,
+    extra,
+  } = input;
 
-  const params: Cohere.V2ChatRequest = {
-    model: options.modelId,
-    messages: convertToCohereMessages(input, options),
-    ...samplingParams,
-    ...input.extra,
+  const toolChoice = tool_choice
+    ? convertToCohereToolChoice(tool_choice)
+    : undefined;
+
+  return {
+    model: modelId,
+    messages: convertToCohereMessages(messages, system_prompt),
+    ...(typeof max_tokens === "number" && { maxTokens: max_tokens }),
+    ...(typeof temperature === "number" && { temperature }),
+    ...(typeof top_p === "number" && { p: top_p }),
+    ...(typeof top_k === "number" && { k: top_k }),
+    ...(typeof presence_penalty === "number" && {
+      presencePenalty: presence_penalty,
+    }),
+    ...(typeof frequency_penalty === "number" && {
+      frequencyPenalty: frequency_penalty,
+    }),
+    ...(typeof seed === "number" && { seed }),
+    ...(tools && { tools: tools.map(convertToCohereTool) }),
+    ...(toolChoice && { toolChoice }),
+    strictTools: true,
+    ...(response_format && {
+      responseFormat: convertToCohereResponseFormat(response_format),
+    }),
+    ...extra,
   };
-  if (input.tools) {
-    params.tools = input.tools.map(convertToCohereTool);
-  }
-  if (response_format) {
-    params.responseFormat = response_format;
-  }
-  return params;
 }
 
-export function convertToCohereMessages(
-  input: Pick<CohereLanguageModelInput, "messages" | "system_prompt">,
-  options: CohereModelOptions,
+// MARK: To Provider Messages
+
+function convertToCohereMessages(
+  messages: Message[],
+  systemPrompt: string | undefined,
 ): Cohere.ChatMessageV2[] {
   const cohereMessages: Cohere.ChatMessageV2[] = [];
 
-  let messages = input.messages;
-  if (options.convertAudioPartsToTextParts) {
-    messages = messages.map(convertAudioPartsToTextParts);
-  }
-
-  if (input.system_prompt) {
+  if (systemPrompt) {
     cohereMessages.push({
       role: "system",
-      content: [
-        {
-          type: "text",
-          text: input.system_prompt,
-        },
-      ],
+      content: systemPrompt,
     });
   }
 
   messages.forEach((message) => {
-    const { content, toolCalls, toolResults } =
-      convertToCohereMessageParam(message);
     switch (message.role) {
       case "user": {
-        if (!content) {
-          throw new Error("User message must have contents");
-        }
         cohereMessages.push({
           role: "user",
-          content,
+          content: message.content.map(convertToCohereContent),
         });
         break;
       }
+
       case "assistant": {
-        const assistantMessage: Cohere.ChatMessageV2 = { role: "assistant" };
-        if (content) {
-          assistantMessage.content = content;
-        }
-        if (toolCalls) {
-          assistantMessage.toolCalls = toolCalls;
-        }
-        cohereMessages.push(assistantMessage);
-        break;
-      }
-      case "tool": {
-        if (toolResults) {
-          for (const toolResult of toolResults) {
-            cohereMessages.push({
-              role: "tool",
-              ...toolResult,
-            });
+        const cohereAssistantMessage: Omit<
+          Cohere.ChatMessageV2.Assistant,
+          "content"
+        > & {
+          content?: Cohere.AssistantMessageContentItem[];
+        } = {
+          role: "assistant",
+        };
+        message.content.forEach((part) => {
+          switch (part.type) {
+            case "text": {
+              cohereAssistantMessage.content =
+                cohereAssistantMessage.content ?? [];
+              cohereAssistantMessage.content.push(
+                convertToCohereTextContent(part),
+              );
+              break;
+            }
+            case "tool-call": {
+              cohereAssistantMessage.toolCalls =
+                cohereAssistantMessage.toolCalls ?? [];
+              cohereAssistantMessage.toolCalls.push(
+                convertToCohereToolCall(part),
+              );
+              break;
+            }
+            default:
+              throw new UnsupportedError(
+                `Unsupported part in assistant message: ${part.type}`,
+              );
           }
-        } else {
-          throw new Error("Tool message must have tool results");
-        }
+        });
+        cohereMessages.push(cohereAssistantMessage);
         break;
       }
-      default: {
-        const exhaustiveCheck: never = message;
-        throw new InvalidValueError(
-          "message.role",
-          (exhaustiveCheck as { role: string }).role,
-        );
+
+      case "tool": {
+        message.content.forEach((part) => {
+          if (part.type !== "tool-result") {
+            throw new InvalidInputError(
+              "Tool messages must contain only tool result parts",
+            );
+          }
+
+          cohereMessages.push({
+            role: "tool",
+            toolCallId: part.tool_call_id,
+            content: part.content.map(convertToCohereToolMessageContent),
+          });
+        });
+        break;
       }
     }
   });
@@ -213,209 +228,142 @@ export function convertToCohereMessages(
   return cohereMessages;
 }
 
-export function convertToCohereMessageParam(message: Message): {
-  content?: Cohere.Content[];
-  toolCalls?: Cohere.ToolCallV2[];
-  toolResults?: Cohere.ToolMessageV2[];
-} {
-  let content: Cohere.Content[] | undefined;
-  let toolCalls: Cohere.ToolCallV2[] | undefined;
-  let toolResults: Cohere.ToolMessageV2[] | undefined;
-
-  message.content.forEach((part) => {
-    switch (part.type) {
-      case "text": {
-        content = content ?? [];
-        content.push({
-          type: "text",
-          text: part.text,
-        });
-        break;
-      }
-      case "audio":
-      case "image":
-        throw new ModelUnsupportedMessagePart("cohere", message, part);
-      case "tool-call": {
-        toolCalls = toolCalls ?? [];
-        toolCalls.push({
-          id: part.tool_call_id,
-          type: "function",
-          function: {
-            name: part.tool_name,
-            ...(part.args ? { arguments: JSON.stringify(part.args) } : {}),
-          },
-        });
-        break;
-      }
-      case "tool-result": {
-        toolResults = toolResults ?? [];
-        toolResults.push({
-          toolCallId: part.tool_call_id,
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(part.result),
-            },
-          ],
-        });
-        break;
-      }
-      default: {
-        const exhaustiveCheck: never = part;
-        throw new InvalidValueError(
-          "part.type",
-          (exhaustiveCheck as { type: string }).type,
-        );
-      }
-    }
-  });
-
-  const result: {
-    content?: Cohere.Content[];
-    toolCalls?: Cohere.ToolCallV2[];
-    toolResults?: Cohere.ToolMessageV2[];
-  } = {};
-  if (content) {
-    result.content = content;
+function convertToCohereContent(part: Part): Cohere.Content {
+  switch (part.type) {
+    case "text":
+      return convertToCohereTextContent(part);
+    case "image":
+      return convertToCohereImageContent(part);
+    default:
+      throw new UnsupportedError(`Unsupported part type: ${part.type}`);
   }
-  if (toolCalls) {
-    result.toolCalls = toolCalls;
-  }
-  if (toolResults) {
-    result.toolResults = toolResults;
-  }
-  return result;
 }
 
-export function convertToCohereSamplingParams(
-  input: Partial<LanguageModelInput>,
-): Partial<Cohere.V2ChatRequest> {
-  const params: Partial<Cohere.V2ChatRequest> = {};
-  if (typeof input.max_tokens === "number") {
-    params.maxTokens = input.max_tokens;
-  }
-  if (typeof input.temperature === "number") {
-    params.temperature = input.temperature;
-  }
-  if (typeof input.top_p === "number") {
-    params.p = input.top_p;
-  }
-  if (typeof input.presence_penalty === "number") {
-    params.presencePenalty = input.presence_penalty;
-  }
-  if (typeof input.frequency_penalty === "number") {
-    params.frequencyPenalty = input.frequency_penalty;
-  }
-  if (typeof input.seed === "number") {
-    params.seed = input.seed;
-  }
-  return params;
+function convertToCohereTextContent(textPart: TextPart): Cohere.Content.Text {
+  return {
+    type: "text",
+    text: textPart.text,
+  };
 }
 
-export function convertToCohereTool(tool: Tool): Cohere.ToolV2 {
-  const toolParams: Cohere.ToolV2 = {
+function convertToCohereImageContent(
+  imagePart: ImagePart,
+): Cohere.Content.ImageUrl {
+  return {
+    type: "image_url",
+    imageUrl: {
+      url: `data:${imagePart.mime_type};base64,${imagePart.image_data}`,
+    },
+  };
+}
+
+function convertToCohereToolCall(
+  toolCallPart: ToolCallPart,
+): Cohere.ToolCallV2 {
+  return {
+    type: "function",
+    id: toolCallPart.tool_call_id,
+    function: {
+      name: toolCallPart.tool_name,
+      arguments: JSON.stringify(toolCallPart.args),
+    },
+  };
+}
+
+function convertToCohereToolMessageContent(part: Part): Cohere.ToolContent {
+  switch (part.type) {
+    case "text":
+      return convertToCohereTextContent(part);
+    default:
+      throw new UnsupportedError(
+        `Unsupported part in tool message: ${part.type}`,
+      );
+  }
+}
+
+// MARK: To Provider Tools
+
+function convertToCohereTool(tool: Tool): Cohere.ToolV2 {
+  return {
     type: "function",
     function: {
       name: tool.name,
       description: tool.description,
+      parameters: tool.parameters,
     },
   };
-
-  if (tool.parameters && toolParams.function) {
-    toolParams.function.parameters = convertToCohereSchema(tool.parameters);
-  }
-  return toolParams;
 }
 
-export function convertToCohereSchema(
-  schema: Record<string, unknown>,
-): Record<string, unknown> {
-  const newSchema: Record<string, unknown> = { ...schema };
-  if (newSchema["properties"]) {
-    newSchema["properties"] = convertToCohereSchema(
-      newSchema["properties"] as Record<string, unknown>,
-    );
+function convertToCohereToolChoice(
+  toolChoice: ToolChoiceOption,
+): Cohere.V2ChatRequestToolChoice | undefined {
+  switch (toolChoice.type) {
+    case "auto": {
+      return undefined;
+    }
+    case "none": {
+      return Cohere.V2ChatRequestToolChoice.None;
+    }
+    case "required": {
+      return Cohere.V2ChatRequestToolChoice.Required;
+    }
+    default:
+      throw new UnsupportedError(
+        `Unsupported tool choice type: ${toolChoice.type}`,
+      );
   }
-  if (newSchema["items"]) {
-    newSchema["items"] = convertToCohereSchema(
-      newSchema["items"] as Record<string, unknown>,
-    );
-  }
-  if (newSchema["anyOf"]) {
-    newSchema["anyOf"] = (newSchema["anyOf"] as Record<string, unknown>[]).map(
-      convertToCohereSchema,
-    );
-  }
-  if (newSchema["allOf"]) {
-    newSchema["allOf"] = (newSchema["allOf"] as Record<string, unknown>[]).map(
-      convertToCohereSchema,
-    );
-  }
-  if (newSchema["oneOf"]) {
-    newSchema["oneOf"] = (newSchema["oneOf"] as Record<string, unknown>[]).map(
-      convertToCohereSchema,
-    );
-  }
-  if ("additionalProperties" in newSchema) {
-    delete newSchema["additionalProperties"];
-  }
-  return newSchema;
 }
 
-export function convertToCohereResponseFormat(
-  responseFormat: LanguageModelInput["response_format"],
-): Cohere.ResponseFormatV2 | undefined {
-  if (!responseFormat) return undefined;
+// MARK: To Provider Response Format
 
+function convertToCohereResponseFormat(
+  responseFormat: ResponseFormatOption,
+): Cohere.ResponseFormatV2 {
   switch (responseFormat.type) {
     case "json": {
-      const format: Cohere.ResponseFormatV2 = {
+      return {
         type: "json_object",
+        ...(responseFormat.schema && {
+          jsonSchema: responseFormat.schema,
+        }),
       };
-      if (responseFormat.schema) {
-        format.jsonSchema = convertToCohereSchema(responseFormat.schema);
-      }
-      return format;
     }
-    case "text":
+    case "text": {
       return { type: "text" };
-    default: {
-      const exhaustiveCheck: never = responseFormat;
-      throw new InvalidValueError(
-        "responseFormat.type",
-        (exhaustiveCheck as { type: string }).type,
-      );
     }
   }
 }
 
-export function mapCohereMessage(
+// MARK: To SDK Message
+
+function mapCohereMessageResponse(
   messageResponse: Cohere.AssistantMessageResponse,
-): AssistantMessage {
-  const content: AssistantMessage["content"] = [];
+): Part[] {
+  const parts: Part[] = [];
 
   if (messageResponse.content) {
-    messageResponse.content.forEach((contentBlock) => {
-      content.push({
-        type: "text",
-        text: contentBlock.text,
-      });
+    messageResponse.content.forEach((contentItem) => {
+      parts.push(mapCohereTextContent(contentItem));
     });
   }
 
   if (messageResponse.toolCalls) {
     messageResponse.toolCalls.forEach((toolCall) => {
-      content.push(mapCohereToolCall(toolCall));
+      parts.push(mapCohereToolCall(toolCall));
     });
   }
 
+  return parts;
+}
+
+function mapCohereTextContent(content: Cohere.Content.Text): Part {
   return {
-    role: "assistant",
-    content,
+    type: "text",
+    text: content.text,
   };
 }
 
-export function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
+function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
   if (!toolCall.id) {
     throw new Error(`Tool call is missing an ID`);
   }
@@ -430,74 +378,78 @@ export function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
     tool_name: functionName,
     args: functionArguments
       ? (JSON.parse(functionArguments) as Record<string, unknown>)
-      : null,
+      : {},
   };
 }
 
-export function mapCohereContentDelta(
+// MARK: To SDK Delta
+
+function mapCohereStreamedContent(
   event:
     | Cohere.StreamedChatResponseV2.ContentDelta
-    | Cohere.StreamedChatResponseV2.ContentStart
-    | Cohere.StreamedChatResponseV2.ToolCallDelta
-    | Cohere.StreamedChatResponseV2.ToolCallStart,
-): ContentDelta | undefined {
-  if (typeof event.index !== "number") {
-    throw new Error("Delta event is missing index");
-  }
-  switch (event.type) {
-    case "content-start":
-    case "content-delta": {
-      const text = event.delta?.message?.content?.text;
-      if (!text) {
-        return undefined;
-      }
-      return {
-        index: event.index,
-        part: {
-          type: "text",
-          text,
-        },
-      };
-    }
-    case "tool-call-start": {
-      const toolCall = event.delta?.message?.toolCalls;
-      const part: ToolCallPartDelta = {
-        type: "tool-call",
-      };
-      if (toolCall?.id) {
-        part.tool_call_id = toolCall.id;
-      }
-      if (toolCall?.function?.name) {
-        part.tool_name = toolCall.function.name;
-      }
-      if (toolCall?.function?.arguments) {
-        part.args = toolCall.function.arguments;
-      }
-      return {
-        index: event.index,
-        part,
-      };
-    }
-    case "tool-call-delta": {
-      const toolCall = event.delta?.message?.toolCalls;
-      const part: ToolCallPartDelta = { type: "tool-call" };
-      if (toolCall?.function?.arguments) {
-        part.args = toolCall.function.arguments;
-      }
-      return {
-        index: event.index,
-        part,
-      };
-    }
-  }
-}
-
-export function mapCohereUsage(usage: Cohere.Usage): ModelUsage | undefined {
-  if (!usage.tokens?.inputTokens && !usage.tokens?.outputTokens) {
-    return undefined;
+    | Cohere.StreamedChatResponseV2.ContentStart,
+): ContentDelta | null {
+  const text = event.delta?.message?.content?.text;
+  if (!text || !event.index) {
+    return null;
   }
   return {
-    input_tokens: usage.tokens.inputTokens || 0,
-    output_tokens: usage.tokens.outputTokens || 0,
+    index: event.index,
+    part: {
+      type: "text",
+      text,
+    },
+  };
+}
+
+function mapCohereToolCallStartEvent(
+  event: Cohere.ChatToolCallStartEvent,
+): ContentDelta | null {
+  const toolCall = event.delta?.message?.toolCalls;
+  const index = event.index;
+  if (!toolCall || typeof index !== "number") return null;
+  const part: ToolCallPartDelta = {
+    type: "tool-call",
+  };
+  if (toolCall.id) {
+    part.tool_call_id = toolCall.id;
+  }
+  if (toolCall.function?.name) {
+    part.tool_name = toolCall.function.name;
+  }
+  if (toolCall.function?.arguments) {
+    part.args = toolCall.function.arguments;
+  }
+  return {
+    index,
+    part,
+  };
+}
+
+function mapCohereToolCallDeltaEvent(
+  event: Cohere.ChatToolCallDeltaEvent,
+): ContentDelta | null {
+  const toolCall = event.delta?.message?.toolCalls;
+  const index = event.index;
+  if (!toolCall || typeof index !== "number") return null;
+
+  const part: ToolCallPartDelta = { type: "tool-call" };
+  if (toolCall.function?.arguments) {
+    part.args = toolCall.function.arguments;
+  }
+  return {
+    index,
+    part,
+  };
+}
+
+// MARK: To SDK Usage
+
+function mapCohereUsage(usage: Cohere.Usage): ModelUsage {
+  return {
+    input_tokens:
+      usage.billedUnits?.inputTokens ?? usage.tokens?.inputTokens ?? 0,
+    output_tokens:
+      usage.billedUnits?.outputTokens ?? usage.tokens?.outputTokens ?? 0,
   };
 }

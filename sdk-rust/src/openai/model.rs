@@ -268,6 +268,19 @@ fn into_openai_messages(
 
     for message in &messages {
         match message {
+            Message::User(UserMessage { content }) => {
+                let openai_message_param = openai_api::ChatCompletionUserMessageParam {
+                    content: content
+                        .iter()
+                        .map(TryInto::try_into)
+                        .collect::<LanguageModelResult<_>>()?,
+                    ..Default::default()
+                };
+                openai_messages.push(openai_api::ChatCompletionMessageParam::User(
+                    openai_message_param,
+                ));
+            }
+
             Message::Assistant(AssistantMessage { content }) => {
                 let mut openai_message_param =
                     openai_api::ChatCompletionAssistantMessageParam::default();
@@ -328,36 +341,27 @@ fn into_openai_messages(
                     ));
                 }
             }
-
-            Message::User(UserMessage { content }) => {
-                let openai_message_param = openai_api::ChatCompletionUserMessageParam {
-                    content: content
-                        .iter()
-                        .map(|part| match part {
-                            Part::Text(part) => {
-                                Ok(openai_api::ChatCompletionContentPart::Text(part.into()))
-                            }
-                            Part::Image(part) => {
-                                Ok(openai_api::ChatCompletionContentPart::Image(part.into()))
-                            }
-                            Part::Audio(part) => Ok(
-                                openai_api::ChatCompletionContentPart::InputAudio(part.try_into()?),
-                            ),
-                            _ => Err(LanguageModelError::Unsupported(format!(
-                                "Unsupported part in user message {part:?}"
-                            ))),
-                        })
-                        .collect::<LanguageModelResult<_>>()?,
-                    ..Default::default()
-                };
-                openai_messages.push(openai_api::ChatCompletionMessageParam::User(
-                    openai_message_param,
-                ));
-            }
         }
     }
 
     Ok(openai_messages)
+}
+
+impl TryFrom<&Part> for openai_api::ChatCompletionContentPart {
+    type Error = LanguageModelError;
+
+    fn try_from(part: &Part) -> Result<Self, Self::Error> {
+        match part {
+            Part::Text(part) => Ok(openai_api::ChatCompletionContentPart::Text(part.into())),
+            Part::Image(part) => Ok(openai_api::ChatCompletionContentPart::Image(part.into())),
+            Part::Audio(part) => Ok(openai_api::ChatCompletionContentPart::InputAudio(
+                part.try_into()?,
+            )),
+            _ => Err(LanguageModelError::Unsupported(format!(
+                "Unsupported part in user message {part:?}"
+            ))),
+        }
+    }
 }
 
 impl From<&TextPart> for openai_api::ChatCompletionContentPartText {

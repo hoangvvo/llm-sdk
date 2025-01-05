@@ -184,6 +184,12 @@ function convertToGenerateContentRequest(
 function convertToGoogleContent(message: Message): Content {
   const parts = message.content.map(convertToGooglePart);
   switch (message.role) {
+    case "user": {
+      return {
+        role: "user",
+        parts,
+      };
+    }
     case "assistant": {
       return {
         role: "model",
@@ -193,12 +199,6 @@ function convertToGoogleContent(message: Message): Content {
     case "tool": {
       return {
         role: "function",
-        parts,
-      };
-    }
-    case "user": {
-      return {
-        role: "user",
         parts,
       };
     }

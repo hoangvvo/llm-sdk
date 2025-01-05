@@ -207,6 +207,16 @@ function convertToOpenAIMessages(
   }
   messages.forEach((message) => {
     switch (message.role) {
+      case "user": {
+        const openaiMessageParam: OpenAI.Chat.ChatCompletionUserMessageParam = {
+          role: "user",
+          content: message.content.map(convertToOpenAIContentPart),
+        };
+
+        openaiMessages.push(openaiMessageParam);
+        break;
+      }
+
       case "assistant": {
         const openaiMessageParam: Omit<
           OpenAI.Chat.ChatCompletionAssistantMessageParam,
@@ -252,51 +262,36 @@ function convertToOpenAIMessages(
         message.content.forEach((part) => {
           if (part.type !== "tool-result") {
             throw new InvalidInputError(
-              "Tool messages must contain tool result parts",
+              "Tool messages must contain only tool result parts",
             );
           }
 
           openaiMessages.push({
             role: "tool",
             tool_call_id: part.tool_call_id,
-            content: part.content.map((part) => {
-              if (part.type === "text") {
-                return convertToOpenAIContentPartText(part);
-              }
-              throw new UnsupportedError(
-                `Unsupported part in tool message: ${part.type}`,
-              );
-            }),
+            content: part.content.map(convertToOpenAIToolMessageParamContent),
           });
         });
-        break;
-      }
-
-      case "user": {
-        const openaiMessageParam: OpenAI.Chat.ChatCompletionUserMessageParam = {
-          role: "user",
-          content: message.content.map((part) => {
-            switch (part.type) {
-              case "text":
-                return convertToOpenAIContentPartText(part);
-              case "image":
-                return convertToOpenAIContentPartImage(part);
-              case "audio":
-                return convertToOpenAIContentPartInputAudio(part);
-              default:
-                throw new UnsupportedError(
-                  `Unsupported part in user message: ${part.type}`,
-                );
-            }
-          }),
-        };
-
-        openaiMessages.push(openaiMessageParam);
         break;
       }
     }
   });
   return openaiMessages;
+}
+
+function convertToOpenAIContentPart(
+  part: Part,
+): OpenAI.Chat.ChatCompletionContentPart {
+  switch (part.type) {
+    case "text":
+      return convertToOpenAIContentPartText(part);
+    case "image":
+      return convertToOpenAIContentPartImage(part);
+    case "audio":
+      return convertToOpenAIContentPartInputAudio(part);
+    default:
+      throw new UnsupportedError(`Unsupported part: ${part.type}`);
+  }
 }
 
 function convertToOpenAIContentPartText(
@@ -367,6 +362,22 @@ function convertToOpenAIToolCall(
       arguments: JSON.stringify(part.args),
     },
   };
+}
+
+function convertToOpenAIToolMessageParamContent(
+  part: Part,
+): Extract<
+  OpenAI.ChatCompletionToolMessageParam["content"],
+  unknown[]
+>[number] {
+  switch (part.type) {
+    case "text":
+      return convertToOpenAIContentPartText(part);
+    default:
+      throw new UnsupportedError(
+        `Unsupported part in tool message: ${part.type}`,
+      );
+  }
 }
 
 // MARK: To Provider Tools

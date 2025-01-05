@@ -1,2 +1,1 @@
-export * from "./cohere.js";
-export * from "./types.js";
+export { CohereModel, type CohereModelOptions } from "./cohere.js";
