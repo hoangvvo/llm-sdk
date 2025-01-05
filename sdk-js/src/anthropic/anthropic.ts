@@ -141,6 +141,8 @@ function convertToAnthropicCreateParams(
   };
 }
 
+// MARK: To Provider Messages
+
 function convertToAnthropicMessages(
   messages: Message[],
 ): Anthropic.Messages.MessageParam[] {
@@ -233,6 +235,8 @@ function convertToAnthropicToolResultBlockParam(
   };
 }
 
+// MARK: To Provider Tools
+
 function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
   return {
     name: tool.name,
@@ -266,6 +270,8 @@ function convertToAnthropicToolChoice(
     }
   }
 }
+
+// MARK: To SDK Message
 
 function mapAnthropicMessage(
   contentBlocks: Anthropic.Messages.ContentBlock[],
@@ -304,19 +310,14 @@ function mapAnthropicToolUseBlock(
   };
 }
 
-function mapAnthropicUsage(usage: Anthropic.Usage): ModelUsage {
-  return {
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
-  };
-}
-
 function mapAnthropicMessageDeltaUsage(usage: Anthropic.MessageDeltaUsage) {
   return {
     input_tokens: 0,
     output_tokens: usage.output_tokens,
   };
 }
+
+// MARK: To SDK Delta
 
 function mapAnthropicRawContentBlockStartEvent(
   event: Anthropic.RawContentBlockStartEvent,
@@ -373,5 +374,14 @@ function mapAnthropicInputJSONDelta(
   return {
     type: "tool-call",
     args: delta.partial_json,
+  };
+}
+
+// MARK: To SDK Usage
+
+function mapAnthropicUsage(usage: Anthropic.Usage): ModelUsage {
+  return {
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
   };
 }

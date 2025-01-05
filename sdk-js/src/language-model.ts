@@ -6,7 +6,7 @@ import type {
   PartialModelResponse,
 } from "./types.js";
 
-export type LanguageModelMetadata = {
+export interface LanguageModelMetadata {
   /**
    * The pricing per single token for the model. Used to calculate the cost of a response.
    */
@@ -15,7 +15,7 @@ export type LanguageModelMetadata = {
    * The capabilities of the model.
    */
   capabilities?: LanguageModelCapability[];
-};
+}
 
 export abstract class LanguageModel {
   /**

@@ -18,6 +18,7 @@ import type {
   ImagePart,
   LanguageModelInput,
   Message,
+  Modality,
   ModelResponse,
   ModelTokensDetails,
   ModelUsage,
@@ -186,10 +187,12 @@ function convertToOpenAICreateParams(
     ...(response_format && {
       response_format: convertToOpenAIResponseFormat(response_format),
     }),
-    modalities: modalities ?? null,
+    modalities: modalities?.map(convertToOpenAIModality) ?? null,
     ...extra,
   };
 }
+
+// MARK: To Provider Messages
 
 function convertToOpenAIMessages(
   messages: Message[],
@@ -296,104 +299,12 @@ function convertToOpenAIMessages(
   return openaiMessages;
 }
 
-function convertToOpenAITool(
-  tool: Tool,
-): OpenAI.Chat.Completions.ChatCompletionTool {
-  return {
-    type: "function",
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-      strict: true,
-    },
-  };
-}
-
-function convertToOpenAIToolChoice(
-  toolChoice: ToolChoiceOption,
-): OpenAI.Chat.Completions.ChatCompletionToolChoiceOption {
-  switch (toolChoice.type) {
-    case "tool": {
-      return {
-        type: "function",
-        function: {
-          name: toolChoice.tool_name,
-        },
-      };
-    }
-    case "auto": {
-      return "auto";
-    }
-    case "none": {
-      return "none";
-    }
-    case "required": {
-      return "required";
-    }
-  }
-}
-
-function convertToOpenAIResponseFormat(
-  responseFormat: ResponseFormatOption,
-): NonNullable<
-  OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
-> {
-  switch (responseFormat.type) {
-    case "json": {
-      if (responseFormat.schema) {
-        return {
-          type: "json_schema",
-          json_schema: {
-            name: responseFormat.name,
-            ...(responseFormat.description && {
-              description: responseFormat.description,
-            }),
-            schema: responseFormat.schema,
-            strict: true,
-          },
-        };
-      }
-      return {
-        type: "json_object",
-      };
-    }
-    case "text": {
-      return { type: "text" };
-    }
-  }
-}
-
 function convertToOpenAIContentPartText(
   part: TextPart,
 ): OpenAI.Chat.ChatCompletionContentPartText {
   return {
     type: "text",
     text: part.text,
-  };
-}
-
-function convertToOpenAIToolCall(
-  part: ToolCallPart,
-): OpenAI.Chat.Completions.ChatCompletionMessageToolCall {
-  return {
-    type: "function",
-    id: part.tool_call_id,
-    function: {
-      name: part.tool_name,
-      arguments: JSON.stringify(part.args),
-    },
-  };
-}
-
-function convertToOpenAIAssistantMessageParamAudio(
-  part: AudioPart,
-): OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam.Audio {
-  if (!part.id) {
-    throw new UnsupportedError("OpenAI audio parts must have an id");
-  }
-  return {
-    id: part.id,
   };
 }
 
@@ -434,6 +345,117 @@ function convertToOpenAIContentPartInputAudio(
   };
 }
 
+function convertToOpenAIAssistantMessageParamAudio(
+  part: AudioPart,
+): OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam.Audio {
+  if (!part.id) {
+    throw new UnsupportedError("OpenAI audio parts must have an id");
+  }
+  return {
+    id: part.id,
+  };
+}
+
+function convertToOpenAIToolCall(
+  part: ToolCallPart,
+): OpenAI.Chat.Completions.ChatCompletionMessageToolCall {
+  return {
+    type: "function",
+    id: part.tool_call_id,
+    function: {
+      name: part.tool_name,
+      arguments: JSON.stringify(part.args),
+    },
+  };
+}
+
+// MARK: To Provider Tools
+
+function convertToOpenAITool(
+  tool: Tool,
+): OpenAI.Chat.Completions.ChatCompletionTool {
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+      strict: true,
+    },
+  };
+}
+
+function convertToOpenAIToolChoice(
+  toolChoice: ToolChoiceOption,
+): OpenAI.Chat.Completions.ChatCompletionToolChoiceOption {
+  switch (toolChoice.type) {
+    case "tool": {
+      return {
+        type: "function",
+        function: {
+          name: toolChoice.tool_name,
+        },
+      };
+    }
+    case "auto": {
+      return "auto";
+    }
+    case "none": {
+      return "none";
+    }
+    case "required": {
+      return "required";
+    }
+  }
+}
+
+// MARK: To Provider Response Format
+
+function convertToOpenAIResponseFormat(
+  responseFormat: ResponseFormatOption,
+): NonNullable<
+  OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
+> {
+  switch (responseFormat.type) {
+    case "json": {
+      if (responseFormat.schema) {
+        return {
+          type: "json_schema",
+          json_schema: {
+            name: responseFormat.name,
+            ...(responseFormat.description && {
+              description: responseFormat.description,
+            }),
+            schema: responseFormat.schema,
+            strict: true,
+          },
+        };
+      }
+      return {
+        type: "json_object",
+      };
+    }
+    case "text": {
+      return { type: "text" };
+    }
+  }
+}
+
+// MARK: To Provider Modality
+
+function convertToOpenAIModality(
+  modality: Modality,
+): NonNullable<OpenAI.Chat.ChatCompletionCreateParams["modalities"]>[number] {
+  switch (modality) {
+    case "text":
+      return "text";
+    case "audio":
+      return "audio";
+  }
+}
+
+// MARK: To SDK Message
+
 function mapOpenAIMessage(
   message: OpenAI.Chat.Completions.ChatCompletionMessage,
   createParams: OpenAI.Chat.Completions.ChatCompletionCreateParams,
@@ -444,12 +466,6 @@ function mapOpenAIMessage(
     parts.push({
       type: "text",
       text: message.content,
-    });
-  }
-
-  if (message.tool_calls) {
-    message.tool_calls.forEach((toolCall) => {
-      parts.push(mapOpenAIFunctionToolCall(toolCall));
     });
   }
 
@@ -468,21 +484,13 @@ function mapOpenAIMessage(
     parts.push(audioPart);
   }
 
-  return parts;
-}
+  if (message.tool_calls) {
+    message.tool_calls.forEach((toolCall) => {
+      parts.push(mapOpenAIFunctionToolCall(toolCall));
+    });
+  }
 
-function mapOpenAIFunctionToolCall(
-  messageToolCall: OpenAI.Chat.Completions.ChatCompletionMessageToolCall,
-): ToolCallPart {
-  return {
-    type: "tool-call",
-    tool_call_id: messageToolCall.id,
-    tool_name: messageToolCall.function.name,
-    args: JSON.parse(messageToolCall.function.arguments) as Record<
-      string,
-      unknown
-    >,
-  };
+  return parts;
 }
 
 function mapOpenAIAudioFormat(
@@ -504,78 +512,21 @@ function mapOpenAIAudioFormat(
   }
 }
 
-function mapOpenAIUsage(
-  usage: OpenAI.CompletionUsage,
-  input: LanguageModelInput,
-): ModelUsage {
-  const result: ModelUsage = {
-    input_tokens: usage.prompt_tokens,
-    output_tokens: usage.completion_tokens,
+function mapOpenAIFunctionToolCall(
+  messageToolCall: OpenAI.Chat.Completions.ChatCompletionMessageToolCall,
+): ToolCallPart {
+  return {
+    type: "tool-call",
+    tool_call_id: messageToolCall.id,
+    tool_name: messageToolCall.function.name,
+    args: JSON.parse(messageToolCall.function.arguments) as Record<
+      string,
+      unknown
+    >,
   };
-  if (usage.prompt_tokens_details) {
-    result.input_tokens_details = mapOpenAIPromptTokensDetails(
-      usage.prompt_tokens_details as OpenAIPatchedPromptTokensDetails,
-      input,
-    );
-    result.output_tokens_details = mapOpenAICompletionTokenDetails(
-      usage.completion_tokens_details as OpenAIPatchedCompletionTokenDetails,
-    );
-  }
-  return result;
 }
 
-function mapOpenAIPromptTokensDetails(
-  details: OpenAIPatchedPromptTokensDetails,
-  input: LanguageModelInput,
-): ModelTokensDetails {
-  const textTokens = details.text_tokens;
-  const audioTokens = details.audio_tokens;
-  const imageTokens = details.image_tokens;
-  const hasTextPart = input.messages.some(
-    (s) => s.role === "user" && s.content.some((p) => p.type === "text"),
-  );
-  const hasAudioPart = input.messages.some(
-    (s) => s.role === "user" && s.content.some((p) => p.type === "audio"),
-  );
-  const cachedTextTokens =
-    details.cached_tokens_details?.text_tokens ??
-    // Guess that cached tokens are for text if there are text messages
-    (hasTextPart ? details.cached_tokens : undefined);
-  const cachedAudioTokens =
-    details.cached_tokens_details?.audio_tokens ??
-    // Guess that cached tokens are for audio if there are audio messages
-    (hasAudioPart ? details.cached_tokens : undefined);
-  const result: ModelTokensDetails = {};
-  if (typeof textTokens === "number") {
-    result.text_tokens = textTokens;
-  }
-  if (typeof audioTokens === "number") {
-    result.audio_tokens = audioTokens;
-  }
-  if (typeof imageTokens === "number") {
-    result.image_tokens = imageTokens;
-  }
-  if (typeof cachedTextTokens === "number") {
-    result.cached_text_tokens = cachedTextTokens;
-  }
-  if (typeof cachedAudioTokens === "number") {
-    result.cached_audio_tokens = cachedAudioTokens;
-  }
-  return result;
-}
-
-function mapOpenAICompletionTokenDetails(
-  details: OpenAIPatchedCompletionTokenDetails,
-): ModelTokensDetails {
-  const result: ModelTokensDetails = {};
-  if (details.text_tokens) {
-    result.text_tokens = details.text_tokens;
-  }
-  if (details.audio_tokens) {
-    result.audio_tokens = details.audio_tokens;
-  }
-  return result;
-}
+// MARK: To SDK Delta
 
 function mapOpenAIDelta(
   delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
@@ -653,4 +604,79 @@ function mapOpenAIDelta(
   }
 
   return contentDeltas;
+}
+
+// MARK: To SDK Usage
+
+function mapOpenAIUsage(
+  usage: OpenAI.CompletionUsage,
+  input: LanguageModelInput,
+): ModelUsage {
+  const result: ModelUsage = {
+    input_tokens: usage.prompt_tokens,
+    output_tokens: usage.completion_tokens,
+  };
+  if (usage.prompt_tokens_details) {
+    result.input_tokens_details = mapOpenAIPromptTokensDetails(
+      usage.prompt_tokens_details as OpenAIPatchedPromptTokensDetails,
+      input,
+    );
+    result.output_tokens_details = mapOpenAICompletionTokenDetails(
+      usage.completion_tokens_details as OpenAIPatchedCompletionTokenDetails,
+    );
+  }
+  return result;
+}
+
+function mapOpenAIPromptTokensDetails(
+  details: OpenAIPatchedPromptTokensDetails,
+  input: LanguageModelInput,
+): ModelTokensDetails {
+  const textTokens = details.text_tokens;
+  const audioTokens = details.audio_tokens;
+  const imageTokens = details.image_tokens;
+  const hasTextPart = input.messages.some(
+    (s) => s.role === "user" && s.content.some((p) => p.type === "text"),
+  );
+  const hasAudioPart = input.messages.some(
+    (s) => s.role === "user" && s.content.some((p) => p.type === "audio"),
+  );
+  const cachedTextTokens =
+    details.cached_tokens_details?.text_tokens ??
+    // Guess that cached tokens are for text if there are text messages
+    (hasTextPart ? details.cached_tokens : undefined);
+  const cachedAudioTokens =
+    details.cached_tokens_details?.audio_tokens ??
+    // Guess that cached tokens are for audio if there are audio messages
+    (hasAudioPart ? details.cached_tokens : undefined);
+  const result: ModelTokensDetails = {};
+  if (typeof textTokens === "number") {
+    result.text_tokens = textTokens;
+  }
+  if (typeof audioTokens === "number") {
+    result.audio_tokens = audioTokens;
+  }
+  if (typeof imageTokens === "number") {
+    result.image_tokens = imageTokens;
+  }
+  if (typeof cachedTextTokens === "number") {
+    result.cached_text_tokens = cachedTextTokens;
+  }
+  if (typeof cachedAudioTokens === "number") {
+    result.cached_audio_tokens = cachedAudioTokens;
+  }
+  return result;
+}
+
+function mapOpenAICompletionTokenDetails(
+  details: OpenAIPatchedCompletionTokenDetails,
+): ModelTokensDetails {
+  const result: ModelTokensDetails = {};
+  if (details.text_tokens) {
+    result.text_tokens = details.text_tokens;
+  }
+  if (details.audio_tokens) {
+    result.audio_tokens = details.audio_tokens;
+  }
+  return result;
 }

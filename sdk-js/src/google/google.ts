@@ -179,6 +179,8 @@ function convertToGenerateContentRequest(
   };
 }
 
+// MARK: To Provider Messages
+
 function convertToGoogleContent(message: Message): Content {
   const parts = message.content.map(convertToGooglePart);
   switch (message.role) {
@@ -302,6 +304,8 @@ function tryConvertToGoogleFunctionResponseResponse(
   }
 }
 
+// MARK: To Provider Tools
+
 function convertToGoogleFunctionDeclarationTools(
   tools: Tool[],
 ): FunctionDeclarationsTool[] {
@@ -350,6 +354,8 @@ function convertToGoogleToolConfig(toolChoice: ToolChoiceOption): ToolConfig {
   }
 }
 
+// MARK: To Provider Response Format
+
 function convertResponseFormatToGoogleGenerationConfig(
   responseFormat: ResponseFormatOption,
 ): GenerationConfig {
@@ -368,6 +374,8 @@ function convertResponseFormatToGoogleGenerationConfig(
     }
   }
 }
+
+// MARK: To SDK Message
 
 function mapGoogleContent(content: Content): Part[] {
   return content.parts.map(mapGooglePart);
@@ -421,10 +429,14 @@ function mapGoogleFunctionCall(part: GoogleFunctionCallPart): ToolCallPart {
   };
 }
 
-// Google function calls do not have ids so we need to generate ones
+/**
+ * Google function calls do not have ids so we need to generate ones
+ */
 function genidForToolCall() {
   return Math.random().toString(36).substring(2, 15);
 }
+
+// MARK: To SDK Delta
 
 function mapGoogleUsageMetadata(
   usage: UsageMetadata,
@@ -446,6 +458,8 @@ function mapGoogleUsageMetadata(
   }
   return result;
 }
+
+// MARK: To SDK Usage
 
 function mapGoogleContentToDelta(
   content: Content,

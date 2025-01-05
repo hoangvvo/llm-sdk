@@ -65,7 +65,7 @@ impl LanguageModel for OpenAIModel {
     }
 
     async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
-        let params = into_openai_params(input, self.model_id.clone())?;
+        let params = into_openai_create_params(input, self.model_id.clone())?;
 
         let response = self
             .client
@@ -113,7 +113,7 @@ impl LanguageModel for OpenAIModel {
     }
 
     async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream> {
-        let mut params = into_openai_params(input, self.model_id.clone())?;
+        let mut params = into_openai_create_params(input, self.model_id.clone())?;
         params.stream = Some(true);
 
         let mut openai_stream = self
@@ -199,7 +199,7 @@ impl LanguageModel for OpenAIModel {
     }
 }
 
-fn into_openai_params(
+fn into_openai_create_params(
     input: LanguageModelInput,
     model_id: String,
 ) -> LanguageModelResult<openai_api::ChatCompletionCreateParams> {
@@ -247,6 +247,8 @@ fn into_openai_params(
         ..Default::default()
     })
 }
+
+// MARK: To Provider Messages
 
 fn into_openai_messages(
     messages: Vec<Message>,
@@ -427,6 +429,8 @@ impl TryFrom<&ToolCallPart> for openai_api::ChatCompletionMessageFunctionToolCal
     }
 }
 
+// MARK: To Provider Tools
+
 impl From<&Tool> for openai_api::ChatCompletionTool {
     fn from(value: &Tool) -> Self {
         Self::Function(openai_api::ChatCompletionFunctionTool {
@@ -458,6 +462,8 @@ impl From<&ToolChoiceOption> for openai_api::ChatCompletionToolChoiceOption {
     }
 }
 
+// MARK: To Provider Response Format
+
 impl From<&ResponseFormatOption> for openai_api::ResponseFormat {
     fn from(response_format: &ResponseFormatOption) -> Self {
         match response_format {
@@ -484,6 +490,8 @@ impl From<&ResponseFormatOption> for openai_api::ResponseFormat {
     }
 }
 
+// MARK: To Provider Modality
+
 impl From<&Modality> for openai_api::Modality {
     fn from(modality: &Modality) -> Self {
         match modality {
@@ -492,6 +500,8 @@ impl From<&Modality> for openai_api::Modality {
         }
     }
 }
+
+// MARK: To SDK Message
 
 fn map_openai_message(
     message: &openai_api::CompletionsCompletionsAPIChatCompletionMessage,
@@ -537,17 +547,6 @@ fn map_openai_message(
     Ok(parts)
 }
 
-impl From<openai_api::CompletionsAPICompletionUsage> for ModelUsage {
-    fn from(value: openai_api::CompletionsAPICompletionUsage) -> Self {
-        // TODO: map details token
-        Self {
-            input_tokens: value.prompt_tokens,
-            output_tokens: value.completion_tokens,
-            ..Default::default()
-        }
-    }
-}
-
 impl From<&openai_api::AudioOutputFormat> for AudioFormat {
     fn from(format: &openai_api::AudioOutputFormat) -> Self {
         match format {
@@ -576,6 +575,8 @@ impl TryFrom<&openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPar
         })
     }
 }
+
+// MARK: To SDK Delta
 
 fn map_openai_delta(
     delta: &openai_api::ChatCompletionChunkChoiceDelta,
@@ -658,4 +659,17 @@ fn map_openai_delta(
     }
 
     content_deltas
+}
+
+// MARK: To SDK Usage
+
+impl From<openai_api::CompletionsAPICompletionUsage> for ModelUsage {
+    fn from(value: openai_api::CompletionsAPICompletionUsage) -> Self {
+        // TODO: map details token
+        Self {
+            input_tokens: value.prompt_tokens,
+            output_tokens: value.completion_tokens,
+            ..Default::default()
+        }
+    }
 }
