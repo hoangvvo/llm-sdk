@@ -14,7 +14,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/hoangvvo/llm-sdk.git",
-    "directory": "javascript"
+    "directory": "sdk-js"
   },
   "author": "Hoang Vo (https://www.hoangvvo.com)",
   "bugs": {
