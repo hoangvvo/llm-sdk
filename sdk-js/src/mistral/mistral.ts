@@ -1,34 +1,43 @@
 import { Mistral } from "@mistralai/mistralai";
-import type * as MistralComponents from "@mistralai/mistralai/models/components/index.js";
+import * as MistralComponents from "@mistralai/mistralai/models/components/index.js";
 import {
-  InvalidValueError,
-  ModelUnsupportedMessagePart,
+  InvalidInputError,
+  InvariantError,
   NotImplementedError,
-} from "../errors/errors.js";
+  UnsupportedError,
+} from "../errors.js";
+import type { LanguageModelMetadata } from "../language-model.js";
+import { LanguageModel } from "../language-model.js";
 import {
-  LanguageModel,
-  type LanguageModelMetadata,
-} from "../models/language-model.js";
+  guessDeltaIndex,
+  looselyConvertPartToPartDelta,
+} from "../stream.utils.js";
 import type {
-  AssistantMessage,
   ContentDelta,
+  ImagePart,
   LanguageModelInput,
+  Message,
   ModelResponse,
   ModelUsage,
+  Part,
   PartialModelResponse,
+  ResponseFormatOption,
+  TextPart,
+  TextPartDelta,
   Tool,
   ToolCallPart,
-  ToolCallPartDelta,
+  ToolChoiceOption,
 } from "../types.js";
-import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
-import type { InternalContentDelta } from "../utils/stream.utils.js";
-import { ContentDeltaAccumulator } from "../utils/stream.utils.js";
-import { calculateCost } from "../utils/usage.utils.js";
-import type { MistralModelOptions } from "./types.js";
+import { calculateCost } from "../usage.utils.js";
 
-export type MistralLanguageModelInput = LanguageModelInput & {
-  extra?: Partial<MistralComponents.ChatCompletionRequest>;
-};
+export interface MistralModelOptions {
+  baseURL?: string;
+  apiKey: string;
+  modelId: string;
+}
+
+type MistralChatCompletionRequestMessage =
+  MistralComponents.ChatCompletionRequest["messages"][number];
 
 export class MistralModel extends LanguageModel {
   public provider: string;
@@ -53,22 +62,18 @@ export class MistralModel extends LanguageModel {
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const response = await this.client.chat.complete(
-      convertToMistralParams(input, this.options),
-    );
+    const request = convertToMistralRequest(input, this.modelId);
+    const response = await this.client.chat.complete(request);
 
-    if (!response.choices?.[0]) {
-      throw new Error("no choices in response");
+    const choice = response.choices?.[0];
+    if (!choice) {
+      throw new InvariantError("Response does not contain a valid choice");
     }
 
-    const choice = response.choices[0];
+    const content = mapMistralMessage(choice.message);
+    const usage = mapMistralUsageInfo(response.usage);
 
-    const usage = mapMistralUsage(response.usage);
-
-    const result: ModelResponse = {
-      content: mapMistralMessage(choice.message).content,
-      usage,
-    };
+    const result: ModelResponse = { content, usage };
     if (this.metadata?.pricing) {
       result.cost = calculateCost(usage, this.metadata.pricing);
     }
@@ -77,23 +82,22 @@ export class MistralModel extends LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
-  ): AsyncGenerator<PartialModelResponse, ModelResponse> {
-    const result = await this.client.chat.stream(
-      convertToMistralParams(input, this.options),
-    );
+  ): AsyncGenerator<PartialModelResponse> {
+    const request = convertToMistralRequest(input, this.modelId);
+    const stream = await this.client.chat.stream(request);
 
-    let usage: ModelUsage | undefined;
-    const accumulator = new ContentDeltaAccumulator();
+    const allContentDeltas: ContentDelta[] = [];
 
-    for await (const chunk of result) {
+    for await (const chunk of stream) {
       const choice = chunk.data.choices[0];
+
       if (choice?.delta) {
         const incomingContentDeltas = mapMistralDelta(
           choice.delta,
-          accumulator.deltas,
+          allContentDeltas,
         );
 
-        accumulator.addChunks(incomingContentDeltas);
+        allContentDeltas.push(...incomingContentDeltas);
 
         for (const delta of incomingContentDeltas) {
           yield { delta };
@@ -101,216 +105,218 @@ export class MistralModel extends LanguageModel {
       }
 
       if (chunk.data.usage) {
-        usage = mapMistralUsage(chunk.data.usage);
+        const usage = mapMistralUsageInfo(chunk.data.usage);
+        yield { usage };
       }
     }
-
-    const finalResult: ModelResponse = {
-      content: accumulator.computeContent(),
-    };
-    if (usage) {
-      finalResult.usage = usage;
-      if (this.metadata?.pricing) {
-        finalResult.cost = calculateCost(usage, this.metadata.pricing);
-      }
-    }
-
-    return finalResult;
   }
 }
 
-export function convertToMistralParams(
+function convertToMistralRequest(
   input: LanguageModelInput,
-  options: MistralModelOptions,
+  modelId: string,
 ): MistralComponents.ChatCompletionRequest {
-  const params: MistralComponents.ChatCompletionRequest = {
-    model: options.modelId,
-    messages: convertToMistralMessages(input, options),
-    ...convertToMistralSamplingParams(input),
-    ...input.extra,
+  const {
+    messages,
+    system_prompt,
+    max_tokens,
+    temperature,
+    top_p,
+    presence_penalty,
+    frequency_penalty,
+    seed,
+    response_format,
+    tools,
+    tool_choice,
+    extra,
+  } = input;
+
+  return {
+    model: modelId,
+    messages: convertToMistralMessages(messages, system_prompt),
+    ...(typeof max_tokens === "number" && { maxTokens: max_tokens }),
+    ...(typeof temperature === "number" && { temperature }),
+    ...(typeof top_p === "number" && { topP: top_p }),
+    ...(typeof presence_penalty === "number" && {
+      presencePenalty: presence_penalty,
+    }),
+    ...(typeof frequency_penalty === "number" && {
+      frequencyPenalty: frequency_penalty,
+    }),
+    ...(typeof seed === "number" && { randomSeed: seed }),
+    ...(tools && { tools: tools.map(convertToMistralTool) }),
+    ...(tool_choice && { toolChoice: convertToMistralToolChoice(tool_choice) }),
+    ...(response_format && {
+      responseFormat: convertToMistralResponseFormat(response_format),
+    }),
+    ...extra,
   };
-  if (input.tools) {
-    params.tools = input.tools.map(convertToMistralTool);
-  }
-  if (input.tool_choice) {
-    params.toolChoice = convertToMistralToolChoice(input.tool_choice);
-  }
-  if (input.response_format) {
-    params.responseFormat = convertToMistralResponseFormat(
-      input.response_format,
-    );
-  }
-  return params;
 }
 
-export function convertToMistralMessages(
-  input: Pick<MistralLanguageModelInput, "messages" | "system_prompt">,
-  options: MistralModelOptions,
+// MARK: To Provider Messages
+
+function convertToMistralMessages(
+  messages: Message[],
+  systemPrompt: string | undefined,
 ): MistralComponents.ChatCompletionRequest["messages"] {
-  const mistralMessages: MistralComponents.ChatCompletionRequest["messages"] =
-    [];
+  const mistralMessages: MistralChatCompletionRequestMessage[] = [];
 
-  let messages = input.messages;
-
-  if (options.convertAudioPartsToTextParts) {
-    messages = messages.map(convertAudioPartsToTextParts);
-  }
-
-  if (input.system_prompt) {
+  if (systemPrompt) {
     mistralMessages.push({
       role: "system",
       content: [
         {
           type: "text",
-          text: input.system_prompt,
+          text: systemPrompt,
         },
       ],
     });
   }
 
-  messages.forEach((message) => {
-    switch (message.role) {
-      case "assistant": {
-        const mistralMessageParam: Omit<
-          MistralComponents.AssistantMessage,
-          "content"
-        > & {
-          content: MistralComponents.ContentChunk[] | null;
-        } = {
-          role: "assistant",
-          content: null,
-        };
-        message.content.forEach((part) => {
-          switch (part.type) {
-            case "text": {
-              mistralMessageParam.content = mistralMessageParam.content || [];
-              mistralMessageParam.content.push({
-                type: "text",
-                text: part.text,
-              });
-              break;
-            }
-            case "tool-call": {
-              mistralMessageParam.toolCalls =
-                mistralMessageParam.toolCalls || [];
-              mistralMessageParam.toolCalls.push({
-                type: "function",
-                id: part.tool_call_id,
-                function: {
-                  name: part.tool_name,
-                  arguments: JSON.stringify(part.args),
-                },
-              });
-              break;
-            }
-            case "image":
-            case "tool-result":
-            case "audio": {
-              throw new ModelUnsupportedMessagePart("mistral", message, part);
-            }
-            default: {
-              const exhaustiveCheck: never = part;
-              throw new InvalidValueError(
-                "part.type",
-                (exhaustiveCheck as { type: string }).type,
-              );
-            }
-          }
-        });
-        mistralMessages.push({
-          ...mistralMessageParam,
-          role: "assistant",
-        });
-        break;
-      }
-      case "tool": {
-        message.content.forEach((toolResult) => {
-          mistralMessages.push({
-            role: "tool",
-            content: JSON.stringify(toolResult.result),
-            toolCallId: toolResult.tool_call_id,
-            name: toolResult.tool_name,
-          });
-        });
-        break;
-      }
-      case "user": {
-        const contentParts = message.content;
-        mistralMessages.push({
-          role: "user",
-          content: contentParts.map((part): MistralComponents.ContentChunk => {
+  const convertedMistralMessages = messages.map(
+    (
+      message,
+    ):
+      | MistralChatCompletionRequestMessage
+      | MistralChatCompletionRequestMessage[] => {
+      switch (message.role) {
+        case "user": {
+          return {
+            role: "user",
+            content: message.content.map((part) =>
+              convertToMistralContentChunk(part),
+            ),
+          };
+        }
+        case "assistant": {
+          const mistralAssistantMessage: Omit<
+            MistralComponents.AssistantMessage,
+            "content"
+          > & {
+            content: MistralComponents.ContentChunk[] | null;
+          } = {
+            role: "assistant",
+            content: null,
+          };
+          message.content.forEach((part) => {
             switch (part.type) {
-              case "text": {
-                return {
-                  type: "text",
-                  text: part.text,
-                };
-              }
+              case "text":
               case "image": {
-                return {
-                  type: "image_url",
-                  imageUrl: {
-                    url: `data:${part.mime_type};base64,${part.image_data}`,
-                  },
-                };
+                mistralAssistantMessage.content =
+                  mistralAssistantMessage.content ?? [];
+                mistralAssistantMessage.content.push(
+                  convertToMistralContentChunk(part),
+                );
+                break;
               }
-              case "tool-call":
-              case "tool-result":
-              case "audio": {
-                throw new ModelUnsupportedMessagePart("mistral", message, part);
+              case "tool-call": {
+                mistralAssistantMessage.toolCalls =
+                  mistralAssistantMessage.toolCalls ?? [];
+                mistralAssistantMessage.toolCalls.push(
+                  convertToMistralToolCall(part),
+                );
+                break;
               }
               default: {
-                const exhaustiveCheck: never = part;
-                throw new InvalidValueError(
-                  "part.type",
-                  (exhaustiveCheck as { type: string }).type,
+                throw new UnsupportedError(
+                  `Cannot convert Part to Mistral message for type: ${part.type}`,
                 );
               }
             }
-          }),
-        });
-        break;
+          });
+          return {
+            ...mistralAssistantMessage,
+            role: "assistant",
+          };
+        }
+        case "tool": {
+          return message.content.map((part) => {
+            if (part.type !== "tool-result") {
+              throw new InvalidInputError(
+                "Tool messages must contain only tool result parts",
+              );
+            }
+            return {
+              role: "tool",
+              toolCallId: part.tool_call_id,
+              name: part.tool_name,
+              content: part.content.map(convertToMistralContentChunk),
+            };
+          });
+        }
       }
-      default: {
-        const exhaustiveCheck: never = message;
-        throw new InvalidValueError(
-          "message.role",
-          (exhaustiveCheck as { role: string }).role,
-        );
-      }
-    }
-  });
+    },
+  );
+
+  mistralMessages.push(...convertedMistralMessages.flat());
 
   return mistralMessages;
 }
 
-export function convertToMistralSamplingParams(
-  input: Partial<LanguageModelInput>,
-): Partial<MistralComponents.ChatCompletionRequest> {
-  const sampling: Partial<MistralComponents.ChatCompletionRequest> = {};
-  if (typeof input.max_tokens === "number") {
-    sampling.maxTokens = input.max_tokens;
+function convertToMistralContentChunk(
+  part: Part,
+): MistralComponents.ContentChunk {
+  switch (part.type) {
+    case "text":
+      return convertToMistralTextChunk(part);
+    case "image":
+      return convertToMistralImageURLChunk(part);
+    default:
+      throw new UnsupportedError(
+        `Cannot convert Part to Mistral ContentChunk for type: ${part.type}`,
+      );
   }
-  if (typeof input.temperature === "number") {
-    sampling.temperature = input.temperature;
-  }
-  if (typeof input.top_p === "number") {
-    sampling.topP = input.top_p;
-  }
-  if (typeof input.presence_penalty === "number") {
-    sampling.presencePenalty = input.presence_penalty;
-  }
-  if (typeof input.frequency_penalty === "number") {
-    sampling.frequencyPenalty = input.frequency_penalty;
-  }
-  if (typeof input.seed === "number") {
-    sampling.randomSeed = input.seed;
-  }
-  return sampling;
 }
 
-export function convertToMistralToolChoice(
-  toolChoice: NonNullable<LanguageModelInput["tool_choice"]>,
+function convertToMistralTextChunk(
+  part: TextPart,
+): MistralComponents.TextChunk & { type: "text" } {
+  return {
+    type: "text",
+    text: part.text,
+  };
+}
+
+function convertToMistralImageURLChunk(
+  part: ImagePart,
+): MistralComponents.ImageURLChunk & { type: "image_url" } {
+  return {
+    type: "image_url",
+    imageUrl: {
+      url: `data:${part.mime_type};base64,${part.image_data}`,
+    },
+  };
+}
+
+function convertToMistralToolCall(
+  part: ToolCallPart,
+): MistralComponents.ToolCall {
+  return {
+    type: "function",
+    id: part.tool_call_id,
+    function: {
+      name: part.tool_name,
+      arguments: JSON.stringify(part.args),
+    },
+  };
+}
+
+// MARK: To Provider Tools
+
+function convertToMistralTool(tool: Tool): MistralComponents.Tool {
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+      strict: true,
+    },
+  };
+}
+
+function convertToMistralToolChoice(
+  toolChoice: ToolChoiceOption,
 ): MistralComponents.ToolChoice | MistralComponents.ToolChoiceEnum {
   switch (toolChoice.type) {
     case "tool": {
@@ -321,176 +327,162 @@ export function convertToMistralToolChoice(
         },
       };
     }
-    default:
-      return toolChoice.type;
-  }
-}
-
-export function convertToMistralTool(tool: Tool): MistralComponents.Tool {
-  return {
-    type: "function",
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters || {},
-    },
-  };
-}
-
-export function convertToMistralResponseFormat(
-  responseFormat: NonNullable<LanguageModelInput["response_format"]>,
-): MistralComponents.ResponseFormat {
-  switch (responseFormat.type) {
-    case "json":
-      return { type: "json_object" };
-    case "text":
-      return { type: "text" };
-    default: {
-      const exhaustiveCheck: never = responseFormat;
-      throw new InvalidValueError(
-        "responseFormat.type",
-        (exhaustiveCheck as { type: string }).type,
-      );
+    case "auto": {
+      return MistralComponents.ToolChoiceEnum.Auto;
+    }
+    case "none": {
+      return MistralComponents.ToolChoiceEnum.None;
+    }
+    case "required": {
+      return MistralComponents.ToolChoiceEnum.Required;
     }
   }
 }
 
-export function mapMistralMessage(
+// MARK: To Provider Response Format
+
+function convertToMistralResponseFormat(
+  responseFormat: ResponseFormatOption,
+): MistralComponents.ResponseFormat {
+  switch (responseFormat.type) {
+    case "json":
+      if (responseFormat.schema) {
+        return {
+          type: MistralComponents.ResponseFormats.JsonSchema,
+          jsonSchema: {
+            name: responseFormat.name,
+            description: responseFormat.description ?? null,
+            schemaDefinition: responseFormat.schema,
+            strict: true,
+          },
+        };
+      }
+      return { type: MistralComponents.ResponseFormats.JsonObject };
+    case "text":
+      return { type: MistralComponents.ResponseFormats.Text };
+  }
+}
+
+// MARK: To SDK Message
+
+function mapMistralMessage(
   message: MistralComponents.AssistantMessage,
-): AssistantMessage {
-  const content: AssistantMessage["content"] = [];
+): Part[] {
+  const parts: Part[] = [];
 
   if (typeof message.content === "string") {
-    content.push({
+    parts.push({
       type: "text",
       text: message.content,
     });
   }
+
   if (Array.isArray(message.content)) {
-    message.content.forEach((chunk) => {
-      switch (chunk.type) {
-        case "text":
-          content.push({
-            type: "text",
-            text: chunk.text,
-          });
-          break;
-        case "image_url":
-        case "reference":
-          throw new NotImplementedError("message.part", chunk.type);
-        default: {
-          const exhaustiveCheck: never = chunk;
-          throw new NotImplementedError(
-            "message.part",
-            (exhaustiveCheck as { type: string }).type,
-          );
-        }
-      }
-    });
+    parts.push(...message.content.map(mapMistralContentChunk));
   }
 
   if (message.toolCalls) {
-    message.toolCalls.forEach((toolCall) => {
-      if (!toolCall.id) {
-        throw new Error("toolCall.id is missing");
-      }
-      let args: ToolCallPart["args"] = null;
-
-      if (typeof toolCall.function.arguments === "string") {
-        args = JSON.parse(toolCall.function.arguments) as {
-          [key: string]: unknown;
-        };
-      }
-      if (typeof toolCall.function.arguments === "object") {
-        args = toolCall.function.arguments;
-      }
-
-      content.push({
-        type: "tool-call",
-        tool_call_id: toolCall.id,
-        tool_name: toolCall.function.name,
-        args,
-      });
-    });
+    parts.push(...message.toolCalls.map(mapMistralToolCall));
   }
 
+  return parts;
+}
+
+function mapMistralContentChunk(chunk: MistralComponents.ContentChunk): Part {
+  switch (chunk.type) {
+    case "text": {
+      return {
+        type: "text",
+        text: chunk.text,
+      };
+    }
+    default:
+      throw new NotImplementedError(
+        `Cannot map Mistral ContentChunk to Part for type: ${chunk.type}`,
+      );
+  }
+}
+
+function mapMistralToolCall(
+  toolCall: MistralComponents.ToolCall,
+): ToolCallPart {
+  if (!toolCall.id) {
+    throw new InvariantError("Mistral ToolCall does not contain an id");
+  }
+  const args =
+    typeof toolCall.function.arguments === "string"
+      ? (JSON.parse(toolCall.function.arguments) as Record<string, unknown>)
+      : toolCall.function.arguments;
+
   return {
-    role: "assistant",
-    content,
+    type: "tool-call",
+    tool_call_id: toolCall.id,
+    tool_name: toolCall.function.name,
+    args,
   };
 }
 
+// MARK: To SDK Delta
+
 export function mapMistralDelta(
-  delta: MistralComponents.DeltaMessage,
-  existingContentDeltas: InternalContentDelta[],
+  deltaMessage: MistralComponents.DeltaMessage,
+  existingContentDeltas: ContentDelta[],
 ): ContentDelta[] {
   const contentDeltas: ContentDelta[] = [];
-  if (delta.content && typeof delta.content === "string") {
-    const existingDelta = existingContentDeltas.find(
-      (delta) => delta.part.type === "text",
-    );
-    contentDeltas.push({
-      index: existingDelta ? existingDelta.index : contentDeltas.length,
-      part: { type: "text", text: delta.content },
-    });
-  }
-  if (Array.isArray(delta.content)) {
-    delta.content.forEach((chunk) => {
-      switch (chunk.type) {
-        case "text": {
-          const existingDelta = existingContentDeltas.find(
-            (delta) => delta.part.type === "text",
-          );
-          contentDeltas.push({
-            index: existingDelta ? existingDelta.index : contentDeltas.length,
-            part: { type: "text", text: chunk.text },
-          });
-          break;
-        }
-        case "image_url":
-        case "reference":
-          throw new NotImplementedError("message.part", chunk.type);
-        default: {
-          const exhaustiveCheck: never = chunk;
-          throw new NotImplementedError(
-            "message.part",
-            (exhaustiveCheck as { type: string }).type,
-          );
-        }
-      }
-    });
-  }
-  if (delta.toolCalls) {
-    delta.toolCalls.forEach((toolCall) => {
-      // This is unsafe because it leads to mismatched tool calls
-      // but from the Mistral API, it seems like the tool calls are
-      // always streamed at once
-      let args: string;
-      if (typeof toolCall.function.arguments === "string") {
-        args = toolCall.function.arguments;
-      } else {
-        args = JSON.stringify(toolCall.function.arguments);
-      }
-      const toolCallPart: ToolCallPartDelta = {
-        type: "tool-call",
-        tool_name: toolCall.function.name,
-        args,
+
+  if (deltaMessage.content) {
+    if (typeof deltaMessage.content === "string") {
+      const part: TextPartDelta = {
+        type: "text",
+        text: deltaMessage.content,
       };
-      if (toolCall.id) {
-        toolCallPart.tool_call_id = toolCall.id;
-      }
+      const index = guessDeltaIndex(part, [
+        ...existingContentDeltas,
+        ...contentDeltas,
+      ]);
+
+      contentDeltas.push({ index, part });
+    } else if (Array.isArray(deltaMessage.content)) {
+      deltaMessage.content.forEach((chunk) => {
+        const part = looselyConvertPartToPartDelta(
+          mapMistralContentChunk(chunk),
+        );
+        const index = guessDeltaIndex(part, [
+          ...existingContentDeltas,
+          ...contentDeltas,
+        ]);
+        contentDeltas.push({ index, part });
+      });
+    }
+  }
+
+  if (deltaMessage.toolCalls) {
+    const allExistingToolCalls = existingContentDeltas.filter(
+      (delta) => delta.part.type === "tool-call",
+    );
+
+    deltaMessage.toolCalls.forEach((toolCall) => {
+      const existingDelta = allExistingToolCalls[toolCall.index ?? 0];
+
+      const part = looselyConvertPartToPartDelta(mapMistralToolCall(toolCall));
+
       contentDeltas.push({
-        index: contentDeltas.length,
-        part: toolCallPart,
+        index: guessDeltaIndex(
+          part,
+          [...existingContentDeltas, ...contentDeltas],
+          existingDelta,
+        ),
+        part,
       });
     });
   }
+
   return contentDeltas;
 }
 
-export function mapMistralUsage(
-  usage: MistralComponents.UsageInfo,
-): ModelUsage {
+// MARK: To SDK Usage
+
+function mapMistralUsageInfo(usage: MistralComponents.UsageInfo): ModelUsage {
   return {
     input_tokens: usage.promptTokens,
     output_tokens: usage.completionTokens,

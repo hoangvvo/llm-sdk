@@ -1,2 +1,1 @@
-export * from "./mistral.js";
-export * from "./types.js";
+export { MistralModel, type MistralModelOptions } from "./mistral.js";
