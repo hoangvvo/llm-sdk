@@ -177,7 +177,7 @@ function convertToAnthropicContentBlockParam(
       return convertToAnthropicToolResultBlockParam(part);
     default:
       throw new UnsupportedError(
-        `Unsupported content block type: ${part.type}`,
+        `Cannot convert part to Anthropic content for type ${part.type}`,
       );
   }
 }
@@ -226,7 +226,7 @@ function convertToAnthropicToolResultBlockParam(
       const blockParam = convertToAnthropicContentBlockParam(part);
       if (blockParam.type !== "text" && blockParam.type !== "image") {
         throw new UnsupportedError(
-          `Unsupported content block type in tool result: ${blockParam.type}`,
+          `Cannot convert tool result part to Anthropic ToolResultBlockParam content for type ${blockParam.type}`,
         );
       }
       return blockParam;
@@ -287,7 +287,7 @@ function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock): Part {
       return mapAnthropicToolUseBlock(block);
     default:
       throw new NotImplementedError(
-        `Unsupported content block type: ${block.type}`,
+        `Cannot map Anthropic content block for type ${block.type}`,
       );
   }
 }
@@ -355,7 +355,7 @@ function mapAnthropicRawContentBlockDelta(
       return mapAnthropicInputJSONDelta(delta);
     default: {
       throw new NotImplementedError(
-        `Unsupported content block delta type: ${delta.type}`,
+        `Cannot map Anthropic raw content block delta for type ${delta.type}`,
       );
     }
   }

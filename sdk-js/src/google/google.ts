@@ -267,7 +267,9 @@ function convertToGoogleFunctionResponsePart(
   let response: object;
   const firstTextPart = textParts[0];
   if (!firstTextPart) {
-    throw new UnsupportedError("Tool result must have at least one text part");
+    throw new UnsupportedError(
+      "Cannot convert tool result to Google function response without a text part",
+    );
   }
   if (textParts.length === 1) {
     response = {
@@ -386,7 +388,7 @@ function mapGooglePart(part: GooglePart): Part {
   if (part.inlineData) return mapGoogleInlineData(part);
   if (part.functionCall) return mapGoogleFunctionCall(part);
   throw new NotImplementedError(
-    `Unsupported Google part: ${Object.keys(part)
+    `Cannot map Google part to SDK part for type ${Object.keys(part)
       .filter((key) => !!part[key as keyof GooglePart])
       .join(", ")}`,
   );
@@ -415,8 +417,8 @@ function mapGoogleInlineData(
       audio_data: part.inlineData.data,
     };
   }
-  throw new UnsupportedError(
-    `Unsupported inline data mime type: ${part.inlineData.mimeType}`,
+  throw new NotImplementedError(
+    `Cannot map Google inline data part to SDK part for mime type: ${part.inlineData.mimeType}`,
   );
 }
 

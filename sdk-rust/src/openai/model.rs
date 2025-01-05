@@ -305,7 +305,7 @@ fn into_openai_messages(
                             openai_message_param.audio = Some(part.try_into()?);
                         }
                         _ => Err(LanguageModelError::Unsupported(format!(
-                            "Unsupported part in assistant message {part:?}"
+                            "Cannot convert part to OpenAI assistant message for type {part:?}"
                         )))?,
                     }
                 }
@@ -333,7 +333,7 @@ fn into_openai_messages(
                                 .map(|p| match p {
                                     Part::Text(part) => Ok(part.into()),
                                     _ => Err(LanguageModelError::Unsupported(format!(
-                                        "Unsupported part in tool message {p:?}"
+                                        "Cannot convert part to OpenAI tool message for type {p:?}"
                                     ))),
                                 })
                                 .collect::<LanguageModelResult<_>>()?,
@@ -358,7 +358,7 @@ impl TryFrom<&Part> for openai_api::ChatCompletionContentPart {
                 part.try_into()?,
             )),
             _ => Err(LanguageModelError::Unsupported(format!(
-                "Unsupported part in user message {part:?}"
+                "Cannot convert part to OpenAI content part for type {part:?}"
             ))),
         }
     }
@@ -397,7 +397,7 @@ impl TryFrom<&AudioPart> for openai_api::ChatCompletionContentPartInputAudio {
                     Some(AudioFormat::Wav) => Ok(openai_api::AudioInputFormat::Wav),
                     Some(AudioFormat::Mp3) => Ok(openai_api::AudioInputFormat::Mp3),
                     _ => Err(LanguageModelError::Unsupported(format!(
-                        "Unsupported audio format: {:?}",
+                        "Cannot convert audio format to OpenAI InputAudio format for format {:?}",
                         part.format
                     ))),
                 }?,
@@ -411,7 +411,9 @@ impl TryFrom<&AudioPart> for openai_api::ChatCompletionAssistantMessageParamAudi
 
     fn try_from(part: &AudioPart) -> Result<Self, Self::Error> {
         let id = part.id.as_ref().ok_or_else(|| {
-            LanguageModelError::InvalidInput("Audio part must have an ID".to_string())
+            LanguageModelError::Unsupported(
+                "Cannot convert audio part to OpenAI assistant message without an ID".to_string(),
+            )
         })?;
 
         Ok(Self { id: id.to_string() })
@@ -631,13 +633,7 @@ fn map_openai_delta(
     }
 
     if let Some(tool_calls) = &delta.tool_calls {
-        let all_existing_tool_calls = existing_content_deltas
-            .iter()
-            .filter(|delta| matches!(delta.part, DeltaPart::ToolCall(_)))
-            .collect::<Vec<_>>();
         for tool_call in tool_calls {
-            let existing_delta = all_existing_tool_calls.get(tool_call.index);
-
             let mut tool_call_part = ToolCallPartDelta::default();
             if let Some(id) = &tool_call.id {
                 tool_call_part.id = Some(id.to_string());
@@ -655,7 +651,7 @@ fn map_openai_delta(
             let index = stream_utils::guess_delta_index(
                 &part,
                 &[existing_content_deltas, content_deltas.as_slice()].concat(),
-                existing_delta.map(|v| &**v),
+                Some(tool_call.index),
             );
 
             content_deltas.push(ContentDelta { index, part });

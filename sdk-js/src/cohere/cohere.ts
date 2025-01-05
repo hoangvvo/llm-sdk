@@ -1,5 +1,9 @@
 import { Cohere, CohereClientV2 } from "cohere-ai";
-import { InvalidInputError, UnsupportedError } from "../errors.js";
+import {
+  InvalidInputError,
+  InvariantError,
+  UnsupportedError,
+} from "../errors.js";
 import type { LanguageModelMetadata } from "../language-model.js";
 import { LanguageModel } from "../language-model.js";
 import type {
@@ -198,7 +202,7 @@ function convertToCohereMessages(
             }
             default:
               throw new UnsupportedError(
-                `Unsupported part in assistant message: ${part.type}`,
+                `Cannot convert Part to Cohere assistant message for type ${part.type}`,
               );
           }
         });
@@ -235,7 +239,9 @@ function convertToCohereContent(part: Part): Cohere.Content {
     case "image":
       return convertToCohereImageContent(part);
     default:
-      throw new UnsupportedError(`Unsupported part type: ${part.type}`);
+      throw new UnsupportedError(
+        `Cannot convert part to Cohere content for type ${part.type}`,
+      );
   }
 }
 
@@ -276,7 +282,7 @@ function convertToCohereToolMessageContent(part: Part): Cohere.ToolContent {
       return convertToCohereTextContent(part);
     default:
       throw new UnsupportedError(
-        `Unsupported part in tool message: ${part.type}`,
+        `Cannot convert part to Cohere ToolContent for type ${part.type}`,
       );
   }
 }
@@ -309,7 +315,7 @@ function convertToCohereToolChoice(
     }
     default:
       throw new UnsupportedError(
-        `Unsupported tool choice type: ${toolChoice.type}`,
+        `Cannot convert tool choice to Cohere tool choice for type ${toolChoice.type}`,
       );
   }
 }
@@ -365,11 +371,11 @@ function mapCohereTextContent(content: Cohere.Content.Text): Part {
 
 function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
   if (!toolCall.id) {
-    throw new Error(`Tool call is missing an ID`);
+    throw new InvariantError("Cohere tool call is missing an ID");
   }
   const functionName = toolCall.function?.name;
   if (!functionName) {
-    throw new Error(`Tool call is missing a function name`);
+    throw new InvariantError("Cohere tool call is missing a function name");
   }
   const functionArguments = toolCall.function?.arguments;
   return {

@@ -219,7 +219,7 @@ function convertToMistralMessages(
               }
               default: {
                 throw new UnsupportedError(
-                  `Cannot convert Part to Mistral message for type: ${part.type}`,
+                  `Cannot convert Part to Mistral assistant message for type ${part.type}`,
                 );
               }
             }
@@ -263,7 +263,7 @@ function convertToMistralContentChunk(
       return convertToMistralImageURLChunk(part);
     default:
       throw new UnsupportedError(
-        `Cannot convert Part to Mistral ContentChunk for type: ${part.type}`,
+        `Cannot convert Part to Mistral ContentChunk for type ${part.type}`,
       );
   }
 }
@@ -398,7 +398,7 @@ function mapMistralContentChunk(chunk: MistralComponents.ContentChunk): Part {
     }
     default:
       throw new NotImplementedError(
-        `Cannot map Mistral ContentChunk to Part for type: ${chunk.type}`,
+        `Cannot map Mistral ContentChunk to Part for type ${chunk.type}`,
       );
   }
 }
@@ -457,20 +457,14 @@ export function mapMistralDelta(
   }
 
   if (deltaMessage.toolCalls) {
-    const allExistingToolCalls = existingContentDeltas.filter(
-      (delta) => delta.part.type === "tool-call",
-    );
-
     deltaMessage.toolCalls.forEach((toolCall) => {
-      const existingDelta = allExistingToolCalls[toolCall.index ?? 0];
-
       const part = looselyConvertPartToPartDelta(mapMistralToolCall(toolCall));
 
       contentDeltas.push({
         index: guessDeltaIndex(
           part,
           [...existingContentDeltas, ...contentDeltas],
-          existingDelta,
+          toolCall.index,
         ),
         part,
       });

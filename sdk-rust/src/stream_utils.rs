@@ -5,21 +5,39 @@ use crate::{ContentDelta, DeltaPart};
 /// or in Google cases, where no parts have indexes,
 /// we need to guess an index for the incoming delta
 /// which is required in our unified interface.
+///
+/// toolCallIndex does not always correspond to the index of the tool call in the deltas
+/// because some providers keep tool call separate from other parts (e.g openai). We
+/// can match this against the existing tool call deltas
 pub fn guess_delta_index(
     part: &DeltaPart,
     all_content_deltas: &[ContentDelta],
-    existing_matching_delta: Option<&ContentDelta>,
+    tool_call_index: Option<usize>,
 ) -> usize {
-    // First check if we already have a matching delta provided
-    if let Some(matching_delta) = existing_matching_delta {
-        return matching_delta.index;
+    //     if (part.type === "tool-call" && typeof toolCallIndex === "number") {
+    //     const toolPartDeltas = allContentDeltas.filter(
+    //       (contentDelta) => contentDelta.part.type === "tool-call",
+    //     );
+    //     const existingToolCallDelta = toolPartDeltas[toolCallIndex];
+    //     if (existingToolCallDelta) {
+    //       return existingToolCallDelta.index;
+    //     }
+    //   }
+    if let (Some(tool_call_index), DeltaPart::ToolCall(_)) = (tool_call_index, part) {
+        let mut existing_tool_call_deltas = all_content_deltas
+            .iter()
+            .filter(|content_delta| matches!(content_delta.part, DeltaPart::ToolCall(_)));
+        if let Some(existing_tool_call_delta) = existing_tool_call_deltas.nth(tool_call_index) {
+            return existing_tool_call_delta.index;
+        }
     }
 
     // Attempt to find the LAST matching delta in all_content_deltas
     let matching_delta = all_content_deltas.iter().rev().find(|content_delta| {
         match (&content_delta.part, part) {
             // For text and audio parts, they are the matching delta
-            // if their types are the same
+            // if their types are the same. This is because providers that do not
+            // provide indexes like only have 1 part for each type (e.g openai has only 1 message.content or 1 message.audio)
             (DeltaPart::Text(_), DeltaPart::Text(_))
             | (DeltaPart::Audio(_), DeltaPart::Audio(_)) => true,
 

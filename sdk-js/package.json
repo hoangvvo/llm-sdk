@@ -30,7 +30,6 @@
       "./google": "./src/google/index.ts",
       "./cohere": "./src/cohere/index.ts",
       "./mistral": "./src/mistral/index.ts",
-      "./utils": "./src/utils/index.ts",
       "./package.json": "./package.json"
     },
     "project": "tsconfig.build.json"
@@ -97,16 +96,6 @@
       "require": {
         "types": "./dist/commonjs/mistral/index.d.ts",
         "default": "./dist/commonjs/mistral/index.js"
-      }
-    },
-    "./utils": {
-      "import": {
-        "types": "./dist/esm/utils/index.d.ts",
-        "default": "./dist/esm/utils/index.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/utils/index.d.ts",
-        "default": "./dist/commonjs/utils/index.js"
       }
     },
     "./package.json": "./package.json"

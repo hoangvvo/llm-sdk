@@ -7,22 +7,36 @@ import type { ContentDelta, Part, PartDelta } from "./types.js";
  * or in Google cases, where no parts have indexes,
  * we need to guess an index for the incoming delta
  * which is required in our unified interface.
+ *
+ * toolCallIndex does not always correspond to the index of the tool call in the deltas
+ * because some providers keep tool call separate from other parts (e.g openai). We
+ * can match this against the existing tool call deltas
  */
 export function guessDeltaIndex(
   part: PartDelta,
   allContentDeltas: ContentDelta[],
-  existingMatchingDelta?: ContentDelta,
+  toolCallIndex?: number,
 ) {
-  if (existingMatchingDelta) {
-    return existingMatchingDelta.index;
+  if (part.type === "tool-call" && typeof toolCallIndex === "number") {
+    const toolPartDeltas = allContentDeltas.filter(
+      (contentDelta) => contentDelta.part.type === "tool-call",
+    );
+    const existingToolCallDelta = toolPartDeltas[toolCallIndex];
+    if (existingToolCallDelta) {
+      return existingToolCallDelta.index;
+    }
   }
 
   const matchingDelta = allContentDeltas.findLast((contentDelta) => {
+    // For text and audio parts, they are the matching delta
+    // if their types are the same. This is because providers that do not
+    // provide indexes like only have 1 part for each type (e.g openai has only 1 message.content or 1 message.audio)
     if (part.type === "text" || part.type === "audio") {
       return contentDelta.part.type === part.type;
     }
-    // we won't be able to reliably match tool calls
+    // For tool calls, we can't reliably match them
     // because there can be multiple tool calls with the same tool name
+    // Different types don't match
     return false;
   });
 

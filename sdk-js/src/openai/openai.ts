@@ -249,7 +249,7 @@ function convertToOpenAIMessages(
             }
             default: {
               throw new UnsupportedError(
-                `Unsupported part in assistant message: ${part.type}`,
+                `Cannot convert part to OpenAI assistant message for type ${part.type}`,
               );
             }
           }
@@ -290,7 +290,9 @@ function convertToOpenAIContentPart(
     case "audio":
       return convertToOpenAIContentPartInputAudio(part);
     default:
-      throw new UnsupportedError(`Unsupported part: ${part.type}`);
+      throw new UnsupportedError(
+        `Cannot convert part to OpenAI content part for type ${part.type}`,
+      );
   }
 }
 
@@ -329,7 +331,9 @@ function convertToOpenAIContentPartInputAudio(
       format = "wav";
       break;
     default:
-      throw new UnsupportedError(`Unsupported audio format: ${part.format}`);
+      throw new UnsupportedError(
+        `Cannot convert audio format to OpenAI InputAudio format for format ${part.format}`,
+      );
   }
   return {
     type: "input_audio",
@@ -344,7 +348,9 @@ function convertToOpenAIAssistantMessageParamAudio(
   part: AudioPart,
 ): OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam.Audio {
   if (!part.id) {
-    throw new UnsupportedError("OpenAI audio parts must have an id");
+    throw new UnsupportedError(
+      "Cannot convert audio part to OpenAI assistant message without an ID",
+    );
   }
   return {
     id: part.id,
@@ -375,7 +381,7 @@ function convertToOpenAIToolMessageParamContent(
       return convertToOpenAIContentPartText(part);
     default:
       throw new UnsupportedError(
-        `Unsupported part in tool message: ${part.type}`,
+        `Cannot convert part to OpenAI tool message for type ${part.type}`,
       );
   }
 }
@@ -587,12 +593,7 @@ function mapOpenAIDelta(
   }
 
   if (delta.tool_calls) {
-    const allExistingToolCalls = existingContentDeltas.filter(
-      (delta) => delta.part.type === "tool-call",
-    );
     delta.tool_calls.forEach((toolCall) => {
-      const existingDelta = allExistingToolCalls[toolCall.index];
-
       const part: ToolCallPartDelta = { type: "tool-call" };
       if (toolCall.id) {
         part.tool_call_id = toolCall.id;
@@ -607,7 +608,7 @@ function mapOpenAIDelta(
         index: guessDeltaIndex(
           part,
           [...existingContentDeltas, ...contentDeltas],
-          existingDelta,
+          toolCall.index,
         ),
         part,
       });
