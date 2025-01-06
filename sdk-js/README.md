@@ -1,6 +1,6 @@
 # @hoangvvo/llm-sdk
 
-`@hoangvvo/llm-sdk` is a JavaScript SDK that provides a unified API to access the LLM APIs of various providers.
+`@hoangvvo/llm-sdk` is a JavaScript library that provides a unified API to access the LLM APIs of various providers.
 
 ## Installation
 
@@ -96,9 +96,14 @@ Find examples in the [examples](./examples/) folder to learn how to:
 
 - [Generate text](./examples/generate-text.ts)
 - [Stream text](./examples/stream-text.ts)
+- [Describe image](./examples/describe-image.ts)
 - [Function calling](./examples/tool-use.ts)
 - [Generate audio](./examples/generate-audio.ts)
 - [Stream audio](./examples/stream-audio.ts)
+
+```bash
+node --env-file=../.env examples/generate-text.ts
+```
 
 ## License
 

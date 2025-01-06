@@ -28,17 +28,17 @@ We provide SDKs to interact with various LLM providers in the following programm
 
 ### Supported Providers
 
-| Feature \ Provider | OpenAI            | Anthropic                                                 | Google | Cohere | Mistral           |
-| ------------------ | ----------------- | --------------------------------------------------------- | ------ | ------ | ----------------- |
-| Sampling Params    | ✅ except `top_k` | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅     | ✅     | ✅ except `top_k` |
-| Function Calling   | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Structured Output  | ✅                | ➖                                                        | ✅     | ✅     | ✅                |
-| Text Input         | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Image Input        | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Audio Input        | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
-| Text Output        | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Image Output       | 🚧                | ➖                                                        | ✅     | ➖     | ➖                |
-| Audio Output       | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
+|                   | OpenAI            | Anthropic                                                 | Google | Cohere | Mistral           |
+| ----------------- | ----------------- | --------------------------------------------------------- | ------ | ------ | ----------------- |
+| Sampling Params   | ✅ except `top_k` | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅     | ✅     | ✅ except `top_k` |
+| Function Calling  | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
+| Structured Output | ✅                | ➖                                                        | ✅     | ✅     | ✅                |
+| Text Input        | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
+| Image Input       | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
+| Audio Input       | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
+| Text Output       | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
+| Image Output      | 🚧                | ➖                                                        | ✅     | ➖     | ➖                |
+| Audio Output      | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
 
 Keys:
 

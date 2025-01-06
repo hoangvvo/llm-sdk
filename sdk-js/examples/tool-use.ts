@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
   Message,
@@ -11,31 +11,29 @@ import { getModel } from "./get-model.ts";
 let MY_BALANCE = 1000;
 const STOCK_PRICE = 100;
 
-const TOOLS: Record<string, (args: any) => any> = {
-  trade({
-    action,
-    quantity,
-    symbol,
-  }: {
-    action: "buy" | "sell";
-    quantity: number;
-    symbol: string;
-  }) {
-    console.log(
-      `[TOOLS trade()] Trading ${String(quantity)} shares of ${symbol} with action: ${action}`,
-    );
-    const balanceChange =
-      action === "buy" ? -quantity * STOCK_PRICE : quantity * STOCK_PRICE;
+function trade({
+  action,
+  quantity,
+  symbol,
+}: {
+  action: "buy" | "sell";
+  quantity: number;
+  symbol: string;
+}) {
+  console.log(
+    `[TOOLS trade()] Trading ${String(quantity)} shares of ${symbol} with action: ${action}`,
+  );
+  const balanceChange =
+    action === "buy" ? -quantity * STOCK_PRICE : quantity * STOCK_PRICE;
 
-    MY_BALANCE += balanceChange;
+  MY_BALANCE += balanceChange;
 
-    return {
-      success: true,
-      balance: MY_BALANCE,
-      balance_change: balanceChange,
-    };
-  },
-};
+  return {
+    success: true,
+    balance: MY_BALANCE,
+    balance_change: balanceChange,
+  };
+}
 
 let MAX_TURN_LEFT = 10;
 
@@ -103,11 +101,16 @@ do {
 
   for (const toolCallPart of toolCallParts) {
     const { tool_call_id, tool_name, args } = toolCallPart;
-    const toolFn = TOOLS[tool_name];
-    if (!toolFn) {
-      throw new Error(`Tool ${tool_name} not found`);
+
+    let toolResult: any;
+    switch (tool_name) {
+      case "trade": {
+        toolResult = trade(args as any);
+        break;
+      }
+      default:
+        throw new Error(`Tool ${tool_name} not found`);
     }
-    const toolResult = toolFn(args);
 
     toolMessage = toolMessage ?? {
       role: "tool",
