@@ -1,9 +1,11 @@
 import audioContext from "audio-context";
 import decodeAudio from "audio-decode";
 import play from "audio-play";
-import { openaiAudioModel } from "./model.js";
+import { getModel } from "./get-model.ts";
 
-const response = await openaiAudioModel.generate({
+const model = getModel("openai", "gpt-4o-audio-preview");
+
+const response = await model.generate({
   extra: {
     audio: {
       voice: "alloy",
@@ -34,11 +36,10 @@ if (audioPart) {
   );
   const playback = play(
     audioBuffer,
-    {
-      // @ts-expect-error: it works ok?
-      context: audioContext,
+    { context: audioContext } as unknown as play.Options,
+    () => {
+      console.log("Playback finished");
     },
-    () => {},
   );
   playback.play();
 }

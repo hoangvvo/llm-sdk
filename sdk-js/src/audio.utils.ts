@@ -1,4 +1,4 @@
-import type { AudioFormat } from "./types.js";
+import type { AudioFormat } from "./types.ts";
 
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binaryString = atob(base64);

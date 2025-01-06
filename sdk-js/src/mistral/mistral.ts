@@ -1,17 +1,17 @@
 import { Mistral } from "@mistralai/mistralai";
-import * as MistralComponents from "@mistralai/mistralai/models/components/index.js";
+import type * as MistralComponents from "@mistralai/mistralai/models/components/index.ts";
 import {
   InvalidInputError,
   InvariantError,
   NotImplementedError,
   UnsupportedError,
-} from "../errors.js";
-import type { LanguageModelMetadata } from "../language-model.js";
-import { LanguageModel } from "../language-model.js";
+} from "../errors.ts";
+import type { LanguageModelMetadata } from "../language-model.ts";
+import { LanguageModel } from "../language-model.ts";
 import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
-} from "../stream.utils.js";
+} from "../stream.utils.ts";
 import type {
   ContentDelta,
   ImagePart,
@@ -27,8 +27,8 @@ import type {
   Tool,
   ToolCallPart,
   ToolChoiceOption,
-} from "../types.js";
-import { calculateCost } from "../usage.utils.js";
+} from "../types.ts";
+import { calculateCost } from "../usage.utils.ts";
 
 export interface MistralModelOptions {
   baseURL?: string;
@@ -328,13 +328,13 @@ function convertToMistralToolChoice(
       };
     }
     case "auto": {
-      return MistralComponents.ToolChoiceEnum.Auto;
+      return "auto";
     }
     case "none": {
-      return MistralComponents.ToolChoiceEnum.None;
+      return "none";
     }
     case "required": {
-      return MistralComponents.ToolChoiceEnum.Required;
+      return "required";
     }
   }
 }
@@ -348,7 +348,7 @@ function convertToMistralResponseFormat(
     case "json":
       if (responseFormat.schema) {
         return {
-          type: MistralComponents.ResponseFormats.JsonSchema,
+          type: "json_schema",
           jsonSchema: {
             name: responseFormat.name,
             description: responseFormat.description ?? null,
@@ -357,9 +357,9 @@ function convertToMistralResponseFormat(
           },
         };
       }
-      return { type: MistralComponents.ResponseFormats.JsonObject };
+      return { type: "json_object" };
     case "text":
-      return { type: MistralComponents.ResponseFormats.Text };
+      return { type: "text" };
   }
 }
 

@@ -3,9 +3,9 @@ import {
   InvalidInputError,
   InvariantError,
   UnsupportedError,
-} from "../errors.js";
-import type { LanguageModelMetadata } from "../language-model.js";
-import { LanguageModel } from "../language-model.js";
+} from "../errors.ts";
+import type { LanguageModelMetadata } from "../language-model.ts";
+import { LanguageModel } from "../language-model.ts";
 import type {
   ContentDelta,
   ImagePart,
@@ -21,8 +21,8 @@ import type {
   ToolCallPart,
   ToolCallPartDelta,
   ToolChoiceOption,
-} from "../types.js";
-import { calculateCost } from "../usage.utils.js";
+} from "../types.ts";
+import { calculateCost } from "../usage.utils.ts";
 
 export interface CohereModelOptions {
   apiKey: string;

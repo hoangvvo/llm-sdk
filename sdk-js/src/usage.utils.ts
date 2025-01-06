@@ -1,4 +1,4 @@
-import type { LanguageModelPricing, ModelUsage } from "./types.js";
+import type { LanguageModelPricing, ModelUsage } from "./types.ts";
 
 export function calculateCost(
   usage: ModelUsage,

@@ -1,1 +1,1 @@
-export { GoogleModel, type GoogleModelOptions } from "./google.js";
+export { GoogleModel, type GoogleModelOptions } from "./google.ts";

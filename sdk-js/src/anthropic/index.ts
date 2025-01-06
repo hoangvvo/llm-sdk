@@ -1,1 +1,1 @@
-export { AnthropicModel, type AnthropicModelOptions } from "./anthropic.js";
+export { AnthropicModel, type AnthropicModelOptions } from "./anthropic.ts";

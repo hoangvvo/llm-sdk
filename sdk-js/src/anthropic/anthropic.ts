@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NotImplementedError, UnsupportedError } from "../errors.js";
-import type { LanguageModelMetadata } from "../language-model.js";
-import { LanguageModel } from "../language-model.js";
-import { looselyConvertPartToPartDelta } from "../stream.utils.js";
+import { NotImplementedError, UnsupportedError } from "../errors.ts";
+import type { LanguageModelMetadata } from "../language-model.ts";
+import { LanguageModel } from "../language-model.ts";
+import { looselyConvertPartToPartDelta } from "../stream.utils.ts";
 import type {
   ContentDelta,
   ImagePart,
@@ -20,8 +20,8 @@ import type {
   ToolCallPartDelta,
   ToolChoiceOption,
   ToolResultPart,
-} from "../types.js";
-import { calculateCost } from "../usage.utils.js";
+} from "../types.ts";
+import { calculateCost } from "../usage.utils.ts";
 
 export interface AnthropicModelOptions {
   baseURL?: string;
@@ -310,13 +310,6 @@ function mapAnthropicToolUseBlock(
   };
 }
 
-function mapAnthropicMessageDeltaUsage(usage: Anthropic.MessageDeltaUsage) {
-  return {
-    input_tokens: 0,
-    output_tokens: usage.output_tokens,
-  };
-}
-
 // MARK: To SDK Delta
 
 function mapAnthropicRawContentBlockStartEvent(
@@ -382,6 +375,13 @@ function mapAnthropicInputJSONDelta(
 function mapAnthropicUsage(usage: Anthropic.Usage): ModelUsage {
   return {
     input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+  };
+}
+
+function mapAnthropicMessageDeltaUsage(usage: Anthropic.MessageDeltaUsage) {
+  return {
+    input_tokens: 0,
     output_tokens: usage.output_tokens,
   };
 }

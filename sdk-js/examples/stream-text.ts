@@ -1,4 +1,6 @@
-import { openaiModel as model } from "./model.js";
+import { getModel } from "./get-model.ts";
+
+const model = getModel("openai", "gpt-4o");
 
 const response = model.stream({
   messages: [
@@ -37,5 +39,3 @@ while (!current.done) {
   console.dir(current.value, { depth: null });
   current = await response.next();
 }
-
-console.dir(current.value, { depth: null });

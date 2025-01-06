@@ -1,9 +1,11 @@
 import Speaker from "speaker";
-import { openaiAudioModel } from "./model.js";
+import { getModel } from "./get-model.ts";
 
 let speaker: Speaker | undefined;
 
-const response = openaiAudioModel.stream({
+const model = getModel("openai", "gpt-4o-audio-preview");
+
+const response = model.stream({
   extra: {
     audio: {
       voice: "alloy",
@@ -26,29 +28,19 @@ const response = openaiAudioModel.stream({
 
 let current = await response.next();
 while (!current.done) {
-  const part = current.value.delta.part;
-  if (part.type === "audio") {
+  console.dir(current.value, { depth: null });
+  const part = current.value.delta?.part;
+  if (part?.type === "audio") {
     if (part.audio_data) {
       speaker =
-        speaker ||
+        speaker ??
         new Speaker({
-          sampleRate: part.sample_rate || 24000,
+          sampleRate: part.sample_rate ?? 24000,
           bitDepth: 16,
-          channels: part.channels || 1,
+          channels: part.channels ?? 1,
         });
       speaker.write(Buffer.from(part.audio_data, "base64"));
     }
-    if (part.transcript) {
-      console.log(part.transcript);
-    }
   }
   current = await response.next();
-}
-
-console.dir(current.value, { depth: null });
-const audioPart = current.value.content.find((part) => part.type === "audio");
-
-if (audioPart) {
-  // will repeat that one more time
-  speaker?.write(Buffer.from(audioPart.audio_data, "base64"));
 }

@@ -22,18 +22,18 @@ import {
 import {
   mapAudioFormatToMimeType,
   mapMimeTypeToAudioFormat,
-} from "../audio.utils.js";
+} from "../audio.utils.ts";
 import {
   InvariantError,
   NotImplementedError,
   UnsupportedError,
-} from "../errors.js";
-import type { LanguageModelMetadata } from "../language-model.js";
-import { LanguageModel } from "../language-model.js";
+} from "../errors.ts";
+import type { LanguageModelMetadata } from "../language-model.ts";
+import { LanguageModel } from "../language-model.ts";
 import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
-} from "../stream.utils.js";
+} from "../stream.utils.ts";
 import type {
   AudioPart,
   ContentDelta,
@@ -50,8 +50,8 @@ import type {
   ToolCallPart,
   ToolChoiceOption,
   ToolResultPart,
-} from "../types.js";
-import { calculateCost } from "../usage.utils.js";
+} from "../types.ts";
+import { calculateCost } from "../usage.utils.ts";
 
 export interface GoogleModelOptions {
   apiKey: string;

@@ -2,7 +2,7 @@ import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
   mergeInt16Arrays,
-} from "./audio.utils.js";
+} from "./audio.utils.ts";
 import type {
   AudioFormat,
   AudioPartDelta,
@@ -10,7 +10,7 @@ import type {
   Part,
   TextPartDelta,
   ToolCallPartDelta,
-} from "./types.js";
+} from "./types.ts";
 
 /**
  * Internal representation of accumulated audio data with chunks stored separately

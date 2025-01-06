@@ -1,1 +1,1 @@
-export { OpenAIModel, type OpenAIModelOptions } from "./openai.js";
+export { OpenAIModel, type OpenAIModelOptions } from "./openai.ts";

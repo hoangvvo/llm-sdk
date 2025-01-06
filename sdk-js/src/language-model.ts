@@ -4,7 +4,7 @@ import type {
   LanguageModelPricing,
   ModelResponse,
   PartialModelResponse,
-} from "./types.js";
+} from "./types.ts";
 
 export interface LanguageModelMetadata {
   /**

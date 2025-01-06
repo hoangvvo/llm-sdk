@@ -1,6 +1,8 @@
-import { openaiModel } from "./model.js";
+import { getModel } from "./get-model.ts";
 
-const response = await openaiModel.generate({
+const model = getModel("openai", "gpt-4o");
+
+const response = await model.generate({
   messages: [
     {
       role: "user",

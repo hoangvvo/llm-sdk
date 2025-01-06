@@ -4,12 +4,12 @@ import {
   InvariantError,
   RefusalError,
   UnsupportedError,
-} from "../errors.js";
+} from "../errors.ts";
 import {
   LanguageModel,
   type LanguageModelMetadata,
-} from "../language-model.js";
-import { guessDeltaIndex } from "../stream.utils.js";
+} from "../language-model.ts";
+import { guessDeltaIndex } from "../stream.utils.ts";
 import type {
   AudioFormat,
   AudioPart,
@@ -31,12 +31,12 @@ import type {
   ToolCallPart,
   ToolCallPartDelta,
   ToolChoiceOption,
-} from "../types.js";
-import { calculateCost } from "../usage.utils.js";
+} from "../types.ts";
+import { calculateCost } from "../usage.utils.ts";
 import type {
   OpenAIPatchedCompletionTokenDetails,
   OpenAIPatchedPromptTokensDetails,
-} from "./types.js";
+} from "./types.ts";
 
 const OPENAI_AUDIO_SAMPLE_RATE = 24_000;
 const OPENAI_AUDIO_CHANNELS = 1;
@@ -120,7 +120,9 @@ export class OpenAIModel extends LanguageModel {
     const allContentDeltas: ContentDelta[] = [];
 
     for await (const chunk of stream) {
-      const choice = chunk.choices[0];
+      // It is possible for choices to be empty
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const choice = chunk.choices?.[0];
       if (choice) {
         if (choice.delta.refusal) {
           refusal += choice.delta.refusal;

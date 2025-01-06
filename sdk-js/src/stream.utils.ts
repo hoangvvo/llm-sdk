@@ -1,5 +1,5 @@
-import { InvariantError } from "./errors.js";
-import type { ContentDelta, Part, PartDelta } from "./types.js";
+import { InvariantError } from "./errors.ts";
+import type { ContentDelta, Part, PartDelta } from "./types.ts";
 
 /**
  * Because of the difference in mapping, especially in `OpenAI` cases,

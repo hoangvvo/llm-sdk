@@ -1,1 +1,1 @@
-export { CohereModel, type CohereModelOptions } from "./cohere.js";
+export { CohereModel, type CohereModelOptions } from "./cohere.ts";

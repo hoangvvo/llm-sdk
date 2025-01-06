@@ -5,17 +5,17 @@ Access the LLM API of different providers using a unified SDK.
 ## Features
 
 - Supports multiple LLM providers with a unified API.
-- Supports multi modalities: Text, Image, and Audio, even in stream requests.
-- Supports function calling.
-- Supports streaming responses. Contains utilities for building final output from streamed data, including for streaming audio.
-- Supports reporting the token usage and calculating cost of a request if given the model's pricing information.
-- Provides consistent serialization and deserialization for data storage across different programming languages.
+- Handles multiple modalities: Text, Image, and Audio, even in streaming requests.
+- Enables function calling.
+- Supports streaming responses and includes utilities for building final output from streamed data, including streaming audio.
+- Reports token usage and calculates the cost of a request when provided with the model's pricing information.
+- Offers consistent serialization and deserialization for data storage across different programming languages.
 
 ## Specification
 
-The specification serves as the basis to implement the unified LLM SDK in different programming languages. The specification is expressed using TypeScript in [schemas/sdk.ts](./schema/sdk.ts).
+The specification serves as the foundation for implementing the unified LLM SDK in various programming languages. It is expressed using TypeScript in [schemas/sdk.ts](./schema/sdk.ts).
 
-Implementations in different programming languages should adhere to this specification strictly. In particular, the properties in data structures should have the same names and types, even if that goes against the conventions of the target language, such as camelCase vs snake_case (we follow the later).
+Implementations in different programming languages must strictly adhere to this specification. Specifically, the properties in data structures should retain the same names and types, even if this conflicts with the conventions of the target language, such as camelCase vs snake_case (we follow the latter).
 
 Each implementation may provide additional features.
 
@@ -28,17 +28,17 @@ We provide SDKs to interact with various LLM providers in the following programm
 
 ### Supported Providers
 
-| Feature \ Provider                | OpenAI            | Anthropic                                                 | Google | Cohere | Mistral           |
-| --------------------------------- | ----------------- | --------------------------------------------------------- | ------ | ------ | ----------------- |
-| Sampling Params[^sampling_params] | ✅ except `top_k` | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅     | ✅     | ✅ except `top_k` |
-| Function Calling                  | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Structured Output                 | ✅                | ➖                                                        | ✅     | ✅     | ✅                |
-| Text Input                        | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Image Input                       | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Audio Input                       | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
-| Text Output                       | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Image Output                      | 🚧                | ➖                                                        | ✅     | ➖     | ➖                |
-| Audio Output                      | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
+| Feature \ Provider | OpenAI            | Anthropic                                                 | Google | Cohere | Mistral           |
+| ------------------ | ----------------- | --------------------------------------------------------- | ------ | ------ | ----------------- |
+| Sampling Params    | ✅ except `top_k` | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅     | ✅     | ✅ except `top_k` |
+| Function Calling   | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
+| Structured Output  | ✅                | ➖                                                        | ✅     | ✅     | ✅                |
+| Text Input         | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
+| Image Input        | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
+| Audio Input        | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
+| Text Output        | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
+| Image Output       | 🚧                | ➖                                                        | ✅     | ➖     | ➖                |
+| Audio Output       | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
 
 Keys:
 
@@ -46,196 +46,38 @@ Keys:
 - 🚧: Not yet implemented
 - ➖: Not available from provider
 
-[^sampling_params]: The following sampling parameters are supported: `max_tokens`, `temperature`, `top_p`, `top_k`, `presence_penalty`, `frequency_penalty`, `seed`
+### Language Model Input
+
+A unified format to represent the input for generating responses from the language model, applicable to both non-streaming and streaming requests. The library converts these inputs into corresponding properties for each LLM provider, if applicable. This allows specifying:
+
+- The conversation history, which includes `UserMessage`, `AssistantMessage`, and `ToolMessage`.
+- Sampling parameters: `max_tokens`, `temperature`, `top_p`, `top_k`, `presence_penalty`, `frequency_penalty`, and `seed`.
+- Tool definitions and tool selection.
+- The response format to enforce the model to return structured objects instead of plain text.
+
+See [LanguageModelInput](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L366).
 
 ### Message
 
-`messages` are primitives which make up the conversation history, and `parts`, which are the building blocks of each message. The library converts them into a format suitable for the underlying LLM provider as well as mapping those from different providers to the unified format.
+`messages` are primitives that make up the conversation history, and `parts` are the building blocks of each message. The library converts them into a format suitable for the underlying LLM provider and maps those from different providers to the unified format.
 
-The following `Message` types are implemented in the SDK:
+Three message types are defined in the SDK: `UserMessage`, `AssistantMessage`, and `ToolMessage`.
 
-```ts
-/**
- * Represents a message sent by the user.
- */
-export interface UserMessage {
-  role: "user";
-  content: Part[];
-}
-
-/**
- * Represents a message generated by the model.
- */
-export interface AssistantMessage {
-  role: "assistant";
-  content: Part[];
-}
-
-/**
- * Represents tool result in the message history.
- * Only ToolResultPart should be included in the content.
- */
-export interface ToolMessage {
-  role: "tool";
-  content: Part[];
-}
-```
+See [Message](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L29).
 
 ### Part
 
 > [!NOTE]
-> Tool calls are implemented as a `Part` instead of on a property of the `AssistantMessage`
+> Tool calls are implemented as a `Part` instead of being a property of the `AssistantMessage`.
 
 > [!NOTE]
-> `ToolResultPart` content is an array of `Part` instead of a string or an object, which enables non-text results to be returned for LLM provider that supports them (e.g. Anthropic Function Calling supports Image in Tool Result)
+> The `ToolResultPart` content is an array of `Part` instead of a string or an object. This enables non-text results to be returned for LLM providers that support them (e.g., Anthropic Function Calling supports images in tool results).
 
-The following `Part` types are implemented in the SDK:
+The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `ToolCallPart`, and `ToolResultPart`.
 
-```ts
-/**
- * A part of the message that contains text.
- */
-export interface TextPart {
-  type: "text";
-  text: string;
-  /**
-   * The ID of the part, if applicable.
-   */
-  id?: string;
-}
+See [Part](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L16).
 
-/**
- * A part of the message that contains an image.
- */
-export interface ImagePart {
-  type: "image";
-  /**
-   * The MIME type of the image. E.g. "image/jpeg", "image/png".
-   */
-  mime_type: string;
-  /**
-   * The base64-encoded image data.
-   */
-  image_data: string;
-  /**
-   * The width of the image in pixels.
-   */
-  width?: number;
-  /**
-   * The height of the image in pixels.
-   */
-  height?: number;
-  /**
-   * The ID of the part, if applicable.
-   */
-  id?: string;
-}
-
-/**
- * A part of the message that contains an audio.
- */
-export interface AudioPart {
-  type: "audio";
-  /**
-   * The base64-encoded audio data.
-   */
-  audio_data: string;
-  format?: AudioFormat;
-  /**
-   * The sample rate of the audio. E.g. 44100, 48000.
-   */
-  sample_rate?: number;
-  /**
-   * The number of channels of the audio. E.g. 1, 2.
-   */
-  channels?: number;
-  /**
-   * The transcript of the audio.
-   */
-  transcript?: string;
-  /**
-   * The ID of the part, if applicable.
-   */
-  id?: string;
-}
-
-/**
- * A part of the message that contains an audio.
- */
-export interface AudioPart {
-  type: "audio";
-  /**
-   * The base64-encoded audio data.
-   */
-  audio_data: string;
-  format?: AudioFormat;
-  /**
-   * The sample rate of the audio. E.g. 44100, 48000.
-   */
-  sample_rate?: number;
-  /**
-   * The number of channels of the audio. E.g. 1, 2.
-   */
-  channels?: number;
-  /**
-   * The transcript of the audio.
-   */
-  transcript?: string;
-  /**
-   * The ID of the part, if applicable.
-   */
-  id?: string;
-}
-/**
- * A part of the message that represents a call to a tool the model wants to use.
- */
-export interface ToolCallPart {
-  type: "tool-call";
-  /**
-   * The ID of the tool call, used to match the tool result with the tool call.
-   */
-  tool_call_id: string;
-  /**
-   * The name of the tool to call.
-   */
-  tool_name: string;
-  /**
-   * The arguments to pass to the tool.
-   */
-  args: {
-    [k: string]: unknown;
-  };
-  /**
-   * The ID of the part, if applicable. This might not be the same as the tool_call_id.
-   */
-  id?: string;
-}
-
-/**
- * A part of the message that represents the result of a tool call.
- */
-export interface ToolResultPart {
-  type: "tool-result";
-  /**
-   * The ID of the tool call from previous assistant message.
-   */
-  tool_call_id: string;
-  /**
-   * The name of the tool that was called.
-   */
-  tool_name: string;
-  /**
-   * The content of the tool result.
-   */
-  content: Part[];
-  /**
-   * Marks the tool result as an error.
-   */
-  is_error?: boolean;
-}
-```
-
-For streaming call, there are also the counterparts `XXXPartDelta`.
+For streaming calls, there are also corresponding `XXXPartDelta` types.
 
 ## License
 

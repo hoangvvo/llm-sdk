@@ -16,7 +16,7 @@ export class UnsupportedError extends Error {
 export class NotImplementedError extends Error {
   constructor(message: string) {
     super(
-      `An output from the model is not recognized by the library: ${message}. Please report this issue to the library maintainers.`,
+      `An output from the model is not recognized by the library: ${message}.`,
     );
     this.name = "NotImplemented";
   }
