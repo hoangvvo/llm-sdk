@@ -152,7 +152,7 @@ fn parse_tool_call_args(args: &str) -> Value {
     match serde_json::from_str(args) {
         Ok(value) => value,
         Err(e) => {
-            eprintln!("Failed to parse tool call args: {}", e);
+            eprintln!("Failed to parse tool call args: {e}");
             Value::Object(serde_json::Map::new())
         }
     }
@@ -165,15 +165,13 @@ fn create_tool_call_part(
 ) -> LanguageModelResult<Part> {
     let tool_call_id = data.tool_call_id.as_ref().ok_or_else(|| {
         LanguageModelError::Invariant(format!(
-            "Missing required field tool_call_id at index {}",
-            index
+            "Missing required field tool_call_id at index {index}"
         ))
     })?;
 
     if data.tool_name.is_empty() {
         return Err(LanguageModelError::Invariant(format!(
-            "Missing required field tool_name at index {}",
-            index
+            "Missing required field tool_name at index {index}"
         )));
     }
 
@@ -196,14 +194,12 @@ fn concatenate_audio_chunks(chunks: &[String]) -> LanguageModelResult<String> {
 
     for chunk in chunks {
         let samples = audio_utils::base64_to_i16sample(chunk).map_err(|e| {
-            LanguageModelError::Invariant(format!("Failed to decode audio chunk: {}", e))
+            LanguageModelError::Invariant(format!("Failed to decode audio chunk: {e}"))
         })?;
         all_samples.extend(samples);
     }
 
-    let b64 = audio_utils::i16sample_to_base64(&all_samples).map_err(|e| {
-        LanguageModelError::Invariant(format!("Failed to encode audio samples to base64: {}", e))
-    })?;
+    let b64 = audio_utils::i16sample_to_base64(&all_samples);
 
     Ok(b64)
 }
@@ -216,8 +212,7 @@ fn create_audio_part(data: &AccumulatedAudioData) -> LanguageModelResult<Part> {
 
     if !matches!(format, AudioFormat::Linear16) {
         return Err(LanguageModelError::NotImplemented(format!(
-            "Only linear16 format is supported for audio concatenation. Received: {:?}",
-            format
+            "Only linear16 format is supported for audio concatenation. Received: {format:?}"
         )));
     }
 
@@ -246,14 +241,16 @@ fn create_part(data: &AccumulatedData, index: usize) -> LanguageModelResult<Part
     }
 }
 
-/// Manages the accumulation and merging of content deltas for streaming responses
+/// Manages the accumulation and merging of content deltas for streaming
+/// responses
 pub struct ContentDeltaAccumulator {
-    /// Map of index to accumulated data, using BTreeMap for automatic sorting
+    /// Map of index to accumulated data, using `BTreeMap` for automatic sorting
     accumulated_parts: BTreeMap<usize, AccumulatedData>,
 }
 
 impl ContentDeltaAccumulator {
-    /// Creates a new ContentDeltaAccumulator
+    /// Creates a new `ContentDeltaAccumulator`
+    #[must_use]
     pub fn new() -> Self {
         Self {
             accumulated_parts: BTreeMap::new(),
@@ -288,11 +285,13 @@ impl ContentDeltaAccumulator {
     }
 
     /// Gets the number of accumulated parts
+    #[must_use]
     pub fn size(&self) -> usize {
         self.accumulated_parts.len()
     }
 
     /// Checks if the accumulator has any data
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.accumulated_parts.is_empty()
     }
@@ -301,13 +300,12 @@ impl ContentDeltaAccumulator {
     fn process_delta(&mut self, delta: ContentDelta) -> Result<(), String> {
         let index = delta.index;
 
-        match self.accumulated_parts.get_mut(&index) {
-            Some(existing) => merge_delta(existing, delta),
-            None => {
-                let accumulated = initialize_accumulated_data(delta);
-                self.accumulated_parts.insert(index, accumulated);
-                Ok(())
-            }
+        if let Some(existing) = self.accumulated_parts.get_mut(&index) {
+            merge_delta(existing, delta)
+        } else {
+            let accumulated = initialize_accumulated_data(delta);
+            self.accumulated_parts.insert(index, accumulated);
+            Ok(())
         }
     }
 }

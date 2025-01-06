@@ -33,6 +33,7 @@ pub struct OpenAIModel {
 }
 
 impl OpenAIModel {
+    #[must_use]
     pub fn new(options: OpenAIModelOptions) -> Self {
         let client = Client::new();
 
@@ -48,6 +49,7 @@ impl OpenAIModel {
         }
     }
 
+    #[must_use]
     pub fn with_metadata(mut self, metadata: LanguageModelMetadata) -> Self {
         self.metadata = Some(metadata);
         self
@@ -76,7 +78,10 @@ impl LanguageModel for OpenAIModel {
             .await?;
 
         if response.status().is_client_error() {
-            return Err(LanguageModelError::StatusCode(response.status()));
+            return Err(LanguageModelError::StatusCode(
+                response.status(),
+                response.text().await.unwrap_or_default(),
+            ));
         }
 
         let json = response.json::<openai_api::ChatCompletion>().await?;
@@ -221,8 +226,8 @@ fn into_openai_create_params(
 
     Ok(openai_api::ChatCompletionCreateParams {
         model: model_id,
-        messages: into_openai_messages(messages, system_prompt)?,
-        max_completion_tokens: max_tokens.clone(),
+        messages: into_openai_messages(&messages, system_prompt)?,
+        max_completion_tokens: max_tokens,
         temperature,
         top_p,
         presence_penalty,
@@ -251,7 +256,7 @@ fn into_openai_create_params(
 // MARK: To Provider Messages
 
 fn into_openai_messages(
-    messages: Vec<Message>,
+    messages: &[Message],
     system_prompt: Option<String>,
 ) -> LanguageModelResult<Vec<openai_api::ChatCompletionMessageParam>> {
     let mut openai_messages = vec![];
@@ -259,14 +264,16 @@ fn into_openai_messages(
     if let Some(system_prompt) = system_prompt {
         openai_messages.push(openai_api::ChatCompletionMessageParam::System(
             openai_api::ChatCompletionSystemMessageParam {
-                content: vec![openai_api::ChatCompletionContentPartText {
-                    text: system_prompt.clone(),
-                }],
+                content: vec![openai_api::SystemContentPart::Text(
+                    openai_api::ChatCompletionContentPartText {
+                        text: system_prompt,
+                    },
+                )],
             },
         ));
     }
 
-    for message in &messages {
+    for message in messages {
         match message {
             Message::User(UserMessage { content }) => {
                 let openai_message_param = openai_api::ChatCompletionUserMessageParam {
@@ -319,9 +326,9 @@ fn into_openai_messages(
                 for part in content {
                     let tool_part = match part {
                         Part::ToolResult(part) => part,
-                        _ => Err(LanguageModelError::InvalidInput(format!(
-                            "ToolMessage content must only contain ToolResult parts"
-                        )))?,
+                        _ => Err(LanguageModelError::InvalidInput(
+                            "ToolMessage content must only contain ToolResult parts".to_string(),
+                        ))?,
                     };
 
                     openai_messages.push(openai_api::ChatCompletionMessageParam::Tool(
@@ -331,7 +338,9 @@ fn into_openai_messages(
                                 .content
                                 .iter()
                                 .map(|p| match p {
-                                    Part::Text(part) => Ok(part.into()),
+                                    Part::Text(part) => {
+                                        Ok(openai_api::ToolContentPart::Text(part.into()))
+                                    }
                                     _ => Err(LanguageModelError::Unsupported(format!(
                                         "Cannot convert part to OpenAI tool message for type {p:?}"
                                     ))),
@@ -352,11 +361,9 @@ impl TryFrom<&Part> for openai_api::ChatCompletionContentPart {
 
     fn try_from(part: &Part) -> Result<Self, Self::Error> {
         match part {
-            Part::Text(part) => Ok(openai_api::ChatCompletionContentPart::Text(part.into())),
-            Part::Image(part) => Ok(openai_api::ChatCompletionContentPart::Image(part.into())),
-            Part::Audio(part) => Ok(openai_api::ChatCompletionContentPart::InputAudio(
-                part.try_into()?,
-            )),
+            Part::Text(part) => Ok(Self::Text(part.into())),
+            Part::Image(part) => Ok(Self::Image(part.into())),
+            Part::Audio(part) => Ok(Self::InputAudio(part.try_into()?)),
             _ => Err(LanguageModelError::Unsupported(format!(
                 "Cannot convert part to OpenAI content part for type {part:?}"
             ))),
@@ -425,8 +432,7 @@ impl TryFrom<&ToolCallPart> for openai_api::ChatCompletionMessageFunctionToolCal
             id: part.tool_call_id.to_string(),
             function: openai_api::ChatCompletionMessageFunctionToolCallFunction {
                 name: part.tool_name.to_string(),
-                arguments: serde_json::from_value(part.args.clone())
-                    .map_err(|e| LanguageModelError::InvalidInput(e.to_string()))?,
+                arguments: part.args.to_string(),
             },
         })
     }
@@ -576,11 +582,17 @@ impl TryFrom<&openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPar
     fn try_from(
         value: &openai_api::ChatCompletionMessageFunctionToolCall,
     ) -> Result<Self, Self::Error> {
+        let args_value: serde_json::Value = serde_json::from_str(&value.function.arguments)
+            .map_err(|e| {
+                LanguageModelError::InvalidInput(format!(
+                    "failed to parse tool arguments JSON: {e}"
+                ))
+            })?;
+
         Ok(Self {
             tool_call_id: value.id.to_string(),
             tool_name: value.function.name.to_string(),
-            args: serde_json::to_value(&value.function.arguments)
-                .map_err(|e| LanguageModelError::InvalidInput(e.to_string()))?,
+            args: args_value,
             id: None,
         })
     }

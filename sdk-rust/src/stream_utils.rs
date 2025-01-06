@@ -6,9 +6,9 @@ use crate::{ContentDelta, DeltaPart};
 /// we need to guess an index for the incoming delta
 /// which is required in our unified interface.
 ///
-/// toolCallIndex does not always correspond to the index of the tool call in the deltas
-/// because some providers keep tool call separate from other parts (e.g openai). We
-/// can match this against the existing tool call deltas
+/// toolCallIndex does not always correspond to the index of the tool call in
+/// the deltas because some providers keep tool call separate from other parts
+/// (e.g openai). We can match this against the existing tool call deltas
 pub fn guess_delta_index(
     part: &DeltaPart,
     all_content_deltas: &[ContentDelta],
@@ -37,7 +37,8 @@ pub fn guess_delta_index(
         match (&content_delta.part, part) {
             // For text and audio parts, they are the matching delta
             // if their types are the same. This is because providers that do not
-            // provide indexes like only have 1 part for each type (e.g openai has only 1 message.content or 1 message.audio)
+            // provide indexes like only have 1 part for each type (e.g openai has only 1
+            // message.content or 1 message.audio)
             (DeltaPart::Text(_), DeltaPart::Text(_))
             | (DeltaPart::Audio(_), DeltaPart::Audio(_)) => true,
 

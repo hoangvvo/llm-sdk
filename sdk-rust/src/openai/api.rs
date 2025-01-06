@@ -163,12 +163,18 @@ pub enum ChatCompletionMessageParam {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatCompletionDeveloperMessageParam {
     /// The contents of the developer message.
-    pub content: Vec<ChatCompletionContentPartText>,
+    pub content: Vec<DeveloperContentPart>,
 
     /// An optional name for the participant. Provides the model information to
     /// differentiate between participants of the same role.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum DeveloperContentPart {
+    Text(ChatCompletionContentPartText),
 }
 
 /// Developer-provided instructions that the model should follow, regardless of
@@ -177,7 +183,13 @@ pub struct ChatCompletionDeveloperMessageParam {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatCompletionSystemMessageParam {
     /// The contents of the system message.
-    pub content: Vec<ChatCompletionContentPartText>,
+    pub content: Vec<SystemContentPart>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SystemContentPart {
+    Text(ChatCompletionContentPartText),
 }
 
 /// Messages sent by an end user, containing prompts or additional context
@@ -230,10 +242,16 @@ pub enum AssistantContentPart {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatCompletionToolMessageParam {
     /// The contents of the tool message.
-    pub content: Vec<ChatCompletionContentPartText>,
+    pub content: Vec<ToolContentPart>,
 
     /// Tool call that this message is responding to.
     pub tool_call_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolContentPart {
+    Text(ChatCompletionContentPartText),
 }
 
 /// Learn about

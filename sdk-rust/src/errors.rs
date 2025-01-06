@@ -10,7 +10,7 @@ pub enum LanguageModelError {
     Transport(#[from] reqwest::Error),
     /// The request returns a non-OK status code
     #[error("HTTP status error: {0}")]
-    StatusCode(reqwest::StatusCode),
+    StatusCode(reqwest::StatusCode, String),
     /// The input is not supported by or is incompatible with the model
     /// (e.g. using non text for assistant message parts)
     #[error("Unsupported feature: {0}")]
