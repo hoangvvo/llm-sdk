@@ -164,15 +164,17 @@ fn create_tool_call_part(
     index: usize,
 ) -> LanguageModelResult<Part> {
     let tool_call_id = data.tool_call_id.as_ref().ok_or_else(|| {
-        LanguageModelError::Invariant(format!(
-            "Missing required field tool_call_id at index {index}"
-        ))
+        LanguageModelError::Invariant(
+            "",
+            format!("Missing required field tool_call_id at index {index}"),
+        )
     })?;
 
     if data.tool_name.is_empty() {
-        return Err(LanguageModelError::Invariant(format!(
-            "Missing required field tool_name at index {index}"
-        )));
+        return Err(LanguageModelError::Invariant(
+            "",
+            format!("Missing required field tool_name at index {index}"),
+        ));
     }
 
     Ok(Part::ToolCall(ToolCallPart {
@@ -194,7 +196,7 @@ fn concatenate_audio_chunks(chunks: &[String]) -> LanguageModelResult<String> {
 
     for chunk in chunks {
         let samples = audio_utils::base64_to_i16sample(chunk).map_err(|e| {
-            LanguageModelError::Invariant(format!("Failed to decode audio chunk: {e}"))
+            LanguageModelError::Invariant("", format!("Failed to decode audio chunk: {e}"))
         })?;
         all_samples.extend(samples);
     }
@@ -207,13 +209,19 @@ fn concatenate_audio_chunks(chunks: &[String]) -> LanguageModelResult<String> {
 /// Creates an audio part from accumulated audio data
 fn create_audio_part(data: &AccumulatedAudioData) -> LanguageModelResult<Part> {
     let format = data.format.as_ref().ok_or_else(|| {
-        LanguageModelError::Invariant("Missing required field format for audio part".to_string())
+        LanguageModelError::Invariant(
+            "",
+            "Missing required field format for audio part".to_string(),
+        )
     })?;
 
     if !matches!(format, AudioFormat::Linear16) {
-        return Err(LanguageModelError::NotImplemented(format!(
-            "Only linear16 format is supported for audio concatenation. Received: {format:?}"
-        )));
+        return Err(LanguageModelError::NotImplemented(
+            "",
+            format!(
+                "Only linear16 format is supported for audio concatenation. Received: {format:?}"
+            ),
+        ));
     }
 
     let concatenated_audio = concatenate_audio_chunks(&data.audio_data_chunks)?;

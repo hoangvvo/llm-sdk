@@ -53,6 +53,8 @@ import type {
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 
+const PROVIDER = "google";
+
 export interface GoogleModelOptions {
   apiKey: string;
   modelId: string;
@@ -70,7 +72,7 @@ export class GoogleModel extends LanguageModel {
     metadata?: LanguageModelMetadata,
   ) {
     super();
-    this.provider = "google";
+    this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
 
@@ -84,7 +86,7 @@ export class GoogleModel extends LanguageModel {
 
     const candidate = response.candidates?.[0];
     if (!candidate) {
-      throw new InvariantError("No candidate in response");
+      throw new InvariantError(PROVIDER, "No candidate in response");
     }
 
     const content = mapGoogleContent(candidate.content);
@@ -267,6 +269,7 @@ function convertToGoogleFunctionResponsePart(
   const firstTextPart = textParts[0];
   if (!firstTextPart) {
     throw new UnsupportedError(
+      PROVIDER,
       "Cannot convert tool result to Google function response without a text part",
     );
   }
@@ -387,6 +390,7 @@ function mapGooglePart(part: GooglePart): Part {
   if (part.inlineData) return mapGoogleInlineData(part);
   if (part.functionCall) return mapGoogleFunctionCall(part);
   throw new NotImplementedError(
+    PROVIDER,
     `Cannot map Google part to SDK part for type ${Object.keys(part)
       .filter((key) => !!part[key as keyof GooglePart])
       .join(", ")}`,
@@ -418,6 +422,7 @@ function mapGoogleInlineData(
     };
   }
   throw new NotImplementedError(
+    PROVIDER,
     `Cannot map Google inline data part to SDK part for mime type: ${part.inlineData.mimeType}`,
   );
 }

@@ -14,6 +14,8 @@ use eventsource_stream::{self, Eventsource};
 use futures::stream::StreamExt;
 use reqwest::Client;
 
+const PROVIDER: &'static str = "openai";
+
 const OPENAI_AUDIO_SAMPLE_RATE: u32 = 24_000;
 const OPENAI_AUDIO_CHANNELS: u32 = 1;
 
@@ -59,7 +61,7 @@ impl OpenAIModel {
 #[async_trait::async_trait]
 impl LanguageModel for OpenAIModel {
     fn provider(&self) -> &'static str {
-        "openai"
+        PROVIDER
     }
 
     fn model_id(&self) -> String {
@@ -86,10 +88,9 @@ impl LanguageModel for OpenAIModel {
 
         let json = response.json::<openai_api::ChatCompletion>().await?;
 
-        let choice = json
-            .choices
-            .first()
-            .ok_or_else(|| LanguageModelError::Invariant("No choices in response".to_string()))?;
+        let choice = json.choices.first().ok_or_else(|| {
+            LanguageModelError::Invariant(PROVIDER, "No choices in response".to_string())
+        })?;
 
         let openai_api::ChatCompletionChoice { message, .. } = choice;
 
@@ -148,7 +149,8 @@ impl LanguageModel for OpenAIModel {
                         let chunk: openai_api::ChatCompletionChunk =
                         serde_json::from_str(&event.data)
                             .map_err(|e| LanguageModelError::Invariant(
-                                format!("Failed to parse chunk: {e}")
+                                PROVIDER,
+                                format!("Failed to parse stream chunk: {e}")
                             ))?;
 
                         let choice = chunk.choices.first();
@@ -183,11 +185,13 @@ impl LanguageModel for OpenAIModel {
                         match e {
                             eventsource_stream::EventStreamError::Utf8(_) => {
                                 return Err(LanguageModelError::Invariant(
-                                    "Receive invalid UTF-8 sequence".to_string()
+                                    PROVIDER,
+                                    "Receive invalid UTF-8 sequence for stream data".to_string()
                                 ))?;
                             }
                             eventsource_stream::EventStreamError::Parser(error) => {
                                 return Err(LanguageModelError::Invariant(
+                                    PROVIDER,
                                     format!("Receive invalid EventStream data: {error}")
                                 ))?;
                             },
@@ -311,9 +315,12 @@ fn into_openai_messages(
                         Part::Audio(part) => {
                             openai_message_param.audio = Some(part.try_into()?);
                         }
-                        _ => Err(LanguageModelError::Unsupported(format!(
-                            "Cannot convert part to OpenAI assistant message for type {part:?}"
-                        )))?,
+                        _ => Err(LanguageModelError::Unsupported(
+                            PROVIDER,
+                            format!(
+                                "Cannot convert part to OpenAI assistant message for type {part:?}"
+                            ),
+                        ))?,
                     }
                 }
 
@@ -341,9 +348,12 @@ fn into_openai_messages(
                                     Part::Text(part) => {
                                         Ok(openai_api::ToolContentPart::Text(part.into()))
                                     }
-                                    _ => Err(LanguageModelError::Unsupported(format!(
+                                    _ => Err(LanguageModelError::Unsupported(
+                                        PROVIDER,
+                                        format!(
                                         "Cannot convert part to OpenAI tool message for type {p:?}"
-                                    ))),
+                                    ),
+                                    )),
                                 })
                                 .collect::<LanguageModelResult<_>>()?,
                         },
@@ -364,9 +374,10 @@ impl TryFrom<&Part> for openai_api::ChatCompletionContentPart {
             Part::Text(part) => Ok(Self::Text(part.into())),
             Part::Image(part) => Ok(Self::Image(part.into())),
             Part::Audio(part) => Ok(Self::InputAudio(part.try_into()?)),
-            _ => Err(LanguageModelError::Unsupported(format!(
-                "Cannot convert part to OpenAI content part for type {part:?}"
-            ))),
+            _ => Err(LanguageModelError::Unsupported(
+                PROVIDER,
+                format!("Cannot convert part to OpenAI content part for type {part:?}"),
+            )),
         }
     }
 }
@@ -400,10 +411,13 @@ impl TryFrom<&AudioPart> for openai_api::ChatCompletionContentPartInputAudio {
                 format: match part.format {
                     AudioFormat::Wav => Ok(openai_api::AudioInputFormat::Wav),
                     AudioFormat::Mp3 => Ok(openai_api::AudioInputFormat::Mp3),
-                    _ => Err(LanguageModelError::Unsupported(format!(
+                    _ => Err(LanguageModelError::Unsupported(
+                        PROVIDER,
+                        format!(
                         "Cannot convert audio format to OpenAI InputAudio format for format {:?}",
                         part.format
-                    ))),
+                    ),
+                    )),
                 }?,
             },
         })
@@ -416,6 +430,7 @@ impl TryFrom<&AudioPart> for openai_api::ChatCompletionAssistantMessageParamAudi
     fn try_from(part: &AudioPart) -> Result<Self, Self::Error> {
         let id = part.id.as_ref().ok_or_else(|| {
             LanguageModelError::Unsupported(
+                PROVIDER,
                 "Cannot convert audio part to OpenAI assistant message without an ID".to_string(),
             )
         })?;
@@ -544,6 +559,7 @@ fn map_openai_message(
                     .as_ref()
                     .ok_or_else(|| {
                         LanguageModelError::Invariant(
+                            PROVIDER,
                             "Audio returned from OpenAI API but no audio parameter was provided"
                                 .to_string(),
                         )

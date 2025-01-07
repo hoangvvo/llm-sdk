@@ -38,6 +38,8 @@ import type {
   OpenAIPatchedPromptTokensDetails,
 } from "./types.ts";
 
+const PROVIDER = "openai";
+
 const OPENAI_AUDIO_SAMPLE_RATE = 24_000;
 const OPENAI_AUDIO_CHANNELS = 1;
 
@@ -59,7 +61,7 @@ export class OpenAIModel extends LanguageModel {
     metadata?: LanguageModelMetadata,
   ) {
     super();
-    this.provider = "openai";
+    this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
     this.openai = new OpenAI({
@@ -78,7 +80,7 @@ export class OpenAIModel extends LanguageModel {
 
     const choice = response.choices[0];
     if (!choice) {
-      throw new InvariantError("No choices in response");
+      throw new InvariantError(PROVIDER, "No choices in response");
     }
     const { message } = choice;
 
@@ -251,6 +253,7 @@ function convertToOpenAIMessages(
             }
             default: {
               throw new UnsupportedError(
+                PROVIDER,
                 `Cannot convert part to OpenAI assistant message for type ${part.type}`,
               );
             }
@@ -293,6 +296,7 @@ function convertToOpenAIContentPart(
       return convertToOpenAIContentPartInputAudio(part);
     default:
       throw new UnsupportedError(
+        PROVIDER,
         `Cannot convert part to OpenAI content part for type ${part.type}`,
       );
   }
@@ -331,6 +335,7 @@ function convertToOpenAIContentPartInputAudio(
       break;
     default:
       throw new UnsupportedError(
+        PROVIDER,
         `Cannot convert audio format to OpenAI InputAudio format for format ${part.format}`,
       );
   }
@@ -348,6 +353,7 @@ function convertToOpenAIAssistantMessageParamAudio(
 ): OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam.Audio {
   if (!part.id) {
     throw new UnsupportedError(
+      PROVIDER,
       "Cannot convert audio part to OpenAI assistant message without an ID",
     );
   }
@@ -380,6 +386,7 @@ function convertToOpenAIToolMessageParamContent(
       return convertToOpenAIContentPartText(part);
     default:
       throw new UnsupportedError(
+        PROVIDER,
         `Cannot convert part to OpenAI tool message for type ${part.type}`,
       );
   }
@@ -488,6 +495,7 @@ function mapOpenAIMessage(
   if (message.audio) {
     if (!createParams.audio) {
       throw new InvariantError(
+        PROVIDER,
         "Audio returned from OpenAI API but no audio parameter was provided",
       );
     }

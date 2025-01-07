@@ -29,6 +29,8 @@ export interface AnthropicModelOptions {
   modelId: string;
 }
 
+const PROVIDER = "anthropic";
+
 export class AnthropicModel extends LanguageModel {
   public provider: string;
   public modelId: string;
@@ -41,7 +43,7 @@ export class AnthropicModel extends LanguageModel {
     metadata?: LanguageModelMetadata,
   ) {
     super();
-    this.provider = "anthropic";
+    this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
     this.anthropic = new Anthropic({
@@ -177,6 +179,7 @@ function convertToAnthropicContentBlockParam(
       return convertToAnthropicToolResultBlockParam(part);
     default:
       throw new UnsupportedError(
+        PROVIDER,
         `Cannot convert part to Anthropic content for type ${part.type}`,
       );
   }
@@ -226,6 +229,7 @@ function convertToAnthropicToolResultBlockParam(
       const blockParam = convertToAnthropicContentBlockParam(part);
       if (blockParam.type !== "text" && blockParam.type !== "image") {
         throw new UnsupportedError(
+          PROVIDER,
           `Cannot convert tool result part to Anthropic ToolResultBlockParam content for type ${blockParam.type}`,
         );
       }
@@ -287,6 +291,7 @@ function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock): Part {
       return mapAnthropicToolUseBlock(block);
     default:
       throw new NotImplementedError(
+        PROVIDER,
         `Cannot map Anthropic content block for type ${block.type}`,
       );
   }
@@ -348,6 +353,7 @@ function mapAnthropicRawContentBlockDelta(
       return mapAnthropicInputJSONDelta(delta);
     default: {
       throw new NotImplementedError(
+        PROVIDER,
         `Cannot map Anthropic raw content block delta for type ${delta.type}`,
       );
     }

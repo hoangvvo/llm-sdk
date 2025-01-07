@@ -24,6 +24,8 @@ import type {
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 
+const PROVIDER = "cohere";
+
 export interface CohereModelOptions {
   apiKey: string;
   modelId: string;
@@ -41,7 +43,7 @@ export class CohereModel extends LanguageModel {
     metadata?: LanguageModelMetadata,
   ) {
     super();
-    this.provider = "cohere";
+    this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
     this.cohere = new CohereClientV2({
@@ -202,6 +204,7 @@ function convertToCohereMessages(
             }
             default:
               throw new UnsupportedError(
+                PROVIDER,
                 `Cannot convert Part to Cohere assistant message for type ${part.type}`,
               );
           }
@@ -240,6 +243,7 @@ function convertToCohereContent(part: Part): Cohere.Content {
       return convertToCohereImageContent(part);
     default:
       throw new UnsupportedError(
+        PROVIDER,
         `Cannot convert part to Cohere content for type ${part.type}`,
       );
   }
@@ -282,6 +286,7 @@ function convertToCohereToolMessageContent(part: Part): Cohere.ToolContent {
       return convertToCohereTextContent(part);
     default:
       throw new UnsupportedError(
+        PROVIDER,
         `Cannot convert part to Cohere ToolContent for type ${part.type}`,
       );
   }
@@ -315,6 +320,7 @@ function convertToCohereToolChoice(
     }
     default:
       throw new UnsupportedError(
+        PROVIDER,
         `Cannot convert tool choice to Cohere tool choice for type ${toolChoice.type}`,
       );
   }
@@ -371,11 +377,14 @@ function mapCohereTextContent(content: Cohere.Content.Text): Part {
 
 function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
   if (!toolCall.id) {
-    throw new InvariantError("Cohere tool call is missing an ID");
+    throw new InvariantError(PROVIDER, "Cohere tool call is missing an ID");
   }
   const functionName = toolCall.function?.name;
   if (!functionName) {
-    throw new InvariantError("Cohere tool call is missing a function name");
+    throw new InvariantError(
+      PROVIDER,
+      "Cohere tool call is missing a function name",
+    );
   }
   const functionArguments = toolCall.function?.arguments;
   return {

@@ -30,6 +30,8 @@ import type {
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 
+const PROVIDER = "mistral";
+
 export interface MistralModelOptions {
   baseURL?: string;
   apiKey: string;
@@ -67,7 +69,10 @@ export class MistralModel extends LanguageModel {
 
     const choice = response.choices?.[0];
     if (!choice) {
-      throw new InvariantError("Response does not contain a valid choice");
+      throw new InvariantError(
+        PROVIDER,
+        "Response does not contain a valid choice",
+      );
     }
 
     const content = mapMistralMessage(choice.message);
@@ -219,6 +224,7 @@ function convertToMistralMessages(
               }
               default: {
                 throw new UnsupportedError(
+                  PROVIDER,
                   `Cannot convert Part to Mistral assistant message for type ${part.type}`,
                 );
               }
@@ -263,6 +269,7 @@ function convertToMistralContentChunk(
       return convertToMistralImageURLChunk(part);
     default:
       throw new UnsupportedError(
+        PROVIDER,
         `Cannot convert Part to Mistral ContentChunk for type ${part.type}`,
       );
   }
@@ -398,6 +405,7 @@ function mapMistralContentChunk(chunk: MistralComponents.ContentChunk): Part {
     }
     default:
       throw new NotImplementedError(
+        PROVIDER,
         `Cannot map Mistral ContentChunk to Part for type ${chunk.type}`,
       );
   }
@@ -407,7 +415,10 @@ function mapMistralToolCall(
   toolCall: MistralComponents.ToolCall,
 ): ToolCallPart {
   if (!toolCall.id) {
-    throw new InvariantError("Mistral ToolCall does not contain an id");
+    throw new InvariantError(
+      PROVIDER,
+      "Mistral ToolCall does not contain an id",
+    );
   }
   const args =
     typeof toolCall.function.arguments === "string"
