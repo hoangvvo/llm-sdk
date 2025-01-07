@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@hoangvvo/llm-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A unified LLM SDK",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

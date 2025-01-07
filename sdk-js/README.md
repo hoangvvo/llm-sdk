@@ -105,6 +105,18 @@ Find examples in the [examples](./examples/) folder to learn how to:
 node --env-file=../.env examples/generate-text.ts
 ```
 
+## Migration
+
+### To 0.3.0
+
+- **ESM Only**. The library is now ESM-only. CommonJS is no longer supported. You can continue using the library in CommonJS environment by [using the latest Node.js version](https://nodejs.org/api/modules.html#loading-ecmascript-modules-using-require).
+
+- **Tool result content.** Rename `result` to `content`. Tool result content is now an array of `Part` instead of an object to support Anthropic support for multi-modal tool result.
+
+### To 0.2.0
+
+- **All properties now use snake_case.** Initially, the design allowed properties to be transformed to either camelCase or snake_case based on the programming language. However, this flexibility led to database inconsistencies in mixed-language environments. Adopting snake_case aligns with the most common convention.
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)
