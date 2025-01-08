@@ -7,7 +7,10 @@ import type {
   AudioFormat,
   AudioPartDelta,
   ContentDelta,
+  ModelResponse,
+  ModelUsage,
   Part,
+  PartialModelResponse,
   TextPartDelta,
   ToolCallPartDelta,
 } from "./types.ts";
@@ -260,34 +263,34 @@ function createPart(data: AccumulatedData, index: number): Part {
 /**
  * Manages the accumulation and merging of content deltas for streaming responses
  */
-export class ContentDeltaAccumulator {
+export class StreamAccumulator {
   private readonly accumulatedParts = new Map<number, AccumulatedData>();
+  private accumulatedUsage?: ModelUsage;
 
   /**
    * Adds a chunk of content deltas to the accumulator
    */
-  addChunk(incomingDeltas: ContentDelta[]): void {
-    for (const delta of incomingDeltas) {
-      this.processDelta(delta);
+  addPartial(partial: PartialModelResponse): void {
+    if (partial.delta) {
+      this.processDelta(partial.delta);
+    }
+    if (partial.usage) {
+      this.processUsage(partial.usage);
     }
   }
 
   /**
-   * Computes the final content from accumulated deltas
+   * Computes the final response from accumulated deltas
    */
-  computeContent(): Part[] {
-    const sortedEntries = Array.from(this.accumulatedParts.entries()).sort(
-      ([a], [b]) => a - b,
-    );
+  computeResponse(): ModelResponse {
+    const content = Array.from(this.accumulatedParts.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([index, data]) => createPart(data, index));
 
-    return sortedEntries.map(([index, data]) => createPart(data, index));
-  }
-
-  /**
-   * Clears all accumulated data
-   */
-  clear(): void {
-    this.accumulatedParts.clear();
+    return {
+      content,
+      ...(this.accumulatedUsage && { usage: this.accumulatedUsage }),
+    };
   }
 
   /**
@@ -315,5 +318,12 @@ export class ContentDeltaAccumulator {
     } else {
       this.accumulatedParts.set(delta.index, initializeAccumulatedData(delta));
     }
+  }
+
+  private processUsage(usage: ModelUsage): void {
+    this.accumulatedUsage = this.accumulatedUsage ?? { ...usage };
+
+    this.accumulatedUsage.input_tokens += usage.input_tokens;
+    this.accumulatedUsage.output_tokens += usage.output_tokens;
   }
 }

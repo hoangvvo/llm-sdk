@@ -1,7 +1,7 @@
 use crate::{
     audio_utils, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, DeltaPart,
-    LanguageModelError, LanguageModelResult, Part, TextPart, TextPartDelta, ToolCallPart,
-    ToolCallPartDelta,
+    LanguageModelError, LanguageModelResult, ModelResponse, ModelUsage, Part, PartialModelResponse,
+    TextPart, TextPartDelta, ToolCallPart, ToolCallPartDelta,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -136,10 +136,10 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
 }
 
 /// Creates a text part from accumulated text data
-fn create_text_part(data: &AccumulatedTextData) -> Part {
+fn create_text_part(data: AccumulatedTextData) -> Part {
     Part::Text(TextPart {
-        text: data.text.clone(),
-        id: data.id.clone(),
+        text: data.text,
+        id: data.id,
     })
 }
 
@@ -159,11 +159,8 @@ fn parse_tool_call_args(args: &str) -> Value {
 }
 
 /// Creates a tool call part from accumulated tool call data
-fn create_tool_call_part(
-    data: &AccumulatedToolCallData,
-    index: usize,
-) -> LanguageModelResult<Part> {
-    let tool_call_id = data.tool_call_id.as_ref().ok_or_else(|| {
+fn create_tool_call_part(data: AccumulatedToolCallData, index: usize) -> LanguageModelResult<Part> {
+    let tool_call_id = data.tool_call_id.ok_or_else(|| {
         LanguageModelError::Invariant(
             "",
             format!("Missing required field tool_call_id at index {index}"),
@@ -178,10 +175,10 @@ fn create_tool_call_part(
     }
 
     Ok(Part::ToolCall(ToolCallPart {
-        tool_call_id: tool_call_id.clone(),
-        tool_name: data.tool_name.clone(),
+        tool_call_id,
+        tool_name: data.tool_name,
         args: parse_tool_call_args(&data.args),
-        id: data.id.clone(),
+        id: data.id,
     }))
 }
 
@@ -207,8 +204,8 @@ fn concatenate_audio_chunks(chunks: &[String]) -> LanguageModelResult<String> {
 }
 
 /// Creates an audio part from accumulated audio data
-fn create_audio_part(data: &AccumulatedAudioData) -> LanguageModelResult<Part> {
-    let format = data.format.as_ref().ok_or_else(|| {
+fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
+    let format = data.format.ok_or_else(|| {
         LanguageModelError::Invariant(
             "",
             "Missing required field format for audio part".to_string(),
@@ -228,20 +225,20 @@ fn create_audio_part(data: &AccumulatedAudioData) -> LanguageModelResult<Part> {
 
     Ok(Part::Audio(AudioPart {
         audio_data: concatenated_audio,
-        format: format.clone(),
+        format,
         sample_rate: data.sample_rate,
         channels: data.channels,
         transcript: if data.transcript.is_empty() {
             None
         } else {
-            Some(data.transcript.clone())
+            Some(data.transcript)
         },
-        id: data.id.clone(),
+        id: data.id,
     }))
 }
 
 /// Creates a final Part from accumulated data
-fn create_part(data: &AccumulatedData, index: usize) -> LanguageModelResult<Part> {
+fn create_part(data: AccumulatedData, index: usize) -> LanguageModelResult<Part> {
     match data {
         AccumulatedData::Text(text_data) => Ok(create_text_part(text_data)),
         AccumulatedData::ToolCall(tool_data) => create_tool_call_part(tool_data, index),
@@ -251,17 +248,20 @@ fn create_part(data: &AccumulatedData, index: usize) -> LanguageModelResult<Part
 
 /// Manages the accumulation and merging of content deltas for streaming
 /// responses
-pub struct ContentDeltaAccumulator {
+pub struct StreamAccumulator {
     /// Map of index to accumulated data, using `BTreeMap` for automatic sorting
     accumulated_parts: BTreeMap<usize, AccumulatedData>,
+    /// Accumulated usage statistics
+    accumulated_usage: Option<ModelUsage>,
 }
 
-impl ContentDeltaAccumulator {
-    /// Creates a new `ContentDeltaAccumulator`
+impl StreamAccumulator {
+    /// Creates a new `StreamAccumulator`
     #[must_use]
     pub fn new() -> Self {
         Self {
             accumulated_parts: BTreeMap::new(),
+            accumulated_usage: None,
         }
     }
 
@@ -269,22 +269,32 @@ impl ContentDeltaAccumulator {
     ///
     /// # Errors
     /// Returns an error if delta types mismatch for the same index
-    pub fn add_chunk(&mut self, incoming_deltas: Vec<ContentDelta>) -> Result<(), String> {
-        for delta in incoming_deltas {
-            self.process_delta(delta)?;
+    pub fn add_partial(&mut self, partial: &PartialModelResponse) -> Result<(), String> {
+        if let Some(delta) = &partial.delta {
+            self.process_delta(delta.clone())?;
+        }
+        if let Some(usage) = &partial.usage {
+            self.process_usage(usage.clone())?;
         }
         Ok(())
     }
 
-    /// Computes the final content from accumulated deltas
+    /// Computes the final response from accumulated deltas
     ///
     /// # Errors
     /// Returns an error if required fields are missing or format is unsupported
-    pub fn compute_content(&self) -> LanguageModelResult<Vec<Part>> {
-        self.accumulated_parts
-            .iter()
-            .map(|(index, data)| create_part(data, *index))
-            .collect()
+    pub fn compute_response(self) -> LanguageModelResult<ModelResponse> {
+        let content = self
+            .accumulated_parts
+            .into_iter()
+            .map(|(index, data)| create_part(data, index))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(ModelResponse {
+            content,
+            cost: None,
+            usage: self.accumulated_usage,
+        })
     }
 
     /// Clears all accumulated data
@@ -316,9 +326,20 @@ impl ContentDeltaAccumulator {
             Ok(())
         }
     }
+
+    fn process_usage(&mut self, usage: ModelUsage) -> Result<(), String> {
+        let accumulated_usage = self
+            .accumulated_usage
+            .get_or_insert_with(ModelUsage::default);
+
+        accumulated_usage.input_tokens += usage.input_tokens;
+        accumulated_usage.output_tokens += usage.output_tokens;
+
+        Ok(())
+    }
 }
 
-impl Default for ContentDeltaAccumulator {
+impl Default for StreamAccumulator {
     fn default() -> Self {
         Self::new()
     }

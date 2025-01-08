@@ -12,11 +12,10 @@ export class InvalidInputError extends Error {
  * The reqest returns a non-OK status code
  */
 export class StatusCodeError extends Error {
-  constructor(
-    public statusCode: number,
-    message: string,
-  ) {
+  public statusCode: number;
+  constructor(statusCode: number, message: string) {
     super(`Status error: ${message} (Status ${String(statusCode)})`);
+    this.statusCode = statusCode;
     this.name = "StatusCode";
   }
 }
@@ -26,12 +25,11 @@ export class StatusCodeError extends Error {
  * (e.g. using non text for assistant message parts)
  */
 export class UnsupportedError extends Error {
-  constructor(
-    public provider: string,
-    message: string,
-  ) {
+  public provider: string;
+  constructor(provider: string, message: string) {
     super(`Unsupported by ${provider}: ${message}`);
     this.name = "Unsupported";
+    this.provider = provider;
   }
 }
 
@@ -40,12 +38,11 @@ export class UnsupportedError extends Error {
  * Please report this issue to the library maintainers.
  */
 export class NotImplementedError extends Error {
-  constructor(
-    public provider: string,
-    message: string,
-  ) {
+  provider: string;
+  constructor(provider: string, message: string) {
     super(`Not implemented for ${provider}: ${message}.`);
     this.name = "NotImplemented";
+    this.provider = provider;
   }
 }
 
@@ -54,12 +51,11 @@ export class NotImplementedError extends Error {
  * in an `OpenAI` completion)
  */
 export class InvariantError extends Error {
-  constructor(
-    public provider: string,
-    message: string,
-  ) {
+  provider: string;
+  constructor(provider: string, message: string) {
     super(`Invariant from ${provider}: ${message}`);
     this.name = "Invariant";
+    this.provider = provider;
   }
 }
 
