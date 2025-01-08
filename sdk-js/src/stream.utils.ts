@@ -17,17 +17,37 @@ export function guessDeltaIndex(
   allContentDeltas: ContentDelta[],
   toolCallIndex?: number,
 ) {
+  // contentDeltas may have the structure of [part0 partial, part0 partial, part1 partial].
+  // For the purpose of this matching, we want only [part0, part1]
+  const uniqueContentDeltas = allContentDeltas.filter(
+    (part, index) =>
+      allContentDeltas.findIndex(
+        (findPart) => findPart.index === part.index,
+      ) === index,
+  );
+
   if (part.type === "tool-call" && typeof toolCallIndex === "number") {
-    const toolPartDeltas = allContentDeltas.filter(
+    // Providers like OpenAI track tool calls in a separate field, so we
+    // need to reconcile that. To understand how this matching works:
+    // [Provider]
+    // toolCalls: [index 0] [index 1]
+    // [LLM-SDK state]
+    // parts: [index 0 text] [index 1 tool] [index 2 text] [index 3 tool]
+    // In this case, we need to map the tool index 0 -> 1 and 1 -> 3
+    const toolPartDeltas = uniqueContentDeltas.filter(
       (contentDelta) => contentDelta.part.type === "tool-call",
     );
     const existingToolCallDelta = toolPartDeltas[toolCallIndex];
     if (existingToolCallDelta) {
       return existingToolCallDelta.index;
+    } else {
+      // If no matching tool call delta found, return the length of unique_content_deltas
+      // This is because we want to append a new tool call delta
+      return uniqueContentDeltas.length;
     }
   }
 
-  const matchingDelta = allContentDeltas.findLast((contentDelta) => {
+  const matchingDelta = uniqueContentDeltas.findLast((contentDelta) => {
     // For text and audio parts, they are the matching delta
     // if their types are the same. This is because providers that do not
     // provide indexes like only have 1 part for each type (e.g openai has only 1 message.content or 1 message.audio)
@@ -45,7 +65,7 @@ export function guessDeltaIndex(
   }
 
   const maxIndex = Math.max(
-    ...allContentDeltas.map((contentDelta) => contentDelta.index),
+    ...uniqueContentDeltas.map((contentDelta) => contentDelta.index),
     -1,
   );
   return maxIndex + 1;

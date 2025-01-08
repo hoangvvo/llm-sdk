@@ -3,6 +3,7 @@ import {
   base64ToArrayBuffer,
   mergeInt16Arrays,
 } from "./audio.utils.ts";
+import { InvariantError } from "./errors.ts";
 import type {
   AudioFormat,
   AudioPartDelta,
@@ -209,13 +210,20 @@ function createToolCallPart(
     );
   }
 
-  return {
-    type: "tool-call",
-    tool_call_id: data.toolCallId,
-    tool_name: data.toolName,
-    args: JSON.parse(data.args) as Record<string, unknown>,
-    ...(data.id && { id: data.id }),
-  };
+  try {
+    return {
+      type: "tool-call",
+      tool_call_id: data.toolCallId,
+      tool_name: data.toolName,
+      args: JSON.parse(data.args) as Record<string, unknown>,
+      ...(data.id && { id: data.id }),
+    };
+  } catch (e) {
+    throw new InvariantError(
+      "",
+      `Invalid tool call arguments: ${data.args}: ${(e as Error).message}`,
+    );
+  }
 }
 
 /**

@@ -14,26 +14,46 @@ pub fn guess_delta_index(
     all_content_deltas: &[ContentDelta],
     tool_call_index: Option<usize>,
 ) -> usize {
-    //     if (part.type === "tool-call" && typeof toolCallIndex === "number") {
-    //     const toolPartDeltas = allContentDeltas.filter(
-    //       (contentDelta) => contentDelta.part.type === "tool-call",
-    //     );
-    //     const existingToolCallDelta = toolPartDeltas[toolCallIndex];
-    //     if (existingToolCallDelta) {
-    //       return existingToolCallDelta.index;
-    //     }
-    //   }
+    // contentDeltas may have the structure of [part0 partial, part0 partial, part1 partial].
+    // For the purpose of this matching, we want only [part0, part1]
+    let unique_content_deltas: Vec<_> = all_content_deltas
+        .iter()
+        .enumerate()
+        .filter(|(index, content_delta)| {
+            all_content_deltas
+                .iter()
+                .position(|find_part| find_part.index == content_delta.index)
+                == Some(*index)
+        })
+        .map(|(_, content_delta)| content_delta.clone())
+        .collect();
+
     if let (Some(tool_call_index), DeltaPart::ToolCall(_)) = (tool_call_index, part) {
-        let mut existing_tool_call_deltas = all_content_deltas
+        // Providers like OpenAI track tool calls in a separate field, so we
+        // need to reconcile that. To understand how this matching works:
+        // [Provider]
+        // toolCalls: [index 0] [index 1]
+        // [LLM-SDK state]
+        // parts: [index 0 text] [index 1 tool] [index 2 text] [index 3 tool]
+        // In this case, we need to map the tool index 0 -> 1 and 1 -> 3
+        let tool_part_deltas: Vec<_> = unique_content_deltas
             .iter()
-            .filter(|content_delta| matches!(content_delta.part, DeltaPart::ToolCall(_)));
-        if let Some(existing_tool_call_delta) = existing_tool_call_deltas.nth(tool_call_index) {
+            .filter(|content_delta| matches!(content_delta.part, DeltaPart::ToolCall(_)))
+            .collect();
+
+        let existing_tool_call_delta = tool_part_deltas.get(tool_call_index).cloned();
+
+        if let Some(existing_tool_call_delta) = existing_tool_call_delta {
             return existing_tool_call_delta.index;
+        } else {
+            // If no matching tool call delta found, return the length of unique_content_deltas
+            // This is because we want to append a new tool call delta
+            return unique_content_deltas.len();
         }
     }
 
-    // Attempt to find the LAST matching delta in all_content_deltas
-    let matching_delta = all_content_deltas.iter().rev().find(|content_delta| {
+    // Attempt to find the LAST matching delta in unique_content_deltas
+    let matching_delta = unique_content_deltas.iter().rev().find(|content_delta| {
         match (&content_delta.part, part) {
             // For text and audio parts, they are the matching delta
             // if their types are the same. This is because providers that do not
@@ -54,14 +74,14 @@ pub fn guess_delta_index(
     }
 
     // If no matching delta found, return max index + 1
-    let max_index = all_content_deltas
+    let max_index = unique_content_deltas
         .iter()
         .map(|content_delta| content_delta.index)
         .max()
         .unwrap_or(0);
 
     // Since we're using usize, we start from 0 instead of -1
-    if max_index == 0 && all_content_deltas.is_empty() {
+    if max_index == 0 && unique_content_deltas.is_empty() {
         0
     } else {
         max_index + 1

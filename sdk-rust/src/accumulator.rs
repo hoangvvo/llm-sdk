@@ -144,18 +144,14 @@ fn create_text_part(data: AccumulatedTextData) -> Part {
 }
 
 /// Parses tool call arguments from JSON string
-fn parse_tool_call_args(args: &str) -> Value {
+fn parse_tool_call_args(args: &str) -> LanguageModelResult<Value> {
     if args.trim().is_empty() {
-        return Value::Object(serde_json::Map::new());
+        return Ok(Value::Object(serde_json::Map::new()));
     }
 
-    match serde_json::from_str(args) {
-        Ok(value) => value,
-        Err(e) => {
-            eprintln!("Failed to parse tool call args: {e}");
-            Value::Object(serde_json::Map::new())
-        }
-    }
+    serde_json::from_str(args).map_err(|e| {
+        LanguageModelError::Invariant("", format!("Invalid tool call arguments: {args}: {e}"))
+    })
 }
 
 /// Creates a tool call part from accumulated tool call data
@@ -177,7 +173,7 @@ fn create_tool_call_part(data: AccumulatedToolCallData, index: usize) -> Languag
     Ok(Part::ToolCall(ToolCallPart {
         tool_call_id,
         tool_name: data.tool_name,
-        args: parse_tool_call_args(&data.args),
+        args: parse_tool_call_args(&data.args)?,
         id: data.id,
     }))
 }
