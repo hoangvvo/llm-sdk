@@ -39,7 +39,7 @@ export class AnthropicModel extends LanguageModel {
   private anthropic: Anthropic;
 
   constructor(
-    public options: AnthropicModelOptions,
+    options: AnthropicModelOptions,
     metadata?: LanguageModelMetadata,
   ) {
     super();
@@ -323,6 +323,11 @@ function mapAnthropicRawContentBlockStartEvent(
   const part = looselyConvertPartToPartDelta(
     mapAnthropicBlock(event.content_block),
   );
+  if (part.type === "tool-call") {
+    // Start event for tool call should not have content
+    part.args = "";
+  }
+
   return [
     {
       index: event.index,

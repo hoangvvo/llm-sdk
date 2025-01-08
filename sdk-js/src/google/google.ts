@@ -9,8 +9,9 @@ import type {
   FunctionResponsePart as GoogleFunctionResponsePart,
   InlineDataPart as GoogleInlineDataPart,
   Part as GooglePart,
-  ResponseSchema as GoogleResponseSchema,
+  Schema as GoogleSchema,
   TextPart as GoogleTextPart,
+  SchemaType,
   ToolConfig,
   UsageMetadata,
 } from "@google/generative-ai";
@@ -67,10 +68,7 @@ export class GoogleModel extends LanguageModel {
 
   private genModel: GenerativeModel;
 
-  constructor(
-    public options: GoogleModelOptions,
-    metadata?: LanguageModelMetadata,
-  ) {
+  constructor(options: GoogleModelOptions, metadata?: LanguageModelMetadata) {
     super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;
@@ -310,6 +308,63 @@ function tryConvertToGoogleFunctionResponseResponse(
 
 // MARK: To Provider Tools
 
+/**
+ * Google supports only a subset of JSON Schema
+ */
+function convertToGoogleSchema(schema: Record<string, unknown>): GoogleSchema {
+  const allowedFormatValues = ["float", "double", "int32", "int64", "enum"];
+  let enumValue = schema["enum"] as string[] | undefined;
+  if (typeof schema["const"] === "string") {
+    enumValue = [...(enumValue ?? []), schema["const"]];
+  }
+  const result: GoogleSchema = {};
+  if (schema["type"]) {
+    if (Array.isArray(schema["type"])) {
+      if (schema["type"][1] === "null") {
+        // This schema targets strict structured output and use type: [type, null]
+        // This is not supported by Google models
+        schema["type"] = schema["type"][0];
+      }
+      throw new UnsupportedError(
+        PROVIDER,
+        `Cannot convert schema with array "type" to Google schema: ${JSON.stringify(
+          schema,
+        )}`,
+      );
+    }
+    result.type = schema["type"] as SchemaType;
+  }
+  if (
+    typeof schema["format"] === "string" &&
+    allowedFormatValues.includes(schema["format"])
+  ) {
+    result.format = schema["format"];
+  }
+  if (schema["description"]) {
+    result.description = schema["description"] as string;
+  }
+  if (enumValue) {
+    result.enum = enumValue;
+  }
+  if (schema["properties"]) {
+    result.properties = Object.fromEntries(
+      Object.entries(schema["properties"]).map(([key, value]) => [
+        key,
+        convertToGoogleSchema(value as Record<string, unknown>),
+      ]),
+    );
+  }
+  if (schema["required"]) {
+    result.required = schema["required"] as string[];
+  }
+  if (schema["items"]) {
+    result.items = convertToGoogleSchema(
+      schema["items"] as Record<string, unknown>,
+    );
+  }
+  return result;
+}
+
 function convertToGoogleFunctionDeclarationTools(
   tools: Tool[],
 ): FunctionDeclarationsTool[] {
@@ -319,7 +374,9 @@ function convertToGoogleFunctionDeclarationTools(
         const declaration: FunctionDeclaration = {
           name: tool.name,
           description: tool.description,
-          parameters: tool.parameters as unknown as FunctionDeclarationSchema,
+          parameters: convertToGoogleSchema(
+            tool.parameters,
+          ) as FunctionDeclarationSchema,
         };
 
         return declaration;
@@ -368,8 +425,7 @@ function convertResponseFormatToGoogleGenerationConfig(
       return {
         responseMimeType: "application/json",
         ...(responseFormat.schema && {
-          responseSchema:
-            responseFormat.schema as unknown as GoogleResponseSchema,
+          responseSchema: convertToGoogleSchema(responseFormat.schema),
         }),
       };
     }
@@ -475,6 +531,10 @@ function mapGoogleContentToDelta(
   const contentDeltas: ContentDelta[] = [];
 
   content.parts.forEach((googlePart) => {
+    if (Object.keys(googlePart).length === 0) {
+      // Streaming mode sometimes produce a part with no content
+      return;
+    }
     const part = looselyConvertPartToPartDelta(mapGooglePart(googlePart));
     const index = guessDeltaIndex(part, [
       ...existingContentDeltas,

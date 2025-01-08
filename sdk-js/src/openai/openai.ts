@@ -56,10 +56,7 @@ export class OpenAIModel extends LanguageModel {
 
   private openai: OpenAI;
 
-  constructor(
-    public options: OpenAIModelOptions,
-    metadata?: LanguageModelMetadata,
-  ) {
+  constructor(options: OpenAIModelOptions, metadata?: LanguageModelMetadata) {
     super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;

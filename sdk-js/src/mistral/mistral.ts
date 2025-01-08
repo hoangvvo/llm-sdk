@@ -48,10 +48,7 @@ export class MistralModel extends LanguageModel {
 
   private client: Mistral;
 
-  constructor(
-    public options: MistralModelOptions,
-    metadata?: LanguageModelMetadata,
-  ) {
+  constructor(options: MistralModelOptions, metadata?: LanguageModelMetadata) {
     super();
     this.provider = "mistral";
     this.modelId = options.modelId;

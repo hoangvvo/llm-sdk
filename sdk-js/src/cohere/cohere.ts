@@ -38,10 +38,7 @@ export class CohereModel extends LanguageModel {
 
   private cohere: CohereClientV2;
 
-  constructor(
-    public options: CohereModelOptions,
-    metadata?: LanguageModelMetadata,
-  ) {
+  constructor(options: CohereModelOptions, metadata?: LanguageModelMetadata) {
     super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;
@@ -140,9 +137,12 @@ function convertToCohereChatRequest(
       frequencyPenalty: frequency_penalty,
     }),
     ...(typeof seed === "number" && { seed }),
-    ...(tools && { tools: tools.map(convertToCohereTool) }),
+    ...(tools && {
+      tools: tools.map(convertToCohereTool),
+      strictTools: true,
+    }),
     ...(toolChoice && { toolChoice }),
-    strictTools: true,
+
     ...(response_format && {
       responseFormat: convertToCohereResponseFormat(response_format),
     }),
@@ -405,11 +405,12 @@ function mapCohereStreamedContent(
     | Cohere.StreamedChatResponseV2.ContentStart,
 ): ContentDelta | null {
   const text = event.delta?.message?.content?.text;
-  if (!text || !event.index) {
+  const index = event.index;
+  if (!text || typeof index !== "number") {
     return null;
   }
   return {
-    index: event.index,
+    index: index,
     part: {
       type: "text",
       text,
