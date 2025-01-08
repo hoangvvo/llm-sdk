@@ -567,6 +567,7 @@ fn map_openai_message(
                     .format,
             ),
             audio_data: audio.data.to_string(),
+            transcript: Some(audio.transcript.clone()),
             ..Default::default()
         };
         if matches!(audio_part.format, AudioFormat::Linear16) {

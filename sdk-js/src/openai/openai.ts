@@ -500,6 +500,8 @@ function mapOpenAIMessage(
       type: "audio",
       audio_data: message.audio.data,
       format: mapOpenAIAudioFormat(createParams.audio.format),
+      id: message.audio.id,
+      transcript: message.audio.transcript,
     };
     if (audioPart.format == "linear16") {
       audioPart.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;

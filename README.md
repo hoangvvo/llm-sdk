@@ -23,8 +23,8 @@ Each implementation may provide additional features.
 
 We provide SDKs to interact with various LLM providers in the following programming languages:
 
-- [JavaScript](./sdk-js/README.md)
-- [Rust](./sdk-rust/README.md)
+- [JavaScript](./sdk-js)
+- [Rust](./sdk-rust)
 
 ### Supported Providers
 
@@ -35,7 +35,7 @@ We provide SDKs to interact with various LLM providers in the following programm
 | Structured Output | ✅                | ➖                                                        | ✅     | ✅     | ✅                |
 | Text Input        | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
 | Image Input       | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Audio Input       | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
+| Audio Input       | ✅                | ➖                                                        | ✅     | ➖     | ➖                |
 | Text Output       | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
 | Image Output      | 🚧                | ➖                                                        | ✅     | ➖     | ➖                |
 | Audio Output      | ✅                | ➖                                                        | ➖     | ➖     | ➖                |

@@ -49,7 +49,6 @@ export type ResponseFormatOption = ResponseFormatText | ResponseFormatJson;
 export type LanguageModelCapability =
   | "structured-output"
   | "function-calling"
-  | "structured-output-strict"
   | "audio-input"
   | "audio-output"
   | "image-input"

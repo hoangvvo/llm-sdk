@@ -12,6 +12,6 @@
     "target": "ES2022",
     "noEmit": true
   },
-  "include": ["src", "examples", "test", "scripts"],
+  "include": ["src", "examples", "test-utils"],
   "exclude": ["dist"]
 }
