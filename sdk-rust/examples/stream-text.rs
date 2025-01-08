@@ -1,6 +1,8 @@
 use dotenvy::dotenv;
 use futures::stream::StreamExt;
-use llm_sdk::{AssistantMessage, LanguageModelInput, Message, Part, UserMessage};
+use llm_sdk::{
+    AssistantMessage, LanguageModelInput, Message, Part, StreamAccumulator, UserMessage,
+};
 
 mod common;
 
@@ -30,8 +32,14 @@ async fn main() {
         .await
         .unwrap();
 
+    let mut accumulator = StreamAccumulator::new();
+
     while let Some(partial_response) = stream.next().await {
         let partial_response = partial_response.unwrap();
+        accumulator.add_partial(&partial_response).unwrap();
         println!("{partial_response:#?}");
     }
+
+    let final_response = accumulator.compute_response();
+    println!("Final response: {final_response:#?}");
 }

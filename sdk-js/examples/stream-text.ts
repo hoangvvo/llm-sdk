@@ -1,3 +1,4 @@
+import { StreamAccumulator } from "../src/accumulator.ts";
 import { getModel } from "./get-model.ts";
 
 const model = getModel("openai", "gpt-4o");
@@ -34,8 +35,14 @@ const response = model.stream({
   ],
 });
 
+const accumulator = new StreamAccumulator();
+
 let current = await response.next();
 while (!current.done) {
   console.dir(current.value, { depth: null });
+  accumulator.addPartial(current.value);
   current = await response.next();
 }
+
+const finalResponse = accumulator.computeResponse();
+console.dir(finalResponse, { depth: null });
