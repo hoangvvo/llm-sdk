@@ -721,6 +721,7 @@ pub struct CompletionsAPICompletionUsage {
 
 /// Breakdown of tokens used in a completion.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_field_names)]
 pub struct CompletionUsageCompletionTokensDetails {
     /// When using Predicted Outputs, the number of tokens in the prediction
     /// that appeared in the completion.

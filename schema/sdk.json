@@ -1,0 +1,676 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "AudioFormat": {
+      "type": "string",
+      "description": "Loosely describe audio format. Some values (e.g., 'wav') denote containers; others (e.g., 'linear16') specify encoding only; cannot describe containers that can contain different audio encodings.",
+      "enum": ["wav", "mp3", "linear16", "flac", "mulaw", "alaw", "aac", "opus"]
+    },
+    "TextPart": {
+      "type": "object",
+      "description": "A part of the message that contains text.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "text"
+        },
+        "text": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
+        }
+      },
+      "required": ["type", "text"],
+      "additionalProperties": false
+    },
+    "ImagePart": {
+      "type": "object",
+      "description": "A part of the message that contains an image.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "image"
+        },
+        "mime_type": {
+          "type": "string",
+          "description": "The MIME type of the image. E.g. \"image/jpeg\", \"image/png\"."
+        },
+        "image_data": {
+          "type": "string",
+          "description": "The base64-encoded image data."
+        },
+        "width": {
+          "type": "number",
+          "description": "The width of the image in pixels."
+        },
+        "height": {
+          "type": "number",
+          "description": "The height of the image in pixels."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
+        }
+      },
+      "required": ["type", "mime_type", "image_data"],
+      "additionalProperties": false
+    },
+    "AudioPart": {
+      "type": "object",
+      "description": "A part of the message that contains an audio.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "audio"
+        },
+        "audio_data": {
+          "type": "string",
+          "description": "The base64-encoded audio data."
+        },
+        "format": {
+          "$ref": "#/definitions/AudioFormat"
+        },
+        "sample_rate": {
+          "type": "number",
+          "description": "The sample rate of the audio. E.g. 44100, 48000."
+        },
+        "channels": {
+          "type": "number",
+          "description": "The number of channels of the audio. E.g. 1, 2."
+        },
+        "transcript": {
+          "type": "string",
+          "description": "The transcript of the audio."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
+        }
+      },
+      "required": ["type", "audio_data"],
+      "additionalProperties": false
+    },
+    "ToolCallPart": {
+      "type": "object",
+      "description": "A part of the message that represents a call to a tool the model wants to use.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "tool-call"
+        },
+        "tool_call_id": {
+          "type": "string",
+          "description": "The ID of the tool call, used to match the tool result with the tool call."
+        },
+        "tool_name": {
+          "type": "string",
+          "description": "The name of the tool to call."
+        },
+        "args": {
+          "type": "object",
+          "description": "The arguments to pass to the tool.",
+          "additionalProperties": true
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable. This might not be the same as the tool_call_id."
+        }
+      },
+      "required": ["type", "tool_call_id", "tool_name", "args"],
+      "additionalProperties": false
+    },
+    "ToolResultPart": {
+      "type": "object",
+      "description": "A part of the message that represents the result of a tool call.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "tool-result"
+        },
+        "tool_call_id": {
+          "type": "string",
+          "description": "The ID of the tool call from previous assistant message."
+        },
+        "tool_name": {
+          "type": "string",
+          "description": "The name of the tool that was called."
+        },
+        "content": {
+          "type": "array",
+          "description": "The content of the tool result.",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        },
+        "is_error": {
+          "type": "boolean",
+          "description": "Marks the tool result as an error."
+        }
+      },
+      "required": ["type", "tool_call_id", "tool_name", "content"],
+      "additionalProperties": false
+    },
+    "Part": {
+      "description": "A part of the message.",
+      "oneOf": [
+        { "$ref": "#/definitions/TextPart" },
+        { "$ref": "#/definitions/ImagePart" },
+        { "$ref": "#/definitions/AudioPart" },
+        { "$ref": "#/definitions/ToolCallPart" },
+        { "$ref": "#/definitions/ToolResultPart" }
+      ]
+    },
+    "TextPartDelta": {
+      "type": "object",
+      "description": "A delta update for a text part, used in streaming or incremental updates of a message.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "text"
+        },
+        "text": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
+        }
+      },
+      "required": ["type", "text"],
+      "additionalProperties": false
+    },
+    "ToolCallPartDelta": {
+      "type": "object",
+      "description": "A delta update for a tool call part, used in streaming of a tool invocation.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "tool-call"
+        },
+        "tool_call_id": {
+          "type": "string",
+          "description": "The ID of the tool call, used to match the tool result with the tool call."
+        },
+        "tool_name": {
+          "type": "string",
+          "description": "The name of the tool to call."
+        },
+        "args": {
+          "type": "string",
+          "description": "The partial JSON string of the arguments to pass to the tool."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable. This might not be the same as the tool_call_id."
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "AudioPartDelta": {
+      "type": "object",
+      "description": "A delta update for an audio part, used in streaming of an audio message.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "audio"
+        },
+        "audio_data": {
+          "type": "string",
+          "description": "The base64-encoded audio data."
+        },
+        "format": {
+          "$ref": "#/definitions/AudioFormat"
+        },
+        "sample_rate": {
+          "type": "number",
+          "description": "The sample rate of the audio. E.g. 44100, 48000."
+        },
+        "channels": {
+          "type": "number",
+          "description": "The number of channels of the audio. E.g. 1, 2."
+        },
+        "transcript": {
+          "type": "string",
+          "description": "The transcript of the audio."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the part, if applicable."
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "PartDelta": {
+      "description": "Delta parts used in partial updates.",
+      "oneOf": [
+        { "$ref": "#/definitions/TextPartDelta" },
+        { "$ref": "#/definitions/ToolCallPartDelta" },
+        { "$ref": "#/definitions/AudioPartDelta" }
+      ]
+    },
+    "ContentDelta": {
+      "type": "object",
+      "description": "Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.",
+      "properties": {
+        "index": {
+          "type": "number"
+        },
+        "part": {
+          "$ref": "#/definitions/PartDelta"
+        }
+      },
+      "required": ["index", "part"],
+      "additionalProperties": false
+    },
+    "UserMessage": {
+      "type": "object",
+      "description": "Represents a message sent by the user.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "const": "user"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        }
+      },
+      "required": ["role", "content"],
+      "additionalProperties": false
+    },
+    "AssistantMessage": {
+      "type": "object",
+      "description": "Represents a message generated by the model.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "const": "assistant"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        }
+      },
+      "required": ["role", "content"],
+      "additionalProperties": false
+    },
+    "ToolMessage": {
+      "type": "object",
+      "description": "Represents tool result in the message history. Only ToolResultPart should be included in the content.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "const": "tool"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        }
+      },
+      "required": ["role", "content"],
+      "additionalProperties": false
+    },
+    "Message": {
+      "description": "A message in an LLM conversation history.",
+      "oneOf": [
+        { "$ref": "#/definitions/UserMessage" },
+        { "$ref": "#/definitions/AssistantMessage" },
+        { "$ref": "#/definitions/ToolMessage" }
+      ]
+    },
+    "Modality": {
+      "type": "string",
+      "description": "Defines the modality of content (e.g., text or audio) in LLM responses.",
+      "enum": ["text", "audio"]
+    },
+    "JSONSchema": {
+      "type": "object",
+      "description": "Represents a JSON schema.",
+      "additionalProperties": true
+    },
+    "Tool": {
+      "type": "object",
+      "description": "Represents a tool that can be used by the model.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the tool."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the tool."
+        },
+        "parameters": {
+          "$ref": "#/definitions/JSONSchema",
+          "description": "The JSON schema of the parameters that the tool accepts. The type must be \"object\"."
+        }
+      },
+      "required": ["name", "description", "parameters"],
+      "additionalProperties": false
+    },
+    "ToolChoiceAuto": {
+      "type": "object",
+      "description": "The model will automatically choose the tool to use or not use any tools.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "auto"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ToolChoiceNone": {
+      "type": "object",
+      "description": "The model will not use any tools.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "none"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ToolChoiceRequired": {
+      "type": "object",
+      "description": "The model will be forced to use a tool.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "required"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ToolChoiceTool": {
+      "type": "object",
+      "description": "The model will use the specified tool.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "tool"
+        },
+        "tool_name": {
+          "type": "string"
+        }
+      },
+      "required": ["type", "tool_name"],
+      "additionalProperties": false
+    },
+    "ToolChoiceOption": {
+      "description": "Determines how the model should choose which tool to use. \"auto\" - The model will automatically choose the tool to use or not use any tools. \"none\" - The model will not use any tools. \"required\" - The model will be forced to use a tool. { type: \"tool\", toolName: \"toolName\" } - The model will use the specified tool.",
+      "oneOf": [
+        { "$ref": "#/definitions/ToolChoiceAuto" },
+        { "$ref": "#/definitions/ToolChoiceNone" },
+        { "$ref": "#/definitions/ToolChoiceRequired" },
+        { "$ref": "#/definitions/ToolChoiceTool" }
+      ]
+    },
+    "ResponseFormatText": {
+      "type": "object",
+      "description": "Specifies that the model response should be in plain text format.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "text"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ResponseFormatJson": {
+      "type": "object",
+      "description": "Specifies that the model response should be in JSON format adhering to a specified schema.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "json"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the schema."
+        },
+        "description": {
+          "type": "string",
+          "description": "The description of the schema."
+        },
+        "schema": {
+          "$ref": "#/definitions/JSONSchema"
+        }
+      },
+      "required": ["type", "name"],
+      "additionalProperties": false
+    },
+    "ResponseFormatOption": {
+      "description": "The format that the model must output.",
+      "oneOf": [
+        { "$ref": "#/definitions/ResponseFormatText" },
+        { "$ref": "#/definitions/ResponseFormatJson" }
+      ]
+    },
+    "LanguageModelCapability": {
+      "type": "string",
+      "description": "A metadata property that describes the capability of the model.",
+      "enum": [
+        "structured-output",
+        "function-calling",
+        "structured-output-strict",
+        "audio-input",
+        "audio-output",
+        "image-input",
+        "image-output"
+      ]
+    },
+    "ModelTokensDetails": {
+      "type": "object",
+      "description": "Represents the token usage of the model.",
+      "properties": {
+        "text_tokens": {
+          "type": "number"
+        },
+        "cached_text_tokens": {
+          "type": "number"
+        },
+        "audio_tokens": {
+          "type": "number"
+        },
+        "cached_audio_tokens": {
+          "type": "number"
+        },
+        "image_tokens": {
+          "type": "number"
+        },
+        "cached_image_tokens": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModelUsage": {
+      "type": "object",
+      "description": "Represents the token usage of the model.",
+      "properties": {
+        "input_tokens": {
+          "type": "number"
+        },
+        "output_tokens": {
+          "type": "number"
+        },
+        "input_tokens_details": {
+          "$ref": "#/definitions/ModelTokensDetails"
+        },
+        "output_tokens_details": {
+          "$ref": "#/definitions/ModelTokensDetails"
+        }
+      },
+      "required": ["input_tokens", "output_tokens"],
+      "additionalProperties": false
+    },
+    "ModelResponse": {
+      "type": "object",
+      "description": "Represents the response generated by the model.",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        },
+        "usage": {
+          "$ref": "#/definitions/ModelUsage"
+        },
+        "cost": {
+          "type": "number",
+          "description": "The cost of the response."
+        }
+      },
+      "required": ["content"],
+      "additionalProperties": false
+    },
+    "PartialModelResponse": {
+      "type": "object",
+      "description": "Represents a partial response from the language model, useful for streaming output via async generator.",
+      "properties": {
+        "delta": {
+          "$ref": "#/definitions/ContentDelta"
+        }
+      },
+      "required": ["delta"],
+      "additionalProperties": false
+    },
+    "LanguageModelInput": {
+      "type": "object",
+      "description": "Defines the input parameters for the language model completion.",
+      "properties": {
+        "system_prompt": {
+          "type": "string",
+          "description": "A system prompt is a way of providing context and instructions to the model"
+        },
+        "messages": {
+          "type": "array",
+          "description": "A list of messages comprising the conversation so far.",
+          "items": {
+            "$ref": "#/definitions/Message"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "description": "Definitions of tools that the model may use.",
+          "items": {
+            "$ref": "#/definitions/Tool"
+          }
+        },
+        "tool_choice": {
+          "$ref": "#/definitions/ToolChoiceOption"
+        },
+        "response_format": {
+          "$ref": "#/definitions/ResponseFormatOption"
+        },
+        "max_tokens": {
+          "type": "number",
+          "description": "The maximum number of tokens that can be generated in the chat completion."
+        },
+        "temperature": {
+          "type": "number",
+          "description": "Amount of randomness injected into the response. Ranges from 0.0 to 1.0"
+        },
+        "top_p": {
+          "type": "number",
+          "description": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. Ranges from 0.0 to 1.0"
+        },
+        "top_k": {
+          "type": "number",
+          "description": "Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Ranges from 0.0 to 1.0"
+        },
+        "presence_penalty": {
+          "type": "number",
+          "description": "Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics."
+        },
+        "frequency_penalty": {
+          "type": "number",
+          "description": "Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim."
+        },
+        "seed": {
+          "type": "number",
+          "description": "The seed (integer), if set and supported by the model, to enable deterministic results."
+        },
+        "modalities": {
+          "type": "array",
+          "description": "The modalities that the model should support.",
+          "items": {
+            "$ref": "#/definitions/Modality"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "description": "A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "extra": {
+          "type": "object",
+          "description": "Extra options that the model may support.",
+          "additionalProperties": true
+        }
+      },
+      "required": ["messages"],
+      "additionalProperties": false
+    },
+    "LanguageModelPricing": {
+      "type": "object",
+      "description": "A metadata property that describes the pricing of the model.",
+      "properties": {
+        "input_cost_per_text_token": {
+          "type": "number",
+          "description": "The cost in USD per single text token for input."
+        },
+        "input_cost_per_cached_text_token": {
+          "type": "number",
+          "description": "The cost in USD per single cached text token for input."
+        },
+        "output_cost_per_text_token": {
+          "type": "number",
+          "description": "The cost in USD per single text token for output."
+        },
+        "input_cost_per_audio_token": {
+          "type": "number",
+          "description": "The cost in USD per single audio token for input."
+        },
+        "input_cost_per_cached_audio_token": {
+          "type": "number",
+          "description": "The cost in USD per single cached audio token for input."
+        },
+        "output_cost_per_audio_token": {
+          "type": "number",
+          "description": "The cost in USD per single audio token for output."
+        },
+        "input_cost_per_image_token": {
+          "type": "number",
+          "description": "The cost in USD per single image token for input."
+        },
+        "input_cost_per_cached_image_token": {
+          "type": "number",
+          "description": "The cost in USD per single cached image token for input."
+        },
+        "output_cost_per_image_token": {
+          "type": "number",
+          "description": "The cost in USD per single image token for output."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

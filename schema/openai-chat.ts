@@ -164,7 +164,7 @@ export interface ChatCompletionDeveloperMessageParam {
   /**
    * The contents of the developer message.
    */
-  content: Array<ChatCompletionContentPartText>;
+  content: Array<DeveloperContentPart>;
 
   /**
    * The role of the messages author, in this case `developer`.
@@ -179,6 +179,11 @@ export interface ChatCompletionDeveloperMessageParam {
 }
 
 /**
+ * A union of possible developer content part
+ */
+export type DeveloperContentPart = ChatCompletionContentPartText;
+
+/**
  * Developer-provided instructions that the model should follow, regardless of
  * messages sent by the user. With o1 models and newer, use `developer` messages
  * for this purpose instead.
@@ -187,7 +192,7 @@ export interface ChatCompletionSystemMessageParam {
   /**
    * The contents of the system message.
    */
-  content: Array<ChatCompletionContentPartText>;
+  content: Array<SystemContentPart>;
 
   /**
    * The role of the messages author, in this case `system`.
@@ -200,6 +205,11 @@ export interface ChatCompletionSystemMessageParam {
    */
   name?: string;
 }
+
+/**
+ * A union of possible system content part
+ */
+export type SystemContentPart = ChatCompletionContentPartText;
 
 /**
  * Messages sent by an end user, containing prompts or additional context
@@ -242,9 +252,7 @@ export interface ChatCompletionAssistantMessageParam {
    * The contents of the assistant message. Required unless `tool_calls` or
    * `function_call` is specified.
    */
-  content?: Array<
-    ChatCompletionContentPartText | ChatCompletionContentPartRefusal
-  > | null;
+  content?: Array<AssistantContentPart> | null;
 
   /**
    * An optional name for the participant. Provides the model information to
@@ -262,6 +270,13 @@ export interface ChatCompletionAssistantMessageParam {
    */
   tool_calls?: Array<ChatCompletionMessageToolCall>;
 }
+
+/**
+ * A union of possible assistant content part
+ */
+export type AssistantContentPart =
+  | ChatCompletionContentPartText
+  | ChatCompletionContentPartRefusal;
 
 export interface ChatCompletionToolMessageParam {
   /**

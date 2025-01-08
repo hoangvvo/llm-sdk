@@ -4,38 +4,37 @@
     "sdk-js"
   ],
   "scripts": {
-    "generate": "node sdk-js/scripts/generate.js",
     "format": "prettier --write .",
     "lint": "eslint .",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
     "postinstall": "patch-package"
   },
   "devDependencies": {
-    "@eslint/js": "^9.33.0",
+    "@eslint/js": "^9.20.0",
     "@tsconfig/strictest": "^2.0.5",
     "@types/audio-context": "^1.0.3",
     "@types/audio-play": "^2.3.2",
-    "@types/node": "^24.2.1",
-    "eslint": "^9.33.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.4",
-    "globals": "^16.3.0",
+    "@types/node": "^22.13.4",
+    "eslint": "^9.20.1",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-prettier": "^5.2.3",
+    "globals": "^15.15.0",
     "patch-package": "^8.0.0",
-    "prettier": "^3.6.2",
+    "prettier": "^3.5.1",
     "tshy": "^3.0.2",
-    "tsx": "^4.20.4",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.39.1",
-    "typescript-json-schema": "^0.65.1"
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.1",
-    "@google/generative-ai": "^0.24.1",
-    "@mistralai/mistralai": "^1.6.0",
+    "@google/generative-ai": "^0.21.0",
+    "@mistralai/mistralai": "^1.5.0",
     "audio-context": "^1.0.3",
     "audio-decode": "^2.2.2",
     "audio-play": "^2.3.1",
-    "cohere-ai": "^7.17.1",
-    "openai": "^4.96.2"
+    "cohere-ai": "^7.15.4",
+    "openai": "^4.85.0"
   },
   "optionalDependencies": {
     "speaker": "^0.5.5"

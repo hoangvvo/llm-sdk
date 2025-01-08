@@ -69,6 +69,7 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
       };
     default: {
       throw new InvariantError(
+        "",
         `Cannot convert Part of type ${part.type} to PartDelta`,
       );
     }

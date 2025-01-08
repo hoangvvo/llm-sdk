@@ -14,7 +14,7 @@ use eventsource_stream::{self, Eventsource};
 use futures::stream::StreamExt;
 use reqwest::Client;
 
-const PROVIDER: &'static str = "openai";
+const PROVIDER: &str = "openai";
 
 const OPENAI_AUDIO_SAMPLE_RATE: u32 = 24_000;
 const OPENAI_AUDIO_CHANNELS: u32 = 1;
