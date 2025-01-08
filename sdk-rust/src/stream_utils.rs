@@ -41,15 +41,14 @@ pub fn guess_delta_index(
             .filter(|content_delta| matches!(content_delta.part, DeltaPart::ToolCall(_)))
             .collect();
 
-        let existing_tool_call_delta = tool_part_deltas.get(tool_call_index).cloned();
+        let existing_tool_call_delta = tool_part_deltas.get(tool_call_index).copied();
 
         if let Some(existing_tool_call_delta) = existing_tool_call_delta {
             return existing_tool_call_delta.index;
-        } else {
-            // If no matching tool call delta found, return the length of unique_content_deltas
-            // This is because we want to append a new tool call delta
-            return unique_content_deltas.len();
         }
+        // If no matching tool call delta found, return the length of unique_content_deltas
+        // This is because we want to append a new tool call delta
+        return unique_content_deltas.len();
     }
 
     // Attempt to find the LAST matching delta in unique_content_deltas

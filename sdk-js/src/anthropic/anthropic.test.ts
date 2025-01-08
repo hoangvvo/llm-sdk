@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 
+import { runTests } from "#test-utils/assert";
 import { COMMON_TEST_CASES } from "#test-utils/cases";
 import assert from "node:assert";
 import { suite } from "node:test";
-import { runTests } from "../../test-utils/assert.ts";
 import { AnthropicModel } from "./anthropic.ts";
 
 suite("AnthropicModel", () => {

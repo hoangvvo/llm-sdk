@@ -135,9 +135,7 @@ export interface ToolCallPart {
   /**
    * The arguments to pass to the tool.
    */
-  args: {
-    [k: string]: unknown;
-  };
+  args: Record<string, unknown>;
   /**
    * The ID of the part, if applicable. This might not be the same as the tool_call_id.
    */
@@ -249,9 +247,7 @@ export interface ContentDelta {
 /**
  * Represents a JSON schema.
  */
-export interface JSONSchema {
-  [k: string]: unknown;
-}
+export type JSONSchema = Record<string, unknown>;
 /**
  * Represents a tool that can be used by the model.
  */
@@ -413,15 +409,11 @@ export interface LanguageModelInput {
   /**
    * A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.
    */
-  metadata?: {
-    [k: string]: string;
-  };
+  metadata?: Record<string, string>;
   /**
    * Extra options that the model may support.
    */
-  extra?: {
-    [k: string]: unknown;
-  };
+  extra?: Record<string, unknown>;
 }
 /**
  * A metadata property that describes the pricing of the model.

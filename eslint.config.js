@@ -1,13 +1,14 @@
 import pluginJs from "@eslint/js";
 import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
+import { globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
+  globalIgnores(["**/node_modules/**", "**/dist/**"]),
   {
     files: ["**/*.{js,mjs,cjs,ts}"],
-    ignores: ["**/node_modules/**", "**/dist/**"],
     rules: {
       "@typescript-eslint/consistent-type-imports": "error",
     },

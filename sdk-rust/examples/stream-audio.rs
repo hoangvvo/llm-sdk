@@ -49,8 +49,8 @@ async fn main() {
             if let DeltaPart::Audio(a) = part {
                 // audio_data is a String, not Option<String>
                 if let Some(b64_data) = a.audio_data {
-                    let sample_rate: u32 = a.sample_rate.unwrap_or(24_000) as u32;
-                    let channels: u16 = a.channels.unwrap_or(1) as u16;
+                    let sample_rate: u32 = a.sample_rate.unwrap_or(24_000);
+                    let channels: u32 = a.channels.unwrap_or(1);
 
                     // Ensure audio output is initialized
                     if out_stream.is_none() {
@@ -70,7 +70,8 @@ async fn main() {
                     let samples = bytes_to_i16_le_samples(&bytes);
 
                     // Append chunk to the sink (seamless streaming)
-                    let source = SamplesBuffer::new(channels, sample_rate, samples);
+                    let source =
+                        SamplesBuffer::new(u16::try_from(channels).unwrap(), sample_rate, samples);
                     sink.append(source);
                 }
             }
