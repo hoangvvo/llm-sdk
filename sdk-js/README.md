@@ -1,6 +1,6 @@
 # @hoangvvo/llm-sdk
 
-`@hoangvvo/llm-sdk` is a JavaScript library that provides a unified API to access the LLM APIs of various providers.
+A JavaScript library that provides a unified API to access the LLM APIs of various providers.
 
 ## Installation
 

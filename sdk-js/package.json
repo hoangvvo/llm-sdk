@@ -38,7 +38,7 @@
     "#test-utils/assert": "./test-utils/assert.ts",
     "#test-utils/cases": "./test-utils/cases.ts"
   },
-  "main": "./dist/commonjs/index.js",
-  "types": "./dist/commonjs/index.d.ts",
-  "module": "./dist/esm/index.js"
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.js"
 }
