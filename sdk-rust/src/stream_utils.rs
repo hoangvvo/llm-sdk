@@ -14,8 +14,10 @@ pub fn guess_delta_index(
     all_content_deltas: &[ContentDelta],
     tool_call_index: Option<usize>,
 ) -> usize {
-    // contentDeltas may have the structure of [part0 partial, part0 partial, part1 partial].
-    // For the purpose of this matching, we want only [part0, part1]
+    // contentDeltas may have the structure of
+    // [part0 partial, part0 partial, part1 partial].
+    // For the purpose of this matching, we want only
+    // [part0, part1]
     let unique_content_deltas: Vec<_> = all_content_deltas
         .iter()
         .enumerate()
@@ -46,8 +48,9 @@ pub fn guess_delta_index(
         if let Some(existing_tool_call_delta) = existing_tool_call_delta {
             return existing_tool_call_delta.index;
         }
-        // If no matching tool call delta found, return the length of unique_content_deltas
-        // This is because we want to append a new tool call delta
+        // If no matching tool call delta found, return the length of
+        // unique_content_deltas This is because we want to append a new tool
+        // call delta
         return unique_content_deltas.len();
     }
 

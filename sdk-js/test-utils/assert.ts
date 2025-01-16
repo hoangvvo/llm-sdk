@@ -37,16 +37,7 @@ export interface TestCase {
   };
 }
 
-export interface RunTestOptions {
-  /**
-   * Delay per test case
-   * Useful if testing using a free tier API with rate limits
-   */
-  delay?: number;
-  /**
-   * Names of test cases to skip
-   */
-  skipCases?: string[];
+export interface RunTestCaseOptions {
   /**
    * For newer models with structured outputs, all properties are required
    * but they can be marked optional using type: [type, "null"]. However,
@@ -57,6 +48,61 @@ export interface RunTestOptions {
   compatibleSchema?: boolean;
 }
 
+export async function runTestCase(
+  t: TestContext,
+  model: LanguageModel,
+  testCase: TestCase,
+  options?: RunTestCaseOptions,
+) {
+  const { input, type, output } = testCase;
+  const modelInput = { ...input };
+
+  if (options?.compatibleSchema) {
+    if (modelInput.tools) {
+      modelInput.tools = modelInput.tools.map((tool) => {
+        return {
+          ...tool,
+          parameters: transformCompatibleSchema(tool.parameters),
+        };
+      });
+    }
+    if (
+      modelInput.response_format?.type === "json" &&
+      modelInput.response_format.schema
+    ) {
+      modelInput.response_format.schema = transformCompatibleSchema(
+        modelInput.response_format.schema,
+      );
+    }
+  }
+
+  if (type === "generate") {
+    const result = await model.generate(modelInput);
+    if (output.content.length > 0) {
+      assertContentPart(t, result.content, output.content);
+    }
+  } else {
+    const stream = model.stream(modelInput);
+    const accumulator = new StreamAccumulator();
+
+    for await (const chunk of stream) {
+      accumulator.addPartial(chunk);
+    }
+
+    const result = accumulator.computeResponse();
+    if (output.content.length > 0) {
+      assertContentPart(t, result.content, output.content);
+    }
+  }
+}
+export interface RunTestOptions extends RunTestCaseOptions {
+  /**
+   * Delay per test case
+   * Useful if testing using a free tier API with rate limits
+   */
+  delay?: number;
+}
+
 export function runTests(
   testCases: TestCase[],
   model: LanguageModel,
@@ -64,65 +110,27 @@ export function runTests(
 ) {
   for (const testCase of testCases) {
     if (testCase.requiredCapabilities) {
-      if (
-        testCase.requiredCapabilities.some(
-          (cap) => !model.metadata?.capabilities?.includes(cap),
-        )
-      ) {
-        continue; // Skip this test case if the model does not support required capabilities
+      const missingCapabilities = testCase.requiredCapabilities.filter(
+        (cap) => !model.metadata?.capabilities?.includes(cap),
+      );
+
+      if (missingCapabilities.length > 0) {
+        test(`${model.provider} / ${testCase.name} `, (t, done) => {
+          t.skip(
+            `Skipping test case due to missing capability: ${missingCapabilities.join(", ")}`,
+          );
+          done();
+        });
+        continue;
       }
     }
 
-    test(
-      `${model.provider} / ${testCase.name}`,
-      { skip: options?.skipCases?.includes(testCase.name) },
-      async (t) => {
-        if (options?.delay) {
-          await new Promise((resolve) => setTimeout(resolve, options.delay));
-        }
-
-        const { input, type, output } = testCase;
-        const modelInput = { ...input };
-
-        if (options?.compatibleSchema) {
-          if (modelInput.tools) {
-            modelInput.tools = modelInput.tools.map((tool) => {
-              return {
-                ...tool,
-                parameters: transformCompatibleSchema(tool.parameters),
-              };
-            });
-          }
-          if (
-            modelInput.response_format?.type === "json" &&
-            modelInput.response_format.schema
-          ) {
-            modelInput.response_format.schema = transformCompatibleSchema(
-              modelInput.response_format.schema,
-            );
-          }
-        }
-
-        if (type === "generate") {
-          const result = await model.generate(modelInput);
-          if (output.content.length > 0) {
-            assertContentPart(t, result.content, output.content);
-          }
-        } else {
-          const stream = model.stream(modelInput);
-          const accumulator = new StreamAccumulator();
-
-          for await (const chunk of stream) {
-            accumulator.addPartial(chunk);
-          }
-
-          const result = accumulator.computeResponse();
-          if (output.content.length > 0) {
-            assertContentPart(t, result.content, output.content);
-          }
-        }
-      },
-    );
+    test(`${model.provider} / ${testCase.name}`, async (t) => {
+      if (options?.delay) {
+        await new Promise((resolve) => setTimeout(resolve, options.delay));
+      }
+      return runTestCase(t, model, testCase, options);
+    });
   }
 }
 

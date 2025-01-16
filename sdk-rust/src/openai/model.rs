@@ -669,7 +669,7 @@ fn map_openai_delta(
         for tool_call in tool_calls {
             let mut tool_call_part = ToolCallPartDelta::default();
             if let Some(id) = &tool_call.id {
-                tool_call_part.id = Some(id.to_string());
+                tool_call_part.tool_call_id = Some(id.to_string());
             }
             if let Some(function) = &tool_call.function {
                 if let Some(name) = &function.name {
@@ -704,5 +704,145 @@ impl From<openai_api::CompletionsAPICompletionUsage> for ModelUsage {
             output_tokens: value.completion_tokens,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{generate_common_tests, test_utils::prelude::*, StreamAccumulator};
+    use std::{env, sync::LazyLock};
+    pub use tokio::test;
+
+    static OPENAI_MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
+        dotenvy::dotenv().ok();
+
+        OpenAIModel::new(OpenAIModelOptions {
+            model_id: "gpt-4o".to_string(),
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY must be set")
+                .to_string(),
+            ..Default::default()
+        })
+    });
+
+    static OPENAI_AUDIO_MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
+        dotenvy::dotenv().ok();
+
+        OpenAIModel::new(OpenAIModelOptions {
+            model_id: "gpt-4o-audio-preview".to_string(),
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY must be set")
+                .to_string(),
+            ..Default::default()
+        })
+    });
+
+    generate_common_tests! {
+        model_name: OPENAI_MODEL,
+    }
+
+    #[test]
+    async fn test_generate_audio() -> Result<(), Box<dyn Error>> {
+        let response = OPENAI_AUDIO_MODEL
+            .generate(LanguageModelInput {
+                modalities: Some(vec![Modality::Text, Modality::Audio]),
+                extra: Some(serde_json::json!({
+                    "audio": {
+                        "voice": "alloy",
+                        "format": "pcm16"
+                    }
+                })),
+                messages: vec![Message::User(UserMessage {
+                    content: vec![Part::Text(TextPart {
+                        text: "Hello".to_string(),
+                        id: None,
+                    })],
+                })],
+                ..Default::default()
+            })
+            .await?;
+
+        let audio_part = response
+            .content
+            .iter()
+            .find_map(|part| match part {
+                Part::Audio(audio) => Some(audio),
+                _ => None,
+            })
+            .ok_or_else(|| "Audio part must be present".to_string())?
+            .clone();
+
+        assert!(
+            !audio_part.audio_data.is_empty(),
+            "Audio data must be present"
+        );
+        assert!(
+            audio_part.transcript.is_some_and(|t| !t.is_empty()),
+            "Transcript must be present"
+        );
+        assert!(
+            audio_part.id.is_some_and(|id| !id.is_empty()),
+            "Audio part ID must be present"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    async fn test_stream_audio() -> Result<(), Box<dyn Error>> {
+        let mut stream = OPENAI_AUDIO_MODEL
+            .stream(LanguageModelInput {
+                modalities: Some(vec![Modality::Text, Modality::Audio]),
+                extra: Some(serde_json::json!({
+                    "audio": {
+                        "voice": "alloy",
+                        "format": "pcm16"
+                    }
+                })),
+                messages: vec![Message::User(UserMessage {
+                    content: vec![Part::Text(TextPart {
+                        text: "Hello".to_string(),
+                        id: None,
+                    })],
+                })],
+                ..Default::default()
+            })
+            .await?;
+
+        let mut accumulator = StreamAccumulator::new();
+
+        while let Some(partial_response) = stream.next().await {
+            let partial_response = partial_response.unwrap();
+            accumulator.add_partial(&partial_response).unwrap();
+            println!("{partial_response:#?}");
+        }
+
+        let response = accumulator.compute_response()?;
+
+        let audio_part = response
+            .content
+            .iter()
+            .find_map(|part| match part {
+                Part::Audio(audio) => Some(audio),
+                _ => None,
+            })
+            .ok_or_else(|| "Audio part must be present".to_string())?
+            .clone();
+
+        assert!(
+            !audio_part.audio_data.is_empty(),
+            "Audio data must be present"
+        );
+        assert!(
+            audio_part.transcript.is_some_and(|t| !t.is_empty()),
+            "Transcript must be present"
+        );
+        assert!(
+            audio_part.id.is_some_and(|id| !id.is_empty()),
+            "Audio part ID must be present"
+        );
+
+        Ok(())
     }
 }
