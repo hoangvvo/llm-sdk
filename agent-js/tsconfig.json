@@ -1,0 +1,17 @@
+{
+  "extends": "@tsconfig/strictest/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "lib": ["ESNext", "DOM"],
+    "target": "ES2022",
+    "noEmit": true
+  },
+  "include": ["src", "examples", "test-utils"],
+  "exclude": ["dist"]
+}

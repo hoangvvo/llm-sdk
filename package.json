@@ -1,7 +1,8 @@
 {
   "type": "module",
   "workspaces": [
-    "sdk-js"
+    "sdk-js",
+    "agent-js"
   ],
   "scripts": {
     "format": "prettier --write .",
@@ -30,11 +31,14 @@
     "@anthropic-ai/sdk": "^0.40.1",
     "@google/generative-ai": "^0.21.0",
     "@mistralai/mistralai": "^1.5.0",
+    "@sinclair/typebox": "^0.34.16",
     "audio-context": "^1.0.3",
     "audio-decode": "^2.2.2",
     "audio-play": "^2.3.1",
     "cohere-ai": "^7.15.4",
-    "openai": "^4.85.0"
+    "openai": "^4.85.0",
+    "zod": "^3.24.2",
+    "zod-to-json-schema": "^3.24.6"
   },
   "optionalDependencies": {
     "speaker": "^0.5.5"

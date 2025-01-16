@@ -1,0 +1,39 @@
+{
+  "type": "module",
+  "name": "@hoangvvo/llm-agent",
+  "version": "0.1.0",
+  "description": "A unified LLM agent SDK",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src",
+    "test": "node --test --env-file=../.env"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoangvvo/llm-sdk.git",
+    "directory": "agent-js"
+  },
+  "author": "Hoang Vo (https://www.hoangvvo.com)",
+  "bugs": {
+    "url": "https://github.com/hoangvvo/llm-sdk/issues"
+  },
+  "homepage": "https://github.com/hoangvvo/llm-sdk",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./typebox": "./dist/typebox/index.js",
+    "./zod": "./dist/zod/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.js",
+  "dependencies": {
+    "@hoangvvo/llm-sdk": "0.3.0"
+  }
+}
