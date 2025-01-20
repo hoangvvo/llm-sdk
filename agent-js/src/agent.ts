@@ -3,11 +3,7 @@ import type { LanguageModel, ResponseFormatOption } from "@hoangvvo/llm-sdk";
 import type { InstructionParam } from "./instruction.ts";
 import { RunSession } from "./run.ts";
 import type { AgentTool } from "./tool.ts";
-import type {
-  AgentRequest,
-  AgentResponse,
-  AgentStreamResult,
-} from "./types.ts";
+import type { AgentRequest, AgentResponse, AgentStreamEvent } from "./types.ts";
 
 export class Agent<TContext> {
   /**
@@ -40,7 +36,7 @@ export class Agent<TContext> {
 
   async *runStream(
     request: AgentRequest<TContext>,
-  ): AsyncGenerator<AgentStreamResult, AgentResponse> {
+  ): AsyncGenerator<AgentStreamEvent, AgentResponse> {
     const runSession = await this.createSession();
     const stream = runSession.runStream(request);
 

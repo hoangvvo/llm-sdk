@@ -1,9 +1,8 @@
 use crate::{
-    run::RunSession, tool::AgentTool, types::AgentStreamResult, AgentError, AgentRequest,
-    AgentResponse, InstructionParam,
+    run::RunSession, tool::AgentTool, types::AgentStream, AgentError, AgentRequest, AgentResponse,
+    InstructionParam,
 };
-use futures::{stream::StreamExt, Stream};
-use futures_core::stream::BoxStream;
+use futures::stream::StreamExt;
 use llm_sdk::{LanguageModel, ResponseFormatOption};
 use std::sync::Arc;
 
@@ -40,14 +39,9 @@ where
     }
 
     /// Create a stateless one-time streaming run of the agent
-    pub async fn run_stream(
-        &self,
-        request: AgentRequest<TCtx>,
-    ) -> Result<BoxStream<'static, Result<AgentStreamResult, AgentError>>, AgentError> {
+    pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
         let run_session = Arc::new(self.create_session().await);
-        let mut stream: std::pin::Pin<
-            Box<dyn Stream<Item = Result<AgentStreamResult, AgentError>> + Send + 'static>,
-        > = run_session.clone().run_stream(request)?;
+        let mut stream = run_session.clone().run_stream(request)?;
 
         let wrapped_stream = async_stream::stream! {
             let run_session = run_session;
@@ -60,7 +54,7 @@ where
             }
         };
 
-        Ok(wrapped_stream.boxed())
+        Ok(AgentStream::from_stream(wrapped_stream))
     }
 
     /// Create a session for stateful multiple runs of the agent

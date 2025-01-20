@@ -1,5 +1,13 @@
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures::{stream::BoxStream, Stream};
 use llm_sdk::{Message, ModelResponse, Part, PartialModelResponse};
 use serde::{Deserialize, Serialize};
+
+use crate::AgentError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRequest<TCtx> {
@@ -22,8 +30,27 @@ pub struct AgentResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
-pub enum AgentStreamResult {
+pub enum AgentStreamEvent {
     PartialModelResponse(PartialModelResponse),
     ModelResponse(ModelResponse),
     Response(AgentResponse),
+}
+
+pub struct AgentStream(BoxStream<'static, Result<AgentStreamEvent, AgentError>>);
+
+impl AgentStream {
+    pub fn from_stream<S>(stream: S) -> Self
+    where
+        S: Stream<Item = Result<AgentStreamEvent, AgentError>> + Send + 'static,
+    {
+        Self(Box::pin(stream))
+    }
+}
+
+impl Stream for AgentStream {
+    type Item = Result<AgentStreamEvent, AgentError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.0.as_mut().poll_next(cx)
+    }
 }

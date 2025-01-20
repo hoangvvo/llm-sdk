@@ -1,9 +1,9 @@
 use crate::{
-    instruction, types::AgentStreamResult, AgentError, AgentRequest, AgentResponse, AgentTool,
-    InstructionParam,
+    instruction,
+    types::{AgentStream, AgentStreamEvent},
+    AgentError, AgentRequest, AgentResponse, AgentTool, InstructionParam,
 };
 use futures::stream::StreamExt;
-use futures_core::stream::BoxStream;
 use llm_sdk::{
     AssistantMessage, LanguageModel, LanguageModelInput, Message, ModelResponse, Part,
     ResponseFormatOption, StreamAccumulator, ToolCallPart, ToolMessage, ToolResultPart,
@@ -130,10 +130,7 @@ where
     }
 
     /// Run a streaming execution of the agent.
-    pub fn run_stream(
-        &self,
-        request: AgentRequest<TCtx>,
-    ) -> Result<BoxStream<'static, Result<AgentStreamResult, AgentError>>, AgentError> {
+    pub fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
         let mut input = self.get_llm_input(&request);
         let context = Arc::new(request.context);
 
@@ -159,16 +156,16 @@ where
                         AgentError::Invariant(format!("Failed to accumulate stream: {e}"))
                     })?;
 
-                    yield AgentStreamResult::PartialModelResponse(partial);
+                    yield AgentStreamEvent::PartialModelResponse(partial);
                 }
 
                 let model_response = accumulator.compute_response()?;
 
-                yield AgentStreamResult::ModelResponse(model_response.clone());
+                yield AgentStreamEvent::ModelResponse(model_response.clone());
 
                 match session.process(input.clone(), context.clone(), model_response).await? {
                     ProcessResult::Response(response) => {
-                        yield AgentStreamResult::Response(response);
+                        yield AgentStreamEvent::Response(response);
                     }
                     ProcessResult::Next(next_input) => {
                         input = *next_input;
@@ -177,7 +174,7 @@ where
             }
         };
 
-        Ok(stream.boxed())
+        Ok(AgentStream::from_stream(stream))
     }
 
     pub fn finish(self) {

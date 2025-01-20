@@ -7,6 +7,7 @@ use crate::{
     LanguageModelCapability, LanguageModelInput, LanguageModelPricing, LanguageModelResult,
     ModelResponse, PartialModelResponse,
 };
+use futures::stream::BoxStream;
 use futures_core::Stream;
 
 #[derive(Debug, Clone, Default)]
@@ -23,9 +24,7 @@ pub trait LanguageModel: Send + Sync {
     async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream>;
 }
 
-pub struct LanguageModelStream(
-    Pin<Box<dyn Stream<Item = LanguageModelResult<PartialModelResponse>> + Send>>,
-);
+pub struct LanguageModelStream(BoxStream<'static, LanguageModelResult<PartialModelResponse>>);
 
 impl LanguageModelStream {
     pub fn from_stream<S>(stream: S) -> Self

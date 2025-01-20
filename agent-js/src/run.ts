@@ -14,11 +14,7 @@ import {
   type InstructionParam,
 } from "./instruction.ts";
 import type { AgentTool } from "./tool.ts";
-import type {
-  AgentRequest,
-  AgentResponse,
-  AgentStreamResult,
-} from "./types.ts";
+import type { AgentRequest, AgentResponse, AgentStreamEvent } from "./types.ts";
 
 /**
  * Manages the run session for an agent run.
@@ -159,7 +155,7 @@ export class RunSession<TContext> {
    */
   async *runStream(
     request: AgentRequest<TContext>,
-  ): AsyncGenerator<AgentStreamResult, AgentResponse> {
+  ): AsyncGenerator<AgentStreamEvent, AgentResponse> {
     let input = this.getLlmInput(request);
     const context = request.context;
 

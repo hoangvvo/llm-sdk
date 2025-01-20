@@ -3,9 +3,9 @@ use crate::{
     openai::api as openai_api,
     stream_utils,
     usage_utils::calculate_cost,
-    AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, PartDelta, ImagePart,
+    AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ImagePart,
     LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult, Message, Modality,
-    ModelResponse, ModelUsage, Part, PartialModelResponse, ResponseFormatJson,
+    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
     ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
     ToolChoiceOption, ToolMessage, UserMessage,
 };
