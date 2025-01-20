@@ -111,15 +111,6 @@ pub struct TextPart {
     pub id: Option<String>,
 }
 
-impl<T: ToString> From<T> for TextPart {
-    fn from(value: T) -> Self {
-        Self {
-            text: value.to_string(),
-            id: None,
-        }
-    }
-}
-
 /// A part of the message that contains an image.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ImagePart {
@@ -438,4 +429,80 @@ pub struct LanguageModelPricing {
     /// The cost in USD per single image token for output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_cost_per_image_token: Option<f64>,
+}
+
+// MARK: Helper conversions
+
+impl<T: ToString> From<T> for TextPart {
+    fn from(value: T) -> Self {
+        Self {
+            text: value.to_string(),
+            id: None,
+        }
+    }
+}
+
+impl<T: ToString> From<T> for Part {
+    fn from(value: T) -> Self {
+        Self::Text(value.into())
+    }
+}
+
+impl UserMessage {
+    pub fn new<I, P>(parts: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<Part>,
+    {
+        Self {
+            content: parts.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+impl AssistantMessage {
+    pub fn new<I, P>(parts: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<Part>,
+    {
+        Self {
+            content: parts.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+impl ToolMessage {
+    pub fn new<I, P>(parts: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<Part>,
+    {
+        Self {
+            content: parts.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl Message {
+    pub fn user<I, P>(parts: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<Part>,
+    {
+        Self::User(UserMessage::new(parts))
+    }
+    pub fn assistant<I, P>(parts: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<Part>,
+    {
+        Self::Assistant(AssistantMessage::new(parts))
+    }
+
+    pub fn tool<I, P>(parts: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<Part>,
+    {
+        Self::Tool(ToolMessage::new(parts))
+    }
 }

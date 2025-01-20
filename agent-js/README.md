@@ -1,6 +1,6 @@
 # @hoangvvo/llm-agent
 
-A JavaScript library to implement LLM agents that works with any LLM providers.
+A JavaScript library to implement LLM agents that work with any LLM providers.
 
 ## Installation
 
@@ -181,3 +181,7 @@ Find examples in the [examples](./examples/) folder:
 ```bash
 node --env-file=../.env examples/assistant.ts
 ```
+
+## License
+
+[MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)

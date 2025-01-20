@@ -1,10 +1,10 @@
 use dotenvy::dotenv;
-use futures::FutureExt;
 use llm_agent::{Agent, AgentParams, AgentRequest, AgentTool, AgentToolResult, InstructionParam};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     Message, Part, ResponseFormatOption, UserMessage,
 };
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::json;
 use std::{
@@ -20,6 +20,20 @@ struct MyContext {
     pub user_name: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct GetWeatherParams {
+    city: String,
+}
+
+// Define the JSON schema using `schemars` crate
+#[derive(Debug, Deserialize, JsonSchema)]
+struct SendMessageParams {
+    #[schemars(description = "The message to send")]
+    message: String,
+    #[schemars(description = "The phone number to send the message to")]
+    phone_number: String,
+}
+
 #[allow(clippy::too_many_lines)]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,139 +47,75 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     }));
 
-    // Define tools
-    let get_time_tool = AgentTool {
-        name: "get_time".to_string(),
-        description: "Get the current time".to_string(),
-        parameters: json!({
-          "type": "object",
-          "properties": {},
-          "additionalProperties": false
-        }),
-        execute: Box::new(|_params, _ctx| {
-            async move {
-                Ok(AgentToolResult {
-                    content: vec![Part::Text(
-                        json!({ "current_time": chrono::Utc::now().to_rfc3339() })
-                            .to_string()
-                            .into(),
-                    )],
-                    is_error: false,
-                })
-            }
-            .boxed()
-        }),
-    };
-
-    let get_weather_tool = AgentTool {
-        name: "get_weather".to_string(),
-        description: "Get weather for a given city".to_string(),
-        parameters: json!({
+    let get_weather_tool = AgentTool::new(
+        "get_weather",
+        "Get weather for a given city",
+        json!({
           "type": "object",
           "properties": {
             "city": {
               "type": "string",
-              "description": "The name of the city"
+              "description": "The city to get the weather for"
             }
           },
           "required": ["city"],
           "additionalProperties": false
         }),
-        execute: Box::new(|params, _ctx| {
-            async move {
-                #[derive(Debug, Deserialize)]
-                struct GetWeatherParams {
-                    city: String,
-                }
+        |params: GetWeatherParams, _ctx: Arc<MyContext>| async move {
+            println!("Getting weather for {}", params.city);
 
-                let params = serde_json::from_value::<GetWeatherParams>(params)
-                    .map_err(|e| anyhow::anyhow!("Invalid parameters: {}", e))?;
+            Ok(AgentToolResult {
+                content: vec![Part::Text(
+                    json!({
+                        "city": params.city,
+                        "forecast": "Sunny",
+                        "temperatureC": 25
+                    })
+                    .into(),
+                )],
+                is_error: false,
+            })
+        },
+    );
 
-                println!("Getting weather for {}", params.city);
+    let send_message_tool = AgentTool::new(
+        "send_message",
+        "Send a text message to a phone number",
+        schemars::schema_for!(SendMessageParams).into(),
+        |params: SendMessageParams, _ctx| async move {
+            println!(
+                "Sending message to {}: {}",
+                params.phone_number, params.message
+            );
 
-                Ok(AgentToolResult {
-                    content: vec![Part::Text(
-                        json!({
-                            "city": params.city,
-                            "forecast": "Sunny",
-                            "temperatureC": 25
-                        })
-                        .to_string()
-                        .into(),
-                    )],
-                    is_error: false,
-                })
-            }
-            .boxed()
-        }),
-    };
-
-    let send_message_tool = AgentTool {
-        name: "send_message".to_string(),
-        description: "Send a text message".to_string(),
-        parameters: json!({
-          "type": "object",
-          "properties": {
-            "message": {
-              "type": "string",
-              "description": "The message to send"
-            },
-            "phone_number": {
-              "type": "string",
-              "description": "The phone number to send the message to"
-            }
-          },
-          "required": ["message", "phone_number"],
-          "additionalProperties": false
-        }),
-        execute: Box::new(|params, _ctx| {
-            async move {
-                #[derive(Debug, Deserialize)]
-                struct SendMessageParams {
-                    message: String,
-                    phone_number: String,
-                }
-
-                let params = serde_json::from_value::<SendMessageParams>(params)
-                    .map_err(|e| anyhow::anyhow!("Invalid parameters: {}", e))?;
-
-                println!(
-                    "Sending message to {}: {}",
-                    params.phone_number, params.message
-                );
-
-                Ok(AgentToolResult {
-                    content: vec![Part::Text(
-                        json!({
-                            "message": params.message,
-                            "status": "sent"
-                        })
-                        .to_string()
-                        .into(),
-                    )],
-                    is_error: false,
-                })
-            }
-            .boxed()
-        }),
-    };
+            Ok(AgentToolResult {
+                content: vec![Part::Text(
+                    json!({
+                        "message": params.message,
+                        "status": "sent"
+                    })
+                    .into(),
+                )],
+                is_error: false,
+            })
+        },
+    );
 
     // Create the Agent
     let my_assistant = Agent::<MyContext>::new(AgentParams {
         name: "Mai".to_string(),
         model,
         instructions: vec![
-            InstructionParam::String(
-                "You are Mai, a helpful assistant. Answer questions to the best of your ability."
-                    .to_string(),
-            ),
+            // Static instruction
+            "You are Mai, a helpful assistant. Answer questions to the best of your ability."
+                .into(),
             // Dynamic instruction
             InstructionParam::Func(|ctx: &MyContext| {
                 format!("You are talking to {}", ctx.user_name)
             }),
         ],
         response_format: ResponseFormatOption::Text,
-        tools: vec![get_time_tool, get_weather_tool, send_message_tool],
+        tools: vec![get_weather_tool, send_message_tool],
     });
 
     // Implement the CLI to interact with the Agent

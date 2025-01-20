@@ -10,7 +10,7 @@ import {
 } from "@hoangvvo/llm-sdk";
 import { InvariantError } from "./errors.ts";
 import {
-  getPromptForInstructionParam,
+  getPromptForInstructionParams,
   type InstructionParam,
 } from "./instruction.ts";
 import type { AgentTool } from "./tool.ts";
@@ -45,6 +45,9 @@ export class RunSession<TContext> {
     this.tools = tools;
   }
 
+  /**
+   * Create a new run session and initializes dependencies
+   */
   static async create<TContext>(
     model: LanguageModel,
     instructions: InstructionParam<TContext>[],
@@ -171,7 +174,7 @@ export class RunSession<TContext> {
         accumulator.addPartial(partial);
         yield {
           type: "partial-model-response",
-          partial,
+          ...partial,
         };
       }
 
@@ -179,7 +182,7 @@ export class RunSession<TContext> {
 
       yield {
         type: "model-response",
-        response: modelResponse,
+        ...modelResponse,
       };
 
       const processResult = await this.process(input, modelResponse, context);
@@ -193,7 +196,7 @@ export class RunSession<TContext> {
 
     yield {
       type: "response",
-      response,
+      ...response,
     };
 
     return response;
@@ -209,11 +212,10 @@ export class RunSession<TContext> {
   private getLlmInput(request: AgentRequest<TContext>): LanguageModelInput {
     return {
       messages: request.messages,
-      system_prompt: this.instructions
-        .map((instruction) =>
-          getPromptForInstructionParam(instruction, request.context),
-        )
-        .join("\n"),
+      system_prompt: getPromptForInstructionParams(
+        this.instructions,
+        request.context,
+      ),
       tools: this.tools.map((tool) => ({
         name: tool.name,
         description: tool.description,

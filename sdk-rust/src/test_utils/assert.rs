@@ -43,22 +43,22 @@ impl ToolCallpartAssertionArgPropValue {
             Self::Value(regex) => {
                 let actual_str = actual.to_string();
                 regex.is_match(&actual_str)
-            } // Self::Object(expected_props) => {
-              //     if let Some(actual_obj) = actual.as_object() {
-              //         for (key, expected_value) in expected_props {
-              //             if let Some(actual_value) = actual_obj.get(key) {
-              //                 if !expected_value.is_matched(actual_value) {
-              //                     return false;
-              //                 }
-              //             } else {
-              //                 return false;
-              //             }
-              //         }
-              //         true
-              //     } else {
-              //         false
-              //     }
-              // }
+            } /* Self::Object(expected_props) => {
+               *     if let Some(actual_obj) = actual.as_object() {
+               *         for (key, expected_value) in expected_props {
+               *             if let Some(actual_value) = actual_obj.get(key) {
+               *                 if !expected_value.is_matched(actual_value) {
+               *                     return false;
+               *                 }
+               *             } else {
+               *                 return false;
+               *             }
+               *         }
+               *         true
+               *     } else {
+               *         false
+               *     }
+               * } */
         }
     }
 }

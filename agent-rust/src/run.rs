@@ -91,7 +91,8 @@ where
                     ))
                 })?;
 
-            let tool_res = (agent_tool.execute)(tool_call_part.args.clone(), context.clone())
+            let tool_res = agent_tool
+                .call(tool_call_part.args.clone(), context.clone())
                 .await
                 .map_err(|e| AgentError::ToolExecution(e.into()))?;
 

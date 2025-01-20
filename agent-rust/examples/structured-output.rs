@@ -1,13 +1,38 @@
 use dotenvy::dotenv;
-use futures::FutureExt;
 use llm_agent::{Agent, AgentParams, AgentRequest, AgentTool, AgentToolResult, InstructionParam};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     Message, Part, ResponseFormatJson, ResponseFormatOption, UserMessage,
 };
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::json;
 use std::{env, sync::Arc};
+
+#[derive(Deserialize, JsonSchema)]
+struct SearchFlightsParams {
+    #[schemars(description = "Origin city/airport")]
+    from: String,
+    #[schemars(description = "Destination city/airport")]
+    to: String,
+    #[schemars(description = "Departure date in YYYY-MM-DD")]
+    date: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct SearchHotelsParams {
+    #[schemars(description = "City to search hotels in")]
+    city: String,
+    #[schemars(description = "Check-in date in YYYY-MM-DD")]
+    check_in: String,
+    #[schemars(description = "Number of nights to stay")]
+    nights: u32,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct GetWeatherParams {
+    city: String,
+}
 
 #[allow(clippy::too_many_lines)]
 #[tokio::main]
@@ -20,6 +45,91 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         model_id: "gpt-4o".to_string(),
         ..Default::default()
     }));
+
+    let search_flights_tool = AgentTool::new(
+        "search_flights",
+        "Search for flights between two cities",
+        schemars::schema_for!(SearchFlightsParams).into(),
+        |params: SearchFlightsParams, _ctx| async move {
+            println!(
+                "Searching flights from {} to {} on {}",
+                params.from, params.to, params.date
+            );
+            Ok(AgentToolResult {
+                content: vec![Part::Text(
+                    json!([
+                        {
+                            "airline": "Vietnam Airlines",
+                            "departure": format!("{}T10:00:00", params.date),
+                            "arrival": format!("{}T12:00:00", params.date),
+                            "price": 150
+                        },
+                        {
+                            "airline": "Southwest Airlines",
+                            "departure": format!("{}T11:00:00", params.date),
+                            "arrival": format!("{}T13:00:00", params.date),
+                            "price": 120
+                        }
+                    ])
+                    .into(),
+                )],
+                is_error: false,
+            })
+        },
+    );
+
+    let search_hotels_tool = AgentTool::new(
+        "search_hotels",
+        "Search for hotels in a specific location",
+        schemars::schema_for!(SearchHotelsParams).into(),
+        |params: SearchHotelsParams, _ctx| async move {
+            println!(
+                "Searching hotels in {} from {} for {} nights",
+                params.city, params.check_in, params.nights
+            );
+            Ok(AgentToolResult {
+                content: vec![Part::Text(
+                    json!([
+                        {
+                            "name": "The Plaza",
+                            "location": params.city.to_string(),
+                            "pricePerNight": 150,
+                            "rating": 4.8
+                        },
+                        {
+                            "name": "Hotel Ritz",
+                            "location": params.city.to_string(),
+                            "pricePerNight": 200,
+                            "rating": 4.7
+                        }
+                    ])
+                    .to_string()
+                    .into(),
+                )],
+                is_error: false,
+            })
+        },
+    );
+
+    let weather_tool = AgentTool::new(
+        "get_weather",
+        "Get current weather for a city",
+        schemars::schema_for!(GetWeatherParams).into(),
+        |params: GetWeatherParams, _ctx| async move {
+            println!("Getting weather for {}", params.city);
+            Ok(AgentToolResult {
+                content: vec![Part::Text(
+                    json!({
+                        "summary": "Sunny",
+                        "temperatureC": 25
+                    })
+                    .to_string()
+                    .into(),
+                )],
+                is_error: false,
+            })
+        },
+    );
 
     let travel_agent = Agent::<()>::new(AgentParams {
         name: "Bob".to_string(),
@@ -122,141 +232,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "additionalProperties": false
             })),
         }),
-        tools: vec![
-            AgentTool {
-                name: "search_flights".to_string(),
-                description: "Search for flights between two cities".to_string(),
-                parameters: json!({
-                    "type": "object",
-                    "properties": {
-                        "from": { "type": "string", "description": "Origin city/airport" },
-                        "to": { "type": "string", "description": "Destination city/airport" },
-                        "date": { "type": "string", "description": "Departure date in YYYY-MM-DD" }
-                    },
-                    "required": ["from", "to", "date"],
-                    "additionalProperties": false
-                }),
-                execute: Box::new(|params, _ctx| {
-                    async move {
-                        let from = params["from"].as_str().unwrap();
-                        let to = params["to"].as_str().unwrap();
-                        let date = params["date"].as_str().unwrap();
-                        println!("Searching flights from {from} to {to} on {date}");
-                        Ok(AgentToolResult {
-                            content: vec![Part::Text(
-                                json!([
-                                    {
-                                        "airline": "Vietnam Airlines",
-                                        "departure": format!("{}T10:00:00", date),
-                                        "arrival": format!("{}T12:00:00", date),
-                                        "price": 150
-                                    },
-                                    {
-                                        "airline": "Southwest Airlines",
-                                        "departure": format!("{}T11:00:00", date),
-                                        "arrival": format!("{}T13:00:00", date),
-                                        "price": 120
-                                    }
-                                ])
-                                .to_string()
-                                .into(),
-                            )],
-                            is_error: false,
-                        })
-                    }
-                    .boxed()
-                }),
-            },
-            AgentTool {
-                name: "search_hotels".to_string(),
-                description: "Search for hotels in a specific location".to_string(),
-                parameters: json!({
-                    "type": "object",
-                    "properties": {
-                        "city": { "type": "string" },
-                        "check_in": { "type": "string", "description": "Check-in date in YYYY-MM-DD" },
-                        "nights": { "type": "number", "description": "Number of nights to stay" }
-                    },
-                    "required": ["city", "check_in", "nights"],
-                    "additionalProperties": false
-                }),
-                execute: Box::new(|params, _ctx| {
-                    async move {
-                        #[derive(Deserialize)]
-                        struct SearchHotelsParams {
-                            city: String,
-                            check_in: String,
-                            nights: u32,
-                        }
-
-                        let params = serde_json::from_value::<SearchHotelsParams>(params)?;
-
-                        println!(
-                            "Searching hotels in {} from {} for {} nights",
-                            params.city, params.check_in, params.nights
-                        );
-                        Ok(AgentToolResult {
-                            content: vec![Part::Text(
-                                json!([
-                                    {
-                                        "name": "The Plaza",
-                                        "location": params.city.to_string(),
-                                        "pricePerNight": 150,
-                                        "rating": 4.8
-                                    },
-                                    {
-                                        "name": "Hotel Ritz",
-                                        "location": params.city.to_string(),
-                                        "pricePerNight": 200,
-                                        "rating": 4.7
-                                    }
-                                ])
-                                .to_string()
-                                .into(),
-                            )],
-                            is_error: false,
-                        })
-                    }
-                    .boxed()
-                }),
-            },
-            AgentTool {
-                name: "get_weather".to_string(),
-                description: "Get current weather for a city".to_string(),
-                parameters: json!({
-                  "type": "object",
-                  "properties": {
-                    "city": { "type": "string" }
-                  },
-                  "required": ["city"],
-                  "additionalProperties": false
-                }),
-                execute: Box::new(|params, _ctx| {
-                    async move {
-                        #[derive(Deserialize)]
-                        struct GetWeatherParams {
-                            city: String,
-                        }
-
-                        let params = serde_json::from_value::<GetWeatherParams>(params)?;
-
-                        println!("Getting weather for {}", params.city);
-                        Ok(AgentToolResult {
-                            content: vec![Part::Text(
-                                json!({
-                                    "summary": "Sunny",
-                                    "temperatureC": 25
-                                })
-                                .to_string()
-                                .into(),
-                            )],
-                            is_error: false,
-                        })
-                    }
-                    .boxed()
-                }),
-            },
-        ],
+        tools: vec![search_flights_tool, search_hotels_tool, weather_tool],
     });
 
     let prompt = "Plan a trip from Paris to Tokyo next week";

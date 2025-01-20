@@ -20,11 +20,7 @@ export default [
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
-        project: [
-          "./schema/tsconfig.json",
-          "./sdk-js/tsconfig.json",
-          "./agent-js/tsconfig.json",
-        ],
+        project: "./**/tsconfig.json",
         projectService: {
           allowDefaultProject: ["*.js", "*.mjs"],
         },

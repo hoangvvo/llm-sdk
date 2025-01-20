@@ -51,9 +51,8 @@ async fn main() {
                         "What kind of story would you like to hear?".into(),
                     )],
                 }),
-                Message::User(UserMessage {
-                    content: vec![Part::Text("A fairy tale.".into())],
-                }),
+                // Or use the helper function to create a user message
+                Message::user(vec!["a fairty tail"]),
             ],
             ..Default::default()
         })
@@ -62,7 +61,6 @@ async fn main() {
 
     println!("{response:#?}");
 }
-
 ```
 
 Find examples in the [examples](./examples/) folder to learn how to:

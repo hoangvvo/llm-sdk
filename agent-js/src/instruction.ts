@@ -4,9 +4,13 @@
  */
 export type InstructionParam<TContext> = string | ((ctx: TContext) => string);
 
-export function getPromptForInstructionParam<TContext>(
-  instruction: InstructionParam<TContext>,
+export function getPromptForInstructionParams<TContext>(
+  instructions: InstructionParam<TContext>[],
   ctx: TContext,
 ) {
-  return typeof instruction === "function" ? instruction(ctx) : instruction;
+  return instructions
+    .map((instruction) => {
+      return typeof instruction === "function" ? instruction(ctx) : instruction;
+    })
+    .join("\n");
 }

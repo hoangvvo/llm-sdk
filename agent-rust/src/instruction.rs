@@ -13,6 +13,12 @@ impl<TCtx> InstructionParam<TCtx> {
     }
 }
 
+impl<T: ToString, TCtx> From<T> for InstructionParam<TCtx> {
+    fn from(value: T) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
 pub fn get_prompt<TCtx>(instructions: &[InstructionParam<TCtx>], context: &TCtx) -> String {
     instructions
         .iter()

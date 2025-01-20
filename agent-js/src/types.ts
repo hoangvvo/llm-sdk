@@ -29,19 +29,17 @@ export interface AgentResponse {
   content: Part[];
 }
 
-export interface AgentStreamResultPartialModelResponse {
+export interface AgentStreamResultPartialModelResponse
+  extends PartialModelResponse {
   type: "partial-model-response";
-  partial: PartialModelResponse;
 }
 
-export interface AgentStreamResultModelResponse {
+export interface AgentStreamResultModelResponse extends ModelResponse {
   type: "model-response";
-  response: ModelResponse;
 }
 
-export interface AgentStreamResultResponse {
+export interface AgentStreamResultResponse extends AgentResponse {
   type: "response";
-  response: AgentResponse;
 }
 
 export type AgentStreamResult =
