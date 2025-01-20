@@ -7,6 +7,9 @@ version = "0.1.0"
 pedantic = "warn"
 use_self = "warn"
 
+[features]
+utoipa = ["dep:utoipa"]
+
 [dependencies]
 async-stream = "0.3.6"
 async-trait = "0.1.86"
@@ -18,6 +21,7 @@ reqwest = { version = "0.12.12", features = ["json", "gzip", "stream"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.134"
 thiserror = "2.0.11"
+utoipa = { version = "5", optional = true }
 
 [dev-dependencies]
 dotenvy = { version = "0.15.7" }

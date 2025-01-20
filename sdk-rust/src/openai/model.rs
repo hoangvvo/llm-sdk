@@ -3,7 +3,7 @@ use crate::{
     openai::api as openai_api,
     stream_utils,
     usage_utils::calculate_cost,
-    AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, DeltaPart, ImagePart,
+    AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, PartDelta, ImagePart,
     LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult, Message, Modality,
     ModelResponse, ModelUsage, Part, PartialModelResponse, ResponseFormatJson,
     ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
@@ -629,7 +629,7 @@ fn map_openai_delta(
             text: content.clone(),
             id: None,
         };
-        let part = DeltaPart::Text(text_part);
+        let part = PartDelta::Text(text_part);
         let index = stream_utils::guess_delta_index(
             &part,
             &[existing_content_deltas, content_deltas.as_slice()].concat(),
@@ -656,7 +656,7 @@ fn map_openai_delta(
         if let Some(transcript) = &audio.transcript {
             audio_part.transcript = Some(transcript.to_string());
         }
-        let part = DeltaPart::Audio(audio_part);
+        let part = PartDelta::Audio(audio_part);
         let index = stream_utils::guess_delta_index(
             &part,
             &[existing_content_deltas, content_deltas.as_slice()].concat(),
@@ -680,7 +680,7 @@ fn map_openai_delta(
                 }
             }
 
-            let part = DeltaPart::ToolCall(tool_call_part);
+            let part = PartDelta::ToolCall(tool_call_part);
             let index = stream_utils::guess_delta_index(
                 &part,
                 &[existing_content_deltas, content_deltas.as_slice()].concat(),

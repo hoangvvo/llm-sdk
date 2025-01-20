@@ -1,6 +1,6 @@
 use crate::{
-    audio_utils, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, DeltaPart,
-    LanguageModelError, LanguageModelResult, ModelResponse, ModelUsage, Part, PartialModelResponse,
+    audio_utils, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, LanguageModelError,
+    LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
     TextPart, TextPartDelta, ToolCallPart, ToolCallPartDelta,
 };
 use serde_json::Value;
@@ -44,17 +44,17 @@ enum AccumulatedData {
 /// Initializes accumulated data from a delta
 fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
     match delta.part {
-        DeltaPart::Text(text_delta) => AccumulatedData::Text(AccumulatedTextData {
+        PartDelta::Text(text_delta) => AccumulatedData::Text(AccumulatedTextData {
             text: text_delta.text,
             id: text_delta.id,
         }),
-        DeltaPart::ToolCall(tool_delta) => AccumulatedData::ToolCall(AccumulatedToolCallData {
+        PartDelta::ToolCall(tool_delta) => AccumulatedData::ToolCall(AccumulatedToolCallData {
             tool_name: tool_delta.tool_name.unwrap_or_default(),
             tool_call_id: tool_delta.tool_call_id,
             args: tool_delta.args.unwrap_or_default(),
             id: tool_delta.id,
         }),
-        DeltaPart::Audio(audio_delta) => AccumulatedData::Audio(AccumulatedAudioData {
+        PartDelta::Audio(audio_delta) => AccumulatedData::Audio(AccumulatedAudioData {
             audio_data_chunks: audio_delta
                 .audio_data
                 .map(|data| vec![data])
@@ -117,13 +117,13 @@ fn merge_audio_delta(existing: &mut AccumulatedAudioData, delta: AudioPartDelta)
 /// Merges an incoming delta with existing accumulated data
 fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<(), String> {
     match (existing, delta.part) {
-        (AccumulatedData::Text(ref mut existing_text), DeltaPart::Text(text_delta)) => {
+        (AccumulatedData::Text(ref mut existing_text), PartDelta::Text(text_delta)) => {
             merge_text_delta(existing_text, text_delta);
         }
-        (AccumulatedData::ToolCall(ref mut existing_tool), DeltaPart::ToolCall(tool_delta)) => {
+        (AccumulatedData::ToolCall(ref mut existing_tool), PartDelta::ToolCall(tool_delta)) => {
             merge_tool_call_delta(existing_tool, tool_delta);
         }
-        (AccumulatedData::Audio(ref mut existing_audio), DeltaPart::Audio(audio_delta)) => {
+        (AccumulatedData::Audio(ref mut existing_audio), PartDelta::Audio(audio_delta)) => {
             merge_audio_delta(existing_audio, audio_delta);
         }
         _ => Err(format!(

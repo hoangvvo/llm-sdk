@@ -1,4 +1,4 @@
-use crate::{ContentDelta, DeltaPart};
+use crate::{ContentDelta, PartDelta};
 
 /// Because of the difference in mapping, especially in `OpenAI` cases,
 /// where text and audio part does not have indexes
@@ -10,7 +10,7 @@ use crate::{ContentDelta, DeltaPart};
 /// the deltas because some providers keep tool call separate from other parts
 /// (e.g openai). We can match this against the existing tool call deltas
 pub fn guess_delta_index(
-    part: &DeltaPart,
+    part: &PartDelta,
     all_content_deltas: &[ContentDelta],
     tool_call_index: Option<usize>,
 ) -> usize {
@@ -30,7 +30,7 @@ pub fn guess_delta_index(
         .map(|(_, content_delta)| content_delta.clone())
         .collect();
 
-    if let (Some(tool_call_index), DeltaPart::ToolCall(_)) = (tool_call_index, part) {
+    if let (Some(tool_call_index), PartDelta::ToolCall(_)) = (tool_call_index, part) {
         // Providers like OpenAI track tool calls in a separate field, so we
         // need to reconcile that. To understand how this matching works:
         // [Provider]
@@ -40,7 +40,7 @@ pub fn guess_delta_index(
         // In this case, we need to map the tool index 0 -> 1 and 1 -> 3
         let tool_part_deltas: Vec<_> = unique_content_deltas
             .iter()
-            .filter(|content_delta| matches!(content_delta.part, DeltaPart::ToolCall(_)))
+            .filter(|content_delta| matches!(content_delta.part, PartDelta::ToolCall(_)))
             .collect();
 
         let existing_tool_call_delta = tool_part_deltas.get(tool_call_index).copied();
@@ -61,8 +61,8 @@ pub fn guess_delta_index(
             // if their types are the same. This is because providers that do not
             // provide indexes like only have 1 part for each type (e.g openai has only 1
             // message.content or 1 message.audio)
-            (DeltaPart::Text(_), DeltaPart::Text(_))
-            | (DeltaPart::Audio(_), DeltaPart::Audio(_)) => true,
+            (PartDelta::Text(_), PartDelta::Text(_))
+            | (PartDelta::Audio(_), PartDelta::Audio(_)) => true,
 
             // For tool calls, we can't reliably match them
             // because there can be multiple tool calls with the same tool name

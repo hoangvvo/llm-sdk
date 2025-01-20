@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
 use futures::StreamExt;
-use llm_sdk::{DeltaPart, LanguageModelInput, Message, Modality, Part, UserMessage};
+use llm_sdk::{LanguageModelInput, Message, Modality, Part, PartDelta, UserMessage};
 use rodio::{buffer::SamplesBuffer, OutputStream, Sink};
 use serde_json::json;
 
@@ -46,7 +46,7 @@ async fn main() {
 
         if let Some(delta) = chunk.delta {
             let part = delta.part; // not an Option
-            if let DeltaPart::Audio(a) = part {
+            if let PartDelta::Audio(a) = part {
                 // audio_data is a String, not Option<String>
                 if let Some(b64_data) = a.audio_data {
                     let sample_rate: u32 = a.sample_rate.unwrap_or(24_000);
