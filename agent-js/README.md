@@ -181,12 +181,12 @@ while (userInput !== "exit") {
 
 Find examples in the [examples](./examples/) folder:
 
-- [Assistant CLI Example](./examples/assistant.ts)
-- [Structured Output](./examples/structured-output.ts)
-- [Multi-agent Delegation](./examples/agents-delegation.ts)
+- [`agent`: Simple Example](./examples/agent.ts)
+- [`structured-output`: Structured Output](./examples/structured-output.ts)
+- [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.ts)
 
 ```bash
-node --env-file=../.env examples/assistant.ts
+node --env-file=../.env examples/agent.ts
 ```
 
 ## License
