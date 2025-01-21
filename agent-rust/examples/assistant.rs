@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
           "required": ["city"],
           "additionalProperties": false
         }),
-        |params: GetWeatherParams, _ctx: Arc<MyContext>| async move {
+        |params: GetWeatherParams, _, _| async move {
             println!("Getting weather for {}", params.city);
 
             Ok(AgentToolResult {
@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "send_message",
         "Send a text message to a phone number",
         schemars::schema_for!(SendMessageParams).into(),
-        |params: SendMessageParams, _ctx| async move {
+        |params: SendMessageParams, _, _| async move {
             println!(
                 "Sending message to {}: {}",
                 params.phone_number, params.message

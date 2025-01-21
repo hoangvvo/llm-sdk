@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "search_flights",
         "Search for flights between two cities",
         schemars::schema_for!(SearchFlightsParams).into(),
-        |params: SearchFlightsParams, _ctx| async move {
+        |params: SearchFlightsParams, _, _| async move {
             println!(
                 "Searching flights from {} to {} on {}",
                 params.from, params.to, params.date
@@ -79,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "search_hotels",
         "Search for hotels in a specific location",
         schemars::schema_for!(SearchHotelsParams).into(),
-        |params: SearchHotelsParams, _ctx| async move {
+        |params: SearchHotelsParams, _, _| async move {
             println!(
                 "Searching hotels in {} from {} for {} nights",
                 params.city, params.check_in, params.nights

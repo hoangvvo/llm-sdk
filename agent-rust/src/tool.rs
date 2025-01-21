@@ -1,14 +1,15 @@
 use anyhow::Error;
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future::BoxFuture, lock::Mutex, FutureExt};
 use llm_sdk::{Part, Tool};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{fmt::Debug, future::Future, sync::Arc};
 
-use crate::AgentError;
+use crate::{AgentError, RunState};
 
-pub type AgentToolFn<TCtx> =
-    dyn Fn(Value, Arc<TCtx>) -> BoxFuture<'static, Result<AgentToolResult, Error>> + Send + Sync;
+pub type AgentToolFn<TCtx> = dyn Fn(Value, Arc<TCtx>, Arc<Mutex<RunState>>) -> BoxFuture<'static, Result<AgentToolResult, Error>>
+    + Send
+    + Sync;
 
 pub struct AgentTool<TCtx> {
     /// Name of the tool.
@@ -34,7 +35,7 @@ where
         execute: F,
     ) -> Self
     where
-        F: Fn(TArgs, Arc<TCtx>) -> Fut + Send + Sync + 'static,
+        F: Fn(TArgs, Arc<TCtx>, Arc<Mutex<RunState>>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<AgentToolResult, Error>> + Send + 'static,
         TArgs: DeserializeOwned + Send + 'static,
     {
@@ -44,13 +45,13 @@ where
             name: name.into(),
             description: description.into(),
             parameters,
-            execute: Box::new(move |arg, ctx| {
+            execute: Box::new(move |arg, ctx, state| {
                 let execute = execute_arc.clone();
                 async move {
                     let params: TArgs = serde_json::from_value(arg).map_err(|e| {
                         AgentError::Invariant(format!("Failed to deserialize tool arguments: {e}"))
                     })?;
-                    execute(params, ctx).await
+                    execute(params, ctx, state).await
                 }
                 .boxed()
             }),
@@ -58,8 +59,13 @@ where
     }
     /// Executes the tool with the given arguments and context.
     /// The arguments are deserialized from JSON to the specified type.
-    pub async fn call(&self, args: Value, context: Arc<TCtx>) -> Result<AgentToolResult, Error> {
-        (self.execute)(args, context).await
+    pub async fn call(
+        &self,
+        args: Value,
+        context: Arc<TCtx>,
+        state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Error> {
+        (self.execute)(args, context, state).await
     }
 }
 

@@ -3,7 +3,7 @@ use crate::{
     types::{AgentStream, AgentStreamEvent},
     AgentError, AgentRequest, AgentResponse, AgentTool, InstructionParam, RunItem,
 };
-use futures::stream::StreamExt;
+use futures::{lock::Mutex, stream::StreamExt};
 use llm_sdk::{
     AssistantMessage, LanguageModel, LanguageModelInput, Message, ModelResponse, Part,
     ResponseFormatOption, StreamAccumulator, ToolCallPart, ToolMessage, ToolResultPart,
@@ -50,6 +50,7 @@ where
     async fn process(
         &self,
         context: Arc<TCtx>,
+        run_state: Arc<Mutex<RunState>>,
         model_response: ModelResponse,
     ) -> Result<ProcessResult, AgentError> {
         let tool_call_parts: Vec<ToolCallPart> = model_response
@@ -91,7 +92,7 @@ where
                 })?;
 
             let tool_res = agent_tool
-                .call(args, context.clone())
+                .call(args, context.clone(), run_state.clone())
                 .await
                 .map_err(|e| AgentError::ToolExecution(e.into()))?;
 
@@ -110,37 +111,49 @@ where
 
     /// Run a non-streaming execution of the agent.
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
-        let mut state = RunState::new(request.messages.clone(), self.max_turns);
+        let state = Arc::new(Mutex::new(RunState::new(
+            request.messages.clone(),
+            self.max_turns,
+        )));
 
         let (input, context) = self.get_llm_input(request);
 
         loop {
             let mut input = input.clone();
-            input.messages = state.get_turn_messages();
+            input.messages = state.lock().await.get_turn_messages();
             let model_response = self.model.generate(input).await?;
 
-            state.append_message(Message::Assistant(AssistantMessage {
-                content: model_response.content.clone(),
-            }));
+            state
+                .lock()
+                .await
+                .append_message(Message::Assistant(AssistantMessage {
+                    content: model_response.content.clone(),
+                }));
 
-            match self.process(context.clone(), model_response).await? {
+            match self
+                .process(context.clone(), state.clone(), model_response)
+                .await?
+            {
                 ProcessResult::Response(content) => {
-                    return Ok(state.create_response(content));
+                    return Ok(state.lock().await.create_response(content));
                 }
                 ProcessResult::Next(next_messages) => {
                     for message in next_messages {
-                        state.append_message(message);
+                        state.lock().await.append_message(message);
                     }
                 }
             }
 
-            state.turn()?;
+            state.lock().await.turn()?;
         }
     }
 
     /// Run a streaming execution of the agent.
     pub fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
-        let mut state = RunState::new(request.messages.clone(), self.max_turns);
+        let state = Arc::new(Mutex::new(RunState::new(
+            request.messages.clone(),
+            self.max_turns,
+        )));
 
         let (input, context) = self.get_llm_input(request);
 
@@ -155,7 +168,7 @@ where
         let stream = async_stream::try_stream! {
             loop {
                 let mut input = input.clone();
-                input.messages = state.get_turn_messages();
+                input.messages = state.lock().await.get_turn_messages();
 
                 let mut model_stream = session.model.stream(input).await?;
 
@@ -177,24 +190,25 @@ where
                     content: model_response.content.clone(),
                 });
 
-                state.append_message(assistant_message.clone());
+                state.lock().await
+                    .append_message(assistant_message.clone());
                 yield AgentStreamEvent::Message(assistant_message);
 
-                match session.process(context.clone(), model_response).await? {
+                match session.process(context.clone(), state.clone(), model_response).await? {
                     ProcessResult::Response(content) => {
-                        let response = state.create_response(content);
+                        let response = state.lock().await.create_response(content);
                         yield AgentStreamEvent::Response(response);
                         break;
                     }
                     ProcessResult::Next(next_messages) => {
                         for message in next_messages {
-                            state.append_message(message.clone());
+                            state.lock().await.append_message(message.clone());
                             yield AgentStreamEvent::Message(message);
                         }
                     }
                 }
 
-                state.turn()?;
+                state.lock().await.turn()?;
             }
         };
 
@@ -228,7 +242,7 @@ enum ProcessResult {
     Next(Vec<Message>),
 }
 
-struct RunState {
+pub struct RunState {
     max_turns: usize,
     input_messages: Vec<Message>,
 

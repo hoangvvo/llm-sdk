@@ -1,8 +1,7 @@
-import { Agent } from "@hoangvvo/llm-agent";
+import { Agent, tool } from "@hoangvvo/llm-agent";
 import type { ResponseFormatOption } from "@hoangvvo/llm-sdk";
 import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
 import assert from "node:assert";
-import { AgentTool } from "../src/tool.ts";
 
 // Define the model to use for the Agent
 assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
@@ -11,7 +10,7 @@ const model = new OpenAIModel({
   modelId: "gpt-4o",
 });
 
-const searchFlightsTool = new AgentTool({
+const searchFlightsTool = tool({
   name: "search_flights",
   description: "Search for flights between two cities",
   parameters: {
@@ -52,7 +51,7 @@ const searchFlightsTool = new AgentTool({
   },
 });
 
-const searchHotelsTool = new AgentTool({
+const searchHotelsTool = tool({
   name: "search_hotels",
   description: "Search for hotels in a city",
   parameters: {

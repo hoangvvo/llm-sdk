@@ -88,6 +88,7 @@ export class RunSession<TContext> {
    */
   async #process(
     context: TContext,
+    state: RunState,
     modelResponse: ModelResponse,
   ): Promise<ProcessResult> {
     const toolCallParts = modelResponse.content.filter(
@@ -117,7 +118,11 @@ export class RunSession<TContext> {
         );
       }
 
-      const toolRes = await agentTool.execute(toolCallPart.args, context);
+      const toolRes = await agentTool.execute(
+        toolCallPart.args,
+        context,
+        state,
+      );
 
       toolMessage.content.push({
         type: "tool-result",
@@ -158,7 +163,7 @@ export class RunSession<TContext> {
         content: modelResponse.content,
       });
 
-      const processResult = await this.#process(context, modelResponse);
+      const processResult = await this.#process(context, state, modelResponse);
       if (processResult.type === "response") {
         return state.createResponse(processResult.content);
       } else {
@@ -212,7 +217,7 @@ export class RunSession<TContext> {
         ...assistantMessage,
       };
 
-      const processResult = await this.#process(context, modelResponse);
+      const processResult = await this.#process(context, state, modelResponse);
 
       if (processResult.type === "response") {
         const response = state.createResponse(processResult.content);
@@ -275,7 +280,7 @@ interface ProcessResultNext {
   messages: Message[];
 }
 
-class RunState {
+export class RunState {
   readonly #maxTurns: number;
   readonly #inputMessages: Message[];
 

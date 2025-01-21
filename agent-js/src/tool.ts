@@ -1,4 +1,5 @@
 import type { JSONSchema, Part } from "@hoangvvo/llm-sdk";
+import type { RunState } from "./run.ts";
 
 export class AgentTool<TArgs extends Record<string, unknown> | null, TContext> {
   /**
@@ -20,6 +21,7 @@ export class AgentTool<TArgs extends Record<string, unknown> | null, TContext> {
   execute: (
     args: TArgs,
     ctx: TContext,
+    state: RunState,
   ) => AgentToolResult | Promise<AgentToolResult>;
 
   constructor(params: AgentToolParams<TArgs, TContext>) {
