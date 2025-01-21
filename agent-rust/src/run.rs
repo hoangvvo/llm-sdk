@@ -75,7 +75,7 @@ where
         // Process all tool calls
         let mut tool_message = ToolMessage { content: vec![] };
 
-        for tool_call_part in tool_call_parts.into_iter() {
+        for tool_call_part in tool_call_parts {
             let ToolCallPart {
                 tool_call_id,
                 tool_name,
@@ -88,7 +88,7 @@ where
                 .iter()
                 .find(|tool| tool.name == *tool_name)
                 .ok_or_else(|| {
-                    AgentError::Invariant(format!("Tool {} not found for tool call", tool_name))
+                    AgentError::Invariant(format!("Tool {tool_name} not found for tool call"))
                 })?;
 
             let tool_res = agent_tool
@@ -248,12 +248,13 @@ pub struct RunState {
 
     /// The current turn number in the run.
     pub current_turn: usize,
-    /// All items generated during the run, such as new ToolMessage and
-    /// AssistantMessage
+    /// All items generated during the run, such as new `ToolMessage` and
+    /// `AssistantMessage`
     pub items: Vec<RunItem>,
 }
 
 impl RunState {
+    #[must_use]
     pub fn new(input_messages: Vec<Message>, max_turns: usize) -> Self {
         Self {
             max_turns,
@@ -278,7 +279,8 @@ impl RunState {
         self.items.push(RunItem::Message(message));
     }
 
-    /// Get LLM messages to use in the LanguageModelInput for the turn
+    /// Get LLM messages to use in the `LanguageModelInput` for the turn
+    #[must_use]
     pub fn get_turn_messages(&self) -> Vec<Message> {
         [
             self.input_messages.clone(),
@@ -292,6 +294,7 @@ impl RunState {
         .concat()
     }
 
+    #[must_use]
     pub fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
         AgentResponse {
             content: final_content,

@@ -179,6 +179,7 @@ Find examples in the [examples](./examples/) folder:
 
 - [Assistant CLI Example](./examples/assistant.rs)
 - [Structured Output](./examples/structured-output.rs)
+- [Multi-agent Delegation](./examples/agents-delegation.rs)
 
 ```bash
 cargo run --example assistant

@@ -20,5 +20,6 @@ thiserror = "2.0.11"
 [dev-dependencies]
 chrono = "0.4"
 dotenvy = { version = "0.15.7" }
+rand = { version = "0.8" }
 schemars = "1.0.4"
 tokio = { version = "1.42.0", features = ["full"] }

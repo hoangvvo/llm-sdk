@@ -21,6 +21,7 @@ impl<TCtx> Agent<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
+    #[must_use]
     pub fn new(params: AgentParams<TCtx>) -> Self {
         Self {
             name: params.name,
@@ -82,7 +83,7 @@ where
 /// # Default Values
 /// - `instructions`: `vec![]`
 /// - `tools`: `vec![]`
-/// - `response_format`: ResponseFormatOption::Text
+/// - `response_format`: `ResponseFormatOption::Text`
 /// - `max_turns`: 10
 pub struct AgentParams<TCtx> {
     pub name: String,
@@ -128,17 +129,20 @@ where
     }
 
     /// Set the response format
+    #[must_use]
     pub fn response_format(mut self, response_format: ResponseFormatOption) -> Self {
         self.response_format = response_format;
         self
     }
 
     /// Set the max turns
+    #[must_use]
     pub fn max_turns(mut self, max_turns: usize) -> Self {
         self.max_turns = max_turns;
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Agent<TCtx> {
         Agent::new(self)
     }

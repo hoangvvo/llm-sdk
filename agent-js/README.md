@@ -181,8 +181,9 @@ while (userInput !== "exit") {
 
 Find examples in the [examples](./examples/) folder:
 
-- [Assistant (AIO) Example](./examples/assistant.ts)
+- [Assistant CLI Example](./examples/assistant.ts)
 - [Structured Output](./examples/structured-output.ts)
+- [Multi-agent Delegation](./examples/agents-delegation.ts)
 
 ```bash
 node --env-file=../.env examples/assistant.ts
