@@ -1,8 +1,8 @@
 use dotenvy::dotenv;
-use llm_agent::{Agent, AgentParams, AgentRequest, AgentTool, AgentToolResult, InstructionParam};
+use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
-    Message, Part, ResponseFormatOption, UserMessage,
+    Message, Part, UserMessage,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -27,6 +27,7 @@ struct GetWeatherParams {
 
 // Define the JSON schema using `schemars` crate
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SendMessageParams {
     #[schemars(description = "The message to send")]
     message: String,
@@ -104,22 +105,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Create the Agent
-    let my_assistant = Agent::<MyContext>::new(AgentParams {
-        name: "Mai".to_string(),
-        model,
-        instructions: vec![
-            // Static instruction
-            "You are Mai, a helpful assistant. Answer questions to the best of your ability."
-                .into(),
-            // Dynamic instruction
-            InstructionParam::Func(|ctx: &MyContext| {
-                format!("You are talking to {}", ctx.user_name)
-            }),
-        ],
-        response_format: ResponseFormatOption::Text,
-        tools: vec![get_weather_tool, send_message_tool],
-        max_turns: 10,
-    });
+    let my_assistant = Agent::<MyContext>::builder("Mai", model)
+        .add_instruction(
+            "You are Mai, a helpful assistant. Answer questions to the best of your ability.",
+        )
+        .add_instruction(|ctx: &MyContext| format!("You are talking to {}", ctx.user_name))
+        .tools(vec![get_weather_tool, send_message_tool])
+        .build();
 
     // Implement the CLI to interact with the Agent
     let mut messages: Vec<Message> = Vec::new();

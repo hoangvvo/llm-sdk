@@ -151,7 +151,6 @@ const travelAgent = new Agent({
   model,
   response_format: responseFormat,
   tools: [searchFlightsTool, searchHotelsTool],
-  max_turns: 10,
 });
 
 const prompt = "Plan a trip from Paris to Tokyo next week";

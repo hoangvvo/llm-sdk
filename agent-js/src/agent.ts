@@ -17,7 +17,8 @@ export class Agent<TContext> {
   readonly #tools: AgentTool<any, TContext>[];
   readonly #max_turns: number;
 
-  constructor(params: AgentParams<TContext>) {
+  constructor(inputParams: AgentParams<TContext>) {
+    const params = agentParamsWithDefaults(inputParams);
     this.name = params.name;
     this.#instructions = params.instructions;
     this.#model = params.model;
@@ -85,21 +86,39 @@ export interface AgentParams<TContext> {
   /**
    * Instructions to be added to system messages when executing the agent.
    * This can include formatting instructions or other guidance for the agent.
+   * @default []
    */
-  instructions: InstructionParam<TContext>[];
+  instructions?: InstructionParam<TContext>[];
 
   /**
    * The tools that the agent can use to perform tasks.
+   * @default []
    */
-  tools: AgentTool<any, TContext>[];
+  tools?: AgentTool<any, TContext>[];
 
   /**
    * The expected format of the response. Either text or json.
+   * @default { type: "text" }
    */
-  response_format: ResponseFormatOption;
+  response_format?: ResponseFormatOption;
 
   /**
    * Max number of turns for agent to run to protect against infinite loops.
+   * @default 10
    */
-  max_turns: number;
+  max_turns?: number;
+}
+
+function agentParamsWithDefaults<TContext>(
+  params: AgentParams<TContext>,
+): Required<AgentParams<TContext>> {
+  return {
+    instructions: [],
+    tools: [],
+    response_format: {
+      type: "text",
+    },
+    max_turns: 10,
+    ...params,
+  };
 }

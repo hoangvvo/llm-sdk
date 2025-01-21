@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use llm_agent::{Agent, AgentParams, AgentRequest, AgentTool, AgentToolResult, InstructionParam};
+use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     Message, Part, ResponseFormatJson, ResponseFormatOption, UserMessage,
@@ -10,6 +10,7 @@ use serde_json::json;
 use std::{env, sync::Arc};
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SearchFlightsParams {
     #[schemars(description = "Origin city/airport")]
     from: String,
@@ -20,6 +21,7 @@ struct SearchFlightsParams {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct SearchHotelsParams {
     #[schemars(description = "City to search hotels in")]
     city: String,
@@ -182,19 +184,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })),
     });
 
-    let travel_agent = Agent::<()>::new(AgentParams {
-        name: "Bob".to_string(),
-        instructions: vec![
-            InstructionParam::String(
-                "You are Bob, a travel agent that helps users plan their trips.".to_string(),
-            ),
-            InstructionParam::Func(|_ctx| format!("The current time is: {}", chrono::Local::now())),
-        ],
-        model,
-        response_format,
-        tools: vec![search_flights_tool, search_hotels_tool],
-        max_turns: 10,
-    });
+    let travel_agent = Agent::<()>::builder("Bob", model)
+        .add_instruction("You are Bob, a travel agent that helps users plan their trips.")
+        .add_instruction(|_ctx: &()| format!("The current time is {}", chrono::Local::now()))
+        .response_format(response_format)
+        .tools(vec![search_flights_tool, search_hotels_tool])
+        .build();
 
     let prompt = "Plan a trip from Paris to Tokyo next week";
 

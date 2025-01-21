@@ -234,7 +234,8 @@ struct RunState {
 
     /// The current turn number in the run.
     pub current_turn: usize,
-    /// All items generated during the run, such as new ToolMessage and AssistantMessage
+    /// All items generated during the run, such as new ToolMessage and
+    /// AssistantMessage
     pub items: Vec<RunItem>,
 }
 
@@ -248,7 +249,8 @@ impl RunState {
         }
     }
 
-    /// Mark a new turn in the conversation and throw an error if max turns exceeded.
+    /// Mark a new turn in the conversation and throw an error if max turns
+    /// exceeded.
     pub fn turn(&mut self) -> Result<(), AgentError> {
         self.current_turn += 1;
         if self.current_turn > self.max_turns {

@@ -21,7 +21,6 @@ impl<TCtx> Agent<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
-    #[must_use]
     pub fn new(params: AgentParams<TCtx>) -> Self {
         Self {
             name: params.name,
@@ -70,9 +69,21 @@ where
         )
         .await
     }
+
+    pub fn builder(
+        name: impl ToString,
+        model: Arc<dyn LanguageModel + Send + Sync>,
+    ) -> AgentParams<TCtx> {
+        AgentParams::new(name, model)
+    }
 }
 
 /// Parameters required to create a new agent.
+/// # Default Values
+/// - `instructions`: `vec![]`
+/// - `tools`: `vec![]`
+/// - `response_format`: ResponseFormatOption::Text
+/// - `max_turns`: 10
 pub struct AgentParams<TCtx> {
     pub name: String,
     /// The default language model to use for the agent.
@@ -87,4 +98,48 @@ pub struct AgentParams<TCtx> {
     pub response_format: ResponseFormatOption,
     /// Max number of turns for agent to run to protect against infinite loops.
     pub max_turns: usize,
+}
+
+impl<TCtx> AgentParams<TCtx>
+where
+    TCtx: Send + Sync + 'static,
+{
+    pub fn new(name: impl ToString, model: Arc<dyn LanguageModel + Send + Sync>) -> Self {
+        Self {
+            name: name.to_string(),
+            model,
+            instructions: Vec::new(),
+            tools: Vec::new(),
+            response_format: ResponseFormatOption::Text,
+            max_turns: 10,
+        }
+    }
+
+    /// Add an instruction
+    pub fn add_instruction(mut self, instruction: impl Into<InstructionParam<TCtx>>) -> Self {
+        self.instructions.push(instruction.into());
+        self
+    }
+
+    /// Set the tools
+    pub fn tools(mut self, tools: impl IntoIterator<Item = AgentTool<TCtx>>) -> Self {
+        self.tools = tools.into_iter().collect();
+        self
+    }
+
+    /// Set the response format
+    pub fn response_format(mut self, response_format: ResponseFormatOption) -> Self {
+        self.response_format = response_format;
+        self
+    }
+
+    /// Set the max turns
+    pub fn max_turns(mut self, max_turns: usize) -> Self {
+        self.max_turns = max_turns;
+        self
+    }
+
+    pub fn build(self) -> Agent<TCtx> {
+        Agent::new(self)
+    }
 }

@@ -1,7 +1,6 @@
-#[derive(Debug, Clone)]
 pub enum InstructionParam<TCtx> {
     String(String),
-    Func(fn(&TCtx) -> String),
+    Func(Box<dyn Fn(&TCtx) -> String + Send + Sync>),
 }
 
 impl<TCtx> InstructionParam<TCtx> {
@@ -13,9 +12,25 @@ impl<TCtx> InstructionParam<TCtx> {
     }
 }
 
-impl<T: ToString, TCtx> From<T> for InstructionParam<TCtx> {
-    fn from(value: T) -> Self {
+impl<TCtx> From<String> for InstructionParam<TCtx> {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl<TCtx> From<&str> for InstructionParam<TCtx> {
+    fn from(value: &str) -> Self {
         Self::String(value.to_string())
+    }
+}
+
+impl<TCtx, F> From<F> for InstructionParam<TCtx>
+where
+    F: Fn(&TCtx) -> String + Send + Sync + 'static,
+    TCtx: Send + Sync + 'static,
+{
+    fn from(value: F) -> Self {
+        Self::Func(Box::new(value))
     }
 }
 

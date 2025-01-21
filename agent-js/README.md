@@ -124,9 +124,7 @@ const myAssistant = new Agent<MyContext>({
     // Dynamic instruction
     (context) => `You are talking to ${context.userName}.`,
   ],
-  response_format: { type: "text" },
   tools: [getTimeTool, getWeatherTool, sendMessageTool],
-  max_turns: 10,
 });
 
 // Implement the CLI to interact with the Agent
