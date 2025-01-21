@@ -272,18 +272,18 @@ function createPart(data: AccumulatedData, index: number): Part {
  * Manages the accumulation and merging of content deltas for streaming responses
  */
 export class StreamAccumulator {
-  private readonly accumulatedParts = new Map<number, AccumulatedData>();
-  private accumulatedUsage?: ModelUsage;
+  readonly #accumulatedParts = new Map<number, AccumulatedData>();
+  #accumulatedUsage?: ModelUsage;
 
   /**
    * Adds a chunk of content deltas to the accumulator
    */
   addPartial(partial: PartialModelResponse): void {
     if (partial.delta) {
-      this.processDelta(partial.delta);
+      this.#processDelta(partial.delta);
     }
     if (partial.usage) {
-      this.processUsage(partial.usage);
+      this.#processUsage(partial.usage);
     }
   }
 
@@ -291,13 +291,13 @@ export class StreamAccumulator {
    * Computes the final response from accumulated deltas
    */
   computeResponse(): ModelResponse {
-    const content = Array.from(this.accumulatedParts.entries())
+    const content = Array.from(this.#accumulatedParts.entries())
       .sort(([a], [b]) => a - b)
       .map(([index, data]) => createPart(data, index));
 
     return {
       content,
-      ...(this.accumulatedUsage && { usage: this.accumulatedUsage }),
+      ...(this.#accumulatedUsage && { usage: this.#accumulatedUsage }),
     };
   }
 
@@ -305,33 +305,33 @@ export class StreamAccumulator {
    * Gets the number of accumulated parts
    */
   get size(): number {
-    return this.accumulatedParts.size;
+    return this.#accumulatedParts.size;
   }
 
   /**
    * Checks if the accumulator has any data
    */
   get isEmpty(): boolean {
-    return this.accumulatedParts.size === 0;
+    return this.#accumulatedParts.size === 0;
   }
 
   /**
    * Processes a single delta, either merging with existing or creating new
    */
-  private processDelta(delta: ContentDelta): void {
-    const existing = this.accumulatedParts.get(delta.index);
+  #processDelta(delta: ContentDelta): void {
+    const existing = this.#accumulatedParts.get(delta.index);
 
     if (existing) {
       mergeDelta(existing, delta);
     } else {
-      this.accumulatedParts.set(delta.index, initializeAccumulatedData(delta));
+      this.#accumulatedParts.set(delta.index, initializeAccumulatedData(delta));
     }
   }
 
-  private processUsage(usage: ModelUsage): void {
-    this.accumulatedUsage = this.accumulatedUsage ?? { ...usage };
+  #processUsage(usage: ModelUsage): void {
+    this.#accumulatedUsage = this.#accumulatedUsage ?? { ...usage };
 
-    this.accumulatedUsage.input_tokens += usage.input_tokens;
-    this.accumulatedUsage.output_tokens += usage.output_tokens;
+    this.#accumulatedUsage.input_tokens += usage.input_tokens;
+    this.#accumulatedUsage.output_tokens += usage.output_tokens;
   }
 }

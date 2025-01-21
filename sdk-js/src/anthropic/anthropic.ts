@@ -32,11 +32,11 @@ export interface AnthropicModelOptions {
 const PROVIDER = "anthropic";
 
 export class AnthropicModel extends LanguageModel {
-  public provider: string;
-  public modelId: string;
-  public metadata?: LanguageModelMetadata;
+  provider: string;
+  modelId: string;
+  metadata?: LanguageModelMetadata;
 
-  private anthropic: Anthropic;
+  #anthropic: Anthropic;
 
   constructor(
     options: AnthropicModelOptions,
@@ -46,7 +46,7 @@ export class AnthropicModel extends LanguageModel {
     this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
-    this.anthropic = new Anthropic({
+    this.#anthropic = new Anthropic({
       baseURL: options.baseURL,
       apiKey: options.apiKey,
     });
@@ -55,7 +55,7 @@ export class AnthropicModel extends LanguageModel {
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
     const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    const response = await this.anthropic.messages.create(createParams);
+    const response = await this.#anthropic.messages.create(createParams);
 
     const content = mapAnthropicMessage(response.content);
     const usage = mapAnthropicUsage(response.usage);
@@ -74,7 +74,7 @@ export class AnthropicModel extends LanguageModel {
   ): AsyncGenerator<PartialModelResponse> {
     const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    const stream = this.anthropic.messages.stream(createParams);
+    const stream = this.#anthropic.messages.stream(createParams);
 
     for await (const chunk of stream) {
       switch (chunk.type) {

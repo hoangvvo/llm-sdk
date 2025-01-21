@@ -42,11 +42,11 @@ type MistralChatCompletionRequestMessage =
   MistralComponents.ChatCompletionRequest["messages"][number];
 
 export class MistralModel extends LanguageModel {
-  public provider: string;
-  public modelId: string;
-  public metadata?: LanguageModelMetadata;
+  provider: string;
+  modelId: string;
+  metadata?: LanguageModelMetadata;
 
-  private client: Mistral;
+  #client: Mistral;
 
   constructor(options: MistralModelOptions, metadata?: LanguageModelMetadata) {
     super();
@@ -54,7 +54,7 @@ export class MistralModel extends LanguageModel {
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
 
-    this.client = new Mistral({
+    this.#client = new Mistral({
       apiKey: options.apiKey,
       ...(options.baseURL && { serverURL: options.baseURL }),
     });
@@ -62,7 +62,7 @@ export class MistralModel extends LanguageModel {
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
     const request = convertToMistralRequest(input, this.modelId);
-    const response = await this.client.chat.complete(request);
+    const response = await this.#client.chat.complete(request);
 
     const choice = response.choices?.[0];
     if (!choice) {
@@ -86,7 +86,7 @@ export class MistralModel extends LanguageModel {
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
     const request = convertToMistralRequest(input, this.modelId);
-    const stream = await this.client.chat.stream(request);
+    const stream = await this.#client.chat.stream(request);
 
     const allContentDeltas: ContentDelta[] = [];
 

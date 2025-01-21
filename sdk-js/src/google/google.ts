@@ -66,7 +66,7 @@ export class GoogleModel extends LanguageModel {
   modelId: string;
   metadata?: LanguageModelMetadata;
 
-  private genModel: GenerativeModel;
+  #genModel: GenerativeModel;
 
   constructor(options: GoogleModelOptions, metadata?: LanguageModelMetadata) {
     super();
@@ -75,12 +75,12 @@ export class GoogleModel extends LanguageModel {
     if (metadata) this.metadata = metadata;
 
     const genAI = new GoogleGenerativeAI(options.apiKey);
-    this.genModel = genAI.getGenerativeModel({ model: options.modelId });
+    this.#genModel = genAI.getGenerativeModel({ model: options.modelId });
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
     const request = convertToGenerateContentRequest(input);
-    const { response } = await this.genModel.generateContent(request);
+    const { response } = await this.#genModel.generateContent(request);
 
     const candidate = response.candidates?.[0];
     if (!candidate) {
@@ -103,7 +103,7 @@ export class GoogleModel extends LanguageModel {
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
     const request = convertToGenerateContentRequest(input);
-    const { stream } = await this.genModel.generateContentStream(request);
+    const { stream } = await this.#genModel.generateContentStream(request);
 
     const allContentDeltas: ContentDelta[] = [];
 

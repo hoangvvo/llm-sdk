@@ -12,7 +12,7 @@ export class InvalidInputError extends Error {
  * The reqest returns a non-OK status code
  */
 export class StatusCodeError extends Error {
-  public statusCode: number;
+  statusCode: number;
   constructor(statusCode: number, message: string) {
     super(`Status error: ${message} (Status ${String(statusCode)})`);
     this.statusCode = statusCode;
@@ -25,7 +25,7 @@ export class StatusCodeError extends Error {
  * (e.g. using non text for assistant message parts)
  */
 export class UnsupportedError extends Error {
-  public provider: string;
+  provider: string;
   constructor(provider: string, message: string) {
     super(`Unsupported by ${provider}: ${message}`);
     this.name = "Unsupported";

@@ -32,25 +32,25 @@ export interface CohereModelOptions {
 }
 
 export class CohereModel extends LanguageModel {
-  public provider: string;
-  public modelId: string;
-  public metadata?: LanguageModelMetadata;
+  provider: string;
+  modelId: string;
+  metadata?: LanguageModelMetadata;
 
-  private cohere: CohereClientV2;
+  #cohere: CohereClientV2;
 
   constructor(options: CohereModelOptions, metadata?: LanguageModelMetadata) {
     super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
-    this.cohere = new CohereClientV2({
+    this.#cohere = new CohereClientV2({
       token: options.apiKey,
     });
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
     const request = convertToCohereChatRequest(input, this.modelId);
-    const response = await this.cohere.chat(request);
+    const response = await this.#cohere.chat(request);
 
     const content = mapCohereMessageResponse(response.message);
     const result: ModelResponse = { content };
@@ -69,7 +69,7 @@ export class CohereModel extends LanguageModel {
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
     const request = convertToCohereChatRequest(input, this.modelId);
-    const stream = await this.cohere.chatStream(request);
+    const stream = await this.#cohere.chatStream(request);
 
     for await (const event of stream) {
       switch (event.type) {

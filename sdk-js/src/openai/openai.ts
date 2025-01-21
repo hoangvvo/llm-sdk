@@ -54,14 +54,14 @@ export class OpenAIModel extends LanguageModel {
   modelId: string;
   metadata?: LanguageModelMetadata;
 
-  private openai: OpenAI;
+  #openai: OpenAI;
 
   constructor(options: OpenAIModelOptions, metadata?: LanguageModelMetadata) {
     super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;
-    this.openai = new OpenAI({
+    this.#openai = new OpenAI({
       baseURL: options.baseURL,
       apiKey: options.apiKey,
     });
@@ -70,7 +70,7 @@ export class OpenAIModel extends LanguageModel {
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
     const createParams = convertToOpenAICreateParams(input, this.modelId);
 
-    const response = await this.openai.chat.completions.create({
+    const response = await this.#openai.chat.completions.create({
       ...createParams,
       stream: false,
     });
@@ -106,7 +106,7 @@ export class OpenAIModel extends LanguageModel {
   ): AsyncGenerator<PartialModelResponse> {
     const createParams = convertToOpenAICreateParams(input, this.modelId);
 
-    const stream = await this.openai.chat.completions.create({
+    const stream = await this.#openai.chat.completions.create({
       ...createParams,
       stream: true,
       stream_options: {
