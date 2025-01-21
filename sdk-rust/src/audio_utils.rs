@@ -1,5 +1,7 @@
 use base64::Engine as _;
 
+use crate::{LanguageModelError, LanguageModelResult};
+
 pub fn base64_to_i16sample(b64: &str) -> Result<Vec<i16>, String> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(b64)
@@ -28,4 +30,25 @@ pub fn i16sample_to_base64(samples: &[i16]) -> String {
 
     // Encode to base64
     base64::engine::general_purpose::STANDARD.encode(result_bytes)
+}
+
+/// Concatenates audio data chunks into a single base64 string
+pub fn concatenate_b64_audio_chunks(chunks: &[String]) -> LanguageModelResult<String> {
+    if chunks.is_empty() {
+        return Ok(String::new());
+    }
+
+    // Decode all chunks and collect samples
+    let mut all_samples: Vec<i16> = Vec::new();
+
+    for chunk in chunks {
+        let samples = base64_to_i16sample(chunk).map_err(|e| {
+            LanguageModelError::Invariant("", format!("Failed to decode audio chunk: {e}"))
+        })?;
+        all_samples.extend(samples);
+    }
+
+    let b64 = i16sample_to_base64(&all_samples);
+
+    Ok(b64)
 }

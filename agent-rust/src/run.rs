@@ -1,7 +1,7 @@
 use crate::{
     instruction,
     types::{AgentStream, AgentStreamEvent},
-    AgentError, AgentRequest, AgentResponse, AgentTool, InstructionParam,
+    AgentError, AgentRequest, AgentResponse, AgentTool, InstructionParam, RunItem,
 };
 use futures::stream::StreamExt;
 use llm_sdk::{
@@ -10,16 +10,17 @@ use llm_sdk::{
 };
 use std::sync::Arc;
 
-/// Manages the run session for an agent run.
+/// Manages the run session for an agent.
 /// It initializes all necessary components for the agent to run
 /// and handles the execution of the agent's tasks.
 /// Once finish, the session cleans up any resources used during the run.
 /// The session can be reused in multiple runs.
 pub struct RunSession<TCtx> {
-    pub tools: Arc<Vec<AgentTool<TCtx>>>,
-    pub model: Arc<dyn LanguageModel + Send + Sync>,
-    pub response_format: ResponseFormatOption,
-    pub instructions: Arc<Vec<InstructionParam<TCtx>>>,
+    tools: Arc<Vec<AgentTool<TCtx>>>,
+    model: Arc<dyn LanguageModel + Send + Sync>,
+    response_format: ResponseFormatOption,
+    instructions: Arc<Vec<InstructionParam<TCtx>>>,
+    max_turns: usize,
 }
 
 impl<TCtx> RunSession<TCtx>
@@ -33,12 +34,14 @@ where
         instructions: Arc<Vec<InstructionParam<TCtx>>>,
         tools: Arc<Vec<AgentTool<TCtx>>>,
         response_format: ResponseFormatOption,
+        max_turns: usize,
     ) -> Self {
         Self {
             tools,
             model,
             response_format,
             instructions,
+            max_turns,
         }
     }
 
@@ -107,36 +110,38 @@ where
 
     /// Run a non-streaming execution of the agent.
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
-        let (input, context) = self.get_llm_input(request);
+        let mut state = RunState::new(request.messages.clone(), self.max_turns);
 
-        let mut new_messages = vec![];
+        let (input, context) = self.get_llm_input(request);
 
         loop {
             let mut input = input.clone();
-            input.messages.append(new_messages.clone().as_mut());
+            input.messages = state.get_turn_messages();
             let model_response = self.model.generate(input).await?;
 
-            new_messages.push(Message::Assistant(AssistantMessage {
+            state.append_message(Message::Assistant(AssistantMessage {
                 content: model_response.content.clone(),
             }));
 
             match self.process(context.clone(), model_response).await? {
                 ProcessResult::Response(content) => {
-                    return Ok(AgentResponse {
-                        content,
-                        new_messages,
-                    });
+                    return Ok(state.create_response(content));
                 }
                 ProcessResult::Next(next_messages) => {
-                    new_messages.extend(next_messages);
-                    continue;
+                    for message in next_messages {
+                        state.append_message(message);
+                    }
                 }
             }
+
+            state.turn()?;
         }
     }
 
     /// Run a streaming execution of the agent.
     pub fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
+        let mut state = RunState::new(request.messages.clone(), self.max_turns);
+
         let (input, context) = self.get_llm_input(request);
 
         let session = Arc::new(Self {
@@ -144,14 +149,13 @@ where
             model: self.model.clone(),
             response_format: self.response_format.clone(),
             instructions: self.instructions.clone(),
+            max_turns: self.max_turns,
         });
-
-        let mut new_messages = vec![];
 
         let stream = async_stream::try_stream! {
             loop {
                 let mut input = input.clone();
-                input.messages.append(new_messages.clone().as_mut());
+                input.messages = state.get_turn_messages();
 
                 let mut model_stream = session.model.stream(input).await?;
 
@@ -173,22 +177,24 @@ where
                     content: model_response.content.clone(),
                 });
 
-                new_messages.push(assistant_message.clone());
+                state.append_message(assistant_message.clone());
                 yield AgentStreamEvent::Message(assistant_message);
 
                 match session.process(context.clone(), model_response).await? {
                     ProcessResult::Response(content) => {
-                        yield AgentStreamEvent::Response(AgentResponse { new_messages, content });
+                        let response = state.create_response(content);
+                        yield AgentStreamEvent::Response(response);
                         break;
                     }
                     ProcessResult::Next(next_messages) => {
-                        new_messages.extend(next_messages.clone());
                         for message in next_messages {
+                            state.append_message(message.clone());
                             yield AgentStreamEvent::Message(message);
                         }
-                        continue;
                     }
                 }
+
+                state.turn()?;
             }
         };
 
@@ -220,4 +226,60 @@ enum ProcessResult {
     Response(Vec<Part>),
     // Return when new messages need to be added to the input and continue processing
     Next(Vec<Message>),
+}
+
+struct RunState {
+    max_turns: usize,
+    input_messages: Vec<Message>,
+
+    /// The current turn number in the run.
+    pub current_turn: usize,
+    /// All items generated during the run, such as new ToolMessage and AssistantMessage
+    pub items: Vec<RunItem>,
+}
+
+impl RunState {
+    pub fn new(input_messages: Vec<Message>, max_turns: usize) -> Self {
+        Self {
+            max_turns,
+            input_messages,
+            current_turn: 0,
+            items: vec![],
+        }
+    }
+
+    /// Mark a new turn in the conversation and throw an error if max turns exceeded.
+    pub fn turn(&mut self) -> Result<(), AgentError> {
+        self.current_turn += 1;
+        if self.current_turn > self.max_turns {
+            return Err(AgentError::MaxTurnsExceeded(self.max_turns));
+        }
+        Ok(())
+    }
+
+    /// Add a message to the run state.
+    pub fn append_message(&mut self, message: Message) {
+        self.items.push(RunItem::Message(message));
+    }
+
+    /// Get LLM messages to use in the LanguageModelInput for the turn
+    pub fn get_turn_messages(&self) -> Vec<Message> {
+        [
+            self.input_messages.clone(),
+            self.items
+                .iter()
+                .filter_map(|item| match item {
+                    RunItem::Message(msg) => Some(msg.clone()),
+                })
+                .collect(),
+        ]
+        .concat()
+    }
+
+    pub fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
+        AgentResponse {
+            content: final_content,
+            items: self.items.clone(),
+        }
+    }
 }

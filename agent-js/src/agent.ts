@@ -10,18 +10,20 @@ export class Agent<TContext> {
    * A unique name for the agent.
    * The name can only contain letters and underscores.
    */
-  public readonly name: string;
-  private readonly instructions: InstructionParam<TContext>[];
-  private readonly model: LanguageModel;
-  private readonly response_format: ResponseFormatOption;
-  private readonly tools: AgentTool<any, TContext>[];
+  readonly name: string;
+  readonly #instructions: InstructionParam<TContext>[];
+  readonly #model: LanguageModel;
+  readonly #response_format: ResponseFormatOption;
+  readonly #tools: AgentTool<any, TContext>[];
+  readonly #max_turns: number;
 
   constructor(params: AgentParams<TContext>) {
     this.name = params.name;
-    this.instructions = params.instructions;
-    this.model = params.model;
-    this.response_format = params.response_format;
-    this.tools = params.tools;
+    this.#instructions = params.instructions;
+    this.#model = params.model;
+    this.#response_format = params.response_format;
+    this.#tools = params.tools;
+    this.#max_turns = params.max_turns;
   }
 
   /**
@@ -56,10 +58,11 @@ export class Agent<TContext> {
    */
   async createSession(): Promise<RunSession<TContext>> {
     return RunSession.create(
-      this.model,
-      this.instructions,
-      this.tools,
-      this.response_format,
+      this.#model,
+      this.#instructions,
+      this.#tools,
+      this.#response_format,
+      this.#max_turns,
     );
   }
 }
@@ -94,4 +97,9 @@ export interface AgentParams<TContext> {
    * The expected format of the response. Either text or json.
    */
   response_format: ResponseFormatOption;
+
+  /**
+   * Max number of turns for agent to run to protect against infinite loops.
+   */
+  max_turns: number;
 }

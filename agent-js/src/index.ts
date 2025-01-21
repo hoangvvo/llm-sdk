@@ -4,6 +4,7 @@ export type { InstructionParam } from "./instruction.ts";
 export { RunSession } from "./run.ts";
 export {
   AgentTool,
+  tool,
   type AgentToolParams,
   type AgentToolResult,
 } from "./tool.ts";

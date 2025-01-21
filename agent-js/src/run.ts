@@ -10,13 +10,18 @@ import {
   type ResponseFormatOption,
   type ToolMessage,
 } from "@hoangvvo/llm-sdk";
-import { InvariantError } from "./errors.ts";
+import { AgentInvariantError, AgentTurnsExceededError } from "./errors.ts";
 import {
   getPromptForInstructionParams,
   type InstructionParam,
 } from "./instruction.ts";
 import type { AgentTool } from "./tool.ts";
-import type { AgentRequest, AgentResponse, AgentStreamEvent } from "./types.ts";
+import type {
+  AgentRequest,
+  AgentResponse,
+  AgentStreamEvent,
+  RunItem,
+} from "./types.ts";
 
 /**
  * Manages the run session for an agent run.
@@ -26,21 +31,28 @@ import type { AgentRequest, AgentResponse, AgentStreamEvent } from "./types.ts";
  * The session can be reused in multiple runs.
  */
 export class RunSession<TContext> {
-  private readonly instructions: InstructionParam<TContext>[];
-  private readonly model: LanguageModel;
-  private readonly response_format: ResponseFormatOption;
-  private readonly tools: AgentTool<any, TContext>[];
+  readonly #instructions: InstructionParam<TContext>[];
+  readonly #model: LanguageModel;
+  readonly #responseFormat: ResponseFormatOption;
+  readonly #tools: AgentTool<any, TContext>[];
+  readonly #maxTurns: number;
+
+  #initialized: boolean;
 
   constructor(
     model: LanguageModel,
     instructions: InstructionParam<TContext>[],
     tools: AgentTool<any, TContext>[],
-    response_format: ResponseFormatOption,
+    responseFormat: ResponseFormatOption,
+    maxTurns: number,
   ) {
-    this.instructions = instructions;
-    this.model = model;
-    this.response_format = response_format;
-    this.tools = tools;
+    this.#instructions = instructions;
+    this.#model = model;
+    this.#responseFormat = responseFormat;
+    this.#tools = tools;
+    this.#maxTurns = maxTurns;
+
+    this.#initialized = false;
   }
 
   /**
@@ -50,24 +62,33 @@ export class RunSession<TContext> {
     model: LanguageModel,
     instructions: InstructionParam<TContext>[],
     tools: AgentTool<any, TContext>[],
-    response_format: ResponseFormatOption,
+    responseFormat: ResponseFormatOption,
+    maxTurns: number,
   ): Promise<RunSession<TContext>> {
-    const session = new RunSession(model, instructions, tools, response_format);
-    await session.initialize();
+    const session = new RunSession(
+      model,
+      instructions,
+      tools,
+      responseFormat,
+      maxTurns,
+    );
+    await session.#initialize();
     return session;
   }
 
-  async initialize() {
+  async #initialize() {
     // Initialize any resources needed for the run session
+    this.#initialized = true;
+    return Promise.resolve();
   }
 
   /**
    * Process the model response and decide whether to continue the loop or
    * return the response
    */
-  private async process(
-    modelResponse: ModelResponse,
+  async #process(
     context: TContext,
+    modelResponse: ModelResponse,
   ): Promise<ProcessResult> {
     const toolCallParts = modelResponse.content.filter(
       (part) => part.type === "tool-call",
@@ -80,20 +101,18 @@ export class RunSession<TContext> {
       };
     }
 
-    const nextMessages: Message[] = [];
-
     const toolMessage: ToolMessage = {
       role: "tool",
       content: [],
     };
 
     for (const toolCallPart of toolCallParts) {
-      const agentTool = this.tools.find(
+      const agentTool = this.#tools.find(
         (tool) => tool.name === toolCallPart.tool_name,
       );
 
       if (!agentTool) {
-        throw new InvariantError(
+        throw new AgentInvariantError(
           `Tool ${toolCallPart.tool_name} not found in agent`,
         );
       }
@@ -109,11 +128,9 @@ export class RunSession<TContext> {
       });
     }
 
-    nextMessages.push(toolMessage);
-
     return {
       type: "next",
-      next_messages: nextMessages,
+      messages: [toolMessage],
     };
   }
 
@@ -121,35 +138,37 @@ export class RunSession<TContext> {
    * Run a non-streaming execution of the agent.
    */
   async run(request: AgentRequest<TContext>): Promise<AgentResponse> {
-    const input = this.getLlmInput(request);
+    if (!this.#initialized) {
+      throw new Error("RunSession not initialized.");
+    }
+
+    const state = new RunState(request.messages, this.#maxTurns);
+
+    const input = this.#getLlmInput(request);
     const context = request.context;
 
-    const newMessages: Message[] = [];
-
-    let response: AgentResponse | undefined;
-    while (!response) {
-      const modelResponse = await this.model.generate({
+    for (;;) {
+      const modelResponse = await this.#model.generate({
         ...input,
-        messages: [...input.messages, ...newMessages],
+        messages: state.getTurnMessages(),
       });
 
-      newMessages.push({
+      state.appendMessage({
         role: "assistant",
         content: modelResponse.content,
       });
 
-      const processResult = await this.process(modelResponse, context);
+      const processResult = await this.#process(context, modelResponse);
       if (processResult.type === "response") {
-        response = {
-          content: processResult.content,
-          new_messages: newMessages,
-        };
+        return state.createResponse(processResult.content);
       } else {
-        newMessages.push(...processResult.next_messages);
+        for (const message of processResult.messages) {
+          state.appendMessage(message);
+        }
       }
-    }
 
-    return response;
+      state.turn();
+    }
   }
 
   /**
@@ -158,15 +177,17 @@ export class RunSession<TContext> {
   async *runStream(
     request: AgentRequest<TContext>,
   ): AsyncGenerator<AgentStreamEvent, AgentResponse> {
-    const input = this.getLlmInput(request);
+    if (!this.#initialized) {
+      throw new Error("RunSession not initialized.");
+    }
+
+    const state = new RunState(request.messages, this.#maxTurns);
+
+    const input = this.#getLlmInput(request);
     const context = request.context;
 
-    let response: AgentResponse | undefined;
-
-    const newMessages: Message[] = [];
-
-    while (!response) {
-      const modelStream = this.model.stream(input);
+    for (;;) {
+      const modelStream = this.#model.stream(input);
 
       const accumulator = new StreamAccumulator();
 
@@ -185,59 +206,56 @@ export class RunSession<TContext> {
         content: modelResponse.content,
       };
 
-      newMessages.push(assistantMessage);
-
+      state.appendMessage(assistantMessage);
       yield {
         type: "message",
         ...assistantMessage,
       };
 
-      const processResult = await this.process(modelResponse, context);
+      const processResult = await this.#process(context, modelResponse);
 
       if (processResult.type === "response") {
-        response = {
-          content: processResult.content,
-          new_messages: newMessages,
+        const response = state.createResponse(processResult.content);
+        yield {
+          type: "response",
+          ...response,
         };
+        return response;
       } else {
-        newMessages.push(...processResult.next_messages);
-        for (const message of processResult.next_messages) {
+        for (const message of processResult.messages) {
+          state.appendMessage(message);
           yield {
             type: "message",
             ...message,
           };
         }
       }
+
+      state.turn();
     }
-
-    yield {
-      type: "response",
-      ...response,
-    };
-
-    return response;
   }
 
   /**
    * Finalize any resources or state for the run session
    */
   async finish(): Promise<void> {
+    this.#initialized = false;
     return Promise.resolve();
   }
 
-  private getLlmInput(request: AgentRequest<TContext>): LanguageModelInput {
+  #getLlmInput(request: AgentRequest<TContext>): LanguageModelInput {
     return {
       messages: request.messages,
       system_prompt: getPromptForInstructionParams(
-        this.instructions,
+        this.#instructions,
         request.context,
       ),
-      tools: this.tools.map((tool) => ({
+      tools: this.#tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         parameters: tool.parameters,
       })),
-      response_format: this.response_format,
+      response_format: this.#responseFormat,
     };
   }
 }
@@ -251,5 +269,62 @@ interface ProcessResultResponse {
 
 interface ProcessResultNext {
   type: "next";
-  next_messages: Message[];
+  /**
+   * Messages generated by the process() calls
+   */
+  messages: Message[];
+}
+
+class RunState {
+  readonly #maxTurns: number;
+  readonly #inputMessages: Message[];
+
+  /**
+   * The current turn number in the run.
+   */
+  currentTurn: number;
+
+  /**
+   * All items generated during the run, such as new ToolMessage and AssistantMessage
+   */
+  items: RunItem[];
+
+  constructor(inputMessages: Message[], maxTurns: number) {
+    this.#inputMessages = inputMessages;
+    this.#maxTurns = maxTurns;
+
+    this.currentTurn = 0;
+    this.items = [];
+  }
+
+  /**
+   * Mark a new turn in the conversation and throw an error if max turns exceeded.
+   */
+  turn() {
+    this.currentTurn++;
+    if (this.currentTurn > this.#maxTurns) {
+      throw new AgentTurnsExceededError(this.#maxTurns);
+    }
+  }
+
+  /**
+   * Add a message to the run state.
+   */
+  appendMessage(message: Message) {
+    this.items.push({ type: "message", ...message });
+  }
+
+  /**
+   * Get LLM messages to use in the LanguageModelInput for the turn
+   */
+  getTurnMessages(): Message[] {
+    return [...this.#inputMessages, ...this.items];
+  }
+
+  createResponse(finalContent: Part[]): AgentResponse {
+    return {
+      content: finalContent,
+      items: this.items,
+    };
+  }
 }

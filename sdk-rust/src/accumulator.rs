@@ -178,27 +178,6 @@ fn create_tool_call_part(data: AccumulatedToolCallData, index: usize) -> Languag
     }))
 }
 
-/// Concatenates audio data chunks into a single base64 string
-fn concatenate_audio_chunks(chunks: &[String]) -> LanguageModelResult<String> {
-    if chunks.is_empty() {
-        return Ok(String::new());
-    }
-
-    // Decode all chunks and collect samples
-    let mut all_samples: Vec<i16> = Vec::new();
-
-    for chunk in chunks {
-        let samples = audio_utils::base64_to_i16sample(chunk).map_err(|e| {
-            LanguageModelError::Invariant("", format!("Failed to decode audio chunk: {e}"))
-        })?;
-        all_samples.extend(samples);
-    }
-
-    let b64 = audio_utils::i16sample_to_base64(&all_samples);
-
-    Ok(b64)
-}
-
 /// Creates an audio part from accumulated audio data
 fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
     let format = data.format.ok_or_else(|| {
@@ -217,7 +196,7 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
         ));
     }
 
-    let concatenated_audio = concatenate_audio_chunks(&data.audio_data_chunks)?;
+    let concatenated_audio = audio_utils::concatenate_b64_audio_chunks(&data.audio_data_chunks)?;
 
     Ok(Part::Audio(AudioPart {
         audio_data: concatenated_audio,

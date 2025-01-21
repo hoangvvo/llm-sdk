@@ -14,6 +14,7 @@ pub struct Agent<TCtx> {
     instructions: Arc<Vec<InstructionParam<TCtx>>>,
     tools: Arc<Vec<AgentTool<TCtx>>>,
     response_format: ResponseFormatOption,
+    max_turns: usize,
 }
 
 impl<TCtx> Agent<TCtx>
@@ -28,6 +29,7 @@ where
             instructions: Arc::new(params.instructions),
             tools: Arc::new(params.tools),
             response_format: params.response_format,
+            max_turns: params.max_turns,
         }
     }
     /// Create a stateless one-time run of the agent
@@ -64,6 +66,7 @@ where
             self.instructions.clone(),
             self.tools.clone(),
             self.response_format.clone(),
+            self.max_turns,
         )
         .await
     }
@@ -82,4 +85,6 @@ pub struct AgentParams<TCtx> {
     pub tools: Vec<AgentTool<TCtx>>,
     /// The expected format of the response. Either text or json.
     pub response_format: ResponseFormatOption,
+    /// Max number of turns for agent to run to protect against infinite loops.
+    pub max_turns: usize,
 }

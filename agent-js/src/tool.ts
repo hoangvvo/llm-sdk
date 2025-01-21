@@ -74,3 +74,12 @@ export interface AgentToolParams<
     ctx: TContext,
   ) => AgentToolResult | Promise<AgentToolResult>;
 }
+
+/**
+ * A helper function to create an agent tool.
+ */
+export function tool<TArgs extends Record<string, unknown> | null, TContext>(
+  params: AgentToolParams<TArgs, TContext>,
+): AgentTool<TArgs, TContext> {
+  return new AgentTool(params);
+}

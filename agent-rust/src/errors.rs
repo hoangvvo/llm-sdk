@@ -8,4 +8,6 @@ pub enum AgentError {
     Invariant(String),
     #[error("Tool execution error: {0}")]
     ToolExecution(Box<dyn std::error::Error + Send + Sync>),
+    #[error("The maximum number of turns ({0}) has been exceeded.")]
+    MaxTurnsExceeded(usize),
 }

@@ -47,6 +47,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     }));
 
+    // Define the agent tools
+
     let get_weather_tool = AgentTool::new(
         "get_weather",
         "Get weather for a given city",
@@ -116,6 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
         response_format: ResponseFormatOption::Text,
         tools: vec![get_weather_tool, send_message_tool],
+        max_turns: 10,
     });
 
     // Implement the CLI to interact with the Agent
@@ -139,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        // Add user message
+        // Add user message as the input
         messages.push(Message::User(UserMessage {
             content: vec![Part::Text(user_input.into())],
         }));
@@ -152,8 +155,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .await?;
 
-        // Update messages with response
-        messages.extend(response.new_messages);
+        // Update messages with the new items
+        messages.extend(response.items.iter().filter_map(|item| match item {
+            llm_agent::RunItem::Message(msg) => Some(msg.clone()),
+        }));
 
         println!("{:#?}", response.content);
     }

@@ -29,11 +29,6 @@ struct SearchHotelsParams {
     nights: u32,
 }
 
-#[derive(Deserialize, JsonSchema)]
-struct GetWeatherParams {
-    city: String,
-}
-
 #[allow(clippy::too_many_lines)]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -111,25 +106,81 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
-    let weather_tool = AgentTool::new(
-        "get_weather",
-        "Get current weather for a city",
-        schemars::schema_for!(GetWeatherParams).into(),
-        |params: GetWeatherParams, _ctx| async move {
-            println!("Getting weather for {}", params.city);
-            Ok(AgentToolResult {
-                content: vec![Part::Text(
-                    json!({
-                        "summary": "Sunny",
-                        "temperatureC": 25
-                    })
-                    .to_string()
-                    .into(),
-                )],
-                is_error: false,
-            })
-        },
-    );
+    // Define the response format
+    let response_format = ResponseFormatOption::Json(ResponseFormatJson {
+        name: "travel_plan".to_string(),
+        description: Some(
+            "A structured travel plan including flights, hotels, and weather forecast.".to_string(),
+        ),
+        schema: Some(json!({
+            "type": "object",
+            "properties": {
+                "destination": {
+                    "type": "string"
+                },
+                "flights": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "airline": {
+                                "type": "string"
+                            },
+                            "departure": {
+                                "type": "string"
+                            },
+                            "arrival": {
+                                "type": "string"
+                            },
+                            "price": {
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "airline",
+                            "departure",
+                            "arrival",
+                            "price"
+                        ],
+                        "additionalProperties": false
+                    }
+                },
+                "hotels": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "location": {
+                                "type": "string"
+                            },
+                            "pricePerNight": {
+                                "type": "number"
+                            },
+                            "rating": {
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "location",
+                            "pricePerNight",
+                            "rating"
+                        ],
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "required": [
+                "destination",
+                "flights",
+                "hotels",
+            ],
+            "additionalProperties": false
+        })),
+    });
 
     let travel_agent = Agent::<()>::new(AgentParams {
         name: "Bob".to_string(),
@@ -140,99 +191,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             InstructionParam::Func(|_ctx| format!("The current time is: {}", chrono::Local::now())),
         ],
         model,
-        response_format: ResponseFormatOption::Json(ResponseFormatJson {
-            name: "travel_plan".to_string(),
-            description: Some(
-                "A structured travel plan including flights, hotels, and weather forecast."
-                    .to_string(),
-            ),
-            schema: Some(json!({
-                "type": "object",
-                "properties": {
-                    "destination": {
-                        "type": "string"
-                    },
-                    "flights": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "airline": {
-                                    "type": "string"
-                                },
-                                "departure": {
-                                    "type": "string"
-                                },
-                                "arrival": {
-                                    "type": "string"
-                                },
-                                "price": {
-                                    "type": "number"
-                                }
-                            },
-                            "required": [
-                                "airline",
-                                "departure",
-                                "arrival",
-                                "price"
-                            ],
-                            "additionalProperties": false
-                        }
-                    },
-                    "hotels": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {
-                                    "type": "string"
-                                },
-                                "location": {
-                                    "type": "string"
-                                },
-                                "pricePerNight": {
-                                    "type": "number"
-                                },
-                                "rating": {
-                                    "type": "number"
-                                }
-                            },
-                            "required": [
-                                "name",
-                                "location",
-                                "pricePerNight",
-                                "rating"
-                            ],
-                            "additionalProperties": false
-                        }
-                    },
-                    "weather": {
-                        "type": "object",
-                        "properties": {
-                            "summary": {
-                                "type": "string"
-                            },
-                            "temperatureC": {
-                                "type": "number"
-                            }
-                        },
-                        "required": [
-                            "summary",
-                            "temperatureC"
-                        ],
-                        "additionalProperties": false
-                    }
-                },
-                "required": [
-                    "destination",
-                    "flights",
-                    "hotels",
-                    "weather"
-                ],
-                "additionalProperties": false
-            })),
-        }),
-        tools: vec![search_flights_tool, search_hotels_tool, weather_tool],
+        response_format,
+        tools: vec![search_flights_tool, search_hotels_tool],
+        max_turns: 10,
     });
 
     let prompt = "Plan a trip from Paris to Tokyo next week";
