@@ -25,6 +25,7 @@ We provide SDKs to interact with various LLM providers in the following programm
 
 - [JavaScript](./sdk-js)
 - [Rust](./sdk-rust)
+- [Go](./sdk-go)
 
 ### Supported Providers
 
