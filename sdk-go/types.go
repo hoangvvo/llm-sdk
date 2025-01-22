@@ -452,30 +452,20 @@ func (m Message) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements custom JSON unmarshaling for Message
 func (m *Message) UnmarshalJSON(data []byte) error {
 	var temp struct {
-		Role    string            `json:"role"`
-		Content []json.RawMessage `json:"content"`
+		Role    string `json:"role"`
+		Content []Part `json:"content"`
 	}
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
 
-	// Parse content parts
-	var content []Part
-	for _, raw := range temp.Content {
-		var part Part
-		if err := json.Unmarshal(raw, &part); err != nil {
-			return err
-		}
-		content = append(content, part)
-	}
-
 	switch temp.Role {
 	case "user":
-		m.UserMessage = &UserMessage{Content: content}
+		m.UserMessage = &UserMessage{Content: temp.Content}
 	case "assistant":
-		m.AssistantMessage = &AssistantMessage{Content: content}
+		m.AssistantMessage = &AssistantMessage{Content: temp.Content}
 	case "tool":
-		m.ToolMessage = &ToolMessage{Content: content}
+		m.ToolMessage = &ToolMessage{Content: temp.Content}
 	default:
 		return fmt.Errorf("unknown message role: %s", temp.Role)
 	}
@@ -513,6 +503,10 @@ const (
 )
 
 // ToolChoiceOption determines how the model should choose which tool to use.
+// - "auto" The model will automatically choose the tool to use or not use any tools.
+// - "none" The model will not use any tools.
+// - "required" The model will be forced to use a tool.
+// - { type: "tool", toolName: "toolName" } The model will use the specified tool.
 type ToolChoiceOption struct {
 	Auto     *ToolChoiceAuto     `json:"-"`
 	None     *ToolChoiceNone     `json:"-"`
@@ -532,26 +526,6 @@ type ToolChoiceRequired struct{}
 // ToolChoiceTool means the model will use the specified tool.
 type ToolChoiceTool struct {
 	ToolName string `json:"tool_name"`
-}
-
-// AsAuto returns the option as ToolChoiceAuto if it is one
-func (t ToolChoiceOption) AsAuto() *ToolChoiceAuto {
-	return t.Auto
-}
-
-// AsNone returns the option as ToolChoiceNone if it is one
-func (t ToolChoiceOption) AsNone() *ToolChoiceNone {
-	return t.None
-}
-
-// AsRequired returns the option as ToolChoiceRequired if it is one
-func (t ToolChoiceOption) AsRequired() *ToolChoiceRequired {
-	return t.Required
-}
-
-// AsTool returns the option as ToolChoiceTool if it is one
-func (t ToolChoiceOption) AsTool() *ToolChoiceTool {
-	return t.Tool
 }
 
 // MarshalJSON implements custom JSON marshaling for ToolChoiceOption
@@ -641,16 +615,6 @@ type ResponseFormatJSON struct {
 	Schema      *JSONSchema `json:"schema,omitempty"`
 }
 
-// AsText returns the format as ResponseFormatText if it is one
-func (r ResponseFormatOption) AsText() *ResponseFormatText {
-	return r.Text
-}
-
-// AsJSON returns the format as ResponseFormatJSON if it is one
-func (r ResponseFormatOption) AsJSON() *ResponseFormatJSON {
-	return r.JSON
-}
-
 // MarshalJSON implements custom JSON marshaling for ResponseFormatOption
 func (r ResponseFormatOption) MarshalJSON() ([]byte, error) {
 	if r.Text != nil {
@@ -716,13 +680,12 @@ func NewResponseFormatJSON(name string, description *string, schema *JSONSchema)
 type LanguageModelCapability string
 
 const (
-	CapabilityStructuredOutput       LanguageModelCapability = "structured-output"
-	CapabilityFunctionCalling        LanguageModelCapability = "function-calling"
-	CapabilityStructuredOutputStrict LanguageModelCapability = "structured-output-strict"
-	CapabilityAudioInput             LanguageModelCapability = "audio-input"
-	CapabilityAudioOutput            LanguageModelCapability = "audio-output"
-	CapabilityImageInput             LanguageModelCapability = "image-input"
-	CapabilityImageOutput            LanguageModelCapability = "image-output"
+	CapabilityStructuredOutput LanguageModelCapability = "structured-output"
+	CapabilityFunctionCalling  LanguageModelCapability = "function-calling"
+	CapabilityAudioInput       LanguageModelCapability = "audio-input"
+	CapabilityAudioOutput      LanguageModelCapability = "audio-output"
+	CapabilityImageInput       LanguageModelCapability = "image-input"
+	CapabilityImageOutput      LanguageModelCapability = "image-output"
 )
 
 // ContentDelta represents a delta update in a message's content, enabling partial streaming updates in LLM responses.
@@ -787,7 +750,7 @@ type LanguageModelInput struct {
 	ToolChoice     *ToolChoiceOption     `json:"tool_choice,omitempty"`
 	ResponseFormat *ResponseFormatOption `json:"response_format,omitempty"`
 	// The maximum number of tokens that can be generated in the chat completion.
-	MaxTokens *int64 `json:"max_tokens,omitempty"`
+	MaxTokens *uint32 `json:"max_tokens,omitempty"`
 	// Amount of randomness injected into the response. Ranges from 0.0 to 1.0
 	Temperature *float64 `json:"temperature,omitempty"`
 	// An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. Ranges from 0.0 to 1.0
