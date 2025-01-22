@@ -134,8 +134,8 @@ where
                 .process(context.clone(), state.clone(), model_response)
                 .await?
             {
-                ProcessResult::Response(content) => {
-                    return Ok(state.lock().await.create_response(content));
+                ProcessResult::Response(final_content) => {
+                    return Ok(state.lock().await.create_response(final_content));
                 }
                 ProcessResult::Next(next_messages) => {
                     for message in next_messages {
@@ -195,8 +195,8 @@ where
                 yield AgentStreamEvent::Message(assistant_message);
 
                 match session.process(context.clone(), state.clone(), model_response).await? {
-                    ProcessResult::Response(content) => {
-                        let response = state.lock().await.create_response(content);
+                    ProcessResult::Response(final_content) => {
+                        let response = state.lock().await.create_response(final_content);
                         yield AgentStreamEvent::Response(response);
                         break;
                     }

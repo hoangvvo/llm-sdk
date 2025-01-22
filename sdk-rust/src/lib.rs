@@ -8,7 +8,7 @@ mod types;
 mod usage_utils;
 
 #[cfg(test)]
-mod test_utils;
+mod test_common;
 
 pub use accumulator::StreamAccumulator;
 pub use errors::*;

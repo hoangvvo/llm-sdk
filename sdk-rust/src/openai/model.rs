@@ -68,6 +68,10 @@ impl LanguageModel for OpenAIModel {
         self.model_id.clone()
     }
 
+    fn metadata(&self) -> Option<&LanguageModelMetadata> {
+        self.metadata.as_ref()
+    }
+
     async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
         let params = into_openai_create_params(input, self.model_id.clone())?;
 
@@ -707,7 +711,7 @@ impl From<openai_api::CompletionsAPICompletionUsage> for ModelUsage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate_common_tests, test_utils::prelude::*, StreamAccumulator};
+    use crate::{generate_common_tests, test_common::prelude::*, StreamAccumulator};
     use std::{env, sync::LazyLock};
     pub use tokio::test;
 
@@ -721,6 +725,14 @@ mod tests {
                 .to_string(),
             ..Default::default()
         })
+        .with_metadata(LanguageModelMetadata {
+            capabilities: Some(vec![
+                LanguageModelCapability::FunctionCalling,
+                LanguageModelCapability::ImageInput,
+                LanguageModelCapability::StructuredOutput,
+            ]),
+            ..Default::default()
+        })
     });
 
     static OPENAI_AUDIO_MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
@@ -731,6 +743,16 @@ mod tests {
             api_key: env::var("OPENAI_API_KEY")
                 .expect("OPENAI_API_KEY must be set")
                 .to_string(),
+            ..Default::default()
+        })
+        .with_metadata(LanguageModelMetadata {
+            capabilities: Some(vec![
+                LanguageModelCapability::AudioInput,
+                LanguageModelCapability::AudioOutput,
+                LanguageModelCapability::FunctionCalling,
+                LanguageModelCapability::ImageInput,
+                LanguageModelCapability::StructuredOutput,
+            ]),
             ..Default::default()
         })
     });

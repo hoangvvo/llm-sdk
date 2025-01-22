@@ -18,6 +18,7 @@ pub struct LanguageModelMetadata {
 pub trait LanguageModel: Send + Sync {
     fn provider(&self) -> &'static str;
     fn model_id(&self) -> String;
+    fn metadata(&self) -> Option<&LanguageModelMetadata>;
     async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse>;
     async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream>;
 }

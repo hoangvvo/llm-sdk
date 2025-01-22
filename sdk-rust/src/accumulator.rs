@@ -249,7 +249,7 @@ impl StreamAccumulator {
             self.process_delta(delta.clone())?;
         }
         if let Some(usage) = partial.usage {
-            self.process_usage(usage);
+            self.process_usage(&usage);
         }
         Ok(())
     }
@@ -302,7 +302,7 @@ impl StreamAccumulator {
         }
     }
 
-    fn process_usage(&mut self, usage: ModelUsage) {
+    fn process_usage(&mut self, usage: &ModelUsage) {
         let accumulated_usage = self
             .accumulated_usage
             .get_or_insert_with(ModelUsage::default);

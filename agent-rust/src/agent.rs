@@ -117,12 +117,14 @@ where
     }
 
     /// Add an instruction
+    #[must_use]
     pub fn add_instruction(mut self, instruction: impl Into<InstructionParam<TCtx>>) -> Self {
         self.instructions.push(instruction.into());
         self
     }
 
     /// Set the tools
+    #[must_use]
     pub fn tools(mut self, tools: impl IntoIterator<Item = AgentTool<TCtx>>) -> Self {
         self.tools = tools.into_iter().collect();
         self

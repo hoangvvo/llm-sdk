@@ -66,11 +66,13 @@ pub enum Modality {
     Audio,
 }
 
-/// Determines how the model should choose which tool to use. "auto" - The model
-/// will automatically choose the tool to use or not use any tools. "none" - The
-/// model will not use any tools. "required" - The model will be forced to use a
-/// tool. { type: "tool", toolName: "toolName" } - The model will use the
-/// specified tool.
+/// Determines how the model should choose which tool to use.
+/// - "auto" The model will automatically choose the tool to use or not use any
+///   tools.
+/// - "none" The model will not use any tools.
+/// - "required" The model will be forced to use a tool.
+/// - { type: "tool", toolName: "toolName" } The model will use the specified
+///   tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -103,7 +105,6 @@ pub enum ResponseFormatOption {
 pub enum LanguageModelCapability {
     StructuredOutput,
     FunctionCalling,
-    StructuredOutputStrict,
     AudioInput,
     AudioOutput,
     ImageInput,
