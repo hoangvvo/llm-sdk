@@ -32,7 +32,11 @@ export type Message = UserMessage | AssistantMessage | ToolMessage;
  */
 export type Modality = "text" | "audio";
 /**
- * Determines how the model should choose which tool to use. "auto" - The model will automatically choose the tool to use or not use any tools. "none" - The model will not use any tools. "required" - The model will be forced to use a tool. { type: "tool", toolName: "toolName" } - The model will use the specified tool.
+ * Determines how the model should choose which tool to use.
+ * - "auto": The model will automatically choose the tool to use or not use any tools.
+ * - "none": The model will not use any tools.
+ * - "required": The model will be forced to use a tool.
+ * - { type: "tool", toolName: "toolName" }: The model will use the specified tool.
  */
 export type ToolChoiceOption =
   | ToolChoiceAuto

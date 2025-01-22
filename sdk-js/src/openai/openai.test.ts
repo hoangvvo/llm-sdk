@@ -9,15 +9,29 @@ import { OpenAIModel } from "./openai.ts";
 
 suite("OpenAIModel", () => {
   assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
-  const model = new OpenAIModel({
-    apiKey: process.env["OPENAI_API_KEY"],
-    modelId: "gpt-4o",
-  });
+  const model = new OpenAIModel(
+    {
+      apiKey: process.env["OPENAI_API_KEY"],
+      modelId: "gpt-4o",
+    },
+    { capabilities: ["function-calling", "image-input", "structured-output"] },
+  );
 
-  const audioModel = new OpenAIModel({
-    modelId: "gpt-4o-audio-preview",
-    apiKey: process.env["OPENAI_API_KEY"],
-  });
+  const audioModel = new OpenAIModel(
+    {
+      modelId: "gpt-4o-audio-preview",
+      apiKey: process.env["OPENAI_API_KEY"],
+    },
+    {
+      capabilities: [
+        "audio-input",
+        "audio-output",
+        "function-calling",
+        "image-input",
+        "structured-output",
+      ],
+    },
+  );
 
   runTests(COMMON_TEST_CASES, model);
 

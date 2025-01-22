@@ -1,6 +1,6 @@
 # llm-sdk for Rust
 
-`llm-sdk` is Rust library that provides a unified API to access the LLM APIs of various providers.
+A Rust library that provides a unified API to access the LLM APIs of various providers.
 
 ## Usage
 
@@ -65,12 +65,12 @@ async fn main() {
 
 Find examples in the [examples](./examples/) folder to learn how to:
 
-- [Generate text](./examples/generate-text.rs)
-- [Stream text](./examples/stream-text.rs)
-- [Describe image](./examples/describe-image.rs)
-- [Function calling](./examples/tool-use.rs)
-- [Generate audio](./examples/generate-audio.rs)
-- [Stream audio](./examples/stream-audio.rs)
+- [`generate-text`: Generate text](./examples/generate-text.rs)
+- [`stream-text`: Stream text](./examples/stream-text.rs)
+- [`describe-image`: Describe image](./examples/describe-image.rs)
+- [`tool-use`: Function calling](./examples/tool-use.rs)
+- [`generate-audio`: Generate audio](./examples/generate-audio.rs)
+- [`stream-audio`: Stream audio](./examples/stream-audio.rs)
 
 ```bash
 cargo run --example generate-text
