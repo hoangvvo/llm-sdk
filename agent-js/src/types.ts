@@ -24,7 +24,7 @@ export interface AgentResponse {
 }
 
 /**
- * LLM items generated during the runs
+ * Items generated during the run
  */
 export type RunItem = RunItemMessage;
 

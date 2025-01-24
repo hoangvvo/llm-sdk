@@ -92,7 +92,7 @@ pub struct AgentParams<TCtx> {
     pub instructions: Vec<InstructionParam<TCtx>>,
     /// The tools that the agent can use to perform tasks.
     pub tools: Vec<Box<dyn AgentTool<TCtx>>>,
-    /// The expected format of the response. Either text or json.
+    /// The expected format of the response. Either text or structured output.
     pub response_format: ResponseFormatOption,
     /// Max number of turns for agent to run to protect against infinite loops.
     pub max_turns: usize,

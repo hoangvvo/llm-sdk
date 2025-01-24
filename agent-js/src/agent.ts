@@ -8,7 +8,6 @@ import type { AgentRequest, AgentResponse, AgentStreamEvent } from "./types.ts";
 export class Agent<TContext> {
   /**
    * A unique name for the agent.
-   * The name can only contain letters and underscores.
    */
   readonly name: string;
   readonly #instructions: InstructionParam<TContext>[];
@@ -74,7 +73,6 @@ export class Agent<TContext> {
 export interface AgentParams<TContext> {
   /**
    * A unique name for the agent.
-   * The name can only contain letters and underscores.
    */
   name: string;
 

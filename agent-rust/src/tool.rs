@@ -7,7 +7,7 @@ use std::{error::Error, fmt::Debug, sync::Arc};
 
 /**
  * Agent tool that can be used by the agent to perform specific tasks. Any
- * object that implements the `AgentTool` trait can be used as a tool.
+ * type that implements the `AgentTool` trait can be used as a tool.
  */
 #[async_trait]
 pub trait AgentTool<TCtx>: Send + Sync {
