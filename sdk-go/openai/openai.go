@@ -142,7 +142,7 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 }
 
 // Stream implements streaming generation
-func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.StreamResponse, error) {
+func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.LanguageModelStream, error) {
 	params, err := convertToOpenAICreateParams(input, m.modelID)
 	if err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 		}
 	}()
 
-	return llmsdk.NewStreamResponse(responseCh, errCh), nil
+	return llmsdk.NewLanguageModelStream(responseCh, errCh), nil
 }
 
 // MARK: - Convert To OpenAI API Types

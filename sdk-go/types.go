@@ -84,10 +84,10 @@ type AudioPart struct {
 
 // ToolCallPart represents a part of the message that represents a call to a tool the model wants to use.
 type ToolCallPart struct {
-	ToolCallID string         `json:"tool_call_id"`
-	ToolName   string         `json:"tool_name"`
-	Args       map[string]any `json:"args"`
-	ID         *string        `json:"id,omitempty"`
+	ToolCallID string          `json:"tool_call_id"`
+	ToolName   string          `json:"tool_name"`
+	Args       json.RawMessage `json:"args"`
+	ID         *string         `json:"id,omitempty"`
 }
 
 // ToolResultPart represents a part of the message that represents the result of a tool call.
@@ -253,12 +253,15 @@ func NewAudioPart(audioData string, format AudioFormat, sampleRate, channels *in
 }
 
 // NewToolCallPart creates a new tool call part
-func NewToolCallPart(toolCallID, toolName string, args map[string]any, id *string) Part {
+func NewToolCallPart(toolCallID, toolName string, args any, id *string) Part {
+	// TODO: handle error
+	argsJSON, _ := json.Marshal(args)
+
 	return Part{
 		ToolCallPart: &ToolCallPart{
 			ToolCallID: toolCallID,
 			ToolName:   toolName,
-			Args:       args,
+			Args:       argsJSON,
 			ID:         id,
 		},
 	}

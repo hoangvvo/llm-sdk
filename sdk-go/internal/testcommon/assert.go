@@ -152,7 +152,12 @@ func assertToolCallPart(t *testing.T, content []llmsdk.Part, assertion ToolCallP
 }
 
 // matchToolCallArgs matches tool call arguments against assertions
-func matchToolCallArgs(actual map[string]any, expected ToolCallPartAssertionArgProp) bool {
+func matchToolCallArgs(raw json.RawMessage, expected ToolCallPartAssertionArgProp) bool {
+	var actual map[string]any
+	if err := json.Unmarshal(raw, &actual); err != nil {
+		return false
+	}
+
 	for key, expectedRegex := range expected {
 		actualValue, exists := actual[key]
 		if !exists {

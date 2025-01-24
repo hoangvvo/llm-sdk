@@ -14,10 +14,10 @@ type LanguageModel interface {
 	ModelID() string
 	Metadata() *LanguageModelMetadata
 	Generate(ctx context.Context, input *LanguageModelInput) (*ModelResponse, error)
-	Stream(ctx context.Context, input *LanguageModelInput) (*StreamResponse, error)
+	Stream(ctx context.Context, input *LanguageModelInput) (*LanguageModelStream, error)
 }
 
-type StreamResponse struct {
+type LanguageModelStream struct {
 	C    <-chan *PartialModelResponse
 	errC <-chan error
 
@@ -25,8 +25,8 @@ type StreamResponse struct {
 	err  error
 }
 
-func NewStreamResponse(c <-chan *PartialModelResponse, errC <-chan error) *StreamResponse {
-	return &StreamResponse{
+func NewLanguageModelStream(c <-chan *PartialModelResponse, errC <-chan error) *LanguageModelStream {
+	return &LanguageModelStream{
 		C:    c,
 		errC: errC,
 		curr: nil,
@@ -35,7 +35,7 @@ func NewStreamResponse(c <-chan *PartialModelResponse, errC <-chan error) *Strea
 }
 
 // Next advances the stream and returns true if there is a next item.
-func (s *StreamResponse) Next() bool {
+func (s *LanguageModelStream) Next() bool {
 	select {
 	case partial, ok := <-s.C:
 		if !ok {
@@ -57,11 +57,11 @@ func (s *StreamResponse) Next() bool {
 }
 
 // Current gets the most recent item after Next() returns true.
-func (s *StreamResponse) Current() *PartialModelResponse {
+func (s *LanguageModelStream) Current() *PartialModelResponse {
 	return s.curr
 }
 
 // Err returns a terminal error (after channel closes or Next() returns false).
-func (s *StreamResponse) Err() error {
+func (s *LanguageModelStream) Err() error {
 	return s.err
 }
