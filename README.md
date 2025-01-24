@@ -118,6 +118,7 @@ We provide Agent implementations in the following programming languages:
 
 - [JavaScript](./agent-js)
 - [Rust](./agent-rust)
+- [Go](./agent-go)
 
 ### Agent Definition
 

@@ -163,7 +163,7 @@ func (t *SearchHotelsTool) Execute(ctx context.Context, paramsJSON json.RawMessa
 }
 
 func main() {
-	godotenv.Load("../../.env")
+	godotenv.Load("../.env")
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {

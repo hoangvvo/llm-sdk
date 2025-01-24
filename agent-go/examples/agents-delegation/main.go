@@ -305,7 +305,7 @@ func (t *DeliverOrderTool) Execute(ctx context.Context, paramsJSON json.RawMessa
 }
 
 func main() {
-	godotenv.Load("../../.env")
+	godotenv.Load("../.env")
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -381,13 +381,11 @@ You should also poll the order status in every turn to send them for delivery on
 			log.Fatal(err)
 		}
 
-		fmt.Print("Response: ")
-		for _, part := range response.Content {
-			if part.TextPart != nil {
-				fmt.Print(part.TextPart.Text)
-			}
+		prettyJSON, err := json.MarshalIndent(response.Content, "", "  ")
+		if err != nil {
+			log.Fatalf("Failed to format JSON: %v", err)
 		}
-		fmt.Println()
+		fmt.Printf("%s\n", string(prettyJSON))
 
 		// Update messages with the new items
 		for _, item := range response.Items {

@@ -1,3 +1,10 @@
+# llmagent
+
+A Go library to implement LLM agents that work with any LLM providers.
+
+## Usage
+
+```go
 package main
 
 import (
@@ -225,3 +232,18 @@ func main() {
 		fmt.Printf("%s\n", string(prettyJSON))
 	}
 }
+```
+
+Find examples in the [examples](./examples/) folder:
+
+- [`agent`: Simple Example](./examples/agent/main.go)
+- [`structured-output`: Structured Output](./examples/structured-output/main.go)
+- [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation/main.go)
+
+```bash
+go run ./examples/agent
+```
+
+## License
+
+[MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)
