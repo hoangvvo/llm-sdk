@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use dotenvy::dotenv;
-use futures::lock::Mutex;
+use futures::lock::{Mutex, MutexGuard};
 use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult, RunItem, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -88,6 +88,23 @@ struct Order {
 #[derive(Clone)]
 struct MyContext(Arc<Mutex<Vec<Order>>>);
 
+impl MyContext {
+    async fn push_order(&self, order: Order) {
+        let mut guard = self.0.lock().await;
+        guard.push(order);
+    }
+
+    async fn get_orders(&self) -> MutexGuard<'_, Vec<Order>> {
+        self.0.lock().await
+    }
+
+    async fn prune_orders(&self) {
+        let now = Instant::now();
+        let mut guard = self.0.lock().await;
+        guard.retain(|order| order.completion_time > now);
+    }
+}
+
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct CreateOrderParams {
@@ -120,15 +137,16 @@ impl AgentTool<MyContext> for CreateOrderTool {
             "[order.create_order] Creating order for {} with quantity {}",
             params.customer_name, params.quantity
         );
-        let mut orders_guard = context.0.lock().await;
         // Randomly finish between 1 to 10 seconds
         let completion_duration = Duration::from_millis((rand::random::<u64>() % 9000) + 1000);
-        orders_guard.push(Order {
-            customer_name: params.customer_name,
-            address: params.address,
-            quantity: params.quantity,
-            completion_time: Instant::now() + completion_duration,
-        });
+        context
+            .push_order(Order {
+                customer_name: params.customer_name,
+                address: params.address,
+                quantity: params.quantity,
+                completion_time: Instant::now() + completion_duration,
+            })
+            .await;
         Ok(AgentToolResult {
             content: vec![serde_json::json!({ "status": "creating" })
                 .to_string()
@@ -169,12 +187,12 @@ impl AgentTool<MyContext> for GetOrdersTool {
         context: &MyContext,
         _state: Arc<Mutex<RunState>>,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let mut orders_guard = context.0.lock().await;
         let now = Instant::now();
 
         let mut result = Vec::new();
         let mut completed_count = 0;
 
+        let orders_guard = context.get_orders().await;
         for order in orders_guard.iter() {
             let status = if order.completion_time <= now {
                 completed_count += 1;
@@ -193,7 +211,7 @@ impl AgentTool<MyContext> for GetOrdersTool {
         println!("[order.get_orders] Retrieving orders. Found {completed_count} completed orders.");
 
         // Remove completed orders
-        orders_guard.retain(|order| order.completion_time > now);
+        context.prune_orders().await;
 
         Ok(AgentToolResult {
             content: vec![serde_json::to_string(&result)?.into()],
@@ -279,7 +297,7 @@ You should also poll the order status in every turn to send them for delivery on
             .add_tool(AgentTransferTool::new(delivery_agent, "delivering processed orders")) // Delegate delivery to delivery agent
             .build();
 
-    let orders = Arc::new(Mutex::new(Vec::<Order>::new()));
+    let orders: Arc<Mutex<Vec<Order>>> = Arc::new(Mutex::new(Vec::<Order>::new()));
 
     let mut messages = Vec::new();
 

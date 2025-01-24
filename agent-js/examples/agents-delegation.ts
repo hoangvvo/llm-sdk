@@ -51,15 +51,40 @@ const model = new OpenAIModel({
   modelId: "gpt-4o",
 });
 
-let ORDERS: {
+interface Order {
   customer_name: string;
   address: string;
   quantity: number;
   completionTime: Date;
-}[] = [];
+}
+
+class MyContext {
+  readonly #orders: Order[];
+  constructor() {
+    this.#orders = [];
+  }
+
+  addOrder(order: Order) {
+    this.#orders.push(order);
+  }
+
+  getOrders() {
+    return this.#orders;
+  }
+
+  pruneOrders() {
+    const now = new Date();
+    // remove completed orders
+    this.#orders.splice(
+      0,
+      this.#orders.length,
+      ...this.#orders.filter(({ completionTime }) => completionTime > now),
+    );
+  }
+}
 
 // Order processing agent
-const orderAgent = new Agent({
+const orderAgent = new Agent<MyContext>({
   name: "order",
   model,
   instructions: [
@@ -74,12 +99,12 @@ const orderAgent = new Agent({
         address: z.string(),
         quantity: z.number(),
       }),
-      execute(args) {
+      execute(args, context) {
         console.log(
           `[delivery.create_order] Creating order for ${args.customer_name} with quantity ${String(args.quantity)}`,
         );
 
-        ORDERS.push({
+        context.addOrder({
           ...args,
           // Randomly finish between 1 to 10 seconds
           completionTime: new Date(
@@ -100,10 +125,12 @@ const orderAgent = new Agent({
       description:
         "Retrieve the list of customer orders and their status (completed or pending)",
       parameters: z.object({}),
-      execute() {
+      execute(_args, context) {
         const now = new Date();
 
-        const result = ORDERS.map(
+        const orders = context.getOrders();
+
+        const result = orders.map(
           ({ customer_name, quantity, address, completionTime }) =>
             ({
               customer_name,
@@ -122,7 +149,7 @@ const orderAgent = new Agent({
         );
 
         // remove completed orders
-        ORDERS = ORDERS.filter(({ completionTime }) => completionTime > now);
+        context.pruneOrders();
 
         return Promise.resolve({
           content: [{ type: "text", text: JSON.stringify(result) }],
@@ -185,6 +212,8 @@ You should also poll the order status in every turn to send them for delivery on
 
 const messages: Message[] = [];
 
+const myContext = new MyContext();
+
 for (;;) {
   console.log("\n--- New iteration ---");
 
@@ -195,7 +224,7 @@ for (;;) {
 
   const response = await coordinator.run({
     messages,
-    context: {},
+    context: myContext,
   });
 
   console.dir(response.content, { depth: null });

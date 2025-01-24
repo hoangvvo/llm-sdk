@@ -92,8 +92,40 @@ type Order struct {
 }
 
 type MyContext struct {
-	Orders *sync.Mutex
-	Data   []Order
+	mu     *sync.Mutex
+	orders []Order
+}
+
+func NewMyContext() *MyContext {
+	return &MyContext{
+		mu:     &sync.Mutex{},
+		orders: []Order{},
+	}
+}
+
+func (c *MyContext) AddOrder(order Order) {
+	c.mu.Lock()
+	c.orders = append(c.orders, order)
+	c.mu.Unlock()
+}
+
+func (c *MyContext) GetOrders() []Order {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.orders
+}
+
+func (c *MyContext) PruneOrders() {
+	c.mu.Lock()
+	now := time.Now()
+	var remainingOrders []Order
+	for _, order := range c.orders {
+		if order.CompletionTime.After(now) {
+			remainingOrders = append(remainingOrders, order)
+		}
+	}
+	c.orders = remainingOrders
+	c.mu.Unlock()
 }
 
 type CreateOrderParams struct {
@@ -140,16 +172,14 @@ func (t *CreateOrderTool) Execute(ctx context.Context, paramsJSON json.RawMessag
 	fmt.Printf("[order.create_order] Creating order for %s with quantity %d\n",
 		params.CustomerName, params.Quantity)
 
-	context.Orders.Lock()
 	// Randomly finish between 1 to 10 seconds
 	completionDuration := time.Duration(rand.Intn(9)+1) * time.Second
-	context.Data = append(context.Data, Order{
+	context.AddOrder(Order{
 		CustomerName:   params.CustomerName,
 		Address:        params.Address,
 		Quantity:       params.Quantity,
 		CompletionTime: time.Now().Add(completionDuration),
 	})
-	context.Orders.Unlock()
 
 	result := map[string]string{"status": "creating"}
 	resultJSON, _ := json.Marshal(result)
@@ -188,20 +218,16 @@ type OrderStatus struct {
 }
 
 func (t *GetOrdersTool) Execute(ctx context.Context, paramsJSON json.RawMessage, contextVal *MyContext, runState *llmagent.RunState) (llmagent.AgentToolResult, error) {
-	contextVal.Orders.Lock()
 	now := time.Now()
 
 	var result []OrderStatus
 	var completedCount int
-	var remainingOrders []Order
 
-	for _, order := range contextVal.Data {
+	for _, order := range contextVal.GetOrders() {
 		status := "pending"
 		if order.CompletionTime.Before(now) {
 			completedCount++
 			status = "completed"
-		} else {
-			remainingOrders = append(remainingOrders, order)
 		}
 
 		result = append(result, OrderStatus{
@@ -215,8 +241,7 @@ func (t *GetOrdersTool) Execute(ctx context.Context, paramsJSON json.RawMessage,
 	fmt.Printf("[order.get_orders] Retrieving orders. Found %d completed orders.\n", completedCount)
 
 	// Remove completed orders
-	contextVal.Data = remainingOrders
-	contextVal.Orders.Unlock()
+	contextVal.PruneOrders()
 
 	resultJSON, _ := json.Marshal(result)
 
@@ -335,10 +360,7 @@ You should also poll the order status in every turn to send them for delivery on
 		),
 	)
 
-	orders := &MyContext{
-		Orders: &sync.Mutex{},
-		Data:   []Order{},
-	}
+	contextVal := NewMyContext()
 
 	var messages []llmsdk.Message
 	ctx := context.Background()
@@ -353,7 +375,7 @@ You should also poll the order status in every turn to send them for delivery on
 
 		response, err := coordinator.Run(ctx, llmagent.AgentRequest[*MyContext]{
 			Messages: messages,
-			Context:  orders,
+			Context:  contextVal,
 		})
 		if err != nil {
 			log.Fatal(err)
