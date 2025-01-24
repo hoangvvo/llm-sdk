@@ -12,7 +12,7 @@ pub struct Agent<TCtx> {
     pub name: String,
     model: Arc<dyn LanguageModel + Send + Sync>,
     instructions: Arc<Vec<InstructionParam<TCtx>>>,
-    tools: Arc<Vec<AgentTool<TCtx>>>,
+    tools: Arc<Vec<Box<dyn AgentTool<TCtx>>>>,
     response_format: ResponseFormatOption,
     max_turns: usize,
 }
@@ -71,10 +71,7 @@ where
         .await
     }
 
-    pub fn builder(
-        name: impl ToString,
-        model: Arc<dyn LanguageModel + Send + Sync>,
-    ) -> AgentParams<TCtx> {
+    pub fn builder(name: &str, model: Arc<dyn LanguageModel + Send + Sync>) -> AgentParams<TCtx> {
         AgentParams::new(name, model)
     }
 }
@@ -94,7 +91,7 @@ pub struct AgentParams<TCtx> {
     /// agent.
     pub instructions: Vec<InstructionParam<TCtx>>,
     /// The tools that the agent can use to perform tasks.
-    pub tools: Vec<AgentTool<TCtx>>,
+    pub tools: Vec<Box<dyn AgentTool<TCtx>>>,
     /// The expected format of the response. Either text or json.
     pub response_format: ResponseFormatOption,
     /// Max number of turns for agent to run to protect against infinite loops.
@@ -105,7 +102,7 @@ impl<TCtx> AgentParams<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
-    pub fn new(name: impl ToString, model: Arc<dyn LanguageModel + Send + Sync>) -> Self {
+    pub fn new(name: &str, model: Arc<dyn LanguageModel + Send + Sync>) -> Self {
         Self {
             name: name.to_string(),
             model,
@@ -123,10 +120,10 @@ where
         self
     }
 
-    /// Set the tools
+    /// Add a tool
     #[must_use]
-    pub fn tools(mut self, tools: impl IntoIterator<Item = AgentTool<TCtx>>) -> Self {
-        self.tools = tools.into_iter().collect();
+    pub fn add_tool(mut self, tool: impl AgentTool<TCtx> + 'static) -> Self {
+        self.tools.push(Box::new(tool));
         self
     }
 

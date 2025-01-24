@@ -1,13 +1,15 @@
-use std::{env, sync::Arc, time::Duration};
-
+use async_trait::async_trait;
 use dotenvy::dotenv;
-use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult};
+use futures::lock::Mutex;
+use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult, RunItem, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
-    Message,
+    JSONSchema, Message,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{env, error::Error, sync::Arc, time::Duration};
 use tokio::time::Instant;
 
 #[derive(Deserialize, JsonSchema)]
@@ -24,41 +26,67 @@ struct DelegateParams {
 /// Implement the agent delegation pattern, where a main agent delegates tasks
 /// to sub-agents. The main agent uses the results from the sub-agents'
 /// execution to make informed decisions and coordinate overall behavior.
-fn delegate<TCtx>(agent: Arc<Agent<TCtx>>, description: &str) -> AgentTool<TCtx>
-where
-    TCtx: Send + Clone + Sync + 'static,
-{
-    AgentTool::<TCtx>::new(
-        format!("transfer_to_{}", agent.name),
-        format!(
-            "Use this tool to transfer the task to {}, which can help with:\n{}",
-            agent.name, description,
-        ),
-        schemars::schema_for!(DelegateParams).into(),
-        move |params: DelegateParams, ctx, _| {
-            let agent = agent.clone();
-            async move {
-                let result = agent
-                    .run(AgentRequest {
-                        messages: vec![Message::user(vec![params.task])],
-                        context: (*ctx).clone(),
-                    })
-                    .await?;
-                Ok(AgentToolResult {
-                    content: result.content,
-                    is_error: false,
-                })
-            }
-        },
-    )
+struct AgentTransferTool<TCtx> {
+    agent: Agent<TCtx>,
+    description: String,
 }
 
-pub struct Order {
+impl<TCtx> AgentTransferTool<TCtx> {
+    fn new(agent: Agent<TCtx>, description: &str) -> Self {
+        Self {
+            agent,
+            description: description.into(),
+        }
+    }
+}
+
+#[async_trait]
+impl<TCtx> AgentTool<TCtx> for AgentTransferTool<TCtx>
+where
+    TCtx: Send + Sync + Clone + 'static,
+{
+    fn name(&self) -> String {
+        format!("transfer_to_{}", &self.agent.name)
+    }
+    fn description(&self) -> String {
+        format!(
+            "Use this tool to transfer the task to {}, which can help with:\n{}",
+            &self.agent.name, &self.description,
+        )
+    }
+    fn parameters(&self) -> JSONSchema {
+        schemars::schema_for!(DelegateParams).into()
+    }
+    async fn execute(
+        &self,
+        params: Value,
+        context: &TCtx,
+        _state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: DelegateParams = serde_json::from_value(params)?;
+        let result = self
+            .agent
+            .run(AgentRequest {
+                messages: vec![Message::user(vec![params.task])],
+                context: (*context).clone(),
+            })
+            .await?;
+        Ok(AgentToolResult {
+            content: result.content,
+            is_error: false,
+        })
+    }
+}
+
+struct Order {
     customer_name: String,
     address: String,
     quantity: u32,
     completion_time: Instant,
 }
+
+#[derive(Clone)]
+struct MyContext(Arc<Mutex<Vec<Order>>>);
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -68,16 +96,51 @@ struct CreateOrderParams {
     quantity: u32,
 }
 
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct GetOrdersParams {}
+struct CreateOrderTool;
+
+#[async_trait]
+impl AgentTool<MyContext> for CreateOrderTool {
+    fn name(&self) -> String {
+        "create_order".to_string()
+    }
+    fn description(&self) -> String {
+        "Create a new customer order".to_string()
+    }
+    fn parameters(&self) -> JSONSchema {
+        schemars::schema_for!(CreateOrderParams).into()
+    }
+    async fn execute(
+        &self,
+        params: Value,
+        context: &MyContext,
+        _state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: CreateOrderParams = serde_json::from_value(params)?;
+        println!(
+            "[order.create_order] Creating order for {} with quantity {}",
+            params.customer_name, params.quantity
+        );
+        let mut orders_guard = context.0.lock().await;
+        // Randomly finish between 1 to 10 seconds
+        let completion_duration = Duration::from_millis((rand::random::<u64>() % 9000) + 1000);
+        orders_guard.push(Order {
+            customer_name: params.customer_name,
+            address: params.address,
+            quantity: params.quantity,
+            completion_time: Instant::now() + completion_duration,
+        });
+        Ok(AgentToolResult {
+            content: vec![serde_json::json!({ "status": "creating" })
+                .to_string()
+                .into()],
+            is_error: false,
+        })
+    }
+}
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct DeliverOrderParams {
-    customer_name: String,
-    address: String,
-}
+struct GetOrdersParams {}
 
 #[derive(Serialize)]
 struct OrderStatus {
@@ -87,8 +150,101 @@ struct OrderStatus {
     status: String,
 }
 
+struct GetOrdersTool;
+
+#[async_trait]
+impl AgentTool<MyContext> for GetOrdersTool {
+    fn name(&self) -> String {
+        "get_orders".to_string()
+    }
+    fn description(&self) -> String {
+        "Retrieve the list of customer orders and their status (completed or pending)".to_string()
+    }
+    fn parameters(&self) -> JSONSchema {
+        schemars::schema_for!(GetOrdersParams).into()
+    }
+    async fn execute(
+        &self,
+        _params: Value,
+        context: &MyContext,
+        _state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let mut orders_guard = context.0.lock().await;
+        let now = Instant::now();
+
+        let mut result = Vec::new();
+        let mut completed_count = 0;
+
+        for order in orders_guard.iter() {
+            let status = if order.completion_time <= now {
+                completed_count += 1;
+                "completed"
+            } else {
+                "pending"
+            };
+
+            result.push(OrderStatus {
+                customer_name: order.customer_name.clone(),
+                address: order.address.clone(),
+                quantity: order.quantity,
+                status: status.to_string(),
+            });
+        }
+        println!("[order.get_orders] Retrieving orders. Found {completed_count} completed orders.");
+
+        // Remove completed orders
+        orders_guard.retain(|order| order.completion_time > now);
+
+        Ok(AgentToolResult {
+            content: vec![serde_json::to_string(&result)?.into()],
+            is_error: false,
+        })
+    }
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DeliverOrderParams {
+    customer_name: String,
+    address: String,
+}
+
+pub struct DeliverOrderTool;
+
+#[async_trait]
+impl AgentTool<MyContext> for DeliverOrderTool {
+    fn name(&self) -> String {
+        "deliver_order".to_string()
+    }
+    fn description(&self) -> String {
+        "Deliver a customer order".to_string()
+    }
+    fn parameters(&self) -> JSONSchema {
+        schemars::schema_for!(DeliverOrderParams).into()
+    }
+    async fn execute(
+        &self,
+        params: Value,
+        _context: &MyContext,
+        _state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: DeliverOrderParams = serde_json::from_value(params)?;
+        println!(
+            "[delivery.deliver_order] Delivering order for {} to {}",
+            params.customer_name, params.address
+        );
+
+        Ok(AgentToolResult {
+            content: vec![serde_json::json!({ "status": "delivering" })
+                .to_string()
+                .into()],
+            is_error: false,
+        })
+    }
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
     let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
@@ -98,130 +254,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     }));
 
-    let orders = Arc::new(tokio::sync::Mutex::new(Vec::<Order>::new()));
-
     // Order processing agent
-    let order_agent = {
-        let orders_clone = orders.clone();
-        Arc::new(
-            Agent::<()>::builder("order", model.clone())
-                .add_instruction("You are an order processing agent. Your job is to handle customer orders efficiently and accurately.")
-                .tools(vec![
-                    AgentTool::new(
-                        "create_order",
-                        "Create a new customer order",
-                        schemars::schema_for!(CreateOrderParams).into(),
-                        move |params: CreateOrderParams, _, _| {
-                            let orders = orders_clone.clone();
-                            async move {
-                                println!("[order.create_order] Creating order for {} with quantity {}", params.customer_name, params.quantity);
-
-                                let mut orders_guard = orders.lock().await;
-
-                                // Randomly finish between 1 to 10 seconds
-                                let completion_duration = Duration::from_millis((rand::random::<u64>() % 9000) + 1000);
-
-                                orders_guard.push(Order {
-                                    customer_name: params.customer_name,
-                                    address: params.address,
-                                    quantity: params.quantity,
-                                    completion_time: Instant::now() + completion_duration,
-                                });
-
-                                Ok(AgentToolResult {
-                                    content: vec![serde_json::json!({ "status": "creating" }).to_string().into()],
-                                    is_error: false,
-                                })
-                            }
-                        },
-                    ),
-                    AgentTool::new(
-                        "get_orders",
-                        "Retrieve the list of customer orders and their status (completed or pending)",
-                        serde_json::json!({
-                            "type": "object",
-                            "properties": {},
-                            "additionalProperties": false,
-                            "required": []
-                        }),
-                        move |_params: GetOrdersParams, _, _| {
-                            let orders = orders.clone();
-                            async move {
-                                let mut orders_guard = orders.lock().await;
-                                let now = Instant::now();
-
-                                let mut result = Vec::new();
-                                let mut completed_count = 0;
-
-                                for order in orders_guard.iter() {
-                                    let status = if order.completion_time <= now {
-                                        completed_count += 1;
-                                        "completed"
-                                    } else {
-                                        "pending"
-                                    };
-
-                                    result.push(OrderStatus {
-                                        customer_name: order.customer_name.clone(),
-                                        address: order.address.clone(),
-                                        quantity: order.quantity,
-                                        status: status.to_string(),
-                                    });
-                                }
-                                println!("[order.get_orders] Retrieving orders. Found {completed_count} completed orders.");
-
-                                // Remove completed orders
-                                orders_guard.retain(|order| order.completion_time > now);
-
-                                Ok(AgentToolResult {
-                                    content: vec![serde_json::to_string(&result)?.into()],
-                                    is_error: false,
-                                })
-                            }
-                        },
-                    ),
-                ])
-                .build(),
-        )
-    };
+    let order_agent =  Agent::<MyContext>::builder("order", model.clone())
+            .add_instruction("You are an order processing agent. Your job is to handle customer orders efficiently and accurately.")
+            .add_tool(CreateOrderTool)
+            .add_tool(GetOrdersTool)
+            .build();
 
     // Delivery agent
-    let delivery_agent = Arc::new(
-        Agent::<()>::builder("delivery", model.clone())
+    let delivery_agent =   Agent::<MyContext>::builder("delivery", model.clone())
             .add_instruction("You are a delivery agent. Your job is to ensure timely and accurate delivery of customer orders.")
-            .tools(vec![
-                AgentTool::new(
-                    "deliver_order",
-                    "Deliver a customer order",
-                    schemars::schema_for!(DeliverOrderParams).into(),
-                    |params: DeliverOrderParams, _, _| async move {
-                        println!( "[delivery.deliver_order] Delivering order for {} to {}", params.customer_name, params.address);
-
-                        Ok(AgentToolResult {
-                            content: vec![serde_json::json!({ "status": "delivering" }).to_string().into()],
-                            is_error: false,
-                        })
-                    },
-                ),
-            ])
-            .build(),
-    );
+            .add_tool(DeliverOrderTool)
+            .build();
 
     // Coordinator agent
-    let coordinator = Arc::new(
-        Agent::<()>::builder("coordinator", model.clone())
+    let coordinator =  Agent::<MyContext>::builder("coordinator", model.clone())
             .add_instruction("You are a coordinator agent. Your job is to delegate tasks to the appropriate sub-agents (order processing and delivery) and ensure smooth operation.
 You should also poll the order status in every turn to send them for delivery once they are ready.")
             .add_instruction("Respond by letting me know what you did and what is the result from the sub-agents.")
             .add_instruction("For the purpose of demo:
 - you can think of random customer name and address. To be fun, use those from fictions and literatures.
 - every time you are called (NEXT), you should randomly create 0 to 1 order.")
-            .tools(vec![
-                delegate(order_agent.clone(), "handling customer orders and get order statuses"),
-                delegate(delivery_agent.clone(), "delivering processed orders"),
-            ])
-            .build(),
-    );
+            .add_tool(AgentTransferTool::new(order_agent, "handling customer orders and get order statuses")) // Delegate order creation to order agent
+            .add_tool(AgentTransferTool::new(delivery_agent, "delivering processed orders")) // Delegate delivery to delivery agent
+            .build();
+
+    let orders = Arc::new(Mutex::new(Vec::<Order>::new()));
 
     let mut messages = Vec::new();
 
@@ -234,7 +292,7 @@ You should also poll the order status in every turn to send them for delivery on
         let response = coordinator
             .run(AgentRequest {
                 messages: messages.clone(),
-                context: (),
+                context: MyContext(orders.clone()),
             })
             .await?;
 
@@ -242,7 +300,7 @@ You should also poll the order status in every turn to send them for delivery on
 
         // Update messages with the new items
         messages.extend(response.items.iter().filter_map(|item| match item {
-            llm_agent::RunItem::Message(msg) => Some(msg.clone()),
+            RunItem::Message(msg) => Some(msg.clone()),
         }));
 
         // Wait 5 seconds before next iteration

@@ -1,13 +1,11 @@
+use crate::AgentError;
+use futures::{stream::BoxStream, Stream};
+use llm_sdk::{Message, Part, PartialModelResponse};
+use serde::{Deserialize, Serialize};
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-
-use futures::{stream::BoxStream, Stream};
-use llm_sdk::{Message, Part, PartialModelResponse};
-use serde::{Deserialize, Serialize};
-
-use crate::AgentError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRequest<TCtx> {

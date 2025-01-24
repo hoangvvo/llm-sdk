@@ -12,7 +12,7 @@ export class AgentInvariantError extends AgentError {
   }
 }
 
-export class AgentTurnsExceededError extends AgentError {
+export class AgentMaxTurnsExceededError extends AgentError {
   constructor(maxTurns: number) {
     super(
       `The maximum number of turns (${String(maxTurns)}) has been exceeded.`,

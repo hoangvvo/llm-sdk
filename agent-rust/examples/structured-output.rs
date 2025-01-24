@@ -1,13 +1,15 @@
+use async_trait::async_trait;
 use dotenvy::dotenv;
-use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult};
+use futures::lock::Mutex;
+use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
-    Message, Part, ResponseFormatJson, ResponseFormatOption, UserMessage,
+    JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption, UserMessage,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
-use serde_json::json;
-use std::{env, sync::Arc};
+use serde_json::{json, Value};
+use std::{env, error::Error, sync::Arc};
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -18,6 +20,53 @@ struct SearchFlightsParams {
     to: String,
     #[schemars(description = "Departure date in YYYY-MM-DD")]
     date: String,
+}
+
+struct SearchFlightsTool;
+
+#[async_trait]
+impl AgentTool<()> for SearchFlightsTool {
+    fn name(&self) -> String {
+        "search_flights".to_string()
+    }
+    fn description(&self) -> String {
+        "Search for flights between two cities".to_string()
+    }
+    fn parameters(&self) -> JSONSchema {
+        schemars::schema_for!(SearchFlightsParams).into()
+    }
+    async fn execute(
+        &self,
+        args: Value,
+        _context: &(),
+        _state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: SearchFlightsParams = serde_json::from_value(args)?;
+        println!(
+            "Searching flights from {} to {} on {}",
+            params.from, params.to, params.date
+        );
+        Ok(AgentToolResult {
+            content: vec![Part::Text(
+                json!([
+                    {
+                        "airline": "Vietnam Airlines",
+                        "departure": format!("{}T10:00:00", params.date),
+                        "arrival": format!("{}T12:00:00", params.date),
+                        "price": 150
+                    },
+                    {
+                        "airline": "Southwest Airlines",
+                        "departure": format!("{}T11:00:00", params.date),
+                        "arrival": format!("{}T13:00:00", params.date),
+                        "price": 120
+                    }
+                ])
+                .into(),
+            )],
+            is_error: false,
+        })
+    }
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -31,9 +80,56 @@ struct SearchHotelsParams {
     nights: u32,
 }
 
+struct SearchHotelsTool;
+
+#[async_trait]
+impl AgentTool<()> for SearchHotelsTool {
+    fn name(&self) -> String {
+        "search_hotels".to_string()
+    }
+    fn description(&self) -> String {
+        "Search for hotels in a specific location".to_string()
+    }
+    fn parameters(&self) -> JSONSchema {
+        schemars::schema_for!(SearchHotelsParams).into()
+    }
+    async fn execute(
+        &self,
+        args: Value,
+        _context: &(),
+        _state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: SearchHotelsParams = serde_json::from_value(args)?;
+        println!(
+            "Searching hotels in {} from {} for {} nights",
+            params.city, params.check_in, params.nights
+        );
+        Ok(AgentToolResult {
+            content: vec![Part::Text(
+                json!([
+                    {
+                        "name": "The Plaza",
+                        "location": params.city.to_string(),
+                        "pricePerNight": 150,
+                        "rating": 4.8
+                    },
+                    {
+                        "name": "Hotel Ritz",
+                        "location": params.city.to_string(),
+                        "pricePerNight": 200,
+                        "rating": 4.7
+                    }
+                ])
+                .into(),
+            )],
+            is_error: false,
+        })
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
     let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
@@ -42,71 +138,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         model_id: "gpt-4o".to_string(),
         ..Default::default()
     }));
-
-    let search_flights_tool = AgentTool::new(
-        "search_flights",
-        "Search for flights between two cities",
-        schemars::schema_for!(SearchFlightsParams).into(),
-        |params: SearchFlightsParams, _, _| async move {
-            println!(
-                "Searching flights from {} to {} on {}",
-                params.from, params.to, params.date
-            );
-            Ok(AgentToolResult {
-                content: vec![Part::Text(
-                    json!([
-                        {
-                            "airline": "Vietnam Airlines",
-                            "departure": format!("{}T10:00:00", params.date),
-                            "arrival": format!("{}T12:00:00", params.date),
-                            "price": 150
-                        },
-                        {
-                            "airline": "Southwest Airlines",
-                            "departure": format!("{}T11:00:00", params.date),
-                            "arrival": format!("{}T13:00:00", params.date),
-                            "price": 120
-                        }
-                    ])
-                    .into(),
-                )],
-                is_error: false,
-            })
-        },
-    );
-
-    let search_hotels_tool = AgentTool::new(
-        "search_hotels",
-        "Search for hotels in a specific location",
-        schemars::schema_for!(SearchHotelsParams).into(),
-        |params: SearchHotelsParams, _, _| async move {
-            println!(
-                "Searching hotels in {} from {} for {} nights",
-                params.city, params.check_in, params.nights
-            );
-            Ok(AgentToolResult {
-                content: vec![Part::Text(
-                    json!([
-                        {
-                            "name": "The Plaza",
-                            "location": params.city.to_string(),
-                            "pricePerNight": 150,
-                            "rating": 4.8
-                        },
-                        {
-                            "name": "Hotel Ritz",
-                            "location": params.city.to_string(),
-                            "pricePerNight": 200,
-                            "rating": 4.7
-                        }
-                    ])
-                    .to_string()
-                    .into(),
-                )],
-                is_error: false,
-            })
-        },
-    );
 
     // Define the response format
     let response_format = ResponseFormatOption::Json(ResponseFormatJson {
@@ -188,7 +219,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_instruction("You are Bob, a travel agent that helps users plan their trips.")
         .add_instruction(|_ctx: &()| format!("The current time is {}", chrono::Local::now()))
         .response_format(response_format)
-        .tools(vec![search_flights_tool, search_hotels_tool])
+        .add_tool(SearchFlightsTool)
+        .add_tool(SearchHotelsTool)
         .build();
 
     let prompt = "Plan a trip from Paris to Tokyo next week";
@@ -213,8 +245,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .ok_or("No text part in response")?;
 
-    let val: serde_json::Value =
-        serde_json::from_str(&text_part.text).expect("Invalid JSON response");
+    let val: Value = serde_json::from_str(&text_part.text).expect("Invalid JSON response");
 
     println!(
         "{}",

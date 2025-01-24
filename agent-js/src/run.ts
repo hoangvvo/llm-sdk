@@ -10,7 +10,7 @@ import {
   type ResponseFormatOption,
   type ToolMessage,
 } from "@hoangvvo/llm-sdk";
-import { AgentInvariantError, AgentTurnsExceededError } from "./errors.ts";
+import { AgentInvariantError, AgentMaxTurnsExceededError } from "./errors.ts";
 import {
   getPromptForInstructionParams,
   type InstructionParam,
@@ -308,7 +308,7 @@ export class RunState {
   turn() {
     this.currentTurn++;
     if (this.currentTurn > this.#maxTurns) {
-      throw new AgentTurnsExceededError(this.#maxTurns);
+      throw new AgentMaxTurnsExceededError(this.#maxTurns);
     }
   }
 

@@ -1,14 +1,17 @@
 import type { JSONSchema, Part } from "@hoangvvo/llm-sdk";
 import type { RunState } from "./run.ts";
 
-export class AgentTool<TArgs extends Record<string, unknown> | null, TContext> {
+/**
+ * Agent tool that can be used by the agent to perform specific tasks. Any object
+ * that implements the `AgentTool` interface can be used as a tool.
+ */
+export interface AgentTool<TArgs extends Record<string, unknown>, TContext> {
   /**
    * Name of the tool.
-   * The name can only contain letters and underscores.
    */
   name: string;
   /**
-   * A description of the tool.
+   * A description of the tool to instruct the model how and when to use it.
    */
   description: string;
   /**
@@ -17,30 +20,15 @@ export class AgentTool<TArgs extends Record<string, unknown> | null, TContext> {
   parameters: JSONSchema;
   /**
    * The function that will be called to execute the tool with given parameters and context.
+   *
+   * If the tool throws an error, the agent will be interrupted and the error will be propagated.
+   * To avoid interrupting the agent, the tool must return an `AgentToolResult` with `is_error` set to true.
    */
   execute: (
     args: TArgs,
     ctx: TContext,
     state: RunState,
   ) => AgentToolResult | Promise<AgentToolResult>;
-
-  constructor(params: AgentToolParams<TArgs, TContext>) {
-    this.name = params.name;
-    this.description = params.description;
-    this.parameters = params.parameters;
-    this.execute = params.execute;
-
-    this.validate();
-  }
-
-  validate() {
-    // Validate tool name
-    if (!/^[a-zA-Z_]+$/.exec(this.name)) {
-      throw new Error(
-        `Invalid tool name: ${this.name}. It can only contain letters and underscores.`,
-      );
-    }
-  }
 }
 
 export interface AgentToolResult {
@@ -49,19 +37,15 @@ export interface AgentToolResult {
 }
 
 /**
- * Parameters required to create an agent tool
+ * A helper function to create an agent tool.
  */
-export interface AgentToolParams<
-  TArgs extends Record<string, unknown> | null,
-  TContext,
-> {
+export function tool<TArgs extends Record<string, unknown>, TContext>(params: {
   /**
    * Name of the tool.
-   * The name can only contain letters and underscores.
    */
   name: string;
   /**
-   * A description of the tool.
+   * A description of the tool to instruct the model how and when to use it.
    */
   description: string;
   /**
@@ -70,18 +54,14 @@ export interface AgentToolParams<
   parameters: JSONSchema;
   /**
    * The function that will be called to execute the tool with given parameters and context.
+   *
+   * If the tool throws an error, the agent will be interrupted and the error will be propagated.
+   * To avoid interrupting the agent, the tool must return an `AgentToolResult` with `is_error` set to true.
    */
   execute: (
     args: TArgs,
     ctx: TContext,
   ) => AgentToolResult | Promise<AgentToolResult>;
-}
-
-/**
- * A helper function to create an agent tool.
- */
-export function tool<TArgs extends Record<string, unknown> | null, TContext>(
-  params: AgentToolParams<TArgs, TContext>,
-): AgentTool<TArgs, TContext> {
-  return new AgentTool(params);
+}): AgentTool<TArgs, TContext> {
+  return params;
 }

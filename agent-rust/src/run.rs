@@ -16,7 +16,7 @@ use std::sync::Arc;
 /// Once finish, the session cleans up any resources used during the run.
 /// The session can be reused in multiple runs.
 pub struct RunSession<TCtx> {
-    tools: Arc<Vec<AgentTool<TCtx>>>,
+    tools: Arc<Vec<Box<dyn AgentTool<TCtx>>>>,
     model: Arc<dyn LanguageModel + Send + Sync>,
     response_format: ResponseFormatOption,
     instructions: Arc<Vec<InstructionParam<TCtx>>>,
@@ -32,7 +32,7 @@ where
     pub async fn new(
         model: Arc<dyn LanguageModel + Send + Sync>,
         instructions: Arc<Vec<InstructionParam<TCtx>>>,
-        tools: Arc<Vec<AgentTool<TCtx>>>,
+        tools: Arc<Vec<Box<dyn AgentTool<TCtx>>>>,
         response_format: ResponseFormatOption,
         max_turns: usize,
     ) -> Self {
@@ -86,15 +86,15 @@ where
             let agent_tool = self
                 .tools
                 .iter()
-                .find(|tool| tool.name == *tool_name)
+                .find(|tool| tool.name() == tool_name)
                 .ok_or_else(|| {
                     AgentError::Invariant(format!("Tool {tool_name} not found for tool call"))
                 })?;
 
             let tool_res = agent_tool
-                .call(args, context.clone(), run_state.clone())
+                .execute(args, &context, run_state.clone())
                 .await
-                .map_err(|e| AgentError::ToolExecution(e.into()))?;
+                .map_err(AgentError::ToolExecution)?;
 
             tool_message.content.push(Part::ToolResult(ToolResultPart {
                 tool_call_id,
@@ -227,7 +227,7 @@ where
                     &self.instructions,
                     &request.context,
                 )),
-                tools: Some(self.tools.iter().map(Into::into).collect()),
+                tools: Some(self.tools.iter().map(|tool| tool.as_ref().into()).collect()),
                 response_format: Some(self.response_format.clone()),
                 ..Default::default()
             },
@@ -286,8 +286,8 @@ impl RunState {
             self.input_messages.clone(),
             self.items
                 .iter()
-                .filter_map(|item| match item {
-                    RunItem::Message(msg) => Some(msg.clone()),
+                .map(|item| match item {
+                    RunItem::Message(msg) => msg.clone(),
                 })
                 .collect(),
         ]

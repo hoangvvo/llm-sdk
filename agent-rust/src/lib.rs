@@ -9,5 +9,5 @@ pub use agent::{Agent, AgentParams};
 pub use errors::AgentError;
 pub use instruction::InstructionParam;
 pub use run::{RunSession, RunState};
-pub use tool::{AgentTool, AgentToolFn, AgentToolResult};
+pub use tool::{AgentTool, AgentToolResult};
 pub use types::*;

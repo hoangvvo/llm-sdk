@@ -5,17 +5,20 @@ A Rust library to implement LLM agents that work with any LLM providers.
 ## Usage
 
 ```rust
+use async_trait::async_trait;
 use dotenvy::dotenv;
-use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult};
+use futures::lock::Mutex;
+use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult, RunItem, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
-    Message, Part, UserMessage,
+    JSONSchema, Message, Part, UserMessage,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::{
     env,
+    error::Error,
     io::{self, Write},
     sync::Arc,
 };
@@ -32,34 +35,18 @@ struct GetWeatherParams {
     city: String,
 }
 
-// Define the JSON schema using `schemars` crate
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct SendMessageParams {
-    #[schemars(description = "The message to send")]
-    message: String,
-    #[schemars(description = "The phone number to send the message to")]
-    phone_number: String,
-}
+// Define the agent tools
+struct GetWeatherTool;
 
-#[allow(clippy::too_many_lines)]
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv().ok();
-
-    // Define the model to use for the Agent
-    let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
-        api_key: env::var("OPENAI_API_KEY")
-            .expect("OPENAI_API_KEY environment variable must be set"),
-        model_id: "gpt-4o".to_string(),
-        ..Default::default()
-    }));
-
-    // Define the agent tools
-
-    let get_weather_tool = AgentTool::new(
-        "get_weather",
-        "Get weather for a given city",
+#[async_trait]
+impl AgentTool<MyContext> for GetWeatherTool {
+    fn name(&self) -> String {
+        "get_weather".to_string()
+    }
+    fn description(&self) -> String {
+        "Get weather for a given city".to_string()
+    }
+    fn parameters(&self) -> JSONSchema {
         json!({
           "type": "object",
           "properties": {
@@ -70,46 +57,90 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
           },
           "required": ["city"],
           "additionalProperties": false
-        }),
-        |params: GetWeatherParams, _ctx: Arc<MyContext>| async move {
-            println!("Getting weather for {}", params.city);
+        })
+    }
+    async fn execute(
+        &self,
+        args: Value,
+        _context: &MyContext,
+        _state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: GetWeatherParams = serde_json::from_value(args)?;
+        println!("Getting weather for {}", params.city);
 
-            Ok(AgentToolResult {
-                content: vec![Part::Text(
-                    json!({
-                        "city": params.city,
-                        "forecast": "Sunny",
-                        "temperatureC": 25
-                    })
-                    .into(),
-                )],
-                is_error: false,
-            })
-        },
-    );
+        Ok(AgentToolResult {
+            content: vec![Part::Text(
+                json!({
+                    "city": params.city,
+                    "forecast": "Sunny",
+                    "temperatureC": 25
+                })
+                .into(),
+            )],
+            is_error: false,
+        })
+    }
+}
 
-    let send_message_tool = AgentTool::new(
-        "send_message",
-        "Send a text message to a phone number",
-        schemars::schema_for!(SendMessageParams).into(),
-        |params: SendMessageParams, _ctx| async move {
-            println!(
-                "Sending message to {}: {}",
-                params.phone_number, params.message
-            );
+// Define the JSON schema using `schemars` crate
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct SendMessageParams {
+    #[schemars(description = "The message to send")]
+    message: String,
+    #[schemars(description = "The phone number to send the message to")]
+    phone_number: String,
+}
 
-            Ok(AgentToolResult {
-                content: vec![Part::Text(
-                    json!({
-                        "message": params.message,
-                        "status": "sent"
-                    })
-                    .into(),
-                )],
-                is_error: false,
-            })
-        },
-    );
+struct SendMessageTool;
+
+#[async_trait]
+impl AgentTool<MyContext> for SendMessageTool {
+    fn name(&self) -> String {
+        "send_message".to_string()
+    }
+    fn description(&self) -> String {
+        "Send a text message to a phone number".to_string()
+    }
+    fn parameters(&self) -> JSONSchema {
+        schemars::schema_for!(SendMessageParams).into()
+    }
+    async fn execute(
+        &self,
+        args: Value,
+        _context: &MyContext,
+        _state: Arc<Mutex<RunState>>,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: SendMessageParams = serde_json::from_value(args)?;
+        println!(
+            "Sending message to {}: {}",
+            params.phone_number, params.message
+        );
+
+        Ok(AgentToolResult {
+            content: vec![Part::Text(
+                json!({
+                    "message": params.message,
+                    "status": "sent"
+                })
+                .into(),
+            )],
+            is_error: false,
+        })
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    dotenv().ok();
+
+    // Define the model to use for the Agent
+    let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
+        api_key: env::var("OPENAI_API_KEY")
+            .expect("OPENAI_API_KEY environment variable must be set"),
+        model_id: "gpt-4o".to_string(),
+        ..Default::default()
+    }));
 
     // Create the Agent
     let my_assistant = Agent::<MyContext>::builder("Mai", model)
@@ -117,7 +148,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "You are Mai, a helpful assistant. Answer questions to the best of your ability.",
         )
         .add_instruction(|ctx: &MyContext| format!("You are talking to {}", ctx.user_name))
-        .tools(vec![get_weather_tool, send_message_tool])
+        .add_tool(GetWeatherTool)
+        .add_tool(SendMessageTool)
         .build();
 
     // Implement the CLI to interact with the Agent
@@ -156,7 +188,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Update messages with the new items
         messages.extend(response.items.iter().filter_map(|item| match item {
-            llm_agent::RunItem::Message(msg) => Some(msg.clone()),
+            RunItem::Message(msg) => Some(msg.clone()),
         }));
 
         println!("{:#?}", response.content);

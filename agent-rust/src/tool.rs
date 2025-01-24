@@ -1,80 +1,43 @@
-use anyhow::Error;
-use futures::{future::BoxFuture, lock::Mutex, FutureExt};
-use llm_sdk::{Part, Tool};
-use serde::de::DeserializeOwned;
+use crate::RunState;
+use async_trait::async_trait;
+use futures::lock::Mutex;
+use llm_sdk::{JSONSchema, Part, Tool};
 use serde_json::Value;
-use std::{fmt::Debug, future::Future, sync::Arc};
+use std::{error::Error, fmt::Debug, sync::Arc};
 
-use crate::{AgentError, RunState};
-
-pub type AgentToolFn<TCtx> = dyn Fn(Value, Arc<TCtx>, Arc<Mutex<RunState>>) -> BoxFuture<'static, Result<AgentToolResult, Error>>
-    + Send
-    + Sync;
-
-pub struct AgentTool<TCtx> {
+/**
+ * Agent tool that can be used by the agent to perform specific tasks. Any
+ * object that implements the `AgentTool` trait can be used as a tool.
+ */
+#[async_trait]
+pub trait AgentTool<TCtx>: Send + Sync {
     /// Name of the tool.
-    /// The name can only contain letters and underscores.
-    pub name: String,
-    /// The description of the tool, when to use, how to use, and what it does.
-    pub description: String,
+    fn name(&self) -> String;
+    /// A description of the tool to instruct the model how and when to use it.
+    fn description(&self) -> String;
     /// The JSON schema of the parameters that the tool accepts. The type must
     /// be "object".
-    pub parameters: Value,
-    /// The function that will be called to execute the tool.
-    pub execute: Box<AgentToolFn<TCtx>>,
-}
-
-impl<TCtx> AgentTool<TCtx>
-where
-    TCtx: Send + Sync + 'static,
-{
-    pub fn new<TArgs, F, Fut>(
-        name: impl Into<String>,
-        description: impl Into<String>,
-        parameters: Value,
-        execute: F,
-    ) -> Self
-    where
-        F: Fn(TArgs, Arc<TCtx>, Arc<Mutex<RunState>>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<AgentToolResult, Error>> + Send + 'static,
-        TArgs: DeserializeOwned + Send + 'static,
-    {
-        let execute_arc = Arc::new(execute);
-
-        Self {
-            name: name.into(),
-            description: description.into(),
-            parameters,
-            execute: Box::new(move |arg, ctx, state| {
-                let execute = execute_arc.clone();
-                async move {
-                    let params: TArgs = serde_json::from_value(arg).map_err(|e| {
-                        AgentError::Invariant(format!("Failed to deserialize tool arguments: {e}"))
-                    })?;
-                    execute(params, ctx, state).await
-                }
-                .boxed()
-            }),
-        }
-    }
-    /// Executes the tool with the given arguments and context.
-    /// The arguments are deserialized from JSON to the specified type.
-    pub async fn call(
+    fn parameters(&self) -> JSONSchema;
+    /// The function that will be called to execute the tool with given
+    /// parameters and context.
+    ///
+    /// If the tool throws an error, the agent will be interrupted and the error
+    /// will be propagated. To avoid interrupting the agent, the tool must
+    /// return an `AgentToolResult` with `is_error` set to true.
+    async fn execute(
         &self,
         args: Value,
-        context: Arc<TCtx>,
+        context: &TCtx,
         state: Arc<Mutex<RunState>>,
-    ) -> Result<AgentToolResult, Error> {
-        (self.execute)(args, context, state).await
-    }
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>>;
 }
 
-impl<TCtx> Debug for AgentTool<TCtx> {
+impl<TCtx> Debug for dyn AgentTool<TCtx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AgentTool")
-            .field("name", &self.name)
-            .field("description", &self.description)
-            .field("parameters", &self.parameters)
+            .field("name", &self.name())
+            .field("description", &self.description())
+            .field("parameters", &self.parameters())
             .field("execute", &"Function")
             .finish()
     }
@@ -85,12 +48,12 @@ pub struct AgentToolResult {
     pub is_error: bool,
 }
 
-impl<TCtx> From<&AgentTool<TCtx>> for Tool {
-    fn from(agent_tool: &AgentTool<TCtx>) -> Self {
+impl<TCtx> From<&dyn AgentTool<TCtx>> for Tool {
+    fn from(agent_tool: &dyn AgentTool<TCtx>) -> Self {
         Self {
-            name: agent_tool.name.clone(),
-            description: agent_tool.description.clone(),
-            parameters: agent_tool.parameters.clone(),
+            name: agent_tool.name(),
+            description: agent_tool.description(),
+            parameters: agent_tool.parameters(),
         }
     }
 }

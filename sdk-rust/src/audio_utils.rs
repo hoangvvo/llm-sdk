@@ -1,6 +1,5 @@
-use base64::Engine as _;
-
 use crate::{LanguageModelError, LanguageModelResult};
+use base64::Engine as _;
 
 pub fn base64_to_i16sample(b64: &str) -> Result<Vec<i16>, String> {
     let bytes = base64::engine::general_purpose::STANDARD
