@@ -119,17 +119,19 @@ pub struct AgentParams<TCtx> {
     /// Amount of randomness injected into the response. Ranges from 0.0 to 1.0
     pub temperature: Option<f64>,
     /// An alternative to sampling with temperature, called nucleus sampling,
-    /// where the model considers the results of the tokens with top_p probability mass.
-    /// Ranges from 0.0 to 1.0
+    /// where the model considers the results of the tokens with `top_p`
+    /// probability mass. Ranges from 0.0 to 1.0
     pub top_p: Option<f64>,
     /// Only sample from the top K options for each subsequent token.
     /// Used to remove 'long tail' low probability responses.
     pub top_k: Option<f64>,
-    /// Positive values penalize new tokens based on whether they appear in the text so far,
-    /// increasing the model's likelihood to talk about new topics.
+    /// Positive values penalize new tokens based on whether they appear in the
+    /// text so far, increasing the model's likelihood to talk about new
+    /// topics.
     pub presence_penalty: Option<f64>,
-    /// Positive values penalize new tokens based on their existing frequency in the text so far,
-    /// decreasing the model's likelihood to repeat the same line verbatim.
+    /// Positive values penalize new tokens based on their existing frequency in
+    /// the text so far, decreasing the model's likelihood to repeat the
+    /// same line verbatim.
     pub frequency_penalty: Option<f64>,
 }
 
@@ -189,17 +191,17 @@ where
         self
     }
 
-    /// Set the top_p for nucleus sampling
+    /// Set the `top_p` for nucleus sampling
     /// An alternative to sampling with temperature, called nucleus sampling,
-    /// where the model considers the results of the tokens with top_p probability mass.
-    /// Ranges from 0.0 to 1.0
+    /// where the model considers the results of the tokens with `top_p`
+    /// probability mass. Ranges from 0.0 to 1.0
     #[must_use]
     pub fn top_p(mut self, top_p: f64) -> Self {
         self.top_p = Some(top_p);
         self
     }
 
-    /// Set the top_k for sampling
+    /// Set the `top_k` for sampling
     /// Only sample from the top K options for each subsequent token.
     /// Used to remove 'long tail' low probability responses.
     #[must_use]
@@ -209,8 +211,9 @@ where
     }
 
     /// Set the presence penalty
-    /// Positive values penalize new tokens based on whether they appear in the text so far,
-    /// increasing the model's likelihood to talk about new topics.
+    /// Positive values penalize new tokens based on whether they appear in the
+    /// text so far, increasing the model's likelihood to talk about new
+    /// topics.
     #[must_use]
     pub fn presence_penalty(mut self, presence_penalty: f64) -> Self {
         self.presence_penalty = Some(presence_penalty);
@@ -218,8 +221,9 @@ where
     }
 
     /// Set the frequency penalty
-    /// Positive values penalize new tokens based on their existing frequency in the text so far,
-    /// decreasing the model's likelihood to repeat the same line verbatim.
+    /// Positive values penalize new tokens based on their existing frequency in
+    /// the text so far, decreasing the model's likelihood to repeat the
+    /// same line verbatim.
     #[must_use]
     pub fn frequency_penalty(mut self, frequency_penalty: f64) -> Self {
         self.frequency_penalty = Some(frequency_penalty);

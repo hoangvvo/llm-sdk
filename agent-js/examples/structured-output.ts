@@ -155,7 +155,13 @@ const travelAgent = new Agent({
 const prompt = "Plan a trip from Paris to Tokyo next week";
 
 const response = await travelAgent.run({
-  messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+  input: [
+    {
+      type: "message",
+      role: "user",
+      content: [{ type: "text", text: prompt }],
+    },
+  ],
   context: {},
 });
 

@@ -11,10 +11,9 @@ npm install @hoangvvo/llm-agent
 ## Usage
 
 ```typescript
-import { Agent, tool } from "@hoangvvo/llm-agent";
+import { Agent, tool, type AgentItem } from "@hoangvvo/llm-agent";
 import { typeboxTool } from "@hoangvvo/llm-agent/typebox";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
-import type { Message } from "@hoangvvo/llm-sdk";
 import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
 import { Type } from "@sinclair/typebox";
 import assert from "node:assert";
@@ -141,7 +140,7 @@ const context: MyContext = {
 
 console.log(`Type 'exit' to quit`);
 
-const messages: Message[] = [];
+const items: AgentItem[] = [];
 
 let userInput = "";
 
@@ -156,7 +155,8 @@ while (userInput !== "exit") {
   }
 
   // Add user message as the input
-  messages.push({
+  items.push({
+    type: "message",
     role: "user",
     content: [
       {
@@ -169,11 +169,11 @@ while (userInput !== "exit") {
   // Call assistant
   const response = await myAssistant.run({
     context,
-    messages,
+    input: items,
   });
 
-  // Update messages with the new items
-  messages.push(...response.items);
+  // Append items with the output items
+  items.push(...response.output);
 
   console.dir(response, { depth: null });
 }

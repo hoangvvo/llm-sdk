@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use dotenvy::dotenv;
 use futures::lock::{Mutex, MutexGuard};
-use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult, RunItem, RunState};
+use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message,
@@ -67,7 +67,7 @@ where
         let result = self
             .agent
             .run(AgentRequest {
-                messages: vec![Message::user(vec![params.task])],
+                input: vec![AgentItem::Message(Message::user(vec![params.task]))],
                 context: (*context).clone(),
             })
             .await?;
@@ -299,27 +299,25 @@ You should also poll the order status in every turn to send them for delivery on
 
     let orders: Arc<Mutex<Vec<Order>>> = Arc::new(Mutex::new(Vec::<Order>::new()));
 
-    let mut messages = Vec::new();
+    let mut input = Vec::new();
 
     // Main loop
     loop {
         println!("\n--- New iteration ---");
 
-        messages.push(Message::user(vec!["Next"]));
+        input.push(AgentItem::Message(Message::user(vec!["Next"])));
 
         let response = coordinator
             .run(AgentRequest {
-                messages: messages.clone(),
+                input: input.clone(),
                 context: MyContext(orders.clone()),
             })
             .await?;
 
         println!("Response: {:?}", response.content);
 
-        // Update messages with the new items
-        messages.extend(response.items.iter().filter_map(|item| match item {
-            RunItem::Message(msg) => Some(msg.clone()),
-        }));
+        // Append items with the output items
+        input.extend(response.output.clone());
 
         // Wait 5 seconds before next iteration
         tokio::time::sleep(Duration::from_secs(5)).await;

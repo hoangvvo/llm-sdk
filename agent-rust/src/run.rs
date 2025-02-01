@@ -1,7 +1,7 @@
 use crate::{
     instruction,
     types::{AgentStream, AgentStreamEvent},
-    AgentError, AgentRequest, AgentResponse, AgentTool, InstructionParam, RunItem,
+    AgentError, AgentItem, AgentRequest, AgentResponse, AgentTool, InstructionParam,
 };
 use futures::{lock::Mutex, stream::StreamExt};
 use llm_sdk::{
@@ -34,6 +34,7 @@ where
 {
     /// Creates a new run session and initializes dependencies
     #[allow(clippy::unused_async)]
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         model: Arc<dyn LanguageModel + Send + Sync>,
         instructions: Arc<Vec<InstructionParam<TCtx>>>,
@@ -127,7 +128,7 @@ where
     /// Run a non-streaming execution of the agent.
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
         let state = Arc::new(Mutex::new(RunState::new(
-            request.messages.clone(),
+            request.input.clone(),
             self.max_turns,
         )));
 
@@ -166,7 +167,7 @@ where
     /// Run a streaming execution of the agent.
     pub fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
         let state = Arc::new(Mutex::new(RunState::new(
-            request.messages.clone(),
+            request.input.clone(),
             self.max_turns,
         )));
 
@@ -242,7 +243,8 @@ where
     fn get_llm_input(&self, request: AgentRequest<TCtx>) -> (LanguageModelInput, Arc<TCtx>) {
         (
             LanguageModelInput {
-                messages: request.messages,
+                // messages will be computed from getTurnMessages
+                messages: vec![],
                 system_prompt: Some(instruction::get_prompt(
                     &self.instructions,
                     &request.context,
@@ -269,23 +271,23 @@ enum ProcessResult {
 
 pub struct RunState {
     max_turns: usize,
-    input_messages: Vec<Message>,
+    input: Vec<AgentItem>,
 
     /// The current turn number in the run.
     pub current_turn: usize,
     /// All items generated during the run, such as new `ToolMessage` and
     /// `AssistantMessage`
-    pub items: Vec<RunItem>,
+    output: Vec<AgentItem>,
 }
 
 impl RunState {
     #[must_use]
-    pub fn new(input_messages: Vec<Message>, max_turns: usize) -> Self {
+    pub fn new(input: Vec<AgentItem>, max_turns: usize) -> Self {
         Self {
             max_turns,
-            input_messages,
+            input,
             current_turn: 0,
-            items: vec![],
+            output: vec![],
         }
     }
 
@@ -301,18 +303,23 @@ impl RunState {
 
     /// Add a message to the run state.
     pub fn append_message(&mut self, message: Message) {
-        self.items.push(RunItem::Message(message));
+        self.output.push(AgentItem::Message(message));
     }
 
     /// Get LLM messages to use in the `LanguageModelInput` for the turn
     #[must_use]
     pub fn get_turn_messages(&self) -> Vec<Message> {
         [
-            self.input_messages.clone(),
-            self.items
+            self.input
                 .iter()
                 .map(|item| match item {
-                    RunItem::Message(msg) => msg.clone(),
+                    AgentItem::Message(msg) => msg.clone(),
+                })
+                .collect::<Vec<_>>(),
+            self.output
+                .iter()
+                .map(|item| match item {
+                    AgentItem::Message(msg) => msg.clone(),
                 })
                 .collect(),
         ]
@@ -323,7 +330,7 @@ impl RunState {
     pub fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
         AgentResponse {
             content: final_content,
-            items: self.items.clone(),
+            output: self.output.clone(),
         }
     }
 }

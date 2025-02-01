@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use dotenvy::dotenv;
 use futures::lock::Mutex;
-use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult, RunState};
+use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption, UserMessage,
@@ -226,9 +226,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let prompt = "Plan a trip from Paris to Tokyo next week";
 
     let response = travel_agent.run(AgentRequest {
-        messages: vec![Message::User(UserMessage {
+        input: vec![AgentItem::Message(Message::User(UserMessage {
             content: vec![Part::Text(prompt.to_string().into())],
-        })],
+        }))],
         context: (),
     });
 

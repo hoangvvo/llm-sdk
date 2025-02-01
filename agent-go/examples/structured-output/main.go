@@ -254,9 +254,11 @@ func main() {
 	prompt := "Plan a trip from Paris to Tokyo next week"
 
 	response, err := travelAgent.Run(context.Background(), llmagent.AgentRequest[struct{}]{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart(prompt, nil),
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(
+				llmsdk.NewUserMessage(
+					llmsdk.NewTextPart(prompt, nil),
+				),
 			),
 		},
 		Context: struct{}{},

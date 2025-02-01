@@ -17,10 +17,10 @@ import {
 } from "./instruction.ts";
 import type { AgentTool } from "./tool.ts";
 import type {
+  AgentItem,
   AgentRequest,
   AgentResponse,
   AgentStreamEvent,
-  RunItem,
 } from "./types.ts";
 
 /**
@@ -172,7 +172,7 @@ export class RunSession<TContext> {
       throw new Error("RunSession not initialized.");
     }
 
-    const state = new RunState(request.messages, this.#maxTurns);
+    const state = new RunState(request.input, this.#maxTurns);
 
     const input = this.#getLlmInput(request);
     const context = request.context;
@@ -211,13 +211,16 @@ export class RunSession<TContext> {
       throw new Error("RunSession not initialized.");
     }
 
-    const state = new RunState(request.messages, this.#maxTurns);
+    const state = new RunState(request.input, this.#maxTurns);
 
     const input = this.#getLlmInput(request);
     const context = request.context;
 
     for (;;) {
-      const modelStream = this.#model.stream(input);
+      const modelStream = this.#model.stream({
+        ...input,
+        messages: state.getTurnMessages(),
+      });
 
       const accumulator = new StreamAccumulator();
 
@@ -275,7 +278,8 @@ export class RunSession<TContext> {
 
   #getLlmInput(request: AgentRequest<TContext>): LanguageModelInput {
     const input: LanguageModelInput = {
-      messages: request.messages,
+      // messages will be computed from getTurnMessages
+      messages: [],
       system_prompt: getPromptForInstructionParams(
         this.#instructions,
         request.context,
@@ -325,7 +329,7 @@ interface ProcessResultNext {
 
 export class RunState {
   readonly #maxTurns: number;
-  readonly #inputMessages: Message[];
+  readonly #input: AgentItem[];
 
   /**
    * The current turn number in the run.
@@ -335,14 +339,14 @@ export class RunState {
   /**
    * All items generated during the run, such as new ToolMessage and AssistantMessage
    */
-  items: RunItem[];
+  readonly #output: AgentItem[];
 
-  constructor(inputMessages: Message[], maxTurns: number) {
-    this.#inputMessages = inputMessages;
+  constructor(input: AgentItem[], maxTurns: number) {
+    this.#input = input;
     this.#maxTurns = maxTurns;
 
     this.currentTurn = 0;
-    this.items = [];
+    this.#output = [];
   }
 
   /**
@@ -359,20 +363,20 @@ export class RunState {
    * Add a message to the run state.
    */
   appendMessage(message: Message) {
-    this.items.push({ type: "message", ...message });
+    this.#output.push({ type: "message", ...message });
   }
 
   /**
    * Get LLM messages to use in the LanguageModelInput for the turn
    */
   getTurnMessages(): Message[] {
-    return [...this.#inputMessages, ...this.items];
+    return [...this.#input, ...this.#output];
   }
 
   createResponse(finalContent: Part[]): AgentResponse {
     return {
       content: finalContent,
-      items: this.items,
+      output: this.#output,
     };
   }
 }

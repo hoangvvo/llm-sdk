@@ -14,15 +14,15 @@ import (
 // Once finish, the session cleans up any resources used during the run.
 // The session can be reused in multiple runs.
 type RunSession[C any] struct {
-	tools          []AgentTool[C]
-	model          llmsdk.LanguageModel
-	responseFormat llmsdk.ResponseFormatOption
-	instructions   []InstructionParam[C]
-	maxTurns       uint
-	temperature    *float64
-	topP           *float64
-	topK           *float64
-	presencePenalty *float64
+	tools            []AgentTool[C]
+	model            llmsdk.LanguageModel
+	responseFormat   llmsdk.ResponseFormatOption
+	instructions     []InstructionParam[C]
+	maxTurns         uint
+	temperature      *float64
+	topP             *float64
+	topK             *float64
+	presencePenalty  *float64
 	frequencyPenalty *float64
 }
 
@@ -40,15 +40,15 @@ func NewRunSession[C any](
 	frequencyPenalty *float64,
 ) *RunSession[C] {
 	return &RunSession[C]{
-		tools:          tools,
-		model:          model,
-		responseFormat: responseFormat,
-		instructions:   instructions,
-		maxTurns:       maxTurns,
-		temperature:    temperature,
-		topP:           topP,
-		topK:           topK,
-		presencePenalty: presencePenalty,
+		tools:            tools,
+		model:            model,
+		responseFormat:   responseFormat,
+		instructions:     instructions,
+		maxTurns:         maxTurns,
+		temperature:      temperature,
+		topP:             topP,
+		topK:             topK,
+		presencePenalty:  presencePenalty,
 		frequencyPenalty: frequencyPenalty,
 	}
 }
@@ -123,7 +123,7 @@ func (s *RunSession[C]) process(
 
 // Run runs a non-streaming execution of the agent.
 func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResponse, error) {
-	state := NewRunState(request.Messages, s.maxTurns)
+	state := NewRunState(request.Input, s.maxTurns)
 
 	input := s.getLLMInput(request)
 	contextVal := request.Context
@@ -164,7 +164,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 // Run a streaming execution of the agent.
 func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*AgentStream, error) {
-	state := NewRunState(request.Messages, s.maxTurns)
+	state := NewRunState(request.Input, s.maxTurns)
 
 	input := s.getLLMInput(request)
 	contextVal := request.Context
@@ -273,14 +273,15 @@ func (s *RunSession[C]) getLLMInput(request AgentRequest[C]) *llmsdk.LanguageMod
 	systemPrompt := getPrompt(s.instructions, request.Context)
 
 	return &llmsdk.LanguageModelInput{
-		Messages:       request.Messages,
-		SystemPrompt:   &systemPrompt,
-		Tools:          tools,
-		ResponseFormat: &s.responseFormat,
-		Temperature:    s.temperature,
-		TopP:           s.topP,
-		TopK:           s.topK,
-		PresencePenalty: s.presencePenalty,
+		// messages will be computed from getTurnMessages
+		Messages:         nil,
+		SystemPrompt:     &systemPrompt,
+		Tools:            tools,
+		ResponseFormat:   &s.responseFormat,
+		Temperature:      s.temperature,
+		TopP:             s.topP,
+		TopK:             s.topK,
+		PresencePenalty:  s.presencePenalty,
 		FrequencyPenalty: s.frequencyPenalty,
 	}
 }
@@ -295,24 +296,24 @@ type ProcessResult struct {
 }
 
 type RunState struct {
-	maxTurns      uint
-	inputMessages []llmsdk.Message
+	maxTurns uint
+	input    []AgentItem
 
 	// The current turn number in the run.
 	CurrentTurn uint
 	// All items generated during the run, such as new `ToolMessage` and
 	// `AssistantMessage`
-	Items []RunItem
+	output []AgentItem
 
 	mu sync.RWMutex
 }
 
-func NewRunState(inputMessages []llmsdk.Message, maxTurns uint) *RunState {
+func NewRunState(input []AgentItem, maxTurns uint) *RunState {
 	return &RunState{
-		maxTurns:      maxTurns,
-		inputMessages: inputMessages,
-		CurrentTurn:   0,
-		Items:         []RunItem{},
+		maxTurns:    maxTurns,
+		input:       input,
+		CurrentTurn: 0,
+		output:      []AgentItem{},
 	}
 }
 
@@ -334,7 +335,7 @@ func (s *RunState) AppendMessage(message llmsdk.Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.Items = append(s.Items, RunItem{
+	s.output = append(s.output, AgentItem{
 		Message: &message,
 	})
 }
@@ -344,10 +345,14 @@ func (s *RunState) GetTurnMessages() []llmsdk.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	messages := make([]llmsdk.Message, len(s.inputMessages))
-	copy(messages, s.inputMessages)
+	messages := make([]llmsdk.Message, 0, len(s.input)+len(s.output))
+	for _, item := range s.input {
+		if item.Message != nil {
+			messages = append(messages, *item.Message)
+		}
+	}
 
-	for _, item := range s.Items {
+	for _, item := range s.output {
 		if item.Message != nil {
 			messages = append(messages, *item.Message)
 		}
@@ -362,6 +367,6 @@ func (s *RunState) CreateResponse(finalContent []llmsdk.Part) *AgentResponse {
 
 	return &AgentResponse{
 		Content: finalContent,
-		Items:   s.Items,
+		Output:  s.output,
 	}
 }

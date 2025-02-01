@@ -1,6 +1,5 @@
-import { Agent, tool } from "@hoangvvo/llm-agent";
+import { Agent, tool, type AgentItem } from "@hoangvvo/llm-agent";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
-import type { Message } from "@hoangvvo/llm-sdk";
 import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
 import assert from "node:assert";
 import { z } from "zod";
@@ -30,8 +29,9 @@ ${description}`,
     async execute(args: { task: string }, context: TContext) {
       const result = await agent.run({
         context,
-        messages: [
+        input: [
           {
+            type: "message",
             role: "user",
             content: [{ type: "text", text: args.task }],
           },
@@ -210,27 +210,28 @@ You should also poll the order status in every turn to send them for delivery on
   ],
 });
 
-const messages: Message[] = [];
+const items: AgentItem[] = [];
 
 const myContext = new MyContext();
 
 for (;;) {
   console.log("\n--- New iteration ---");
 
-  messages.push({
+  items.push({
+    type: "message",
     role: "user",
     content: [{ type: "text", text: "Next" }],
   });
 
   const response = await coordinator.run({
-    messages,
+    input: items,
     context: myContext,
   });
 
   console.dir(response.content, { depth: null });
 
-  // Update messages with the new items
-  messages.push(...response.items);
+  // Append items with the output items
+  items.push(...response.output);
 
   await new Promise((resolve) => setTimeout(resolve, 5000));
 }

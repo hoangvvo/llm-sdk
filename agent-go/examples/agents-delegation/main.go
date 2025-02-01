@@ -67,10 +67,11 @@ func (t *AgentTransferTool[C]) Execute(ctx context.Context, paramsJSON json.RawM
 	}
 
 	result, err := t.agent.Run(ctx, llmagent.AgentRequest[C]{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart(params.Task, nil),
-			),
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(
+				llmsdk.NewUserMessage(
+					llmsdk.NewTextPart(params.Task, nil),
+				)),
 		},
 		Context: contextVal,
 	})
@@ -362,20 +363,20 @@ You should also poll the order status in every turn to send them for delivery on
 
 	contextVal := NewMyContext()
 
-	var messages []llmsdk.Message
+	var items []llmagent.AgentItem
 	ctx := context.Background()
 
 	// Main loop
 	for {
 		fmt.Println("\n--- New iteration ---")
 
-		messages = append(messages, llmsdk.NewUserMessage(
+		items = append(items, llmagent.NewMessageAgentItem(llmsdk.NewUserMessage(
 			llmsdk.NewTextPart("Next", nil),
-		))
+		)))
 
 		response, err := coordinator.Run(ctx, llmagent.AgentRequest[*MyContext]{
-			Messages: messages,
-			Context:  contextVal,
+			Input:   items,
+			Context: contextVal,
 		})
 		if err != nil {
 			log.Fatal(err)
@@ -387,12 +388,8 @@ You should also poll the order status in every turn to send them for delivery on
 		}
 		fmt.Printf("%s\n", string(prettyJSON))
 
-		// Update messages with the new items
-		for _, item := range response.Items {
-			if item.Message != nil {
-				messages = append(messages, *item.Message)
-			}
-		}
+		// Append items with the output items
+		items = append(items, response.Output...)
 
 		// Wait 5 seconds before next iteration
 		time.Sleep(5 * time.Second)

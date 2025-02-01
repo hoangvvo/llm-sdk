@@ -184,7 +184,7 @@ func main() {
 	)
 
 	// Implement the CLI to interact with the Agent
-	var messages []llmsdk.Message
+	var items []llmagent.AgentItem
 
 	fmt.Println("Type 'exit' to quit")
 
@@ -204,26 +204,22 @@ func main() {
 		}
 
 		// Add user message as the input
-		messages = append(messages, llmsdk.NewUserMessage(
+		items = append(items, llmagent.NewMessageAgentItem(llmsdk.NewUserMessage(
 			llmsdk.NewTextPart(userInput, nil),
-		))
+		)))
 
 		// Call assistant
 		response, err := myAssistant.Run(ctx, llmagent.AgentRequest[MyContext]{
-			Context:  myContext,
-			Messages: messages,
+			Context: myContext,
+			Input:   items,
 		})
 		if err != nil {
 			log.Printf("Error: %v\n", err)
 			continue
 		}
 
-		// Update messages with the new items
-		for _, item := range response.Items {
-			if item.Message != nil {
-				messages = append(messages, *item.Message)
-			}
-		}
+		// Append items with the output items
+		items = append(items, response.Output...)
 
 		prettyJSON, err := json.MarshalIndent(response.Content, "", "  ")
 		if err != nil {

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use dotenvy::dotenv;
 use futures::lock::Mutex;
-use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult, RunItem, RunState};
+use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part, UserMessage,
@@ -146,7 +146,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .build();
 
     // Implement the CLI to interact with the Agent
-    let mut messages: Vec<Message> = Vec::new();
+    let mut items = Vec::<AgentItem>::new();
 
     // Get user name
     let user_name = read_line("Your name: ")?;
@@ -167,22 +167,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
         // Add user message as the input
-        messages.push(Message::User(UserMessage {
+        items.push(AgentItem::Message(Message::User(UserMessage {
             content: vec![Part::Text(user_input.into())],
-        }));
+        })));
 
         // Call assistant
         let response = my_assistant
             .run(AgentRequest {
                 context: context.clone(),
-                messages: messages.clone(),
+                input: items.clone(),
             })
             .await?;
 
-        // Update messages with the new items
-        messages.extend(response.items.iter().filter_map(|item| match item {
-            RunItem::Message(msg) => Some(msg.clone()),
-        }));
+        // Append items with the output items
+        items.extend(response.output.clone());
 
         println!("{:#?}", response.content);
     }
