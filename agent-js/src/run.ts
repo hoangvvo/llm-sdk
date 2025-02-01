@@ -36,6 +36,11 @@ export class RunSession<TContext> {
   readonly #responseFormat: ResponseFormatOption;
   readonly #tools: AgentTool<any, TContext>[];
   readonly #maxTurns: number;
+  readonly #temperature: number | undefined;
+  readonly #topP: number | undefined;
+  readonly #topK: number | undefined;
+  readonly #presencePenalty: number | undefined;
+  readonly #frequencyPenalty: number | undefined;
 
   #initialized: boolean;
 
@@ -45,12 +50,22 @@ export class RunSession<TContext> {
     tools: AgentTool<any, TContext>[],
     responseFormat: ResponseFormatOption,
     maxTurns: number,
+    temperature?: number,
+    topP?: number,
+    topK?: number,
+    presencePenalty?: number,
+    frequencyPenalty?: number,
   ) {
     this.#instructions = instructions;
     this.#model = model;
     this.#responseFormat = responseFormat;
     this.#tools = tools;
     this.#maxTurns = maxTurns;
+    this.#temperature = temperature;
+    this.#topP = topP;
+    this.#topK = topK;
+    this.#presencePenalty = presencePenalty;
+    this.#frequencyPenalty = frequencyPenalty;
 
     this.#initialized = false;
   }
@@ -64,6 +79,11 @@ export class RunSession<TContext> {
     tools: AgentTool<any, TContext>[],
     responseFormat: ResponseFormatOption,
     maxTurns: number,
+    temperature?: number,
+    topP?: number,
+    topK?: number,
+    presencePenalty?: number,
+    frequencyPenalty?: number,
   ): Promise<RunSession<TContext>> {
     const session = new RunSession(
       model,
@@ -71,6 +91,11 @@ export class RunSession<TContext> {
       tools,
       responseFormat,
       maxTurns,
+      temperature,
+      topP,
+      topK,
+      presencePenalty,
+      frequencyPenalty,
     );
     await session.#initialize();
     return session;
@@ -249,7 +274,7 @@ export class RunSession<TContext> {
   }
 
   #getLlmInput(request: AgentRequest<TContext>): LanguageModelInput {
-    return {
+    const input: LanguageModelInput = {
       messages: request.messages,
       system_prompt: getPromptForInstructionParams(
         this.#instructions,
@@ -262,6 +287,24 @@ export class RunSession<TContext> {
       })),
       response_format: this.#responseFormat,
     };
+
+    if (this.#temperature !== undefined) {
+      input.temperature = this.#temperature;
+    }
+    if (this.#topP !== undefined) {
+      input.top_p = this.#topP;
+    }
+    if (this.#topK !== undefined) {
+      input.top_k = this.#topK;
+    }
+    if (this.#presencePenalty !== undefined) {
+      input.presence_penalty = this.#presencePenalty;
+    }
+    if (this.#frequencyPenalty !== undefined) {
+      input.frequency_penalty = this.#frequencyPenalty;
+    }
+
+    return input;
   }
 }
 

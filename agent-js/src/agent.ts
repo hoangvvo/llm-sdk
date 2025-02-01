@@ -15,6 +15,11 @@ export class Agent<TContext> {
   readonly #response_format: ResponseFormatOption;
   readonly #tools: AgentTool<any, TContext>[];
   readonly #max_turns: number;
+  readonly #temperature: number | undefined;
+  readonly #top_p: number | undefined;
+  readonly #top_k: number | undefined;
+  readonly #presence_penalty: number | undefined;
+  readonly #frequency_penalty: number | undefined;
 
   constructor(inputParams: AgentParams<TContext>) {
     const params = agentParamsWithDefaults(inputParams);
@@ -24,6 +29,11 @@ export class Agent<TContext> {
     this.#response_format = params.response_format;
     this.#tools = params.tools;
     this.#max_turns = params.max_turns;
+    this.#temperature = params.temperature;
+    this.#top_p = params.top_p;
+    this.#top_k = params.top_k;
+    this.#presence_penalty = params.presence_penalty;
+    this.#frequency_penalty = params.frequency_penalty;
   }
 
   /**
@@ -63,6 +73,11 @@ export class Agent<TContext> {
       this.#tools,
       this.#response_format,
       this.#max_turns,
+      this.#temperature,
+      this.#top_p,
+      this.#top_k,
+      this.#presence_penalty,
+      this.#frequency_penalty,
     );
   }
 }
@@ -105,11 +120,55 @@ export interface AgentParams<TContext> {
    * @default 10
    */
   max_turns?: number;
+
+  /**
+   * Amount of randomness injected into the response. Ranges from 0.0 to 1.0
+   * @default undefined
+   */
+  temperature?: number;
+
+  /**
+   * An alternative to sampling with temperature, called nucleus sampling,
+   * where the model considers the results of the tokens with top_p probability mass.
+   * Ranges from 0.0 to 1.0
+   * @default undefined
+   */
+  top_p?: number;
+
+  /**
+   * Only sample from the top K options for each subsequent token.
+   * Used to remove 'long tail' low probability responses.
+   * @default undefined
+   */
+  top_k?: number;
+
+  /**
+   * Positive values penalize new tokens based on whether they appear in the text so far,
+   * increasing the model's likelihood to talk about new topics.
+   * @default undefined
+   */
+  presence_penalty?: number;
+
+  /**
+   * Positive values penalize new tokens based on their existing frequency in the text so far,
+   * decreasing the model's likelihood to repeat the same line verbatim.
+   * @default undefined
+   */
+  frequency_penalty?: number;
 }
+
+type AgentParamsWithDefaults<TContext> = Omit<
+  Required<AgentParams<TContext>>,
+  "temperature" | "top_p" | "top_k" | "presence_penalty" | "frequency_penalty"
+> &
+  Pick<
+    AgentParams<TContext>,
+    "temperature" | "top_p" | "top_k" | "presence_penalty" | "frequency_penalty"
+  >;
 
 function agentParamsWithDefaults<TContext>(
   params: AgentParams<TContext>,
-): Required<AgentParams<TContext>> {
+): AgentParamsWithDefaults<TContext> {
   return {
     instructions: [],
     tools: [],

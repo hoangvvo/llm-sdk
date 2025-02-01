@@ -19,6 +19,11 @@ type RunSession[C any] struct {
 	responseFormat llmsdk.ResponseFormatOption
 	instructions   []InstructionParam[C]
 	maxTurns       uint
+	temperature    *float64
+	topP           *float64
+	topK           *float64
+	presencePenalty *float64
+	frequencyPenalty *float64
 }
 
 // NewRunSession creates a new run session and initializes dependencies
@@ -28,6 +33,11 @@ func NewRunSession[C any](
 	tools []AgentTool[C],
 	responseFormat llmsdk.ResponseFormatOption,
 	maxTurns uint,
+	temperature *float64,
+	topP *float64,
+	topK *float64,
+	presencePenalty *float64,
+	frequencyPenalty *float64,
 ) *RunSession[C] {
 	return &RunSession[C]{
 		tools:          tools,
@@ -35,6 +45,11 @@ func NewRunSession[C any](
 		responseFormat: responseFormat,
 		instructions:   instructions,
 		maxTurns:       maxTurns,
+		temperature:    temperature,
+		topP:           topP,
+		topK:           topK,
+		presencePenalty: presencePenalty,
+		frequencyPenalty: frequencyPenalty,
 	}
 }
 
@@ -262,6 +277,11 @@ func (s *RunSession[C]) getLLMInput(request AgentRequest[C]) *llmsdk.LanguageMod
 		SystemPrompt:   &systemPrompt,
 		Tools:          tools,
 		ResponseFormat: &s.responseFormat,
+		Temperature:    s.temperature,
+		TopP:           s.topP,
+		TopK:           s.topK,
+		PresencePenalty: s.presencePenalty,
+		FrequencyPenalty: s.frequencyPenalty,
 	}
 }
 

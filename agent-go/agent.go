@@ -13,6 +13,11 @@ type Agent[C any] struct {
 	tools          []AgentTool[C]
 	responseFormat llmsdk.ResponseFormatOption
 	maxTurns       uint
+	temperature    *float64
+	topP           *float64
+	topK           *float64
+	presencePenalty *float64
+	frequencyPenalty *float64
 }
 
 // NewAgent creates a new agent with given name, language model, and options.
@@ -22,6 +27,11 @@ type Agent[C any] struct {
 // - `tools`: empty
 // - `responseFormat`: `llmsdk.NewResponseFormatText()`
 // - `maxTurns`: 10
+// - `temperature`: nil
+// - `topP`: nil
+// - `topK`: nil
+// - `presencePenalty`: nil
+// - `frequencyPenalty`: nil
 func NewAgent[C any](name string, model llmsdk.LanguageModel, options ...AgentOption[C]) *Agent[C] {
 	agent := &Agent[C]{
 		Name:           name,
@@ -70,6 +80,51 @@ func WithMaxTurns[C any](maxTurns uint) AgentOption[C] {
 	}
 }
 
+// WithTemperature sets the sampling temperature for the model.
+// Amount of randomness injected into the response. Ranges from 0.0 to 1.0
+func WithTemperature[C any](temperature float64) AgentOption[C] {
+	return func(a *Agent[C]) {
+		a.temperature = &temperature
+	}
+}
+
+// WithTopP sets the nucleus sampling parameter for the model.
+// An alternative to sampling with temperature, called nucleus sampling,
+// where the model considers the results of the tokens with top_p probability mass.
+// Ranges from 0.0 to 1.0
+func WithTopP[C any](topP float64) AgentOption[C] {
+	return func(a *Agent[C]) {
+		a.topP = &topP
+	}
+}
+
+// WithTopK sets the top-k sampling parameter for the model.
+// Only sample from the top K options for each subsequent token.
+// Used to remove 'long tail' low probability responses.
+func WithTopK[C any](topK float64) AgentOption[C] {
+	return func(a *Agent[C]) {
+		a.topK = &topK
+	}
+}
+
+// WithPresencePenalty sets the presence penalty for the model.
+// Positive values penalize new tokens based on whether they appear in the text so far,
+// increasing the model's likelihood to talk about new topics.
+func WithPresencePenalty[C any](presencePenalty float64) AgentOption[C] {
+	return func(a *Agent[C]) {
+		a.presencePenalty = &presencePenalty
+	}
+}
+
+// WithFrequencyPenalty sets the frequency penalty for the model.
+// Positive values penalize new tokens based on their existing frequency in the text so far,
+// decreasing the model's likelihood to repeat the same line verbatim.
+func WithFrequencyPenalty[C any](frequencyPenalty float64) AgentOption[C] {
+	return func(a *Agent[C]) {
+		a.frequencyPenalty = &frequencyPenalty
+	}
+}
+
 // Run executes the agent with the given request and returns the response.
 func (a *Agent[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResponse, error) {
 	session := NewRunSession(
@@ -78,6 +133,11 @@ func (a *Agent[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResp
 		a.tools,
 		a.responseFormat,
 		a.maxTurns,
+		a.temperature,
+		a.topP,
+		a.topK,
+		a.presencePenalty,
+		a.frequencyPenalty,
 	)
 	return session.Run(ctx, request)
 }
@@ -90,6 +150,11 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 		a.tools,
 		a.responseFormat,
 		a.maxTurns,
+		a.temperature,
+		a.topP,
+		a.topK,
+		a.presencePenalty,
+		a.frequencyPenalty,
 	)
 	return session.RunStream(ctx, request)
 }

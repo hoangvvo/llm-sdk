@@ -21,6 +21,11 @@ pub struct RunSession<TCtx> {
     response_format: ResponseFormatOption,
     instructions: Arc<Vec<InstructionParam<TCtx>>>,
     max_turns: usize,
+    temperature: Option<f64>,
+    top_p: Option<f64>,
+    top_k: Option<f64>,
+    presence_penalty: Option<f64>,
+    frequency_penalty: Option<f64>,
 }
 
 impl<TCtx> RunSession<TCtx>
@@ -35,6 +40,11 @@ where
         tools: Arc<Vec<Box<dyn AgentTool<TCtx>>>>,
         response_format: ResponseFormatOption,
         max_turns: usize,
+        temperature: Option<f64>,
+        top_p: Option<f64>,
+        top_k: Option<f64>,
+        presence_penalty: Option<f64>,
+        frequency_penalty: Option<f64>,
     ) -> Self {
         Self {
             tools,
@@ -42,6 +52,11 @@ where
             response_format,
             instructions,
             max_turns,
+            temperature,
+            top_p,
+            top_k,
+            presence_penalty,
+            frequency_penalty,
         }
     }
 
@@ -163,6 +178,11 @@ where
             response_format: self.response_format.clone(),
             instructions: self.instructions.clone(),
             max_turns: self.max_turns,
+            temperature: self.temperature,
+            top_p: self.top_p,
+            top_k: self.top_k,
+            presence_penalty: self.presence_penalty,
+            frequency_penalty: self.frequency_penalty,
         });
 
         let stream = async_stream::try_stream! {
@@ -229,6 +249,11 @@ where
                 )),
                 tools: Some(self.tools.iter().map(|tool| tool.as_ref().into()).collect()),
                 response_format: Some(self.response_format.clone()),
+                temperature: self.temperature,
+                top_p: self.top_p,
+                top_k: self.top_k,
+                presence_penalty: self.presence_penalty,
+                frequency_penalty: self.frequency_penalty,
                 ..Default::default()
             },
             Arc::new(request.context),
