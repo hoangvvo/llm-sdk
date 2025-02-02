@@ -37,7 +37,8 @@ export class Agent<TContext> {
   }
 
   /**
-   * Create a stateless one-time run of the agent
+   * Create a one-time run of the agent and generate a response.
+   * A session is created for the run and cleaned up afterwards.
    */
   async run(request: AgentRequest<TContext>): Promise<AgentResponse> {
     const runSession = await this.createSession();
@@ -46,6 +47,10 @@ export class Agent<TContext> {
     return result;
   }
 
+  /**
+   * Create a one-time streaming run of the agent and generate a response.
+   * A session is created for the run and cleaned up afterwards.
+   */
   async *runStream(
     request: AgentRequest<TContext>,
   ): AsyncGenerator<AgentStreamEvent, AgentResponse> {

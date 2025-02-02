@@ -42,7 +42,8 @@ where
             frequency_penalty: params.frequency_penalty,
         }
     }
-    /// Create a stateless one-time run of the agent
+    /// Create a one-time run of the agent and generate a response.
+    /// A session is created for the run and cleaned up afterwards.
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
         let run_session = self.create_session().await;
         let res = run_session.run(request).await?;
@@ -50,7 +51,8 @@ where
         Ok(res)
     }
 
-    /// Create a stateless one-time streaming run of the agent
+    /// Create a one-time streaming run of the agent and generate a response.
+    /// A session is created for the run and cleaned up afterwards.
     pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
         let run_session = Arc::new(self.create_session().await);
         let mut stream = run_session.clone().run_stream(request)?;

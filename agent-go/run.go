@@ -163,7 +163,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 }
 
 // Run a streaming execution of the agent.
-func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*AgentStream, error) {
+func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) *AgentStream {
 	state := NewRunState(request.Input, s.maxTurns)
 
 	input := s.getLLMInput(request)
@@ -252,7 +252,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 		}
 	}()
 
-	return NewAgentStream(eventChan, errChan), nil
+	return NewAgentStream(eventChan, errChan)
 }
 
 func (s *RunSession[C]) Finish() {
