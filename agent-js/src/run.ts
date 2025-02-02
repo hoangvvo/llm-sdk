@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
+  LanguageModelError,
   StreamAccumulator,
   type LanguageModel,
   type LanguageModelInput,
@@ -10,12 +11,17 @@ import {
   type ResponseFormatOption,
   type ToolMessage,
 } from "@hoangvvo/llm-sdk";
-import { AgentInvariantError, AgentMaxTurnsExceededError } from "./errors.ts";
+import {
+  AgentInvariantError,
+  AgentLanguageModelError,
+  AgentMaxTurnsExceededError,
+  AgentToolExecutionError,
+} from "./errors.ts";
 import {
   getPromptForInstructionParams,
   type InstructionParam,
 } from "./instruction.ts";
-import type { AgentTool } from "./tool.ts";
+import type { AgentTool, AgentToolResult } from "./tool.ts";
 import type {
   AgentItem,
   AgentRequest,
@@ -143,11 +149,13 @@ export class RunSession<TContext> {
         );
       }
 
-      const toolRes = await agentTool.execute(
-        toolCallPart.args,
-        context,
-        state,
-      );
+      let toolRes: AgentToolResult;
+
+      try {
+        toolRes = await agentTool.execute(toolCallPart.args, context, state);
+      } catch (e) {
+        throw new AgentToolExecutionError(e);
+      }
 
       toolMessage.content.push({
         type: "tool-result",
@@ -224,12 +232,19 @@ export class RunSession<TContext> {
 
       const accumulator = new StreamAccumulator();
 
-      for await (const partial of modelStream) {
-        accumulator.addPartial(partial);
-        yield {
-          type: "partial",
-          ...partial,
-        };
+      try {
+        for await (const partial of modelStream) {
+          accumulator.addPartial(partial);
+          yield {
+            type: "partial",
+            ...partial,
+          };
+        }
+      } catch (err) {
+        if (err instanceof LanguageModelError) {
+          throw new AgentLanguageModelError(err);
+        }
+        throw err;
       }
 
       const modelResponse = accumulator.computeResponse();

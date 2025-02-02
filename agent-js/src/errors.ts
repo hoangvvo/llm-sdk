@@ -1,3 +1,5 @@
+import type { LanguageModelError } from "@hoangvvo/llm-sdk";
+
 export class AgentError extends Error {
   constructor(message: string) {
     super(message);
@@ -5,10 +7,28 @@ export class AgentError extends Error {
   }
 }
 
+export class AgentLanguageModelError extends AgentError {
+  constructor(err: LanguageModelError) {
+    super(`Language model error: ${err.message}`);
+    this.name = "LanguageModelError";
+    this.cause = err;
+  }
+}
+
 export class AgentInvariantError extends AgentError {
   constructor(message: string) {
     super(`Invariant: ${message}`);
     this.name = "AgentInvariantError";
+  }
+}
+
+export class AgentToolExecutionError extends AgentError {
+  constructor(err: unknown) {
+    super(
+      `Tool execution failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    this.name = "AgentToolExecutionError";
+    this.cause = err;
   }
 }
 
