@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NotImplementedError, UnsupportedError } from "../errors.ts";
-import type { LanguageModelMetadata } from "../language-model.ts";
-import { LanguageModel } from "../language-model.ts";
+import type {
+  LanguageModel,
+  LanguageModelMetadata,
+} from "../language-model.ts";
 import { looselyConvertPartToPartDelta } from "../stream.utils.ts";
 import type {
   ContentDelta,
@@ -31,7 +33,7 @@ export interface AnthropicModelOptions {
 
 const PROVIDER = "anthropic";
 
-export class AnthropicModel extends LanguageModel {
+export class AnthropicModel implements LanguageModel {
   provider: string;
   modelId: string;
   metadata?: LanguageModelMetadata;
@@ -42,7 +44,6 @@ export class AnthropicModel extends LanguageModel {
     options: AnthropicModelOptions,
     metadata?: LanguageModelMetadata,
   ) {
-    super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;

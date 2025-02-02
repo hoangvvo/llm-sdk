@@ -5,10 +5,8 @@ import {
   RefusalError,
   UnsupportedError,
 } from "../errors.ts";
-import {
-  LanguageModel,
-  type LanguageModelMetadata,
-} from "../language-model.ts";
+import type { LanguageModel } from "../language-model.ts";
+import { type LanguageModelMetadata } from "../language-model.ts";
 import { guessDeltaIndex } from "../stream.utils.ts";
 import type {
   AudioFormat,
@@ -49,7 +47,7 @@ export interface OpenAIModelOptions {
   modelId: string;
 }
 
-export class OpenAIModel extends LanguageModel {
+export class OpenAIModel implements LanguageModel {
   provider: string;
   modelId: string;
   metadata?: LanguageModelMetadata;
@@ -57,7 +55,6 @@ export class OpenAIModel extends LanguageModel {
   #openai: OpenAI;
 
   constructor(options: OpenAIModelOptions, metadata?: LanguageModelMetadata) {
-    super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;

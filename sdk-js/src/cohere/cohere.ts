@@ -4,8 +4,10 @@ import {
   InvariantError,
   UnsupportedError,
 } from "../errors.ts";
-import type { LanguageModelMetadata } from "../language-model.ts";
-import { LanguageModel } from "../language-model.ts";
+import type {
+  LanguageModel,
+  LanguageModelMetadata,
+} from "../language-model.ts";
 import type {
   ContentDelta,
   ImagePart,
@@ -31,7 +33,7 @@ export interface CohereModelOptions {
   modelId: string;
 }
 
-export class CohereModel extends LanguageModel {
+export class CohereModel implements LanguageModel {
   provider: string;
   modelId: string;
   metadata?: LanguageModelMetadata;
@@ -39,7 +41,6 @@ export class CohereModel extends LanguageModel {
   #cohere: CohereClientV2;
 
   constructor(options: CohereModelOptions, metadata?: LanguageModelMetadata) {
-    super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;

@@ -72,18 +72,24 @@ export class Agent<TContext> {
    * Create a session for stateful multiple runs of the agent
    */
   async createSession(): Promise<RunSession<TContext>> {
-    return RunSession.create(
-      this.#model,
-      this.#instructions,
-      this.#tools,
-      this.#response_format,
-      this.#max_turns,
-      this.#temperature,
-      this.#top_p,
-      this.#top_k,
-      this.#presence_penalty,
-      this.#frequency_penalty,
-    );
+    return RunSession.create({
+      model: this.#model,
+      instructions: this.#instructions,
+      tools: this.#tools,
+      responseFormat: this.#response_format,
+      maxTurns: this.#max_turns,
+      ...(this.#temperature !== undefined && {
+        temperature: this.#temperature,
+      }),
+      ...(this.#top_p !== undefined && { topP: this.#top_p }),
+      ...(this.#top_k !== undefined && { topK: this.#top_k }),
+      ...(this.#presence_penalty !== undefined && {
+        presencePenalty: this.#presence_penalty,
+      }),
+      ...(this.#frequency_penalty !== undefined && {
+        frequencyPenalty: this.#frequency_penalty,
+      }),
+    });
   }
 }
 

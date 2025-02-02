@@ -6,8 +6,10 @@ import {
   NotImplementedError,
   UnsupportedError,
 } from "../errors.ts";
-import type { LanguageModelMetadata } from "../language-model.ts";
-import { LanguageModel } from "../language-model.ts";
+import type {
+  LanguageModel,
+  LanguageModelMetadata,
+} from "../language-model.ts";
 import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
@@ -41,7 +43,7 @@ export interface MistralModelOptions {
 type MistralChatCompletionRequestMessage =
   MistralComponents.ChatCompletionRequest["messages"][number];
 
-export class MistralModel extends LanguageModel {
+export class MistralModel implements LanguageModel {
   provider: string;
   modelId: string;
   metadata?: LanguageModelMetadata;
@@ -49,7 +51,6 @@ export class MistralModel extends LanguageModel {
   #client: Mistral;
 
   constructor(options: MistralModelOptions, metadata?: LanguageModelMetadata) {
-    super();
     this.provider = "mistral";
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;

@@ -29,8 +29,10 @@ import {
   NotImplementedError,
   UnsupportedError,
 } from "../errors.ts";
-import type { LanguageModelMetadata } from "../language-model.ts";
-import { LanguageModel } from "../language-model.ts";
+import type {
+  LanguageModel,
+  LanguageModelMetadata,
+} from "../language-model.ts";
 import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
@@ -61,7 +63,7 @@ export interface GoogleModelOptions {
   modelId: string;
 }
 
-export class GoogleModel extends LanguageModel {
+export class GoogleModel implements LanguageModel {
   provider: string;
   modelId: string;
   metadata?: LanguageModelMetadata;
@@ -69,7 +71,6 @@ export class GoogleModel extends LanguageModel {
   #genModel: GenerativeModel;
 
   constructor(options: GoogleModelOptions, metadata?: LanguageModelMetadata) {
-    super();
     this.provider = PROVIDER;
     this.modelId = options.modelId;
     if (metadata) this.metadata = metadata;

@@ -50,18 +50,18 @@ export class RunSession<TContext> {
 
   #initialized: boolean;
 
-  constructor(
-    model: LanguageModel,
-    instructions: InstructionParam<TContext>[],
-    tools: AgentTool<any, TContext>[],
-    responseFormat: ResponseFormatOption,
-    maxTurns: number,
-    temperature?: number,
-    topP?: number,
-    topK?: number,
-    presencePenalty?: number,
-    frequencyPenalty?: number,
-  ) {
+  constructor({
+    instructions,
+    model,
+    responseFormat,
+    tools,
+    maxTurns,
+    temperature,
+    topP,
+    topK,
+    presencePenalty,
+    frequencyPenalty,
+  }: RunSessionParams<TContext>) {
     this.#instructions = instructions;
     this.#model = model;
     this.#responseFormat = responseFormat;
@@ -80,29 +80,9 @@ export class RunSession<TContext> {
    * Create a new run session and initializes dependencies
    */
   static async create<TContext>(
-    model: LanguageModel,
-    instructions: InstructionParam<TContext>[],
-    tools: AgentTool<any, TContext>[],
-    responseFormat: ResponseFormatOption,
-    maxTurns: number,
-    temperature?: number,
-    topP?: number,
-    topK?: number,
-    presencePenalty?: number,
-    frequencyPenalty?: number,
+    params: RunSessionParams<TContext>,
   ): Promise<RunSession<TContext>> {
-    const session = new RunSession(
-      model,
-      instructions,
-      tools,
-      responseFormat,
-      maxTurns,
-      temperature,
-      topP,
-      topK,
-      presencePenalty,
-      frequencyPenalty,
-    );
+    const session = new RunSession(params);
     await session.#initialize();
     return session;
   }
@@ -325,6 +305,19 @@ export class RunSession<TContext> {
 
     return input;
   }
+}
+
+interface RunSessionParams<TContext> {
+  model: LanguageModel;
+  instructions: InstructionParam<TContext>[];
+  tools: AgentTool<any, TContext>[];
+  responseFormat: ResponseFormatOption;
+  maxTurns: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  presencePenalty?: number;
+  frequencyPenalty?: number;
 }
 
 type ProcessResult = ProcessResultResponse | ProcessResultNext;

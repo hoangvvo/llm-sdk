@@ -175,7 +175,7 @@ The library also provides a streaming interface, similar to streaming LLM comple
 
 ### Agent Patterns
 
-Unlike other agent frameworks, this library does not hardcode any hidden prompt templates or parsing logic. This design choice avoids unnecessary constraints, reduces complexity, and prevents the loss of control that comes with excessive abstraction (see this [blog post](https://octomind.dev/blog/why-we-no-longer-use-langchain-for-building-our-ai-agents) for a deeper discussion).
+Unlike other agent frameworks, this library does not hardcode any hidden prompt templates or parsing logic. This design choice avoids unnecessary constraints, reduces complexity, and prevents the loss of control that comes with excessive abstraction (see this [blog post](https://hamel.dev/blog/posts/prompt/) for a deeper discussion).
 
 However, this prevents the library from implementing specific agent patterns, such as hand-off, memory, and others. The examples folder in each agent library contains implementations of various agent patterns to serve as references.
 
