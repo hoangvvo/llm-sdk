@@ -26,6 +26,7 @@ type Part struct {
 	TextPart       *TextPart       `json:"-"`
 	ImagePart      *ImagePart      `json:"-"`
 	AudioPart      *AudioPart      `json:"-"`
+	DocumentPart   *DocumentPart   `json:"-"`
 	ToolCallPart   *ToolCallPart   `json:"-"`
 	ToolResultPart *ToolResultPart `json:"-"`
 }
@@ -36,6 +37,7 @@ const (
 	PartTypeText       PartType = "text"
 	PartTypeImage      PartType = "image"
 	PartTypeAudio      PartType = "audio"
+	PartTypeDocument   PartType = "document"
 	PartTypeToolCall   PartType = "tool-call"
 	PartTypeToolResult PartType = "tool-result"
 )
@@ -59,43 +61,73 @@ func (p Part) Type() PartType {
 
 // TextPart represents a part of the message that contains text.
 type TextPart struct {
-	Text string  `json:"text"`
-	ID   *string `json:"id,omitempty"`
+	Text string `json:"text"`
+	// The ID of the part, if applicable.
+	ID *string `json:"id,omitempty"`
 }
 
 // ImagePart represents a part of the message that contains an image.
 type ImagePart struct {
-	MimeType  string  `json:"mime_type"`
-	ImageData string  `json:"image_data"`
-	Width     *int    `json:"width,omitempty"`
-	Height    *int    `json:"height,omitempty"`
-	ID        *string `json:"id,omitempty"`
+	// The MIME type of the image. E.g. "image/jpeg", "image/png".
+	MimeType string `json:"mime_type"`
+	// The base64-encoded image data.
+	ImageData string `json:"image_data"`
+	// The width of the image in pixels.
+	Width *int `json:"width,omitempty"`
+	// The height of the image in pixels.
+	Height *int `json:"height,omitempty"`
+	// The ID of the part, if applicable.
+	ID *string `json:"id,omitempty"`
 }
 
 // AudioPart represents a part of the message that contains an audio.
 type AudioPart struct {
-	AudioData  string      `json:"audio_data"`
-	Format     AudioFormat `json:"format"`
-	SampleRate *int        `json:"sample_rate,omitempty"`
-	Channels   *int        `json:"channels,omitempty"`
-	Transcript *string     `json:"transcript,omitempty"`
-	ID         *string     `json:"id,omitempty"`
+	// The base64-encoded audio data.
+	AudioData string      `json:"audio_data"`
+	Format    AudioFormat `json:"format"`
+	// The sample rate of the audio. E.g. 44100, 48000.
+	SampleRate *int `json:"sample_rate,omitempty"`
+	// The number of channels of the audio. E.g. 1, 2.
+	Channels *int `json:"channels,omitempty"`
+	// The transcript of the audio.
+	Transcript *string `json:"transcript,omitempty"`
+	// The ID of the part, if applicable.
+	ID *string `json:"id,omitempty"`
+}
+
+// DocumentPart represents A part of the message that contains a document with structured content.
+// Documents will be used for citation for supported models.
+type DocumentPart struct {
+	// The title of the document.
+	Title string `json:"title"`
+	// The content of the document.
+	Content []Part `json:"content"`
+	// The ID of the part, if applicable.
+	ID *string `json:"id,omitempty"`
 }
 
 // ToolCallPart represents a part of the message that represents a call to a tool the model wants to use.
 type ToolCallPart struct {
-	ToolCallID string          `json:"tool_call_id"`
-	ToolName   string          `json:"tool_name"`
-	Args       json.RawMessage `json:"args"`
-	ID         *string         `json:"id,omitempty"`
+	// The ID of the tool call, used to match the tool result with the tool call.
+	ToolCallID string `json:"tool_call_id"`
+	// The name of the tool to call.
+	ToolName string `json:"tool_name"`
+	// The arguments to pass to the tool.
+	Args json.RawMessage `json:"args"`
+	// The ID of the part, if applicable. This might not be the same as the tool_call_id.
+	ID *string `json:"id,omitempty"`
 }
 
 // ToolResultPart represents a part of the message that represents the result of a tool call.
 type ToolResultPart struct {
+	// The ID of the tool call from previous assistant message.
 	ToolCallID string `json:"tool_call_id"`
-	ToolName   string `json:"tool_name"`
-	Content    []Part `json:"content"`
-	IsError    *bool  `json:"is_error,omitempty"`
+	// The name of the tool that was called.
+	ToolName string `json:"tool_name"`
+	// The content of the tool result.
+	Content []Part `json:"content"`
+	// Marks the tool result as an error.
+	IsError *bool `json:"is_error,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Part
@@ -125,6 +157,15 @@ func (p Part) MarshalJSON() ([]byte, error) {
 		}{
 			Type:      PartTypeAudio,
 			AudioPart: p.AudioPart,
+		})
+	}
+	if p.DocumentPart != nil {
+		return json.Marshal(struct {
+			Type PartType `json:"type"`
+			*DocumentPart
+		}{
+			Type:         PartTypeDocument,
+			DocumentPart: p.DocumentPart,
 		})
 	}
 	if p.ToolCallPart != nil {
@@ -248,6 +289,17 @@ func NewAudioPart(audioData string, format AudioFormat, sampleRate, channels *in
 			Channels:   channels,
 			Transcript: transcript,
 			ID:         id,
+		},
+	}
+}
+
+// NewDocumentPart creates a new document part
+func NewDocumentPart(title string, content []Part, id *string) Part {
+	return Part{
+		DocumentPart: &DocumentPart{
+			Title:   title,
+			Content: content,
+			ID:      id,
 		},
 	}
 }

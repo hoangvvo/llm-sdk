@@ -350,3 +350,23 @@ var TestCaseStructuredResponseFormat = TestCase{
 		},
 	},
 }
+
+var TestCaseDocumentPartInput = TestCase{
+	Name: "document part in content",
+	Input: llmsdk.LanguageModelInput{
+		Messages: []llmsdk.Message{
+			llmsdk.NewUserMessage(
+				llmsdk.NewDocumentPart("my secret number", []llmsdk.Part{
+					llmsdk.NewTextPart("Remember that my secret number is \"42\".", nil),
+				}, nil),
+				llmsdk.NewTextPart(" What is my secret number?", nil),
+			),
+		},
+	},
+	Method: Generate,
+	Output: OutputAssertion{
+		Content: []PartAssertion{
+			NewTextAssertion("42"),
+		},
+	},
+}

@@ -89,6 +89,10 @@ func TestStructuredResponseFormat(t *testing.T) {
 	testcommon.RunTestCase(t, model, testcommon.TestCaseStructuredResponseFormat)
 }
 
+func TestDocumentPartInput(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseDocumentPartInput)
+}
+
 func TestGenerateAudio(t *testing.T) {
 	ctx := context.Background()
 	response, err := audioModel.Generate(ctx, &llmsdk.LanguageModelInput{

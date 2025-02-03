@@ -370,18 +370,18 @@ type ChatCompletionAssistantMessageParam struct {
 
 type ChatCompletionToolMessageParam struct {
 	// The contents of the tool message.
-	Content []ToolContentPart `json:"content"`
+	Content []ChatCompletionToolMessageParamToolContentPart `json:"content"`
 
 	// Tool call that this message is responding to.
 	ToolCallID string `json:"tool_call_id"`
 }
 
 // ToolContentPart represents content parts for tool messages
-type ToolContentPart struct {
+type ChatCompletionToolMessageParamToolContentPart struct {
 	Text *ChatCompletionContentPartText `json:"-"`
 }
 
-func (t ToolContentPart) MarshalJSON() ([]byte, error) {
+func (t ChatCompletionToolMessageParamToolContentPart) MarshalJSON() ([]byte, error) {
 	if t.Text != nil {
 		return json.Marshal(struct {
 			Type string `json:"type"`
@@ -394,7 +394,7 @@ func (t ToolContentPart) MarshalJSON() ([]byte, error) {
 	return nil, fmt.Errorf("tool content part has no content")
 }
 
-func (t *ToolContentPart) UnmarshalJSON(data []byte) error {
+func (t *ChatCompletionToolMessageParamToolContentPart) UnmarshalJSON(data []byte) error {
 	var temp struct {
 		Type string `json:"type"`
 	}
@@ -977,11 +977,11 @@ func (r OpenAIResponseFormat) MarshalJSON() ([]byte, error) {
 	}
 	if r.JsonSchema != nil {
 		return json.Marshal(struct {
-			Type       string                   `json:"type"`
-			JsonSchema ResponseFormatJSONSchema `json:"json_schema"`
+			Type string `json:"type"`
+			*ResponseFormatJSONSchema
 		}{
-			Type:       "json_schema",
-			JsonSchema: *r.JsonSchema,
+			Type:                     "json_schema",
+			ResponseFormatJSONSchema: r.JsonSchema,
 		})
 	}
 	if r.JsonObject != nil {

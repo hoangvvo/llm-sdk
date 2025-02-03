@@ -337,14 +337,13 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 	}
 
 	for _, message := range messages {
-		switch message.Role() {
-		case llmsdk.RoleUser:
-			if message.UserMessage == nil {
-				return nil, fmt.Errorf("invalid user message")
-			}
-
+		switch {
+		case message.UserMessage != nil:
 			var content []ChatCompletionContentPart
-			for _, part := range message.UserMessage.Content {
+
+			messageParts := llmsdk.GetCompatiblePartsWithoutDocumentParts(message.UserMessage.Content)
+
+			for _, part := range messageParts {
 				openAIPart, err := convertToOpenAIContentPart(part)
 				if err != nil {
 					return nil, err
@@ -358,14 +357,12 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 				},
 			})
 
-		case llmsdk.RoleAssistant:
-			if message.AssistantMessage == nil {
-				return nil, fmt.Errorf("invalid assistant message")
-			}
-
+		case message.AssistantMessage != nil:
 			assistantMsg := &ChatCompletionAssistantMessageParam{}
 
-			for _, part := range message.AssistantMessage.Content {
+			messageParts := llmsdk.GetCompatiblePartsWithoutDocumentParts(message.AssistantMessage.Content)
+
+			for _, part := range messageParts {
 				switch part.Type() {
 				case llmsdk.PartTypeText:
 					if assistantMsg.Content == nil {
@@ -407,25 +404,21 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 				Assistant: assistantMsg,
 			})
 
-		case llmsdk.RoleTool:
-			if message.ToolMessage == nil {
-				return nil, fmt.Errorf("invalid tool message")
-			}
-
+		case message.ToolMessage != nil:
 			for _, part := range message.ToolMessage.Content {
 				if part.Type() != llmsdk.PartTypeToolResult {
 					return nil, fmt.Errorf("tool message must only contain tool result parts")
 				}
 
-				var content []ToolContentPart
-				for _, contentPart := range part.ToolResultPart.Content {
-					if contentPart.Type() == llmsdk.PartTypeText {
-						content = append(content, ToolContentPart{
-							Text: &ChatCompletionContentPartText{
-								Text: contentPart.TextPart.Text,
-							},
-						})
+				toolResultPartContent := llmsdk.GetCompatiblePartsWithoutDocumentParts(part.ToolResultPart.Content)
+
+				var content []ChatCompletionToolMessageParamToolContentPart
+				for _, contentPart := range toolResultPartContent {
+					toolContentPart, err := convertToOpenAIToolMessageParamContent(contentPart)
+					if err != nil {
+						return nil, err
 					}
+					content = append(content, *toolContentPart)
 				}
 
 				openAIMessages = append(openAIMessages, ChatCompletionMessageParam{
@@ -446,43 +439,68 @@ func convertToOpenAIContentPart(part llmsdk.Part) (*ChatCompletionContentPart, e
 	switch part.Type() {
 	case llmsdk.PartTypeText:
 		return &ChatCompletionContentPart{
-			Text: &ChatCompletionContentPartText{
-				Text: part.TextPart.Text,
-			},
+			Text: convertToOpenAIContentPartText(part.TextPart),
 		}, nil
 
 	case llmsdk.PartTypeImage:
 		return &ChatCompletionContentPart{
-			Image: &ChatCompletionContentPartImage{
-				ImageURL: ChatCompletionContentPartImageImageURL{
-					URL: fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.ImageData),
-				},
-			},
+			Image: convertToOpenAIContentPartImage(part.ImagePart),
 		}, nil
 
 	case llmsdk.PartTypeAudio:
-		var format AudioInputFormat
-		switch part.AudioPart.Format {
-		case llmsdk.AudioFormatWav:
-			format = AudioInputFormatWav
-		case llmsdk.AudioFormatMP3:
-			format = AudioInputFormatMp3
-		default:
-			return nil, fmt.Errorf("unsupported audio format for OpenAI: %s", part.AudioPart.Format)
+		inputAudio, err := convertToOpenAIContentPartInputAudio(part.AudioPart)
+		if err != nil {
+			return nil, err
 		}
-
 		return &ChatCompletionContentPart{
-			InputAudio: &ChatCompletionContentPartInputAudio{
-				InputAudio: ChatCompletionContentPartInputAudioInputAudio{
-					Data:   part.AudioPart.AudioData,
-					Format: format,
-				},
-			},
+			InputAudio: inputAudio,
 		}, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported part type for OpenAI: %s", part.Type())
 	}
+}
+
+func convertToOpenAIContentPartText(textPart *llmsdk.TextPart) *ChatCompletionContentPartText {
+	return &ChatCompletionContentPartText{
+		Text: textPart.Text,
+	}
+}
+
+func convertToOpenAIContentPartImage(imagePart *llmsdk.ImagePart) *ChatCompletionContentPartImage {
+	return &ChatCompletionContentPartImage{
+		ImageURL: ChatCompletionContentPartImageImageURL{
+			URL: fmt.Sprintf("data:%s;base64,%s", imagePart.MimeType, imagePart.ImageData),
+		},
+	}
+}
+
+func convertToOpenAIContentPartInputAudio(audioPart *llmsdk.AudioPart) (*ChatCompletionContentPartInputAudio, error) {
+	var format AudioInputFormat
+	switch audioPart.Format {
+	case llmsdk.AudioFormatWav:
+		format = AudioInputFormatWav
+	case llmsdk.AudioFormatMP3:
+		format = AudioInputFormatMp3
+	default:
+		return nil, fmt.Errorf("unsupported audio format for OpenAI: %s", audioPart.Format)
+	}
+
+	return &ChatCompletionContentPartInputAudio{
+		InputAudio: ChatCompletionContentPartInputAudioInputAudio{
+			Data:   audioPart.AudioData,
+			Format: format,
+		},
+	}, nil
+}
+
+func convertToOpenAIToolMessageParamContent(part llmsdk.Part) (*ChatCompletionToolMessageParamToolContentPart, error) {
+	if part.TextPart != nil {
+		return &ChatCompletionToolMessageParamToolContentPart{
+			Text: convertToOpenAIContentPartText(part.TextPart),
+		}, nil
+	}
+	return nil, fmt.Errorf("cannot convert part to OpenAI tool message for type: %s", part.Type())
 }
 
 // MARK: - To Provider Tools
@@ -518,6 +536,7 @@ func convertToOpenAIResponseFormat(responseFormat llmsdk.ResponseFormatOption) *
 	if responseFormat.Text != nil {
 		return &OpenAIResponseFormat{Text: ptr.To(true)}
 	}
+
 	if responseFormat.JSON != nil {
 		if responseFormat.JSON.Schema != nil {
 			return &OpenAIResponseFormat{
