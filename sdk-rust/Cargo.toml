@@ -24,6 +24,7 @@ utoipa = { version = "5", optional = true }
 
 [dev-dependencies]
 dotenvy = { version = "0.15.7" }
+paste = "1.0.15"
 regex = "1.11.1"
 rodio = "0.17"
 seq-macro = "0.3"

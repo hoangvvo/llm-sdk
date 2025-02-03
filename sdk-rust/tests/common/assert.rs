@@ -1,7 +1,5 @@
-use crate::{LanguageModel, LanguageModelInput, Part, StreamAccumulator};
-use futures::stream::StreamExt;
+use crate::Part;
 use regex::Regex;
-use std::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct TextPartAssertion {
@@ -113,49 +111,6 @@ impl PartAssertion {
 }
 
 #[derive(Debug, Clone)]
-pub enum TestMethod {
-    Generate,
-    Stream,
-}
-
-#[derive(Debug, Clone)]
 pub struct OutputAssertion {
     pub content: Vec<PartAssertion>,
-}
-
-#[derive(Debug, Clone)]
-pub struct TestCase {
-    pub input: LanguageModelInput,
-    pub method: TestMethod,
-    pub output: OutputAssertion,
-}
-
-pub async fn run_test_case(
-    model: &dyn LanguageModel,
-    test_case: TestCase,
-) -> Result<(), Box<dyn Error>> {
-    match test_case.method {
-        TestMethod::Generate => {
-            let result = model.generate(test_case.input).await?;
-            for part_assertion in test_case.output.content {
-                part_assertion.assert(&result.content)?;
-            }
-        }
-        TestMethod::Stream => {
-            let mut stream = model.stream(test_case.input).await?;
-
-            let mut accumulator = StreamAccumulator::new();
-
-            while let Some(partial_response) = stream.next().await {
-                let partial_response = partial_response?;
-                accumulator.add_partial(partial_response)?;
-            }
-
-            let result = accumulator.compute_response()?;
-            for part_assertion in test_case.output.content {
-                part_assertion.assert(&result.content)?;
-            }
-        }
-    }
-    Ok(())
 }

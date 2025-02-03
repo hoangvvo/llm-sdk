@@ -45,12 +45,51 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestOpenAIModel(t *testing.T) {
-	testcommon.RunTests(t, testcommon.CommonTestCases, model)
+func TestGenerateText(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateText)
 }
 
-func TestOpenAIModel_GenerateAudio(t *testing.T) {
+func TestStreamText(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamText)
+}
 
+func TestGenerateWithSystemPrompt(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateWithSystemPrompt)
+}
+
+func TestGenerateToolCall(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateToolCall)
+}
+
+func TestStreamToolCall(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamToolCall)
+}
+
+func TestGenerateTextWithToolResult(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateTextWithToolResult)
+}
+
+func TestStreamTextWithToolResult(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamTextWithToolResult)
+}
+
+func TestGenerateParallelToolCalls(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateParallelToolCalls)
+}
+
+func TestStreamParallelToolCalls(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamParallelToolCalls)
+}
+
+func TestStreamParallelToolCallsOfSameName(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamParallelToolCallsOfSameName)
+}
+
+func TestStructuredResponseFormat(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseStructuredResponseFormat)
+}
+
+func TestGenerateAudio(t *testing.T) {
 	ctx := context.Background()
 	response, err := audioModel.Generate(ctx, &llmsdk.LanguageModelInput{
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
@@ -93,7 +132,7 @@ func TestOpenAIModel_GenerateAudio(t *testing.T) {
 	}
 }
 
-func TestOpenAIModel_StreamAudio(t *testing.T) {
+func TestStreamAudio(t *testing.T) {
 	ctx := context.Background()
 	stream, err := audioModel.Stream(ctx, &llmsdk.LanguageModelInput{
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},

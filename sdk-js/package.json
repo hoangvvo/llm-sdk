@@ -35,8 +35,8 @@
     "./package.json": "./package.json"
   },
   "imports": {
-    "#test-utils/assert": "./test-utils/assert.ts",
-    "#test-utils/cases": "./test-utils/cases.ts"
+    "#test-common/assert": "./test-common/assert.ts",
+    "#test-common/cases": "./test-common/cases.ts"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

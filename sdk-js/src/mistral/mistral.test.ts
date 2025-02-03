@@ -1,24 +1,55 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 
-import { runTests } from "#test-utils/assert";
-import { COMMON_TEST_CASES } from "#test-utils/cases";
+import {
+  TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS,
+  TEST_CASE_GENERATE_TEXT,
+  TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT,
+  TEST_CASE_GENERATE_TOOL_CALL,
+  TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT,
+  TEST_CASE_STREAM_PARALLEL_TOOL_CALLS,
+  TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+  TEST_CASE_STREAM_TEXT,
+  TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT,
+  TEST_CASE_STREAM_TOOL_CALL,
+  TEST_CASE_STRUCTURED_RESPONSE_FORMAT,
+  testTestCase,
+} from "#test-common/cases";
 import assert from "node:assert";
 import { suite } from "node:test";
 import { MistralModel } from "./mistral.ts";
 
 suite("MistralModel", () => {
   assert(process.env["MISTRAL_API_KEY"], "MISTRAL_API_KEY must be set");
-  const model = new MistralModel(
-    {
-      apiKey: process.env["MISTRAL_API_KEY"],
-      modelId: "mistral-small-2409",
-    },
-    {
-      capabilities: ["function-calling", "image-input", "structured-output"],
-    },
+  const model = new MistralModel({
+    apiKey: process.env["MISTRAL_API_KEY"],
+    modelId: "mistral-small-2409",
+  });
+
+  const runTestOptions = { compatibleSchema: true };
+
+  testTestCase(model, TEST_CASE_GENERATE_TEXT, runTestOptions);
+
+  testTestCase(model, TEST_CASE_STREAM_TEXT, runTestOptions);
+
+  testTestCase(model, TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT, runTestOptions);
+
+  testTestCase(model, TEST_CASE_GENERATE_TOOL_CALL, runTestOptions);
+
+  testTestCase(model, TEST_CASE_STREAM_TOOL_CALL, runTestOptions);
+
+  testTestCase(model, TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT, runTestOptions);
+
+  testTestCase(model, TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT, runTestOptions);
+
+  testTestCase(model, TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS, runTestOptions);
+
+  testTestCase(model, TEST_CASE_STREAM_PARALLEL_TOOL_CALLS, runTestOptions);
+
+  testTestCase(
+    model,
+    TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+    runTestOptions,
   );
 
-  runTests(COMMON_TEST_CASES, model, {
-    compatibleSchema: true,
-  });
+  testTestCase(model, TEST_CASE_STRUCTURED_RESPONSE_FORMAT, runTestOptions);
 });

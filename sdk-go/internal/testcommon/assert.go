@@ -1,7 +1,6 @@
 package testcommon
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -41,61 +40,6 @@ const (
 // OutputAssertion represents the expected output
 type OutputAssertion struct {
 	Content []PartAssertion
-}
-
-// TestCase represents a complete test case
-type TestCase struct {
-	Name                 string
-	Input                llmsdk.LanguageModelInput
-	Method               TestMethod
-	RequiredCapabilities []llmsdk.LanguageModelCapability
-	Output               OutputAssertion
-	CompatibleSchema     bool
-}
-
-// RunTestCase executes a single test case
-func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCase TestCase) {
-	t.Helper()
-
-	// Skip if required capabilities are not met (simplified for now)
-	if len(testCase.RequiredCapabilities) > 0 {
-		t.Skip("Required capabilities checking not yet implemented")
-		return
-	}
-
-	ctx := context.Background()
-
-	switch testCase.Method {
-	case Generate:
-		result, err := model.Generate(ctx, &testCase.Input)
-		if err != nil {
-			t.Fatalf("Generate failed: %v", err)
-		}
-		assertContentPart(t, result.Content, testCase.Output.Content)
-	case Stream:
-		stream, err := model.Stream(ctx, &testCase.Input)
-		if err != nil {
-			t.Fatalf("Stream failed: %v", err)
-		}
-
-		accumulator := llmsdk.NewStreamAccumulator()
-		for stream.Next() {
-			partial := stream.Current()
-			if err := accumulator.AddPartial(*partial); err != nil {
-				t.Fatalf("Failed to add partial: %v", err)
-			}
-		}
-
-		if err := stream.Err(); err != nil {
-			t.Fatalf("Stream error: %v", err)
-		}
-
-		result, err := accumulator.ComputeResponse()
-		if err != nil {
-			t.Fatalf("Failed to compute response: %v", err)
-		}
-		assertContentPart(t, result.Content, testCase.Output.Content)
-	}
 }
 
 // RunTests executes multiple test cases
