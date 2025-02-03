@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
-    "test": "node --test --env-file=../.env"
+    "test": "node --test --experimental-test-coverage --test-coverage-include=src/**/*.ts"
   },
   "files": [
     "dist"

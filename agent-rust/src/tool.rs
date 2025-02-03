@@ -43,6 +43,7 @@ impl<TCtx> Debug for dyn AgentTool<TCtx> {
     }
 }
 
+#[derive(Clone)]
 pub struct AgentToolResult {
     pub content: Vec<Part>,
     pub is_error: bool,

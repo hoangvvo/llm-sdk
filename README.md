@@ -130,8 +130,9 @@ The agent is constructed with the following parameters:
 - `tools`: A list of _executable_ tools that the agent can call during its execution.
 - `response_format`: The expected response format from the agent. While the default is plain text, it can be customized to return structured output.
 - `max_turns`: The maximum number of turns the agent can take to complete a request.
+- Other sampling parameters: `temperature`, `top_p`, `max_tokens`, etc.
 
-In addition, the agent is defined with a `context` type that can be accessed in the instructions (for dynamic instructions) and tools.
+In addition, the agent is defined with a `context` generic type that can be accessed in the instructions (for dynamic instructions) and tools.
 
 ### Agent Tools
 

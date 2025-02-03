@@ -12,5 +12,5 @@ mod test_common;
 
 pub use accumulator::StreamAccumulator;
 pub use errors::*;
-pub use language_model::LanguageModel;
+pub use language_model::{LanguageModel, LanguageModelMetadata, LanguageModelStream};
 pub use types::*;
