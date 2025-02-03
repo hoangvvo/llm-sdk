@@ -13,6 +13,7 @@ Two libraries are provided:
 - Handles multiple modalities: Text, Image, and Audio, even in streaming requests.
 - Enables function calling.
 - Supports streaming responses and includes utilities for building final output from streamed data, including streaming audio.
+- Supports citations for supported providers.
 - Reports token usage and calculates the cost of a request when provided with the model's pricing information.
 - Offers consistent serialization and deserialization for data storage across different programming languages.
 
@@ -34,23 +35,26 @@ We provide SDKs to interact with various LLM providers in the following programm
 
 ### Supported Providers
 
-|                   | OpenAI            | Anthropic                                                 | Google | Cohere | Mistral           |
-| ----------------- | ----------------- | --------------------------------------------------------- | ------ | ------ | ----------------- |
-| Sampling Params   | ✅ except `top_k` | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅     | ✅     | ✅ except `top_k` |
-| Function Calling  | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Structured Output | ✅                | ➖                                                        | ✅     | ✅     | ✅                |
-| Text Input        | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Image Input       | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Audio Input       | ✅                | ➖                                                        | ✅     | ➖     | ➖                |
-| Text Output       | ✅                | ✅                                                        | ✅     | ✅     | ✅                |
-| Image Output      | 🚧                | ➖                                                        | ✅     | ➖     | ➖                |
-| Audio Output      | ✅                | ➖                                                        | ➖     | ➖     | ➖                |
+|                           | OpenAI                 | Anthropic                                                 | Google                 | Cohere | Mistral                |
+| ------------------------- | ---------------------- | --------------------------------------------------------- | ---------------------- | ------ | ---------------------- |
+| Sampling Params           | ✅ except `top_k`      | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅                     | ✅     | ✅ except `top_k`      |
+| Function Calling          | ✅                     | ✅                                                        | ✅                     | ✅     | ✅                     |
+| Structured Output         | ✅                     | ➖                                                        | ✅                     | ✅     | ✅                     |
+| Text Input                | ✅                     | ✅                                                        | ✅                     | ✅     | ✅                     |
+| Image Input               | ✅                     | ✅                                                        | ✅                     | ✅     | ✅                     |
+| Audio Input               | ✅                     | ➖                                                        | ✅                     | ➖     | ➖                     |
+| Document Input (citation) | ➖ [^document-as-text] | ✅                                                        | ➖ [^document-as-text] | ✅     | 🚧 [^document-as-text] |
+| Text Output               | ✅                     | ✅                                                        | ✅                     | ✅     | ✅                     |
+| Image Output              | 🚧                     | ➖                                                        | ✅                     | ➖     | ➖                     |
+| Audio Output              | ✅                     | ➖                                                        | ➖                     | ➖     | ➖                     |
 
 Keys:
 
 - ✅: Supported
 - 🚧: Not yet implemented
 - ➖: Not available from provider
+
+[^document-as-text]: Document Input (citation) is not supported by all providers and may be converted to compatible inputs instead.
 
 ### Language Model
 
@@ -89,7 +93,7 @@ See [Message](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L29).
 > [!NOTE]
 > The `ToolResultPart` content is an array of `Part` instead of a string or an object. This enables non-text results to be returned for LLM providers that support them (e.g., Anthropic Function Calling supports images in tool results).
 
-The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `ToolCallPart`, and `ToolResultPart`.
+The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `DocumentPart` (for citation), `ToolCallPart`, and `ToolResultPart`.
 
 See [`Part`](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L16).
 

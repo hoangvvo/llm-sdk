@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 
 import {
+  TEST_CASE_DOCUMENT_PART_INPUT,
   TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS,
   TEST_CASE_GENERATE_TEXT,
   TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT,
@@ -52,4 +53,6 @@ suite("CohereModel", () => {
   );
 
   testTestCase(model, TEST_CASE_STRUCTURED_RESPONSE_FORMAT, runTestOptions);
+
+  testTestCase(model, TEST_CASE_DOCUMENT_PART_INPUT);
 });

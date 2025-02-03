@@ -41,7 +41,7 @@ const getStockPriceTool: Tool = {
   },
 };
 
-export const TEST_CASE_GENERATE_TEST: TestCase = {
+export const TEST_CASE_GENERATE_TEXT: TestCase = {
   name: "generate text",
   input: {
     messages: [
@@ -411,7 +411,7 @@ export const TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME: TestCase = {
   },
 };
 
-export const TEST_CASE_STRUCTURED_RESPONSE_FORMAT = {
+export const TEST_CASE_STRUCTURED_RESPONSE_FORMAT: TestCase = {
   name: "structured response format",
   input: {
     messages: [
@@ -477,6 +477,43 @@ export const TEST_CASE_STRUCTURED_RESPONSE_FORMAT = {
       },
     ],
   },
+};
+
+export const TEST_CASE_DOCUMENT_PART_INPUT: TestCase = {
+  // all providers must accept the document part or translate them to a compatible part
+  name: "document part in content",
+  input: {
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "document",
+            title: "my secret number",
+            content: [
+              {
+                type: "text",
+                text: 'Remember that my secret number is "42".',
+              },
+            ],
+          },
+          {
+            type: "text",
+            text: "What is the my secret number?",
+          },
+        ],
+      },
+    ],
+  },
+  output: {
+    content: [
+      {
+        type: "text",
+        text: /42/,
+      },
+    ],
+  },
+  type: "generate",
 };
 
 export interface RunTestCaseOptions {

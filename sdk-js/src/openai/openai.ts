@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getCompatiblePartsWithoutDocumentParts } from "../document.utils.ts";
 import {
   InvalidInputError,
   InvariantError,
@@ -206,9 +207,13 @@ function convertToOpenAIMessages(
   messages.forEach((message) => {
     switch (message.role) {
       case "user": {
+        const messageParts = getCompatiblePartsWithoutDocumentParts(
+          message.content,
+        );
+
         const openaiMessageParam: OpenAI.Chat.ChatCompletionUserMessageParam = {
           role: "user",
-          content: message.content.map(convertToOpenAIContentPart),
+          content: messageParts.map(convertToOpenAIContentPart).flat(),
         };
 
         openaiMessages.push(openaiMessageParam);
@@ -225,7 +230,12 @@ function convertToOpenAIMessages(
           role: "assistant",
           content: null,
         };
-        message.content.forEach((part) => {
+
+        const messageParts = getCompatiblePartsWithoutDocumentParts(
+          message.content,
+        );
+
+        messageParts.forEach((part) => {
           switch (part.type) {
             case "text": {
               openaiMessageParam.content = openaiMessageParam.content ?? [];
@@ -265,10 +275,16 @@ function convertToOpenAIMessages(
             );
           }
 
+          const toolResultPartContent = getCompatiblePartsWithoutDocumentParts(
+            part.content,
+          );
+
           openaiMessages.push({
             role: "tool",
             tool_call_id: part.tool_call_id,
-            content: part.content.map(convertToOpenAIToolMessageParamContent),
+            content: toolResultPartContent.map(
+              convertToOpenAIToolMessageParamContent,
+            ),
           });
         });
         break;

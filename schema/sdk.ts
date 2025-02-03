@@ -17,6 +17,7 @@ export type Part =
   | TextPart
   | ImagePart
   | AudioPart
+  | DocumentPart
   | ToolCallPart
   | ToolResultPart;
 /**
@@ -57,7 +58,8 @@ export type LanguageModelCapability =
   | "audio-input"
   | "audio-output"
   | "image-input"
-  | "image-output";
+  | "image-output"
+  | "document-input";
 
 /**
  * A part of the message that contains text.
@@ -118,6 +120,25 @@ export interface AudioPart {
    * The transcript of the audio.
    */
   transcript?: string;
+  /**
+   * The ID of the part, if applicable.
+   */
+  id?: string;
+}
+/**
+ * A part of the message that contains a document with structured content.
+ * Documents will be used for citation for supported models.
+ */
+export interface DocumentPart {
+  type: "document";
+  /**
+   * The title of the document.
+   */
+  title: string;
+  /**
+   * The content of the document.
+   */
+  content: Part[];
   /**
    * The ID of the part, if applicable.
    */

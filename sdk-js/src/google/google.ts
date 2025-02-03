@@ -24,6 +24,7 @@ import {
   mapAudioFormatToMimeType,
   mapMimeTypeToAudioFormat,
 } from "../audio.utils.ts";
+import { getCompatiblePartsWithoutDocumentParts } from "../document.utils.ts";
 import {
   InvariantError,
   NotImplementedError,
@@ -185,7 +186,8 @@ function convertToGenerateContentRequest(
 // MARK: To Provider Messages
 
 function convertToGoogleContent(message: Message): Content {
-  const parts = message.content.map(convertToGooglePart);
+  const messageParts = getCompatiblePartsWithoutDocumentParts(message.content);
+  const parts = messageParts.map(convertToGooglePart);
   switch (message.role) {
     case "user": {
       return {
@@ -219,6 +221,11 @@ function convertToGooglePart(part: Part): GooglePart {
       return convertToGoogleFunctionCallPart(part);
     case "tool-result":
       return convertToGoogleFunctionResponsePart(part);
+    default:
+      throw new UnsupportedError(
+        PROVIDER,
+        `Cannot convert part to Google part for type ${part.type}`,
+      );
   }
 }
 
@@ -262,7 +269,10 @@ function convertToGoogleFunctionCallPart(
 function convertToGoogleFunctionResponsePart(
   part: ToolResultPart,
 ): GoogleFunctionResponsePart {
-  const textParts = part.content.filter((part) => part.type === "text");
+  const toolResultContent = getCompatiblePartsWithoutDocumentParts(
+    part.content,
+  );
+  const textParts = toolResultContent.filter((part) => part.type === "text");
 
   let response: object;
   const firstTextPart = textParts[0];

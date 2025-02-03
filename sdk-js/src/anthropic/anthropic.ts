@@ -7,6 +7,7 @@ import type {
 import { looselyConvertPartToPartDelta } from "../stream.utils.ts";
 import type {
   ContentDelta,
+  DocumentPart,
   ImagePart,
   LanguageModelInput,
   Message,
@@ -174,6 +175,8 @@ function convertToAnthropicContentBlockParam(
       return convertToAnthropicTextBlockParam(part);
     case "image":
       return convertToAnthropicImageBlockParam(part);
+    case "document":
+      return convertToAnthropicDocumentBlockParam(part);
     case "tool-call":
       return convertToAnthropicToolUseBlockParam(part);
     case "tool-result":
@@ -207,6 +210,38 @@ function convertToAnthropicImageBlockParam(
         part.mime_type as Anthropic.Messages.Base64ImageSource["media_type"],
     },
   };
+}
+
+function convertToAnthropicDocumentBlockParam(
+  part: DocumentPart,
+): Anthropic.DocumentBlockParam {
+  return {
+    type: "document",
+    title: part.title,
+    source: {
+      type: "content",
+      content: part.content.map(convertToAnthropicContentBlockSourceContent),
+    },
+    citations: {
+      enabled: true,
+    },
+  };
+}
+
+function convertToAnthropicContentBlockSourceContent(
+  part: Part,
+): Anthropic.ContentBlockSourceContent {
+  switch (part.type) {
+    case "text":
+      return convertToAnthropicTextBlockParam(part);
+    case "image":
+      return convertToAnthropicImageBlockParam(part);
+    default:
+      throw new UnsupportedError(
+        PROVIDER,
+        `Cannot convert part to Anthropic content for type ${part.type}`,
+      );
+  }
 }
 
 function convertToAnthropicToolUseBlockParam(

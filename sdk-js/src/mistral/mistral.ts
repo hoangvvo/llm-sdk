@@ -1,5 +1,6 @@
 import { Mistral } from "@mistralai/mistralai";
 import type * as MistralComponents from "@mistralai/mistralai/models/components/index.ts";
+import { getCompatiblePartsWithoutDocumentParts } from "../document.utils.ts";
 import {
   InvalidInputError,
   InvariantError,
@@ -184,9 +185,13 @@ function convertToMistralMessages(
       | MistralChatCompletionRequestMessage[] => {
       switch (message.role) {
         case "user": {
+          const messageParts = getCompatiblePartsWithoutDocumentParts(
+            message.content,
+          );
+
           return {
             role: "user",
-            content: message.content.map((part) =>
+            content: messageParts.map((part) =>
               convertToMistralContentChunk(part),
             ),
           };
@@ -201,7 +206,12 @@ function convertToMistralMessages(
             role: "assistant",
             content: null,
           };
-          message.content.forEach((part) => {
+
+          const messageParts = getCompatiblePartsWithoutDocumentParts(
+            message.content,
+          );
+
+          messageParts.forEach((part) => {
             switch (part.type) {
               case "text":
               case "image": {
@@ -240,11 +250,14 @@ function convertToMistralMessages(
                 "Tool messages must contain only tool result parts",
               );
             }
+            const toolResultContent = getCompatiblePartsWithoutDocumentParts(
+              part.content,
+            );
             return {
               role: "tool",
               toolCallId: part.tool_call_id,
               name: part.tool_name,
-              content: part.content.map(convertToMistralContentChunk),
+              content: toolResultContent.map(convertToMistralContentChunk),
             };
           });
         }
