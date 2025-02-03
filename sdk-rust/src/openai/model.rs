@@ -1,4 +1,5 @@
 use crate::{
+    document_utils,
     language_model::{LanguageModelMetadata, LanguageModelStream},
     openai::api as openai_api,
     stream_utils,
@@ -281,8 +282,10 @@ fn into_openai_messages(
     for message in messages {
         match message {
             Message::User(UserMessage { content }) => {
+                let message_parts =
+                    document_utils::get_compatible_parts_without_document_parts(content);
                 let openai_message_param = openai_api::ChatCompletionUserMessageParam {
-                    content: content
+                    content: message_parts
                         .into_iter()
                         .map(TryInto::try_into)
                         .collect::<LanguageModelResult<_>>()?,
@@ -297,7 +300,10 @@ fn into_openai_messages(
                 let mut openai_message_param =
                     openai_api::ChatCompletionAssistantMessageParam::default();
 
-                for part in content {
+                let message_parts =
+                    document_utils::get_compatible_parts_without_document_parts(content);
+
+                for part in message_parts {
                     match part {
                         Part::Text(part) => {
                             openai_message_param
@@ -339,15 +345,19 @@ fn into_openai_messages(
                         ))?,
                     };
 
+                    let tool_result_part_content =
+                        document_utils::get_compatible_parts_without_document_parts(
+                            tool_part.content,
+                        );
+
                     openai_messages.push(openai_api::ChatCompletionMessageParam::Tool(
                         openai_api::ChatCompletionToolMessageParam {
                             tool_call_id: tool_part.tool_call_id,
-                            content: tool_part
-                                .content
+                            content: tool_result_part_content
                                 .into_iter()
                                 .map(|p| match p {
                                     Part::Text(part) => {
-                                        Ok(openai_api::ToolContentPart::Text(part.into()))
+                                        Ok(openai_api::ChatCompletionToolMessageParamToolContentPart::Text(part.into()))
                                     }
                                     _ => Err(LanguageModelError::Unsupported(
                                         PROVIDER,
@@ -705,160 +715,5 @@ impl From<openai_api::CompletionsAPICompletionUsage> for ModelUsage {
             output_tokens: value.completion_tokens,
             ..Default::default()
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{generate_common_tests, test_common::prelude::*, StreamAccumulator};
-    use std::{env, sync::LazyLock};
-    pub use tokio::test;
-
-    static OPENAI_MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
-        dotenvy::dotenv().ok();
-
-        OpenAIModel::new(OpenAIModelOptions {
-            model_id: "gpt-4o".to_string(),
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY must be set")
-                .to_string(),
-            ..Default::default()
-        })
-        .with_metadata(LanguageModelMetadata {
-            capabilities: Some(vec![
-                LanguageModelCapability::FunctionCalling,
-                LanguageModelCapability::ImageInput,
-                LanguageModelCapability::StructuredOutput,
-            ]),
-            ..Default::default()
-        })
-    });
-
-    static OPENAI_AUDIO_MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
-        dotenvy::dotenv().ok();
-
-        OpenAIModel::new(OpenAIModelOptions {
-            model_id: "gpt-4o-audio-preview".to_string(),
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY must be set")
-                .to_string(),
-            ..Default::default()
-        })
-        .with_metadata(LanguageModelMetadata {
-            capabilities: Some(vec![
-                LanguageModelCapability::AudioInput,
-                LanguageModelCapability::AudioOutput,
-                LanguageModelCapability::FunctionCalling,
-                LanguageModelCapability::ImageInput,
-                LanguageModelCapability::StructuredOutput,
-            ]),
-            ..Default::default()
-        })
-    });
-
-    generate_common_tests! {
-        model_name: OPENAI_MODEL,
-    }
-
-    #[test]
-    async fn test_generate_audio() -> Result<(), Box<dyn Error>> {
-        let response = OPENAI_AUDIO_MODEL
-            .generate(LanguageModelInput {
-                modalities: Some(vec![Modality::Text, Modality::Audio]),
-                extra: Some(serde_json::json!({
-                    "audio": {
-                        "voice": "alloy",
-                        "format": "pcm16"
-                    }
-                })),
-                messages: vec![Message::User(UserMessage {
-                    content: vec![Part::Text(TextPart {
-                        text: "Hello".to_string(),
-                        id: None,
-                    })],
-                })],
-                ..Default::default()
-            })
-            .await?;
-
-        let audio_part = response
-            .content
-            .into_iter()
-            .find_map(|part| match part {
-                Part::Audio(audio) => Some(audio),
-                _ => None,
-            })
-            .ok_or_else(|| "Audio part must be present".to_string())?;
-
-        assert!(
-            !audio_part.audio_data.is_empty(),
-            "Audio data must be present"
-        );
-        assert!(
-            audio_part.transcript.is_some_and(|t| !t.is_empty()),
-            "Transcript must be present"
-        );
-        assert!(
-            audio_part.id.is_some_and(|id| !id.is_empty()),
-            "Audio part ID must be present"
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    async fn test_stream_audio() -> Result<(), Box<dyn Error>> {
-        let mut stream = OPENAI_AUDIO_MODEL
-            .stream(LanguageModelInput {
-                modalities: Some(vec![Modality::Text, Modality::Audio]),
-                extra: Some(serde_json::json!({
-                    "audio": {
-                        "voice": "alloy",
-                        "format": "pcm16"
-                    }
-                })),
-                messages: vec![Message::User(UserMessage {
-                    content: vec![Part::Text(TextPart {
-                        text: "Hello".to_string(),
-                        id: None,
-                    })],
-                })],
-                ..Default::default()
-            })
-            .await?;
-
-        let mut accumulator = StreamAccumulator::new();
-
-        while let Some(partial_response) = stream.next().await {
-            let partial_response = partial_response.unwrap();
-            accumulator.add_partial(partial_response).unwrap();
-        }
-
-        let response = accumulator.compute_response()?;
-
-        let audio_part = response
-            .content
-            .into_iter()
-            .find_map(|part| match part {
-                Part::Audio(audio) => Some(audio),
-                _ => None,
-            })
-            .ok_or_else(|| "Audio part must be present".to_string())?;
-
-        assert!(
-            !audio_part.audio_data.is_empty(),
-            "Audio data must be present"
-        );
-        assert!(
-            audio_part.transcript.is_some_and(|t| !t.is_empty()),
-            "Transcript must be present"
-        );
-        assert!(
-            audio_part.id.is_some_and(|id| !id.is_empty()),
-            "Audio part ID must be present"
-        );
-
-        Ok(())
     }
 }

@@ -486,13 +486,44 @@ pub async fn test_structured_response_format(
     run_test_case(model, test_case).await
 }
 
+pub async fn test_document_part_input(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+    let test_case = TestCase {
+        input: LanguageModelInput {
+            messages: vec![Message::User(UserMessage {
+                content: vec![
+                    Part::Document(DocumentPart {
+                        title: "my secret number".to_string(),
+                        content: vec![Part::Text(TextPart {
+                            text: "Rember that my secret number is 42.".to_string(),
+                            id: None,
+                        })],
+                        id: None,
+                    }),
+                    Part::Text(TextPart {
+                        text: "What is my secret number?".to_string(),
+                        id: None,
+                    }),
+                ],
+            })],
+            ..Default::default()
+        },
+        method: TestMethod::Generate,
+        output: OutputAssertion {
+            content: vec![PartAssertion::Text(TextPartAssertion {
+                text: Regex::new(r"42").unwrap(),
+            })],
+        },
+    };
+    run_test_case(model, test_case).await
+}
+
 #[macro_export]
 macro_rules! test_set {
     ($model_name:ident, $test_name:ident) => {
         #[test]
         async fn $test_name() -> Result<(), Box<dyn Error>> {
             paste::paste! {
-                crate::common::cases::[<test_ $test_name>](&*$model_name).await
+                $crate::common::cases::[<test_ $test_name>](&*$model_name).await
             }
         }
     };

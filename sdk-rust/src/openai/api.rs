@@ -241,7 +241,7 @@ pub enum AssistantContentPart {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatCompletionToolMessageParam {
     /// The contents of the tool message.
-    pub content: Vec<ToolContentPart>,
+    pub content: Vec<ChatCompletionToolMessageParamToolContentPart>,
 
     /// Tool call that this message is responding to.
     pub tool_call_id: String,
@@ -249,7 +249,7 @@ pub struct ChatCompletionToolMessageParam {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum ToolContentPart {
+pub enum ChatCompletionToolMessageParamToolContentPart {
     Text(ChatCompletionContentPartText),
 }
 

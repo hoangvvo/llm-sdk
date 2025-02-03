@@ -1,10 +1,7 @@
 mod common;
 use futures::stream::StreamExt;
-use llm_sdk::openai::*;
-use llm_sdk::StreamAccumulator;
-use llm_sdk::*;
-use std::error::Error;
-use std::{env, sync::LazyLock};
+use llm_sdk::{openai::*, StreamAccumulator, *};
+use std::{env, error::Error, sync::LazyLock};
 use tokio::test;
 
 static OPENAI_MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
@@ -70,6 +67,8 @@ test_set!(OPENAI_MODEL, stream_parallel_tool_calls);
 test_set!(OPENAI_MODEL, stream_parallel_tool_calls_same_name);
 
 test_set!(OPENAI_MODEL, structured_response_format);
+
+test_set!(OPENAI_MODEL, document_part_input);
 
 #[test]
 async fn test_generate_audio() -> Result<(), Box<dyn Error>> {

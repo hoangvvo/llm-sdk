@@ -33,6 +33,7 @@ pub enum Part {
     Text(TextPart),
     Image(ImagePart),
     Audio(AudioPart),
+    Document(DocumentPart),
     ToolCall(ToolCallPart),
     ToolResult(ToolResultPart),
 }
@@ -159,6 +160,19 @@ pub struct AudioPart {
     pub transcript: Option<String>,
     /// The ID of the part, if applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
+/// A part of the message that contains a document with structured content.
+/// Documents will be used for citation for supported models.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct DocumentPart {
+    /// The title of the document.
+    pub title: String,
+    /// The content of the document.
+    pub content: Vec<Part>,
+    /// The ID of the part, if applicable.
     pub id: Option<String>,
 }
 
