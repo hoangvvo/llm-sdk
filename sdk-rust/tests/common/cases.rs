@@ -486,7 +486,7 @@ pub async fn test_structured_response_format(
     run_test_case(model, test_case).await
 }
 
-pub async fn test_document_part_input(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_source_part_input(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
             messages: vec![
@@ -506,7 +506,7 @@ pub async fn test_document_part_input(model: &dyn LanguageModel) -> Result<(), B
                     ..Default::default()
                 })]),
                 Message::user(vec![
-                    Part::Document(DocumentPart {
+                    Part::Source(SourcePart {
                         title: "my secret number".to_string(),
                         content: vec![Part::Text(TextPart {
                             text: "Rember that second secret number is 42.".to_string(),

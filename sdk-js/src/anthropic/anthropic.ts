@@ -1,14 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getCompatiblePartsWithoutDocumentParts } from "../document.utils.ts";
 import { NotImplementedError, UnsupportedError } from "../errors.ts";
 import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
+import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import { looselyConvertPartToPartDelta } from "../stream.utils.ts";
 import type {
   ContentDelta,
-  DocumentPart,
   ImagePart,
   LanguageModelInput,
   Message,
@@ -17,6 +16,7 @@ import type {
   Part,
   PartDelta,
   PartialModelResponse,
+  SourcePart,
   TextPart,
   TextPartDelta,
   Tool,
@@ -177,7 +177,7 @@ function convertToAnthropicContentBlockParam(
       return convertToAnthropicTextBlockParam(part);
     case "image":
       return convertToAnthropicImageBlockParam(part);
-    case "document":
+    case "source":
       return convertToAnthropicDocumentBlockParam(part);
     case "tool-call":
       return convertToAnthropicToolUseBlockParam(part);
@@ -215,7 +215,7 @@ function convertToAnthropicImageBlockParam(
 }
 
 function convertToAnthropicDocumentBlockParam(
-  part: DocumentPart,
+  part: SourcePart,
 ): Anthropic.DocumentBlockParam {
   return {
     type: "document",
@@ -241,7 +241,7 @@ function convertToAnthropicContentBlockSourceContent(
     default:
       throw new UnsupportedError(
         PROVIDER,
-        `Cannot convert part to Anthropic content for type ${part.type}`,
+        `Cannot convert part to Anthropic ContentBlockSourceContent for type ${part.type}`,
       );
   }
 }
@@ -260,7 +260,7 @@ function convertToAnthropicToolUseBlockParam(
 function convertToAnthropicToolResultBlockParam(
   part: ToolResultPart,
 ): Anthropic.ToolResultBlockParam {
-  const toolResultPartContent = getCompatiblePartsWithoutDocumentParts(
+  const toolResultPartContent = getCompatiblePartsWithoutSourceParts(
     part.content,
   );
   return {

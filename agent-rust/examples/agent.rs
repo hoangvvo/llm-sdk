@@ -68,6 +68,7 @@ impl AgentTool<MyContext> for GetWeatherTool {
                     "forecast": "Sunny",
                     "temperatureC": 25
                 })
+                .to_string()
                 .into(),
             )],
             is_error: false,
@@ -116,6 +117,7 @@ impl AgentTool<MyContext> for SendMessageTool {
                     "message": params.message,
                     "status": "sent"
                 })
+                .to_string()
                 .into(),
             )],
             is_error: false,

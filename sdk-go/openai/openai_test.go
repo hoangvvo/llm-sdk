@@ -89,8 +89,8 @@ func TestStructuredResponseFormat(t *testing.T) {
 	testcommon.RunTestCase(t, model, testcommon.TestCaseStructuredResponseFormat)
 }
 
-func TestDocumentPartInput(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseDocumentPartInput)
+func TestSourcePartInput(t *testing.T) {
+	testcommon.RunTestCase(t, model, testcommon.TestCaseSourcePartInput)
 }
 
 func TestGenerateAudio(t *testing.T) {

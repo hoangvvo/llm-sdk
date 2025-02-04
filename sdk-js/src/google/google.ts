@@ -24,7 +24,6 @@ import {
   mapAudioFormatToMimeType,
   mapMimeTypeToAudioFormat,
 } from "../audio.utils.ts";
-import { getCompatiblePartsWithoutDocumentParts } from "../document.utils.ts";
 import {
   InvariantError,
   NotImplementedError,
@@ -34,6 +33,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
+import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
@@ -186,7 +186,7 @@ function convertToGenerateContentRequest(
 // MARK: To Provider Messages
 
 function convertToGoogleContent(message: Message): Content {
-  const messageParts = getCompatiblePartsWithoutDocumentParts(message.content);
+  const messageParts = getCompatiblePartsWithoutSourceParts(message.content);
   const parts = messageParts.map(convertToGooglePart);
   switch (message.role) {
     case "user": {
@@ -269,9 +269,7 @@ function convertToGoogleFunctionCallPart(
 function convertToGoogleFunctionResponsePart(
   part: ToolResultPart,
 ): GoogleFunctionResponsePart {
-  const toolResultContent = getCompatiblePartsWithoutDocumentParts(
-    part.content,
-  );
+  const toolResultContent = getCompatiblePartsWithoutSourceParts(part.content);
   const textParts = toolResultContent.filter((part) => part.type === "text");
 
   let response: object;

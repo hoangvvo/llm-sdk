@@ -341,7 +341,7 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 		case message.UserMessage != nil:
 			var content []ChatCompletionContentPart
 
-			messageParts := llmsdk.GetCompatiblePartsWithoutDocumentParts(message.UserMessage.Content)
+			messageParts := llmsdk.GetCompatiblePartsWithoutSourceParts(message.UserMessage.Content)
 
 			for _, part := range messageParts {
 				openAIPart, err := convertToOpenAIContentPart(part)
@@ -360,7 +360,7 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 		case message.AssistantMessage != nil:
 			assistantMsg := &ChatCompletionAssistantMessageParam{}
 
-			messageParts := llmsdk.GetCompatiblePartsWithoutDocumentParts(message.AssistantMessage.Content)
+			messageParts := llmsdk.GetCompatiblePartsWithoutSourceParts(message.AssistantMessage.Content)
 
 			for _, part := range messageParts {
 				switch part.Type() {
@@ -410,7 +410,7 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 					return nil, fmt.Errorf("tool message must only contain tool result parts")
 				}
 
-				toolResultPartContent := llmsdk.GetCompatiblePartsWithoutDocumentParts(part.ToolResultPart.Content)
+				toolResultPartContent := llmsdk.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
 
 				var content []ChatCompletionToolMessageParamToolContentPart
 				for _, contentPart := range toolResultPartContent {

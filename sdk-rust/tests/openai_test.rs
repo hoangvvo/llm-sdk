@@ -68,7 +68,7 @@ test_set!(OPENAI_MODEL, stream_parallel_tool_calls_same_name);
 
 test_set!(OPENAI_MODEL, structured_response_format);
 
-test_set!(OPENAI_MODEL, document_part_input);
+test_set!(OPENAI_MODEL, source_part_input);
 
 #[test]
 async fn test_generate_audio() -> Result<(), Box<dyn Error>> {

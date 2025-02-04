@@ -39,10 +39,10 @@ func NewAudioPart(audioData string, format AudioFormat, sampleRate, channels *in
 	}
 }
 
-// NewDocumentPart creates a new document part
-func NewDocumentPart(title string, content []Part, id *string) Part {
+// NewSourcePart creates a new source part
+func NewSourcePart(title string, content []Part, id *string) Part {
 	return Part{
-		DocumentPart: &DocumentPart{
+		SourcePart: &SourcePart{
 			Title:   title,
 			Content: content,
 			ID:      id,

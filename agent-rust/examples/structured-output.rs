@@ -62,6 +62,7 @@ impl AgentTool<()> for SearchFlightsTool {
                         "price": 120
                     }
                 ])
+                .to_string()
                 .into(),
             )],
             is_error: false,
@@ -120,6 +121,7 @@ impl AgentTool<()> for SearchHotelsTool {
                         "rating": 4.7
                     }
                 ])
+                .to_string()
                 .into(),
             )],
             is_error: false,

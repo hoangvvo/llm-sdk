@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { getCompatiblePartsWithoutDocumentParts } from "../document.utils.ts";
 import {
   InvalidInputError,
   InvariantError,
@@ -8,6 +7,7 @@ import {
 } from "../errors.ts";
 import type { LanguageModel } from "../language-model.ts";
 import { type LanguageModelMetadata } from "../language-model.ts";
+import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import { guessDeltaIndex } from "../stream.utils.ts";
 import type {
   AudioFormat,
@@ -207,7 +207,7 @@ function convertToOpenAIMessages(
   messages.forEach((message) => {
     switch (message.role) {
       case "user": {
-        const messageParts = getCompatiblePartsWithoutDocumentParts(
+        const messageParts = getCompatiblePartsWithoutSourceParts(
           message.content,
         );
 
@@ -231,7 +231,7 @@ function convertToOpenAIMessages(
           content: null,
         };
 
-        const messageParts = getCompatiblePartsWithoutDocumentParts(
+        const messageParts = getCompatiblePartsWithoutSourceParts(
           message.content,
         );
 
@@ -275,7 +275,7 @@ function convertToOpenAIMessages(
             );
           }
 
-          const toolResultPartContent = getCompatiblePartsWithoutDocumentParts(
+          const toolResultPartContent = getCompatiblePartsWithoutSourceParts(
             part.content,
           );
 

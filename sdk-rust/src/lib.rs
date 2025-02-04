@@ -1,10 +1,10 @@
 mod accumulator;
 mod audio_utils;
-mod document_utils;
 mod errors;
 mod ext;
 mod language_model;
 pub mod openai;
+mod source_part_utils;
 mod stream_utils;
 mod types;
 mod usage_utils;

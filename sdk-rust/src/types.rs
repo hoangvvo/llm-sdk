@@ -33,7 +33,7 @@ pub enum Part {
     Text(TextPart),
     Image(ImagePart),
     Audio(AudioPart),
-    Document(DocumentPart),
+    Source(SourcePart),
     ToolCall(ToolCallPart),
     ToolResult(ToolResultPart),
 }
@@ -163,11 +163,11 @@ pub struct AudioPart {
     pub id: Option<String>,
 }
 
-/// A part of the message that contains a document with structured content.
-/// Documents will be used for citation for supported models.
+/// A part of the message that contains a source with structured content.
+/// It will be used for citation for supported models.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-pub struct DocumentPart {
+pub struct SourcePart {
     /// The title of the document.
     pub title: String,
     /// The content of the document.

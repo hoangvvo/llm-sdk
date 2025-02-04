@@ -4,7 +4,7 @@ use futures::lock::{Mutex, MutexGuard};
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
-    JSONSchema, Message,
+    JSONSchema, Message, Part,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -67,7 +67,9 @@ where
         let result = self
             .agent
             .run(AgentRequest {
-                input: vec![AgentItem::Message(Message::user(vec![params.task]))],
+                input: vec![AgentItem::Message(Message::user(vec![Part::Text(
+                    params.task.into(),
+                )]))],
                 context: (*context).clone(),
             })
             .await?;
@@ -148,9 +150,11 @@ impl AgentTool<MyContext> for CreateOrderTool {
             })
             .await;
         Ok(AgentToolResult {
-            content: vec![serde_json::json!({ "status": "creating" })
-                .to_string()
-                .into()],
+            content: vec![Part::Text(
+                serde_json::json!({ "status": "creating" })
+                    .to_string()
+                    .into(),
+            )],
             is_error: false,
         })
     }
@@ -214,7 +218,7 @@ impl AgentTool<MyContext> for GetOrdersTool {
         context.prune_orders().await;
 
         Ok(AgentToolResult {
-            content: vec![serde_json::to_string(&result)?.into()],
+            content: vec![Part::Text(serde_json::to_string(&result)?.into())],
             is_error: false,
         })
     }
@@ -253,9 +257,11 @@ impl AgentTool<MyContext> for DeliverOrderTool {
         );
 
         Ok(AgentToolResult {
-            content: vec![serde_json::json!({ "status": "delivering" })
-                .to_string()
-                .into()],
+            content: vec![Part::Text(
+                serde_json::json!({ "status": "delivering" })
+                    .to_string()
+                    .into(),
+            )],
             is_error: false,
         })
     }
@@ -305,7 +311,9 @@ You should also poll the order status in every turn to send them for delivery on
     loop {
         println!("\n--- New iteration ---");
 
-        input.push(AgentItem::Message(Message::user(vec!["Next"])));
+        input.push(AgentItem::Message(Message::user(vec![Part::Text(
+            "Next".into(),
+        )])));
 
         let response = coordinator
             .run(AgentRequest {

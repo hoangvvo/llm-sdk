@@ -35,18 +35,18 @@ We provide SDKs to interact with various LLM providers in the following programm
 
 ### Supported Providers
 
-|                           | OpenAI                 | Anthropic                                                 | Google                 | Cohere | Mistral                |
-| ------------------------- | ---------------------- | --------------------------------------------------------- | ---------------------- | ------ | ---------------------- |
-| Sampling Params           | ✅ except `top_k`      | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅                     | ✅     | ✅ except `top_k`      |
-| Function Calling          | ✅                     | ✅                                                        | ✅                     | ✅     | ✅                     |
-| Structured Output         | ✅                     | ➖                                                        | ✅                     | ✅     | ✅                     |
-| Text Input                | ✅                     | ✅                                                        | ✅                     | ✅     | ✅                     |
-| Image Input               | ✅                     | ✅                                                        | ✅                     | ✅     | ✅                     |
-| Audio Input               | ✅                     | ➖                                                        | ✅                     | ➖     | ➖                     |
-| Document Input (citation) | ➖ [^document-as-text] | ✅                                                        | ➖ [^document-as-text] | ✅     | 🚧 [^document-as-text] |
-| Text Output               | ✅                     | ✅                                                        | ✅                     | ✅     | ✅                     |
-| Image Output              | 🚧                     | ➖                                                        | ✅                     | ➖     | ➖                     |
-| Audio Output              | ✅                     | ➖                                                        | ➖                     | ➖     | ➖                     |
+|                   | OpenAI               | Anthropic                                                 | Google               | Cohere | Mistral              |
+| ----------------- | -------------------- | --------------------------------------------------------- | -------------------- | ------ | -------------------- |
+| Sampling Params   | ✅ except `top_k`    | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅                   | ✅     | ✅ except `top_k`    |
+| Function Calling  | ✅                   | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Structured Output | ✅                   | ➖                                                        | ✅                   | ✅     | ✅                   |
+| Text Input        | ✅                   | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Image Input       | ✅                   | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Audio Input       | ✅                   | ➖                                                        | ✅                   | ➖     | ➖                   |
+| Citation          | ➖ [^source-as-text] | ✅                                                        | ➖ [^source-as-text] | ✅     | 🚧 [^source-as-text] |
+| Text Output       | ✅                   | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Image Output      | 🚧                   | ➖                                                        | ✅                   | ➖     | ➖                   |
+| Audio Output      | ✅                   | ➖                                                        | ➖                   | ➖     | ➖                   |
 
 Keys:
 
@@ -54,7 +54,7 @@ Keys:
 - 🚧: Not yet implemented
 - ➖: Not available from provider
 
-[^document-as-text]: Document Input (citation) is not supported by all providers and may be converted to compatible inputs instead.
+[^source-as-text]: Source Input (citation) is not supported by all providers and may be converted to compatible inputs instead.
 
 ### Language Model
 
@@ -93,7 +93,7 @@ See [Message](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L29).
 > [!NOTE]
 > The `ToolResultPart` content is an array of `Part` instead of a string or an object. This enables non-text results to be returned for LLM providers that support them (e.g., Anthropic Function Calling supports images in tool results).
 
-The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `DocumentPart` (for citation), `ToolCallPart`, and `ToolResultPart`.
+The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `SourcePart` (for citation), `ToolCallPart`, and `ToolResultPart`.
 
 See [`Part`](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L16).
 
@@ -183,6 +183,14 @@ The library also provides a streaming interface, similar to streaming LLM comple
 Unlike other agent frameworks, this library does not hardcode any hidden prompt templates or parsing logic. This design choice avoids unnecessary constraints, reduces complexity, and prevents the loss of control that comes with excessive abstraction (see this [blog post](https://hamel.dev/blog/posts/prompt/) for a deeper discussion).
 
 However, this prevents the library from implementing specific agent patterns, such as hand-off, memory, and others. The examples folder in each agent library contains implementations of various agent patterns to serve as references.
+
+## Comparison with other libraries
+
+The initial version of `llm-sdk` was developed internally at my company, prior to the existence or knowledge of similar libraries like the [Vercel AI SDK](https://github.com/vercel/ai) or [OpenAI Swarm](https://github.com/openai/swarm). As a result, it was never intended to compete with or address the limitations of those libraries. As these other libraries matured, `llm-sdk` continued to evolve independently, focusing on its unique features and use cases, which were designed to be sufficient for its intended applications.
+
+This section is designed to outline the differences for those considering migration to or from `llm-sdk` or to assert compatibility.
+
+TBD.
 
 ## License
 

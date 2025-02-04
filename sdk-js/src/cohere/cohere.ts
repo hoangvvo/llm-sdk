@@ -10,7 +10,6 @@ import type {
 } from "../language-model.ts";
 import type {
   ContentDelta,
-  DocumentPart,
   ImagePart,
   LanguageModelInput,
   Message,
@@ -19,6 +18,7 @@ import type {
   Part,
   PartialModelResponse,
   ResponseFormatOption,
+  SourcePart,
   TextPart,
   Tool,
   ToolCallPart,
@@ -266,7 +266,7 @@ function convertToCohereContent(part: Part): Cohere.Content {
   }
 }
 
-// Document Parts are not supported as regular Cohere Content.
+// source parts are not supported as regular Cohere Content.
 // Instead they are provided in a separate property called documents
 // with type V2ChatRequestDocumentsItem.
 // Return those documents and remaining parts that are not documents
@@ -277,7 +277,7 @@ function separatePartsAndDocuments(parts: Part[]): {
   const remainingParts: Part[] = [];
   const documents: Cohere.V2ChatRequestDocumentsItem[] = [];
   for (const part of parts) {
-    if (part.type === "document") {
+    if (part.type === "source") {
       documents.push({
         data: convertToCohereDocumentData(part),
       });
@@ -311,18 +311,18 @@ function convertToCohereImageContent(
 }
 
 function convertToCohereDocumentContent(
-  documentPart: DocumentPart,
+  sourcePart: SourcePart,
 ): Cohere.ToolContent.Document {
   return {
     type: "document",
     document: {
-      data: convertToCohereDocumentData(documentPart),
+      data: convertToCohereDocumentData(sourcePart),
     },
   };
 }
 
 function convertToCohereDocumentData(
-  documentPart: DocumentPart,
+  sourcePart: SourcePart,
 ): Record<string, unknown> {
   function partToRecord(part: Part): Record<string, unknown> {
     switch (part.type) {
@@ -332,15 +332,15 @@ function convertToCohereDocumentData(
     return {};
   }
 
-  const firstPart = documentPart.content[0];
+  const firstPart = sourcePart.content[0];
   if (!firstPart) return {};
 
-  if (documentPart.content.length === 1) {
+  if (sourcePart.content.length === 1) {
     return partToRecord(firstPart);
   }
 
   return {
-    content: documentPart.content,
+    content: sourcePart.content,
   };
 }
 
@@ -361,7 +361,7 @@ function convertToCohereToolMessageContent(part: Part): Cohere.ToolContent {
   switch (part.type) {
     case "text":
       return convertToCohereTextContent(part);
-    case "document":
+    case "source":
       return convertToCohereDocumentContent(part);
     default:
       throw new UnsupportedError(

@@ -479,9 +479,9 @@ export const TEST_CASE_STRUCTURED_RESPONSE_FORMAT: TestCase = {
   },
 };
 
-export const TEST_CASE_DOCUMENT_PART_INPUT: TestCase = {
-  // all providers must accept the document part or translate them to a compatible part
-  name: "document part in content",
+export const TEST_CASE_SOURCE_PART_INPUT: TestCase = {
+  // all providers must accept the source part or translate them to a compatible part
+  name: "source part in content",
   input: {
     messages: [
       {
@@ -508,7 +508,7 @@ export const TEST_CASE_DOCUMENT_PART_INPUT: TestCase = {
             tool_name: "get_first_secret_number",
             content: [
               {
-                type: "document",
+                type: "source",
                 title: "my secret number",
                 content: [
                   {
@@ -534,7 +534,7 @@ export const TEST_CASE_DOCUMENT_PART_INPUT: TestCase = {
         role: "user",
         content: [
           {
-            type: "document",
+            type: "source",
             title: "my secret number",
             content: [
               {

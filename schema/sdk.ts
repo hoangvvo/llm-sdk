@@ -17,7 +17,7 @@ export type Part =
   | TextPart
   | ImagePart
   | AudioPart
-  | DocumentPart
+  | SourcePart
   | ToolCallPart
   | ToolResultPart;
 /**
@@ -33,11 +33,11 @@ export type Message = UserMessage | AssistantMessage | ToolMessage;
  */
 export type Modality = "text" | "audio";
 /**
- * Determines how the model should choose which tool to use. "auto"
- * - The model will automatically choose the tool to use or not use any tools. "none"
- * - The model will not use any tools. "required"
- * - The model will be forced to use a tool. { type: "tool", toolName: "toolName" }
- * - The model will use the specified tool.
+ * Determines how the model should choose which tool to use:
+ * - "auto": The model will automatically choose the tool to use or not use any tools.
+ * - "none": The model will not use any tools.
+ * - "required": The model will be forced to use a tool.
+ * - { type: "tool", toolName: "toolName" }: The model will use the specified tool.
  */
 export type ToolChoiceOption =
   | ToolChoiceAuto
@@ -52,14 +52,15 @@ export type ResponseFormatOption = ResponseFormatText | ResponseFormatJson;
  * A metadata property that describes the capability of the model.
  */
 export type LanguageModelCapability =
-  | "structured-output"
-  | "function-calling"
-  | "structured-output-strict"
+  | "text-input"
+  | "text-output"
   | "audio-input"
   | "audio-output"
   | "image-input"
   | "image-output"
-  | "document-input";
+  | "function-calling"
+  | "structured-output"
+  | "citation";
 
 /**
  * A part of the message that contains text.
@@ -67,6 +68,7 @@ export type LanguageModelCapability =
 export interface TextPart {
   type: "text";
   text: string;
+  citations?: Citation[];
   /**
    * The ID of the part, if applicable.
    */
@@ -107,7 +109,7 @@ export interface AudioPart {
    * The base64-encoded audio data.
    */
   audio_data: string;
-  format?: AudioFormat;
+  format: AudioFormat;
   /**
    * The sample rate of the audio. E.g. 44100, 48000.
    */
@@ -126,11 +128,11 @@ export interface AudioPart {
   id?: string;
 }
 /**
- * A part of the message that contains a document with structured content.
- * Documents will be used for citation for supported models.
+ * A part of the message that contains a source with structured content.
+ * It will be used for citation for supported models.
  */
-export interface DocumentPart {
-  type: "document";
+export interface SourcePart {
+  type: "source";
   /**
    * The title of the document.
    */
@@ -187,6 +189,24 @@ export interface ToolResultPart {
    * Marks the tool result as an error.
    */
   is_error?: boolean;
+}
+/**
+ * Represents a citation for a part.
+ */
+export interface Citation {
+  /**
+   * The ID of the document being cited.
+   */
+  source_id: string;
+
+  /**
+   * The start index of the document content part being cited.
+   */
+  start_source_part_index: number;
+  /**
+   * The end index of the document content part being cited.
+   */
+  end_source_part_index: number;
 }
 /**
  * Represents a message sent by the user.
@@ -333,7 +353,8 @@ export interface ModelResponse {
  * Represents a partial response from the language model, useful for streaming output via async generator.
  */
 export interface PartialModelResponse {
-  delta: ContentDelta;
+  delta?: ContentDelta;
+  usage?: ModelUsage;
 }
 /**
  * The model will automatically choose the tool to use or not use any tools.

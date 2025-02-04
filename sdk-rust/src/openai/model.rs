@@ -1,8 +1,7 @@
 use crate::{
-    document_utils,
     language_model::{LanguageModelMetadata, LanguageModelStream},
     openai::api as openai_api,
-    stream_utils,
+    source_part_utils, stream_utils,
     usage_utils::calculate_cost,
     AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ImagePart,
     LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult, Message, Modality,
@@ -283,7 +282,7 @@ fn into_openai_messages(
         match message {
             Message::User(UserMessage { content }) => {
                 let message_parts =
-                    document_utils::get_compatible_parts_without_document_parts(content);
+                    source_part_utils::get_compatible_parts_without_source_parts(content);
                 let openai_message_param = openai_api::ChatCompletionUserMessageParam {
                     content: message_parts
                         .into_iter()
@@ -301,7 +300,7 @@ fn into_openai_messages(
                     openai_api::ChatCompletionAssistantMessageParam::default();
 
                 let message_parts =
-                    document_utils::get_compatible_parts_without_document_parts(content);
+                    source_part_utils::get_compatible_parts_without_source_parts(content);
 
                 for part in message_parts {
                     match part {
@@ -346,7 +345,7 @@ fn into_openai_messages(
                     };
 
                     let tool_result_part_content =
-                        document_utils::get_compatible_parts_without_document_parts(
+                        source_part_utils::get_compatible_parts_without_source_parts(
                             tool_part.content,
                         );
 

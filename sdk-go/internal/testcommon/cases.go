@@ -351,8 +351,8 @@ var TestCaseStructuredResponseFormat = TestCase{
 	},
 }
 
-var TestCaseDocumentPartInput = TestCase{
-	Name: "document part in content",
+var TestCaseSourcePartInput = TestCase{
+	Name: "source part in content",
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
@@ -370,7 +370,7 @@ var TestCaseDocumentPartInput = TestCase{
 				llmsdk.NewTextPart("Got it!", nil),
 			),
 			llmsdk.NewUserMessage(
-				llmsdk.NewDocumentPart("my secret number", []llmsdk.Part{
+				llmsdk.NewSourcePart("my secret number", []llmsdk.Part{
 					llmsdk.NewTextPart("Remember that my second secret number is \"42\".", nil),
 				}, nil),
 				llmsdk.NewTextPart(" What are my two secret numbers?", nil),

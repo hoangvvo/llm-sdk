@@ -26,7 +26,7 @@ type Part struct {
 	TextPart       *TextPart       `json:"-"`
 	ImagePart      *ImagePart      `json:"-"`
 	AudioPart      *AudioPart      `json:"-"`
-	DocumentPart   *DocumentPart   `json:"-"`
+	SourcePart     *SourcePart     `json:"-"`
 	ToolCallPart   *ToolCallPart   `json:"-"`
 	ToolResultPart *ToolResultPart `json:"-"`
 }
@@ -37,7 +37,7 @@ const (
 	PartTypeText       PartType = "text"
 	PartTypeImage      PartType = "image"
 	PartTypeAudio      PartType = "audio"
-	PartTypeDocument   PartType = "document"
+	PartTypeSource     PartType = "source"
 	PartTypeToolCall   PartType = "tool-call"
 	PartTypeToolResult PartType = "tool-result"
 )
@@ -95,9 +95,9 @@ type AudioPart struct {
 	ID *string `json:"id,omitempty"`
 }
 
-// DocumentPart represents A part of the message that contains a document with structured content.
-// Documents will be used for citation for supported models.
-type DocumentPart struct {
+// SourcePart represents a part of the message that contains a source with structured content.
+// It will be used for citation for supported models.
+type SourcePart struct {
 	// The title of the document.
 	Title string `json:"title"`
 	// The content of the document.
@@ -159,13 +159,13 @@ func (p Part) MarshalJSON() ([]byte, error) {
 			AudioPart: p.AudioPart,
 		})
 	}
-	if p.DocumentPart != nil {
+	if p.SourcePart != nil {
 		return json.Marshal(struct {
 			Type PartType `json:"type"`
-			*DocumentPart
+			*SourcePart
 		}{
-			Type:         PartTypeDocument,
-			DocumentPart: p.DocumentPart,
+			Type:       PartTypeSource,
+			SourcePart: p.SourcePart,
 		})
 	}
 	if p.ToolCallPart != nil {

@@ -1,6 +1,5 @@
 import { Mistral } from "@mistralai/mistralai";
 import type * as MistralComponents from "@mistralai/mistralai/models/components/index.ts";
-import { getCompatiblePartsWithoutDocumentParts } from "../document.utils.ts";
 import {
   InvalidInputError,
   InvariantError,
@@ -11,6 +10,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
+import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
@@ -185,7 +185,7 @@ function convertToMistralMessages(
       | MistralChatCompletionRequestMessage[] => {
       switch (message.role) {
         case "user": {
-          const messageParts = getCompatiblePartsWithoutDocumentParts(
+          const messageParts = getCompatiblePartsWithoutSourceParts(
             message.content,
           );
 
@@ -207,7 +207,7 @@ function convertToMistralMessages(
             content: null,
           };
 
-          const messageParts = getCompatiblePartsWithoutDocumentParts(
+          const messageParts = getCompatiblePartsWithoutSourceParts(
             message.content,
           );
 
@@ -250,7 +250,7 @@ function convertToMistralMessages(
                 "Tool messages must contain only tool result parts",
               );
             }
-            const toolResultContent = getCompatiblePartsWithoutDocumentParts(
+            const toolResultContent = getCompatiblePartsWithoutSourceParts(
               part.content,
             );
             return {
