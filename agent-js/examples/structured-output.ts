@@ -1,4 +1,4 @@
-import { Agent, tool } from "@hoangvvo/llm-agent";
+import { Agent, getTextFromResponse, tool } from "@hoangvvo/llm-agent";
 import type { ResponseFormatOption } from "@hoangvvo/llm-sdk";
 import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
 import assert from "node:assert";
@@ -165,7 +165,4 @@ const response = await travelAgent.run({
   context: {},
 });
 
-const textPart = response.content.find((part) => part.type === "text");
-assert(textPart);
-
-console.dir(JSON.parse(textPart.text));
+console.dir(JSON.parse(getTextFromResponse(response)));

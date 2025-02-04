@@ -227,27 +227,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let prompt = "Plan a trip from Paris to Tokyo next week";
 
-    let response = travel_agent.run(AgentRequest {
-        input: vec![AgentItem::Message(Message::User(UserMessage {
-            content: vec![Part::Text(prompt.to_string().into())],
-        }))],
-        context: (),
-    });
-
-    let text_part = response
-        .await?
-        .content
-        .into_iter()
-        .find_map(|part| {
-            if let Part::Text(text) = part {
-                Some(text)
-            } else {
-                None
-            }
+    let response = travel_agent
+        .run(AgentRequest {
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::Text(prompt.to_string().into())],
+            }))],
+            context: (),
         })
-        .ok_or("No text part in response")?;
+        .await?;
 
-    let val: Value = serde_json::from_str(&text_part.text).expect("Invalid JSON response");
+    let val: Value = serde_json::from_str(&response.text()).expect("Invalid JSON response");
 
     println!(
         "{}",

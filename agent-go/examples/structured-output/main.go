@@ -268,22 +268,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Find the text part in response
-	var textPart *llmsdk.TextPart
-	for _, part := range response.Content {
-		if part.TextPart != nil {
-			textPart = part.TextPart
-			break
-		}
-	}
-
-	if textPart == nil {
-		log.Fatal("No text part in response")
-	}
-
 	// Parse and pretty print the JSON response
 	var val map[string]any
-	if err := json.Unmarshal([]byte(textPart.Text), &val); err != nil {
+	if err := json.Unmarshal([]byte(response.Text()), &val); err != nil {
 		log.Fatalf("Invalid JSON response: %v", err)
 	}
 
