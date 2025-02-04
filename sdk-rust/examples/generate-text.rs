@@ -21,7 +21,7 @@ async fn main() {
                     )],
                 }),
                 // Or use the helper function to create a user message
-                Message::user(vec!["a fairty tail"]),
+                Message::user(vec![Part::Text("a fairy tale".into())]),
             ],
             ..Default::default()
         })

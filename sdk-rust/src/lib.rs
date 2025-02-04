@@ -2,6 +2,7 @@ mod accumulator;
 mod audio_utils;
 mod document_utils;
 mod errors;
+mod ext;
 mod language_model;
 pub mod openai;
 mod stream_utils;

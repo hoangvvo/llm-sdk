@@ -356,16 +356,31 @@ var TestCaseDocumentPartInput = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
+				llmsdk.NewTextPart("What is my first secret number?", nil),
+			),
+			llmsdk.NewAssistantMessage(
+				llmsdk.NewToolCallPart("0mbnj08nt", "get_first_secret_number", map[string]any{}, nil),
+			),
+			llmsdk.NewToolMessage(
+				llmsdk.NewToolResultPart("0mbnj08nt", "get_first_secret_number", []llmsdk.Part{
+					llmsdk.NewTextPart(`{"number": 24}`, nil),
+				}, ptr.To(false)),
+			),
+			llmsdk.NewAssistantMessage(
+				llmsdk.NewTextPart("Got it!", nil),
+			),
+			llmsdk.NewUserMessage(
 				llmsdk.NewDocumentPart("my secret number", []llmsdk.Part{
-					llmsdk.NewTextPart("Remember that my secret number is \"42\".", nil),
+					llmsdk.NewTextPart("Remember that my second secret number is \"42\".", nil),
 				}, nil),
-				llmsdk.NewTextPart(" What is my secret number?", nil),
+				llmsdk.NewTextPart(" What are my two secret numbers?", nil),
 			),
 		},
 	},
 	Method: Generate,
 	Output: OutputAssertion{
 		Content: []PartAssertion{
+			NewTextAssertion("24"),
 			NewTextAssertion("42"),
 		},
 	},

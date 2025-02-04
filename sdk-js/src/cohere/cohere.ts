@@ -148,7 +148,6 @@ function convertToCohereChatRequest(
       strictTools: true,
     }),
     ...(toolChoice && { toolChoice }),
-
     ...(response_format && {
       responseFormat: convertToCohereResponseFormat(response_format),
     }),
@@ -325,7 +324,21 @@ function convertToCohereDocumentContent(
 function convertToCohereDocumentData(
   documentPart: DocumentPart,
 ): Record<string, unknown> {
-  // TODO: not the optimal presentation
+  function partToRecord(part: Part): Record<string, unknown> {
+    switch (part.type) {
+      case "text":
+        return { text: part.text };
+    }
+    return {};
+  }
+
+  const firstPart = documentPart.content[0];
+  if (!firstPart) return {};
+
+  if (documentPart.content.length === 1) {
+    return partToRecord(firstPart);
+  }
+
   return {
     content: documentPart.content,
   };

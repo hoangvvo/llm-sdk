@@ -489,22 +489,37 @@ pub async fn test_structured_response_format(
 pub async fn test_document_part_input(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![
+            messages: vec![
+                Message::user(vec![Part::Text("What is my first secret number?".into())]),
+                Message::assistant(vec![Part::ToolCall(ToolCallPart {
+                    tool_call_id: "0mbnj08nt".to_string(),
+                    tool_name: "get_first_secret_number".to_string(),
+                    ..Default::default()
+                })]),
+                Message::tool(vec![Part::ToolResult(ToolResultPart {
+                    tool_call_id: "0mbnj08nt".to_string(),
+                    tool_name: "get_first_secret_number".to_string(),
+                    content: vec![Part::Text(TextPart {
+                        text: "24".to_string(),
+                        id: None,
+                    })],
+                    ..Default::default()
+                })]),
+                Message::user(vec![
                     Part::Document(DocumentPart {
                         title: "my secret number".to_string(),
                         content: vec![Part::Text(TextPart {
-                            text: "Rember that my secret number is 42.".to_string(),
+                            text: "Rember that second secret number is 42.".to_string(),
                             id: None,
                         })],
                         id: None,
                     }),
                     Part::Text(TextPart {
-                        text: "What is my secret number?".to_string(),
+                        text: "What are my secret numbers?".to_string(),
                         id: None,
                     }),
-                ],
-            })],
+                ]),
+            ],
             ..Default::default()
         },
         method: TestMethod::Generate,

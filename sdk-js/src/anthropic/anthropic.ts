@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getCompatiblePartsWithoutDocumentParts } from "../document.utils.ts";
 import { NotImplementedError, UnsupportedError } from "../errors.ts";
 import type {
   LanguageModel,
@@ -158,11 +159,12 @@ function convertToAnthropicMessages(
           content: message.content.map(convertToAnthropicContentBlockParam),
         };
       case "user":
-      case "tool": //  anthropic does not have a dedicated tool message role
+      case "tool": {
         return {
           role: "user",
           content: message.content.map(convertToAnthropicContentBlockParam),
         };
+      }
     }
   });
 }
@@ -258,10 +260,13 @@ function convertToAnthropicToolUseBlockParam(
 function convertToAnthropicToolResultBlockParam(
   part: ToolResultPart,
 ): Anthropic.ToolResultBlockParam {
+  const toolResultPartContent = getCompatiblePartsWithoutDocumentParts(
+    part.content,
+  );
   return {
     type: "tool_result",
     tool_use_id: part.tool_call_id,
-    content: part.content.map((part) => {
+    content: toolResultPartContent.map((part) => {
       const blockParam = convertToAnthropicContentBlockParam(part);
       if (blockParam.type !== "text" && blockParam.type !== "image") {
         throw new UnsupportedError(

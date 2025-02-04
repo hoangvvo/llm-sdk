@@ -388,7 +388,7 @@ function mapMistralMessage(
 ): Part[] {
   const parts: Part[] = [];
 
-  if (typeof message.content === "string") {
+  if (typeof message.content === "string" && !!message.content) {
     parts.push({
       type: "text",
       text: message.content,

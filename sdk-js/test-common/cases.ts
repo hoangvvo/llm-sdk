@@ -486,6 +486,52 @@ export const TEST_CASE_DOCUMENT_PART_INPUT: TestCase = {
     messages: [
       {
         role: "user",
+        content: [{ type: "text", text: "What is my first secret number?" }],
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "tool-call",
+            tool_call_id: "0mbnj08nt",
+            args: {},
+            tool_name: "get_first_secret_number",
+          },
+        ],
+      },
+      {
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            tool_call_id: "0mbnj08nt",
+            tool_name: "get_first_secret_number",
+            content: [
+              {
+                type: "document",
+                title: "my secret number",
+                content: [
+                  {
+                    type: "text",
+                    text: "24",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "text",
+            text: "Got it!",
+          },
+        ],
+      },
+      {
+        role: "user",
         content: [
           {
             type: "document",
@@ -493,13 +539,13 @@ export const TEST_CASE_DOCUMENT_PART_INPUT: TestCase = {
             content: [
               {
                 type: "text",
-                text: 'Remember that my secret number is "42".',
+                text: 'Remember that my second secret number is "42".',
               },
             ],
           },
           {
             type: "text",
-            text: "What is the my secret number?",
+            text: "What are the my two secret numbers?",
           },
         ],
       },
@@ -507,6 +553,10 @@ export const TEST_CASE_DOCUMENT_PART_INPUT: TestCase = {
   },
   output: {
     content: [
+      {
+        type: "text",
+        text: /24/,
+      },
       {
         type: "text",
         text: /42/,
