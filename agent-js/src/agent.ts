@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { LanguageModel, ResponseFormatOption } from "@hoangvvo/llm-sdk";
 import type { InstructionParam } from "./instruction.ts";
 import { RunSession } from "./run.ts";
@@ -13,7 +12,7 @@ export class Agent<TContext> {
   readonly #instructions: InstructionParam<TContext>[];
   readonly #model: LanguageModel;
   readonly #response_format: ResponseFormatOption;
-  readonly #tools: AgentTool<any, TContext>[];
+  readonly #tools: AgentTool<TContext>[];
   readonly #max_turns: number;
   readonly #temperature: number | undefined;
   readonly #top_p: number | undefined;
@@ -118,7 +117,7 @@ export interface AgentParams<TContext> {
    * The tools that the agent can use to perform tasks.
    * @default []
    */
-  tools?: AgentTool<any, TContext>[];
+  tools?: AgentTool<TContext>[];
 
   /**
    * The expected format of the response. Either text or json.

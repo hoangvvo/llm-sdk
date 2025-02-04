@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import {
   LanguageModelError,
   StreamAccumulator,
@@ -40,7 +38,7 @@ export class RunSession<TContext> {
   readonly #instructions: InstructionParam<TContext>[];
   readonly #model: LanguageModel;
   readonly #responseFormat: ResponseFormatOption;
-  readonly #tools: AgentTool<any, TContext>[];
+  readonly #tools: AgentTool<TContext>[];
   readonly #maxTurns: number;
   readonly #temperature: number | undefined;
   readonly #topP: number | undefined;
@@ -310,7 +308,7 @@ export class RunSession<TContext> {
 interface RunSessionParams<TContext> {
   model: LanguageModel;
   instructions: InstructionParam<TContext>[];
-  tools: AgentTool<any, TContext>[];
+  tools: AgentTool<TContext>[];
   responseFormat: ResponseFormatOption;
   maxTurns: number;
   temperature?: number;

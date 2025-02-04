@@ -2,7 +2,7 @@ import type { z, ZodType } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { type AgentToolResult } from "../tool.ts";
 
-export function zodTool<TZodSchema extends ZodType, TContext>(params: {
+export function zodTool<TContext, TZodSchema extends ZodType>(params: {
   /**
    * Name of the tool.
    */

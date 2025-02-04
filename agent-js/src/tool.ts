@@ -5,7 +5,11 @@ import type { RunState } from "./run.ts";
  * Agent tool that can be used by the agent to perform specific tasks. Any object
  * that implements the `AgentTool` interface can be used as a tool.
  */
-export interface AgentTool<TArgs extends Record<string, unknown>, TContext> {
+export interface AgentTool<
+  TContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  TArgs extends Record<string, unknown> = any,
+> {
   /**
    * Name of the tool.
    */
@@ -39,7 +43,7 @@ export interface AgentToolResult {
 /**
  * A helper function to create an agent tool.
  */
-export function tool<TArgs extends Record<string, unknown>, TContext>(params: {
+export function tool<TContext, TArgs extends Record<string, unknown>>(params: {
   /**
    * Name of the tool.
    */
@@ -62,6 +66,6 @@ export function tool<TArgs extends Record<string, unknown>, TContext>(params: {
     args: TArgs,
     ctx: TContext,
   ) => AgentToolResult | Promise<AgentToolResult>;
-}): AgentTool<TArgs, TContext> {
+}): AgentTool<TContext, TArgs> {
   return params;
 }

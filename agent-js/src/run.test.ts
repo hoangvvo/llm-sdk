@@ -77,7 +77,7 @@ function createMockTool<TContext = any>(
   name: string,
   result: any,
   executeFn?: (args: any, ctx: TContext, state: RunState) => any,
-): AgentTool<any, TContext> {
+): AgentTool<TContext> {
   return {
     name,
     description: `Mock tool ${name}`,

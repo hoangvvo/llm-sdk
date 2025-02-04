@@ -2,7 +2,7 @@ import { type Static, type TSchema as TTypeboxSchema } from "@sinclair/typebox";
 import { type AgentToolResult } from "../tool.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-export function typeboxTool<TSchema extends TTypeboxSchema, TContext>(params: {
+export function typeboxTool<TContext, TSchema extends TTypeboxSchema>(params: {
   /**
    * Name of the tool.
    */
