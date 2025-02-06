@@ -14,10 +14,10 @@ func NewTextPart(text string) Part {
 }
 
 // NewImagePart creates a new image part
-func NewImagePart(mimeType, imageData string, opts ...ImagePartOption) Part {
+func NewImagePart(imageData, mimeType string, opts ...ImagePartOption) Part {
 	imagePart := &ImagePart{
-		MimeType:  mimeType,
 		ImageData: imageData,
+		MimeType:  mimeType,
 	}
 
 	for _, opt := range opts {

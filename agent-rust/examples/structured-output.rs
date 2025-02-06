@@ -4,7 +4,7 @@ use futures::lock::Mutex;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
-    JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption, UserMessage,
+    JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -47,7 +47,7 @@ impl AgentTool<()> for SearchFlightsTool {
             params.from, params.to, params.date
         );
         Ok(AgentToolResult {
-            content: vec![Part::Text(
+            content: vec![Part::text(
                 json!([
                     {
                         "airline": "Vietnam Airlines",
@@ -62,8 +62,7 @@ impl AgentTool<()> for SearchFlightsTool {
                         "price": 120
                     }
                 ])
-                .to_string()
-                .into(),
+                .to_string(),
             )],
             is_error: false,
         })
@@ -106,7 +105,7 @@ impl AgentTool<()> for SearchHotelsTool {
             params.city, params.check_in, params.nights
         );
         Ok(AgentToolResult {
-            content: vec![Part::Text(
+            content: vec![Part::text(
                 json!([
                     {
                         "name": "The Plaza",
@@ -121,8 +120,7 @@ impl AgentTool<()> for SearchHotelsTool {
                         "rating": 4.7
                     }
                 ])
-                .to_string()
-                .into(),
+                .to_string(),
             )],
             is_error: false,
         })
@@ -229,9 +227,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let response = travel_agent
         .run(AgentRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::Text(prompt.to_string().into())],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(prompt)]))],
             context: (),
         })
         .await?;

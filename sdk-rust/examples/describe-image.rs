@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
-use llm_sdk::{ImagePart, LanguageModelInput, Message, Part, UserMessage};
+use llm_sdk::{LanguageModelInput, Message, Part};
 
 mod common;
 
@@ -26,16 +26,10 @@ async fn main() {
 
     let response = model
         .generate(LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![
-                    Part::Text("Describe this image".into()),
-                    Part::Image(ImagePart {
-                        image_data: image_b64,
-                        mime_type,
-                        ..Default::default()
-                    }),
-                ],
-            })],
+            messages: vec![Message::user(vec![
+                Part::text("Describe this image"),
+                Part::image(image_b64, mime_type),
+            ])],
             ..Default::default()
         })
         .await

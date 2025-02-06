@@ -65,7 +65,7 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
 }
 
 /// Merges text delta with existing text data
-fn merge_text_delta(existing: &mut AccumulatedTextData, delta: TextPartDelta) {
+fn merge_text_delta(existing: &mut AccumulatedTextData, delta: &TextPartDelta) {
     existing.text.push_str(&delta.text);
 }
 
@@ -108,7 +108,7 @@ fn merge_audio_delta(existing: &mut AccumulatedAudioData, delta: AudioPartDelta)
 fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<(), String> {
     match (existing, delta.part) {
         (AccumulatedData::Text(ref mut existing_text), PartDelta::Text(text_delta)) => {
-            merge_text_delta(existing_text, text_delta);
+            merge_text_delta(existing_text, &text_delta);
         }
         (AccumulatedData::ToolCall(ref mut existing_tool), PartDelta::ToolCall(tool_delta)) => {
             merge_tool_call_delta(existing_tool, tool_delta);

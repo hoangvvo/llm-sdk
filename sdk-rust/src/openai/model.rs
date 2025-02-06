@@ -573,7 +573,8 @@ fn map_openai_message(
             ),
             audio_data: audio.data,
             transcript: Some(audio.transcript),
-            ..Default::default()
+            channels: None,
+            sample_rate: None,
         };
         if matches!(audio_part.format, AudioFormat::Linear16) {
             audio_part.sample_rate = Some(OPENAI_AUDIO_SAMPLE_RATE);

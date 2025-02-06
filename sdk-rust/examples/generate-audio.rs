@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
-use llm_sdk::{LanguageModelInput, Message, Modality, Part, UserMessage};
+use llm_sdk::{LanguageModelInput, Message, Modality, Part};
 use std::io::Cursor;
 
 mod common;
@@ -20,11 +20,9 @@ async fn main() {
                 }
             })),
             modalities: Some(vec![Modality::Text, Modality::Audio]),
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(
-                    "Is a golden retriever a good family dog?".into(),
-                )],
-            })],
+            messages: vec![Message::user(vec![Part::text(
+                "Is a golden retriever a good family dog?",
+            )])],
             ..Default::default()
         })
         .await

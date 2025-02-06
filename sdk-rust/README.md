@@ -30,7 +30,7 @@ Below is an example to generate text:
 
 ```rust
 use dotenvy::dotenv;
-use llm_sdk::{AssistantMessage, LanguageModelInput, Message, Part, UserMessage};
+use llm_sdk::{LanguageModelInput, Message, Part, UserMessage};
 
 mod common;
 
@@ -46,13 +46,11 @@ async fn main() {
                 Message::User(UserMessage {
                     content: vec![Part::Text("Tell me a story.".into())],
                 }),
-                Message::Assistant(AssistantMessage {
-                    content: vec![Part::Text(
-                        "What kind of story would you like to hear?".into(),
-                    )],
-                }),
-                // Or use the helper function to create a user message
-                Message::user(vec!["a fairty tail"]),
+                // Or use the convenient function to create a user message
+                Message::assistant(vec![Part::text(
+                    "Sure! What kind of story would you like to hear?",
+                )]),
+                Message::user(vec![Part::Text("a fairy tale".into())]),
             ],
             ..Default::default()
         })

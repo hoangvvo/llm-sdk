@@ -257,10 +257,8 @@ impl AgentTool<MyContext> for DeliverOrderTool {
         );
 
         Ok(AgentToolResult {
-            content: vec![Part::Text(
-                serde_json::json!({ "status": "delivering" })
-                    .to_string()
-                    .into(),
+            content: vec![Part::text(
+                serde_json::json!({ "status": "delivering" }).to_string(),
             )],
             is_error: false,
         })
@@ -311,9 +309,7 @@ You should also poll the order status in every turn to send them for delivery on
     loop {
         println!("\n--- New iteration ---");
 
-        input.push(AgentItem::Message(Message::user(vec![Part::Text(
-            "Next".into(),
-        )])));
+        input.push(AgentItem::Message(Message::user(vec![Part::text("Next")])));
 
         let response = coordinator
             .run(AgentRequest {

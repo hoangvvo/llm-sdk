@@ -3,7 +3,7 @@ use llm_agent::*;
 use llm_sdk::{
     ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
     LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    TextPart, TextPartDelta, UserMessage,
+    TextPartDelta,
 };
 use std::sync::{Arc, Mutex};
 
@@ -83,10 +83,7 @@ impl LanguageModel for MockLanguageModel {
 #[tokio::test]
 async fn test_agent_run_creates_session_runs_and_finishes() {
     let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
-        content: vec![Part::Text(TextPart {
-            text: "Mock response".to_string(),
-            id: None,
-        })],
+        content: vec![Part::text("Mock response")],
         usage: Some(ModelUsage {
             input_tokens: 10,
             output_tokens: 5,
@@ -101,12 +98,7 @@ async fn test_agent_run_creates_session_runs_and_finishes() {
     let response = agent
         .run(AgentRequest {
             context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "Hello".to_string(),
-                    id: None,
-                })],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
         })
         .await
         .unwrap();
@@ -137,7 +129,6 @@ async fn test_agent_run_stream_creates_session_streams_and_finishes() {
                     index: 0,
                     part: PartDelta::Text(TextPartDelta {
                         text: "Mock".to_string(),
-                        id: None,
                     }),
                 }),
                 usage: Some(ModelUsage {
@@ -154,12 +145,7 @@ async fn test_agent_run_stream_creates_session_streams_and_finishes() {
     let stream = agent
         .run_stream(AgentRequest {
             context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "Hello".to_string(),
-                    id: None,
-                })],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
         })
         .await
         .unwrap();

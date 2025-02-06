@@ -11,7 +11,7 @@ use futures::lock::Mutex;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
-    JSONSchema, Message, Part, UserMessage,
+    JSONSchema, Message, Part,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -69,13 +69,13 @@ impl AgentTool<MyContext> for GetWeatherTool {
         println!("Getting weather for {}", params.city);
 
         Ok(AgentToolResult {
-            content: vec![Part::Text(
+            content: vec![Part::text(
                 json!({
                     "city": params.city,
                     "forecast": "Sunny",
                     "temperatureC": 25
                 })
-                .into(),
+                .to_string(),
             )],
             is_error: false,
         })
@@ -118,12 +118,12 @@ impl AgentTool<MyContext> for SendMessageTool {
         );
 
         Ok(AgentToolResult {
-            content: vec![Part::Text(
+            content: vec![Part::text(
                 json!({
                     "message": params.message,
                     "status": "sent"
                 })
-                .into(),
+                .to_string(),
             )],
             is_error: false,
         })
@@ -174,9 +174,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
         // Add user message as the input
-        items.push(AgentItem::Message(Message::User(UserMessage {
-            content: vec![Part::Text(user_input.into())],
-        })));
+        items.push(AgentItem::Message(Message::user(vec![Part::text(
+            user_input,
+        )])));
 
         // Call assistant
         let response = my_assistant

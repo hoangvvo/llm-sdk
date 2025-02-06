@@ -479,7 +479,7 @@ pub async fn test_source_part_input(model: &dyn LanguageModel) -> Result<(), Box
                 Message::assistant(vec![Part::ToolCall(ToolCallPart {
                     tool_call_id: "0mbnj08nt".to_string(),
                     tool_name: "get_first_secret_number".to_string(),
-                    ..Default::default()
+                    args: json!({}),
                 })]),
                 Message::tool(vec![Part::ToolResult(ToolResultPart {
                     tool_call_id: "0mbnj08nt".to_string(),
@@ -487,7 +487,7 @@ pub async fn test_source_part_input(model: &dyn LanguageModel) -> Result<(), Box
                     content: vec![Part::Text(TextPart {
                         text: "24".to_string(),
                     })],
-                    ..Default::default()
+                    is_error: None,
                 })]),
                 Message::user(vec![
                     Part::Source(SourcePart {

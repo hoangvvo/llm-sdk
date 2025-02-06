@@ -1,8 +1,6 @@
 use dotenvy::dotenv;
 use futures::stream::StreamExt;
-use llm_sdk::{
-    AssistantMessage, LanguageModelInput, Message, Part, StreamAccumulator, UserMessage,
-};
+use llm_sdk::{LanguageModelInput, Message, Part, StreamAccumulator};
 
 mod common;
 
@@ -15,17 +13,11 @@ async fn main() {
     let mut stream = model
         .stream(LanguageModelInput {
             messages: vec![
-                Message::User(UserMessage {
-                    content: vec![Part::Text("Tell me a story.".into())],
-                }),
-                Message::Assistant(AssistantMessage {
-                    content: vec![Part::Text(
-                        "What kind of story would you like to hear?".into(),
-                    )],
-                }),
-                Message::User(UserMessage {
-                    content: vec![Part::Text("A fairy tale.".into())],
-                }),
+                Message::user(vec![Part::text("Tell me a story.")]),
+                Message::assistant(vec![Part::text(
+                    "Sure! What kind of story would you like to hear?",
+                )]),
+                Message::user(vec![Part::text("A fairy tale.")]),
             ],
             ..Default::default()
         })

@@ -1,8 +1,5 @@
 use dotenvy::dotenv;
-use llm_sdk::{
-    AssistantMessage, LanguageModelInput, Message, Part, Tool, ToolCallPart, ToolMessage,
-    ToolResultPart, UserMessage,
-};
+use llm_sdk::{LanguageModelInput, Message, Part, Tool, ToolCallPart, ToolResultPart};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -80,9 +77,9 @@ async fn main() {
         }),
     }];
 
-    let mut messages = vec![Message::User(UserMessage {
-        content: vec![Part::Text("I would like to buy 50 NVDA stocks.".into())],
-    })];
+    let mut messages = vec![Message::user(vec![Part::text(
+        "I would like to buy 50 NVDA stocks.",
+    )])];
 
     let mut response;
     let mut max_turn_left = 10;
@@ -97,9 +94,7 @@ async fn main() {
             .await
             .unwrap();
 
-        messages.push(Message::Assistant(AssistantMessage {
-            content: response.content.clone(),
-        }));
+        messages.push(Message::assistant(response.content.clone()));
 
         let tool_calls: Vec<ToolCallPart> = response
             .content
@@ -128,17 +123,18 @@ async fn main() {
 
             let result_str = result_json.to_string();
 
-            tool_results.push(Part::ToolResult(ToolResultPart {
-                tool_name: call.tool_name.clone(),
-                tool_call_id: call.tool_call_id.clone(),
-                content: vec![Part::Text(result_str.into())],
-                is_error: Some(false),
-            }));
+            tool_results.push(
+                ToolResultPart {
+                    tool_name: call.tool_name.clone(),
+                    tool_call_id: call.tool_call_id.clone(),
+                    content: vec![Part::text(result_str)],
+                    is_error: Some(false),
+                }
+                .into(),
+            );
         }
 
-        messages.push(Message::Tool(ToolMessage {
-            content: tool_results,
-        }));
+        messages.push(Message::tool(tool_results));
 
         max_turn_left -= 1;
         if max_turn_left <= 0 {

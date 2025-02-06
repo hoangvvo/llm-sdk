@@ -8,7 +8,7 @@ use llm_sdk::{
     AssistantMessage, ContentDelta, JSONSchema, LanguageModel, LanguageModelError,
     LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
     ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatOption,
-    TextPart, TextPartDelta, ToolCallPart, ToolCallPartDelta, UserMessage,
+    TextPartDelta, ToolCallPart, ToolCallPartDelta, UserMessage,
 };
 use serde_json::Value;
 use std::collections::VecDeque;
@@ -180,10 +180,7 @@ impl AgentTool<()> for MockTool {
 }
 
 fn create_text_part(text: &str) -> Part {
-    Part::Text(TextPart {
-        text: text.to_string(),
-        id: None,
-    })
+    Part::text(text)
 }
 
 fn create_model_usage() -> ModelUsage {
@@ -255,7 +252,6 @@ async fn test_run_session_executes_single_tool_call_and_returns_response() {
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
             content: vec![Part::ToolCall(ToolCallPart {
-                id: Some("call_1".to_string()),
                 tool_name: "test_tool".to_string(),
                 tool_call_id: "call_1".to_string(),
                 args: serde_json::json!({"param": "value"}),
@@ -302,7 +298,6 @@ async fn test_run_session_executes_single_tool_call_and_returns_response() {
         output: vec![
             AgentItem::Message(Message::Assistant(AssistantMessage {
                 content: vec![Part::ToolCall(ToolCallPart {
-                    id: Some("call_1".to_string()),
                     tool_name: "test_tool".to_string(),
                     tool_call_id: "call_1".to_string(),
                     args: serde_json::json!({"param": "value"}),
@@ -356,7 +351,6 @@ async fn test_run_session_throws_max_turns_exceeded_error() {
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
             content: vec![Part::ToolCall(ToolCallPart {
-                id: Some("call_1".to_string()),
                 tool_name: "test_tool".to_string(),
                 tool_call_id: "call_1".to_string(),
                 args: serde_json::json!({}),
@@ -366,7 +360,6 @@ async fn test_run_session_throws_max_turns_exceeded_error() {
         },
         ModelResponse {
             content: vec![Part::ToolCall(ToolCallPart {
-                id: Some("call_2".to_string()),
                 tool_name: "test_tool".to_string(),
                 tool_call_id: "call_2".to_string(),
                 args: serde_json::json!({}),
@@ -376,7 +369,6 @@ async fn test_run_session_throws_max_turns_exceeded_error() {
         },
         ModelResponse {
             content: vec![Part::ToolCall(ToolCallPart {
-                id: Some("call_3".to_string()),
                 tool_name: "test_tool".to_string(),
                 tool_call_id: "call_3".to_string(),
                 args: serde_json::json!({}),
@@ -421,7 +413,6 @@ async fn test_run_session_throws_max_turns_exceeded_error() {
 async fn test_run_session_throws_invariant_error_when_tool_not_found() {
     let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
         content: vec![Part::ToolCall(ToolCallPart {
-            id: Some("call_1".to_string()),
             tool_name: "non_existent_tool".to_string(),
             tool_call_id: "call_1".to_string(),
             args: serde_json::json!({}),
@@ -468,7 +459,6 @@ async fn test_run_session_throws_tool_execution_error_when_tool_execution_fails(
 
     let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
         content: vec![Part::ToolCall(ToolCallPart {
-            id: Some("call_1".to_string()),
             tool_name: "failing_tool".to_string(),
             tool_call_id: "call_1".to_string(),
             args: serde_json::json!({}),
@@ -519,7 +509,6 @@ async fn test_run_session_handles_tool_returning_error_result() {
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
             content: vec![Part::ToolCall(ToolCallPart {
-                id: Some("call_1".to_string()),
                 tool_name: "test_tool".to_string(),
                 tool_call_id: "call_1".to_string(),
                 args: serde_json::json!({"invalid": true}),
@@ -627,13 +616,11 @@ async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
         ModelResponse {
             content: vec![
                 Part::ToolCall(ToolCallPart {
-                    id: Some("call_1".to_string()),
                     tool_name: "tool_1".to_string(),
                     tool_call_id: "call_1".to_string(),
                     args: serde_json::json!({"param": "value1"}),
                 }),
                 Part::ToolCall(ToolCallPart {
-                    id: Some("call_2".to_string()),
                     tool_name: "tool_2".to_string(),
                     tool_call_id: "call_2".to_string(),
                     args: serde_json::json!({"param": "value2"}),
@@ -687,13 +674,11 @@ async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
             AgentItem::Message(Message::Assistant(AssistantMessage {
                 content: vec![
                     Part::ToolCall(ToolCallPart {
-                        id: Some("call_1".to_string()),
                         tool_name: "tool_1".to_string(),
                         tool_call_id: "call_1".to_string(),
                         args: serde_json::json!({"param": "value1"}),
                     }),
                     Part::ToolCall(ToolCallPart {
-                        id: Some("call_2".to_string()),
                         tool_name: "tool_2".to_string(),
                         tool_call_id: "call_2".to_string(),
                         args: serde_json::json!({"param": "value2"}),
@@ -761,7 +746,6 @@ async fn test_run_session_handles_multiple_turns_with_tool_calls() {
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
             content: vec![Part::ToolCall(ToolCallPart {
-                id: Some("call_1".to_string()),
                 tool_name: "calculator".to_string(),
                 tool_call_id: "call_1".to_string(),
                 args: serde_json::json!({
@@ -775,7 +759,6 @@ async fn test_run_session_handles_multiple_turns_with_tool_calls() {
         },
         ModelResponse {
             content: vec![Part::ToolCall(ToolCallPart {
-                id: Some("call_2".to_string()),
                 tool_name: "calculator".to_string(),
                 tool_call_id: "call_2".to_string(),
                 args: serde_json::json!({
@@ -873,7 +856,6 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "Hel".to_string(),
-                    id: None,
                 }),
             }),
             usage: Some(create_model_usage()),
@@ -883,7 +865,6 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "lo".to_string(),
-                    id: None,
                 }),
             }),
             usage: Some(create_model_usage()),
@@ -893,7 +874,6 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "!".to_string(),
-                    id: None,
                 }),
             }),
             usage: Some(create_model_usage()),
@@ -1055,7 +1035,6 @@ async fn test_run_session_streaming_tool_call_execution() {
                 delta: Some(ContentDelta {
                     index: 0,
                     part: PartDelta::ToolCall(ToolCallPartDelta {
-                        id: Some("call_1".to_string()),
                         tool_name: Some("test_tool".to_string()),
                         tool_call_id: Some("call_1".to_string()),
                         args: Some("{}".to_string()),
@@ -1118,7 +1097,6 @@ async fn test_run_session_streaming_multiple_turns() {
                 delta: Some(ContentDelta {
                     index: 0,
                     part: PartDelta::ToolCall(ToolCallPartDelta {
-                        id: Some("call_1".to_string()),
                         tool_name: Some("calculator".to_string()),
                         tool_call_id: Some("call_1".to_string()),
                         args: Some("{\"a\": 1, \"b\": 2}".to_string()),
@@ -1130,7 +1108,6 @@ async fn test_run_session_streaming_multiple_turns() {
                 delta: Some(ContentDelta {
                     index: 0,
                     part: PartDelta::ToolCall(ToolCallPartDelta {
-                        id: Some("call_2".to_string()),
                         tool_name: Some("calculator".to_string()),
                         tool_call_id: Some("call_2".to_string()),
                         args: Some("{\"a\": 3, \"b\": 4}".to_string()),
@@ -1143,7 +1120,6 @@ async fn test_run_session_streaming_multiple_turns() {
                     index: 0,
                     part: PartDelta::Text(TextPartDelta {
                         text: "All done".to_string(),
-                        id: None,
                     }),
                 }),
                 usage: Some(create_model_usage()),
@@ -1201,7 +1177,6 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
                 delta: Some(ContentDelta {
                     index: 0,
                     part: PartDelta::ToolCall(ToolCallPartDelta {
-                        id: Some("call_1".to_string()),
                         tool_name: Some("test_tool".to_string()),
                         tool_call_id: Some("call_1".to_string()),
                         args: Some("{}".to_string()),
@@ -1213,7 +1188,6 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
                 delta: Some(ContentDelta {
                     index: 0,
                     part: PartDelta::ToolCall(ToolCallPartDelta {
-                        id: Some("call_2".to_string()),
                         tool_name: Some("test_tool".to_string()),
                         tool_call_id: Some("call_2".to_string()),
                         args: Some("{}".to_string()),
@@ -1225,7 +1199,6 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
                 delta: Some(ContentDelta {
                     index: 0,
                     part: PartDelta::ToolCall(ToolCallPartDelta {
-                        id: Some("call_3".to_string()),
                         tool_name: Some("test_tool".to_string()),
                         tool_call_id: Some("call_3".to_string()),
                         args: Some("{}".to_string()),
