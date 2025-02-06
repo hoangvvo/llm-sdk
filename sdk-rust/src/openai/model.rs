@@ -436,7 +436,7 @@ impl TryFrom<AudioPart> for openai_api::ChatCompletionAssistantMessageParamAudio
     type Error = LanguageModelError;
 
     fn try_from(part: AudioPart) -> Result<Self, Self::Error> {
-        let id = part.id.ok_or_else(|| {
+        let id = part.audio_id.ok_or_else(|| {
             LanguageModelError::Unsupported(
                 PROVIDER,
                 "Cannot convert audio part to OpenAI assistant message without an ID".to_string(),
@@ -542,10 +542,7 @@ fn map_openai_message(
     let mut parts = vec![];
 
     if let Some(content) = message.content {
-        parts.push(Part::Text(TextPart {
-            text: content,
-            id: None,
-        }));
+        parts.push(Part::Text(TextPart { text: content }));
     }
 
     if let Some(tool_calls) = message.tool_calls {
@@ -560,7 +557,7 @@ fn map_openai_message(
 
     if let Some(audio) = message.audio {
         let mut audio_part = AudioPart {
-            id: Some(audio.id),
+            audio_id: Some(audio.id),
             format: AudioFormat::from(
                 &create_params
                     .audio
@@ -618,7 +615,6 @@ impl TryFrom<openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPart
             tool_call_id: value.id,
             tool_name: value.function.name,
             args: args_value,
-            id: None,
         })
     }
 }
@@ -634,10 +630,7 @@ fn map_openai_delta(
 
     if let Some(content) = delta.content {
         if !content.is_empty() {
-            let text_part = TextPartDelta {
-                text: content,
-                id: None,
-            };
+            let text_part = TextPartDelta { text: content };
             let part = PartDelta::Text(text_part);
             let index = stream_utils::guess_delta_index(
                 &part,
@@ -651,7 +644,7 @@ fn map_openai_delta(
     if let Some(audio) = delta.audio {
         let mut audio_part = AudioPartDelta::default();
         if let Some(id) = audio.id {
-            audio_part.id = Some(id);
+            audio_part.audio_id = Some(id);
         }
         if let Some(data) = audio.data {
             audio_part.audio_data = Some(data);

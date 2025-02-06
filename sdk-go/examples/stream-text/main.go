@@ -15,13 +15,13 @@ func main() {
 	response, err := model.Stream(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Tell me a story.", nil),
+				llmsdk.NewTextPart("Tell me a story."),
 			),
 			llmsdk.NewAssistantMessage(
-				llmsdk.NewTextPart("What kind of story would you like to hear?", nil),
+				llmsdk.NewTextPart("What kind of story would you like to hear?"),
 			),
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("A fairy tale.", nil),
+				llmsdk.NewTextPart("A fairy tale."),
 			),
 		},
 	})

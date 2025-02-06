@@ -71,7 +71,7 @@ func (t *GetWeatherTool) Execute(ctx context.Context, paramsJSON json.RawMessage
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -130,7 +130,7 @@ func (t *SendMessageTool) Execute(ctx context.Context, paramsJSON json.RawMessag
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -198,7 +198,7 @@ func main() {
 
 		// Add user message as the input
 		items = append(items, llmagent.NewMessageAgentItem(llmsdk.NewUserMessage(
-			llmsdk.NewTextPart(userInput, nil),
+			llmsdk.NewTextPart(userInput),
 		)))
 
 		// Call assistant

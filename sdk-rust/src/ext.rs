@@ -4,17 +4,13 @@ impl From<&str> for TextPart {
     fn from(value: &str) -> Self {
         Self {
             text: value.to_string(),
-            id: None,
         }
     }
 }
 
 impl From<String> for TextPart {
     fn from(value: String) -> Self {
-        Self {
-            text: value,
-            id: None,
-        }
+        Self { text: value }
     }
 }
 

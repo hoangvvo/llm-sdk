@@ -94,7 +94,7 @@ var TestCaseGenerateText = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart(`Respond by saying "Hello"`, nil),
+				llmsdk.NewTextPart(`Respond by saying "Hello"`),
 			),
 		},
 	},
@@ -111,7 +111,7 @@ var TestCaseStreamText = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart(`Respond by saying "Hello"`, nil),
+				llmsdk.NewTextPart(`Respond by saying "Hello"`),
 			),
 		},
 	},
@@ -129,7 +129,7 @@ var TestCaseGenerateWithSystemPrompt = TestCase{
 		SystemPrompt: ptr.To(`You must always start your message with "🤖"`),
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Hello", nil),
+				llmsdk.NewTextPart("Hello"),
 			),
 		},
 	},
@@ -146,7 +146,7 @@ var TestCaseGenerateToolCall = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What's the weather like in Boston today?", nil),
+				llmsdk.NewTextPart("What's the weather like in Boston today?"),
 			),
 		},
 		Tools: []llmsdk.Tool{GetWeatherTool()},
@@ -166,7 +166,7 @@ var TestCaseStreamToolCall = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What's the weather like in Boston today?", nil),
+				llmsdk.NewTextPart("What's the weather like in Boston today?"),
 			),
 		},
 		Tools: []llmsdk.Tool{GetWeatherTool()},
@@ -186,16 +186,16 @@ var TestCaseGenerateTextWithToolResult = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What's the weather like in Boston today?", nil),
+				llmsdk.NewTextPart("What's the weather like in Boston today?"),
 			),
 			llmsdk.NewAssistantMessage(
 				llmsdk.NewToolCallPart("0mbnj08nt", "get_weather", map[string]any{
 					"location": "Boston",
-				}, nil),
+				}),
 			),
 			llmsdk.NewToolMessage(
 				llmsdk.NewToolResultPart("0mbnj08nt", "get_weather", []llmsdk.Part{
-					llmsdk.NewTextPart(`{"temperature": 70, "unit": "f", "description": "Sunny"}`, nil),
+					llmsdk.NewTextPart(`{"temperature": 70, "unit": "f", "description": "Sunny"}`),
 				}, false),
 			),
 		},
@@ -214,16 +214,16 @@ var TestCaseStreamTextWithToolResult = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What's the weather like in Boston today?", nil),
+				llmsdk.NewTextPart("What's the weather like in Boston today?"),
 			),
 			llmsdk.NewAssistantMessage(
 				llmsdk.NewToolCallPart("0mbnj08nt", "get_weather", map[string]any{
 					"location": "Boston",
-				}, nil),
+				}),
 			),
 			llmsdk.NewToolMessage(
 				llmsdk.NewToolResultPart("0mbnj08nt", "get_weather", []llmsdk.Part{
-					llmsdk.NewTextPart(`{"temperature": 70, "unit": "f", "description": "Sunny"}`, nil),
+					llmsdk.NewTextPart(`{"temperature": 70, "unit": "f", "description": "Sunny"}`),
 				}, false),
 			),
 		},
@@ -242,7 +242,7 @@ var TestCaseGenerateParallelToolCalls = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Get me the weather in Boston and the stock price of AAPL.", nil),
+				llmsdk.NewTextPart("Get me the weather in Boston and the stock price of AAPL."),
 			),
 		},
 		Tools: []llmsdk.Tool{GetWeatherTool(), GetStockPriceTool()},
@@ -265,7 +265,7 @@ var TestCaseStreamParallelToolCalls = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Get me the weather in Boston and the stock price of AAPL. You must do both of them in one go.", nil),
+				llmsdk.NewTextPart("Get me the weather in Boston and the stock price of AAPL. You must do both of them in one go."),
 			),
 		},
 		Tools: []llmsdk.Tool{GetWeatherTool(), GetStockPriceTool()},
@@ -288,7 +288,7 @@ var TestCaseStreamParallelToolCallsOfSameName = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Get me the weather in Boston and the weather in New York.", nil),
+				llmsdk.NewTextPart("Get me the weather in Boston and the weather in New York."),
 			),
 		},
 		Tools: []llmsdk.Tool{GetWeatherTool()},
@@ -311,7 +311,7 @@ var TestCaseStructuredResponseFormat = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart(`Create a user with the id "a1b2c3", name "John Doe", email "john.doe@example.com", birthDate "1990-05-15", age 34, isActive true, role "user", accountBalance 500.75, phoneNumber "+1234567890123", tags ["developer", "gamer"], and lastLogin "2024-11-09T10:30:00Z".`, nil),
+				llmsdk.NewTextPart(`Create a user with the id "a1b2c3", name "John Doe", email "john.doe@example.com", birthDate "1990-05-15", age 34, isActive true, role "user", accountBalance 500.75, phoneNumber "+1234567890123", tags ["developer", "gamer"], and lastLogin "2024-11-09T10:30:00Z".`),
 			),
 		},
 		ResponseFormat: &llmsdk.ResponseFormatOption{
@@ -356,24 +356,24 @@ var TestCaseSourcePartInput = TestCase{
 	Input: llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What is my first secret number?", nil),
+				llmsdk.NewTextPart("What is my first secret number?"),
 			),
 			llmsdk.NewAssistantMessage(
-				llmsdk.NewToolCallPart("0mbnj08nt", "get_first_secret_number", map[string]any{}, nil),
+				llmsdk.NewToolCallPart("0mbnj08nt", "get_first_secret_number", map[string]any{}),
 			),
 			llmsdk.NewToolMessage(
 				llmsdk.NewToolResultPart("0mbnj08nt", "get_first_secret_number", []llmsdk.Part{
-					llmsdk.NewTextPart(`{"number": 24}`, nil),
+					llmsdk.NewTextPart(`{"number": 24}`),
 				}, false),
 			),
 			llmsdk.NewAssistantMessage(
-				llmsdk.NewTextPart("Got it!", nil),
+				llmsdk.NewTextPart("Got it!"),
 			),
 			llmsdk.NewUserMessage(
 				llmsdk.NewSourcePart("my secret number", []llmsdk.Part{
-					llmsdk.NewTextPart("Remember that my second secret number is \"42\".", nil),
-				}, nil),
-				llmsdk.NewTextPart(" What are my two secret numbers?", nil),
+					llmsdk.NewTextPart("Remember that my second secret number is \"42\"."),
+				}),
+				llmsdk.NewTextPart(" What are my two secret numbers?"),
 			),
 		},
 	},

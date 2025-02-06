@@ -10,7 +10,6 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone)]
 struct AccumulatedTextData {
     text: String,
-    id: Option<String>,
 }
 
 /// Internal representation of accumulated tool call data
@@ -19,7 +18,6 @@ struct AccumulatedToolCallData {
     tool_name: String,
     tool_call_id: Option<String>,
     args: String,
-    id: Option<String>,
 }
 
 /// Internal representation of accumulated audio data
@@ -30,7 +28,7 @@ struct AccumulatedAudioData {
     sample_rate: Option<u32>,
     channels: Option<u32>,
     transcript: String,
-    id: Option<String>,
+    audio_id: Option<String>,
 }
 
 /// Represents accumulated data for different part types
@@ -46,13 +44,11 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
     match delta.part {
         PartDelta::Text(text_delta) => AccumulatedData::Text(AccumulatedTextData {
             text: text_delta.text,
-            id: text_delta.id,
         }),
         PartDelta::ToolCall(tool_delta) => AccumulatedData::ToolCall(AccumulatedToolCallData {
             tool_name: tool_delta.tool_name.unwrap_or_default(),
             tool_call_id: tool_delta.tool_call_id,
             args: tool_delta.args.unwrap_or_default(),
-            id: tool_delta.id,
         }),
         PartDelta::Audio(audio_delta) => AccumulatedData::Audio(AccumulatedAudioData {
             audio_data_chunks: audio_delta
@@ -63,7 +59,7 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             sample_rate: audio_delta.sample_rate,
             channels: audio_delta.channels,
             transcript: audio_delta.transcript.unwrap_or_default(),
-            id: audio_delta.id,
+            audio_id: audio_delta.audio_id,
         }),
     }
 }
@@ -71,9 +67,6 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
 /// Merges text delta with existing text data
 fn merge_text_delta(existing: &mut AccumulatedTextData, delta: TextPartDelta) {
     existing.text.push_str(&delta.text);
-    if delta.id.is_some() {
-        existing.id = delta.id;
-    }
 }
 
 /// Merges tool call delta with existing tool call data
@@ -86,9 +79,6 @@ fn merge_tool_call_delta(existing: &mut AccumulatedToolCallData, delta: ToolCall
     }
     if let Some(args) = delta.args {
         existing.args.push_str(&args);
-    }
-    if delta.id.is_some() {
-        existing.id = delta.id;
     }
 }
 
@@ -109,8 +99,8 @@ fn merge_audio_delta(existing: &mut AccumulatedAudioData, delta: AudioPartDelta)
     if let Some(transcript) = delta.transcript {
         existing.transcript.push_str(&transcript);
     }
-    if delta.id.is_some() {
-        existing.id = delta.id;
+    if delta.audio_id.is_some() {
+        existing.audio_id = delta.audio_id;
     }
 }
 
@@ -137,10 +127,7 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
 
 /// Creates a text part from accumulated text data
 fn create_text_part(data: AccumulatedTextData) -> Part {
-    Part::Text(TextPart {
-        text: data.text,
-        id: data.id,
-    })
+    Part::Text(TextPart { text: data.text })
 }
 
 /// Parses tool call arguments from JSON string
@@ -174,7 +161,6 @@ fn create_tool_call_part(data: AccumulatedToolCallData, index: usize) -> Languag
         tool_call_id,
         tool_name: data.tool_name,
         args: parse_tool_call_args(&data.args)?,
-        id: data.id,
     }))
 }
 
@@ -208,7 +194,7 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
         } else {
             Some(data.transcript)
         },
-        id: data.id,
+        audio_id: data.audio_id,
     }))
 }
 

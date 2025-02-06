@@ -26,7 +26,7 @@ interface AccumulatedAudioData {
   sampleRate?: number;
   channels?: number;
   transcript?: string;
-  id?: string;
+  audio_id?: string;
 }
 
 /**
@@ -63,7 +63,6 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
       return {
         type: "text",
         text: delta.part.text,
-        ...(delta.part.id && { id: delta.part.id }),
       };
 
     case "tool-call":
@@ -74,7 +73,6 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
           toolCallId: delta.part.tool_call_id,
         }),
         args: delta.part.args ?? "",
-        ...(delta.part.id && { id: delta.part.id }),
       };
 
     case "audio":
@@ -91,7 +89,7 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
         ...(delta.part.transcript && {
           transcript: delta.part.transcript,
         }),
-        ...(delta.part.id && { id: delta.part.id }),
+        ...(delta.part.audio_id && { audio_id: delta.part.audio_id }),
       };
   }
 }
@@ -104,9 +102,6 @@ function mergeTextDelta(
   delta: TextPartDelta,
 ): void {
   existing.text += delta.text;
-  if (delta.id) {
-    existing.id = delta.id;
-  }
 }
 
 /**
@@ -124,9 +119,6 @@ function mergeToolCallDelta(
   }
   if (delta.args) {
     existing.args += delta.args;
-  }
-  if (delta.id) {
-    existing.id = delta.id;
   }
 }
 
@@ -153,8 +145,8 @@ function mergeAudioDelta(
     existing.transcript = existing.transcript ?? "";
     existing.transcript += delta.transcript;
   }
-  if (delta.id) {
-    existing.id = delta.id;
+  if (delta.audio_id) {
+    existing.audio_id = delta.audio_id;
   }
 }
 
@@ -248,7 +240,7 @@ function createAudioPart(data: AccumulatedAudioData): Part {
     ...(data.sampleRate && { sample_rate: data.sampleRate }),
     ...(data.channels && { channels: data.channels }),
     ...(data.transcript && { transcript: data.transcript }),
-    ...(data.id && { id: data.id }),
+    ...(data.audio_id && { audio_id: data.audio_id }),
   };
 }
 

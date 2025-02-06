@@ -79,7 +79,7 @@ func main() {
 
 	messages := []llmsdk.Message{
 		llmsdk.NewUserMessage(
-			llmsdk.NewTextPart("I would like to buy 50 NVDA stocks.", nil),
+			llmsdk.NewTextPart("I would like to buy 50 NVDA stocks."),
 		),
 	}
 
@@ -131,7 +131,7 @@ func main() {
 						toolCallPart.ToolCallID,
 						toolCallPart.ToolName,
 						[]llmsdk.Part{
-							llmsdk.NewTextPart(string(resultBytes), nil),
+							llmsdk.NewTextPart(string(resultBytes)),
 						},
 						false,
 					),

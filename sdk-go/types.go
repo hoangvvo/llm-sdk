@@ -62,8 +62,6 @@ func (p Part) Type() PartType {
 // TextPart represents a part of the message that contains text.
 type TextPart struct {
 	Text string `json:"text"`
-	// The ID of the part, if applicable.
-	ID *string `json:"id,omitempty"`
 }
 
 // ImagePart represents a part of the message that contains an image.
@@ -76,8 +74,6 @@ type ImagePart struct {
 	Width *int `json:"width,omitempty"`
 	// The height of the image in pixels.
 	Height *int `json:"height,omitempty"`
-	// The ID of the part, if applicable.
-	ID *string `json:"id,omitempty"`
 }
 
 // AudioPart represents a part of the message that contains an audio.
@@ -92,7 +88,7 @@ type AudioPart struct {
 	// The transcript of the audio.
 	Transcript *string `json:"transcript,omitempty"`
 	// The ID of the part, if applicable.
-	ID *string `json:"id,omitempty"`
+	AudioID *string `json:"audio_id,omitempty"`
 }
 
 // SourcePart represents a part of the message that contains a source with structured content.
@@ -102,8 +98,6 @@ type SourcePart struct {
 	Title string `json:"title"`
 	// The content of the document.
 	Content []Part `json:"content"`
-	// The ID of the part, if applicable.
-	ID *string `json:"id,omitempty"`
 }
 
 // ToolCallPart represents a part of the message that represents a call to a tool the model wants to use.
@@ -114,8 +108,6 @@ type ToolCallPart struct {
 	ToolName string `json:"tool_name"`
 	// The arguments to pass to the tool.
 	Args json.RawMessage `json:"args"`
-	// The ID of the part, if applicable. This might not be the same as the tool_call_id.
-	ID *string `json:"id,omitempty"`
 }
 
 // ToolResultPart represents a part of the message that represents the result of a tool call.
@@ -224,31 +216,11 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 		}
 		p.ToolCallPart = &tc
 	case "tool-result":
-		var tr struct {
-			ToolCallID string            `json:"tool_call_id"`
-			ToolName   string            `json:"tool_name"`
-			Content    []json.RawMessage `json:"content"`
-			IsError    bool              `json:"is_error"`
-		}
+		var tr ToolResultPart
 		if err := json.Unmarshal(data, &tr); err != nil {
 			return err
 		}
-
-		var content []Part
-		for _, raw := range tr.Content {
-			var part Part
-			if err := json.Unmarshal(raw, &part); err != nil {
-				return err
-			}
-			content = append(content, part)
-		}
-
-		p.ToolResultPart = &ToolResultPart{
-			ToolCallID: tr.ToolCallID,
-			ToolName:   tr.ToolName,
-			Content:    content,
-			IsError:    tr.IsError,
-		}
+		p.ToolResultPart = &tr
 	default:
 		return fmt.Errorf("unknown part type: %s", temp.Type)
 	}
@@ -265,8 +237,7 @@ type PartDelta struct {
 
 // TextPartDelta represents a delta update for a text part, used in streaming or incremental updates of a message.
 type TextPartDelta struct {
-	Text string  `json:"text"`
-	ID   *string `json:"id,omitempty"`
+	Text string `json:"text"`
 }
 
 // ToolCallPartDelta represents a delta update for a tool call part, used in streaming of a tool invocation.
@@ -274,7 +245,6 @@ type ToolCallPartDelta struct {
 	ToolCallID *string `json:"tool_call_id,omitempty"`
 	ToolName   *string `json:"tool_name,omitempty"`
 	Args       *string `json:"args,omitempty"`
-	ID         *string `json:"id,omitempty"`
 }
 
 // AudioPartDelta represents a delta update for an audio part, used in streaming of an audio message.
@@ -284,7 +254,7 @@ type AudioPartDelta struct {
 	SampleRate *int         `json:"sample_rate,omitempty"`
 	Channels   *int         `json:"channels,omitempty"`
 	Transcript *string      `json:"transcript,omitempty"`
-	ID         *string      `json:"id,omitempty"`
+	AudioID    *string      `json:"audio_id,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for PartDelta

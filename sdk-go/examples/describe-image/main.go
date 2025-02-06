@@ -39,8 +39,8 @@ func main() {
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Describe this image", nil),
-				llmsdk.NewImagePart(mimeType, imageData, nil, nil, nil),
+				llmsdk.NewTextPart("Describe this image"),
+				llmsdk.NewImagePart(mimeType, imageData, nil, nil),
 			),
 		},
 	})

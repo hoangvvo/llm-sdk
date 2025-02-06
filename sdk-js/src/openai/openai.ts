@@ -361,14 +361,14 @@ function convertToOpenAIContentPartInputAudio(
 function convertToOpenAIAssistantMessageParamAudio(
   part: AudioPart,
 ): OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam.Audio {
-  if (!part.id) {
+  if (!part.audio_id) {
     throw new UnsupportedError(
       PROVIDER,
       "Cannot convert audio part to OpenAI assistant message without an ID",
     );
   }
   return {
-    id: part.id,
+    id: part.audio_id,
   };
 }
 
@@ -513,7 +513,7 @@ function mapOpenAIMessage(
       type: "audio",
       audio_data: message.audio.data,
       format: mapOpenAIAudioFormat(createParams.audio.format),
-      id: message.audio.id,
+      audio_id: message.audio.id,
       transcript: message.audio.transcript,
     };
     if (audioPart.format == "linear16") {
@@ -594,7 +594,7 @@ function mapOpenAIDelta(
   if (delta.audio) {
     const part: AudioPartDelta = { type: "audio" };
     if (delta.audio.id) {
-      part.id = delta.audio.id;
+      part.audio_id = delta.audio.id;
     }
     if (delta.audio.data) {
       part.audio_data = delta.audio.data;

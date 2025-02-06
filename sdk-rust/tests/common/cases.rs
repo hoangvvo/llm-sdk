@@ -90,7 +90,6 @@ pub async fn test_generate_text(model: &dyn LanguageModel) -> Result<(), Box<dyn
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: r#"Respond by saying "Hello""#.to_string(),
-                    id: None,
                 })],
             })],
             ..Default::default()
@@ -111,7 +110,6 @@ pub async fn test_stream_text(model: &dyn LanguageModel) -> Result<(), Box<dyn E
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: r#"Respond by saying "Hello""#.to_string(),
-                    id: None,
                 })],
             })],
             ..Default::default()
@@ -135,7 +133,6 @@ pub async fn test_generate_with_system_prompt(
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: "Hello".to_string(),
-                    id: None,
                 })],
             })],
             ..Default::default()
@@ -156,7 +153,6 @@ pub async fn test_generate_tool_call(model: &dyn LanguageModel) -> Result<(), Bo
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: "What's the weather like in Boston today?".to_string(),
-                    id: None,
                 })],
             })],
             tools: Some(vec![get_weather_tool()]),
@@ -182,7 +178,6 @@ pub async fn test_stream_tool_call(model: &dyn LanguageModel) -> Result<(), Box<
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: "What's the weather like in Boston today?".to_string(),
-                    id: None,
                 })],
             })],
             tools: Some(vec![get_weather_tool()]),
@@ -211,7 +206,6 @@ pub async fn test_generate_text_from_tool_result(
                 Message::User(UserMessage {
                     content: vec![Part::Text(TextPart {
                         text: "What's the weather like in Boston today?".to_string(),
-                        id: None,
                     })],
                 }),
                 Message::Assistant(AssistantMessage {
@@ -221,7 +215,6 @@ pub async fn test_generate_text_from_tool_result(
                         args: json!({
                             "location": "Boston",
                         }),
-                        id: None,
                     })],
                 }),
                 Message::Tool(ToolMessage {
@@ -235,7 +228,6 @@ pub async fn test_generate_text_from_tool_result(
                                 "description": "Sunny",
                             })
                             .to_string(),
-                            id: None,
                         })],
                         is_error: None,
                     })],
@@ -263,7 +255,6 @@ pub async fn test_stream_text_from_tool_result(
                 Message::User(UserMessage {
                     content: vec![Part::Text(TextPart {
                         text: "What's the weather like in Boston today?".to_string(),
-                        id: None,
                     })],
                 }),
                 Message::Assistant(AssistantMessage {
@@ -273,7 +264,6 @@ pub async fn test_stream_text_from_tool_result(
                         args: json!({
                             "location": "Boston",
                         }),
-                        id: None,
                     })],
                 }),
                 Message::Tool(ToolMessage {
@@ -287,7 +277,6 @@ pub async fn test_stream_text_from_tool_result(
                                 "description": "Sunny",
                             })
                             .to_string(),
-                            id: None,
                         })],
                         is_error: None,
                     })],
@@ -314,7 +303,6 @@ pub async fn test_generate_parallel_tool_calls(
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: "Get me the weather in Boston and the stock price of AAPL.".to_string(),
-                    id: None,
                 })],
             })],
             tools: Some(vec![get_weather_tool(), get_stock_price_tool()]),
@@ -352,7 +340,6 @@ pub async fn test_stream_parallel_tool_calls(
                 content: vec![Part::Text(TextPart {
                     text: "Get me the weather in Boston and the stock price of AAPL. You must do both of them in one go."
                         .to_string(),
-                    id: None,
                 })],
             })],
             tools: Some(vec![get_weather_tool(), get_stock_price_tool()]),
@@ -391,7 +378,6 @@ pub async fn test_stream_parallel_tool_calls_same_name(
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: "Get me the weather in Boston and the weather in New York.".to_string(),
-                    id: None,
                 })],
             })],
             tools: Some(vec![get_weather_tool()]),
@@ -429,7 +415,6 @@ pub async fn test_structured_response_format(
                 content: vec![Part::Text(TextPart {
                     text: r#"Create a user with the id "a1b2c3", name "John Doe", email "john.doe@example.com", birthDate "1990-05-15", age 34, isActive true, role "user", accountBalance 500.75, phoneNumber "+1234567890123", tags ["developer", "gamer"], and lastLogin "2024-11-09T10:30:00Z"."#
                         .to_string(),
-                    id: None,
                 })],
             })],
             response_format: Some(ResponseFormatOption::Json(ResponseFormatJson {
@@ -501,7 +486,6 @@ pub async fn test_source_part_input(model: &dyn LanguageModel) -> Result<(), Box
                     tool_name: "get_first_secret_number".to_string(),
                     content: vec![Part::Text(TextPart {
                         text: "24".to_string(),
-                        id: None,
                     })],
                     ..Default::default()
                 })]),
@@ -510,13 +494,10 @@ pub async fn test_source_part_input(model: &dyn LanguageModel) -> Result<(), Box
                         title: "my secret number".to_string(),
                         content: vec![Part::Text(TextPart {
                             text: "Rember that second secret number is 42.".to_string(),
-                            id: None,
                         })],
-                        id: None,
                     }),
                     Part::Text(TextPart {
                         text: "What are my secret numbers?".to_string(),
-                        id: None,
                     }),
                 ]),
             ],

@@ -390,8 +390,8 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 	model := NewMockLanguageModel().
 		AddResponses(&llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				llmsdk.NewToolCallPart("call_1", "tool_1", map[string]any{"param": "value1"}, nil),
-				llmsdk.NewToolCallPart("call_2", "tool_2", map[string]any{"param": "value2"}, nil),
+				llmsdk.NewToolCallPart("call_1", "tool_1", map[string]any{"param": "value1"}),
+				llmsdk.NewToolCallPart("call_2", "tool_2", map[string]any{"param": "value2"}),
 			},
 			Usage: &llmsdk.ModelUsage{
 				InputTokens:  2000,
@@ -454,27 +454,27 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
-		Content: []llmsdk.Part{llmsdk.NewTextPart("Processed both tools", nil)},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Processed both tools")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewMessageAgentItem(
 				llmsdk.NewAssistantMessage(
-					llmsdk.NewToolCallPart("call_1", "tool_1", map[string]any{"param": "value1"}, nil),
-					llmsdk.NewToolCallPart("call_2", "tool_2", map[string]any{"param": "value2"}, nil),
+					llmsdk.NewToolCallPart("call_1", "tool_1", map[string]any{"param": "value1"}),
+					llmsdk.NewToolCallPart("call_2", "tool_2", map[string]any{"param": "value2"}),
 				),
 			),
 			llmagent.NewMessageAgentItem(
 				llmsdk.NewToolMessage(
 					llmsdk.NewToolResultPart("call_1", "tool_1", []llmsdk.Part{
-						llmsdk.NewTextPart("Tool 1 result", nil),
+						llmsdk.NewTextPart("Tool 1 result"),
 					}, false),
 					llmsdk.NewToolResultPart("call_2", "tool_2", []llmsdk.Part{
-						llmsdk.NewTextPart("Tool 2 result", nil),
+						llmsdk.NewTextPart("Tool 2 result"),
 					}, false),
 				),
 			),
 			llmagent.NewMessageAgentItem(
 				llmsdk.NewAssistantMessage(
-					llmsdk.NewTextPart("Processed both tools", nil),
+					llmsdk.NewTextPart("Processed both tools"),
 				),
 			),
 		},

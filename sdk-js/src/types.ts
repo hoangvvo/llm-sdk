@@ -69,10 +69,6 @@ export interface TextPart {
   type: "text";
   text: string;
   citations?: Citation[];
-  /**
-   * The ID of the part, if applicable.
-   */
-  id?: string;
 }
 /**
  * A part of the message that contains an image.
@@ -95,10 +91,6 @@ export interface ImagePart {
    * The height of the image in pixels.
    */
   height?: number;
-  /**
-   * The ID of the part, if applicable.
-   */
-  id?: string;
 }
 /**
  * A part of the message that contains an audio.
@@ -123,9 +115,9 @@ export interface AudioPart {
    */
   transcript?: string;
   /**
-   * The ID of the part, if applicable.
+   * Audio ID, if applicable.
    */
-  id?: string;
+  audio_id?: string;
 }
 /**
  * A part of the message that contains a source with structured content.
@@ -141,10 +133,6 @@ export interface SourcePart {
    * The content of the document.
    */
   content: Part[];
-  /**
-   * The ID of the part, if applicable.
-   */
-  id?: string;
 }
 /**
  * A part of the message that represents a call to a tool the model wants to use.
@@ -163,10 +151,6 @@ export interface ToolCallPart {
    * The arguments to pass to the tool.
    */
   args: Record<string, unknown>;
-  /**
-   * The ID of the part, if applicable. This might not be the same as the tool_call_id.
-   */
-  id?: string;
 }
 /**
  * A part of the message that represents the result of a tool call.
@@ -228,10 +212,6 @@ export interface AssistantMessage {
 export interface TextPartDelta {
   type: "text";
   text: string;
-  /**
-   * The ID of the part, if applicable.
-   */
-  id?: string;
 }
 /**
  * A delta update for a tool call part, used in streaming of a tool invocation.
@@ -250,10 +230,6 @@ export interface ToolCallPartDelta {
    * The partial JSON string of the arguments to pass to the tool.
    */
   args?: string;
-  /**
-   * The ID of the part, if applicable. This might not be the same as the tool_call_id.
-   */
-  id?: string;
 }
 /**
  * A delta update for an audio part, used in streaming of an audio message.
@@ -278,9 +254,9 @@ export interface AudioPartDelta {
    */
   transcript?: string;
   /**
-   * The ID of the part, if applicable.
+   * The audio ID, if applicable.
    */
-  id?: string;
+  audio_id?: string;
 }
 /**
  * Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.

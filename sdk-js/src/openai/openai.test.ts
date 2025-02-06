@@ -86,7 +86,7 @@ suite("OpenAIModel", () => {
     t.assert.ok(audioPart, "Audio part must be present");
     t.assert.ok(audioPart.audio_data, "Audio data must be present");
     t.assert.ok(audioPart.transcript, "Transcript must be present");
-    t.assert.ok(audioPart.id, "Audio part ID must be present");
+    t.assert.ok(audioPart.audio_id, "Audio part ID must be present");
   });
 
   test("stream audio", async (t: TestContext) => {
@@ -126,6 +126,6 @@ suite("OpenAIModel", () => {
     t.assert.ok(audioPart, "Audio part must be present");
     t.assert.ok(audioPart.audio_data, "Audio data must be present");
     t.assert.ok(audioPart.transcript, "Transcript must be present");
-    t.assert.ok(audioPart.id, "Audio part ID must be present");
+    t.assert.ok(audioPart.audio_id, "Audio part ID must be present");
   });
 });

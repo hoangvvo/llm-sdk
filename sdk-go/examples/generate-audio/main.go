@@ -26,7 +26,7 @@ func main() {
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Is a golden retriever a good family dog?", nil),
+				llmsdk.NewTextPart("Is a golden retriever a good family dog?"),
 			),
 		},
 	})
@@ -68,7 +68,7 @@ func main() {
 			<-ready
 
 			audioPlayer := otoContext.NewPlayer(decoder)
-			fmt.Printf("Playing MP3 audio (sample rate: %d, channels: %d)\n", 
+			fmt.Printf("Playing MP3 audio (sample rate: %d, channels: %d)\n",
 				decoder.SampleRate(), 2)
 
 			audioPlayer.Play()

@@ -99,7 +99,7 @@ func TestGenerateAudio(t *testing.T) {
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Hello", nil),
+				llmsdk.NewTextPart("Hello"),
 			),
 		},
 		Extra: map[string]any{
@@ -142,7 +142,7 @@ func TestStreamAudio(t *testing.T) {
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Hello", nil),
+				llmsdk.NewTextPart("Hello"),
 			),
 		},
 		Extra: map[string]any{
@@ -195,7 +195,7 @@ func TestStreamAudio(t *testing.T) {
 		t.Fatal("Transcript must be present")
 	}
 
-	if audioPart.ID == nil || *audioPart.ID == "" {
+	if audioPart.AudioID == nil || *audioPart.AudioID == "" {
 		t.Fatal("Audio part ID must be present")
 	}
 }

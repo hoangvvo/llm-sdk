@@ -5,30 +5,28 @@ import (
 )
 
 // NewTextPart creates a new text part
-func NewTextPart(text string, id *string) Part {
+func NewTextPart(text string) Part {
 	return Part{
 		TextPart: &TextPart{
 			Text: text,
-			ID:   id,
 		},
 	}
 }
 
 // NewImagePart creates a new image part
-func NewImagePart(mimeType, imageData string, width, height *int, id *string) Part {
+func NewImagePart(mimeType, imageData string, width, height *int) Part {
 	return Part{
 		ImagePart: &ImagePart{
 			MimeType:  mimeType,
 			ImageData: imageData,
 			Width:     width,
 			Height:    height,
-			ID:        id,
 		},
 	}
 }
 
 // NewAudioPart creates a new audio part
-func NewAudioPart(audioData string, format AudioFormat, sampleRate, channels *int, transcript, id *string) Part {
+func NewAudioPart(audioData string, format AudioFormat, sampleRate, channels *int, transcript, audioID *string) Part {
 	return Part{
 		AudioPart: &AudioPart{
 			AudioData:  audioData,
@@ -36,24 +34,23 @@ func NewAudioPart(audioData string, format AudioFormat, sampleRate, channels *in
 			SampleRate: sampleRate,
 			Channels:   channels,
 			Transcript: transcript,
-			ID:         id,
+			AudioID:    audioID,
 		},
 	}
 }
 
 // NewSourcePart creates a new source part
-func NewSourcePart(title string, content []Part, id *string) Part {
+func NewSourcePart(title string, content []Part) Part {
 	return Part{
 		SourcePart: &SourcePart{
 			Title:   title,
 			Content: content,
-			ID:      id,
 		},
 	}
 }
 
 // NewToolCallPart creates a new tool call part
-func NewToolCallPart(toolCallID, toolName string, args any, id *string) Part {
+func NewToolCallPart(toolCallID, toolName string, args any) Part {
 	// TODO: handle error
 	argsJSON, _ := json.Marshal(args)
 
@@ -62,7 +59,6 @@ func NewToolCallPart(toolCallID, toolName string, args any, id *string) Part {
 			ToolCallID: toolCallID,
 			ToolName:   toolName,
 			Args:       argsJSON,
-			ID:         id,
 		},
 	}
 }

@@ -26,7 +26,7 @@ func main() {
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Is a golden retriever a good family dog?", nil),
+				llmsdk.NewTextPart("Is a golden retriever a good family dog?"),
 			),
 		},
 	})

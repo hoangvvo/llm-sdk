@@ -9,7 +9,6 @@ import (
 // AccumulatedTextData represents accumulated text data
 type AccumulatedTextData struct {
 	Text string
-	ID   *string
 }
 
 // AccumulatedToolCallData represents accumulated tool call data
@@ -17,7 +16,6 @@ type AccumulatedToolCallData struct {
 	ToolName   string
 	ToolCallID *string
 	Args       string
-	ID         *string
 }
 
 // AccumulatedAudioData represents accumulated audio data
@@ -27,7 +25,7 @@ type AccumulatedAudioData struct {
 	SampleRate      *int
 	Channels        *int
 	Transcript      string
-	ID              *string
+	AudioID         *string
 }
 
 // AccumulatedData represents accumulated data for different part types
@@ -53,7 +51,6 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 	case delta.Part.TextPartDelta != nil:
 		return &AccumulatedTextData{
 			Text: delta.Part.TextPartDelta.Text,
-			ID:   delta.Part.TextPartDelta.ID,
 		}
 	case delta.Part.ToolCallPartDelta != nil:
 		toolName := ""
@@ -68,7 +65,6 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 			ToolName:   toolName,
 			ToolCallID: delta.Part.ToolCallPartDelta.ToolCallID,
 			Args:       args,
-			ID:         delta.Part.ToolCallPartDelta.ID,
 		}
 	case delta.Part.AudioPartDelta != nil:
 		var audioDataChunks []string
@@ -85,7 +81,7 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 			SampleRate:      delta.Part.AudioPartDelta.SampleRate,
 			Channels:        delta.Part.AudioPartDelta.Channels,
 			Transcript:      transcript,
-			ID:              delta.Part.AudioPartDelta.ID,
+			AudioID:         delta.Part.AudioPartDelta.AudioID,
 		}
 	default:
 		return nil
@@ -95,9 +91,6 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 // mergeTextDelta merges text delta with existing text data
 func mergeTextDelta(existing *AccumulatedTextData, delta *TextPartDelta) {
 	existing.Text += delta.Text
-	if delta.ID != nil {
-		existing.ID = delta.ID
-	}
 }
 
 // mergeToolCallDelta merges tool call delta with existing tool call data
@@ -110,9 +103,6 @@ func mergeToolCallDelta(existing *AccumulatedToolCallData, delta *ToolCallPartDe
 	}
 	if delta.Args != nil {
 		existing.Args += *delta.Args
-	}
-	if delta.ID != nil {
-		existing.ID = delta.ID
 	}
 }
 
@@ -133,8 +123,8 @@ func mergeAudioDelta(existing *AccumulatedAudioData, delta *AudioPartDelta) {
 	if delta.Transcript != nil {
 		existing.Transcript += *delta.Transcript
 	}
-	if delta.ID != nil {
-		existing.ID = delta.ID
+	if delta.AudioID != nil {
+		existing.AudioID = delta.AudioID
 	}
 }
 
@@ -164,7 +154,7 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 
 // createTextPart creates a text part from accumulated text data
 func createTextPart(data *AccumulatedTextData) Part {
-	return NewTextPart(data.Text, data.ID)
+	return NewTextPart(data.Text)
 }
 
 // parseToolCallArgs parses tool call arguments from JSON string
@@ -194,7 +184,7 @@ func createToolCallPart(data *AccumulatedToolCallData, index int) (Part, error) 
 		return Part{}, err
 	}
 
-	return NewToolCallPart(*data.ToolCallID, data.ToolName, args, data.ID), nil
+	return NewToolCallPart(*data.ToolCallID, data.ToolName, args), nil
 }
 
 // createAudioPart creates an audio part from accumulated audio data
@@ -217,7 +207,7 @@ func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 		transcript = &data.Transcript
 	}
 
-	return NewAudioPart(concatenatedAudio, *data.Format, data.SampleRate, data.Channels, transcript, data.ID), nil
+	return NewAudioPart(concatenatedAudio, *data.Format, data.SampleRate, data.Channels, transcript, data.AudioID), nil
 }
 
 // createPart creates a final Part from accumulated data

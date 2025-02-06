@@ -84,7 +84,6 @@ async fn test_generate_audio() -> Result<(), Box<dyn Error>> {
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: "Hello".to_string(),
-                    id: None,
                 })],
             })],
             ..Default::default()
@@ -109,7 +108,7 @@ async fn test_generate_audio() -> Result<(), Box<dyn Error>> {
         "Transcript must be present"
     );
     assert!(
-        audio_part.id.is_some_and(|id| !id.is_empty()),
+        audio_part.audio_id.is_some_and(|id| !id.is_empty()),
         "Audio part ID must be present"
     );
 
@@ -130,7 +129,6 @@ async fn test_stream_audio() -> Result<(), Box<dyn Error>> {
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
                     text: "Hello".to_string(),
-                    id: None,
                 })],
             })],
             ..Default::default()
@@ -164,7 +162,7 @@ async fn test_stream_audio() -> Result<(), Box<dyn Error>> {
         "Transcript must be present"
     );
     assert!(
-        audio_part.id.is_some_and(|id| !id.is_empty()),
+        audio_part.audio_id.is_some_and(|id| !id.is_empty()),
         "Audio part ID must be present"
     );
 

@@ -117,9 +117,6 @@ pub enum LanguageModelCapability {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct TextPart {
     pub text: String,
-    /// The ID of the part, if applicable.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
 }
 
 /// A part of the message that contains an image.
@@ -136,9 +133,6 @@ pub struct ImagePart {
     /// The height of the image in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
-    /// The ID of the part, if applicable.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
 }
 
 /// A part of the message that contains an audio.
@@ -158,9 +152,9 @@ pub struct AudioPart {
     /// The transcript of the audio.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript: Option<String>,
-    /// The ID of the part, if applicable.
+    /// The Audio ID, if applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub audio_id: Option<String>,
 }
 
 /// A part of the message that contains a source with structured content.
@@ -172,8 +166,6 @@ pub struct SourcePart {
     pub title: String,
     /// The content of the document.
     pub content: Vec<Part>,
-    /// The ID of the part, if applicable.
-    pub id: Option<String>,
 }
 
 /// A part of the message that represents a call to a tool the model wants to
@@ -188,10 +180,6 @@ pub struct ToolCallPart {
     pub tool_name: String,
     /// The arguments to pass to the tool.
     pub args: Value,
-    /// The ID of the part, if applicable. This might not be the same as the
-    /// `tool_call_id`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
 }
 
 /// A part of the message that represents the result of a tool call.
@@ -229,9 +217,6 @@ pub struct AssistantMessage {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct TextPartDelta {
     pub text: String,
-    /// The ID of the part, if applicable.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
 }
 
 /// A delta update for a tool call part, used in streaming of a tool invocation.
@@ -248,10 +233,6 @@ pub struct ToolCallPartDelta {
     /// The partial JSON string of the arguments to pass to the tool.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
-    /// The ID of the part, if applicable. This might not be the same as the
-    /// `tool_call_id`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
 }
 
 /// A delta update for an audio part, used in streaming of an audio message.
@@ -272,9 +253,9 @@ pub struct AudioPartDelta {
     /// The transcript of the audio.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript: Option<String>,
-    /// The ID of the part, if applicable.
+    /// The audio ID, if applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub audio_id: Option<String>,
 }
 
 /// Represents a delta update in a message's content, enabling partial streaming

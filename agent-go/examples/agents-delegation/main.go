@@ -70,7 +70,7 @@ func (t *AgentTransferTool[C]) Execute(ctx context.Context, paramsJSON json.RawM
 		Input: []llmagent.AgentItem{
 			llmagent.NewMessageAgentItem(
 				llmsdk.NewUserMessage(
-					llmsdk.NewTextPart(params.Task, nil),
+					llmsdk.NewTextPart(params.Task),
 				)),
 		},
 		Context: contextVal,
@@ -187,7 +187,7 @@ func (t *CreateOrderTool) Execute(ctx context.Context, paramsJSON json.RawMessag
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -248,7 +248,7 @@ func (t *GetOrdersTool) Execute(ctx context.Context, paramsJSON json.RawMessage,
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -299,7 +299,7 @@ func (t *DeliverOrderTool) Execute(ctx context.Context, paramsJSON json.RawMessa
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -371,7 +371,7 @@ You should also poll the order status in every turn to send them for delivery on
 		fmt.Println("\n--- New iteration ---")
 
 		items = append(items, llmagent.NewMessageAgentItem(llmsdk.NewUserMessage(
-			llmsdk.NewTextPart("Next", nil),
+			llmsdk.NewTextPart("Next"),
 		)))
 
 		response, err := coordinator.Run(ctx, llmagent.AgentRequest[*MyContext]{

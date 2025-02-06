@@ -82,7 +82,7 @@ func (t *SearchFlightsTool) Execute(ctx context.Context, paramsJSON json.RawMess
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -156,7 +156,7 @@ func (t *SearchHotelsTool) Execute(ctx context.Context, paramsJSON json.RawMessa
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -257,7 +257,7 @@ func main() {
 		Input: []llmagent.AgentItem{
 			llmagent.NewMessageAgentItem(
 				llmsdk.NewUserMessage(
-					llmsdk.NewTextPart(prompt, nil),
+					llmsdk.NewTextPart(prompt),
 				),
 			),
 		},
