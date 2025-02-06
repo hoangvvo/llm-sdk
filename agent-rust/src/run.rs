@@ -67,9 +67,9 @@ where
         &self,
         context: Arc<TCtx>,
         run_state: Arc<Mutex<RunState>>,
-        content: Vec<Part>,
+        parts: Vec<Part>,
     ) -> Result<ProcessResult, AgentError> {
-        let tool_call_parts: Vec<ToolCallPart> = content
+        let tool_call_parts: Vec<ToolCallPart> = parts
             .iter()
             .filter_map(|part| {
                 if let Part::ToolCall(tool_call) = part {
@@ -82,7 +82,7 @@ where
 
         // If no tool calls were found, return the model response as is
         if tool_call_parts.is_empty() {
-            return Ok(ProcessResult::Response(content));
+            return Ok(ProcessResult::Response(parts));
         }
 
         let mut next_messages: Vec<Message> = vec![];

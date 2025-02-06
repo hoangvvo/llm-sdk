@@ -21,5 +21,6 @@ jobs:
         run: cargo +nightly fmt -- --check
       - name: Build
         run: cargo build
-      # - name: Test
-      #   run: cargo test
+
+      - name: Test
+        run: cargo test --lib agent-sdk

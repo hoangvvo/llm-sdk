@@ -25,5 +25,6 @@ jobs:
         run: npm run lint
       - name: Run build
         run: npm run build
-      # - name: Run tests
-      #   run: npm test
+
+      - name: Run tests
+        run: npm test -w=agent-js

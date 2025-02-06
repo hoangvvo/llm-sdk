@@ -31,6 +31,7 @@ pub struct AgentResponse {
 
 impl AgentResponse {
     /// Extract all text content from the final content, separated by a space.
+    #[must_use]
     pub fn text(&self) -> String {
         self.content
             .iter()
