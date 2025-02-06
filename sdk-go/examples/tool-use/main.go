@@ -133,7 +133,7 @@ func main() {
 						[]llmsdk.Part{
 							llmsdk.NewTextPart(string(resultBytes), nil),
 						},
-						nil,
+						false,
 					),
 				)
 			}

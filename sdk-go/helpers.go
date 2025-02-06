@@ -1,6 +1,8 @@
 package llmsdk
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // NewTextPart creates a new text part
 func NewTextPart(text string, id *string) Part {
@@ -66,7 +68,7 @@ func NewToolCallPart(toolCallID, toolName string, args any, id *string) Part {
 }
 
 // NewToolResultPart creates a new tool result part
-func NewToolResultPart(toolCallID, toolName string, content []Part, isError *bool) Part {
+func NewToolResultPart(toolCallID, toolName string, content []Part, isError bool) Part {
 	return Part{
 		ToolResultPart: &ToolResultPart{
 			ToolCallID: toolCallID,

@@ -11,9 +11,12 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 )
 
-// Helper function to get string pointer
 func stringPtr(s string) *string {
 	return &s
+}
+
+func floatPtr(f float64) *float64 {
+	return &f
 }
 
 // MockLanguageModel implements llmsdk.LanguageModel for testing
@@ -168,1013 +171,1082 @@ func (t *MockAgentTool[C]) Execute(ctx context.Context, params json.RawMessage, 
 	return t.executeFunc(ctx, params, contextVal, runState)
 }
 
-func TestRunSession_Run(t *testing.T) {
-	t.Run("returns a response when there is no tool call", func(t *testing.T) {
-		model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
-			},
-		})
+// -------- Root-level tests (Run) --------
 
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
-
-		response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hello!"}},
-						},
-					},
-				}),
-			},
-		})
-
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		expectedResponse := &llmagent.AgentResponse{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
-			},
-			Output: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					AssistantMessage: &llmsdk.AssistantMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
-						},
-					},
-				}),
-			},
-		}
-
-		if diff := cmp.Diff(expectedResponse, response); diff != "" {
-			t.Errorf("response mismatch (-want +got):\n%s", diff)
-		}
+func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
+	model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
+		},
 	})
 
-	t.Run("executes a single tool call and returns response", func(t *testing.T) {
-		toolResult := llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
-			},
-			IsError: false,
-		}
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
 
-		tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
-
-		model := NewMockLanguageModel().
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "test_tool",
-						ToolCallID: "call_1",
-						Args:       json.RawMessage(`{"param": "value"}`),
-					}},
-				},
-			}).
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Final response"}},
-				},
-			})
-
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{tool},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
-
-		response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{"testContext": true},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
-						},
+	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Hello!"}},
 					},
-				}),
+				},
+			}),
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	expectedResponse := &llmagent.AgentResponse{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
+		},
+		Output: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				AssistantMessage: &llmsdk.AssistantMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
+					},
+				},
+			}),
+		},
+		ModelCalls: []llmagent.ModelCallInfo{
+			{
+				Cost:     nil,
+				Usage:    nil,
+				ModelID:  model.ModelID(),
+				Provider: model.Provider(),
 			},
-		})
+		},
+	}
 
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
+	if diff := cmp.Diff(expectedResponse, response); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+}
 
-		// Verify tool was called with correct arguments
-		var args map[string]interface{}
-		if err := json.Unmarshal(tool.LastArgs, &args); err != nil {
-			t.Fatalf("failed to unmarshal tool args: %v", err)
-		}
+func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
+	toolResult := llmagent.AgentToolResult{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+		},
+		IsError: false,
+	}
 
-		if args["param"] != "value" {
-			t.Errorf("expected param=value, got param=%v", args["param"])
-		}
+	tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
 
-		// Verify context was passed correctly
-		if testCtx, ok := tool.LastContext["testContext"].(bool); !ok || !testCtx {
-			t.Errorf("expected testContext=true, got %v", tool.LastContext)
-		}
-
-		expectedResponse := &llmagent.AgentResponse{
+	model := NewMockLanguageModel().
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				{ToolCallPart: &llmsdk.ToolCallPart{
+					ToolName:   "test_tool",
+					ToolCallID: "call_1",
+					Args:       json.RawMessage(`{"param": "value"}`),
+				}},
+			},
+			Usage: &llmsdk.ModelUsage{
+				InputTokens:  1000,
+				OutputTokens: 50,
+			},
+			Cost: floatPtr(0.0015),
+		}).
+		AddResponses(&llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "Final response"}},
 			},
-			Output: []llmagent.AgentItem{
-				// Assistant tool call message
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					AssistantMessage: &llmsdk.AssistantMessage{
-						Content: []llmsdk.Part{
-							{ToolCallPart: &llmsdk.ToolCallPart{
-								ToolName:   "test_tool",
-								ToolCallID: "call_1",
-								Args:       json.RawMessage(`{"param": "value"}`),
-							}},
-						},
-					},
-				}),
-				// Tool result message
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					ToolMessage: &llmsdk.ToolMessage{
-						Content: []llmsdk.Part{
-							{ToolResultPart: &llmsdk.ToolResultPart{
-								ToolCallID: "call_1",
-								ToolName:   "test_tool",
-								Content: []llmsdk.Part{
-									{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
-								},
-								IsError: func() *bool { b := false; return &b }(),
-							}},
-						},
-					},
-				}),
-				// Final assistant response message
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					AssistantMessage: &llmsdk.AssistantMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Final response"}},
-						},
-					},
-				}),
-			},
-		}
-
-		if diff := cmp.Diff(expectedResponse, response); diff != "" {
-			t.Errorf("response mismatch (-want +got):\n%s", diff)
-		}
-	})
-
-	t.Run("executes multiple tool calls in parallel", func(t *testing.T) {
-		tool1Result := llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Tool 1 result"}},
-			},
-			IsError: false,
-		}
-
-		tool2Result := llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Tool 2 result"}},
-			},
-			IsError: false,
-		}
-
-		tool1 := NewMockTool[map[string]interface{}]("tool_1", tool1Result, nil)
-		tool2 := NewMockTool[map[string]interface{}]("tool_2", tool2Result, nil)
-
-		model := NewMockLanguageModel().
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "tool_1",
-						ToolCallID: "call_1",
-						Args:       json.RawMessage(`{"param": "value1"}`),
-					}},
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "tool_2",
-						ToolCallID: "call_2",
-						Args:       json.RawMessage(`{"param": "value2"}`),
-					}},
-				},
-			}).
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Processed both tools"}},
-				},
-			})
-
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{tool1, tool2},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
-
-		response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Use both tools"}},
-						},
-					},
-				}),
-			},
 		})
 
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{tool},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
 
-		// Verify tool1 was called with correct arguments
-		var tool1Args map[string]interface{}
-		if err := json.Unmarshal(tool1.LastArgs, &tool1Args); err != nil {
-			t.Fatalf("failed to unmarshal tool1 args: %v", err)
-		}
-
-		if tool1Args["param"] != "value1" {
-			t.Errorf("expected tool1 param=value1, got param=%v", tool1Args["param"])
-		}
-
-		// Verify tool2 was called with correct arguments
-		var tool2Args map[string]interface{}
-		if err := json.Unmarshal(tool2.LastArgs, &tool2Args); err != nil {
-			t.Fatalf("failed to unmarshal tool2 args: %v", err)
-		}
-
-		if tool2Args["param"] != "value2" {
-			t.Errorf("expected tool2 param=value2, got param=%v", tool2Args["param"])
-		}
-
-		if response.Content[0].TextPart.Text != "Processed both tools" {
-			t.Errorf("expected processed both tools, got %q", response.Content[0].TextPart.Text)
-		}
-
-		if len(response.Output) != 3 {
-			t.Errorf("expected 3 output messages, got %d", len(response.Output))
-		}
+	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{"testContext": true},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
+					},
+				},
+			}),
+		},
 	})
 
-	t.Run("handles multiple turns with tool calls", func(t *testing.T) {
-		toolResult := llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Calculation result"}},
-			},
-			IsError: false,
-		}
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
-		tool := NewMockTool[map[string]interface{}]("calculator", toolResult, nil)
+	// Verify tool was called with correct arguments
+	var args map[string]interface{}
+	if err := json.Unmarshal(tool.LastArgs, &args); err != nil {
+		t.Fatalf("failed to unmarshal tool args: %v", err)
+	}
 
-		model := NewMockLanguageModel().
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "calculator",
-						ToolCallID: "call_1",
-						Args:       json.RawMessage(`{"operation": "add", "a": 1, "b": 2}`),
-					}},
-				},
-			}).
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "calculator",
-						ToolCallID: "call_2",
-						Args:       json.RawMessage(`{"operation": "multiply", "a": 3, "b": 4}`),
-					}},
-				},
-			}).
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "All calculations done"}},
-				},
-			})
+	if args["param"] != "value" {
+		t.Errorf("expected param=value, got param=%v", args["param"])
+	}
 
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{tool},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
+	// Verify context was passed correctly
+	if testCtx, ok := tool.LastContext["testContext"].(bool); !ok || !testCtx {
+		t.Errorf("expected testContext=true, got %v", tool.LastContext)
+	}
 
-		response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Calculate some numbers"}},
-						},
+	expectedResponse := &llmagent.AgentResponse{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Final response"}},
+		},
+		Output: []llmagent.AgentItem{
+			// Assistant tool call message
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				AssistantMessage: &llmsdk.AssistantMessage{
+					Content: []llmsdk.Part{
+						{ToolCallPart: &llmsdk.ToolCallPart{
+							ToolName:   "test_tool",
+							ToolCallID: "call_1",
+							Args:       json.RawMessage(`{"param": "value"}`),
+						}},
 					},
-				}),
+				},
+			}),
+			// Tool result message
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				ToolMessage: &llmsdk.ToolMessage{
+					Content: []llmsdk.Part{
+						{ToolResultPart: &llmsdk.ToolResultPart{
+							ToolCallID: "call_1",
+							ToolName:   "test_tool",
+							Content: []llmsdk.Part{
+								{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+							},
+							IsError: false,
+						}},
+					},
+				},
+			}),
+			// Final assistant response message
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				AssistantMessage: &llmsdk.AssistantMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Final response"}},
+					},
+				},
+			}),
+		},
+		ModelCalls: []llmagent.ModelCallInfo{
+			{
+				Usage: &llmsdk.ModelUsage{
+					InputTokens:  1000,
+					OutputTokens: 50,
+				},
+				Cost:     floatPtr(0.0015),
+				ModelID:  model.ModelID(),
+				Provider: model.Provider(),
 			},
+			{
+				ModelID:  model.ModelID(),
+				Provider: model.Provider(),
+			},
+		},
+	}
+
+	if diff := cmp.Diff(expectedResponse, response); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
+	tool1Result := llmagent.AgentToolResult{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Tool 1 result"}},
+		},
+		IsError: false,
+	}
+
+	tool2Result := llmagent.AgentToolResult{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Tool 2 result"}},
+		},
+		IsError: false,
+	}
+
+	tool1 := NewMockTool[map[string]interface{}]("tool_1", tool1Result, nil)
+	tool2 := NewMockTool[map[string]interface{}]("tool_2", tool2Result, nil)
+
+	model := NewMockLanguageModel().
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				llmsdk.NewToolCallPart("call_1", "tool_1", map[string]any{"param": "value1"}, nil),
+				llmsdk.NewToolCallPart("call_2", "tool_2", map[string]any{"param": "value2"}, nil),
+			},
+			Usage: &llmsdk.ModelUsage{
+				InputTokens:  2000,
+				OutputTokens: 100,
+			},
+		}).
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				{TextPart: &llmsdk.TextPart{Text: "Processed both tools"}},
+			},
+			Usage: &llmsdk.ModelUsage{
+				InputTokens:  50,
+				OutputTokens: 10,
+			},
+			Cost: floatPtr(0.0003),
 		})
 
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{tool1, tool2},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
 
-		var firstCallArgs map[string]interface{}
-		if err := json.Unmarshal(tool.AllCalls[0], &firstCallArgs); err != nil {
-			t.Fatalf("failed to unmarshal first call args: %v", err)
-		}
-
-		expectedFirstCall := map[string]interface{}{
-			"operation": "add",
-			"a":         float64(1),
-			"b":         float64(2),
-		}
-
-		if firstCallArgs["operation"] != expectedFirstCall["operation"] ||
-			firstCallArgs["a"] != expectedFirstCall["a"] ||
-			firstCallArgs["b"] != expectedFirstCall["b"] {
-			t.Errorf("expected first call %v, got %v", expectedFirstCall, firstCallArgs)
-		}
-
-		if response.Content[0].TextPart.Text != "All calculations done" {
-			t.Errorf("expected all calculations done, got %q", response.Content[0].TextPart.Text)
-		}
-
-		if len(response.Output) != 5 {
-			t.Errorf("expected 5 output messages, got %d", len(response.Output))
-		}
-	})
-
-	t.Run("throws AgentMaxTurnsExceededError when max turns exceeded", func(t *testing.T) {
-		toolResult := llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
-			},
-			IsError: false,
-		}
-
-		tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
-
-		model := NewMockLanguageModel().
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "test_tool",
-						ToolCallID: "call_1",
-						Args:       json.RawMessage(`{}`),
-					}},
-				},
-			}).
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "test_tool",
-						ToolCallID: "call_2",
-						Args:       json.RawMessage(`{}`),
-					}},
-				},
-			}).
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "test_tool",
-						ToolCallID: "call_3",
-						Args:       json.RawMessage(`{}`),
-					}},
-				},
-			})
-
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{tool},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			2, // max turns is 2
-			nil, nil, nil, nil, nil,
-		)
-
-		_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Keep using tools"}},
-						},
+	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Use both tools"}},
 					},
-				}),
-			},
-		})
-
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-
-		var agentErr *llmagent.AgentError
-		if !errors.As(err, &agentErr) {
-			t.Fatalf("expected AgentError, got %T", err)
-		}
-
-		if agentErr.Kind != llmagent.AgentErrorKindMaxTurnsExceeded {
-			t.Errorf("expected max turns exceeded error, got %s", agentErr.Kind)
-		}
+				},
+			}),
+		},
 	})
 
-	t.Run("throws AgentInvariantError when tool not found", func(t *testing.T) {
-		model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Verify tool1 was called with correct arguments
+	var tool1Args map[string]interface{}
+	if err := json.Unmarshal(tool1.LastArgs, &tool1Args); err != nil {
+		t.Fatalf("failed to unmarshal tool1 args: %v", err)
+	}
+	if tool1Args["param"] != "value1" {
+		t.Errorf("expected tool1 param=value1, got param=%v", tool1Args["param"])
+	}
+
+	// Verify tool2 was called with correct arguments
+	var tool2Args map[string]interface{}
+	if err := json.Unmarshal(tool2.LastArgs, &tool2Args); err != nil {
+		t.Fatalf("failed to unmarshal tool2 args: %v", err)
+	}
+	if tool2Args["param"] != "value2" {
+		t.Errorf("expected tool2 param=value2, got param=%v", tool2Args["param"])
+	}
+
+	expectedResponse := &llmagent.AgentResponse{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Processed both tools", nil)},
+		Output: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(
+				llmsdk.NewAssistantMessage(
+					llmsdk.NewToolCallPart("call_1", "tool_1", map[string]any{"param": "value1"}, nil),
+					llmsdk.NewToolCallPart("call_2", "tool_2", map[string]any{"param": "value2"}, nil),
+				),
+			),
+			llmagent.NewMessageAgentItem(
+				llmsdk.NewToolMessage(
+					llmsdk.NewToolResultPart("call_1", "tool_1", []llmsdk.Part{
+						llmsdk.NewTextPart("Tool 1 result", nil),
+					}, false),
+					llmsdk.NewToolResultPart("call_2", "tool_2", []llmsdk.Part{
+						llmsdk.NewTextPart("Tool 2 result", nil),
+					}, false),
+				),
+			),
+			llmagent.NewMessageAgentItem(
+				llmsdk.NewAssistantMessage(
+					llmsdk.NewTextPart("Processed both tools", nil),
+				),
+			),
+		},
+		ModelCalls: []llmagent.ModelCallInfo{
+			{
+				Usage: &llmsdk.ModelUsage{
+					InputTokens:  2000,
+					OutputTokens: 100,
+				},
+				ModelID:  model.ModelID(),
+				Provider: model.Provider(),
+			},
+			{
+				Usage: &llmsdk.ModelUsage{
+					InputTokens:  50,
+					OutputTokens: 10,
+				},
+				Cost:     floatPtr(0.0003),
+				ModelID:  model.ModelID(),
+				Provider: model.Provider(),
+			},
+		},
+	}
+
+	if diff := cmp.Diff(expectedResponse, response); diff != "" {
+		t.Errorf("response mismatch (-want +got): %v", diff)
+	}
+}
+
+func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
+	toolResult := llmagent.AgentToolResult{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Calculation result"}},
+		},
+		IsError: false,
+	}
+
+	tool := NewMockTool[map[string]interface{}]("calculator", toolResult, nil)
+
+	model := NewMockLanguageModel().
+		AddResponses(&llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "non_existent_tool",
+					ToolName:   "calculator",
 					ToolCallID: "call_1",
+					Args:       json.RawMessage([]byte(`{"operation": "add", "a": 1, "b": 2}`)),
+				}},
+			},
+		}).
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				{ToolCallPart: &llmsdk.ToolCallPart{
+					ToolName:   "calculator",
+					ToolCallID: "call_2",
+					Args:       json.RawMessage([]byte(`{"operation": "multiply", "a": 3, "b": 4}`)),
+				}},
+			},
+		}).
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				{TextPart: &llmsdk.TextPart{Text: "All calculations done"}},
+			},
+		})
+
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{tool},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
+
+	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Calculate some numbers"}},
+					},
+				},
+			}),
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	var firstCallArgs map[string]interface{}
+	if err := json.Unmarshal(tool.AllCalls[0], &firstCallArgs); err != nil {
+		t.Fatalf("failed to unmarshal first call args: %v", err)
+	}
+
+	expectedFirstCall := map[string]interface{}{
+		"operation": "add",
+		"a":         float64(1),
+		"b":         float64(2),
+	}
+
+	if firstCallArgs["operation"] != expectedFirstCall["operation"] ||
+		firstCallArgs["a"] != expectedFirstCall["a"] ||
+		firstCallArgs["b"] != expectedFirstCall["b"] {
+		t.Errorf("expected first call %v, got %v", expectedFirstCall, firstCallArgs)
+	}
+
+	if response.Content[0].TextPart.Text != "All calculations done" {
+		t.Errorf("expected all calculations done, got %q", response.Content[0].TextPart.Text)
+	}
+
+	if len(response.Output) != 5 {
+		t.Errorf("expected 5 output messages, got %d", len(response.Output))
+	}
+}
+
+func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
+	toolResult := llmagent.AgentToolResult{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+		},
+		IsError: false,
+	}
+
+	tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
+
+	model := NewMockLanguageModel().
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				{ToolCallPart: &llmsdk.ToolCallPart{
+					ToolName:   "test_tool",
+					ToolCallID: "call_1",
+					Args:       json.RawMessage(`{}`),
+				}},
+			},
+		}).
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				{ToolCallPart: &llmsdk.ToolCallPart{
+					ToolName:   "test_tool",
+					ToolCallID: "call_2",
+					Args:       json.RawMessage(`{}`),
+				}},
+			},
+		}).
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				{ToolCallPart: &llmsdk.ToolCallPart{
+					ToolName:   "test_tool",
+					ToolCallID: "call_3",
 					Args:       json.RawMessage(`{}`),
 				}},
 			},
 		})
 
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{tool},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		2, // max turns is 2
+		nil, nil, nil, nil, nil,
+	)
 
-		_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Use a tool"}},
-						},
+	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Keep using tools"}},
 					},
-				}),
-			},
-		})
-
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-
-		var agentErr *llmagent.AgentError
-		if !errors.As(err, &agentErr) {
-			t.Fatalf("expected AgentError, got %T", err)
-		}
-
-		if agentErr.Kind != llmagent.InvariantErrorKind {
-			t.Errorf("expected invariant error, got %s", agentErr.Kind)
-		}
-	})
-
-	t.Run("throws AgentToolExecutionError when tool execution fails", func(t *testing.T) {
-		tool := NewMockTool("failing_tool", llmagent.AgentToolResult{}, func(ctx context.Context, params json.RawMessage, contextVal map[string]interface{}, runState *llmagent.RunState) (llmagent.AgentToolResult, error) {
-			return llmagent.AgentToolResult{}, errors.New("tool execution failed")
-		})
-
-		model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
-			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "failing_tool",
-					ToolCallID: "call_1",
-					Args:       json.RawMessage(`{}`),
-				}},
-			},
-		})
-
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{tool},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
-
-		_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
-						},
-					},
-				}),
-			},
-		})
-
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-
-		var agentErr *llmagent.AgentError
-		if !errors.As(err, &agentErr) {
-			t.Fatalf("expected AgentError, got %T", err)
-		}
-
-		if agentErr.Kind != llmagent.ToolExecutionErrorKind {
-			t.Errorf("expected tool execution error, got %s", agentErr.Kind)
-		}
-	})
-
-	t.Run("handles tool returning error result", func(t *testing.T) {
-		toolResult := llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Error: Invalid parameters"}},
-			},
-			IsError: true,
-		}
-
-		tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
-
-		model := NewMockLanguageModel().
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "test_tool",
-						ToolCallID: "call_1",
-						Args:       json.RawMessage(`{"invalid": true}`),
-					}},
 				},
-			}).
-			AddResponses(&llmsdk.ModelResponse{
-				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Handled the error"}},
-				},
-			})
-
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{tool},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
-
-		response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
-						},
-					},
-				}),
-			},
-		})
-
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		// Check that the tool result was marked as an error
-		if len(response.Output) < 2 {
-			t.Fatalf("expected at least 2 output messages, got %d", len(response.Output))
-		}
-
-		toolMessage := response.Output[1]
-		if toolMessage.Message == nil || toolMessage.Message.ToolMessage == nil {
-			t.Fatal("expected tool message")
-		}
-
-		if len(toolMessage.Message.ToolMessage.Content) == 0 {
-			t.Fatal("expected tool message content")
-		}
-
-		toolResultPart := toolMessage.Message.ToolMessage.Content[0].ToolResultPart
-		if toolResultPart == nil {
-			t.Fatal("expected tool result part")
-		}
-
-		if toolResultPart.IsError == nil || !*toolResultPart.IsError {
-			t.Error("expected tool result to be marked as error")
-		}
-
-		if response.Content[0].TextPart.Text != "Handled the error" {
-			t.Errorf("expected handled the error, got %q", response.Content[0].TextPart.Text)
-		}
+			}),
+		},
 	})
 
-	t.Run("passes sampling parameters to model", func(t *testing.T) {
-		model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Response"}},
-			},
-		})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
 
-		temp := 0.7
-		topP := 0.9
-		topK := 40.0
-		presencePenalty := 0.1
-		frequencyPenalty := 0.2
+	var agentErr *llmagent.AgentError
+	if !errors.As(err, &agentErr) {
+		t.Fatalf("expected AgentError, got %T", err)
+	}
 
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			&temp, &topP, &topK, &presencePenalty, &frequencyPenalty,
-		)
+	if agentErr.Kind != llmagent.AgentErrorKindMaxTurnsExceeded {
+		t.Errorf("expected max turns exceeded error, got %s", agentErr.Kind)
+	}
+}
 
-		_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hello"}},
-						},
-					},
-				}),
-			},
-		})
-
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		if len(model.generateCalls) != 1 {
-			t.Fatalf("expected 1 generate call, got %d", len(model.generateCalls))
-		}
-
-		call := *model.generateCalls[0]
-		if call.Temperature == nil || *call.Temperature != temp {
-			t.Errorf("expected temperature %f, got %v", temp, call.Temperature)
-		}
-		if call.TopP == nil || *call.TopP != topP {
-			t.Errorf("expected topP %f, got %v", topP, call.TopP)
-		}
-		if call.TopK == nil || *call.TopK != topK {
-			t.Errorf("expected topK %f, got %v", topK, call.TopK)
-		}
-		if call.PresencePenalty == nil || *call.PresencePenalty != presencePenalty {
-			t.Errorf("expected presencePenalty %f, got %v", presencePenalty, call.PresencePenalty)
-		}
-		if call.FrequencyPenalty == nil || *call.FrequencyPenalty != frequencyPenalty {
-			t.Errorf("expected frequencyPenalty %f, got %v", frequencyPenalty, call.FrequencyPenalty)
-		}
-	})
-
-	t.Run("includes string and dynamic function instructions in system prompt", func(t *testing.T) {
-		model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Response"}},
-			},
-		})
-
-		instructions := []llmagent.InstructionParam[map[string]interface{}]{
-			{String: stringPtr("You are a helpful assistant.")},
-			{Func: func(ctx map[string]interface{}) string {
-				if userRole, ok := ctx["userRole"].(string); ok {
-					return "The user is a " + userRole + "."
-				}
-				return ""
+func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
+	model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
+		Content: []llmsdk.Part{
+			{ToolCallPart: &llmsdk.ToolCallPart{
+				ToolName:   "non_existent_tool",
+				ToolCallID: "call_1",
+				Args:       json.RawMessage(`{}`),
 			}},
-			{String: stringPtr("Always be polite.")},
-		}
-
-		session := llmagent.NewRunSession(
-			model,
-			instructions,
-			[]llmagent.AgentTool[map[string]interface{}]{},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
-
-		_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{"userRole": "developer"},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hello"}},
-						},
-					},
-				}),
-			},
-		})
-
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		if len(model.generateCalls) != 1 {
-			t.Fatalf("expected 1 generate call, got %d", len(model.generateCalls))
-		}
-
-		call := *model.generateCalls[0]
-		expectedSystemPrompt := "You are a helpful assistant.\nThe user is a developer.\nAlways be polite."
-
-		if call.SystemPrompt == nil || *call.SystemPrompt != expectedSystemPrompt {
-			t.Errorf("expected system prompt %q, got %q", expectedSystemPrompt, *call.SystemPrompt)
-		}
+		},
 	})
+
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
+
+	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Use a tool"}},
+					},
+				},
+			}),
+		},
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var agentErr *llmagent.AgentError
+	if !errors.As(err, &agentErr) {
+		t.Fatalf("expected AgentError, got %T", err)
+	}
+
+	if agentErr.Kind != llmagent.InvariantErrorKind {
+		t.Errorf("expected invariant error, got %s", agentErr.Kind)
+	}
 }
 
-func TestRunSession_RunStream(t *testing.T) {
-	t.Run("streams response when there is no tool call", func(t *testing.T) {
-		model := NewMockLanguageModel().AddPartialResponses([]llmsdk.PartialModelResponse{
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Hel"}}}},
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "lo"}}}},
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "!"}}}},
-		})
-
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
-
-		stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hi"}},
-						},
-					},
-				}),
-			},
-		})
-
-		events := []*llmagent.AgentStreamEvent{}
-		for stream.Next() {
-			events = append(events, stream.Current())
-		}
-
-		if err := stream.Err(); err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		// Should have partial events, a message event, and a response event
-		if len(events) < 4 {
-			t.Errorf("expected at least 4 events, got %d", len(events))
-		}
-
-		// Check that we got partial events
-		partialCount := 0
-		for _, event := range events {
-			if event.Partial != nil {
-				partialCount++
-			}
-		}
-
-		if partialCount != 3 {
-			t.Errorf("expected 3 partial events, got %d", partialCount)
-		}
-
-		// Check final response
-		finalResponse := events[len(events)-1]
-		if finalResponse.Response == nil {
-			t.Error("expected final event to be a response")
-		} else if len(finalResponse.Response.Content) == 0 || finalResponse.Response.Content[0].TextPart.Text != "Hello!" {
-			t.Errorf("expected final response to be 'Hello!', got %v", finalResponse.Response.Content)
-		}
+func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) {
+	tool := NewMockTool("failing_tool", llmagent.AgentToolResult{}, func(ctx context.Context, params json.RawMessage, contextVal map[string]interface{}, runState *llmagent.RunState) (llmagent.AgentToolResult, error) {
+		return llmagent.AgentToolResult{}, errors.New("tool execution failed")
 	})
 
-	t.Run("streams tool call execution and response", func(t *testing.T) {
-		toolResult := llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
-			},
-			IsError: false,
-		}
-
-		tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
-
-		toolName := "test_tool"
-		callId := "call_1"
-		args := `{"operation": "add", "a": 1, "b": 2}`
-
-		model := NewMockLanguageModel().
-			AddPartialResponses([]llmsdk.PartialModelResponse{
-				{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-					ToolName:   &toolName,
-					ToolCallID: &callId,
-					Args:       &args,
-				}}}},
-			}).
-			AddPartialResponses([]llmsdk.PartialModelResponse{
-				{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Final response"}}}},
-			})
-
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{tool},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
-
-		stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Use tool"}},
-						},
-					},
-				}),
-			},
-		})
-
-		events := []*llmagent.AgentStreamEvent{}
-		for stream.Next() {
-			events = append(events, stream.Current())
-		}
-
-		if err := stream.Err(); err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		// Count event types
-		partialCount := 0
-		messageCount := 0
-		responseCount := 0
-
-		for _, event := range events {
-			if event.Partial != nil {
-				partialCount++
-			} else if event.Message != nil {
-				messageCount++
-			} else if event.Response != nil {
-				responseCount++
-			}
-		}
-
-		if partialCount < 2 {
-			t.Errorf("expected at least 2 partial events, got %d", partialCount)
-		}
-		if messageCount != 3 {
-			t.Errorf("expected 3 message events, got %d", messageCount)
-		}
-		if responseCount != 1 {
-			t.Errorf("expected 1 response event, got %d", responseCount)
-		}
-
-		// Verify tool call arguments
-		var toolArgs map[string]interface{}
-		if err := json.Unmarshal(tool.LastArgs, &toolArgs); err != nil {
-			t.Fatalf("failed to unmarshal tool args: %v", err)
-		}
-
-		expectedArgs := map[string]interface{}{
-			"operation": "add",
-			"a":         float64(1),
-			"b":         float64(2),
-		}
-
-		if toolArgs["operation"] != expectedArgs["operation"] ||
-			toolArgs["a"] != expectedArgs["a"] ||
-			toolArgs["b"] != expectedArgs["b"] {
-			t.Errorf("expected tool args %v, got %v", expectedArgs, toolArgs)
-		}
+	model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
+		Content: []llmsdk.Part{
+			{ToolCallPart: &llmsdk.ToolCallPart{
+				ToolName:   "failing_tool",
+				ToolCallID: "call_1",
+				Args:       json.RawMessage(`{}`),
+			}},
+		},
 	})
 
-	t.Run("throws error when max turns exceeded in streaming", func(t *testing.T) {
-		toolResult := llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
-			},
-			IsError: false,
-		}
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{tool},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
 
-		tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
-
-		toolName := "test_tool"
-		callId1 := "call_1"
-		callId2 := "call_2"
-		callId3 := "call_3"
-		args := "{}"
-
-		model := NewMockLanguageModel().
-			AddPartialResponses([]llmsdk.PartialModelResponse{
-				{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-					ToolName:   &toolName,
-					ToolCallID: &callId1,
-					Args:       &args,
-				}}}},
-			}).
-			AddPartialResponses([]llmsdk.PartialModelResponse{
-				{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-					ToolName:   &toolName,
-					ToolCallID: &callId2,
-					Args:       &args,
-				}}}},
-			}).
-			AddPartialResponses([]llmsdk.PartialModelResponse{
-				{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-					ToolName:   &toolName,
-					ToolCallID: &callId3,
-					Args:       &args,
-				}}}},
-			})
-
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{tool},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			2, // max turns is 2
-			nil, nil, nil, nil, nil,
-		)
-
-		stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Keep using tools"}},
-						},
+	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
 					},
-				}),
-			},
-		})
-
-		// Consume events until error
-		for stream.Next() {
-			// consume events
-		}
-
-		err := stream.Err()
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-
-		var agentErr *llmagent.AgentError
-		if !errors.As(err, &agentErr) {
-			t.Fatalf("expected AgentError, got %T", err)
-		}
-
-		if agentErr.Kind != llmagent.AgentErrorKindMaxTurnsExceeded {
-			t.Errorf("expected max turns exceeded error, got %s", agentErr.Kind)
-		}
+				},
+			}),
+		},
 	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var agentErr *llmagent.AgentError
+	if !errors.As(err, &agentErr) {
+		t.Fatalf("expected AgentError, got %T", err)
+	}
+
+	if agentErr.Kind != llmagent.ToolExecutionErrorKind {
+		t.Errorf("expected tool execution error, got %s", agentErr.Kind)
+	}
 }
 
-func TestRunSession_Lifecycle(t *testing.T) {
-	t.Run("finish cleans up session resources", func(t *testing.T) {
-		model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
+func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
+	toolResult := llmagent.AgentToolResult{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Error: Invalid parameters"}},
+		},
+		IsError: true,
+	}
+
+	tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
+
+	model := NewMockLanguageModel().
+		AddResponses(&llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Response"}},
+				{ToolCallPart: &llmsdk.ToolCallPart{
+					ToolName:   "test_tool",
+					ToolCallID: "call_1",
+					Args:       json.RawMessage(`{"invalid": true}`),
+				}},
+			},
+		}).
+		AddResponses(&llmsdk.ModelResponse{
+			Content: []llmsdk.Part{
+				{TextPart: &llmsdk.TextPart{Text: "Handled the error"}},
 			},
 		})
 
-		session := llmagent.NewRunSession(
-			model,
-			[]llmagent.InstructionParam[map[string]interface{}]{},
-			[]llmagent.AgentTool[map[string]interface{}]{},
-			llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			10,
-			nil, nil, nil, nil, nil,
-		)
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{tool},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
 
-		_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
-			Context: map[string]interface{}{},
-			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hello"}},
-						},
+	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
 					},
-				}),
-			},
+				},
+			}),
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Check that the tool result was marked as an error
+	if len(response.Output) < 2 {
+		t.Fatalf("expected at least 2 output messages, got %d", len(response.Output))
+	}
+
+	toolMessage := response.Output[1]
+	if toolMessage.Message == nil || toolMessage.Message.ToolMessage == nil {
+		t.Fatal("expected tool message")
+	}
+
+	if len(toolMessage.Message.ToolMessage.Content) == 0 {
+		t.Fatal("expected tool message content")
+	}
+
+	toolResultPart := toolMessage.Message.ToolMessage.Content[0].ToolResultPart
+	if toolResultPart == nil {
+		t.Fatal("expected tool result part")
+	}
+
+	if !toolResultPart.IsError {
+		t.Error("expected tool result to be marked as error")
+	}
+
+	if response.Content[0].TextPart.Text != "Handled the error" {
+		t.Errorf("expected handled the error, got %q", response.Content[0].TextPart.Text)
+	}
+}
+
+func TestRun_PassesSamplingParametersToModel(t *testing.T) {
+	model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Response"}},
+		},
+	})
+
+	temp := 0.7
+	topP := 0.9
+	topK := 40.0
+	presencePenalty := 0.1
+	frequencyPenalty := 0.2
+
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		&temp, &topP, &topK, &presencePenalty, &frequencyPenalty,
+	)
+
+	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Hello"}},
+					},
+				},
+			}),
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(model.generateCalls) != 1 {
+		t.Fatalf("expected 1 generate call, got %d", len(model.generateCalls))
+	}
+
+	call := *model.generateCalls[0]
+	if call.Temperature == nil || *call.Temperature != temp {
+		t.Errorf("expected temperature %f, got %v", temp, call.Temperature)
+	}
+	if call.TopP == nil || *call.TopP != topP {
+		t.Errorf("expected topP %f, got %v", topP, call.TopP)
+	}
+	if call.TopK == nil || *call.TopK != topK {
+		t.Errorf("expected topK %f, got %v", topK, call.TopK)
+	}
+	if call.PresencePenalty == nil || *call.PresencePenalty != presencePenalty {
+		t.Errorf("expected presencePenalty %f, got %v", presencePenalty, call.PresencePenalty)
+	}
+	if call.FrequencyPenalty == nil || *call.FrequencyPenalty != frequencyPenalty {
+		t.Errorf("expected frequencyPenalty %f, got %v", frequencyPenalty, call.FrequencyPenalty)
+	}
+}
+
+func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testing.T) {
+	model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Response"}},
+		},
+	})
+
+	instructions := []llmagent.InstructionParam[map[string]interface{}]{
+		{String: stringPtr("You are a helpful assistant.")},
+		{Func: func(ctx map[string]interface{}) string {
+			if userRole, ok := ctx["userRole"].(string); ok {
+				return "The user is a " + userRole + "."
+			}
+			return ""
+		}},
+		{String: stringPtr("Always be polite.")},
+	}
+
+	session := llmagent.NewRunSession(
+		model,
+		instructions,
+		[]llmagent.AgentTool[map[string]interface{}]{},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
+
+	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{"userRole": "developer"},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Hello"}},
+					},
+				},
+			}),
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(model.generateCalls) != 1 {
+		t.Fatalf("expected 1 generate call, got %d", len(model.generateCalls))
+	}
+
+	call := *model.generateCalls[0]
+	expectedSystemPrompt := "You are a helpful assistant.\nThe user is a developer.\nAlways be polite."
+
+	if call.SystemPrompt == nil || *call.SystemPrompt != expectedSystemPrompt {
+		t.Errorf("expected system prompt %q, got %q", expectedSystemPrompt, *call.SystemPrompt)
+	}
+}
+
+// -------- Root-level tests (RunStream) --------
+
+func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
+	model := NewMockLanguageModel().AddPartialResponses([]llmsdk.PartialModelResponse{
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Hel"}}}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "lo"}}}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "!"}}}},
+	})
+
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
+
+	stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Hi"}},
+					},
+				},
+			}),
+		},
+	})
+
+	events := []*llmagent.AgentStreamEvent{}
+	for stream.Next() {
+		events = append(events, stream.Current())
+	}
+
+	if err := stream.Err(); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Should have partial events, a message event, and a response event
+	if len(events) < 4 {
+		t.Errorf("expected at least 4 events, got %d", len(events))
+	}
+
+	// Check that we got partial events
+	partialCount := 0
+	for _, event := range events {
+		if event.Partial != nil {
+			partialCount++
+		}
+	}
+
+	if partialCount != 3 {
+		t.Errorf("expected 3 partial events, got %d", partialCount)
+	}
+
+	// Check final response
+	finalResponse := events[len(events)-1]
+	if finalResponse.Response == nil {
+		t.Error("expected final event to be a response")
+	} else if len(finalResponse.Response.Content) == 0 || finalResponse.Response.Content[0].TextPart.Text != "Hello!" {
+		t.Errorf("expected final response to be 'Hello!', got %v", finalResponse.Response.Content)
+	}
+}
+
+func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
+	toolResult := llmagent.AgentToolResult{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+		},
+		IsError: false,
+	}
+
+	tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
+
+	toolName := "test_tool"
+	callId := "call_1"
+	args := `{"operation": "add", "a": 1, "b": 2}`
+
+	model := NewMockLanguageModel().
+		AddPartialResponses([]llmsdk.PartialModelResponse{
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolName:   &toolName,
+				ToolCallID: &callId,
+				Args:       &args,
+			}}}},
+		}).
+		AddPartialResponses([]llmsdk.PartialModelResponse{
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Final response"}}}},
 		})
 
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{tool},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
 
-		// Call finish (currently no-op but tests the interface)
-		session.Finish()
-
-		// In this implementation, we don't prevent reuse after finish,
-		// but the test shows the expected lifecycle
+	stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Use tool"}},
+					},
+				},
+			}),
+		},
 	})
+
+	events := []*llmagent.AgentStreamEvent{}
+	for stream.Next() {
+		events = append(events, stream.Current())
+	}
+
+	if err := stream.Err(); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Count event types
+	partialCount := 0
+	messageCount := 0
+	responseCount := 0
+
+	for _, event := range events {
+		if event.Partial != nil {
+			partialCount++
+		} else if event.Message != nil {
+			messageCount++
+		} else if event.Response != nil {
+			responseCount++
+		}
+	}
+
+	if partialCount < 2 {
+		t.Errorf("expected at least 2 partial events, got %d", partialCount)
+	}
+	if messageCount != 3 {
+		t.Errorf("expected 3 message events, got %d", messageCount)
+	}
+	if responseCount != 1 {
+		t.Errorf("expected 1 response event, got %d", responseCount)
+	}
+
+	// Verify tool call arguments
+	var toolArgs map[string]interface{}
+	if err := json.Unmarshal(tool.LastArgs, &toolArgs); err != nil {
+		t.Fatalf("failed to unmarshal tool args: %v", err)
+	}
+
+	expectedArgs := map[string]interface{}{
+		"operation": "add",
+		"a":         float64(1),
+		"b":         float64(2),
+	}
+
+	if toolArgs["operation"] != expectedArgs["operation"] ||
+		toolArgs["a"] != expectedArgs["a"] ||
+		toolArgs["b"] != expectedArgs["b"] {
+		t.Errorf("expected tool args %v, got %v", expectedArgs, toolArgs)
+	}
+}
+
+func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
+	toolResult := llmagent.AgentToolResult{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+		},
+		IsError: false,
+	}
+
+	tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
+
+	toolName := "test_tool"
+	callId1 := "call_1"
+	callId2 := "call_2"
+	callId3 := "call_3"
+	args := "{}"
+
+	model := NewMockLanguageModel().
+		AddPartialResponses([]llmsdk.PartialModelResponse{
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolName:   &toolName,
+				ToolCallID: &callId1,
+				Args:       &args,
+			}}}},
+		}).
+		AddPartialResponses([]llmsdk.PartialModelResponse{
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolName:   &toolName,
+				ToolCallID: &callId2,
+				Args:       &args,
+			}}}},
+		}).
+		AddPartialResponses([]llmsdk.PartialModelResponse{
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolName:   &toolName,
+				ToolCallID: &callId3,
+				Args:       &args,
+			}}}},
+		})
+
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{tool},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		2, // max turns is 2
+		nil, nil, nil, nil, nil,
+	)
+
+	stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Keep using tools"}},
+					},
+				},
+			}),
+		},
+	})
+
+	// Consume events until error
+	for stream.Next() {
+		// consume events
+	}
+
+	err := stream.Err()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var agentErr *llmagent.AgentError
+	if !errors.As(err, &agentErr) {
+		t.Fatalf("expected AgentError, got %T", err)
+	}
+
+	if agentErr.Kind != llmagent.AgentErrorKindMaxTurnsExceeded {
+		t.Errorf("expected max turns exceeded error, got %s", agentErr.Kind)
+	}
+}
+
+// -------- Root-level lifecycle test --------
+
+func TestRun_FinishCleansUpSessionResources(t *testing.T) {
+	model := NewMockLanguageModel().AddResponses(&llmsdk.ModelResponse{
+		Content: []llmsdk.Part{
+			{TextPart: &llmsdk.TextPart{Text: "Response"}},
+		},
+	})
+
+	session := llmagent.NewRunSession(
+		model,
+		[]llmagent.InstructionParam[map[string]interface{}]{},
+		[]llmagent.AgentTool[map[string]interface{}]{},
+		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		10,
+		nil, nil, nil, nil, nil,
+	)
+
+	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+		Context: map[string]interface{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewMessageAgentItem(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Hello"}},
+					},
+				},
+			}),
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Call finish (currently no-op but tests the interface)
+	session.Finish()
+
+	// In this implementation, we don't prevent reuse after finish,
+	// but the test shows the expected lifecycle
 }

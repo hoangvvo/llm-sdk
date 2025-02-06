@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 )
@@ -62,16 +63,16 @@ func TestAgent_Run(t *testing.T) {
 					},
 				}),
 			},
+			ModelCalls: []llmagent.ModelCallInfo{
+				{
+					ModelID:  model.ModelID(),
+					Provider: model.Provider(),
+				},
+			},
 		}
 
-		if response.Content[0].TextPart.Text != expectedResponse.Content[0].TextPart.Text {
-			t.Errorf("expected content %q, got %q", expectedResponse.Content[0].TextPart.Text, response.Content[0].TextPart.Text)
-		}
-
-		actualContent := response.Output[0].Message.AssistantMessage.Content[0].TextPart.Text
-		expectedContent := expectedResponse.Output[0].Message.AssistantMessage.Content[0].TextPart.Text
-		if actualContent != expectedContent {
-			t.Errorf("expected output content %q, got %q", expectedContent, actualContent)
+		if diff := cmp.Diff(expectedResponse, response); diff != "" {
+			t.Errorf("response mismatch (-want +got): %s", diff)
 		}
 	})
 }

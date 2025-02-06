@@ -127,7 +127,7 @@ type ToolResultPart struct {
 	// The content of the tool result.
 	Content []Part `json:"content"`
 	// Marks the tool result as an error.
-	IsError *bool `json:"is_error,omitempty"`
+	IsError bool `json:"is_error,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Part
@@ -228,7 +228,7 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 			ToolCallID string            `json:"tool_call_id"`
 			ToolName   string            `json:"tool_name"`
 			Content    []json.RawMessage `json:"content"`
-			IsError    *bool             `json:"is_error,omitempty"`
+			IsError    bool              `json:"is_error"`
 		}
 		if err := json.Unmarshal(data, &tr); err != nil {
 			return err

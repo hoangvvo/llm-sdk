@@ -1,7 +1,7 @@
 use crate::{
     instruction,
     types::{AgentStream, AgentStreamEvent},
-    AgentError, AgentItem, AgentRequest, AgentResponse, AgentTool, InstructionParam,
+    AgentError, AgentItem, AgentRequest, AgentResponse, AgentTool, InstructionParam, ModelCallInfo,
 };
 use futures::{lock::Mutex, stream::StreamExt};
 use llm_sdk::{
@@ -67,10 +67,9 @@ where
         &self,
         context: Arc<TCtx>,
         run_state: Arc<Mutex<RunState>>,
-        model_response: ModelResponse,
+        content: Vec<Part>,
     ) -> Result<ProcessResult, AgentError> {
-        let tool_call_parts: Vec<ToolCallPart> = model_response
-            .content
+        let tool_call_parts: Vec<ToolCallPart> = content
             .iter()
             .filter_map(|part| {
                 if let Part::ToolCall(tool_call) = part {
@@ -83,7 +82,7 @@ where
 
         // If no tool calls were found, return the model response as is
         if tool_call_parts.is_empty() {
-            return Ok(ProcessResult::Response(model_response.content));
+            return Ok(ProcessResult::Response(content));
         }
 
         let mut next_messages: Vec<Message> = vec![];
@@ -136,26 +135,41 @@ where
 
         loop {
             let mut input = input.clone();
-            input.messages = state.lock().await.get_turn_messages();
-            let model_response = self.model.generate(input).await?;
 
-            state
-                .lock()
-                .await
-                .append_message(Message::Assistant(AssistantMessage {
-                    content: model_response.content.clone(),
-                }));
+            let mut state_guard = state.lock().await;
+
+            input.messages = state_guard.get_turn_messages();
+            let ModelResponse {
+                content,
+                usage,
+                cost,
+            } = self.model.generate(input).await?;
+
+            state_guard.append_message(Message::Assistant(AssistantMessage {
+                content: content.clone(),
+            }));
+
+            state_guard.append_model_call(ModelCallInfo {
+                usage,
+                cost,
+                model_id: self.model.model_id(),
+                provider: self.model.provider().to_string(),
+            });
+
+            drop(state_guard);
 
             match self
-                .process(context.clone(), state.clone(), model_response)
+                .process(context.clone(), state.clone(), content)
                 .await?
             {
                 ProcessResult::Response(final_content) => {
                     return Ok(state.lock().await.create_response(final_content));
                 }
                 ProcessResult::Next(next_messages) => {
+                    let mut state_guard = state.lock().await;
+
                     for message in next_messages {
-                        state.lock().await.append_message(message);
+                        state_guard.append_message(message);
                     }
                 }
             }
@@ -189,7 +203,10 @@ where
         let stream = async_stream::try_stream! {
             loop {
                 let mut input = input.clone();
-                input.messages = state.lock().await.get_turn_messages();
+
+                let mut state_guard = state.lock().await;
+
+                input.messages = state_guard.get_turn_messages();
 
                 let mut model_stream = session.model.stream(input).await?;
 
@@ -205,25 +222,35 @@ where
                     yield AgentStreamEvent::Partial(partial);
                 }
 
-                let model_response = accumulator.compute_response()?;
+                let ModelResponse { content, usage, cost } = accumulator.compute_response()?;
 
                 let assistant_message = Message::Assistant(AssistantMessage {
-                    content: model_response.content.clone(),
+                    content: content.clone(),
                 });
 
-                state.lock().await
-                    .append_message(assistant_message.clone());
+                state_guard.append_message(assistant_message.clone());
+
+                state_guard.append_model_call(ModelCallInfo {
+                    usage,
+                    cost,
+                    model_id: session.model.model_id(),
+                    provider: session.model.provider().to_string(),
+                });
+
+                drop(state_guard);
+
                 yield AgentStreamEvent::Message(assistant_message);
 
-                match session.process(context.clone(), state.clone(), model_response).await? {
+                match session.process(context.clone(), state.clone(), content).await? {
                     ProcessResult::Response(final_content) => {
                         let response = state.lock().await.create_response(final_content);
                         yield AgentStreamEvent::Response(response);
                         break;
                     }
                     ProcessResult::Next(next_messages) => {
+                        let mut state_guard = state.lock().await;
                         for message in next_messages {
-                            state.lock().await.append_message(message.clone());
+                            state_guard.append_message(message.clone());
                             yield AgentStreamEvent::Message(message);
                         }
                     }
@@ -278,6 +305,8 @@ pub struct RunState {
     /// All items generated during the run, such as new `ToolMessage` and
     /// `AssistantMessage`
     output: Vec<AgentItem>,
+    /// Information about the LLM calls made during the run
+    model_calls: Vec<ModelCallInfo>,
 }
 
 impl RunState {
@@ -288,6 +317,7 @@ impl RunState {
             input,
             current_turn: 0,
             output: vec![],
+            model_calls: vec![],
         }
     }
 
@@ -304,6 +334,11 @@ impl RunState {
     /// Add a message to the run state.
     pub fn append_message(&mut self, message: Message) {
         self.output.push(AgentItem::Message(message));
+    }
+
+    /// Add a model call to the run state.
+    pub fn append_model_call(&mut self, info: ModelCallInfo) {
+        self.model_calls.push(info);
     }
 
     /// Get LLM messages to use in the `LanguageModelInput` for the turn
@@ -331,6 +366,7 @@ impl RunState {
         AgentResponse {
             content: final_content,
             output: self.output.clone(),
+            model_calls: self.model_calls.clone(),
         }
     }
 }

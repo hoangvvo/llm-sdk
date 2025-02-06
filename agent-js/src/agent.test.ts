@@ -47,6 +47,14 @@ suite("Agent#run", () => {
           content: [{ type: "text", text: "Mock response" }],
         },
       ],
+      model_calls: [
+        {
+          cost: null,
+          model_id: "mock-model",
+          provider: "mock",
+          usage: null,
+        },
+      ],
     });
   });
 });
@@ -97,6 +105,14 @@ suite("Agent#runStream", () => {
             content: [{ type: "text", text: "Mock" }],
           },
         ],
+        model_calls: [
+          {
+            cost: null,
+            model_id: "mock-model",
+            provider: "mock",
+            usage: null,
+          },
+        ],
       },
     ]);
     t.assert.deepStrictEqual(current.value, {
@@ -106,6 +122,14 @@ suite("Agent#runStream", () => {
           type: "message",
           role: "assistant",
           content: [{ type: "text", text: "Mock" }],
+        },
+      ],
+      model_calls: [
+        {
+          cost: null,
+          model_id: "mock-model",
+          provider: "mock",
+          usage: null,
         },
       ],
     });

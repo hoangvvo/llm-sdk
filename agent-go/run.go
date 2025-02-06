@@ -59,10 +59,10 @@ func (s *RunSession[C]) process(
 	ctx context.Context,
 	contextVal C,
 	runState *RunState,
-	modelResponse *llmsdk.ModelResponse,
+	content []llmsdk.Part,
 ) (ProcessResult, error) {
 	var toolCallParts []*llmsdk.ToolCallPart
-	for _, part := range modelResponse.Content {
+	for _, part := range content {
 		if part.ToolCallPart != nil {
 			toolCallParts = append(toolCallParts, part.ToolCallPart)
 		}
@@ -71,7 +71,7 @@ func (s *RunSession[C]) process(
 	// If no tool calls were found, return the model response as is
 	if len(toolCallParts) == 0 {
 		return ProcessResult{
-			Response: &modelResponse.Content,
+			Response: &content,
 		}, nil
 	}
 
@@ -107,7 +107,7 @@ func (s *RunSession[C]) process(
 				ToolCallID: toolCallPart.ToolCallID,
 				ToolName:   toolCallPart.ToolName,
 				Content:    toolRes.Content,
-				IsError:    &toolRes.IsError,
+				IsError:    toolRes.IsError,
 			},
 		})
 	}
@@ -135,13 +135,22 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 			return nil, NewLanguageModelError(err)
 		}
 
+		content := modelResponse.Content
+
 		state.AppendMessage(llmsdk.Message{
 			AssistantMessage: &llmsdk.AssistantMessage{
-				Content: modelResponse.Content,
+				Content: content,
 			},
 		})
 
-		result, err := s.process(ctx, contextVal, state, modelResponse)
+		state.AppendModelCall(ModelCallInfo{
+			Usage:    modelResponse.Usage,
+			Cost:     modelResponse.Cost,
+			ModelID:  s.model.ModelID(),
+			Provider: s.model.Provider(),
+		})
+
+		result, err := s.process(ctx, contextVal, state, content)
 		if err != nil {
 			return nil, err
 		}
@@ -211,18 +220,28 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 				return
 			}
 
+			content := modelResponse.Content
+
 			assistantMessage := llmsdk.Message{
 				AssistantMessage: &llmsdk.AssistantMessage{
-					Content: modelResponse.Content,
+					Content: content,
 				},
 			}
 
 			state.AppendMessage(assistantMessage)
+
+			state.AppendModelCall(ModelCallInfo{
+				Usage:    modelResponse.Usage,
+				Cost:     modelResponse.Cost,
+				ModelID:  s.model.ModelID(),
+				Provider: s.model.Provider(),
+			})
+
 			eventChan <- &AgentStreamEvent{
 				Message: &assistantMessage,
 			}
 
-			result, err := s.process(ctx, contextVal, state, &modelResponse)
+			result, err := s.process(ctx, contextVal, state, content)
 			if err != nil {
 				errChan <- err
 				return
@@ -299,11 +318,14 @@ type RunState struct {
 	maxTurns uint
 	input    []AgentItem
 
-	// The current turn number in the run.
+	// CurrentTurn is the current turn number in the run.
 	CurrentTurn uint
-	// All items generated during the run, such as new `ToolMessage` and
+	// output contains all items generated during the run, such as new `ToolMessage` and
 	// `AssistantMessage`
 	output []AgentItem
+
+	// modelCalls contain information about the LLM calls made during the run
+	modelCalls []ModelCallInfo
 
 	mu sync.RWMutex
 }
@@ -314,10 +336,11 @@ func NewRunState(input []AgentItem, maxTurns uint) *RunState {
 		input:       input,
 		CurrentTurn: 0,
 		output:      []AgentItem{},
+		modelCalls:  []ModelCallInfo{},
 	}
 }
 
-// Mark a new turn in the conversation and throw an error if max turns
+// Turn marks a new turn in the conversation and throw an error if max turns
 // exceeded.
 func (s *RunState) Turn() error {
 	s.mu.Lock()
@@ -330,7 +353,7 @@ func (s *RunState) Turn() error {
 	return nil
 }
 
-// Add a message to the run state.
+// AppendMessage adds a message to the run state.
 func (s *RunState) AppendMessage(message llmsdk.Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -340,7 +363,15 @@ func (s *RunState) AppendMessage(message llmsdk.Message) {
 	})
 }
 
-// Get LLM messages to use in the `LanguageModelInput` for the turn
+// AppendModelCall adds a model call to the run state.
+func (s *RunState) AppendModelCall(call ModelCallInfo) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.modelCalls = append(s.modelCalls, call)
+}
+
+// GetTurnMessages gets LLM messages to use in the `LanguageModelInput` for the turn
 func (s *RunState) GetTurnMessages() []llmsdk.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -366,7 +397,8 @@ func (s *RunState) CreateResponse(finalContent []llmsdk.Part) *AgentResponse {
 	defer s.mu.RUnlock()
 
 	return &AgentResponse{
-		Content: finalContent,
-		Output:  s.output,
+		Content:    finalContent,
+		Output:     s.output,
+		ModelCalls: s.modelCalls,
 	}
 }

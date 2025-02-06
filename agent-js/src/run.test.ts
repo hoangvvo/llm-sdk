@@ -21,7 +21,7 @@ import {
 } from "./errors.ts";
 import { RunSession, type RunState } from "./run.ts";
 import type { AgentTool } from "./tool.ts";
-import type { AgentStreamEvent } from "./types.ts";
+import type { AgentResponse, AgentStreamEvent } from "./types.ts";
 
 function createMockLanguageModel(t: TestContext) {
   const responses: ModelResponse[] = [];
@@ -134,6 +134,14 @@ suite("RunSession#run", () => {
           ],
         },
       ],
+      model_calls: [
+        {
+          cost: null,
+          model_id: "mock-model",
+          provider: "mock",
+          usage: null,
+        },
+      ],
     });
   });
 
@@ -156,6 +164,11 @@ suite("RunSession#run", () => {
             args: { param: "value" },
           },
         ],
+        usage: {
+          input_tokens: 1000,
+          output_tokens: 50,
+        },
+        cost: 0.0015,
       },
       {
         content: [{ type: "text", text: "Final response" }],
@@ -225,6 +238,23 @@ suite("RunSession#run", () => {
           content: [{ type: "text", text: "Final response" }],
         },
       ],
+      model_calls: [
+        {
+          usage: {
+            input_tokens: 1000,
+            output_tokens: 50,
+          },
+          cost: 0.0015,
+          model_id: model.modelId,
+          provider: model.provider,
+        },
+        {
+          usage: null,
+          cost: null,
+          model_id: model.modelId,
+          provider: model.provider,
+        },
+      ],
     });
   });
 
@@ -259,9 +289,18 @@ suite("RunSession#run", () => {
             args: { param: "value2" },
           },
         ],
+        usage: {
+          input_tokens: 2000,
+          output_tokens: 100,
+        },
       },
       {
         content: [{ type: "text", text: "Processed both tools" }],
+        usage: {
+          input_tokens: 50,
+          output_tokens: 10,
+        },
+        cost: 0.0003,
       },
     );
 
@@ -290,6 +329,92 @@ suite("RunSession#run", () => {
     t.assert.deepStrictEqual(tool2Execute.mock.calls[0]?.arguments[0], {
       param: "value2",
     });
+
+    const expectedResponse: AgentResponse = {
+      content: [{ type: "text", text: "Processed both tools" }],
+      output: [
+        {
+          type: "message",
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "tool_1",
+              tool_call_id: "call_1",
+              args: { param: "value1" },
+            },
+            {
+              type: "tool-call",
+              tool_name: "tool_2",
+              tool_call_id: "call_2",
+              args: { param: "value2" },
+            },
+          ],
+        },
+        {
+          type: "message",
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              tool_call_id: "call_1",
+              tool_name: "tool_1",
+              content: [
+                {
+                  type: "text",
+                  text: "Tool 1 result",
+                },
+              ],
+              is_error: false,
+            },
+            {
+              type: "tool-result",
+              tool_call_id: "call_2",
+              tool_name: "tool_2",
+              content: [
+                {
+                  type: "text",
+                  text: "Tool 2 result",
+                },
+              ],
+              is_error: false,
+            },
+          ],
+        },
+        {
+          type: "message",
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "Processed both tools",
+            },
+          ],
+        },
+      ],
+      model_calls: [
+        {
+          usage: {
+            input_tokens: 2000,
+            output_tokens: 100,
+          },
+          cost: null,
+          model_id: model.modelId,
+          provider: model.provider,
+        },
+        {
+          usage: {
+            input_tokens: 50,
+            output_tokens: 10,
+          },
+          cost: 0.0003,
+          model_id: model.modelId,
+          provider: model.provider,
+        },
+      ],
+    };
+
+    t.assert.deepStrictEqual(response, expectedResponse);
 
     t.assert.deepStrictEqual(response.content, [
       { type: "text", text: "Processed both tools" },
@@ -673,7 +798,7 @@ suite("RunSession#run", () => {
         });
       },
       (err: any) => {
-        t.assert.strictEqual(err instanceof LanguageModelError, true);
+        t.assert.strictEqual(err instanceof AgentLanguageModelError, true);
         t.assert.match(err.message, /API quota exceeded/);
         return true;
       },
@@ -801,7 +926,7 @@ suite("RunSession#runStream", () => {
           type: "tool-call",
           tool_name: "test_tool",
           tool_call_id: "call_1",
-          args: "{}",
+          args: JSON.stringify({ a: 1, b: 2, operation: "add" }),
         }),
       ])
       .addPartialModelResponses([
@@ -850,7 +975,7 @@ suite("RunSession#runStream", () => {
       ],
     );
 
-    t.assert.strictEqual(toolExecute.mock.calls[0]?.arguments[0], {
+    t.assert.deepStrictEqual(toolExecute.mock.calls[0]?.arguments[0], {
       operation: "add",
       a: 1,
       b: 2,

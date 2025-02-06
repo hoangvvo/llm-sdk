@@ -1,24 +1,25 @@
 use futures::lock::Mutex;
 use futures::StreamExt;
 use llm_agent::{
-    AgentError, AgentItem, AgentRequest, AgentStreamEvent, AgentTool, AgentToolResult,
-    InstructionParam, RunSession, RunState,
+    AgentError, AgentItem, AgentRequest, AgentResponse, AgentStreamEvent, AgentTool,
+    AgentToolResult, InstructionParam, ModelCallInfo, RunSession, RunState,
 };
 use llm_sdk::{
-    ContentDelta, JSONSchema, LanguageModel, LanguageModelError, LanguageModelInput,
-    LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatOption, TextPart,
-    TextPartDelta, ToolCallPart, ToolCallPartDelta, UserMessage,
+    AssistantMessage, ContentDelta, JSONSchema, LanguageModel, LanguageModelError,
+    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
+    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatOption,
+    TextPart, TextPartDelta, ToolCallPart, ToolCallPartDelta, UserMessage,
 };
 use serde_json::Value;
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 #[derive(Clone)]
 struct MockLanguageModel {
-    responses: Arc<std::sync::Mutex<Vec<ModelResponse>>>,
-    partial_responses: Arc<std::sync::Mutex<Vec<Vec<PartialModelResponse>>>>,
-    errors: Arc<std::sync::Mutex<Vec<LanguageModelError>>>,
-    stream_errors: Arc<std::sync::Mutex<Vec<LanguageModelError>>>,
+    responses: Arc<std::sync::Mutex<VecDeque<ModelResponse>>>,
+    partial_responses: Arc<std::sync::Mutex<VecDeque<Vec<PartialModelResponse>>>>,
+    errors: Arc<std::sync::Mutex<VecDeque<LanguageModelError>>>,
+    stream_errors: Arc<std::sync::Mutex<VecDeque<LanguageModelError>>>,
     generate_calls: Arc<std::sync::Mutex<Vec<LanguageModelInput>>>,
     stream_calls: Arc<std::sync::Mutex<Vec<LanguageModelInput>>>,
 }
@@ -26,17 +27,17 @@ struct MockLanguageModel {
 impl MockLanguageModel {
     fn new() -> Self {
         Self {
-            responses: Arc::new(std::sync::Mutex::new(Vec::new())),
-            partial_responses: Arc::new(std::sync::Mutex::new(Vec::new())),
-            errors: Arc::new(std::sync::Mutex::new(Vec::new())),
-            stream_errors: Arc::new(std::sync::Mutex::new(Vec::new())),
+            responses: Arc::new(std::sync::Mutex::new(VecDeque::new())),
+            partial_responses: Arc::new(std::sync::Mutex::new(VecDeque::new())),
+            errors: Arc::new(std::sync::Mutex::new(VecDeque::new())),
+            stream_errors: Arc::new(std::sync::Mutex::new(VecDeque::new())),
             generate_calls: Arc::new(std::sync::Mutex::new(Vec::new())),
             stream_calls: Arc::new(std::sync::Mutex::new(Vec::new())),
         }
     }
 
     fn add_response(self, response: ModelResponse) -> Self {
-        self.responses.lock().unwrap().push(response);
+        self.responses.lock().unwrap().push_back(response);
         self
     }
 
@@ -46,17 +47,17 @@ impl MockLanguageModel {
     }
 
     fn add_partial_responses(self, responses: Vec<PartialModelResponse>) -> Self {
-        self.partial_responses.lock().unwrap().push(responses);
+        self.partial_responses.lock().unwrap().push_back(responses);
         self
     }
 
     fn add_error(self, error: LanguageModelError) -> Self {
-        self.errors.lock().unwrap().push(error);
+        self.errors.lock().unwrap().push_back(error);
         self
     }
 
     fn add_stream_error(self, error: LanguageModelError) -> Self {
-        self.stream_errors.lock().unwrap().push(error);
+        self.stream_errors.lock().unwrap().push_back(error);
         self
     }
 
@@ -83,12 +84,12 @@ impl LanguageModel for MockLanguageModel {
         self.generate_calls.lock().unwrap().push(input.clone());
 
         let mut errors = self.errors.lock().unwrap();
-        if let Some(error) = errors.pop() {
+        if let Some(error) = errors.pop_front() {
             return Err(error);
         }
 
         let mut responses = self.responses.lock().unwrap();
-        if let Some(response) = responses.pop() {
+        if let Some(response) = responses.pop_front() {
             Ok(response)
         } else {
             panic!("No mock response available");
@@ -99,12 +100,12 @@ impl LanguageModel for MockLanguageModel {
         self.stream_calls.lock().unwrap().push(input.clone());
 
         let mut stream_errors = self.stream_errors.lock().unwrap();
-        if let Some(error) = stream_errors.pop() {
+        if let Some(error) = stream_errors.pop_front() {
             return Err(error);
         }
 
         let mut partial_responses = self.partial_responses.lock().unwrap();
-        if let Some(responses) = partial_responses.pop() {
+        if let Some(responses) = partial_responses.pop_front() {
             let stream = futures::stream::iter(responses.into_iter().map(Ok));
             Ok(LanguageModelStream::from_stream(stream))
         } else {
@@ -198,8 +199,7 @@ fn create_model_usage() -> ModelUsage {
 async fn test_run_session_returns_response_when_no_tool_call() {
     let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
         content: vec![create_text_part("Hi!")],
-        usage: Some(create_model_usage()),
-        cost: Some(0.0),
+        ..Default::default()
     }));
 
     let session = RunSession::new(
@@ -226,21 +226,22 @@ async fn test_run_session_returns_response_when_no_tool_call() {
         .await
         .unwrap();
 
-    // Check the content contains our expected text
-    assert_eq!(response.content.len(), 1);
-    if let Part::Text(text_part) = &response.content[0] {
-        assert_eq!(text_part.text, "Hi!");
-    }
-    assert_eq!(response.output.len(), 1);
+    let expected_response = AgentResponse {
+        content: vec![create_text_part("Hi!")],
+        output: vec![AgentItem::Message(Message::Assistant(AssistantMessage {
+            content: vec![create_text_part("Hi!")],
+        }))],
+        model_calls: vec![ModelCallInfo {
+            model_id: "mock-model".to_string(),
+            provider: "mock".to_string(),
+            ..Default::default()
+        }],
+    };
 
-    if let AgentItem::Message(Message::Assistant(assistant_msg)) = &response.output[0] {
-        assert_eq!(assistant_msg.content.len(), 1);
-        if let Part::Text(text_part) = &assistant_msg.content[0] {
-            assert_eq!(text_part.text, "Hi!");
-        }
-    } else {
-        panic!("Expected assistant message");
-    }
+    assert_eq!(
+        serde_json::to_string(&response).unwrap(),
+        serde_json::to_string(&expected_response).unwrap()
+    );
 }
 
 #[tokio::test]
@@ -259,13 +260,16 @@ async fn test_run_session_executes_single_tool_call_and_returns_response() {
                 tool_call_id: "call_1".to_string(),
                 args: serde_json::json!({"param": "value"}),
             })],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
+            usage: Some(ModelUsage {
+                input_tokens: 100,
+                output_tokens: 50,
+                ..Default::default()
+            }),
+            cost: Some(0.0015),
         },
         ModelResponse {
             content: vec![create_text_part("Final response")],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
+            ..Default::default()
         },
     ]));
 
@@ -293,13 +297,52 @@ async fn test_run_session_executes_single_tool_call_and_returns_response() {
         .await
         .unwrap();
 
-    // Check the final response content
-    assert_eq!(response.content.len(), 1);
-    if let Part::Text(text_part) = &response.content[0] {
-        assert_eq!(text_part.text, "Final response");
-    }
-    // Output should contain: assistant message with tool call, tool result message, and final assistant message
-    assert_eq!(response.output.len(), 1); // Only expecting final assistant message for now
+    let expected_response = AgentResponse {
+        content: vec![create_text_part("Final response")],
+        output: vec![
+            AgentItem::Message(Message::Assistant(AssistantMessage {
+                content: vec![Part::ToolCall(ToolCallPart {
+                    id: Some("call_1".to_string()),
+                    tool_name: "test_tool".to_string(),
+                    tool_call_id: "call_1".to_string(),
+                    args: serde_json::json!({"param": "value"}),
+                })],
+            })),
+            AgentItem::Message(Message::Tool(llm_sdk::ToolMessage {
+                content: vec![Part::ToolResult(llm_sdk::ToolResultPart {
+                    tool_call_id: "call_1".to_string(),
+                    tool_name: "test_tool".to_string(),
+                    content: vec![create_text_part("Tool result")],
+                    is_error: Some(false),
+                })],
+            })),
+            AgentItem::Message(Message::Assistant(AssistantMessage {
+                content: vec![create_text_part("Final response")],
+            })),
+        ],
+        model_calls: vec![
+            ModelCallInfo {
+                usage: Some(ModelUsage {
+                    input_tokens: 100,
+                    output_tokens: 50,
+                    ..Default::default()
+                }),
+                cost: Some(0.0015),
+                model_id: "mock-model".to_string(),
+                provider: "mock".to_string(),
+            },
+            ModelCallInfo {
+                model_id: "mock-model".to_string(),
+                provider: "mock".to_string(),
+                ..Default::default()
+            },
+        ],
+    };
+
+    assert_eq!(
+        serde_json::to_string(&response).unwrap(),
+        serde_json::to_string(&expected_response).unwrap()
+    );
 }
 
 #[tokio::test]
@@ -596,18 +639,26 @@ async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
                     args: serde_json::json!({"param": "value2"}),
                 }),
             ],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
+            usage: Some(ModelUsage {
+                input_tokens: 2000,
+                output_tokens: 100,
+                ..Default::default()
+            }),
+            cost: None,
         },
         ModelResponse {
             content: vec![create_text_part("Processed both tools")],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
+            usage: Some(ModelUsage {
+                input_tokens: 50,
+                output_tokens: 10,
+                ..Default::default()
+            }),
+            cost: Some(0.0003),
         },
     ]));
 
     let session = RunSession::new(
-        model.clone(),
+        model,
         Arc::new(vec![]),
         Arc::new(vec![tool1, tool2]),
         ResponseFormatOption::Text,
@@ -630,12 +681,73 @@ async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
         .await
         .unwrap();
 
-    assert_eq!(response.content.len(), 1);
-    if let Part::Text(text_part) = &response.content[0] {
-        assert_eq!(text_part.text, "Processed both tools");
-    }
-    // Should have multiple message outputs: assistant with tool calls, tool results, final assistant message
-    assert!(response.output.len() >= 1);
+    let expected_response = AgentResponse {
+        content: vec![create_text_part("Processed both tools")],
+        output: vec![
+            AgentItem::Message(Message::Assistant(AssistantMessage {
+                content: vec![
+                    Part::ToolCall(ToolCallPart {
+                        id: Some("call_1".to_string()),
+                        tool_name: "tool_1".to_string(),
+                        tool_call_id: "call_1".to_string(),
+                        args: serde_json::json!({"param": "value1"}),
+                    }),
+                    Part::ToolCall(ToolCallPart {
+                        id: Some("call_2".to_string()),
+                        tool_name: "tool_2".to_string(),
+                        tool_call_id: "call_2".to_string(),
+                        args: serde_json::json!({"param": "value2"}),
+                    }),
+                ],
+            })),
+            AgentItem::Message(Message::Tool(llm_sdk::ToolMessage {
+                content: vec![
+                    Part::ToolResult(llm_sdk::ToolResultPart {
+                        tool_call_id: "call_1".to_string(),
+                        tool_name: "tool_1".to_string(),
+                        content: vec![create_text_part("Tool 1 result")],
+                        is_error: Some(false),
+                    }),
+                    Part::ToolResult(llm_sdk::ToolResultPart {
+                        tool_call_id: "call_2".to_string(),
+                        tool_name: "tool_2".to_string(),
+                        content: vec![create_text_part("Tool 2 result")],
+                        is_error: Some(false),
+                    }),
+                ],
+            })),
+            AgentItem::Message(Message::Assistant(AssistantMessage {
+                content: vec![create_text_part("Processed both tools")],
+            })),
+        ],
+        model_calls: vec![
+            ModelCallInfo {
+                usage: Some(ModelUsage {
+                    input_tokens: 2000,
+                    output_tokens: 100,
+                    ..Default::default()
+                }),
+                model_id: "mock-model".to_string(),
+                provider: "mock".to_string(),
+                ..Default::default()
+            },
+            ModelCallInfo {
+                usage: Some(ModelUsage {
+                    input_tokens: 50,
+                    output_tokens: 10,
+                    ..Default::default()
+                }),
+                cost: Some(0.0003),
+                model_id: "mock-model".to_string(),
+                provider: "mock".to_string(),
+            },
+        ],
+    };
+
+    assert_eq!(
+        serde_json::to_string(&response).unwrap(),
+        serde_json::to_string(&expected_response).unwrap()
+    );
 }
 
 #[tokio::test]

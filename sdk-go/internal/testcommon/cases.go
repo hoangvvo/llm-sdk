@@ -196,7 +196,7 @@ var TestCaseGenerateTextWithToolResult = TestCase{
 			llmsdk.NewToolMessage(
 				llmsdk.NewToolResultPart("0mbnj08nt", "get_weather", []llmsdk.Part{
 					llmsdk.NewTextPart(`{"temperature": 70, "unit": "f", "description": "Sunny"}`, nil),
-				}, nil),
+				}, false),
 			),
 		},
 		Tools: []llmsdk.Tool{GetWeatherTool()},
@@ -224,7 +224,7 @@ var TestCaseStreamTextWithToolResult = TestCase{
 			llmsdk.NewToolMessage(
 				llmsdk.NewToolResultPart("0mbnj08nt", "get_weather", []llmsdk.Part{
 					llmsdk.NewTextPart(`{"temperature": 70, "unit": "f", "description": "Sunny"}`, nil),
-				}, nil),
+				}, false),
 			),
 		},
 		Tools: []llmsdk.Tool{GetWeatherTool()},
@@ -364,7 +364,7 @@ var TestCaseSourcePartInput = TestCase{
 			llmsdk.NewToolMessage(
 				llmsdk.NewToolResultPart("0mbnj08nt", "get_first_secret_number", []llmsdk.Part{
 					llmsdk.NewTextPart(`{"number": 24}`, nil),
-				}, ptr.To(false)),
+				}, false),
 			),
 			llmsdk.NewAssistantMessage(
 				llmsdk.NewTextPart("Got it!", nil),

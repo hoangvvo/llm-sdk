@@ -25,6 +25,7 @@ import type {
   AgentRequest,
   AgentResponse,
   AgentStreamEvent,
+  ModelCallInfo,
 } from "./types.ts";
 
 /**
@@ -98,16 +99,14 @@ export class RunSession<TContext> {
   async #process(
     context: TContext,
     state: RunState,
-    modelResponse: ModelResponse,
+    content: Part[],
   ): Promise<ProcessResult> {
-    const toolCallParts = modelResponse.content.filter(
-      (part) => part.type === "tool-call",
-    );
+    const toolCallParts = content.filter((part) => part.type === "tool-call");
 
     if (!toolCallParts.length) {
       return {
         type: "response",
-        content: modelResponse.content,
+        content,
       };
     }
 
@@ -164,17 +163,35 @@ export class RunSession<TContext> {
     const context = request.context;
 
     for (;;) {
-      const modelResponse = await this.#model.generate({
-        ...input,
-        messages: state.getTurnMessages(),
-      });
+      let modelResponse: ModelResponse;
+
+      try {
+        modelResponse = await this.#model.generate({
+          ...input,
+          messages: state.getTurnMessages(),
+        });
+      } catch (err) {
+        if (err instanceof LanguageModelError) {
+          throw new AgentLanguageModelError(err);
+        }
+        throw err;
+      }
+
+      const { content, usage, cost } = modelResponse;
 
       state.appendMessage({
         role: "assistant",
-        content: modelResponse.content,
+        content,
       });
 
-      const processResult = await this.#process(context, state, modelResponse);
+      state.appendModelCall({
+        usage: usage ?? null,
+        cost: cost ?? null,
+        model_id: this.#model.modelId,
+        provider: this.#model.provider,
+      });
+
+      const processResult = await this.#process(context, state, content);
       if (processResult.type === "response") {
         return state.createResponse(processResult.content);
       } else {
@@ -225,20 +242,27 @@ export class RunSession<TContext> {
         throw err;
       }
 
-      const modelResponse = accumulator.computeResponse();
+      const { content, cost, usage } = accumulator.computeResponse();
 
       const assistantMessage: Message = {
         role: "assistant",
-        content: modelResponse.content,
+        content,
       };
-
       state.appendMessage(assistantMessage);
+
+      state.appendModelCall({
+        usage: usage ?? null,
+        cost: cost ?? null,
+        model_id: this.#model.modelId,
+        provider: this.#model.provider,
+      });
+
       yield {
         type: "message",
         ...assistantMessage,
       };
 
-      const processResult = await this.#process(context, state, modelResponse);
+      const processResult = await this.#process(context, state, content);
 
       if (processResult.type === "response") {
         const response = state.createResponse(processResult.content);
@@ -346,6 +370,10 @@ export class RunState {
    * All items generated during the run, such as new ToolMessage and AssistantMessage
    */
   readonly #output: AgentItem[];
+  /**
+   * Information about the LLM calls made during the run
+   */
+  readonly #model_calls: ModelCallInfo[];
 
   constructor(input: AgentItem[], maxTurns: number) {
     this.#input = input;
@@ -353,6 +381,7 @@ export class RunState {
 
     this.currentTurn = 0;
     this.#output = [];
+    this.#model_calls = [];
   }
 
   /**
@@ -373,6 +402,13 @@ export class RunState {
   }
 
   /**
+   * Add a model call to the run state.
+   */
+  appendModelCall(call: ModelCallInfo) {
+    this.#model_calls.push(call);
+  }
+
+  /**
    * Get LLM messages to use in the LanguageModelInput for the turn
    */
   getTurnMessages(): Message[] {
@@ -383,6 +419,7 @@ export class RunState {
     return {
       content: finalContent,
       output: this.#output,
+      model_calls: this.#model_calls,
     };
   }
 }
