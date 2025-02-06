@@ -207,7 +207,16 @@ func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 		transcript = &data.Transcript
 	}
 
-	return NewAudioPart(concatenatedAudio, *data.Format, data.SampleRate, data.Channels, transcript, data.AudioID), nil
+	return Part{
+		AudioPart: &AudioPart{
+			AudioData:  concatenatedAudio,
+			Format:     *data.Format,
+			SampleRate: data.SampleRate,
+			Channels:   data.Channels,
+			Transcript: transcript,
+			AudioID:    data.AudioID,
+		},
+	}, nil
 }
 
 // createPart creates a final Part from accumulated data

@@ -604,10 +604,10 @@ func (m *OpenAIModel) mapOpenAIMessage(message ChatCompletionMessage, createPara
 		audioPart := llmsdk.NewAudioPart(
 			message.Audio.Data,
 			audioFormat,
-			ptr.To(OpenAIAudioSampleRate),
-			ptr.To(OpenAIAudioChannels),
-			&message.Audio.Transcript,
-			&message.Audio.ID,
+			llmsdk.WithAudioSampleRate(OpenAIAudioSampleRate),
+			llmsdk.WithAudioChannels(OpenAIAudioChannels),
+			llmsdk.WithAudioTranscript(message.Audio.Transcript),
+			llmsdk.WithAudioID(message.Audio.ID),
 		)
 		parts = append(parts, audioPart)
 	}

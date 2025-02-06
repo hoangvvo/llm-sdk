@@ -40,7 +40,7 @@ func main() {
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
 				llmsdk.NewTextPart("Describe this image"),
-				llmsdk.NewImagePart(mimeType, imageData, nil, nil),
+				llmsdk.NewImagePart(mimeType, imageData),
 			),
 		},
 	})

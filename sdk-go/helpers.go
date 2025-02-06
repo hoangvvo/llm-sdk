@@ -14,28 +14,74 @@ func NewTextPart(text string) Part {
 }
 
 // NewImagePart creates a new image part
-func NewImagePart(mimeType, imageData string, width, height *int) Part {
+func NewImagePart(mimeType, imageData string, opts ...ImagePartOption) Part {
+	imagePart := &ImagePart{
+		MimeType:  mimeType,
+		ImageData: imageData,
+	}
+
+	for _, opt := range opts {
+		opt(imagePart)
+	}
+
 	return Part{
-		ImagePart: &ImagePart{
-			MimeType:  mimeType,
-			ImageData: imageData,
-			Width:     width,
-			Height:    height,
-		},
+		ImagePart: imagePart,
+	}
+}
+
+type ImagePartOption func(*ImagePart)
+
+func WithImageWidth(width int) ImagePartOption {
+	return func(p *ImagePart) {
+		p.Width = &width
+	}
+}
+
+func WithImageHeight(height int) ImagePartOption {
+	return func(p *ImagePart) {
+		p.Height = &height
 	}
 }
 
 // NewAudioPart creates a new audio part
-func NewAudioPart(audioData string, format AudioFormat, sampleRate, channels *int, transcript, audioID *string) Part {
+func NewAudioPart(audioData string, format AudioFormat, opts ...AudioPartOption) Part {
+	audioPart := &AudioPart{
+		AudioData: audioData,
+		Format:    format,
+	}
+
+	for _, opt := range opts {
+		opt(audioPart)
+	}
+
 	return Part{
-		AudioPart: &AudioPart{
-			AudioData:  audioData,
-			Format:     format,
-			SampleRate: sampleRate,
-			Channels:   channels,
-			Transcript: transcript,
-			AudioID:    audioID,
-		},
+		AudioPart: audioPart,
+	}
+}
+
+type AudioPartOption func(*AudioPart)
+
+func WithAudioSampleRate(sampleRate int) AudioPartOption {
+	return func(p *AudioPart) {
+		p.SampleRate = &sampleRate
+	}
+}
+
+func WithAudioChannels(channels int) AudioPartOption {
+	return func(p *AudioPart) {
+		p.Channels = &channels
+	}
+}
+
+func WithAudioTranscript(transcript string) AudioPartOption {
+	return func(p *AudioPart) {
+		p.Transcript = &transcript
+	}
+}
+
+func WithAudioID(audioID string) AudioPartOption {
+	return func(p *AudioPart) {
+		p.AudioID = &audioID
 	}
 }
 
