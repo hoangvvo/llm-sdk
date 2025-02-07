@@ -40,5 +40,8 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "module": "./dist/index.js"
+  "module": "./dist/index.js",
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0"
+  }
 }

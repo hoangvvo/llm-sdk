@@ -10,6 +10,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
+import { SDKSpan } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import {
   guessDeltaIndex,
@@ -63,55 +64,78 @@ export class MistralModel implements LanguageModel {
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const request = convertToMistralRequest(input, this.modelId);
-    const response = await this.#client.chat.complete(request);
+    const span = new SDKSpan(this.provider, this.modelId, "generate", input);
 
-    const choice = response.choices?.[0];
-    if (!choice) {
-      throw new InvariantError(
-        PROVIDER,
-        "Response does not contain a valid choice",
-      );
+    try {
+      const request = convertToMistralRequest(input, this.modelId);
+      const response = await this.#client.chat.complete(request);
+
+      const choice = response.choices?.[0];
+      if (!choice) {
+        throw new InvariantError(
+          PROVIDER,
+          "Response does not contain a valid choice",
+        );
+      }
+
+      const content = mapMistralMessage(choice.message);
+      const usage = mapMistralUsageInfo(response.usage);
+
+      const result: ModelResponse = { content, usage };
+      if (this.metadata?.pricing) {
+        result.cost = calculateCost(usage, this.metadata.pricing);
+      }
+
+      span.onEnd(result);
+
+      return result;
+    } catch (error) {
+      span.onError(error);
+      throw error;
     }
-
-    const content = mapMistralMessage(choice.message);
-    const usage = mapMistralUsageInfo(response.usage);
-
-    const result: ModelResponse = { content, usage };
-    if (this.metadata?.pricing) {
-      result.cost = calculateCost(usage, this.metadata.pricing);
-    }
-    return result;
   }
 
   async *stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
-    const request = convertToMistralRequest(input, this.modelId);
-    const stream = await this.#client.chat.stream(request);
+    const span = new SDKSpan(this.provider, this.modelId, "stream", input);
 
-    const allContentDeltas: ContentDelta[] = [];
+    try {
+      const request = convertToMistralRequest(input, this.modelId);
+      const stream = await this.#client.chat.stream(request);
 
-    for await (const chunk of stream) {
-      const choice = chunk.data.choices[0];
+      const allContentDeltas: ContentDelta[] = [];
 
-      if (choice?.delta) {
-        const incomingContentDeltas = mapMistralDelta(
-          choice.delta,
-          allContentDeltas,
-        );
+      for await (const chunk of stream) {
+        const choice = chunk.data.choices[0];
 
-        allContentDeltas.push(...incomingContentDeltas);
+        if (choice?.delta) {
+          const incomingContentDeltas = mapMistralDelta(
+            choice.delta,
+            allContentDeltas,
+          );
 
-        for (const delta of incomingContentDeltas) {
-          yield { delta };
+          allContentDeltas.push(...incomingContentDeltas);
+
+          for (const delta of incomingContentDeltas) {
+            const event: PartialModelResponse = { delta };
+            yield event;
+            span.onStreamPartial(event);
+          }
+        }
+
+        if (chunk.data.usage) {
+          const usage = mapMistralUsageInfo(chunk.data.usage);
+          const event: PartialModelResponse = { usage };
+          yield event;
+          span.onStreamPartial(event);
         }
       }
 
-      if (chunk.data.usage) {
-        const usage = mapMistralUsageInfo(chunk.data.usage);
-        yield { usage };
-      }
+      span.onStreamEnd();
+    } catch (error) {
+      span.onError(error);
+      throw error;
     }
   }
 }

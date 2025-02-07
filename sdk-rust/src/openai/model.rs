@@ -1,6 +1,8 @@
 use crate::{
+    client_utils,
     language_model::{LanguageModelMetadata, LanguageModelStream},
     openai::api as openai_api,
+    opentelemetry::SDKSpan,
     source_part_utils, stream_utils,
     usage_utils::calculate_cost,
     AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ImagePart,
@@ -10,9 +12,8 @@ use crate::{
     ToolChoiceOption, ToolMessage, UserMessage,
 };
 use async_stream::try_stream;
-use eventsource_stream::{self, Eventsource};
 use futures::stream::StreamExt;
-use reqwest::Client;
+use reqwest::{header, Client};
 
 const PROVIDER: &str = "openai";
 
@@ -73,36 +74,56 @@ impl LanguageModel for OpenAIModel {
     }
 
     async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
-        let params = into_openai_create_params(input, self.model_id.clone())?;
+        let (_ctx, mut span) = SDKSpan::new(PROVIDER, &self.model_id, "generate", &input);
 
-        let response = self
-            .client
-            .post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(&params)
-            .send()
-            .await?;
+        let params = match into_openai_create_params(input, self.model_id.clone()) {
+            Ok(params) => params,
+            Err(e) => {
+                span.on_error(&e);
+                return Err(e);
+            }
+        };
 
-        if response.status().is_client_error() {
-            return Err(LanguageModelError::StatusCode(
-                response.status(),
-                response.text().await.unwrap_or_default(),
-            ));
+        let mut header_map = reqwest::header::HeaderMap::new();
+        if let Ok(header_val) = header::HeaderValue::from_str(&format!("Bearer {}", self.api_key)) {
+            header_map.insert(header::AUTHORIZATION, header_val);
         }
+        let json: openai_api::ChatCompletion = match client_utils::send_json(
+            &self.client,
+            &format!("{}/chat/completions", self.base_url),
+            &params,
+            header_map,
+        )
+        .await
+        {
+            Ok(json) => json,
+            Err(e) => {
+                span.on_error(&e);
+                return Err(e);
+            }
+        };
 
-        let json = response.json::<openai_api::ChatCompletion>().await?;
-
-        let choice = json.choices.into_iter().next().ok_or_else(|| {
-            LanguageModelError::Invariant(PROVIDER, "No choices in response".to_string())
-        })?;
+        let Some(choice) = json.choices.into_iter().next() else {
+            let err = LanguageModelError::Invariant(PROVIDER, "No choices in response".to_string());
+            span.on_error(&err);
+            return Err(err);
+        };
 
         let openai_api::ChatCompletionChoice { message, .. } = choice;
 
         if let Some(refusal) = message.refusal {
-            return Err(LanguageModelError::Refusal(refusal));
+            let err = LanguageModelError::Refusal(refusal);
+            span.on_error(&err);
+            return Err(err);
         }
 
-        let content = map_openai_message(message, &params)?;
+        let content = match map_openai_message(message, &params) {
+            Ok(content) => content,
+            Err(e) => {
+                span.on_error(&e);
+                return Err(e);
+            }
+        };
 
         let usage: Option<ModelUsage> = json.usage.map(Into::into);
 
@@ -115,97 +136,97 @@ impl LanguageModel for OpenAIModel {
             None
         };
 
-        Ok(ModelResponse {
+        let result = ModelResponse {
             content,
             usage,
             cost,
-        })
+        };
+
+        span.on_end(&result);
+        Ok(result)
     }
 
     async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream> {
-        let mut params = into_openai_create_params(input, self.model_id.clone())?;
+        let (_ctx, mut span) = SDKSpan::new(PROVIDER, &self.model_id, "stream", &input);
+
+        let mut params = match into_openai_create_params(input, self.model_id.clone()) {
+            Ok(params) => params,
+            Err(e) => {
+                span.on_error(&e);
+                return Err(e);
+            }
+        };
         params.stream = Some(true);
 
-        let mut openai_stream = self
-            .client
-            .post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(&params)
-            .send()
-            .await?
-            .bytes_stream()
-            .eventsource();
+        let mut header_map = reqwest::header::HeaderMap::new();
+        if let Ok(header_val) = header::HeaderValue::from_str(&format!("Bearer {}", self.api_key)) {
+            header_map.insert(header::AUTHORIZATION, header_val);
+        }
+
+        let mut chunk_stream =
+            match client_utils::send_sse_stream::<_, openai_api::ChatCompletionChunk>(
+                &self.client,
+                &format!("{}/chat/completions", self.base_url),
+                &params,
+                header_map,
+                PROVIDER,
+            )
+            .await
+            {
+                Ok(stream) => stream,
+                Err(e) => {
+                    span.on_error(&e);
+                    return Err(e);
+                }
+            };
 
         let stream = try_stream! {
             let mut refusal = String::new();
-
             let mut all_content_deltas: Vec<ContentDelta> = Vec::new();
 
-            while let Some(event) = openai_stream.next().await {
-                match event {
-                    Ok(event) => {
-                        if event.data.is_empty() {
-                            continue; // Skip empty events
-                        }
-                        if event.data == "[DONE]" {
-                            break; // End of stream
-                        }
-                        let chunk: openai_api::ChatCompletionChunk =
-                        serde_json::from_str(&event.data)
-                            .map_err(|e| LanguageModelError::Invariant(
-                                PROVIDER,
-                                format!("Failed to parse stream chunk: {e}")
-                            ))?;
-
-                        let choice = chunk.choices.into_iter().next();
-                        if let Some(choice) = choice {
-                            if let Some(refusal_text) = &choice.delta.refusal {
-                                refusal.push_str(refusal_text);
-                            }
-
-
-                            let incoming_content_deltas = map_openai_delta(
-                                choice.delta,
-                                &all_content_deltas,
-                                &params,
-                            );
-                            all_content_deltas.extend(incoming_content_deltas.clone());
-                            for delta in incoming_content_deltas {
-                                yield PartialModelResponse {
-                                    delta: Some(delta),
-                                    ..Default::default()
-                                 }
-                            }
-                        }
-
-                        if let Some(usage) = chunk.usage {
-                            yield PartialModelResponse {
-                                usage: Some(usage.into()),
-                                ..Default::default()
-                            };
-                        }
-                    }
+            while let Some(chunk_result) = chunk_stream.next().await {
+                let chunk = match chunk_result {
+                    Ok(chunk) => chunk,
                     Err(e) => {
-                        match e {
-                            eventsource_stream::EventStreamError::Utf8(_) => {
-                                return Err(LanguageModelError::Invariant(
-                                    PROVIDER,
-                                    "Receive invalid UTF-8 sequence for stream data".to_string()
-                                ))?;
-                            }
-                            eventsource_stream::EventStreamError::Parser(error) => {
-                                return Err(LanguageModelError::Invariant(
-                                    PROVIDER,
-                                    format!("Receive invalid EventStream data: {error}")
-                                ))?;
-                            },
-                            eventsource_stream::EventStreamError::Transport(e) => {
-                                return Err(LanguageModelError::Transport(e))?;
-                            }
-                        }
+                        span.on_error(&e);
+                        Err(e)?;
+                        return;
+                    }
+                };
+
+                let choice = chunk.choices.into_iter().next();
+                if let Some(choice) = choice {
+                    if let Some(refusal_text) = &choice.delta.refusal {
+                        refusal.push_str(refusal_text);
+                    }
+
+                    let incoming_content_deltas = map_openai_delta(
+                        choice.delta,
+                        &all_content_deltas,
+                        &params,
+                    );
+                    all_content_deltas.extend(incoming_content_deltas.clone());
+                    for delta in incoming_content_deltas {
+                        let partial = PartialModelResponse {
+                            delta: Some(delta),
+                            ..Default::default()
+                        };
+                        span.on_stream_partial(&partial);
+                        yield partial;
                     }
                 }
+
+                if let Some(usage) = chunk.usage {
+                    let partial = PartialModelResponse {
+                        usage: Some(usage.into()),
+                        ..Default::default()
+                    };
+                    span.on_stream_partial(&partial);
+                    yield partial;
+                }
             }
+
+            span.on_stream_end();
         };
 
         Ok(LanguageModelStream::from_stream(stream))

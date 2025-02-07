@@ -1,16 +1,15 @@
 package openai
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"slices"
 	"strings"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sse"
 )
@@ -75,51 +74,41 @@ func (m *OpenAIModel) Metadata() *llmsdk.LanguageModelMetadata {
 
 // Generate implements synchronous generation
 func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
+	spanCtx, span := llmsdk.NewSDKSpan(ctx, Provider, m.modelID, "generate", input)
+	ctx = spanCtx
+
+	var err error
+	defer func() {
+		if err != nil {
+			span.OnError(err)
+		}
+	}()
+
 	params, err := convertToOpenAICreateParams(input, m.modelID)
 	if err != nil {
 		return nil, err
 	}
 
-	reqBody, err := json.Marshal(params)
+	completion, err := clientutils.DoJSON[ChatCompletion](ctx, m.client, clientutils.JSONRequestConfig{
+		URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
+		Body: params,
+		Headers: map[string]string{
+			"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
+		},
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/chat/completions", m.baseURL), bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.apiKey))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := m.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(respBody))
-	}
-
-	var completion ChatCompletion
-	if err := json.Unmarshal(respBody, &completion); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, err
 	}
 
 	if len(completion.Choices) == 0 {
-		return nil, fmt.Errorf("no choices in response")
+		err = llmsdk.NewInvariantError(m.Provider(), "no choices in response")
+		return nil, err
 	}
 
 	choice := completion.Choices[0]
 	if choice.Message.Refusal != nil && *choice.Message.Refusal != "" {
-		return nil, fmt.Errorf("request was refused: %s", *choice.Message.Refusal)
+		err = fmt.Errorf("request was refused: %s", *choice.Message.Refusal)
+		return nil, err
 	}
 
 	content, err := m.mapOpenAIMessage(choice.Message, params)
@@ -135,45 +124,41 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		}
 	}
 
-	return &llmsdk.ModelResponse{
+	result := &llmsdk.ModelResponse{
 		Content: content,
 		Usage:   usage,
-	}, nil
+	}
+	span.OnEnd(result)
+	return result, nil
 }
 
 // Stream implements streaming generation
 func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.LanguageModelStream, error) {
+	spanCtx, span := llmsdk.NewSDKSpan(ctx, Provider, m.modelID, "stream", input)
+	ctx = spanCtx
+
+	var err error
+	defer func() {
+		if err != nil {
+			span.OnError(err)
+		}
+	}()
+
 	params, err := convertToOpenAICreateParams(input, m.modelID)
 	if err != nil {
 		return nil, err
 	}
-
-	// Enable streaming
 	params.Stream = ptr.To(true)
 
-	reqBody, err := json.Marshal(params)
+	sseStream, err := clientutils.DoSSE(ctx, m.client, clientutils.SSERequestConfig{
+		URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
+		Body: params,
+		Headers: map[string]string{
+			"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
+		},
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/chat/completions", m.baseURL), bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.apiKey))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "text/event-stream")
-
-	resp, err := m.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-
-	if resp.StatusCode >= 400 {
-		defer resp.Body.Close()
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(respBody))
+		return nil, err
 	}
 
 	responseCh := make(chan *llmsdk.PartialModelResponse)
@@ -182,13 +167,21 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 	go func() {
 		defer close(responseCh)
 		defer close(errCh)
-		defer resp.Body.Close()
+		defer sseStream.Close()
+
+		var err error
+		defer func() {
+			if err != nil {
+				span.OnError(err)
+			} else {
+				span.OnStreamEnd()
+			}
+		}()
 
 		var allContentDeltas []llmsdk.ContentDelta
-		scanner := sse.NewScanner(resp.Body)
 
-		for scanner.Scan() {
-			line := scanner.Text()
+		for sseStream.Scanner.Scan() {
+			line := sseStream.Scanner.Text()
 
 			if line == "" || strings.HasPrefix(line, ":") {
 				continue // Skip empty lines and comments
@@ -200,7 +193,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 				}
 
 				var chunk ChatCompletionChunk
-				if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+				if err = json.Unmarshal([]byte(data), &chunk); err != nil {
 					errCh <- fmt.Errorf("failed to parse chunk: %w", err)
 					return
 				}
@@ -209,7 +202,8 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					choice := chunk.Choices[0]
 
 					if choice.Delta.Refusal != nil && *choice.Delta.Refusal != "" {
-						errCh <- fmt.Errorf("request was refused: %s", *choice.Delta.Refusal)
+						err = llmsdk.NewRefusalError(*choice.Delta.Refusal)
+						errCh <- err
 						return
 					}
 
@@ -217,9 +211,11 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					allContentDeltas = slices.Concat(allContentDeltas, incomingDeltas)
 
 					for _, delta := range incomingDeltas {
-						responseCh <- &llmsdk.PartialModelResponse{
+						partial := &llmsdk.PartialModelResponse{
 							Delta: &delta,
 						}
+						span.OnStreamPartial(partial)
+						responseCh <- partial
 					}
 				}
 
@@ -228,14 +224,16 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 						InputTokens:  int(chunk.Usage.PromptTokens),
 						OutputTokens: int(chunk.Usage.CompletionTokens),
 					}
-					responseCh <- &llmsdk.PartialModelResponse{
+					partial := &llmsdk.PartialModelResponse{
 						Usage: usage,
 					}
+					span.OnStreamPartial(partial)
+					responseCh <- partial
 				}
 			}
 		}
 
-		if err := scanner.Err(); err != nil {
+		if err = sseStream.Scanner.Err(); err != nil {
 			errCh <- fmt.Errorf("scanner error: %w", err)
 		}
 	}()

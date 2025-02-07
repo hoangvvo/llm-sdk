@@ -10,12 +10,11 @@ Two libraries are provided:
 ## Features
 
 - Supports multiple LLM providers with a unified API.
-- Handles multiple modalities: Text, Image, and Audio, even in streaming requests.
-- Enables function calling.
-- Supports streaming responses and includes utilities for building final output from streamed data, including streaming audio.
+- Handles multiple modalities: Text, Image, and Audio. Support streaming, including for audio.
 - Supports citations for supported providers.
 - Reports token usage and calculates the cost of a request when provided with the model's pricing information.
-- Offers consistent serialization and deserialization for data storage across different programming languages.
+- Offers consistent serialization for data storage across different programming languages.
+- Integrates OpenTelemetry for tracing.
 
 ## Specification
 

@@ -8,6 +8,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
+import { SDKSpan } from "../opentelemetry.ts";
 import type {
   ContentDelta,
   ImagePart,
@@ -51,52 +52,82 @@ export class CohereModel implements LanguageModel {
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const request = convertToCohereChatRequest(input, this.modelId);
-    const response = await this.#cohere.chat(request);
+    const span = new SDKSpan(this.provider, this.modelId, "generate", input);
 
-    const content = mapCohereMessageResponse(response.message);
-    const result: ModelResponse = { content };
+    try {
+      const request = convertToCohereChatRequest(input, this.modelId);
+      const response = await this.#cohere.chat(request);
 
-    if (response.usage) {
-      result.usage = mapCohereUsage(response.usage);
-      if (this.metadata?.pricing) {
-        result.cost = calculateCost(result.usage, this.metadata.pricing);
+      const content = mapCohereMessageResponse(response.message);
+      const result: ModelResponse = { content };
+
+      if (response.usage) {
+        result.usage = mapCohereUsage(response.usage);
+        if (this.metadata?.pricing) {
+          result.cost = calculateCost(result.usage, this.metadata.pricing);
+        }
       }
-    }
 
-    return result;
+      span.onEnd(result);
+
+      return result;
+    } catch (error) {
+      span.onError(error);
+      throw error;
+    }
   }
 
   async *stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
-    const request = convertToCohereChatRequest(input, this.modelId);
-    const stream = await this.#cohere.chatStream(request);
+    const span = new SDKSpan(this.provider, this.modelId, "stream", input);
 
-    for await (const event of stream) {
-      switch (event.type) {
-        case "content-start":
-        case "content-delta": {
-          const incomingContentDelta = mapCohereStreamedContent(event);
-          if (incomingContentDelta) {
-            yield { delta: incomingContentDelta };
+    try {
+      const request = convertToCohereChatRequest(input, this.modelId);
+      const stream = await this.#cohere.chatStream(request);
+
+      for await (const event of stream) {
+        switch (event.type) {
+          case "content-start":
+          case "content-delta": {
+            const incomingContentDelta = mapCohereStreamedContent(event);
+            if (incomingContentDelta) {
+              const event: PartialModelResponse = {
+                delta: incomingContentDelta,
+              };
+              yield event;
+              span.onStreamPartial(event);
+            }
+            break;
           }
-          break;
-        }
-        case "tool-call-start": {
-          const incomingContentDelta = mapCohereToolCallStartEvent(event);
-          if (incomingContentDelta) {
-            yield { delta: incomingContentDelta };
+          case "tool-call-start": {
+            const incomingContentDelta = mapCohereToolCallStartEvent(event);
+            if (incomingContentDelta) {
+              const event: PartialModelResponse = {
+                delta: incomingContentDelta,
+              };
+              yield event;
+              span.onStreamPartial(event);
+            }
+            break;
           }
-          break;
-        }
-        case "tool-call-delta": {
-          const incomingContentDelta = mapCohereToolCallDeltaEvent(event);
-          if (incomingContentDelta) {
-            yield { delta: incomingContentDelta };
+          case "tool-call-delta": {
+            const incomingContentDelta = mapCohereToolCallDeltaEvent(event);
+            if (incomingContentDelta) {
+              const event: PartialModelResponse = {
+                delta: incomingContentDelta,
+              };
+              yield event;
+              span.onStreamPartial(event);
+            }
           }
         }
       }
+
+      span.onStreamEnd();
+    } catch (error) {
+      span.onError(error);
+      throw error;
     }
   }
 }

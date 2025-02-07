@@ -7,6 +7,7 @@ import {
 } from "../errors.ts";
 import type { LanguageModel } from "../language-model.ts";
 import { type LanguageModelMetadata } from "../language-model.ts";
+import { SDKSpan } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import { guessDeltaIndex } from "../stream.utils.ts";
 import type {
@@ -66,85 +67,107 @@ export class OpenAIModel implements LanguageModel {
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const createParams = convertToOpenAICreateParams(input, this.modelId);
+    const span = new SDKSpan(this.provider, this.modelId, "generate", input);
 
-    const response = await this.#openai.chat.completions.create({
-      ...createParams,
-      stream: false,
-    });
+    try {
+      const createParams = convertToOpenAICreateParams(input, this.modelId);
 
-    const choice = response.choices[0];
-    if (!choice) {
-      throw new InvariantError(PROVIDER, "No choices in response");
-    }
-    const { message } = choice;
+      const response = await this.#openai.chat.completions.create({
+        ...createParams,
+        stream: false,
+      });
 
-    if (message.refusal) {
-      throw new RefusalError(message.refusal);
-    }
-
-    const content = mapOpenAIMessage(message, createParams);
-
-    const result: ModelResponse = {
-      content,
-    };
-
-    if (response.usage) {
-      result.usage = mapOpenAIUsage(response.usage, input);
-      if (this.metadata?.pricing) {
-        result.cost = calculateCost(result.usage, this.metadata.pricing);
+      const choice = response.choices[0];
+      if (!choice) {
+        throw new InvariantError(PROVIDER, "No choices in response");
       }
-    }
+      const { message } = choice;
 
-    return result;
+      if (message.refusal) {
+        throw new RefusalError(message.refusal);
+      }
+
+      const content = mapOpenAIMessage(message, createParams);
+
+      const result: ModelResponse = {
+        content,
+      };
+
+      if (response.usage) {
+        result.usage = mapOpenAIUsage(response.usage, input);
+        if (this.metadata?.pricing) {
+          result.cost = calculateCost(result.usage, this.metadata.pricing);
+        }
+      }
+
+      span.onEnd(result);
+
+      return result;
+    } catch (error) {
+      span.onError(error);
+      throw error;
+    }
   }
 
   async *stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
-    const createParams = convertToOpenAICreateParams(input, this.modelId);
+    const span = new SDKSpan(this.provider, this.modelId, "stream", input);
 
-    const stream = await this.#openai.chat.completions.create({
-      ...createParams,
-      stream: true,
-      stream_options: {
-        include_usage: true,
-      },
-    });
+    try {
+      const createParams = convertToOpenAICreateParams(input, this.modelId);
 
-    let refusal = "";
+      const stream = await this.#openai.chat.completions.create({
+        ...createParams,
+        stream: true,
+        stream_options: {
+          include_usage: true,
+        },
+      });
 
-    const allContentDeltas: ContentDelta[] = [];
+      let refusal = "";
 
-    for await (const chunk of stream) {
-      // It is possible for choices to be empty
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      const choice = chunk.choices?.[0];
-      if (choice) {
-        if (choice.delta.refusal) {
-          refusal += choice.delta.refusal;
+      const allContentDeltas: ContentDelta[] = [];
+
+      for await (const chunk of stream) {
+        // It is possible for choices to be empty
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        const choice = chunk.choices?.[0];
+        if (choice) {
+          if (choice.delta.refusal) {
+            refusal += choice.delta.refusal;
+          }
+
+          const incomingContentDeltas = mapOpenAIDelta(
+            choice.delta,
+            allContentDeltas,
+            createParams,
+          );
+
+          allContentDeltas.push(...incomingContentDeltas);
+
+          for (const delta of incomingContentDeltas) {
+            const event: PartialModelResponse = { delta };
+            yield event;
+            span.onStreamPartial(event);
+          }
         }
-
-        const incomingContentDeltas = mapOpenAIDelta(
-          choice.delta,
-          allContentDeltas,
-          createParams,
-        );
-
-        allContentDeltas.push(...incomingContentDeltas);
-
-        for (const delta of incomingContentDeltas) {
-          yield { delta };
+        if (chunk.usage) {
+          const usage = mapOpenAIUsage(chunk.usage, input);
+          const event: PartialModelResponse = { usage };
+          yield event;
+          span.onStreamPartial(event);
         }
       }
-      if (chunk.usage) {
-        const usage = mapOpenAIUsage(chunk.usage, input);
-        yield { usage };
-      }
-    }
 
-    if (refusal) {
-      throw new RefusalError(refusal);
+      if (refusal) {
+        throw new RefusalError(refusal);
+      }
+
+      span.onStreamEnd();
+    } catch (error) {
+      span.onError(error);
+      throw error;
     }
   }
 }

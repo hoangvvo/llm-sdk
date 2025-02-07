@@ -1,8 +1,10 @@
 mod accumulator;
 mod audio_utils;
+mod client_utils;
 mod errors;
 mod language_model;
 pub mod openai;
+mod opentelemetry;
 mod source_part_utils;
 mod stream_utils;
 mod types;
