@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use dotenvy::dotenv;
-use futures::lock::Mutex;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -56,7 +55,7 @@ impl AgentTool<MyContext> for GetWeatherTool {
         &self,
         args: Value,
         _context: &MyContext,
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: GetWeatherParams = serde_json::from_value(args)?;
         println!("Getting weather for {}", params.city);
@@ -102,7 +101,7 @@ impl AgentTool<MyContext> for SendMessageTool {
         &self,
         args: Value,
         _context: &MyContext,
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: SendMessageParams = serde_json::from_value(args)?;
         println!(

@@ -137,11 +137,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 		content := modelResponse.Content
 
-		state.AppendMessage(llmsdk.Message{
-			AssistantMessage: &llmsdk.AssistantMessage{
-				Content: content,
-			},
-		})
+		state.AppendMessages([]llmsdk.Message{llmsdk.NewAssistantMessage(content...)})
 
 		state.AppendModelCall(ModelCallInfo{
 			Usage:    modelResponse.Usage,
@@ -160,9 +156,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 		}
 
 		if result.Next != nil {
-			for _, message := range *result.Next {
-				state.AppendMessage(message)
-			}
+			state.AppendMessages(*result.Next)
 		}
 
 		if err := state.Turn(); err != nil {
@@ -228,7 +222,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 				},
 			}
 
-			state.AppendMessage(assistantMessage)
+			state.AppendMessages([]llmsdk.Message{assistantMessage})
 
 			state.AppendModelCall(ModelCallInfo{
 				Usage:    modelResponse.Usage,
@@ -256,8 +250,8 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 			}
 
 			if result.Next != nil {
+				state.AppendMessages(*result.Next)
 				for _, message := range *result.Next {
-					state.AppendMessage(message)
 					eventChan <- &AgentStreamEvent{
 						Message: &message,
 					}
@@ -353,14 +347,16 @@ func (s *RunState) Turn() error {
 	return nil
 }
 
-// AppendMessage adds a message to the run state.
-func (s *RunState) AppendMessage(message llmsdk.Message) {
+// AppendMessages adds messages to the run state.
+func (s *RunState) AppendMessages(messages []llmsdk.Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.output = append(s.output, AgentItem{
-		Message: &message,
-	})
+	for _, message := range messages {
+		s.output = append(s.output, AgentItem{
+			Message: &message,
+		})
+	}
 }
 
 // AppendModelCall adds a model call to the run state.

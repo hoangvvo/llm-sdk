@@ -1,4 +1,3 @@
-use futures::lock::Mutex;
 use futures::StreamExt;
 use llm_agent::{
     AgentError, AgentItem, AgentRequest, AgentResponse, AgentStreamEvent, AgentTool,
@@ -163,7 +162,7 @@ impl AgentTool<()> for MockTool {
         &self,
         args: Value,
         _context: &(),
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
         *self.execution_count.lock().unwrap() += 1;
         *self.last_args.lock().unwrap() = Some(args);

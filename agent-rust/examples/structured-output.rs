@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use dotenvy::dotenv;
-use futures::lock::Mutex;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -39,7 +38,7 @@ impl AgentTool<()> for SearchFlightsTool {
         &self,
         args: Value,
         _context: &(),
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: SearchFlightsParams = serde_json::from_value(args)?;
         println!(
@@ -97,7 +96,7 @@ impl AgentTool<()> for SearchHotelsTool {
         &self,
         args: Value,
         _context: &(),
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: SearchHotelsParams = serde_json::from_value(args)?;
         println!(

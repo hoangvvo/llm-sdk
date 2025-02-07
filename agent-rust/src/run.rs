@@ -66,7 +66,7 @@ where
     async fn process(
         &self,
         context: Arc<TCtx>,
-        run_state: Arc<Mutex<RunState>>,
+        run_state: &RunState,
         parts: Vec<Part>,
     ) -> Result<ProcessResult, AgentError> {
         let tool_call_parts: Vec<ToolCallPart> = parts
@@ -107,7 +107,7 @@ where
                 })?;
 
             let tool_res = agent_tool
-                .execute(args, &context, run_state.clone())
+                .execute(args, &context, run_state)
                 .await
                 .map_err(AgentError::ToolExecution)?;
 
@@ -126,64 +126,51 @@ where
 
     /// Run a non-streaming execution of the agent.
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
-        let state = Arc::new(Mutex::new(RunState::new(
-            request.input.clone(),
-            self.max_turns,
-        )));
+        let state = RunState::new(request.input.clone(), self.max_turns);
 
         let (input, context) = self.get_llm_input(request);
 
         loop {
             let mut input = input.clone();
 
-            let mut state_guard = state.lock().await;
-
-            input.messages = state_guard.get_turn_messages();
+            input.messages = state.get_turn_messages().await;
             let ModelResponse {
                 content,
                 usage,
                 cost,
             } = self.model.generate(input).await?;
 
-            state_guard.append_message(Message::Assistant(AssistantMessage {
-                content: content.clone(),
-            }));
+            state.append_messages(vec![Message::assistant(content.clone())]).await;
 
-            state_guard.append_model_call(ModelCallInfo {
+            state.append_model_call(ModelCallInfo {
                 usage,
                 cost,
                 model_id: self.model.model_id(),
                 provider: self.model.provider().to_string(),
-            });
-
-            drop(state_guard);
+            }).await;
 
             match self
-                .process(context.clone(), state.clone(), content)
+                .process(context.clone(), &state, content)
                 .await?
             {
                 ProcessResult::Response(final_content) => {
-                    return Ok(state.lock().await.create_response(final_content));
+                    return Ok(state.create_response(final_content).await);
                 }
                 ProcessResult::Next(next_messages) => {
-                    let mut state_guard = state.lock().await;
-
-                    for message in next_messages {
-                        state_guard.append_message(message);
-                    }
+                    state.append_messages(next_messages).await;
                 }
             }
 
-            state.lock().await.turn()?;
+            state.turn().await?;
         }
     }
 
     /// Run a streaming execution of the agent.
     pub fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
-        let state = Arc::new(Mutex::new(RunState::new(
+        let state = Arc::new(RunState::new(
             request.input.clone(),
             self.max_turns,
-        )));
+        ));
 
         let (input, context) = self.get_llm_input(request);
 
@@ -204,9 +191,7 @@ where
             loop {
                 let mut input = input.clone();
 
-                let mut state_guard = state.lock().await;
-
-                input.messages = state_guard.get_turn_messages();
+                input.messages = state.get_turn_messages().await;
 
                 let mut model_stream = session.model.stream(input).await?;
 
@@ -228,35 +213,29 @@ where
                     content: content.clone(),
                 });
 
-                state_guard.append_message(assistant_message.clone());
+                state.append_messages(vec![assistant_message.clone()]).await;
 
-                state_guard.append_model_call(ModelCallInfo {
+                state.append_model_call(ModelCallInfo {
                     usage,
                     cost,
                     model_id: session.model.model_id(),
                     provider: session.model.provider().to_string(),
-                });
-
-                drop(state_guard);
+                }).await;
 
                 yield AgentStreamEvent::Message(assistant_message);
 
-                match session.process(context.clone(), state.clone(), content).await? {
+                match session.process(context.clone(), &state, content).await? {
                     ProcessResult::Response(final_content) => {
-                        let response = state.lock().await.create_response(final_content);
+                        let response = state.create_response(final_content).await;
                         yield AgentStreamEvent::Response(response);
                         break;
                     }
                     ProcessResult::Next(next_messages) => {
-                        let mut state_guard = state.lock().await;
-                        for message in next_messages {
-                            state_guard.append_message(message.clone());
-                            yield AgentStreamEvent::Message(message);
-                        }
+                        state.append_messages(next_messages).await;
                     }
                 }
 
-                state.lock().await.turn()?;
+                state.turn().await?;
             }
         };
 
@@ -301,12 +280,12 @@ pub struct RunState {
     input: Vec<AgentItem>,
 
     /// The current turn number in the run.
-    pub current_turn: usize,
+    pub current_turn: Arc<Mutex<usize>>,
     /// All items generated during the run, such as new `ToolMessage` and
     /// `AssistantMessage`
-    output: Vec<AgentItem>,
+    output: Arc<Mutex<Vec<AgentItem>>>,
     /// Information about the LLM calls made during the run
-    model_calls: Vec<ModelCallInfo>,
+    model_calls: Arc<Mutex<Vec<ModelCallInfo>>>,
 }
 
 impl RunState {
@@ -315,35 +294,44 @@ impl RunState {
         Self {
             max_turns,
             input,
-            current_turn: 0,
-            output: vec![],
-            model_calls: vec![],
+            current_turn: Arc::new(Mutex::new(0)),
+            output: Arc::new(Mutex::new(vec![])),
+            model_calls: Arc::new(Mutex::new(vec![])),
         }
     }
 
     /// Mark a new turn in the conversation and throw an error if max turns
     /// exceeded.
-    pub fn turn(&mut self) -> Result<(), AgentError> {
-        self.current_turn += 1;
-        if self.current_turn > self.max_turns {
+    pub async fn turn(&self) -> Result<(), AgentError> {
+        let mut current_turn = self.current_turn.lock().await;
+        *current_turn += 1;
+        if *current_turn > self.max_turns {
             return Err(AgentError::MaxTurnsExceeded(self.max_turns));
         }
         Ok(())
     }
 
     /// Add a message to the run state.
-    pub fn append_message(&mut self, message: Message) {
-        self.output.push(AgentItem::Message(message));
+    pub async fn append_messages(&self, messages: Vec<Message>) {
+        let mut output = self.output.lock().await;
+        output.append(&mut messages.into_iter().map(AgentItem::Message).collect());
     }
 
     /// Add a model call to the run state.
-    pub fn append_model_call(&mut self, info: ModelCallInfo) {
-        self.model_calls.push(info);
+    pub async fn append_model_call(&self, info: ModelCallInfo) {
+        let mut model_calls = self.model_calls.lock().await;
+        model_calls.push(info);
+    }
+
+    pub async fn append_outputs(&self, mut outputs: Vec<AgentItem>) {
+        let mut output = self.output.lock().await;
+        output.append(&mut outputs);
     }
 
     /// Get LLM messages to use in the `LanguageModelInput` for the turn
     #[must_use]
-    pub fn get_turn_messages(&self) -> Vec<Message> {
+    pub async fn get_turn_messages(&self) -> Vec<Message> {
+        let output = self.output.lock().await;
         [
             self.input
                 .iter()
@@ -351,7 +339,7 @@ impl RunState {
                     AgentItem::Message(msg) => msg.clone(),
                 })
                 .collect::<Vec<_>>(),
-            self.output
+            output
                 .iter()
                 .map(|item| match item {
                     AgentItem::Message(msg) => msg.clone(),
@@ -362,11 +350,13 @@ impl RunState {
     }
 
     #[must_use]
-    pub fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
+    pub async fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
+        let output = self.output.lock().await;
+        let model_calls = self.model_calls.lock().await;
         AgentResponse {
             content: final_content,
-            output: self.output.clone(),
-            model_calls: self.model_calls.clone(),
+            output: output.clone(),
+            model_calls: model_calls.clone(),
         }
     }
 }

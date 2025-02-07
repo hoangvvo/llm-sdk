@@ -22,6 +22,7 @@ import {
 import type { AgentTool, AgentToolResult } from "./tool.ts";
 import type {
   AgentItem,
+  AgentItemMessage,
   AgentRequest,
   AgentResponse,
   AgentStreamEvent,
@@ -179,10 +180,12 @@ export class RunSession<TContext> {
 
       const { content, usage, cost } = modelResponse;
 
-      state.appendMessage({
-        role: "assistant",
-        content,
-      });
+      state.appendMessages([
+        {
+          role: "assistant",
+          content,
+        },
+      ]);
 
       state.appendModelCall({
         usage: usage ?? null,
@@ -196,7 +199,7 @@ export class RunSession<TContext> {
         return state.createResponse(processResult.content);
       } else {
         for (const message of processResult.messages) {
-          state.appendMessage(message);
+          state.appendMessages([message]);
         }
       }
 
@@ -248,7 +251,7 @@ export class RunSession<TContext> {
         role: "assistant",
         content,
       };
-      state.appendMessage(assistantMessage);
+      state.appendMessages([assistantMessage]);
 
       state.appendModelCall({
         usage: usage ?? null,
@@ -273,7 +276,7 @@ export class RunSession<TContext> {
         return response;
       } else {
         for (const message of processResult.messages) {
-          state.appendMessage(message);
+          state.appendMessages([message]);
           yield {
             type: "message",
             ...message,
@@ -373,7 +376,7 @@ export class RunState {
   /**
    * Information about the LLM calls made during the run
    */
-  readonly #model_calls: ModelCallInfo[];
+  readonly #modelCalls: ModelCallInfo[];
 
   constructor(input: AgentItem[], maxTurns: number) {
     this.#input = input;
@@ -381,7 +384,7 @@ export class RunState {
 
     this.currentTurn = 0;
     this.#output = [];
-    this.#model_calls = [];
+    this.#modelCalls = [];
   }
 
   /**
@@ -397,15 +400,19 @@ export class RunState {
   /**
    * Add a message to the run state.
    */
-  appendMessage(message: Message) {
-    this.#output.push({ type: "message", ...message });
+  appendMessages(messages: Message[]) {
+    this.#output.push(
+      ...messages.map(
+        (message): AgentItemMessage => ({ type: "message", ...message }),
+      ),
+    );
   }
 
   /**
    * Add a model call to the run state.
    */
   appendModelCall(call: ModelCallInfo) {
-    this.#model_calls.push(call);
+    this.#modelCalls.push(call);
   }
 
   /**
@@ -419,7 +426,7 @@ export class RunState {
     return {
       content: finalContent,
       output: this.#output,
-      model_calls: this.#model_calls,
+      model_calls: this.#modelCalls,
     };
   }
 }

@@ -61,7 +61,7 @@ where
         &self,
         params: Value,
         context: &TCtx,
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: DelegateParams = serde_json::from_value(params)?;
         let result = self
@@ -132,7 +132,7 @@ impl AgentTool<MyContext> for CreateOrderTool {
         &self,
         params: Value,
         context: &MyContext,
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: CreateOrderParams = serde_json::from_value(params)?;
         println!(
@@ -189,7 +189,7 @@ impl AgentTool<MyContext> for GetOrdersTool {
         &self,
         _params: Value,
         context: &MyContext,
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let now = Instant::now();
 
@@ -248,7 +248,7 @@ impl AgentTool<MyContext> for DeliverOrderTool {
         &self,
         params: Value,
         _context: &MyContext,
-        _state: Arc<Mutex<RunState>>,
+        _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: DeliverOrderParams = serde_json::from_value(params)?;
         println!(

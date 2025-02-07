@@ -1,9 +1,8 @@
 use crate::RunState;
 use async_trait::async_trait;
-use futures::lock::Mutex;
 use llm_sdk::{JSONSchema, Part, Tool};
 use serde_json::Value;
-use std::{error::Error, fmt::Debug, sync::Arc};
+use std::{error::Error, fmt::Debug};
 
 /**
  * Agent tool that can be used by the agent to perform specific tasks. Any
@@ -28,7 +27,7 @@ pub trait AgentTool<TCtx>: Send + Sync {
         &self,
         args: Value,
         context: &TCtx,
-        state: Arc<Mutex<RunState>>,
+        state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>>;
 }
 

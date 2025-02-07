@@ -36,7 +36,7 @@ export type AgentItem = AgentItemMessage;
 /**
  * A LLM message used in the run
  */
-type AgentItemMessage = { type: "message" } & Message;
+export type AgentItemMessage = { type: "message" } & Message;
 
 /**
  * Track a call to the LLM and record its usage and cost.
