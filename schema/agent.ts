@@ -1,9 +1,4 @@
-import type {
-  Message,
-  ModelUsage,
-  Part,
-  PartialModelResponse,
-} from "@hoangvvo/llm-sdk";
+import type { Message, ModelUsage, Part, PartialModelResponse } from "./sdk.ts";
 
 export interface AgentRequest<TContext> {
   /**

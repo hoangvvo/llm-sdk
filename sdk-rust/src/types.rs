@@ -98,12 +98,14 @@ pub enum ResponseFormatOption {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "kebab-case")]
 pub enum LanguageModelCapability {
-    StructuredOutput,
-    FunctionCalling,
-    AudioInput,
-    AudioOutput,
+    TextInput,
+    TextOutput,
     ImageInput,
     ImageOutput,
+    AudioInput,
+    AudioOutput,
+    FunctionCalling,
+    StructuredOutput,
 }
 
 /// A part of the message that contains text.

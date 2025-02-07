@@ -573,12 +573,15 @@ func (r *ResponseFormatOption) UnmarshalJSON(data []byte) error {
 type LanguageModelCapability string
 
 const (
-	CapabilityStructuredOutput LanguageModelCapability = "structured-output"
-	CapabilityFunctionCalling  LanguageModelCapability = "function-calling"
-	CapabilityAudioInput       LanguageModelCapability = "audio-input"
-	CapabilityAudioOutput      LanguageModelCapability = "audio-output"
+	CapabilityTextInput        LanguageModelCapability = "text-input"
+	CapabilityTextOutput       LanguageModelCapability = "text-output"
 	CapabilityImageInput       LanguageModelCapability = "image-input"
 	CapabilityImageOutput      LanguageModelCapability = "image-output"
+	CapabilityAudioInput       LanguageModelCapability = "audio-input"
+	CapabilityAudioOutput      LanguageModelCapability = "audio-output"
+	CapabilityFunctionCalling  LanguageModelCapability = "function-calling"
+	CapabilityStructuredOutput LanguageModelCapability = "structured-output"
+	CapabilityCitation         LanguageModelCapability = "citation"
 )
 
 // ContentDelta represents a delta update in a message's content, enabling partial streaming updates in LLM responses.

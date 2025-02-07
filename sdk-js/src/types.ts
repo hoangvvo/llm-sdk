@@ -54,10 +54,10 @@ export type ResponseFormatOption = ResponseFormatText | ResponseFormatJson;
 export type LanguageModelCapability =
   | "text-input"
   | "text-output"
-  | "audio-input"
-  | "audio-output"
   | "image-input"
   | "image-output"
+  | "audio-input"
+  | "audio-output"
   | "function-calling"
   | "structured-output"
   | "citation";
