@@ -4,6 +4,7 @@ import {
   type Span,
   type Tracer,
 } from "@opentelemetry/api";
+import type { LanguageModel } from "./language-model.ts";
 import type {
   LanguageModelInput,
   ModelResponse,
@@ -11,24 +12,27 @@ import type {
   PartialModelResponse,
 } from "./types.ts";
 
-// Initialie the tracer lazily to allow user to have a chance to configure the global tracer provider
-let tracer: Tracer | undefined;
-
 function getTracer(): Tracer {
-  tracer = tracer ?? trace.getTracer("@hoangvvo/llm-sdk");
-  return tracer;
+  return trace.getTracer("@hoangvvo/llm-sdk");
 }
 
-export class SDKSpan {
+export class LMSpan {
+  /**
+   * OpenTelemetry span
+   */
+  #span: Span;
+
   /**
    * Start time in milliseconds
    */
   #startTime: number;
 
+  #streamPartialUsage: ModelUsage | undefined;
+
   /**
-   * OpenTelemetry span
+   * Time to first token, in seconds
    */
-  #span: Span;
+  #timeToFirstToken: number | undefined;
 
   constructor(
     provider: string,
@@ -52,23 +56,6 @@ export class SDKSpan {
     this.#startTime = Date.now();
   }
 
-  onEnd(response: ModelResponse): void {
-    if (response.usage) {
-      this.#span.setAttributes({
-        "gen_ai.usage.input_tokens": response.usage.input_tokens,
-        "gen_ai.usage.output_tokens": response.usage.output_tokens,
-      });
-    }
-    this.#span.end();
-  }
-
-  #streamPartialUsage: ModelUsage | undefined;
-
-  /**
-   * Time to first token, in seconds
-   */
-  #timeToFirstToken: number | undefined;
-
   onStreamPartial(partial: PartialModelResponse): void {
     if (partial.usage) {
       this.#streamPartialUsage = this.#streamPartialUsage ?? {
@@ -91,7 +78,16 @@ export class SDKSpan {
     }
   }
 
-  onStreamEnd(): void {
+  onResponse(response: ModelResponse): void {
+    if (response.usage) {
+      this.#span.setAttributes({
+        "gen_ai.usage.input_tokens": response.usage.input_tokens,
+        "gen_ai.usage.output_tokens": response.usage.output_tokens,
+      });
+    }
+  }
+
+  onEnd(): void {
     this.#span.end();
   }
 
@@ -101,6 +97,42 @@ export class SDKSpan {
       code: SpanStatusCode.ERROR,
       message: String(error),
     });
-    this.#span.end();
   }
+}
+
+export function traceLanguageModel(self: LanguageModel) {
+  const originalGenerate = self.generate.bind(self);
+  const originalStream = self.stream.bind(self);
+
+  self.generate = function generate(
+    input: LanguageModelInput,
+  ): Promise<ModelResponse> {
+    const span = new LMSpan(self.provider, self.modelId, "generate", input);
+    return originalGenerate(input)
+      .then(
+        (response) => {
+          span.onResponse(response);
+          return response;
+        },
+        (error: unknown) => {
+          span.onError(error);
+          throw error;
+        },
+      )
+      .finally(() => {
+        span.onEnd();
+      });
+  };
+
+  self.stream = async function* stream(
+    input: LanguageModelInput,
+  ): AsyncGenerator<PartialModelResponse> {
+    const span = new LMSpan(self.provider, self.modelId, "stream", input);
+    const stream = originalStream(input);
+    for await (const partial of stream) {
+      span.onStreamPartial(partial);
+      yield partial;
+    }
+    span.onEnd();
+  };
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sse"
 )
@@ -74,19 +75,8 @@ func DoJSON[T any](ctx context.Context, client *http.Client, config JSONRequestC
 	return &result, nil
 }
 
-// SSEStream represents a server-sent event stream
-type SSEStream struct {
-	Response *http.Response
-	Scanner  *sse.Scanner
-}
-
-// Close closes the SSE stream
-func (s *SSEStream) Close() error {
-	return s.Response.Body.Close()
-}
-
 // DoSSE performs a streaming SSE POST request and returns a stream
-func DoSSE(ctx context.Context, client *http.Client, config SSERequestConfig) (*SSEStream, error) {
+func DoSSE[T any](ctx context.Context, client *http.Client, config SSERequestConfig) (*SSEStream[T], error) {
 	// Marshal request body
 	reqBody, err := json.Marshal(config.Body)
 	if err != nil {
@@ -121,8 +111,45 @@ func DoSSE(ctx context.Context, client *http.Client, config SSERequestConfig) (*
 		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(respBody))
 	}
 
-	return &SSEStream{
-		Response: resp,
-		Scanner:  sse.NewScanner(resp.Body),
+	return &SSEStream[T]{
+		response: resp,
+		scanner:  sse.NewScanner(resp.Body),
 	}, nil
+}
+
+// SSEStream represents a server-sent event stream
+type SSEStream[T any] struct {
+	response *http.Response
+	scanner  *sse.Scanner
+}
+
+// Close closes the SSE stream
+func (s *SSEStream[T]) Close() error {
+	return s.response.Body.Close()
+}
+
+func (s *SSEStream[T]) Next() bool {
+	return s.scanner.Scan()
+}
+
+func (s *SSEStream[T]) Current() (*T, error) {
+	line := s.scanner.Text()
+	if line == "" || strings.HasPrefix(line, ":") {
+		return nil, nil
+	}
+	if data, ok := sse.IsDataLine(line); ok {
+		if data == "[DONE]" {
+			return nil, nil
+		}
+		var result T
+		if err := json.Unmarshal([]byte(data), &result); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal SSE data: %w", err)
+		}
+		return &result, nil
+	}
+	return nil, nil
+}
+
+func (s *SSEStream[T]) Err() error {
+	return s.scanner.Err()
 }

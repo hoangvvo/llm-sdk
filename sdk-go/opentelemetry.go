@@ -23,14 +23,14 @@ func getTracer() trace.Tracer {
 	return tracer
 }
 
-type SDKSpan struct {
+type LMSpan struct {
 	startTime          time.Time
 	span               trace.Span
 	streamPartialUsage *ModelUsage
 	timeToFirstToken   *float64
 }
 
-func NewSDKSpan(ctx context.Context, provider string, modelID string, method string, input *LanguageModelInput) (context.Context, *SDKSpan) {
+func NewLMSpan(ctx context.Context, provider string, modelID string, method string, input *LanguageModelInput) (context.Context, *LMSpan) {
 	spanCtx, span := getTracer().Start(ctx, "llm_sdk."+method,
 		trace.WithAttributes(
 			// https://opentelemetry.io/docs/specs/semconv/gen-ai/
@@ -62,23 +62,22 @@ func NewSDKSpan(ctx context.Context, provider string, modelID string, method str
 		span.SetAttributes(attribute.Float64("gen_ai.request.top_p", *input.TopP))
 	}
 
-	return spanCtx, &SDKSpan{
+	return spanCtx, &LMSpan{
 		startTime: time.Now(),
 		span:      span,
 	}
 }
 
-func (s *SDKSpan) OnEnd(response *ModelResponse) {
+func (s *LMSpan) OnResponse(response *ModelResponse) {
 	if response.Usage != nil {
 		s.span.SetAttributes(
 			attribute.Int("gen_ai.usage.input_tokens", response.Usage.InputTokens),
 			attribute.Int("gen_ai.usage.output_tokens", response.Usage.OutputTokens),
 		)
 	}
-	s.span.End()
 }
 
-func (s *SDKSpan) OnStreamPartial(partial *PartialModelResponse) {
+func (s *LMSpan) OnStreamPartial(partial *PartialModelResponse) {
 	if partial.Usage != nil {
 		if s.streamPartialUsage == nil {
 			s.streamPartialUsage = &ModelUsage{
@@ -102,12 +101,11 @@ func (s *SDKSpan) OnStreamPartial(partial *PartialModelResponse) {
 	}
 }
 
-func (s *SDKSpan) OnStreamEnd() {
-	s.span.End()
-}
-
-func (s *SDKSpan) OnError(err error) {
+func (s *LMSpan) OnError(err error) {
 	s.span.RecordError(err)
 	s.span.SetStatus(codes.Error, err.Error())
+}
+
+func (s *LMSpan) OnEnd() {
 	s.span.End()
 }

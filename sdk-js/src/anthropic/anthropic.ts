@@ -4,7 +4,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
-import { SDKSpan } from "../opentelemetry.ts";
+import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import { looselyConvertPartToPartDelta } from "../stream.utils.ts";
 import type {
@@ -54,87 +54,67 @@ export class AnthropicModel implements LanguageModel {
       baseURL: options.baseURL,
       apiKey: options.apiKey,
     });
+
+    traceLanguageModel(this);
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const span = new SDKSpan(this.provider, this.modelId, "generate", input);
+    const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    try {
-      const createParams = convertToAnthropicCreateParams(input, this.modelId);
+    const response = await this.#anthropic.messages.create(createParams);
 
-      const response = await this.#anthropic.messages.create(createParams);
+    const content = mapAnthropicMessage(response.content);
+    const usage = mapAnthropicUsage(response.usage);
 
-      const content = mapAnthropicMessage(response.content);
-      const usage = mapAnthropicUsage(response.usage);
+    const result: ModelResponse = { content, usage };
 
-      const result: ModelResponse = { content, usage };
-
-      if (this.metadata?.pricing) {
-        result.cost = calculateCost(usage, this.metadata.pricing);
-      }
-
-      span.onEnd(result);
-
-      return result;
-    } catch (error) {
-      span.onError(error);
-      throw error;
+    if (this.metadata?.pricing) {
+      result.cost = calculateCost(usage, this.metadata.pricing);
     }
+
+    return result;
   }
 
   async *stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
-    const span = new SDKSpan(this.provider, this.modelId, "stream", input);
+    const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    try {
-      const createParams = convertToAnthropicCreateParams(input, this.modelId);
+    const stream = this.#anthropic.messages.stream(createParams);
 
-      const stream = this.#anthropic.messages.stream(createParams);
-
-      for await (const chunk of stream) {
-        switch (chunk.type) {
-          case "message_start": {
-            const usage = mapAnthropicUsage(chunk.message.usage);
-            const event: PartialModelResponse = { usage };
+    for await (const chunk of stream) {
+      switch (chunk.type) {
+        case "message_start": {
+          const usage = mapAnthropicUsage(chunk.message.usage);
+          const event: PartialModelResponse = { usage };
+          yield event;
+          break;
+        }
+        case "message_delta": {
+          const usage = mapAnthropicMessageDeltaUsage(chunk.usage);
+          const event: PartialModelResponse = { usage };
+          yield event;
+          break;
+        }
+        case "content_block_start": {
+          const incomingContentDeltas =
+            mapAnthropicRawContentBlockStartEvent(chunk);
+          for (const delta of incomingContentDeltas) {
+            const event: PartialModelResponse = { delta };
             yield event;
-            span.onStreamPartial(event);
-            break;
           }
-          case "message_delta": {
-            const usage = mapAnthropicMessageDeltaUsage(chunk.usage);
-            const event: PartialModelResponse = { usage };
+          break;
+        }
+        case "content_block_delta": {
+          const incomingContentDeltas =
+            mapAnthropicRawContentBlockDeltaEvent(chunk);
+          for (const delta of incomingContentDeltas) {
+            const event: PartialModelResponse = { delta };
             yield event;
-            span.onStreamPartial(event);
-            break;
           }
-          case "content_block_start": {
-            const incomingContentDeltas =
-              mapAnthropicRawContentBlockStartEvent(chunk);
-            for (const delta of incomingContentDeltas) {
-              const event: PartialModelResponse = { delta };
-              yield event;
-              span.onStreamPartial(event);
-            }
-            break;
-          }
-          case "content_block_delta": {
-            const incomingContentDeltas =
-              mapAnthropicRawContentBlockDeltaEvent(chunk);
-            for (const delta of incomingContentDeltas) {
-              const event: PartialModelResponse = { delta };
-              yield event;
-              span.onStreamPartial(event);
-            }
-            break;
-          }
+          break;
         }
       }
-
-      span.onStreamEnd();
-    } catch (error) {
-      span.onError(error);
-      throw error;
     }
   }
 }

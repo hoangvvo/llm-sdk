@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/ptr"
-	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sse"
 )
 
 const (
@@ -74,7 +72,7 @@ func (m *OpenAIModel) Metadata() *llmsdk.LanguageModelMetadata {
 
 // Generate implements synchronous generation
 func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
-	spanCtx, span := llmsdk.NewSDKSpan(ctx, Provider, m.modelID, "generate", input)
+	spanCtx, span := llmsdk.NewLMSpan(ctx, Provider, m.modelID, "generate", input)
 	ctx = spanCtx
 
 	var err error
@@ -82,6 +80,7 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		if err != nil {
 			span.OnError(err)
 		}
+		span.OnEnd()
 	}()
 
 	params, err := convertToOpenAICreateParams(input, m.modelID)
@@ -128,21 +127,14 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		Content: content,
 		Usage:   usage,
 	}
-	span.OnEnd(result)
+
+	span.OnResponse(result)
+
 	return result, nil
 }
 
 // Stream implements streaming generation
 func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.LanguageModelStream, error) {
-	spanCtx, span := llmsdk.NewSDKSpan(ctx, Provider, m.modelID, "stream", input)
-	ctx = spanCtx
-
-	var err error
-	defer func() {
-		if err != nil {
-			span.OnError(err)
-		}
-	}()
 
 	params, err := convertToOpenAICreateParams(input, m.modelID)
 	if err != nil {
@@ -150,7 +142,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 	}
 	params.Stream = ptr.To(true)
 
-	sseStream, err := clientutils.DoSSE(ctx, m.client, clientutils.SSERequestConfig{
+	sseStream, err := clientutils.DoSSE[ChatCompletionChunk](ctx, m.client, clientutils.SSERequestConfig{
 		URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
 		Body: params,
 		Headers: map[string]string{
@@ -169,71 +161,68 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 		defer close(errCh)
 		defer sseStream.Close()
 
+		spanCtx, span := llmsdk.NewLMSpan(ctx, Provider, m.modelID, "stream", input)
+		ctx = spanCtx
+
 		var err error
 		defer func() {
 			if err != nil {
 				span.OnError(err)
-			} else {
-				span.OnStreamEnd()
 			}
+			span.OnEnd()
 		}()
 
 		var allContentDeltas []llmsdk.ContentDelta
 
-		for sseStream.Scanner.Scan() {
-			line := sseStream.Scanner.Text()
-
-			if line == "" || strings.HasPrefix(line, ":") {
-				continue // Skip empty lines and comments
+		for sseStream.Next() {
+			var chunk *ChatCompletionChunk
+			chunk, err = sseStream.Current()
+			if err != nil {
+				errCh <- fmt.Errorf("failed to get sse chunk: %w", err)
+				return
+			}
+			if chunk == nil {
+				continue
 			}
 
-			if data, ok := sse.IsDataLine(line); ok {
-				if data == "[DONE]" {
-					break // End of stream
-				}
+			if len(chunk.Choices) > 0 {
+				choice := chunk.Choices[0]
 
-				var chunk ChatCompletionChunk
-				if err = json.Unmarshal([]byte(data), &chunk); err != nil {
-					errCh <- fmt.Errorf("failed to parse chunk: %w", err)
+				if choice.Delta.Refusal != nil && *choice.Delta.Refusal != "" {
+					err = llmsdk.NewRefusalError(*choice.Delta.Refusal)
+					errCh <- err
 					return
 				}
 
-				if len(chunk.Choices) > 0 {
-					choice := chunk.Choices[0]
+				incomingDeltas := m.mapOpenAIDelta(choice.Delta, allContentDeltas, params)
+				allContentDeltas = slices.Concat(allContentDeltas, incomingDeltas)
 
-					if choice.Delta.Refusal != nil && *choice.Delta.Refusal != "" {
-						err = llmsdk.NewRefusalError(*choice.Delta.Refusal)
-						errCh <- err
-						return
-					}
-
-					incomingDeltas := m.mapOpenAIDelta(choice.Delta, allContentDeltas, params)
-					allContentDeltas = slices.Concat(allContentDeltas, incomingDeltas)
-
-					for _, delta := range incomingDeltas {
-						partial := &llmsdk.PartialModelResponse{
-							Delta: &delta,
-						}
-						span.OnStreamPartial(partial)
-						responseCh <- partial
-					}
-				}
-
-				if chunk.Usage != nil {
-					usage := &llmsdk.ModelUsage{
-						InputTokens:  int(chunk.Usage.PromptTokens),
-						OutputTokens: int(chunk.Usage.CompletionTokens),
-					}
+				for _, delta := range incomingDeltas {
 					partial := &llmsdk.PartialModelResponse{
-						Usage: usage,
+						Delta: &delta,
 					}
+
 					span.OnStreamPartial(partial)
+
 					responseCh <- partial
 				}
 			}
+
+			if chunk.Usage != nil {
+				usage := &llmsdk.ModelUsage{
+					InputTokens:  int(chunk.Usage.PromptTokens),
+					OutputTokens: int(chunk.Usage.CompletionTokens),
+				}
+				partial := &llmsdk.PartialModelResponse{
+					Usage: usage,
+				}
+				span.OnStreamPartial(partial)
+
+				responseCh <- partial
+			}
 		}
 
-		if err = sseStream.Scanner.Err(); err != nil {
+		if err = sseStream.Err(); err != nil {
 			errCh <- fmt.Errorf("scanner error: %w", err)
 		}
 	}()

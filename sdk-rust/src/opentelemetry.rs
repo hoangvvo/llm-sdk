@@ -1,28 +1,33 @@
-use crate::{LanguageModelInput, ModelResponse, ModelUsage, PartialModelResponse};
+use crate::{
+    LanguageModelInput, LanguageModelResult, LanguageModelStream, ModelResponse, ModelUsage,
+    PartialModelResponse,
+};
 use opentelemetry::{
     global::{self, BoxedSpan, BoxedTracer},
     trace::{Span, SpanKind, Status, Tracer},
     Context, KeyValue,
 };
-use std::{sync::LazyLock, time::Instant};
+use std::time::Instant;
 
-pub struct SDKSpan {
+pub struct LMSpan {
     span: BoxedSpan,
     start_time: Instant,
     stream_partial_usage: Option<ModelUsage>,
     time_to_first_token: Option<f64>,
 }
 
-static TRACER: LazyLock<BoxedTracer> = LazyLock::new(|| global::tracer("llm-sdk-rs"));
-
-impl SDKSpan {
+fn get_tracer() -> BoxedTracer {
+    global::tracer("llm-sdk-rs")
+}
+impl LMSpan {
     pub fn new(
         provider: &str,
         model_id: &str,
         method: &str,
         input: &LanguageModelInput,
     ) -> (Context, Self) {
-        let mut span = TRACER
+        let tracer = get_tracer();
+        let mut span = tracer
             .span_builder(format!("llm_sdk.{method}"))
             .with_kind(SpanKind::Client)
             .with_attributes(vec![
@@ -31,7 +36,7 @@ impl SDKSpan {
                 KeyValue::new("gen_ai.provider.name", provider.to_string()),
                 KeyValue::new("gen_ai.request.model", model_id.to_string()),
             ])
-            .start(&*TRACER);
+            .start(&tracer);
 
         // Add optional attributes if they exist
         if let Some(seed) = input.seed {
@@ -78,7 +83,11 @@ impl SDKSpan {
         )
     }
 
-    pub fn on_end(&mut self, response: &ModelResponse) {
+    pub fn on_end(&mut self) {
+        self.span.end();
+    }
+
+    pub fn on_response(&mut self, response: &ModelResponse) {
         if let Some(usage) = &response.usage {
             self.span.set_attribute(KeyValue::new(
                 "gen_ai.usage.input_tokens",
@@ -89,7 +98,6 @@ impl SDKSpan {
                 i64::from(usage.output_tokens),
             ));
         }
-        self.span.end();
     }
 
     pub fn on_stream_partial(&mut self, partial: &PartialModelResponse) {
@@ -123,13 +131,110 @@ impl SDKSpan {
         }
     }
 
-    pub fn on_stream_end(&mut self) {
-        self.span.end();
-    }
-
     pub fn on_error(&mut self, error: &dyn std::error::Error) {
         self.span.record_error(error);
         self.span.set_status(Status::error(error.to_string()));
-        self.span.end();
     }
 }
+
+/// Wrapper for streams to add tracing
+pub struct TracedStream {
+    inner: LanguageModelStream,
+    span: Option<LMSpan>,
+}
+
+impl TracedStream {
+    pub fn new(inner: LanguageModelStream, span: LMSpan) -> Self {
+        Self {
+            inner,
+            span: Some(span),
+        }
+    }
+}
+
+impl futures::Stream for TracedStream {
+    type Item = LanguageModelResult<PartialModelResponse>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let poll_result = std::pin::Pin::new(&mut self.inner).poll_next(cx);
+
+        match &poll_result {
+            std::task::Poll::Ready(Some(Ok(partial))) => {
+                if let Some(ref mut span) = self.span {
+                    span.on_stream_partial(partial);
+                }
+            }
+            std::task::Poll::Ready(Some(Err(error))) => {
+                if let Some(ref mut span) = self.span {
+                    span.on_error(error);
+                }
+            }
+            std::task::Poll::Ready(None) => {
+                // Stream ended, finish the span
+                if let Some(mut span) = self.span.take() {
+                    span.on_end();
+                }
+            }
+            _ => {}
+        }
+
+        poll_result
+    }
+}
+
+/// Helper function to wrap generate calls with tracing
+pub async fn trace_generate<F, Fut>(
+    provider: &str,
+    model_id: &str,
+    input: LanguageModelInput,
+    f: F,
+) -> LanguageModelResult<ModelResponse>
+where
+    F: FnOnce(LanguageModelInput) -> Fut,
+    Fut: std::future::Future<Output = LanguageModelResult<ModelResponse>>,
+{
+    let (_ctx, mut span) = LMSpan::new(provider, model_id, "generate", &input);
+    
+    let result = f(input).await;
+    
+    match &result {
+        Ok(response) => span.on_response(response),
+        Err(error) => span.on_error(error),
+    }
+    
+    span.on_end();
+    result
+}
+
+/// Helper function to wrap stream calls with tracing
+pub async fn trace_stream<F, Fut>(
+    provider: &str,
+    model_id: &str,
+    input: LanguageModelInput,
+    f: F,
+) -> LanguageModelResult<LanguageModelStream>
+where
+    F: FnOnce(LanguageModelInput) -> Fut,
+    Fut: std::future::Future<Output = LanguageModelResult<LanguageModelStream>>,
+{
+    let (_ctx, span) = LMSpan::new(provider, model_id, "stream", &input);
+    
+    let stream_result = f(input).await;
+    
+    match stream_result {
+        Ok(stream) => {
+            let traced_stream = TracedStream::new(stream, span);
+            Ok(LanguageModelStream::from_stream(traced_stream))
+        }
+        Err(error) => {
+            let mut span = span;
+            span.on_error(&error);
+            span.on_end();
+            Err(error)
+        }
+    }
+}
+

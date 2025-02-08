@@ -10,7 +10,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
-import { SDKSpan } from "../opentelemetry.ts";
+import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import {
   guessDeltaIndex,
@@ -61,81 +61,63 @@ export class MistralModel implements LanguageModel {
       apiKey: options.apiKey,
       ...(options.baseURL && { serverURL: options.baseURL }),
     });
+
+    traceLanguageModel(this);
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const span = new SDKSpan(this.provider, this.modelId, "generate", input);
+    const request = convertToMistralRequest(input, this.modelId);
+    const response = await this.#client.chat.complete(request);
 
-    try {
-      const request = convertToMistralRequest(input, this.modelId);
-      const response = await this.#client.chat.complete(request);
-
-      const choice = response.choices?.[0];
-      if (!choice) {
-        throw new InvariantError(
-          PROVIDER,
-          "Response does not contain a valid choice",
-        );
-      }
-
-      const content = mapMistralMessage(choice.message);
-      const usage = mapMistralUsageInfo(response.usage);
-
-      const result: ModelResponse = { content, usage };
-      if (this.metadata?.pricing) {
-        result.cost = calculateCost(usage, this.metadata.pricing);
-      }
-
-      span.onEnd(result);
-
-      return result;
-    } catch (error) {
-      span.onError(error);
-      throw error;
+    const choice = response.choices?.[0];
+    if (!choice) {
+      throw new InvariantError(
+        PROVIDER,
+        "Response does not contain a valid choice",
+      );
     }
+
+    const content = mapMistralMessage(choice.message);
+    const usage = mapMistralUsageInfo(response.usage);
+
+    const result: ModelResponse = { content, usage };
+    if (this.metadata?.pricing) {
+      result.cost = calculateCost(usage, this.metadata.pricing);
+    }
+
+    return result;
   }
 
   async *stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
-    const span = new SDKSpan(this.provider, this.modelId, "stream", input);
+    const request = convertToMistralRequest(input, this.modelId);
+    const stream = await this.#client.chat.stream(request);
 
-    try {
-      const request = convertToMistralRequest(input, this.modelId);
-      const stream = await this.#client.chat.stream(request);
+    const allContentDeltas: ContentDelta[] = [];
 
-      const allContentDeltas: ContentDelta[] = [];
+    for await (const chunk of stream) {
+      const choice = chunk.data.choices[0];
 
-      for await (const chunk of stream) {
-        const choice = chunk.data.choices[0];
+      if (choice?.delta) {
+        const incomingContentDeltas = mapMistralDelta(
+          choice.delta,
+          allContentDeltas,
+        );
 
-        if (choice?.delta) {
-          const incomingContentDeltas = mapMistralDelta(
-            choice.delta,
-            allContentDeltas,
-          );
+        allContentDeltas.push(...incomingContentDeltas);
 
-          allContentDeltas.push(...incomingContentDeltas);
-
-          for (const delta of incomingContentDeltas) {
-            const event: PartialModelResponse = { delta };
-            yield event;
-            span.onStreamPartial(event);
-          }
-        }
-
-        if (chunk.data.usage) {
-          const usage = mapMistralUsageInfo(chunk.data.usage);
-          const event: PartialModelResponse = { usage };
+        for (const delta of incomingContentDeltas) {
+          const event: PartialModelResponse = { delta };
           yield event;
-          span.onStreamPartial(event);
         }
       }
 
-      span.onStreamEnd();
-    } catch (error) {
-      span.onError(error);
-      throw error;
+      if (chunk.data.usage) {
+        const usage = mapMistralUsageInfo(chunk.data.usage);
+        const event: PartialModelResponse = { usage };
+        yield event;
+      }
     }
   }
 }

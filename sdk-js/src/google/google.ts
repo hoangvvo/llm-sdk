@@ -33,7 +33,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
-import { SDKSpan } from "../opentelemetry.ts";
+import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import {
   guessDeltaIndex,
@@ -79,79 +79,61 @@ export class GoogleModel implements LanguageModel {
 
     const genAI = new GoogleGenerativeAI(options.apiKey);
     this.#genModel = genAI.getGenerativeModel({ model: options.modelId });
+
+    traceLanguageModel(this);
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
-    const span = new SDKSpan(this.provider, this.modelId, "generate", input);
+    const request = convertToGenerateContentRequest(input);
+    const { response } = await this.#genModel.generateContent(request);
 
-    try {
-      const request = convertToGenerateContentRequest(input);
-      const { response } = await this.#genModel.generateContent(request);
-
-      const candidate = response.candidates?.[0];
-      if (!candidate) {
-        throw new InvariantError(PROVIDER, "No candidate in response");
-      }
-
-      const content = mapGoogleContent(candidate.content);
-      const result: ModelResponse = { content };
-      if (response.usageMetadata) {
-        result.usage = mapGoogleUsageMetadata(response.usageMetadata, input);
-        if (this.metadata?.pricing) {
-          result.cost = calculateCost(result.usage, this.metadata.pricing);
-        }
-      }
-
-      span.onEnd(result);
-
-      return result;
-    } catch (error) {
-      span.onError(error);
-      throw error;
+    const candidate = response.candidates?.[0];
+    if (!candidate) {
+      throw new InvariantError(PROVIDER, "No candidate in response");
     }
+
+    const content = mapGoogleContent(candidate.content);
+    const result: ModelResponse = { content };
+    if (response.usageMetadata) {
+      result.usage = mapGoogleUsageMetadata(response.usageMetadata, input);
+      if (this.metadata?.pricing) {
+        result.cost = calculateCost(result.usage, this.metadata.pricing);
+      }
+    }
+
+    return result;
   }
 
   async *stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse> {
-    const span = new SDKSpan(this.provider, this.modelId, "stream", input);
+    const request = convertToGenerateContentRequest(input);
+    const { stream } = await this.#genModel.generateContentStream(request);
 
-    try {
-      const request = convertToGenerateContentRequest(input);
-      const { stream } = await this.#genModel.generateContentStream(request);
+    const allContentDeltas: ContentDelta[] = [];
 
-      const allContentDeltas: ContentDelta[] = [];
+    for await (const chunk of stream) {
+      const candidate = chunk.candidates?.[0];
 
-      for await (const chunk of stream) {
-        const candidate = chunk.candidates?.[0];
+      if (candidate?.content) {
+        const incomingContentDeltas = mapGoogleContentToDelta(
+          candidate.content,
+          allContentDeltas,
+        );
 
-        if (candidate?.content) {
-          const incomingContentDeltas = mapGoogleContentToDelta(
-            candidate.content,
-            allContentDeltas,
-          );
+        allContentDeltas.push(...incomingContentDeltas);
 
-          allContentDeltas.push(...incomingContentDeltas);
-
-          for (const delta of incomingContentDeltas) {
-            const event: PartialModelResponse = { delta };
-            yield event;
-            span.onStreamPartial(event);
-          }
-        }
-
-        if (chunk.usageMetadata) {
-          const usage = mapGoogleUsageMetadata(chunk.usageMetadata, input);
-          const event: PartialModelResponse = { usage };
+        for (const delta of incomingContentDeltas) {
+          const event: PartialModelResponse = { delta };
           yield event;
-          span.onStreamPartial(event);
         }
       }
 
-      span.onStreamEnd();
-    } catch (error) {
-      span.onError(error);
-      throw error;
+      if (chunk.usageMetadata) {
+        const usage = mapGoogleUsageMetadata(chunk.usageMetadata, input);
+        const event: PartialModelResponse = { usage };
+        yield event;
+      }
     }
   }
 }
