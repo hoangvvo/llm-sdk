@@ -72,6 +72,7 @@ export class Agent<TContext> {
    */
   async createSession(): Promise<RunSession<TContext>> {
     return RunSession.create({
+      agentName: this.name,
       model: this.#model,
       instructions: this.#instructions,
       tools: this.#tools,

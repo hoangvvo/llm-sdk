@@ -9,15 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
-
-func stringPtr(s string) *string {
-	return &s
-}
-
-func floatPtr(f float64) *float64 {
-	return &f
-}
 
 // MockLanguageModel implements llmsdk.LanguageModel for testing
 type MockLanguageModel struct {
@@ -257,7 +250,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 				InputTokens:  1000,
 				OutputTokens: 50,
 			},
-			Cost: floatPtr(0.0015),
+			Cost: ptr.To(0.0015),
 		}).
 		AddResponses(&llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
@@ -353,7 +346,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 					InputTokens:  1000,
 					OutputTokens: 50,
 				},
-				Cost:     floatPtr(0.0015),
+				Cost:     ptr.To(0.0015),
 				ModelID:  model.ModelID(),
 				Provider: model.Provider(),
 			},
@@ -406,7 +399,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 				InputTokens:  50,
 				OutputTokens: 10,
 			},
-			Cost: floatPtr(0.0003),
+			Cost: ptr.To(0.0003),
 		})
 
 	session := llmagent.NewRunSession(
@@ -492,7 +485,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 					InputTokens:  50,
 					OutputTokens: 10,
 				},
-				Cost:     floatPtr(0.0003),
+				Cost:     ptr.To(0.0003),
 				ModelID:  model.ModelID(),
 				Provider: model.Provider(),
 			},
@@ -913,14 +906,14 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 	})
 
 	instructions := []llmagent.InstructionParam[map[string]interface{}]{
-		{String: stringPtr("You are a helpful assistant.")},
+		{String: ptr.To("You are a helpful assistant.")},
 		{Func: func(ctx map[string]interface{}) string {
 			if userRole, ok := ctx["userRole"].(string); ok {
 				return "The user is a " + userRole + "."
 			}
 			return ""
 		}},
-		{String: stringPtr("Always be polite.")},
+		{String: ptr.To("Always be polite.")},
 	}
 
 	session := llmagent.NewRunSession(

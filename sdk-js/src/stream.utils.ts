@@ -85,7 +85,6 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
         ...(typeof part.args === "object" && {
           args: JSON.stringify(part.args),
         }),
-        ...(part.id && { id: part.id }),
       };
     default: {
       throw new InvariantError(

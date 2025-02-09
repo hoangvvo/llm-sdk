@@ -1,9 +1,4 @@
-import {
-  SpanStatusCode,
-  trace,
-  type Span,
-  type Tracer,
-} from "@opentelemetry/api";
+import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { LanguageModel } from "./language-model.ts";
 import type {
   LanguageModelInput,
@@ -12,27 +7,28 @@ import type {
   PartialModelResponse,
 } from "./types.ts";
 
-function getTracer(): Tracer {
-  return trace.getTracer("@hoangvvo/llm-sdk");
-}
+const tracer = trace.getTracer("@hoangvvo/llm-sdk");
 
 export class LMSpan {
-  /**
-   * OpenTelemetry span
-   */
-  #span: Span;
-
-  /**
-   * Start time in milliseconds
-   */
-  #startTime: number;
-
-  #streamPartialUsage: ModelUsage | undefined;
-
+  provider: string;
+  model_id: string;
+  method: "generate" | "stream";
+  usage: ModelUsage | null;
+  cost: number | null;
+  start_time: Date;
   /**
    * Time to first token, in seconds
    */
-  #timeToFirstToken: number | undefined;
+  time_to_first_token: number | undefined;
+  max_tokens?: number;
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  seed?: number;
+
+  #span: Span;
 
   constructor(
     provider: string,
@@ -40,54 +36,60 @@ export class LMSpan {
     method: "generate" | "stream",
     input: LanguageModelInput,
   ) {
-    this.#span = getTracer().startSpan(`llm_sdk.${method}`).setAttributes({
-      // https://opentelemetry.io/docs/specs/semconv/gen-ai/
-      "gen_ai.operation.name": "generate_content",
-      "gen_ai.provider.name": provider,
-      "gen_ai.request.model": modelId,
-      "gen_ai.request.seed": input.seed,
-      "gen_ai.request.frequency_penalty": input.frequency_penalty,
-      "gen_ai.request.max_tokens": input.max_tokens,
-      "gen_ai.request.presence_penalty": input.presence_penalty,
-      "gen_ai.request.temperature": input.temperature,
-      "gen_ai.request.top_k": input.top_k,
-      "gen_ai.request.top_p": input.top_p,
-    });
-    this.#startTime = Date.now();
+    this.provider = provider;
+    this.model_id = modelId;
+    this.#span = tracer.startSpan(`llm_sdk.${method}`);
+    this.start_time = new Date();
+    this.method = method;
+    this.usage = null;
+    this.cost = null;
+
+    if (input.max_tokens !== undefined) this.max_tokens = input.max_tokens;
+    if (input.temperature !== undefined) this.temperature = input.temperature;
+    if (input.top_p !== undefined) this.top_p = input.top_p;
+    if (input.top_k !== undefined) this.top_k = input.top_k;
+    if (input.presence_penalty !== undefined)
+      this.presence_penalty = input.presence_penalty;
+    if (input.frequency_penalty !== undefined)
+      this.frequency_penalty = input.frequency_penalty;
+    if (input.seed !== undefined) this.seed = input.seed;
   }
 
   onStreamPartial(partial: PartialModelResponse): void {
     if (partial.usage) {
-      this.#streamPartialUsage = this.#streamPartialUsage ?? {
-        input_tokens: 0,
-        output_tokens: 0,
-      };
-      this.#streamPartialUsage.input_tokens += partial.usage.input_tokens;
-      this.#streamPartialUsage.output_tokens += partial.usage.output_tokens;
-      this.#span.setAttributes({
-        "gen_ai.usage.input_tokens": this.#streamPartialUsage.input_tokens,
-        "gen_ai.usage.output_tokens": this.#streamPartialUsage.output_tokens,
-      });
+      this.usage = this.usage ?? { input_tokens: 0, output_tokens: 0 };
+      this.usage.input_tokens += partial.usage.input_tokens;
+      this.usage.output_tokens += partial.usage.output_tokens;
     }
-    if (partial.delta && !this.#timeToFirstToken) {
-      this.#timeToFirstToken = (Date.now() - this.#startTime) / 1000;
-      this.#span.setAttribute(
-        "gen_ai.server.time_to_first_token",
-        this.#timeToFirstToken,
-      );
+    if (partial.delta && !this.time_to_first_token) {
+      this.time_to_first_token =
+        (Date.now() - this.start_time.getTime()) / 1000;
     }
   }
 
   onResponse(response: ModelResponse): void {
     if (response.usage) {
-      this.#span.setAttributes({
-        "gen_ai.usage.input_tokens": response.usage.input_tokens,
-        "gen_ai.usage.output_tokens": response.usage.output_tokens,
-      });
+      this.usage = response.usage;
     }
   }
 
   onEnd(): void {
+    this.#span.setAttributes({
+      // https://opentelemetry.io/docs/specs/semconv/gen-ai/
+      "gen_ai.operation.name": "generate_content",
+      "gen_ai.provider.name": this.provider,
+      "gen_ai.request.model": this.model_id,
+      "gen_ai.usage.input_tokens": this.usage?.input_tokens,
+      "gen_ai.usage.output_tokens": this.usage?.output_tokens,
+      "gen_ai.server.time_to_first_token": this.time_to_first_token,
+      "gen_ai.request.max_tokens": this.max_tokens,
+      "gen_ai.request.temperature": this.temperature,
+      "gen_ai.request.top_p": this.top_p,
+      "gen_ai.request.top_k": this.top_k,
+      "gen_ai.request.presence_penalty": this.presence_penalty,
+      "gen_ai.request.frequency_penalty": this.frequency_penalty,
+      "gen_ai.request.seed": this.seed,
+    });
     this.#span.end();
   }
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/internal/ptr"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
 // https://platform.openai.com/docs/api-reference/chat

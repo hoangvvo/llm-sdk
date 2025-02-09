@@ -4,100 +4,68 @@ import (
 	"context"
 	"time"
 
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
-const (
-	tracerName = "github.com/hoangvvo/llm-sdk/sdk-go"
-)
-
-var tracer trace.Tracer
-
-func getTracer() trace.Tracer {
-	if tracer == nil {
-		tracer = otel.Tracer(tracerName)
-	}
-	return tracer
-}
+var tracer = otel.Tracer("github.com/hoangvvo/llm-sdk/sdk-go")
 
 type LMSpan struct {
-	startTime          time.Time
-	span               trace.Span
-	streamPartialUsage *ModelUsage
-	timeToFirstToken   *float64
+	Provider  string      `json:"provider"`
+	ModelID   string      `json:"model_id"`
+	Usage     *ModelUsage `json:"usage,omitempty"`
+	Cost      *float64    `json:"cost,omitempty"`
+	StartTime time.Time   `json:"start_time"`
+	// Time to first token, in seconds
+	TimeToFirstToken *float64 `json:"time_to_first_token,omitempty"`
+	MaxTokens        *uint32  `json:"max_tokens,omitempty"`
+	Temperature      *float64 `json:"temperature,omitempty"`
+	TopP             *float64 `json:"top_p,omitempty"`
+	TopK             *float64 `json:"top_k,omitempty"`
+	PresencePenalty  *float64 `json:"presence_penalty,omitempty"`
+	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
+	Seed             *int64   `json:"seed,omitempty"`
+
+	span trace.Span
 }
 
 func NewLMSpan(ctx context.Context, provider string, modelID string, method string, input *LanguageModelInput) (context.Context, *LMSpan) {
-	spanCtx, span := getTracer().Start(ctx, "llm_sdk."+method,
-		trace.WithAttributes(
-			// https://opentelemetry.io/docs/specs/semconv/gen-ai/
-			attribute.String("gen_ai.operation.name", "generate_content"),
-			attribute.String("gen_ai.provider.name", provider),
-			attribute.String("gen_ai.request.model", modelID),
-		))
-
-	// Add optional attributes if they exist
-	if input.Seed != nil {
-		span.SetAttributes(attribute.Int64("gen_ai.request.seed", int64(*input.Seed)))
-	}
-	if input.FrequencyPenalty != nil {
-		span.SetAttributes(attribute.Float64("gen_ai.request.frequency_penalty", *input.FrequencyPenalty))
-	}
-	if input.MaxTokens != nil {
-		span.SetAttributes(attribute.Int("gen_ai.request.max_tokens", int(*input.MaxTokens)))
-	}
-	if input.PresencePenalty != nil {
-		span.SetAttributes(attribute.Float64("gen_ai.request.presence_penalty", *input.PresencePenalty))
-	}
-	if input.Temperature != nil {
-		span.SetAttributes(attribute.Float64("gen_ai.request.temperature", *input.Temperature))
-	}
-	if input.TopK != nil {
-		span.SetAttributes(attribute.Float64("gen_ai.request.top_k", *input.TopK))
-	}
-	if input.TopP != nil {
-		span.SetAttributes(attribute.Float64("gen_ai.request.top_p", *input.TopP))
-	}
+	spanCtx, span := tracer.Start(ctx, "llm_sdk."+method)
 
 	return spanCtx, &LMSpan{
-		startTime: time.Now(),
-		span:      span,
-	}
-}
-
-func (s *LMSpan) OnResponse(response *ModelResponse) {
-	if response.Usage != nil {
-		s.span.SetAttributes(
-			attribute.Int("gen_ai.usage.input_tokens", response.Usage.InputTokens),
-			attribute.Int("gen_ai.usage.output_tokens", response.Usage.OutputTokens),
-		)
+		Provider:         provider,
+		ModelID:          modelID,
+		StartTime:        time.Now(),
+		MaxTokens:        input.MaxTokens,
+		Temperature:      input.Temperature,
+		TopP:             input.TopP,
+		TopK:             input.TopK,
+		PresencePenalty:  input.PresencePenalty,
+		FrequencyPenalty: input.FrequencyPenalty,
+		Seed:             input.Seed,
+		span:             span,
 	}
 }
 
 func (s *LMSpan) OnStreamPartial(partial *PartialModelResponse) {
 	if partial.Usage != nil {
-		if s.streamPartialUsage == nil {
-			s.streamPartialUsage = &ModelUsage{
-				InputTokens:  0,
-				OutputTokens: 0,
-			}
+		if s.Usage == nil {
+			s.Usage = &ModelUsage{}
 		}
-		s.streamPartialUsage.InputTokens += partial.Usage.InputTokens
-		s.streamPartialUsage.OutputTokens += partial.Usage.OutputTokens
-		s.span.SetAttributes(
-			attribute.Int("gen_ai.usage.input_tokens", s.streamPartialUsage.InputTokens),
-			attribute.Int("gen_ai.usage.output_tokens", s.streamPartialUsage.OutputTokens),
-		)
+		s.Usage.InputTokens += partial.Usage.InputTokens
+		s.Usage.OutputTokens += partial.Usage.OutputTokens
 	}
-	if partial.Delta != nil && s.timeToFirstToken == nil {
-		elapsed := time.Since(s.startTime).Seconds()
-		s.timeToFirstToken = &elapsed
-		s.span.SetAttributes(
-			attribute.Float64("gen_ai.server.time_to_first_token", elapsed),
-		)
+	if partial.Delta != nil && s.TimeToFirstToken == nil {
+		s.TimeToFirstToken = ptr.To(time.Since(s.StartTime).Seconds())
+	}
+}
+
+func (s *LMSpan) OnResponse(response *ModelResponse) {
+	if response.Usage != nil {
+		s.Usage = response.Usage
 	}
 }
 
@@ -107,5 +75,41 @@ func (s *LMSpan) OnError(err error) {
 }
 
 func (s *LMSpan) OnEnd() {
+	// https://opentelemetry.io/docs/specs/semconv/gen-ai/
+	s.span.SetAttributes(
+		attribute.String("gen_ai.operation.name", "generate_content"),
+		attribute.String("gen_ai.provider.name", s.Provider),
+		attribute.String("gen_ai.request.model", s.ModelID),
+	)
+	if s.Usage != nil {
+		s.span.SetAttributes(
+			attribute.Int("gen_ai.usage.input_tokens", s.Usage.InputTokens),
+			attribute.Int("gen_ai.usage.output_tokens", s.Usage.OutputTokens),
+		)
+	}
+	if s.TimeToFirstToken != nil {
+		s.span.SetAttributes(attribute.Float64("gen_ai.server.time_to_first_token", *s.TimeToFirstToken))
+	}
+	if s.MaxTokens != nil {
+		s.span.SetAttributes(attribute.Int64("gen_ai.request.max_tokens", int64(*s.MaxTokens)))
+	}
+	if s.Temperature != nil {
+		s.span.SetAttributes(attribute.Float64("gen_ai.request.temperature", *s.Temperature))
+	}
+	if s.TopP != nil {
+		s.span.SetAttributes(attribute.Float64("gen_ai.request.top_p", *s.TopP))
+	}
+	if s.TopK != nil {
+		s.span.SetAttributes(attribute.Float64("gen_ai.request.top_k", *s.TopK))
+	}
+	if s.PresencePenalty != nil {
+		s.span.SetAttributes(attribute.Float64("gen_ai.request.presence_penalty", *s.PresencePenalty))
+	}
+	if s.FrequencyPenalty != nil {
+		s.span.SetAttributes(attribute.Float64("gen_ai.request.frequency_penalty", *s.FrequencyPenalty))
+	}
+	if s.Seed != nil {
+		s.span.SetAttributes(attribute.Int64("gen_ai.request.seed", *s.Seed))
+	}
 	s.span.End()
 }
