@@ -175,6 +175,7 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 
 func (a *Agent[C]) CreateSession() *RunSession[C] {
 	return NewRunSession(
+		a.Name,
 		a.model,
 		a.instructions,
 		a.tools,

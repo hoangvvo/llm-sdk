@@ -174,6 +174,7 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 	})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
@@ -259,6 +260,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
@@ -403,6 +405,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool1, tool2},
@@ -533,6 +536,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
@@ -624,6 +628,7 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
@@ -671,6 +676,7 @@ func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
 	})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
@@ -722,6 +728,7 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 	})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
@@ -784,6 +791,7 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
@@ -851,6 +859,7 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 	frequencyPenalty := 0.2
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
@@ -917,6 +926,7 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 	}
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		instructions,
 		[]llmagent.AgentTool[map[string]interface{}]{},
@@ -964,6 +974,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 	})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
@@ -1047,6 +1058,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
@@ -1161,6 +1173,7 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
@@ -1212,6 +1225,7 @@ func TestRun_FinishCleansUpSessionResources(t *testing.T) {
 	})
 
 	session := llmagent.NewRunSession(
+		"test_agent",
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},

@@ -102,6 +102,7 @@ suite("RunSession#run", () => {
     });
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -176,6 +177,7 @@ suite("RunSession#run", () => {
     );
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -305,6 +307,7 @@ suite("RunSession#run", () => {
     );
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -458,6 +461,7 @@ suite("RunSession#run", () => {
     );
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -529,6 +533,7 @@ suite("RunSession#run", () => {
     );
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 2,
@@ -570,6 +575,7 @@ suite("RunSession#run", () => {
     });
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -617,6 +623,7 @@ suite("RunSession#run", () => {
     });
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -670,6 +677,7 @@ suite("RunSession#run", () => {
     );
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -704,6 +712,7 @@ suite("RunSession#run", () => {
     const model = createMockLanguageModel(t);
 
     const session = new RunSession({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -737,6 +746,7 @@ suite("RunSession#run", () => {
     });
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -777,6 +787,7 @@ suite("RunSession#run", () => {
     );
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -811,6 +822,7 @@ suite("RunSession#run", () => {
     });
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [
         "You are a helpful assistant.",
@@ -853,6 +865,7 @@ suite("RunSession#runStream", () => {
     ]);
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -935,6 +948,7 @@ suite("RunSession#runStream", () => {
       ]);
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -1012,6 +1026,7 @@ suite("RunSession#runStream", () => {
       ]);
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -1081,6 +1096,7 @@ suite("RunSession#runStream", () => {
       ]);
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 2,
@@ -1119,6 +1135,7 @@ suite("RunSession#runStream", () => {
     );
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -1159,6 +1176,7 @@ suite("RunSession#runStream", () => {
     const model = createMockLanguageModel(t);
 
     const session = new RunSession({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,
@@ -1199,6 +1217,7 @@ suite("RunSession lifecycle", () => {
     });
 
     const session = await RunSession.create({
+      agentName: "test_agent",
       model,
       instructions: [],
       maxTurns: 10,

@@ -19,7 +19,8 @@ import {
   getPromptForInstructionParams,
   type InstructionParam,
 } from "./instruction.ts";
-import type { AgentTool, AgentToolResult } from "./tool.ts";
+import { AgentSpan, startActiveToolSpan } from "./opentelemetry.ts";
+import type { AgentTool } from "./tool.ts";
 import type {
   AgentItem,
   AgentItemMessage,
@@ -37,6 +38,7 @@ import type {
  * The session can be reused in multiple runs.
  */
 export class RunSession<TContext> {
+  readonly #agentName: string;
   readonly #instructions: InstructionParam<TContext>[];
   readonly #model: LanguageModel;
   readonly #responseFormat: ResponseFormatOption;
@@ -51,6 +53,7 @@ export class RunSession<TContext> {
   #initialized: boolean;
 
   constructor({
+    agentName,
     instructions,
     model,
     responseFormat,
@@ -62,6 +65,7 @@ export class RunSession<TContext> {
     presencePenalty,
     frequencyPenalty,
   }: RunSessionParams<TContext>) {
+    this.#agentName = agentName;
     this.#instructions = instructions;
     this.#model = model;
     this.#responseFormat = responseFormat;
@@ -127,13 +131,18 @@ export class RunSession<TContext> {
         );
       }
 
-      let toolRes: AgentToolResult;
-
-      try {
-        toolRes = await agentTool.execute(toolCallPart.args, context, state);
-      } catch (e) {
-        throw new AgentToolExecutionError(e);
-      }
+      const toolRes = await startActiveToolSpan(
+        toolCallPart.tool_call_id,
+        agentTool.name,
+        agentTool.description,
+        async () => {
+          try {
+            return await agentTool.execute(toolCallPart.args, context, state);
+          } catch (e) {
+            throw new AgentToolExecutionError(e);
+          }
+        },
+      );
 
       toolMessage.content.push({
         type: "tool-result",
@@ -158,52 +167,68 @@ export class RunSession<TContext> {
       throw new Error("RunSession not initialized.");
     }
 
-    const state = new RunState(request.input, this.#maxTurns);
+    const span = new AgentSpan(this.#agentName, "run");
 
-    const input = this.#getLlmInput(request);
-    const context = request.context;
+    try {
+      const state = new RunState(request.input, this.#maxTurns);
 
-    for (;;) {
-      let modelResponse: ModelResponse;
+      const input = span.withContext(() => this.#getLlmInput(request));
+      const context = request.context;
 
-      try {
-        modelResponse = await this.#model.generate({
-          ...input,
-          messages: state.getTurnMessages(),
+      for (;;) {
+        const modelResponse: ModelResponse = await span.withContext(
+          async () => {
+            try {
+              const response = await this.#model.generate({
+                ...input,
+                messages: state.getTurnMessages(),
+              });
+              return response;
+            } catch (err) {
+              if (err instanceof LanguageModelError) {
+                throw new AgentLanguageModelError(err);
+              }
+              throw err;
+            }
+          },
+        );
+
+        const { content, usage, cost } = modelResponse;
+
+        state.appendMessages([
+          {
+            role: "assistant",
+            content,
+          },
+        ]);
+
+        state.appendModelCall({
+          usage: usage ?? null,
+          cost: cost ?? null,
+          model_id: this.#model.modelId,
+          provider: this.#model.provider,
         });
-      } catch (err) {
-        if (err instanceof LanguageModelError) {
-          throw new AgentLanguageModelError(err);
+
+        const processResult = await span.withContext(() =>
+          this.#process(context, state, content),
+        );
+        if (processResult.type === "response") {
+          const response = state.createResponse(processResult.content);
+          span.onResponse(response);
+          return response;
+        } else {
+          for (const message of processResult.messages) {
+            state.appendMessages([message]);
+          }
         }
-        throw err;
+
+        state.turn();
       }
-
-      const { content, usage, cost } = modelResponse;
-
-      state.appendMessages([
-        {
-          role: "assistant",
-          content,
-        },
-      ]);
-
-      state.appendModelCall({
-        usage: usage ?? null,
-        cost: cost ?? null,
-        model_id: this.#model.modelId,
-        provider: this.#model.provider,
-      });
-
-      const processResult = await this.#process(context, state, content);
-      if (processResult.type === "response") {
-        return state.createResponse(processResult.content);
-      } else {
-        for (const message of processResult.messages) {
-          state.appendMessages([message]);
-        }
-      }
-
-      state.turn();
+    } catch (err) {
+      span.onError(err);
+      throw err;
+    } finally {
+      span.onEnd();
     }
   }
 
@@ -217,74 +242,91 @@ export class RunSession<TContext> {
       throw new Error("RunSession not initialized.");
     }
 
-    const state = new RunState(request.input, this.#maxTurns);
+    const span = new AgentSpan(this.#agentName, "run_stream");
 
-    const input = this.#getLlmInput(request);
-    const context = request.context;
+    try {
+      const state = new RunState(request.input, this.#maxTurns);
 
-    for (;;) {
-      const modelStream = this.#model.stream({
-        ...input,
-        messages: state.getTurnMessages(),
-      });
+      const input = span.withContext(() => this.#getLlmInput(request));
+      const context = request.context;
 
-      const accumulator = new StreamAccumulator();
+      for (;;) {
+        const modelStream = this.#model.stream({
+          ...input,
+          messages: state.getTurnMessages(),
+        });
+        // Patch next to propogate tracing context
+        // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
+        const originalNext = modelStream.next.bind(modelStream);
+        modelStream.next = (...args) =>
+          span.withContext(() => originalNext(...args));
 
-      try {
-        for await (const partial of modelStream) {
-          accumulator.addPartial(partial);
-          yield {
-            type: "partial",
-            ...partial,
-          };
+        const accumulator = new StreamAccumulator();
+
+        try {
+          for await (const partial of modelStream) {
+            accumulator.addPartial(partial);
+            yield {
+              type: "partial",
+              ...partial,
+            };
+          }
+        } catch (err) {
+          if (err instanceof LanguageModelError) {
+            throw new AgentLanguageModelError(err);
+          }
+          throw err;
         }
-      } catch (err) {
-        if (err instanceof LanguageModelError) {
-          throw new AgentLanguageModelError(err);
-        }
-        throw err;
-      }
 
-      const { content, cost, usage } = accumulator.computeResponse();
+        const { content, cost, usage } = accumulator.computeResponse();
 
-      const assistantMessage: Message = {
-        role: "assistant",
-        content,
-      };
-      state.appendMessages([assistantMessage]);
-
-      state.appendModelCall({
-        usage: usage ?? null,
-        cost: cost ?? null,
-        model_id: this.#model.modelId,
-        provider: this.#model.provider,
-      });
-
-      yield {
-        type: "message",
-        ...assistantMessage,
-      };
-
-      const processResult = await this.#process(context, state, content);
-
-      if (processResult.type === "response") {
-        const response = state.createResponse(processResult.content);
-        yield {
-          type: "response",
-          ...response,
+        const assistantMessage: Message = {
+          role: "assistant",
+          content,
         };
-        return response;
-      } else {
-        for (const message of processResult.messages) {
-          state.appendMessages([message]);
-          yield {
-            type: "message",
-            ...message,
-          };
-        }
-      }
+        state.appendMessages([assistantMessage]);
 
-      state.turn();
+        state.appendModelCall({
+          usage: usage ?? null,
+          cost: cost ?? null,
+          model_id: this.#model.modelId,
+          provider: this.#model.provider,
+        });
+
+        yield {
+          type: "message",
+          ...assistantMessage,
+        };
+
+        const processResult = await span.withContext(() =>
+          this.#process(context, state, content),
+        );
+
+        if (processResult.type === "response") {
+          const response = state.createResponse(processResult.content);
+          yield {
+            type: "response",
+            ...response,
+          };
+          span.onResponse(response);
+          return response;
+        } else {
+          for (const message of processResult.messages) {
+            state.appendMessages([message]);
+            yield {
+              type: "message",
+              ...message,
+            };
+          }
+        }
+
+        state.turn();
+      }
+    } catch (err) {
+      span.onError(err);
+      throw err;
+    } finally {
+      span.onEnd();
     }
   }
 
@@ -297,13 +339,15 @@ export class RunSession<TContext> {
   }
 
   #getLlmInput(request: AgentRequest<TContext>): LanguageModelInput {
+    const systemPrompt = getPromptForInstructionParams(
+      this.#instructions,
+      request.context,
+    );
+
     const input: LanguageModelInput = {
       // messages will be computed from getTurnMessages
       messages: [],
-      system_prompt: getPromptForInstructionParams(
-        this.#instructions,
-        request.context,
-      ),
+      system_prompt: systemPrompt,
       tools: this.#tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
@@ -333,6 +377,7 @@ export class RunSession<TContext> {
 }
 
 interface RunSessionParams<TContext> {
+  agentName: string;
   model: LanguageModel;
   instructions: InstructionParam<TContext>[];
   tools: AgentTool<TContext>[];
@@ -422,6 +467,9 @@ export class RunState {
     return [...this.#input, ...this.#output];
   }
 
+  /**
+   * Create the Agent Response
+   */
   createResponse(finalContent: Part[]): AgentResponse {
     return {
       content: finalContent,

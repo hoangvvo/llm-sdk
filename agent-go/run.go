@@ -14,6 +14,7 @@ import (
 // Once finish, the session cleans up any resources used during the run.
 // The session can be reused in multiple runs.
 type RunSession[C any] struct {
+	agentName        string
 	tools            []AgentTool[C]
 	model            llmsdk.LanguageModel
 	responseFormat   llmsdk.ResponseFormatOption
@@ -28,6 +29,7 @@ type RunSession[C any] struct {
 
 // NewRunSession creates a new run session and initializes dependencies
 func NewRunSession[C any](
+	agentName string,
 	model llmsdk.LanguageModel,
 	instructions []InstructionParam[C],
 	tools []AgentTool[C],
@@ -40,6 +42,7 @@ func NewRunSession[C any](
 	frequencyPenalty *float64,
 ) *RunSession[C] {
 	return &RunSession[C]{
+		agentName:        agentName,
 		tools:            tools,
 		model:            model,
 		responseFormat:   responseFormat,
@@ -97,9 +100,21 @@ func (s *RunSession[C]) process(
 			)
 		}
 
-		toolRes, err := agentTool.Execute(ctx, toolCallPart.Args, contextVal, runState)
+		toolRes, err := startActiveToolSpan(
+			ctx,
+			toolCallPart.ToolCallID,
+			toolCallPart.ToolName,
+			agentTool.Description(),
+			func(ctx context.Context) (AgentToolResult, error) {
+				res, err := agentTool.Execute(ctx, toolCallPart.Args, contextVal, runState)
+				if err != nil {
+					return AgentToolResult{}, NewToolExecutionError(err)
+				}
+				return res, nil
+			},
+		)
 		if err != nil {
-			return ProcessResult{}, NewToolExecutionError(err)
+			return ProcessResult{}, err
 		}
 
 		toolMessage.Content = append(toolMessage.Content, llmsdk.Part{
@@ -123,6 +138,15 @@ func (s *RunSession[C]) process(
 
 // Run runs a non-streaming execution of the agent.
 func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResponse, error) {
+	span, ctx := NewAgentSpan(ctx, s.agentName, "run")
+	var err error
+	defer func() {
+		if err != nil {
+			span.OnError(err)
+		}
+		span.OnEnd()
+	}()
+
 	state := NewRunState(request.Input, s.maxTurns)
 
 	input := s.getLLMInput(request)
@@ -130,9 +154,11 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 	for {
 		input.Messages = state.GetTurnMessages()
-		modelResponse, err := s.model.Generate(ctx, input)
+		var modelResponse *llmsdk.ModelResponse
+		modelResponse, err = s.model.Generate(ctx, input)
 		if err != nil {
-			return nil, NewLanguageModelError(err)
+			err = NewLanguageModelError(err)
+			return nil, err
 		}
 
 		content := modelResponse.Content
@@ -146,20 +172,23 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 			Provider: s.model.Provider(),
 		})
 
-		result, err := s.process(ctx, contextVal, state, content)
+		var result ProcessResult
+		result, err = s.process(ctx, contextVal, state, content)
 		if err != nil {
 			return nil, err
 		}
 
 		if result.Response != nil {
-			return state.CreateResponse(*result.Response), nil
+			response := state.CreateResponse(*result.Response)
+			span.OnResponse(response)
+			return response, nil
 		}
 
 		if result.Next != nil {
 			state.AppendMessages(*result.Next)
 		}
 
-		if err := state.Turn(); err != nil {
+		if err = state.Turn(); err != nil {
 			return nil, err
 		}
 	}
@@ -167,6 +196,8 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 // Run a streaming execution of the agent.
 func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) *AgentStream {
+	span, ctx := NewAgentSpan(ctx, s.agentName, "run_stream")
+
 	state := NewRunState(request.Input, s.maxTurns)
 
 	input := s.getLLMInput(request)
@@ -176,15 +207,24 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 	errChan := make(chan error, 1)
 
 	go func() {
+		var err error
 		defer close(eventChan)
 		defer close(errChan)
+		defer func() {
+			if err != nil {
+				span.OnError(err)
+			}
+			span.OnEnd()
+		}()
 
 		for {
 			input.Messages = state.GetTurnMessages()
 
-			modelStream, err := s.model.Stream(ctx, input)
+			var modelStream *llmsdk.LanguageModelStream
+			modelStream, err = s.model.Stream(ctx, input)
 			if err != nil {
-				errChan <- NewLanguageModelError(err)
+				err := NewLanguageModelError(err)
+				errChan <- err
 				return
 			}
 
@@ -193,8 +233,9 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 			for modelStream.Next() {
 				partial := modelStream.Current()
 
-				if err := accumulator.AddPartial(*partial); err != nil {
-					errChan <- NewInvariantError(fmt.Sprintf("failed to accumulate stream: %v", err))
+				if err = accumulator.AddPartial(*partial); err != nil {
+					err = NewInvariantError(fmt.Sprintf("failed to accumulate stream: %v", err))
+					errChan <- err
 					return
 				}
 
@@ -203,12 +244,14 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 				}
 			}
 
-			if err := modelStream.Err(); err != nil {
-				errChan <- NewLanguageModelError(err)
+			if err = modelStream.Err(); err != nil {
+				err := NewLanguageModelError(err)
+				errChan <- err
 				return
 			}
 
-			modelResponse, err := accumulator.ComputeResponse()
+			var modelResponse llmsdk.ModelResponse
+			modelResponse, err = accumulator.ComputeResponse()
 			if err != nil {
 				errChan <- err
 				return
@@ -235,7 +278,8 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 				Message: &assistantMessage,
 			}
 
-			result, err := s.process(ctx, contextVal, state, content)
+			var result ProcessResult
+			result, err = s.process(ctx, contextVal, state, content)
 			if err != nil {
 				errChan <- err
 				return
@@ -243,6 +287,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 
 			if result.Response != nil {
 				response := state.CreateResponse(*result.Response)
+				span.OnResponse(response)
 				eventChan <- &AgentStreamEvent{
 					Response: response,
 				}
@@ -258,7 +303,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 				}
 			}
 
-			if err := state.Turn(); err != nil {
+			if err = state.Turn(); err != nil {
 				errChan <- err
 				return
 			}
