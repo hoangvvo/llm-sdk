@@ -26,6 +26,7 @@ const (
 	InvariantErrorKind             ErrorKind = "invariant_error"
 	ToolExecutionErrorKind         ErrorKind = "tool_execution_error"
 	AgentErrorKindMaxTurnsExceeded ErrorKind = "max_turns_exceeded"
+	InitErrorKind                  ErrorKind = "init_error"
 )
 
 func NewLanguageModelError(err error) *AgentError {
@@ -55,5 +56,13 @@ func NewMaxTurnsExceededError(turns int) *AgentError {
 	return &AgentError{
 		Kind:    AgentErrorKindMaxTurnsExceeded,
 		Message: fmt.Sprintf("the maximum number of turns (%d) has been exceeded.", turns),
+	}
+}
+
+func NewInitError(err error) *AgentError {
+	return &AgentError{
+		Kind:    InitErrorKind,
+		Message: fmt.Sprintf("run initialization error: %v", err),
+		Err:     err,
 	}
 }

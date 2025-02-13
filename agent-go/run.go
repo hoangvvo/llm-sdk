@@ -149,7 +149,10 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 	state := NewRunState(request.Input, s.maxTurns)
 
-	input := s.getLLMInput(request)
+	input, err := s.getLLMInput(ctx, request)
+	if err != nil {
+		return nil, err
+	}
 	contextVal := request.Context
 
 	for {
@@ -195,12 +198,15 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 }
 
 // Run a streaming execution of the agent.
-func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) *AgentStream {
+func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*AgentStream, error) {
 	span, ctx := NewAgentSpan(ctx, s.agentName, "run_stream")
 
 	state := NewRunState(request.Input, s.maxTurns)
 
-	input := s.getLLMInput(request)
+	input, err := s.getLLMInput(ctx, request)
+	if err != nil {
+		return nil, err
+	}
 	contextVal := request.Context
 
 	eventChan := make(chan *AgentStreamEvent)
@@ -310,14 +316,14 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 		}
 	}()
 
-	return NewAgentStream(eventChan, errChan)
+	return NewAgentStream(eventChan, errChan), nil
 }
 
 func (s *RunSession[C]) Finish() {
 	// Cleanup dependencies if needed
 }
 
-func (s *RunSession[C]) getLLMInput(request AgentRequest[C]) *llmsdk.LanguageModelInput {
+func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]) (*llmsdk.LanguageModelInput, error) {
 	// Convert AgentTool to SDK Tool
 	var tools []llmsdk.Tool
 	for _, tool := range s.tools {
@@ -328,7 +334,10 @@ func (s *RunSession[C]) getLLMInput(request AgentRequest[C]) *llmsdk.LanguageMod
 		})
 	}
 
-	systemPrompt := getPrompt(s.instructions, request.Context)
+	systemPrompt, err := getPrompt(ctx, s.instructions, request.Context)
+	if err != nil {
+		return nil, NewInitError(err)
+	}
 
 	return &llmsdk.LanguageModelInput{
 		// messages will be computed from getTurnMessages
@@ -341,7 +350,7 @@ func (s *RunSession[C]) getLLMInput(request AgentRequest[C]) *llmsdk.LanguageMod
 		TopK:             s.topK,
 		PresencePenalty:  s.presencePenalty,
 		FrequencyPenalty: s.frequencyPenalty,
-	}
+	}, nil
 }
 
 // ProcessResult represents the result of processing a model response

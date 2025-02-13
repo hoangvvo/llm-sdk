@@ -128,7 +128,7 @@ where
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
         let state = RunState::new(request.input.clone(), self.max_turns);
 
-        let (input, context) = self.get_llm_input(request);
+        let (input, context) = self.get_llm_input(request).await?;
 
         loop {
             let mut input = input.clone();
@@ -140,19 +140,20 @@ where
                 cost,
             } = self.model.generate(input).await?;
 
-            state.append_messages(vec![Message::assistant(content.clone())]).await;
+            state
+                .append_messages(vec![Message::assistant(content.clone())])
+                .await;
 
-            state.append_model_call(ModelCallInfo {
-                usage,
-                cost,
-                model_id: self.model.model_id(),
-                provider: self.model.provider().to_string(),
-            }).await;
+            state
+                .append_model_call(ModelCallInfo {
+                    usage,
+                    cost,
+                    model_id: self.model.model_id(),
+                    provider: self.model.provider().to_string(),
+                })
+                .await;
 
-            match self
-                .process(context.clone(), &state, content)
-                .await?
-            {
+            match self.process(context.clone(), &state, content).await? {
                 ProcessResult::Response(final_content) => {
                     return Ok(state.create_response(final_content).await);
                 }
@@ -166,13 +167,10 @@ where
     }
 
     /// Run a streaming execution of the agent.
-    pub fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
-        let state = Arc::new(RunState::new(
-            request.input.clone(),
-            self.max_turns,
-        ));
+    pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
+        let state = Arc::new(RunState::new(request.input.clone(), self.max_turns));
 
-        let (input, context) = self.get_llm_input(request);
+        let (input, context) = self.get_llm_input(request).await?;
 
         let session = Arc::new(Self {
             tools: self.tools.clone(),
@@ -246,15 +244,19 @@ where
         // Cleanup dependencies if needed
     }
 
-    fn get_llm_input(&self, request: AgentRequest<TCtx>) -> (LanguageModelInput, Arc<TCtx>) {
-        (
+    async fn get_llm_input(
+        &self,
+        request: AgentRequest<TCtx>,
+    ) -> Result<(LanguageModelInput, Arc<TCtx>), AgentError> {
+        let system_prompt = instruction::get_prompt(&self.instructions, &request.context)
+            .await
+            .map_err(AgentError::Init)?;
+
+        Ok((
             LanguageModelInput {
                 // messages will be computed from getTurnMessages
                 messages: vec![],
-                system_prompt: Some(instruction::get_prompt(
-                    &self.instructions,
-                    &request.context,
-                )),
+                system_prompt: Some(system_prompt),
                 tools: Some(self.tools.iter().map(|tool| tool.as_ref().into()).collect()),
                 response_format: Some(self.response_format.clone()),
                 temperature: self.temperature,
@@ -265,7 +267,7 @@ where
                 ..Default::default()
             },
             Arc::new(request.context),
-        )
+        ))
     }
 }
 

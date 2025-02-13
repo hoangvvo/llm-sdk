@@ -55,7 +55,7 @@ where
     /// A session is created for the run and cleaned up afterwards.
     pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
         let run_session = Arc::new(self.create_session().await);
-        let mut stream = run_session.clone().run_stream(request)?;
+        let mut stream = run_session.clone().run_stream(request).await?;
 
         let wrapped_stream = async_stream::stream! {
             let run_session = run_session;

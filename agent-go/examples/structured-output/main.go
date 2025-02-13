@@ -235,8 +235,8 @@ func main() {
 	responseFormat := llmsdk.NewResponseFormatJSON("travel_plan", &description, &responseSchema)
 
 	staticInstruction := "You are Bob, a travel agent that helps users plan their trips."
-	dynamicInstruction := func(ctx struct{}) string {
-		return fmt.Sprintf("The current time is %s", time.Now().Format(time.RFC3339))
+	dynamicInstruction := func(ctx context.Context, ctxVal struct{}) (string, error) {
+		return fmt.Sprintf("The current time is %s", time.Now().Format(time.RFC3339)), nil
 	}
 
 	travelAgent := llmagent.NewAgent("Bob", model,

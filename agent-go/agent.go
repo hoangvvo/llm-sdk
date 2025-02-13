@@ -141,7 +141,10 @@ func (a *Agent[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResp
 // A session is created for the run and cleaned up afterwards.
 func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*AgentStream, error) {
 	session := a.CreateSession()
-	stream := session.RunStream(ctx, request)
+	stream, err := session.RunStream(ctx, request)
+	if err != nil {
+		return nil, err
+	}
 
 	eventChan := make(chan *AgentStreamEvent)
 	errChan := make(chan error, 1)

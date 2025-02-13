@@ -1,13 +1,28 @@
+use std::pin::Pin;
+
+use crate::errors::BoxedError;
+
 pub enum InstructionParam<TCtx> {
     String(String),
-    Func(Box<dyn Fn(&TCtx) -> String + Send + Sync>),
+    Func(Box<dyn Fn(&TCtx) -> Result<String, BoxedError> + Send + Sync>),
+    AsyncFunc(
+        Box<
+            dyn Fn(
+                    &TCtx,
+                )
+                    -> Pin<Box<dyn futures::Future<Output = Result<String, BoxedError>> + Send>>
+                + Send
+                + Sync,
+        >,
+    ),
 }
 
 impl<TCtx> InstructionParam<TCtx> {
-    pub fn as_string(&self, context: &TCtx) -> String {
+    pub async fn as_string(&self, context: &TCtx) -> Result<String, BoxedError> {
         match self {
-            Self::String(s) => s.clone(),
+            Self::String(s) => Ok(s.clone()),
             Self::Func(f) => f(context),
+            Self::AsyncFunc(f) => f(context).await,
         }
     }
 }
@@ -26,7 +41,7 @@ impl<TCtx> From<&str> for InstructionParam<TCtx> {
 
 impl<TCtx, F> From<F> for InstructionParam<TCtx>
 where
-    F: Fn(&TCtx) -> String + Send + Sync + 'static,
+    F: Fn(&TCtx) -> Result<String, BoxedError> + Send + Sync + 'static,
     TCtx: Send + Sync + 'static,
 {
     fn from(value: F) -> Self {
@@ -34,10 +49,14 @@ where
     }
 }
 
-pub fn get_prompt<TCtx>(instructions: &[InstructionParam<TCtx>], context: &TCtx) -> String {
-    instructions
-        .iter()
-        .map(|param| param.as_string(context))
-        .collect::<Vec<_>>()
-        .join("\n")
+pub async fn get_prompt<TCtx>(
+    instructions: &[InstructionParam<TCtx>],
+    context: &TCtx,
+) -> Result<String, BoxedError> {
+    let results =
+        futures::future::join_all(instructions.iter().map(|param| param.as_string(context))).await;
+    Ok(results
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?
+        .join("\n"))
 }

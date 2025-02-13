@@ -10,6 +10,7 @@ import {
   type ToolMessage,
 } from "@hoangvvo/llm-sdk";
 import {
+  AgentInitError,
   AgentInvariantError,
   AgentLanguageModelError,
   AgentMaxTurnsExceededError,
@@ -172,7 +173,7 @@ export class RunSession<TContext> {
     try {
       const state = new RunState(request.input, this.#maxTurns);
 
-      const input = span.withContext(() => this.#getLlmInput(request));
+      const input = await span.withContext(() => this.#getLlmInput(request));
       const context = request.context;
 
       for (;;) {
@@ -247,7 +248,7 @@ export class RunSession<TContext> {
     try {
       const state = new RunState(request.input, this.#maxTurns);
 
-      const input = span.withContext(() => this.#getLlmInput(request));
+      const input = await span.withContext(() => this.#getLlmInput(request));
       const context = request.context;
 
       for (;;) {
@@ -338,41 +339,47 @@ export class RunSession<TContext> {
     return Promise.resolve();
   }
 
-  #getLlmInput(request: AgentRequest<TContext>): LanguageModelInput {
-    const systemPrompt = getPromptForInstructionParams(
-      this.#instructions,
-      request.context,
-    );
+  async #getLlmInput(
+    request: AgentRequest<TContext>,
+  ): Promise<LanguageModelInput> {
+    try {
+      const systemPrompt = await getPromptForInstructionParams(
+        this.#instructions,
+        request.context,
+      );
 
-    const input: LanguageModelInput = {
-      // messages will be computed from getTurnMessages
-      messages: [],
-      system_prompt: systemPrompt,
-      tools: this.#tools.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-      })),
-      response_format: this.#responseFormat,
-    };
+      const input: LanguageModelInput = {
+        // messages will be computed from getTurnMessages
+        messages: [],
+        system_prompt: systemPrompt,
+        tools: this.#tools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        })),
+        response_format: this.#responseFormat,
+      };
 
-    if (this.#temperature !== undefined) {
-      input.temperature = this.#temperature;
-    }
-    if (this.#topP !== undefined) {
-      input.top_p = this.#topP;
-    }
-    if (this.#topK !== undefined) {
-      input.top_k = this.#topK;
-    }
-    if (this.#presencePenalty !== undefined) {
-      input.presence_penalty = this.#presencePenalty;
-    }
-    if (this.#frequencyPenalty !== undefined) {
-      input.frequency_penalty = this.#frequencyPenalty;
-    }
+      if (this.#temperature !== undefined) {
+        input.temperature = this.#temperature;
+      }
+      if (this.#topP !== undefined) {
+        input.top_p = this.#topP;
+      }
+      if (this.#topK !== undefined) {
+        input.top_k = this.#topK;
+      }
+      if (this.#presencePenalty !== undefined) {
+        input.presence_penalty = this.#presencePenalty;
+      }
+      if (this.#frequencyPenalty !== undefined) {
+        input.frequency_penalty = this.#frequencyPenalty;
+      }
 
-    return input;
+      return input;
+    } catch (err) {
+      throw new AgentInitError(err);
+    }
   }
 }
 

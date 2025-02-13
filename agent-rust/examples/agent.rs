@@ -139,7 +139,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .add_instruction(
             "You are Mai, a helpful assistant. Answer questions to the best of your ability.",
         )
-        .add_instruction(|ctx: &MyContext| format!("You are talking to {}", ctx.user_name))
+        .add_instruction(|ctx: &MyContext| Ok(format!("You are talking to {}", ctx.user_name)))
         .add_tool(GetWeatherTool)
         .add_tool(SendMessageTool)
         .build();

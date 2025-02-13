@@ -40,3 +40,13 @@ export class AgentMaxTurnsExceededError extends AgentError {
     this.name = "AgentTurnsExceededError";
   }
 }
+
+export class AgentInitError extends AgentError {
+  constructor(err: unknown) {
+    super(
+      `Run initialization error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    this.name = "AgentInitError";
+    this.cause = err;
+  }
+}

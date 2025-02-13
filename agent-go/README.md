@@ -78,7 +78,7 @@ func (t *GetWeatherTool) Execute(ctx context.Context, paramsJSON json.RawMessage
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -137,7 +137,7 @@ func (t *SendMessageTool) Execute(ctx context.Context, paramsJSON json.RawMessag
 
 	return llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(string(resultJSON), nil),
+			llmsdk.NewTextPart(string(resultJSON)),
 		},
 		IsError: false,
 	}, nil
@@ -167,8 +167,8 @@ func main() {
 
 	// Create instruction params
 	staticInstruction := "You are Mai, a helpful assistant. Answer questions to the best of your ability."
-	dynamicInstruction := func(ctx MyContext) string {
-		return fmt.Sprintf("You are talking to %s", ctx.UserName)
+	dynamicInstruction := func(ctx context.Context, ctxVal MyContext) (string, error) {
+		return fmt.Sprintf("You are talking to %s", ctxVal.UserName), nil
 	}
 
 	// Create the Agent
@@ -205,7 +205,7 @@ func main() {
 
 		// Add user message as the input
 		items = append(items, llmagent.NewMessageAgentItem(llmsdk.NewUserMessage(
-			llmsdk.NewTextPart(userInput, nil),
+			llmsdk.NewTextPart(userInput),
 		)))
 
 		// Call assistant

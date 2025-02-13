@@ -216,7 +216,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let travel_agent = Agent::<()>::builder("Bob", model)
         .add_instruction("You are Bob, a travel agent that helps users plan their trips.")
-        .add_instruction(|_ctx: &()| format!("The current time is {}", chrono::Local::now()))
+        .add_instruction(|_ctx: &()| Ok(format!("The current time is {}", chrono::Local::now())))
         .response_format(response_format)
         .add_tool(SearchFlightsTool)
         .add_tool(SearchHotelsTool)

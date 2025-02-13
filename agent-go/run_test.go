@@ -916,11 +916,11 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 
 	instructions := []llmagent.InstructionParam[map[string]interface{}]{
 		{String: ptr.To("You are a helpful assistant.")},
-		{Func: func(ctx map[string]interface{}) string {
-			if userRole, ok := ctx["userRole"].(string); ok {
-				return "The user is a " + userRole + "."
+		{Func: func(ctx context.Context, ctxVal map[string]interface{}) (string, error) {
+			if userRole, ok := ctxVal["userRole"].(string); ok {
+				return "The user is a " + userRole + ".", nil
 			}
-			return ""
+			return "", nil
 		}},
 		{String: ptr.To("Always be polite.")},
 	}
@@ -983,7 +983,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 		nil, nil, nil, nil, nil,
 	)
 
-	stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
 			llmagent.NewMessageAgentItem(llmsdk.Message{
@@ -995,6 +995,9 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 			}),
 		},
 	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
 	events := []*llmagent.AgentStreamEvent{}
 	for stream.Next() {
@@ -1067,7 +1070,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 		nil, nil, nil, nil, nil,
 	)
 
-	stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
 			llmagent.NewMessageAgentItem(llmsdk.Message{
@@ -1079,6 +1082,9 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 			}),
 		},
 	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
 	events := []*llmagent.AgentStreamEvent{}
 	for stream.Next() {
@@ -1182,7 +1188,7 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 		nil, nil, nil, nil, nil,
 	)
 
-	stream := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
+	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
 			llmagent.NewMessageAgentItem(llmsdk.Message{
@@ -1194,13 +1200,16 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 			}),
 		},
 	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
 	// Consume events until error
 	for stream.Next() {
 		// consume events
 	}
 
-	err := stream.Err()
+	err = stream.Err()
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

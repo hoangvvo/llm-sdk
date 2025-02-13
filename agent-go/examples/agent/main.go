@@ -160,8 +160,8 @@ func main() {
 
 	// Create instruction params
 	staticInstruction := "You are Mai, a helpful assistant. Answer questions to the best of your ability."
-	dynamicInstruction := func(ctx MyContext) string {
-		return fmt.Sprintf("You are talking to %s", ctx.UserName)
+	dynamicInstruction := func(ctx context.Context, ctxVal MyContext) (string, error) {
+		return fmt.Sprintf("You are talking to %s", ctxVal.UserName), nil
 	}
 
 	// Create the Agent

@@ -900,6 +900,7 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
                 content: vec![create_text_part("Hi")],
             }))],
         })
+        .await
         .unwrap();
 
     let events: Vec<_> = stream.collect().await;
@@ -938,12 +939,14 @@ async fn test_run_session_streaming_throws_language_model_error() {
     )
     .await;
 
-    let result = session.run_stream(AgentRequest {
-        context: (),
-        input: vec![AgentItem::Message(Message::User(UserMessage {
-            content: vec![create_text_part("Hello")],
-        }))],
-    });
+    let result = session
+        .run_stream(AgentRequest {
+            context: (),
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![create_text_part("Hello")],
+            }))],
+        })
+        .await;
 
     match result {
         Err(AgentError::LanguageModel(err)) => {
@@ -978,7 +981,7 @@ async fn test_run_session_includes_string_and_dynamic_function_instructions() {
     let instructions: Vec<InstructionParam<TestContext>> = vec![
         InstructionParam::String("You are a helpful assistant.".to_string()),
         InstructionParam::Func(Box::new(|ctx: &TestContext| {
-            format!("The user is a {}.", ctx.user_role)
+            Ok(format!("The user is a {}.", ctx.user_role))
         })),
         InstructionParam::String("Always be polite.".to_string()),
     ];
@@ -1064,6 +1067,7 @@ async fn test_run_session_streaming_tool_call_execution() {
                 content: vec![create_text_part("Use tool")],
             }))],
         })
+        .await
         .unwrap();
 
     let events: Vec<_> = stream.collect().await;
@@ -1146,6 +1150,7 @@ async fn test_run_session_streaming_multiple_turns() {
                 content: vec![create_text_part("Calculate")],
             }))],
         })
+        .await
         .unwrap();
 
     let events: Vec<_> = stream.collect().await;
@@ -1221,12 +1226,14 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
     )
     .await;
 
-    let stream = session.run_stream(AgentRequest {
-        context: (),
-        input: vec![AgentItem::Message(Message::User(UserMessage {
-            content: vec![create_text_part("Keep using tools")],
-        }))],
-    });
+    let stream = session
+        .run_stream(AgentRequest {
+            context: (),
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![create_text_part("Keep using tools")],
+            }))],
+        })
+        .await;
 
     // The stream should either fail immediately or fail during consumption
     match stream {
