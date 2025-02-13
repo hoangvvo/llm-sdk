@@ -1,0 +1,66 @@
+---
+title: Text generation
+---
+
+import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import jsGenerateTextCode from "../../../../../sdk-js/examples/generate-text.ts?raw";
+import goGenerateTextCode from "../../../../../sdk-go/examples/generate-text/main.go?raw";
+import rustGenerateTextCode from "../../../../../sdk-rust/examples/generate-text.rs?raw";
+import jsStreamTextCode from "../../../../../sdk-js/examples/stream-text.ts?raw";
+import goStreamTextCode from "../../../../../sdk-go/examples/stream-text/main.go?raw";
+import rustStreamTextCode from "../../../../../sdk-rust/examples/stream-text.rs?raw";
+
+Text modality is represented as `TextPart`s.
+
+```ts
+export interface TextPart {
+  type: "text";
+  text: string;
+  citations?: Citation[];
+}
+```
+
+## Generate Text
+
+Use `generate()` to call the language model with `TextPart` objects.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsGenerateTextCode}
+      lang="typescript"
+      title="generate-text.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustGenerateTextCode} lang="rust" title="generate-text.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goGenerateTextCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Stream Text
+
+Text generation can also be streamed using the `stream()` method. `TextPart` in streamed responses will be represented as `TextPartDelta`:
+
+```ts
+export interface TextPartDelta {
+  type: "text";
+  text: string;
+}
+```
+
+Individual `text` chunks can be combined to create the final text output.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsStreamTextCode} lang="typescript" title="stream-text.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustStreamTextCode} lang="rust" title="stream-text.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goStreamTextCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>

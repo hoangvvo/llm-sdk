@@ -1,0 +1,91 @@
+---
+title: Function calling
+---
+
+import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import jsToolUseCode from "../../../../../sdk-js/examples/tool-use.ts?raw";
+import rustToolUseCode from "../../../../../sdk-rust/examples/tool-use.rs?raw";
+import goToolUseCode from "../../../../../sdk-go/examples/tool-use/main.go?raw";
+
+Functions can be provided to the model as `Tool`:
+
+```typescript
+/**
+ * Represents a tool that can be used by the model.
+ */
+export interface Tool {
+  /**
+   * The name of the tool.
+   */
+  name: string;
+  /**
+   * A description of the tool.
+   */
+  description: string;
+  /**
+   * The JSON schema of the parameters that the tool accepts. The type must be "object".
+   */
+  parameters: JSONSchema;
+}
+```
+
+The model might returns one or many `ToolResultPart`:
+
+```typescript
+export interface ToolCallPart {
+  type: "tool-call";
+  /**
+   * The ID of the tool call, used to match the tool result with the tool call.
+   */
+  tool_call_id: string;
+  /**
+   * The name of the tool to call.
+   */
+  tool_name: string;
+  /**
+   * The arguments to pass to the tool.
+   */
+  args: Record<string, unknown>;
+}
+```
+
+Execute the tools in your application and return the results to the model as `ToolResultPart`:
+
+```typescript
+export interface ToolResultPart {
+  type: "tool-result";
+  /**
+   * The ID of the tool call from previous assistant message.
+   */
+  tool_call_id: string;
+  /**
+   * The name of the tool that was called.
+   */
+  tool_name: string;
+  /**
+   * The content of the tool result.
+   */
+  content: Part[];
+  /**
+   * Marks the tool result as an error.
+   */
+  is_error?: boolean;
+}
+```
+
+## Function tool example
+
+Below is an example to receive tool calls from the model and return tool results back to the model.
+For complex setup, it is recommended to use the [Agent library](/agent).
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsToolUseCode} lang="typescript" title="tool-use.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustToolUseCode} lang="rust" title="tool-use.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goToolUseCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>

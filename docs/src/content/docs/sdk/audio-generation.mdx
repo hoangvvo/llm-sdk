@@ -1,0 +1,124 @@
+---
+title: Audio generation
+---
+
+import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import jsGenerateAudioCode from "../../../../../sdk-js/examples/generate-audio.ts?raw";
+import goGenerateAudioCode from "../../../../../sdk-go/examples/generate-audio/main.go?raw";
+import rustGenerateAudioCode from "../../../../../sdk-rust/examples/generate-audio.rs?raw";
+import jsStreamAudioCode from "../../../../../sdk-js/examples/stream-audio.ts?raw";
+import goStreamAudioCode from "../../../../../sdk-go/examples/stream-audio/main.go?raw";
+import rustStreamAudioCode from "../../../../../sdk-rust/examples/stream-audio.rs?raw";
+
+Audio modality is represented as `AudioPart`s.
+
+```ts
+/**
+ * A part of the message that contains an audio.
+ */
+export interface AudioPart {
+  type: "audio";
+  /**
+   * The base64-encoded audio data.
+   */
+  audio_data: string;
+  format: AudioFormat;
+  /**
+   * The sample rate of the audio. E.g. 44100, 48000.
+   */
+  sample_rate?: number;
+  /**
+   * The number of channels of the audio. E.g. 1, 2.
+   */
+  channels?: number;
+  /**
+   * The transcript of the audio.
+   */
+  transcript?: string;
+  /**
+   * Audio ID, if applicable.
+   */
+  audio_id?: string;
+}
+
+export type AudioFormat =
+  | "wav"
+  | "mp3"
+  | "linear16"
+  | "flac"
+  | "mulaw"
+  | "alaw"
+  | "aac"
+  | "opus";
+```
+
+To ensure the audio can be played correctly, the application code must consider the provided audio `format`, `sample_rate`, and `channels`.
+
+## Generate audio
+
+Supported models are capable of generating audio. To generate audio, specify `audio` in the input `modalities`.
+Depending on the provider, you may have to pass additional parameters to their API, which can be done through the `extra` field.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsGenerateAudioCode}
+      lang="typescript"
+      title="generate-audio.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustGenerateAudioCode} lang="rust" title="generate-audio.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goGenerateAudioCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Stream audio
+
+Audio generation can also be streamed using the `stream()` method. In streamed responses, `AudioPart` will be represented as `AudioPartDelta`:
+
+```ts
+/**
+ * A delta update for an audio part, used in streaming of an audio message.
+ */
+export interface AudioPartDelta {
+  type: "audio";
+  /**
+   * The base64-encoded audio data.
+   */
+  audio_data?: string;
+  format?: AudioFormat;
+  /**
+   * The sample rate of the audio. E.g. 44100, 48000.
+   */
+  sample_rate?: number;
+  /**
+   * The number of channels of the audio. E.g. 1, 2.
+   */
+  channels?: number;
+  /**
+   * The transcript of the audio.
+   */
+  transcript?: string;
+  /**
+   * The audio ID, if applicable.
+   */
+  audio_id?: string;
+}
+```
+
+Individual `audio_data` chunks can be played back as they are received. They can be combined to create the final audio output.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsStreamAudioCode} lang="typescript" title="stream-audio.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustStreamAudioCode} lang="rust" title="stream-audio.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goStreamAudioCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>

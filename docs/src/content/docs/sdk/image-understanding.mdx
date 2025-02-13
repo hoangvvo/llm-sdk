@@ -1,0 +1,52 @@
+---
+title: Image understanding
+---
+
+import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import jsDescribeImageCode from "../../../../../sdk-js/examples/describe-image.ts?raw";
+import goDescribeImageCode from "../../../../../sdk-go/examples/describe-image/main.go?raw";
+import rustDescribeImageCode from "../../../../../sdk-rust/examples/describe-image.rs?raw";
+
+Image modality is represented as `ImagePart`s.
+
+```ts
+export interface ImagePart {
+  type: "image";
+  /**
+   * The MIME type of the image. E.g. "image/jpeg", "image/png".
+   */
+  mime_type: string;
+  /**
+   * The base64-encoded image data.
+   */
+  image_data: string;
+  /**
+   * The width of the image in pixels.
+   */
+  width?: number;
+  /**
+   * The height of the image in pixels.
+   */
+  height?: number;
+}
+```
+
+## Image Understanding
+
+Images can be sent to the model as `ImagePart` objects.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsDescribeImageCode}
+      lang="typescript"
+      title="describe-image.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustDescribeImageCode} lang="rust" title="describe-image.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goDescribeImageCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
