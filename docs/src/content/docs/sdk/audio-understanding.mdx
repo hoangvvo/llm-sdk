@@ -1,0 +1,18 @@
+---
+title: Audio understanding
+---
+
+import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import jsDescribeAudio from "../../../../../sdk-js/examples/describe-audio.ts?raw";
+
+Audio can be sent to the model using an `AudioPart`. This enables use cases such as:
+
+- Transcribing audio to text
+- Summarizing spoken content
+- Analyzing sentiment in speech
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code lang="ts" code={jsDescribeAudio} title="describe-audio.ts" />
+  </TabItem>
+</Tabs>

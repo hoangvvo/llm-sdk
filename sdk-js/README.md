@@ -106,6 +106,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [Function calling](./examples/tool-use.ts)
 - [Generate audio](./examples/generate-audio.ts)
 - [Stream audio](./examples/stream-audio.ts)
+- [Describe audio](./examples/describe-audio.ts)
 
 ```bash
 node --env-file=../.env examples/generate-text.ts

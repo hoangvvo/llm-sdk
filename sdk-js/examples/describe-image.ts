@@ -14,7 +14,7 @@ const response = await model.generate({
       content: [
         {
           type: "text",
-          text: "Describe this iamge",
+          text: "Describe this image",
         },
         {
           type: "image",
