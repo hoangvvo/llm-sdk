@@ -1,7 +1,7 @@
 {
   "type": "module",
   "workspaces": [
-    "javascript"
+    "sdk-js"
   ],
   "scripts": {
     "generate": "node sdk-js/scripts/generate.js",
