@@ -8,6 +8,9 @@ export default [
   {
     files: ["**/*.{js,mjs,cjs,ts}"],
     ignores: ["**/node_modules/**"],
+    rules: {
+      "@typescript-eslint/consistent-type-imports": "error",
+    },
   },
   {
     languageOptions: {

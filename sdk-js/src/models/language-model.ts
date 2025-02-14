@@ -17,27 +17,27 @@ export type LanguageModelMetadata = {
   capabilities?: LanguageModelCapability[];
 };
 
-export interface LanguageModel {
+export abstract class LanguageModel {
   /**
    * The provider of the model, e.g. "openai", "anthropic", "google"
    */
-  provider: string;
+  abstract provider: string;
   /**
    * The ID of the model, e.g. "gpt-3.5-turbo", "haiku"
    */
-  modelId: string;
+  abstract modelId: string;
   /**
    * The metadata of the model.
    */
-  metadata?: LanguageModelMetadata;
+  abstract metadata?: LanguageModelMetadata;
   /**
    * Generates a response to the given input.
    */
-  generate(input: LanguageModelInput): Promise<ModelResponse>;
+  abstract generate(input: LanguageModelInput): Promise<ModelResponse>;
   /**
    * Generates a response to the given input, returning a stream of partial responses.
    */
-  stream(
+  abstract stream(
     input: LanguageModelInput,
   ): AsyncGenerator<PartialModelResponse, ModelResponse>;
 }
