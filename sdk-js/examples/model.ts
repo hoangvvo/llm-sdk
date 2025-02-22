@@ -11,8 +11,8 @@ export const openaiModel = new OpenAIModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 2.5 / 1_000_000,
-      outputCostPerTextToken: 10 / 1_000_000,
+      input_cost_per_text_token: 2.5 / 1_000_000,
+      output_cost_per_text_token: 10 / 1_000_000,
     },
   },
 );
@@ -23,10 +23,10 @@ export const openaiAudioModel = new OpenAIModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 2.5 / 1_000_000,
-      outputCostPerTextToken: 10 / 1_000_000,
-      inputCostPerAudioToken: 100 / 1_000_000,
-      outputCostPerAudioToken: 200 / 1_000_000,
+      input_cost_per_text_token: 2.5 / 1_000_000,
+      output_cost_per_text_token: 10 / 1_000_000,
+      input_cost_per_audio_token: 100 / 1_000_000,
+      output_cost_per_audio_token: 200 / 1_000_000,
     },
   },
 );
@@ -37,8 +37,8 @@ export const anthropicModel = new AnthropicModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 3.0 / 1_000_000,
-      outputCostPerTextToken: 15.0 / 1_000_000,
+      input_cost_per_text_token: 3.0 / 1_000_000,
+      output_cost_per_text_token: 15.0 / 1_000_000,
     },
   },
 );
@@ -49,8 +49,8 @@ export const googleModel = new GoogleModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 1.25 / 1_000_000,
-      outputCostPerTextToken: 5.0 / 1_000_000,
+      input_cost_per_text_token: 1.25 / 1_000_000,
+      output_cost_per_text_token: 5.0 / 1_000_000,
     },
   },
 );
@@ -61,8 +61,8 @@ export const cohereModel = new CohereModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 0.16 / 1_000_000,
-      outputCostPerTextToken: 0.6 / 1_000_000,
+      input_cost_per_text_token: 0.16 / 1_000_000,
+      output_cost_per_text_token: 0.6 / 1_000_000,
     },
   },
 );
@@ -73,8 +73,8 @@ export const mistralModel = new MistralModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 0.2 / 1_000_000,
-      outputCostPerTextToken: 0.6 / 1_000_000,
+      input_cost_per_text_token: 0.2 / 1_000_000,
+      output_cost_per_text_token: 0.6 / 1_000_000,
     },
   },
 );

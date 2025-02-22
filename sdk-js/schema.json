@@ -29,11 +29,11 @@
           "type": "string",
           "const": "image"
         },
-        "mimeType": {
+        "mime_type": {
           "type": "string",
           "description": "The MIME type of the image. E.g. \"image/jpeg\", \"image/png\"."
         },
-        "imageData": {
+        "image_data": {
           "type": "string",
           "description": "The base64-encoded image data."
         },
@@ -50,7 +50,7 @@
           "description": "The ID of the part, if applicable."
         }
       },
-      "required": ["type", "mimeType", "imageData"],
+      "required": ["type", "mime_type", "image_data"],
       "additionalProperties": false
     },
     "AudioEncoding": {
@@ -74,14 +74,14 @@
         "container": {
           "$ref": "#/definitions/AudioContainer"
         },
-        "audioData": {
+        "audio_data": {
           "type": "string",
           "description": "The base64-encoded audio data."
         },
         "encoding": {
           "$ref": "#/definitions/AudioEncoding"
         },
-        "sampleRate": {
+        "sample_rate": {
           "type": "integer",
           "description": "The sample rate of the audio. E.g. 44100, 48000."
         },
@@ -98,7 +98,7 @@
           "description": "The ID of the part, if applicable."
         }
       },
-      "required": ["type", "audioData"],
+      "required": ["type", "audio_data"],
       "additionalProperties": false
     },
     "ToolCallPart": {
@@ -109,11 +109,11 @@
           "type": "string",
           "const": "tool-call"
         },
-        "toolCallId": {
+        "tool_call_id": {
           "type": "string",
           "description": "The ID of the tool call, used to match the tool result with the tool call."
         },
-        "toolName": {
+        "tool_name": {
           "type": "string",
           "description": "The name of the tool to call."
         },
@@ -131,10 +131,10 @@
         },
         "id": {
           "type": "string",
-          "description": "The ID of the part, if applicable. This might not be the same as the toolCallId."
+          "description": "The ID of the part, if applicable. This might not be the same as the tool_call_id."
         }
       },
-      "required": ["type", "toolCallId", "toolName", "args"],
+      "required": ["type", "tool_call_id", "tool_name", "args"],
       "additionalProperties": false
     },
     "ToolResultPart": {
@@ -145,11 +145,11 @@
           "type": "string",
           "const": "tool-result"
         },
-        "toolCallId": {
+        "tool_call_id": {
           "type": "string",
           "description": "The ID of the tool call from previous assistant message."
         },
-        "toolName": {
+        "tool_name": {
           "type": "string",
           "description": "The name of the tool that was called."
         },
@@ -164,12 +164,12 @@
           ],
           "description": "The result of the tool call."
         },
-        "isError": {
+        "is_error": {
           "type": "boolean",
           "description": "Marks the tool result as an error."
         }
       },
-      "required": ["type", "toolCallId", "toolName", "result"],
+      "required": ["type", "tool_call_id", "tool_name", "result"],
       "additionalProperties": false
     },
     "Part": {
@@ -191,6 +191,19 @@
         }
       ]
     },
+    "UserMessageContentPart": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TextPart"
+        },
+        {
+          "$ref": "#/definitions/ImagePart"
+        },
+        {
+          "$ref": "#/definitions/AudioPart"
+        }
+      ]
+    },
     "UserMessage": {
       "type": "object",
       "description": "Represents a message sent by the user.",
@@ -202,22 +215,25 @@
         "content": {
           "type": "array",
           "items": {
-            "oneOf": [
-              {
-                "$ref": "#/definitions/TextPart"
-              },
-              {
-                "$ref": "#/definitions/ImagePart"
-              },
-              {
-                "$ref": "#/definitions/AudioPart"
-              }
-            ]
+            "$ref": "#/definitions/UserMessageContentPart"
           }
         }
       },
       "required": ["role", "content"],
       "additionalProperties": false
+    },
+    "AssistantMessageContentPart": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TextPart"
+        },
+        {
+          "$ref": "#/definitions/ToolCallPart"
+        },
+        {
+          "$ref": "#/definitions/AudioPart"
+        }
+      ]
     },
     "AssistantMessage": {
       "type": "object",
@@ -230,17 +246,7 @@
         "content": {
           "type": "array",
           "items": {
-            "oneOf": [
-              {
-                "$ref": "#/definitions/TextPart"
-              },
-              {
-                "$ref": "#/definitions/ToolCallPart"
-              },
-              {
-                "$ref": "#/definitions/AudioPart"
-              }
-            ]
+            "$ref": "#/definitions/AssistantMessageContentPart"
           }
         }
       },
@@ -272,11 +278,11 @@
           "type": "string",
           "const": "tool-call"
         },
-        "toolCallId": {
+        "tool_call_id": {
           "type": "string",
           "description": "The ID of the tool call, used to match the tool result with the tool call."
         },
-        "toolName": {
+        "tool_name": {
           "type": "string",
           "description": "The name of the tool to call."
         },
@@ -286,7 +292,7 @@
         },
         "id": {
           "type": "string",
-          "description": "The ID of the part, if applicable. This might not be the same as the toolCallId."
+          "description": "The ID of the part, if applicable. This might not be the same as the tool_call_id."
         }
       },
       "required": ["type"],
@@ -299,7 +305,7 @@
           "type": "string",
           "const": "audio"
         },
-        "audioData": {
+        "audio_data": {
           "type": "string",
           "description": "The base64-encoded audio data."
         },
@@ -309,7 +315,7 @@
         "encoding": {
           "$ref": "#/definitions/AudioEncoding"
         },
-        "sampleRate": {
+        "sample_rate": {
           "type": "integer",
           "description": "The sample rate of the audio. E.g. 44100, 48000."
         },
@@ -329,6 +335,19 @@
       "required": ["type"],
       "additionalProperties": false
     },
+    "ContentDeltaPart": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TextPartDelta"
+        },
+        {
+          "$ref": "#/definitions/ToolCallPartDelta"
+        },
+        {
+          "$ref": "#/definitions/AudioPartDelta"
+        }
+      ]
+    },
     "ContentDelta": {
       "type": "object",
       "properties": {
@@ -336,17 +355,7 @@
           "type": "integer"
         },
         "part": {
-          "oneOf": [
-            {
-              "$ref": "#/definitions/TextPartDelta"
-            },
-            {
-              "$ref": "#/definitions/ToolCallPartDelta"
-            },
-            {
-              "$ref": "#/definitions/AudioPartDelta"
-            }
-          ]
+          "$ref": "#/definitions/ContentDeltaPart"
         }
       },
       "required": ["index", "part"],
@@ -415,26 +424,26 @@
         }
       ]
     },
-    "ModelTokensDetail": {
+    "ModelTokensDetails": {
       "type": "object",
       "description": "Represents the token usage of the model.",
       "properties": {
-        "textTokens": {
+        "text_tokens": {
           "type": "integer"
         },
-        "cachedTextTokens": {
+        "cached_text_tokens": {
           "type": "integer"
         },
-        "audioTokens": {
+        "audio_tokens": {
           "type": "integer"
         },
-        "cachedAudioTokens": {
+        "cached_audio_tokens": {
           "type": "integer"
         },
-        "imageTokens": {
+        "image_tokens": {
           "type": "integer"
         },
-        "cachedImageTokens": {
+        "cached_image_tokens": {
           "type": "integer"
         }
       },
@@ -444,20 +453,20 @@
       "type": "object",
       "description": "Represents the token usage of the model.",
       "properties": {
-        "inputTokens": {
+        "input_tokens": {
           "type": "integer"
         },
-        "outputTokens": {
+        "output_tokens": {
           "type": "integer"
         },
-        "inputTokensDetail": {
-          "$ref": "#/definitions/ModelTokensDetail"
+        "input_tokens_details": {
+          "$ref": "#/definitions/ModelTokensDetails"
         },
-        "outputTokensDetail": {
-          "$ref": "#/definitions/ModelTokensDetail"
+        "output_tokens_details": {
+          "$ref": "#/definitions/ModelTokensDetails"
         }
       },
-      "required": ["inputTokens", "outputTokens"],
+      "required": ["input_tokens", "output_tokens"],
       "additionalProperties": false
     },
     "ModelResponse": {
@@ -467,17 +476,7 @@
         "content": {
           "type": "array",
           "items": {
-            "oneOf": [
-              {
-                "$ref": "#/definitions/TextPart"
-              },
-              {
-                "$ref": "#/definitions/ToolCallPart"
-              },
-              {
-                "$ref": "#/definitions/AudioPart"
-              }
-            ]
+            "$ref": "#/definitions/AssistantMessageContentPart"
           }
         },
         "usage": {
@@ -545,11 +544,11 @@
           "type": "string",
           "const": "tool"
         },
-        "toolName": {
+        "tool_name": {
           "type": "string"
         }
       },
-      "required": ["type", "toolName"],
+      "required": ["type", "tool_name"],
       "additionalProperties": false
     },
     "ResponseFormatText": {
@@ -581,10 +580,38 @@
       "type": "string",
       "enum": ["text", "audio"]
     },
+    "ToolChoiceOption": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ToolChoiceAuto"
+        },
+        {
+          "$ref": "#/definitions/ToolChoiceNone"
+        },
+        {
+          "$ref": "#/definitions/ToolChoiceRequired"
+        },
+        {
+          "$ref": "#/definitions/ToolChoiceTool"
+        }
+      ],
+      "description": "Determines how the model should choose which tool to use. \"auto\" - The model will automatically choose the tool to use or not use any tools. \"none\" - The model will not use any tools. \"required\" - The model will be forced to use a tool. { type: \"tool\", toolName: \"toolName\" } - The model will use the specified tool."
+    },
+    "ResponseFormatOption": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ResponseFormatText"
+        },
+        {
+          "$ref": "#/definitions/ResponseFormatJson"
+        }
+      ],
+      "description": "The format that the model must output"
+    },
     "LanguageModelInput": {
       "type": "object",
       "properties": {
-        "systemPrompt": {
+        "system_prompt": {
           "type": "string",
           "description": "A system prompt is a way of providing context and instructions to the model"
         },
@@ -602,35 +629,13 @@
           },
           "description": "Definitions of tools that the model may use."
         },
-        "toolChoice": {
-          "oneOf": [
-            {
-              "$ref": "#/definitions/ToolChoiceAuto"
-            },
-            {
-              "$ref": "#/definitions/ToolChoiceNone"
-            },
-            {
-              "$ref": "#/definitions/ToolChoiceRequired"
-            },
-            {
-              "$ref": "#/definitions/ToolChoiceTool"
-            }
-          ],
-          "description": "Determines how the model should choose which tool to use. \"auto\" - The model will automatically choose the tool to use or not use any tools. \"none\" - The model will not use any tools. \"required\" - The model will be forced to use a tool. { type: \"tool\", toolName: \"toolName\" } - The model will use the specified tool."
+        "tool_choice": {
+          "$ref": "#/definitions/ToolChoiceOption"
         },
-        "responseFormat": {
-          "oneOf": [
-            {
-              "$ref": "#/definitions/ResponseFormatJson"
-            },
-            {
-              "$ref": "#/definitions/ResponseFormatText"
-            }
-          ],
-          "description": "The format that the model must output"
+        "response_format": {
+          "$ref": "#/definitions/ResponseFormatOption"
         },
-        "maxTokens": {
+        "max_tokens": {
           "type": "integer",
           "description": "The maximum number of tokens that can be generated in the chat completion."
         },
@@ -638,19 +643,19 @@
           "type": "number",
           "description": "Amount of randomness injected into the response. Ranges from 0.0 to 1.0"
         },
-        "topP": {
+        "top_p": {
           "type": "number",
           "description": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass Ranges from 0.0 to 1.0"
         },
-        "topK": {
+        "top_k": {
           "type": "number",
           "description": "Only sample from the top K options for each subsequent token. Used to remove \"long tail\" low probability responses. Ranges from 0.0 to 1.0"
         },
-        "presencePenalty": {
+        "presence_penalty": {
           "type": "number",
           "description": "Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics."
         },
-        "frequencyPenalty": {
+        "frequency_penalty": {
           "type": "number",
           "description": "Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim."
         },
@@ -684,47 +689,46 @@
         "audio-input",
         "audio-output",
         "image-input",
-        "image-output",
-        "caching"
+        "image-output"
       ]
     },
     "LanguageModelPricing": {
       "type": "object",
       "description": "A metadata property that describes the pricing of the model.",
       "properties": {
-        "inputCostPerTextToken": {
+        "input_cost_per_text_token": {
           "type": "number",
           "description": "The cost in USD per single text token for input."
         },
-        "inputCostPerCachedTextToken": {
+        "input_cost_per_cached_text_token": {
           "type": "number",
           "description": "The cost in USD per single cached text token for input."
         },
-        "outputCostPerTextToken": {
+        "output_cost_per_text_token": {
           "type": "number",
           "description": "The cost in USD per single text token for output."
         },
-        "inputCostPerAudioToken": {
+        "input_cost_per_audio_token": {
           "type": "number",
           "description": "The cost in USD per single audio token for input."
         },
-        "inputCostPerCachedAudioToken": {
+        "input_cost_per_cached_audio_token": {
           "type": "number",
           "description": "The cost in USD per single cached audio token for input."
         },
-        "outputCostPerAudioToken": {
+        "output_cost_per_audio_token": {
           "type": "number",
           "description": "The cost in USD per single audio token for output."
         },
-        "inputCostPerImageToken": {
+        "input_cost_per_image_token": {
           "type": "number",
           "description": "The cost in USD per single image token for input."
         },
-        "inputCostPerCachedImageToken": {
+        "input_cost_per_cached_image_token": {
           "type": "number",
           "description": "The cost in USD per single cached image token for input."
         },
-        "outputCostPerImageToken": {
+        "output_cost_per_image_token": {
           "type": "number",
           "description": "The cost in USD per single image token for output."
         }

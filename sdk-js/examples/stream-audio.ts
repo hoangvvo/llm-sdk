@@ -28,15 +28,15 @@ let current = await response.next();
 while (!current.done) {
   const part = current.value.delta.part;
   if (part.type === "audio") {
-    if (part.audioData) {
+    if (part.audio_data) {
       speaker =
         speaker ||
         new Speaker({
-          sampleRate: part.sampleRate || 24000,
+          sampleRate: part.sample_rate || 24000,
           bitDepth: 16,
           channels: part.channels || 1,
         });
-      speaker.write(Buffer.from(part.audioData, "base64"));
+      speaker.write(Buffer.from(part.audio_data, "base64"));
     }
     if (part.transcript) {
       console.log(part.transcript);
@@ -50,5 +50,5 @@ const audioPart = current.value.content.find((part) => part.type === "audio");
 
 if (audioPart) {
   // will repeat that one more time
-  speaker?.write(Buffer.from(audioPart.audioData, "base64"));
+  speaker?.write(Buffer.from(audioPart.audio_data, "base64"));
 }

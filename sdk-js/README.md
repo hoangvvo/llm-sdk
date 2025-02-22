@@ -31,6 +31,12 @@ const model = new OpenAIModel({
 
 See [examples](./examples/) or [test cases](./test/) for more details.
 
+## Migration
+
+### To 0.2.0
+
+- **All properties now use snake_case.** Initially, the design allowed properties to be transformed to either camelCase or snake_case based on the programming language. However, this flexibility led to database inconsistencies in mixed-language environments. Adopting snake_case aligns with the most common convention.
+
 ## License
 
 MIT

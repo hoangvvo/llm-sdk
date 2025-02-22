@@ -79,12 +79,16 @@ export class GoogleModel extends LanguageModel {
       ? mapGoogleUsage(result.response.usageMetadata, input)
       : undefined;
 
-    return {
+    const response: ModelResponse = {
       content: mapGoogleMessage(candidate).content,
-      ...(usage && { usage }),
-      ...(this.metadata?.pricing &&
-        usage && { cost: calculateCost(usage, this.metadata.pricing) }),
     };
+    if (usage) {
+      response.usage = usage;
+      if (this.metadata?.pricing) {
+        response.cost = calculateCost(usage, this.metadata.pricing);
+      }
+    }
+    return response;
   }
 
   async *stream(
@@ -119,10 +123,13 @@ export class GoogleModel extends LanguageModel {
       }
     }
 
-    return {
+    const response: ModelResponse = {
       content: accumulator.computeContent(),
-      ...(usage && { usage }),
     };
+    if (usage) {
+      response.usage = usage;
+    }
+    return response;
   }
 }
 
@@ -130,27 +137,37 @@ export function convertToGoogleParams(
   input: GoogleLanguageModelInput,
   options: GoogleModelOptions,
 ): GenerateContentRequest {
-  const toolConfig = convertToGoogleToolConfig(input.toolChoice);
-
+  const toolConfig = convertToGoogleToolConfig(input.tool_choice);
   const samplingParams = convertToGoogleSamplingParams(input);
 
-  return {
-    ...(!!input.systemPrompt && {
-      systemInstruction: input.systemPrompt,
-    }),
+  const params: GenerateContentRequest = {
     contents: convertToGoogleMessages(input.messages, options),
-    ...(input.tools && {
-      tools: convertToGoogleTools(input.tools),
-    }),
-    ...(toolConfig && { toolConfig }),
     generationConfig: {
       ...samplingParams,
       ...input.extra?.["generationConfig"],
-      ...(convertToGoogleResponseFormat(input.responseFormat) || {}),
-      // TODO: this does not consider input tokens
     },
     ...input.extra,
   };
+
+  if (input.system_prompt) {
+    params.systemInstruction = input.system_prompt;
+  }
+  if (input.tools) {
+    params.tools = convertToGoogleTools(input.tools);
+  }
+  if (toolConfig) {
+    params.toolConfig = toolConfig;
+  }
+  const responseFormatConfig = convertToGoogleResponseFormat(
+    input.response_format,
+  );
+  if (responseFormatConfig) {
+    params.generationConfig = {
+      ...params.generationConfig,
+      ...responseFormatConfig,
+    };
+  }
+  return params;
 }
 
 export function convertToGoogleMessages(
@@ -170,37 +187,33 @@ export function convertToGoogleMessages(
         case "image":
           return {
             inlineData: {
-              data: part.imageData,
-              mimeType: part.mimeType,
+              data: part.image_data,
+              mimeType: part.mime_type,
             },
           };
         case "audio":
           return {
             inlineData: {
-              data: part.audioData,
+              data: part.audio_data,
               mimeType: mapAudioFormatToMimeType(part),
             },
           };
         case "tool-call":
           return {
             functionCall: {
-              name: part.toolName,
+              name: part.tool_name,
               args: part.args || {},
             },
           };
         case "tool-result": {
-          let response = part.result as object;
-
-          if (Array.isArray(response)) {
-            // NOTE: Gemini does not work with Array
-            response = { result: response };
+          let responseObj = part.result as object;
+          if (Array.isArray(responseObj)) {
+            responseObj = { result: responseObj };
           }
-
-          // NOTE: Gemini does not accept a tool call id
           return {
             functionResponse: {
-              name: part.toolName,
-              response,
+              name: part.tool_name,
+              response: responseObj,
             },
           };
         }
@@ -237,25 +250,25 @@ export function convertToGoogleMessages(
 
 export function convertToGoogleSamplingParams(
   input: Partial<LanguageModelInput>,
-) {
-  return {
-    ...(typeof input.maxTokens === "number" && {
-      maxOutputTokens: input.maxTokens,
-    }),
-    ...(typeof input.temperature === "number" && {
-      temperature: input.temperature,
-    }),
-    ...(typeof input.topP === "number" && {
-      topP: input.topP,
-    }),
-    ...(typeof input.topK === "number" && {
-      topK: input.topK,
-    }),
-  } satisfies GenerationConfig;
+): GenerationConfig {
+  const config: GenerationConfig = {};
+  if (typeof input.max_tokens === "number") {
+    config.maxOutputTokens = input.max_tokens;
+  }
+  if (typeof input.temperature === "number") {
+    config.temperature = input.temperature;
+  }
+  if (typeof input.top_p === "number") {
+    config.topP = input.top_p;
+  }
+  if (typeof input.top_k === "number") {
+    config.topK = input.top_k;
+  }
+  return config;
 }
 
 export function convertToGoogleToolConfig(
-  toolChoice: LanguageModelInput["toolChoice"],
+  toolChoice: LanguageModelInput["tool_choice"],
 ): ToolConfig | undefined {
   if (!toolChoice) {
     return undefined;
@@ -284,7 +297,7 @@ export function convertToGoogleToolConfig(
       return {
         functionCallingConfig: {
           mode: FunctionCallingMode.ANY,
-          allowedFunctionNames: [toolChoice.toolName],
+          allowedFunctionNames: [toolChoice.tool_name],
         },
       };
     default: {
@@ -299,23 +312,24 @@ export function convertToGoogleTools(
 ): FunctionDeclarationsTool[] {
   return [
     {
-      functionDeclarations: tools.map(
-        (tool): FunctionDeclaration => ({
+      functionDeclarations: tools.map((tool): FunctionDeclaration => {
+        const declaration: FunctionDeclaration = {
           name: tool.name,
           description: tool.description,
-          ...(!!tool.parameters && {
-            parameters: convertToGoogleSchema(
-              tool.parameters,
-            ) as FunctionDeclarationSchema,
-          }),
-        }),
-      ),
+        };
+        if (tool.parameters) {
+          declaration.parameters = convertToGoogleSchema(
+            tool.parameters,
+          ) as FunctionDeclarationSchema;
+        }
+        return declaration;
+      }),
     },
   ];
 }
 
 export function convertToGoogleResponseFormat(
-  responseFormat: LanguageModelInput["responseFormat"],
+  responseFormat: LanguageModelInput["response_format"],
 ): GenerationConfig | undefined {
   if (responseFormat?.type === "json") {
     const generationConfig: GenerationConfig = {
@@ -333,52 +347,64 @@ export function convertToGoogleResponseFormat(
 
 export function convertToGoogleSchema(schema: Record<string, unknown>): Schema {
   const allowedFormatValues = ["float", "double", "int32", "int64", "enum"];
-
   let enumValue = schema["enum"] as string[] | undefined;
   if (typeof schema["const"] === "string") {
     enumValue = [...(enumValue || []), schema["const"]];
   }
-
-  return {
-    ...(!!schema["type"] && { type: schema["type"] as SchemaType }),
-    ...(typeof schema["format"] === "string" &&
-      allowedFormatValues.includes(schema["format"]) && {
-        format: schema["format"],
-      }),
-    ...(!!schema["description"] && {
-      description: schema["description"] as string,
-    }),
-    ...(!!enumValue && { enum: enumValue }),
-    ...(!!schema["maxItems"] && { maxItems: schema["maxItems"] as number }),
-    ...(!!schema["minItems"] && { minItems: schema["minItems"] as number }),
-    ...(!!schema["properties"] && {
-      properties: Object.fromEntries(
-        Object.entries(schema["properties"]).map(([key, value]) => [
-          key,
-          convertToGoogleSchema(value as Record<string, unknown>),
-        ]),
-      ),
-    }),
-    ...(!!schema["required"] && { required: schema["required"] as string[] }),
-    ...(!!schema["items"] && {
-      items: convertToGoogleSchema(schema["items"] as Record<string, unknown>),
-    }),
-    ...(!!schema["allOf"] && {
-      allOf: (schema["allOf"] as Record<string, unknown>[]).map((value) =>
-        convertToGoogleSchema(value),
-      ),
-    }),
-    ...(!!schema["anyOf"] && {
-      anyOf: (schema["anyOf"] as Record<string, unknown>[]).map((value) =>
-        convertToGoogleSchema(value),
-      ),
-    }),
-    ...(!!schema["oneOf"] && {
-      oneOf: (schema["oneOf"] as Record<string, unknown>[]).map((value) =>
-        convertToGoogleSchema(value),
-      ),
-    }),
-  };
+  const result: Schema = {};
+  if (schema["type"]) {
+    result.type = schema["type"] as SchemaType;
+  }
+  if (
+    typeof schema["format"] === "string" &&
+    allowedFormatValues.includes(schema["format"])
+  ) {
+    result.format = schema["format"];
+  }
+  if (schema["description"]) {
+    result.description = schema["description"] as string;
+  }
+  if (enumValue) {
+    result.enum = enumValue;
+  }
+  // if (schema["maxItems"]) {
+  //   result.maxItems = schema["maxItems"] as number;
+  // }
+  // if (schema["minItems"]) {
+  //   result.minItems = schema["minItems"] as number;
+  // }
+  if (schema["properties"]) {
+    result.properties = Object.fromEntries(
+      Object.entries(schema["properties"]).map(([key, value]) => [
+        key,
+        convertToGoogleSchema(value as Record<string, unknown>),
+      ]),
+    );
+  }
+  if (schema["required"]) {
+    result.required = schema["required"] as string[];
+  }
+  if (schema["items"]) {
+    result.items = convertToGoogleSchema(
+      schema["items"] as Record<string, unknown>,
+    );
+  }
+  // if (schema["allOf"]) {
+  //   result.allOf = (schema["allOf"] as Record<string, unknown>[]).map((value) =>
+  //     convertToGoogleSchema(value),
+  //   );
+  // }
+  // if (schema["anyOf"]) {
+  //   result.anyOf = (schema["anyOf"] as Record<string, unknown>[]).map((value) =>
+  //     convertToGoogleSchema(value),
+  //   );
+  // }
+  // if (schema["oneOf"]) {
+  //   result.oneOf = (schema["oneOf"] as Record<string, unknown>[]).map((value) =>
+  //     convertToGoogleSchema(value),
+  //   );
+  // }
+  return result;
 }
 
 export function mapGoogleMessage(
@@ -403,14 +429,14 @@ export function mapGooglePart(part: GooglePart): Part | undefined {
     if (part.inlineData.mimeType.startsWith("image/")) {
       return {
         type: "image",
-        imageData: part.inlineData.data,
-        mimeType: part.inlineData.mimeType,
+        image_data: part.inlineData.data,
+        mime_type: part.inlineData.mimeType,
       };
     }
     if (part.inlineData.mimeType.startsWith("audio/")) {
       return {
         type: "audio",
-        audioData: part.inlineData.data,
+        audio_data: part.inlineData.data,
       };
     }
     throw new NotImplementedError(
@@ -421,14 +447,9 @@ export function mapGooglePart(part: GooglePart): Part | undefined {
   if (part.functionCall) {
     return {
       type: "tool-call",
-      toolCallId: genidForToolCall(),
-      toolName: part.functionCall.name,
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      args: part.functionCall.args
-        ? ({
-            ...part.functionCall.args,
-          } as Record<string, unknown>)
-        : null,
+      tool_call_id: genidForToolCall(),
+      tool_name: part.functionCall.name,
+      args: part.functionCall.args as Record<string, unknown>,
     };
   }
   if (part.codeExecutionResult) {
@@ -440,19 +461,17 @@ export function mapGooglePart(part: GooglePart): Part | undefined {
   if (part.functionResponse) {
     return {
       type: "tool-result",
-      toolCallId: genidForToolCall(),
-      toolName: part.functionResponse.name,
+      tool_call_id: genidForToolCall(),
+      tool_name: part.functionResponse.name,
       result: part.functionResponse.response as ToolResultPart["result"],
     };
   }
   if (part.fileData) {
     throw new NotImplementedError("part.fileData", part.fileData);
   }
-
   if (part.executableCode) {
     throw new NotImplementedError("part.executableCode", part.executableCode);
   }
-
   return undefined;
 }
 
@@ -464,31 +483,29 @@ export function mapGoogleDelta(
 
   content.parts.forEach((googlePart) => {
     const part = mapGooglePart(googlePart);
-
     if (!part) {
       return;
     }
-
     switch (part.type) {
       case "tool-result":
       case "image":
         throw new Error(`Unexpected part type for delta: ${part.type}`);
       case "text":
-      case "audio":
+      case "audio": {
         contentDeltas.push({
           index: guessDeltaIndex(part, [...existingDeltas, ...contentDeltas]),
           part,
         });
         break;
+      }
       case "tool-call": {
-        const o = {
+        contentDeltas.push({
           index: guessDeltaIndex(part, [...existingDeltas, ...contentDeltas]),
           part: {
             ...part,
             args: part.args ? JSON.stringify(part.args) : "",
           },
-        };
-        contentDeltas.push(o);
+        });
         break;
       }
       default: {
@@ -499,8 +516,6 @@ export function mapGoogleDelta(
         );
       }
     }
-
-    return contentDeltas;
   });
 
   return contentDeltas;
@@ -511,21 +526,20 @@ export function mapGoogleUsage(
   input: GoogleLanguageModelInput,
 ): ModelUsage {
   const cachedContentTokenCount = usage.cachedContentTokenCount;
-
   const hasAudioPart = input.messages.some(
     (s) => s.role === "user" && s.content.some((p) => p.type === "audio"),
   );
-
-  return {
-    inputTokens: usage.promptTokenCount,
-    outputTokens: usage.candidatesTokenCount,
-    ...(typeof cachedContentTokenCount === "number" && {
-      inputTokensDetail: {
-        [hasAudioPart ? "cachedAudioTokens" : "cachedTextTokens"]:
-          cachedContentTokenCount,
-      },
-    }),
+  const result: ModelUsage = {
+    input_tokens: usage.promptTokenCount,
+    output_tokens: usage.candidatesTokenCount,
   };
+  if (typeof cachedContentTokenCount === "number") {
+    result.input_tokens_details = {
+      [hasAudioPart ? "cachedAudioTokens" : "cachedTextTokens"]:
+        cachedContentTokenCount,
+    };
+  }
+  return result;
 }
 
 function genidForToolCall() {

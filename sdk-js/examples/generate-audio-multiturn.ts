@@ -66,7 +66,7 @@ const audioPart2 = response2.content.find((part) => part.type === "audio");
 
 if (audioPart2) {
   const audioBuffer2 = await decodeAudio(
-    Buffer.from(audioPart2.audioData, "base64"),
+    Buffer.from(audioPart2.audio_data, "base64"),
   );
   const playback2 = play(
     audioBuffer2,

@@ -16,13 +16,13 @@ const response = await model.generate({
       content: [
         {
           type: "tool-call",
-          toolName: "trade",
+          tool_name: "trade",
           args: {
             action: "buy",
             quantity: 50,
             symbol: "NVDA",
           },
-          toolCallId: "1",
+          tool_call_id: "1",
         },
       ],
     },
@@ -31,11 +31,11 @@ const response = await model.generate({
       content: [
         {
           type: "tool-result",
-          toolCallId: "1",
+          tool_call_id: "1",
           result: {
             status: "success",
           },
-          toolName: "trade",
+          tool_name: "trade",
         },
       ],
     },

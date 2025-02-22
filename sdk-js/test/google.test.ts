@@ -14,8 +14,8 @@ const model = new GoogleModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 1.25 / 1_000_000,
-      outputCostPerTextToken: 5.0 / 1_000_000,
+      input_cost_per_text_token: 1.25 / 1_000_000,
+      output_cost_per_text_token: 5.0 / 1_000_000,
     },
   },
 );
@@ -49,7 +49,7 @@ suite("GoogleModel", () => {
           content: [
             {
               type: "audio",
-              audioData: "",
+              audio_data: "",
               transcript: "Hi there, how can I help you?",
             },
           ],

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import test from "node:test";
-import {
+import type {
   ContentDelta,
   LanguageModel,
   Message,
@@ -183,7 +183,7 @@ export function testLanguageModel(languageModel: LanguageModel) {
           ],
         },
       ],
-      systemPrompt: 'You must always start your message with "🤖"',
+      system_prompt: 'You must always start your message with "🤖"',
     });
 
     log(response);
@@ -217,9 +217,9 @@ export function testLanguageModel(languageModel: LanguageModel) {
       (part) => part.type === "tool-call",
     );
 
-    t.assert.equal(toolCallPart!.toolCallId.length > 0, true);
+    t.assert.equal(toolCallPart!.tool_call_id.length > 0, true);
 
-    t.assert.equal(toolCallPart?.toolName, "get_weather");
+    t.assert.equal(toolCallPart?.tool_name, "get_weather");
     t.assert.equal(
       (toolCallPart?.args?.["location"] as string).includes("Boston"),
       true,
@@ -255,11 +255,11 @@ export function testLanguageModel(languageModel: LanguageModel) {
     );
 
     t.assert.equal(
-      !!toolCallPart?.toolCallId && toolCallPart.toolCallId.length > 0,
+      !!toolCallPart?.tool_call_id && toolCallPart.tool_call_id.length > 0,
       true,
     );
 
-    t.assert.equal(toolCallPart?.toolName, "get_weather");
+    t.assert.equal(toolCallPart?.tool_name, "get_weather");
     t.assert.equal(
       (toolCallPart?.args?.["location"] as string).includes("Boston"),
       true,
@@ -283,8 +283,8 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "tool-call",
-              toolCallId: "0mbnj08nt",
-              toolName: "get_weather",
+              tool_call_id: "0mbnj08nt",
+              tool_name: "get_weather",
               args: {
                 location: "Boston",
               },
@@ -296,8 +296,8 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "tool-result",
-              toolCallId: "0mbnj08nt",
-              toolName: "get_weather",
+              tool_call_id: "0mbnj08nt",
+              tool_name: "get_weather",
               result: {
                 temperature: 70,
                 unit: "f",
@@ -335,8 +335,8 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "tool-call",
-              toolCallId: "0mbnj08nt",
-              toolName: "get_weather",
+              tool_call_id: "0mbnj08nt",
+              tool_name: "get_weather",
               args: {
                 location: "Boston",
               },
@@ -348,8 +348,8 @@ export function testLanguageModel(languageModel: LanguageModel) {
           content: [
             {
               type: "tool-result",
-              toolCallId: "0mbnj08nt",
-              toolName: "get_weather",
+              tool_call_id: "0mbnj08nt",
+              tool_name: "get_weather",
               result: {
                 temperature: 70,
                 unit: "f",
@@ -399,10 +399,10 @@ export function testLanguageModel(languageModel: LanguageModel) {
     );
 
     t.assert.equal(
-      !!toolCallPart?.toolCallId && toolCallPart.toolCallId.length > 0,
+      !!toolCallPart?.tool_call_id && toolCallPart.tool_call_id.length > 0,
       true,
     );
-    t.assert.equal(toolCallPart?.toolName, "register_user");
+    t.assert.equal(toolCallPart?.tool_name, "register_user");
   });
 
   test("calculate usage and cost", async (t) => {
@@ -420,8 +420,8 @@ export function testLanguageModel(languageModel: LanguageModel) {
       ],
     });
 
-    t.assert.equal(response.usage!.inputTokens > 0, true);
-    t.assert.equal(response.usage!.outputTokens > 0, true);
+    t.assert.equal(response.usage!.input_tokens > 0, true);
+    t.assert.equal(response.usage!.output_tokens > 0, true);
     t.assert.equal(typeof response.cost, "number");
   });
 }
@@ -452,7 +452,7 @@ export function testParallelToolCalls(languageModel: LanguageModel) {
     t.assert.equal(toolCallParts.length, 2);
 
     const weatherCall = toolCallParts.find(
-      (part) => part.toolName === "get_weather",
+      (part) => part.tool_name === "get_weather",
     );
 
     t.assert.equal(
@@ -461,7 +461,7 @@ export function testParallelToolCalls(languageModel: LanguageModel) {
     );
 
     const stockCall = toolCallParts.find(
-      (part) => part.toolName === "get_stock_price",
+      (part) => part.tool_name === "get_stock_price",
     );
 
     t.assert.equal(
@@ -501,7 +501,7 @@ export function testParallelToolCalls(languageModel: LanguageModel) {
     t.assert.equal(toolCallParts.length, 2);
 
     const weatherCall = toolCallParts.find(
-      (part) => part.toolName === "get_weather",
+      (part) => part.tool_name === "get_weather",
     );
 
     t.assert.equal(
@@ -510,7 +510,7 @@ export function testParallelToolCalls(languageModel: LanguageModel) {
     );
 
     const stockCall = toolCallParts.find(
-      (part) => part.toolName === "get_stock_price",
+      (part) => part.tool_name === "get_stock_price",
     );
 
     t.assert.equal(
@@ -550,12 +550,12 @@ export function testParallelToolCalls(languageModel: LanguageModel) {
     t.assert.equal(toolCallParts.length, 2);
     const weatherCall1 = toolCallParts.find(
       (part) =>
-        part.toolName === "get_weather" &&
+        part.tool_name === "get_weather" &&
         (part.args?.["location"] as string).includes("Boston"),
     );
     const weatherCall2 = toolCallParts.find(
       (part) =>
-        part.toolName === "get_weather" &&
+        part.tool_name === "get_weather" &&
         (part.args?.["location"] as string).includes("New York"),
     );
 
@@ -596,16 +596,16 @@ function cleanContentPartObjectForDisplay(
     case "audio": {
       return {
         ...part,
-        audioData: part.audioData
-          ? `<<${String(base64ByteLength(part.audioData))} bytes>>`
+        audioData: part.audio_data
+          ? `<<${String(base64ByteLength(part.audio_data))} bytes>>`
           : undefined,
       };
     }
     case "image":
       return {
         ...part,
-        imageData: part.imageData
-          ? `<<${String(base64ByteLength(part.imageData))} bytes>>`
+        imageData: part.image_data
+          ? `<<${String(base64ByteLength(part.image_data))} bytes>>`
           : undefined,
       };
     case "tool-result": {

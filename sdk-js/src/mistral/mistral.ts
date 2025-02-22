@@ -18,6 +18,7 @@ import type {
   PartialModelResponse,
   Tool,
   ToolCallPart,
+  ToolCallPartDelta,
 } from "../types.js";
 import { convertAudioPartsToTextParts } from "../utils/message.utils.js";
 import type { InternalContentDelta } from "../utils/stream.utils.js";
@@ -64,13 +65,14 @@ export class MistralModel extends LanguageModel {
 
     const usage = mapMistralUsage(response.usage);
 
-    return {
+    const result: ModelResponse = {
       content: mapMistralMessage(choice.message).content,
       usage,
-      ...(this.metadata?.pricing && {
-        cost: calculateCost(usage, this.metadata.pricing),
-      }),
     };
+    if (this.metadata?.pricing) {
+      result.cost = calculateCost(usage, this.metadata.pricing);
+    }
+    return result;
   }
 
   async *stream(
@@ -103,14 +105,17 @@ export class MistralModel extends LanguageModel {
       }
     }
 
-    return {
+    const finalResult: ModelResponse = {
       content: accumulator.computeContent(),
-      ...(usage && { usage }),
-      ...(this.metadata?.pricing &&
-        usage && {
-          cost: calculateCost(usage, this.metadata.pricing),
-        }),
     };
+    if (usage) {
+      finalResult.usage = usage;
+      if (this.metadata?.pricing) {
+        finalResult.cost = calculateCost(usage, this.metadata.pricing);
+      }
+    }
+
+    return finalResult;
   }
 }
 
@@ -118,25 +123,28 @@ export function convertToMistralParams(
   input: LanguageModelInput,
   options: MistralModelOptions,
 ): MistralComponents.ChatCompletionRequest {
-  return {
+  const params: MistralComponents.ChatCompletionRequest = {
     model: options.modelId,
     messages: convertToMistralMessages(input, options),
-    ...(input.tools && {
-      tools: input.tools.map(convertToMistralTool),
-    }),
-    ...(input.toolChoice && {
-      toolChoice: convertToMistralToolChoice(input.toolChoice),
-    }),
-    ...(input.responseFormat && {
-      responseFormat: convertToMistralResponseFormat(input.responseFormat),
-    }),
     ...convertToMistralSamplingParams(input),
     ...input.extra,
   };
+  if (input.tools) {
+    params.tools = input.tools.map(convertToMistralTool);
+  }
+  if (input.tool_choice) {
+    params.toolChoice = convertToMistralToolChoice(input.tool_choice);
+  }
+  if (input.response_format) {
+    params.responseFormat = convertToMistralResponseFormat(
+      input.response_format,
+    );
+  }
+  return params;
 }
 
 export function convertToMistralMessages(
-  input: Pick<MistralLanguageModelInput, "messages" | "systemPrompt">,
+  input: Pick<MistralLanguageModelInput, "messages" | "system_prompt">,
   options: MistralModelOptions,
 ): MistralComponents.ChatCompletionRequest["messages"] {
   const mistralMessages: MistralComponents.ChatCompletionRequest["messages"] =
@@ -148,13 +156,13 @@ export function convertToMistralMessages(
     messages = messages.map(convertAudioPartsToTextParts);
   }
 
-  if (input.systemPrompt) {
+  if (input.system_prompt) {
     mistralMessages.push({
       role: "system",
       content: [
         {
           type: "text",
-          text: input.systemPrompt,
+          text: input.system_prompt,
         },
       ],
     });
@@ -187,9 +195,9 @@ export function convertToMistralMessages(
                 mistralMessageParam.toolCalls || [];
               mistralMessageParam.toolCalls.push({
                 type: "function",
-                id: part.toolCallId,
+                id: part.tool_call_id,
                 function: {
-                  name: part.toolName,
+                  name: part.tool_name,
                   arguments: JSON.stringify(part.args),
                 },
               });
@@ -218,8 +226,8 @@ export function convertToMistralMessages(
           mistralMessages.push({
             role: "tool",
             content: JSON.stringify(toolResult.result),
-            toolCallId: toolResult.toolCallId,
-            name: toolResult.toolName,
+            toolCallId: toolResult.tool_call_id,
+            name: toolResult.tool_name,
           });
         });
         break;
@@ -240,7 +248,7 @@ export function convertToMistralMessages(
                 return {
                   type: "image_url",
                   imageUrl: {
-                    url: `data:${part.mimeType};base64,${part.imageData}`,
+                    url: `data:${part.mime_type};base64,${part.image_data}`,
                   },
                 };
               }
@@ -274,32 +282,38 @@ export function convertToMistralMessages(
 
 export function convertToMistralSamplingParams(
   input: Partial<LanguageModelInput>,
-) {
-  return {
-    ...(typeof input.maxTokens === "number" && { maxTokens: input.maxTokens }),
-    ...(typeof input.temperature === "number" && {
-      temperature: input.temperature,
-    }),
-    ...(typeof input.topP === "number" && { topP: input.topP }),
-    ...(typeof input.presencePenalty === "number" && {
-      presencePenalty: input.presencePenalty,
-    }),
-    ...(typeof input.frequencyPenalty === "number" && {
-      frequencyPenalty: input.frequencyPenalty,
-    }),
-    ...(typeof input.seed === "number" && { randomSeed: input.seed }),
-  } satisfies Partial<MistralComponents.ChatCompletionRequest>;
+): Partial<MistralComponents.ChatCompletionRequest> {
+  const sampling: Partial<MistralComponents.ChatCompletionRequest> = {};
+  if (typeof input.max_tokens === "number") {
+    sampling.maxTokens = input.max_tokens;
+  }
+  if (typeof input.temperature === "number") {
+    sampling.temperature = input.temperature;
+  }
+  if (typeof input.top_p === "number") {
+    sampling.topP = input.top_p;
+  }
+  if (typeof input.presence_penalty === "number") {
+    sampling.presencePenalty = input.presence_penalty;
+  }
+  if (typeof input.frequency_penalty === "number") {
+    sampling.frequencyPenalty = input.frequency_penalty;
+  }
+  if (typeof input.seed === "number") {
+    sampling.randomSeed = input.seed;
+  }
+  return sampling;
 }
 
 export function convertToMistralToolChoice(
-  toolChoice: NonNullable<LanguageModelInput["toolChoice"]>,
+  toolChoice: NonNullable<LanguageModelInput["tool_choice"]>,
 ): MistralComponents.ToolChoice | MistralComponents.ToolChoiceEnum {
   switch (toolChoice.type) {
     case "tool": {
       return {
         type: "function",
         function: {
-          name: toolChoice.toolName,
+          name: toolChoice.tool_name,
         },
       };
     }
@@ -320,7 +334,7 @@ export function convertToMistralTool(tool: Tool): MistralComponents.Tool {
 }
 
 export function convertToMistralResponseFormat(
-  responseFormat: NonNullable<LanguageModelInput["responseFormat"]>,
+  responseFormat: NonNullable<LanguageModelInput["response_format"]>,
 ): MistralComponents.ResponseFormat {
   switch (responseFormat.type) {
     case "json":
@@ -389,8 +403,8 @@ export function mapMistralMessage(
 
       content.push({
         type: "tool-call",
-        toolCallId: toolCall.id,
-        toolName: toolCall.function.name,
+        tool_call_id: toolCall.id,
+        tool_name: toolCall.function.name,
         args,
       });
     });
@@ -453,14 +467,17 @@ export function mapMistralDelta(
       } else {
         args = JSON.stringify(toolCall.function.arguments);
       }
+      const toolCallPart: ToolCallPartDelta = {
+        type: "tool-call",
+        tool_name: toolCall.function.name,
+        args,
+      };
+      if (toolCall.id) {
+        toolCallPart.tool_call_id = toolCall.id;
+      }
       contentDeltas.push({
         index: contentDeltas.length,
-        part: {
-          type: "tool-call",
-          ...(toolCall.id && { toolCallId: toolCall.id }),
-          ...(toolCall.function.name && { toolName: toolCall.function.name }),
-          ...(args && { args }),
-        },
+        part: toolCallPart,
       });
     });
   }
@@ -471,7 +488,7 @@ export function mapMistralUsage(
   usage: MistralComponents.UsageInfo,
 ): ModelUsage {
   return {
-    inputTokens: usage.promptTokens,
-    outputTokens: usage.completionTokens,
+    input_tokens: usage.promptTokens,
+    output_tokens: usage.completionTokens,
   };
 }

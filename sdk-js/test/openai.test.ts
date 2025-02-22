@@ -15,8 +15,8 @@ const model = new OpenAIModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 2.5 / 1_000_000,
-      outputCostPerTextToken: 10 / 1_000_000,
+      input_cost_per_text_token: 2.5 / 1_000_000,
+      output_cost_per_text_token: 10 / 1_000_000,
     },
   },
 );
@@ -55,7 +55,7 @@ suite("OpenAIModel", () => {
           content: [
             {
               type: "audio",
-              audioData: "",
+              audio_data: "",
               transcript: "Hi there, how can I help you?",
             },
           ],
@@ -105,7 +105,7 @@ suite("OpenAIModel", () => {
 
     t.assert.equal(!!audioPart, true);
     t.assert.equal(audioPart?.type, "audio");
-    t.assert.equal(audioPart!.audioData.length > 0, true);
+    t.assert.equal(audioPart!.audio_data.length > 0, true);
     t.assert.equal(audioPart!.encoding!.length > 0, true);
     t.assert.equal(audioPart!.transcript!.length > 0, true);
     t.assert.equal(!!audioPart?.id, true);
@@ -147,7 +147,7 @@ suite("OpenAIModel", () => {
 
     t.assert.equal(!!audioPart, true);
     t.assert.equal(audioPart?.type, "audio");
-    t.assert.equal(audioPart!.audioData.length > 0, true);
+    t.assert.equal(audioPart!.audio_data.length > 0, true);
     t.assert.equal(audioPart!.encoding!.length > 0, true);
     t.assert.equal(audioPart!.transcript!.length > 0, true);
     t.assert.equal(!!audioPart?.id, true);

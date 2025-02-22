@@ -14,8 +14,8 @@ const model = new AnthropicModel(
   },
   {
     pricing: {
-      inputCostPerTextToken: 3.0 / 1_000_000,
-      outputCostPerTextToken: 15.0 / 1_000_000,
+      input_cost_per_text_token: 3.0 / 1_000_000,
+      output_cost_per_text_token: 15.0 / 1_000_000,
     },
   },
 );
@@ -49,7 +49,7 @@ suite("AnthropicModel", () => {
           content: [
             {
               type: "audio",
-              audioData: "",
+              audio_data: "",
               transcript: "Hi there, how can I help you?",
             },
           ],

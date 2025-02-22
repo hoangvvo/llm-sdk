@@ -58,17 +58,18 @@ export class AnthropicModel extends LanguageModel {
     });
 
     const usage: ModelUsage = {
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
+      input_tokens: response.usage.input_tokens,
+      output_tokens: response.usage.output_tokens,
     };
 
-    return {
+    const result: ModelResponse = {
       content: mapAnthropicMessage(response.content).content,
       usage,
-      ...(this.metadata?.pricing && {
-        cost: calculateCost(usage, this.metadata.pricing),
-      }),
     };
+    if (this.metadata?.pricing) {
+      result.cost = calculateCost(usage, this.metadata.pricing);
+    }
+    return result;
   }
 
   async *stream(
@@ -80,8 +81,8 @@ export class AnthropicModel extends LanguageModel {
     });
 
     const usage: ModelUsage = {
-      inputTokens: 0,
-      outputTokens: 0,
+      input_tokens: 0,
+      output_tokens: 0,
     };
 
     const accumulator = new ContentDeltaAccumulator();
@@ -93,11 +94,11 @@ export class AnthropicModel extends LanguageModel {
       // https://docs.anthropic.com/claude/reference/messages-streaming#raw-http-stream-response
       switch (chunk.type) {
         case "message_start":
-          usage.inputTokens += chunk.message.usage.input_tokens;
-          usage.outputTokens += chunk.message.usage.output_tokens;
+          usage.input_tokens += chunk.message.usage.input_tokens;
+          usage.output_tokens += chunk.message.usage.output_tokens;
           break;
         case "message_delta":
-          usage.outputTokens += chunk.usage.output_tokens;
+          usage.output_tokens += chunk.usage.output_tokens;
           break;
         case "content_block_start":
         case "content_block_delta": {
@@ -112,13 +113,14 @@ export class AnthropicModel extends LanguageModel {
       }
     }
 
-    return {
+    const result: ModelResponse = {
       content: accumulator.computeContent(),
       usage,
-      ...(this.metadata?.pricing && {
-        cost: calculateCost(usage, this.metadata.pricing),
-      }),
     };
+    if (this.metadata?.pricing) {
+      result.cost = calculateCost(usage, this.metadata.pricing);
+    }
+    return result;
   }
 }
 
@@ -126,23 +128,27 @@ export function convertToAnthropicParams(
   input: LanguageModelInput,
   options: AnthropicModelOptions,
 ): Anthropic.Messages.MessageCreateParams {
-  const tool_choice = convertToAnthropicToolChoice(input.toolChoice);
+  const tool_choice = convertToAnthropicToolChoice(input.tool_choice);
 
   const sampleParams = convertToAnthropicSamplingParams(input);
 
-  return {
+  const params: Anthropic.Messages.MessageCreateParams = {
     model: options.modelId,
     messages: convertToAnthropicMessages(input.messages, options),
-    ...(input.systemPrompt && { system: input.systemPrompt }),
-    ...(input.tools &&
-      input.toolChoice?.type !== "none" && {
-        tools: input.tools.map(convertToAnthropicTool),
-      }),
-    ...(tool_choice && { tool_choice }),
     ...sampleParams,
     max_tokens: sampleParams.max_tokens || 4096,
     ...input.extra,
   };
+  if (input.system_prompt) {
+    params.system = input.system_prompt;
+  }
+  if (input.tools && input.tool_choice?.type !== "none") {
+    params.tools = input.tools.map(convertToAnthropicTool);
+  }
+  if (tool_choice) {
+    params.tool_choice = tool_choice;
+  }
+  return params;
 }
 
 export function convertToAnthropicMessages(
@@ -173,8 +179,8 @@ export function convertToAnthropicMessages(
                 case "tool-call":
                   return {
                     type: "tool_use",
-                    id: part.toolCallId,
-                    name: part.toolName,
+                    id: part.tool_call_id,
+                    name: part.tool_name,
                     input: part.args,
                   };
                 case "audio":
@@ -199,7 +205,7 @@ export function convertToAnthropicMessages(
           content: message.content.map(
             (part): Anthropic.Messages.ToolResultBlockParam => ({
               type: "tool_result",
-              tool_use_id: part.toolCallId,
+              tool_use_id: part.tool_call_id,
               content: [
                 {
                   type: "text",
@@ -230,10 +236,10 @@ export function convertToAnthropicMessages(
                   return {
                     type: "image",
                     source: {
-                      data: part.imageData,
+                      data: part.image_data,
                       type: "base64",
                       media_type:
-                        part.mimeType as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
+                        part.mime_type as Anthropic.Messages.ImageBlockParam["source"]["media_type"],
                     },
                   };
                 case "audio":
@@ -264,19 +270,25 @@ export function convertToAnthropicMessages(
 
 export function convertToAnthropicSamplingParams(
   input: Partial<LanguageModelInput>,
-) {
-  return {
-    ...(input.maxTokens && { max_tokens: input.maxTokens || 4096 }),
-    ...(typeof input.temperature === "number" && {
-      temperature: input.temperature,
-    }),
-    ...(typeof input.topP === "number" && { top_p: input.topP }),
-    ...(typeof input.topK === "number" && { top_k: input.topK }),
-  } satisfies Partial<Anthropic.Messages.MessageCreateParams>;
+): Partial<Anthropic.Messages.MessageCreateParams> {
+  const params: Partial<Anthropic.Messages.MessageCreateParams> = {};
+  if (input.max_tokens) {
+    params.max_tokens = input.max_tokens || 4096;
+  }
+  if (typeof input.temperature === "number") {
+    params.temperature = input.temperature;
+  }
+  if (typeof input.top_p === "number") {
+    params.top_p = input.top_p;
+  }
+  if (typeof input.top_k === "number") {
+    params.top_k = input.top_k;
+  }
+  return params;
 }
 
 export function convertToAnthropicToolChoice(
-  toolChoice: LanguageModelInput["toolChoice"],
+  toolChoice: LanguageModelInput["tool_choice"],
 ): Anthropic.Messages.MessageCreateParams["tool_choice"] {
   if (!toolChoice) {
     return undefined;
@@ -290,7 +302,7 @@ export function convertToAnthropicToolChoice(
     case "tool":
       return {
         type: "tool",
-        name: toolChoice.toolName,
+        name: toolChoice.tool_name,
       };
     case "none": {
       // already handled in convertToAnthropicParams
@@ -339,8 +351,8 @@ export function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock) {
     case "tool_use":
       return {
         type: "tool-call",
-        toolCallId: block.id,
-        toolName: block.name,
+        tool_call_id: block.id,
+        tool_name: block.name,
         args: block.input as Record<string, unknown>,
       } satisfies ToolCallPart;
     default: {
@@ -375,8 +387,8 @@ export function mapAnthropicStreamEvent(
               index: chunk.index,
               part: {
                 type: "tool-call",
-                toolCallId: chunk.content_block.id,
-                toolName: chunk.content_block.name,
+                tool_call_id: chunk.content_block.id,
+                tool_name: chunk.content_block.name,
               },
             },
           ];
