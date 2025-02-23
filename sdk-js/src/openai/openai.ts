@@ -1,13 +1,16 @@
 import OpenAI from "openai";
-import { InvalidValueError, NotImplementedError } from "../errors/errors.js";
+import {
+  InvalidValueError,
+  ModelUnsupportedMessagePart,
+  NotImplementedError,
+} from "../errors/errors.js";
 import {
   LanguageModel,
   type LanguageModelMetadata,
 } from "../models/language-model.js";
 import type {
   AssistantMessage,
-  AudioContainer,
-  AudioEncoding,
+  AudioFormat,
   AudioPart,
   AudioPartDelta,
   ContentDelta,
@@ -244,6 +247,10 @@ export function convertToOpenAIMessages(
               openaiMessageParam.audio = { id: part.id };
               break;
             }
+            case "image":
+            case "tool-result":
+              throw new ModelUnsupportedMessagePart("openai", message, part);
+
             default: {
               const exhaustiveCheck: never = part;
               throw new InvalidValueError(
@@ -288,19 +295,26 @@ export function convertToOpenAIMessages(
                   };
                 }
                 case "audio": {
+                  if (!part.format) {
+                    throw new Error("audio part must have a format");
+                  }
                   return {
                     type: "input_audio",
                     input_audio: {
                       // this as assertion is not correct, but we will rely on OpenAI to throw an error
-                      format: (convertToOpenAIAudioFormat(
-                        part.container,
-                        part.encoding,
-                      ) ||
+                      format: (AUDIO_FORMAT_MAP[part.format] ||
                         "wav") as OpenAI.ChatCompletionContentPartInputAudio.InputAudio["format"],
                       data: part.audio_data,
                     },
                   };
                 }
+                case "tool-call":
+                case "tool-result":
+                  throw new ModelUnsupportedMessagePart(
+                    "openai",
+                    message,
+                    part,
+                  );
                 default: {
                   const exhaustiveCheck: never = part;
                   throw new InvalidValueError(
@@ -405,41 +419,21 @@ type PossibleOpenAIAudioFormat =
   | "g711_alaw";
 
 /**
- * Maps the audio container and encoding to the OpenAI audio format.
- * Loosely maps based on either container or encoding when defined.
+ * Maps the audio format to the OpenAI audio format.
  */
-export function convertToOpenAIAudioFormat(
-  container: AudioContainer | undefined,
-  encoding: AudioEncoding | undefined,
-): PossibleOpenAIAudioFormat | undefined {
-  if (!container && !encoding) return undefined;
-
-  const encodingMapping: { [key in AudioEncoding]: PossibleOpenAIAudioFormat } =
-    {
-      flac: "flac",
-      mp3: "mp3",
-      opus: "opus",
-      linear16: "pcm16",
-      mulaw: "g711_ulaw",
-      alaw: "g711_alaw",
-      aac: "aac",
-    };
-  const containerMapping: {
-    [key in AudioContainer]: PossibleOpenAIAudioFormat | undefined;
-  } = {
-    wav: "wav",
-    ogg: "opus",
-    flac: "flac",
-    webm: undefined,
-  };
-  if (container) {
-    return containerMapping[container];
-  }
-  if (encoding) {
-    return encodingMapping[encoding];
-  }
-  return undefined;
-}
+const AUDIO_FORMAT_MAP: Record<
+  AudioFormat,
+  PossibleOpenAIAudioFormat | undefined
+> = {
+  wav: "wav",
+  mp3: "mp3",
+  linear16: "pcm16",
+  flac: "flac",
+  mulaw: "g711_ulaw",
+  alaw: "g711_alaw",
+  aac: "aac",
+  opus: "opus",
+};
 
 export function convertToOpenAIResponseFormat(
   responseFormat: NonNullable<LanguageModelInput["response_format"]>,
@@ -450,15 +444,10 @@ export function convertToOpenAIResponseFormat(
   switch (responseFormat.type) {
     case "json":
       if (options.structuredOutputs && responseFormat.schema) {
-        const schemaTitle = responseFormat.schema["title"] as
-          | string
-          | undefined;
-        const schemaDescription = responseFormat.schema["description"] as
-          | string
-          | undefined;
+        const schemaDescription = responseFormat.description;
         const json_schema: OpenAI.ResponseFormatJSONSchema["json_schema"] = {
           strict: true,
-          name: schemaTitle || "response",
+          name: responseFormat.name,
           schema: responseFormat.schema,
         };
         if (schemaDescription) {
@@ -482,27 +471,26 @@ export function convertToOpenAIResponseFormat(
   }
 }
 
-export function mapOpenAIAudioFormat(format: PossibleOpenAIAudioFormat): {
-  container?: AudioContainer;
-  encoding?: AudioEncoding;
-} {
+export function mapOpenAIAudioFormat(
+  format: PossibleOpenAIAudioFormat,
+): AudioFormat {
   switch (format) {
     case "wav":
-      return { container: "wav", encoding: "linear16" };
+      return "wav";
     case "mp3":
-      return { encoding: "mp3" };
+      return "mp3";
     case "flac":
-      return { container: "flac", encoding: "flac" };
+      return "flac";
     case "opus":
-      return { encoding: "opus" };
+      return "opus";
     case "pcm16":
-      return { encoding: "linear16" };
+      return "linear16";
     case "aac":
-      return { encoding: "aac" };
+      return "aac";
     case "g711_ulaw":
-      return { encoding: "mulaw" };
+      return "mulaw";
     case "g711_alaw":
-      return { encoding: "alaw" };
+      return "alaw";
     default: {
       const exhaustiveCheck: never = format;
       throw new NotImplementedError(
@@ -529,14 +517,8 @@ export function mapOpenAIMessage(
   if (message.audio) {
     const audioPart: AudioPart = { type: "audio", audio_data: "" };
     audioPart.id = message.audio.id;
-    const audioFormat = mapOpenAIAudioFormat(options?.audio?.format || "pcm16");
-    if (audioFormat.container) {
-      audioPart.container = audioFormat.container;
-    }
-    if (audioFormat.encoding) {
-      audioPart.encoding = audioFormat.encoding;
-    }
-    if (options?.audio?.format === "pcm16") {
+    audioPart.format = mapOpenAIAudioFormat(options?.audio?.format || "pcm16");
+    if (audioPart.format === "linear16") {
       audioPart.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
       audioPart.channels = OPENAI_AUDIO_CHANNELS;
     }
@@ -594,15 +576,7 @@ export function mapOpenAIDelta(
     }
     if (delta.audio.data) {
       part.audio_data = delta.audio.data;
-      const audioFormat = mapOpenAIAudioFormat(
-        options.audio?.format || "pcm16",
-      );
-      if (audioFormat.container) {
-        part.container = audioFormat.container;
-      }
-      if (audioFormat.encoding) {
-        part.encoding = audioFormat.encoding;
-      }
+      part.format = mapOpenAIAudioFormat(options.audio?.format || "pcm16");
       part.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
       part.channels = OPENAI_AUDIO_CHANNELS;
     }

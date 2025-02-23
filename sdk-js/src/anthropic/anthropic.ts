@@ -184,7 +184,13 @@ export function convertToAnthropicMessages(
                     input: part.args,
                   };
                 case "audio":
-                  throw new ModelUnsupportedMessagePart("anthropic", part.type);
+                case "image":
+                case "tool-result":
+                  throw new ModelUnsupportedMessagePart(
+                    "anthropic",
+                    message,
+                    part,
+                  );
                 default: {
                   const exhaustiveCheck: never = part;
                   throw new InvalidValueError(
@@ -243,7 +249,13 @@ export function convertToAnthropicMessages(
                     },
                   };
                 case "audio":
-                  throw new ModelUnsupportedMessagePart("anthropic", part.type);
+                case "tool-call":
+                case "tool-result":
+                  throw new ModelUnsupportedMessagePart(
+                    "anthropic",
+                    message,
+                    part,
+                  );
                 default: {
                   const exhaustiveCheck: never = part;
                   throw new InvalidValueError(

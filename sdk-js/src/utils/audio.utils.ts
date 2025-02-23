@@ -1,4 +1,4 @@
-import type { AudioContainer, AudioEncoding } from "../types.js";
+import type { AudioFormat } from "../types.js";
 
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binaryString = atob(base64);
@@ -61,30 +61,17 @@ export function mergeInt16Arrays(arrayBuffers: unknown[]) {
   return newValues;
 }
 
-export function mapAudioFormatToMimeType({
-  encoding,
-  container,
-}: {
-  encoding?: AudioEncoding;
-  container?: AudioContainer;
-}): string {
-  const mimeTypes: { [key in AudioEncoding | AudioContainer]?: string } = {
-    ogg: "audio/ogg",
+export function mapAudioFormatToMimeType(format: AudioFormat): string {
+  const mimeTypes: { [key in AudioFormat]?: string } = {
     wav: "audio/wav",
     linear16: "audio/L16",
     flac: "audio/flac",
     mulaw: "audio/basic",
+    alaw: "audio/basic",
     mp3: "audio/mpeg",
     opus: 'audio/ogg; codecs="opus"',
-    webm: "audio/webm",
     aac: "audio/aac",
   };
 
-  if (container && mimeTypes[container]) {
-    return mimeTypes[container];
-  } else if (encoding && mimeTypes[encoding]) {
-    return mimeTypes[encoding];
-  }
-
-  return "application/octet-stream";
+  return mimeTypes[format] || "application/octet-stream";
 }

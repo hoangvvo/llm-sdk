@@ -1,4 +1,5 @@
 import type {
+  AudioPart,
   AudioPartDelta,
   ContentDelta,
   ModelResponse,
@@ -67,8 +68,8 @@ export class ContentDeltaAccumulator {
             // keep an array of audioBuffer internally and concat at the end
             existingDelta.part.audioData.push(incomingAudioData);
           }
-          if (incomingDelta.part.encoding) {
-            existingDelta.part.encoding = incomingDelta.part.encoding;
+          if (incomingDelta.part.format) {
+            existingDelta.part.format = incomingDelta.part.format;
           }
           if (incomingDelta.part.sample_rate) {
             existingDelta.part.sample_rate = incomingDelta.part.sample_rate;
@@ -129,24 +130,30 @@ export class ContentDeltaAccumulator {
             tool_name: delta.part.tool_name,
           };
         case "audio": {
-          if (delta.part.encoding !== "linear16") {
+          if (delta.part.format !== "linear16") {
             throw new Error(
-              `only linear16 encoding is supported for audio concatenation. encoding: ${String(delta.part.encoding)}`,
+              `only linear16 format is supported for audio concatenation. format: ${String(delta.part.format)}`,
             );
           }
           const concatenatedAudioData = mergeInt16Arrays(delta.part.audioData);
-          return {
+          const audioPart: AudioPart = {
             type: "audio",
-            ...(delta.part.id && { id: delta.part.id }),
             audio_data: arrayBufferToBase64(concatenatedAudioData),
-            encoding: delta.part.encoding,
-            ...(delta.part.container && { container: delta.part.container }),
-            ...(delta.part.sample_rate && {
-              sample_rate: delta.part.sample_rate,
-            }),
-            ...(delta.part.channels && { channels: delta.part.channels }),
-            ...(delta.part.transcript && { transcript: delta.part.transcript }),
           };
+          if (delta.part.id) {
+            audioPart.id = delta.part.id;
+          }
+          audioPart.format = delta.part.format;
+          if (delta.part.sample_rate) {
+            audioPart.sample_rate = delta.part.sample_rate;
+          }
+          if (delta.part.channels) {
+            audioPart.channels = delta.part.channels;
+          }
+          if (delta.part.transcript) {
+            audioPart.transcript = delta.part.transcript;
+          }
+          return audioPart;
         }
         default: {
           const exhaustiveCheck: never = delta.part;
