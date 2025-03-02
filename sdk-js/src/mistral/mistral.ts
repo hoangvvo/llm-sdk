@@ -203,8 +203,10 @@ export function convertToMistralMessages(
               });
               break;
             }
+            case "image":
+            case "tool-result":
             case "audio": {
-              throw new ModelUnsupportedMessagePart("mistral", "audio");
+              throw new ModelUnsupportedMessagePart("mistral", message, part);
             }
             default: {
               const exhaustiveCheck: never = part;
@@ -252,8 +254,10 @@ export function convertToMistralMessages(
                   },
                 };
               }
+              case "tool-call":
+              case "tool-result":
               case "audio": {
-                throw new ModelUnsupportedMessagePart("mistral", "audio");
+                throw new ModelUnsupportedMessagePart("mistral", message, part);
               }
               default: {
                 const exhaustiveCheck: never = part;
