@@ -662,6 +662,13 @@
           },
           "description": "The modalities that the model should support."
         },
+        "metadata": {
+          "type": "object",
+          "description": "A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "extra": {
           "type": "object",
           "description": "Extra options that the model may support.",

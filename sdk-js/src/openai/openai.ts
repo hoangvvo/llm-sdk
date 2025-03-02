@@ -187,6 +187,9 @@ export function convertToOpenAIParams(
   if (input.modalities) {
     params.modalities = input.modalities;
   }
+  if (input.metadata) {
+    params.metadata = input.metadata;
+  }
   return params;
 }
 

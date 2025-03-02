@@ -420,6 +420,12 @@ export interface LanguageModelInput {
    */
   modalities?: Modality[];
   /**
+   * A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.
+   */
+  metadata?: {
+    [k: string]: string;
+  };
+  /**
    * Extra options that the model may support.
    */
   extra?: {
