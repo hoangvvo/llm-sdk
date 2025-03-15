@@ -39,6 +39,7 @@ pub enum Part {
 pub enum PartDelta {
     Text(TextPartDelta),
     ToolCall(ToolCallPartDelta),
+    Image(ImagePartDelta),
     Audio(AudioPartDelta),
 }
 
@@ -58,6 +59,7 @@ pub enum Message {
 #[serde(rename_all = "lowercase")]
 pub enum Modality {
     Text,
+    Image,
     Audio,
 }
 
@@ -229,6 +231,24 @@ pub struct ToolCallPartDelta {
     /// The partial JSON string of the arguments to pass to the tool.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
+}
+
+/// A delta update for an image part, used in streaming of an image message.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ImagePartDelta {
+    /// The MIME type of the image. E.g. "image/jpeg", "image/png".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+    /// The base64-encoded image data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_data: Option<String>,
+    /// The width of the image in pixels.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    /// The height of the image in pixels.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
 }
 
 /// A delta update for an audio part, used in streaming of an audio message.

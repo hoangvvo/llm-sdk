@@ -8,6 +8,7 @@ import type {
   AudioFormat,
   AudioPartDelta,
   ContentDelta,
+  ImagePartDelta,
   ModelResponse,
   ModelUsage,
   Part,
@@ -29,29 +30,10 @@ interface AccumulatedAudioData {
   audio_id?: string;
 }
 
-/**
- * Internal representation of accumulated text data
- */
-interface AccumulatedTextData {
-  type: "text";
-  text: string;
-  id?: string;
-}
-
-/**
- * Internal representation of accumulated tool call data
- */
-interface AccumulatedToolCallData {
-  type: "tool-call";
-  toolName: string;
-  toolCallId?: string;
-  args: string;
-  id?: string;
-}
-
 type AccumulatedData =
-  | AccumulatedTextData
-  | AccumulatedToolCallData
+  | TextPartDelta
+  | ToolCallPartDelta
+  | ImagePartDelta
   | AccumulatedAudioData;
 
 /**
@@ -68,11 +50,24 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
     case "tool-call":
       return {
         type: "tool-call",
-        toolName: delta.part.tool_name ?? "",
+        tool_name: delta.part.tool_name ?? "",
         ...(delta.part.tool_call_id && {
-          toolCallId: delta.part.tool_call_id,
+          tool_call_id: delta.part.tool_call_id,
         }),
         args: delta.part.args ?? "",
+      };
+
+    case "image":
+      return {
+        type: "image",
+        image_data: delta.part.image_data ?? "",
+        ...(delta.part.mime_type && { mime_type: delta.part.mime_type }),
+        ...(typeof delta.part.width === "number" && {
+          width: delta.part.width,
+        }),
+        ...(typeof delta.part.height === "number" && {
+          height: delta.part.height,
+        }),
       };
 
     case "audio":
@@ -97,10 +92,7 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
 /**
  * Merges text delta with existing text data
  */
-function mergeTextDelta(
-  existing: AccumulatedTextData,
-  delta: TextPartDelta,
-): void {
+function mergeTextDelta(existing: TextPartDelta, delta: TextPartDelta): void {
   existing.text += delta.text;
 }
 
@@ -108,17 +100,38 @@ function mergeTextDelta(
  * Merges tool call delta with existing tool call data
  */
 function mergeToolCallDelta(
-  existing: AccumulatedToolCallData,
+  existing: ToolCallPartDelta,
   delta: ToolCallPartDelta,
 ): void {
   if (delta.tool_name) {
-    existing.toolName += delta.tool_name;
+    existing.tool_name = (existing.tool_name ?? "") + delta.tool_name;
   }
   if (delta.tool_call_id) {
-    existing.toolCallId = delta.tool_call_id;
+    existing.tool_call_id = delta.tool_call_id;
   }
   if (delta.args) {
-    existing.args += delta.args;
+    existing.args = (existing.args ?? "") + delta.args;
+  }
+}
+
+/**
+ * Merges image delta with existing image data
+ */
+function mergeImageDelta(
+  existing: ImagePartDelta,
+  delta: ImagePartDelta,
+): void {
+  if (delta.image_data) {
+    existing.image_data = (existing.image_data ?? "") + delta.image_data;
+  }
+  if (delta.mime_type) {
+    existing.mime_type = delta.mime_type;
+  }
+  if (typeof delta.width === "number") {
+    existing.width = delta.width;
+  }
+  if (typeof delta.height === "number") {
+    existing.height = delta.height;
   }
 }
 
@@ -164,11 +177,15 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
 
   switch (delta.part.type) {
     case "text":
-      mergeTextDelta(existing as AccumulatedTextData, delta.part);
+      mergeTextDelta(existing as TextPartDelta, delta.part);
       break;
 
     case "tool-call":
-      mergeToolCallDelta(existing as AccumulatedToolCallData, delta.part);
+      mergeToolCallDelta(existing as ToolCallPartDelta, delta.part);
+      break;
+
+    case "image":
+      mergeImageDelta(existing as ImagePartDelta, delta.part);
       break;
 
     case "audio":
@@ -180,42 +197,54 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
 /**
  * Creates a text part from accumulated text data
  */
-function createTextPart(data: AccumulatedTextData): Part {
+function createTextPart(data: TextPartDelta): Part {
   return {
     type: "text",
     text: data.text,
-    ...(data.id && { id: data.id }),
   };
 }
 
 /**
  * Creates a tool call part from accumulated tool call data
  */
-function createToolCallPart(
-  data: AccumulatedToolCallData,
-  index: number,
-): Part {
-  if (!data.toolCallId || !data.toolName) {
+function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
+  if (!data.tool_call_id || !data.tool_name) {
     throw new Error(
       `Missing required fields at index ${String(index)}: ` +
-        `tool_call_id=${String(data.toolCallId)}, tool_name=${data.toolName}`,
+        `tool_call_id=${String(data.tool_call_id)}, tool_name=${String(data.tool_name)}`,
     );
   }
 
   try {
     return {
       type: "tool-call",
-      tool_call_id: data.toolCallId,
-      tool_name: data.toolName,
-      args: JSON.parse(data.args) as Record<string, unknown>,
-      ...(data.id && { id: data.id }),
+      tool_call_id: data.tool_call_id,
+      tool_name: data.tool_name,
+      args: JSON.parse(data.args ?? "{}") as Record<string, unknown>,
     };
   } catch (e) {
     throw new InvariantError(
       "",
-      `Invalid tool call arguments: ${data.args}: ${(e as Error).message}`,
+      `Invalid tool call arguments: ${String(data.args)}: ${(e as Error).message}`,
     );
   }
+}
+
+function createImagePart(data: ImagePartDelta, index: number): Part {
+  if (!data.image_data || !data.mime_type) {
+    throw new Error(
+      `Missing required fields at index ${String(index)}: ` +
+        `image_data=${String(data.image_data)}, mime_type=${String(data.mime_type)}`,
+    );
+  }
+
+  return {
+    type: "image",
+    image_data: data.image_data,
+    mime_type: data.mime_type,
+    ...(data.width && { width: data.width }),
+    ...(data.height && { height: data.height }),
+  };
 }
 
 /**
@@ -254,6 +283,9 @@ function createPart(data: AccumulatedData, index: number): Part {
 
     case "tool-call":
       return createToolCallPart(data, index);
+
+    case "image":
+      return createImagePart(data, index);
 
     case "audio":
       return createAudioPart(data);

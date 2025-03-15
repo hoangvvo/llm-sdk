@@ -231,9 +231,17 @@ fn into_openai_create_params(
         tools: tools.map(|tools| tools.into_iter().map(Into::into).collect()),
         tool_choice: tool_choice.map(Into::into),
         response_format: response_format.map(Into::into),
-        modalities: input
-            .modalities
-            .map(|modalities| modalities.into_iter().map(Into::into).collect()),
+        modalities: input.modalities.map_or(
+            Ok::<Option<Vec<openai_api::Modality>>, LanguageModelError>(None),
+            |modalities| {
+                Ok(Some(
+                    modalities
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<LanguageModelResult<Vec<openai_api::Modality>>>()?,
+                ))
+            },
+        )?,
         audio: extra
             .as_ref()
             .and_then(|extra| extra.get("audio").cloned())
@@ -511,11 +519,17 @@ impl From<ResponseFormatOption> for openai_api::ResponseFormat {
 
 // MARK: To Provider Modality
 
-impl From<Modality> for openai_api::Modality {
-    fn from(modality: Modality) -> Self {
+impl TryFrom<Modality> for openai_api::Modality {
+    type Error = LanguageModelError;
+
+    fn try_from(modality: Modality) -> Result<Self, Self::Error> {
         match modality {
-            Modality::Text => Self::Text,
-            Modality::Audio => Self::Audio,
+            Modality::Text => Ok(Self::Text),
+            Modality::Audio => Ok(Self::Audio),
+            modality => Err(LanguageModelError::Unsupported(
+                PROVIDER,
+                format!("Cannot convert modality to OpenAI modality for modality {modality:#?}"),
+            )),
         }
     }
 }

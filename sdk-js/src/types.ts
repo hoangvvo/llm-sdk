@@ -23,7 +23,11 @@ export type Part =
 /**
  * Delta parts used in partial updates.
  */
-export type PartDelta = TextPartDelta | ToolCallPartDelta | AudioPartDelta;
+export type PartDelta =
+  | TextPartDelta
+  | ToolCallPartDelta
+  | ImagePartDelta
+  | AudioPartDelta;
 /**
  * A message in an LLM conversation history.
  */
@@ -31,7 +35,7 @@ export type Message = UserMessage | AssistantMessage | ToolMessage;
 /**
  * Defines the modality of content (e.g., text or audio) in LLM responses.
  */
-export type Modality = "text" | "audio";
+export type Modality = "text" | "image" | "audio";
 /**
  * Determines how the model should choose which tool to use:
  * - "auto": The model will automatically choose the tool to use or not use any tools.
@@ -230,6 +234,28 @@ export interface ToolCallPartDelta {
    * The partial JSON string of the arguments to pass to the tool.
    */
   args?: string;
+}
+/**
+ * A delta update for an image part, used in streaming of an image message.
+ */
+export interface ImagePartDelta {
+  type: "image";
+  /**
+   * The MIME type of the image. E.g. "image/jpeg", "image/png".
+   */
+  mime_type?: string;
+  /**
+   * The base64-encoded image data.
+   */
+  image_data?: string;
+  /**
+   * The width of the image in pixels.
+   */
+  width?: number;
+  /**
+   * The height of the image in pixels.
+   */
+  height?: number;
 }
 /**
  * A delta update for an audio part, used in streaming of an audio message.

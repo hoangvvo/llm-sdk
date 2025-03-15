@@ -44,7 +44,7 @@ We provide SDKs to interact with various LLM providers in the following programm
 | Audio Input       | ✅                                                                | ✅                       | ➖                                                        | ✅                   | ➖     | ➖                   |
 | Citation          | ➖ [^source-as-text]                                              | ➖ [^source-as-text]     | ✅                                                        | ➖ [^source-as-text] | ✅     | 🚧 [^source-as-text] |
 | Text Output       | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Image Output      | ✅                                                                | 🚧                       | ➖                                                        | ✅                   | ➖     | ➖                   |
+| Image Output      | ✅                                                                | ➖                       | ➖                                                        | ✅                   | ➖     | ➖                   |
 | Audio Output      | ➖                                                                | ✅                       | ➖                                                        | ➖                   | ➖     | ➖                   |
 
 Keys:

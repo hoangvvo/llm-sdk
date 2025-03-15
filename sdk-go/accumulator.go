@@ -18,6 +18,14 @@ type AccumulatedToolCallData struct {
 	Args       string
 }
 
+// AccumulatedImageData represents accumulated image data
+type AccumulatedImageData struct {
+	MimeType  *string
+	ImageData string
+	Width     *int
+	Height    *int
+}
+
 // AccumulatedAudioData represents accumulated audio data
 type AccumulatedAudioData struct {
 	AudioDataChunks []string
@@ -39,6 +47,10 @@ func (a *AccumulatedTextData) Type() PartType {
 
 func (a *AccumulatedToolCallData) Type() PartType {
 	return PartTypeToolCall
+}
+
+func (a *AccumulatedImageData) Type() PartType {
+	return PartTypeImage
 }
 
 func (a *AccumulatedAudioData) Type() PartType {
@@ -65,6 +77,17 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 			ToolName:   toolName,
 			ToolCallID: delta.Part.ToolCallPartDelta.ToolCallID,
 			Args:       args,
+		}
+	case delta.Part.ImagePartDelta != nil:
+		imageData := ""
+		if delta.Part.ImagePartDelta.ImageData != nil {
+			imageData = *delta.Part.ImagePartDelta.ImageData
+		}
+		return &AccumulatedImageData{
+			ImageData: imageData,
+			Width:     delta.Part.ImagePartDelta.Width,
+			Height:    delta.Part.ImagePartDelta.Height,
+			MimeType:  delta.Part.ImagePartDelta.MimeType,
 		}
 	case delta.Part.AudioPartDelta != nil:
 		var audioDataChunks []string
@@ -106,6 +129,22 @@ func mergeToolCallDelta(existing *AccumulatedToolCallData, delta *ToolCallPartDe
 	}
 }
 
+// mergeImageDelta merges image delta with existing image data
+func mergeImageDelta(existing *AccumulatedImageData, delta *ImagePartDelta) {
+	if delta.ImageData != nil {
+		existing.ImageData += *delta.ImageData
+	}
+	if delta.Width != nil {
+		existing.Width = delta.Width
+	}
+	if delta.Height != nil {
+		existing.Height = delta.Height
+	}
+	if delta.MimeType != nil {
+		existing.MimeType = delta.MimeType
+	}
+}
+
 // mergeAudioDelta merges audio delta with existing audio data
 func mergeAudioDelta(existing *AccumulatedAudioData, delta *AudioPartDelta) {
 	if delta.AudioData != nil {
@@ -141,6 +180,11 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 			return fmt.Errorf("type mismatch at index %d: existing type is tool-call, incoming type is not tool-call", delta.Index)
 		}
 		mergeToolCallDelta(existingData, delta.Part.ToolCallPartDelta)
+	case *AccumulatedImageData:
+		if delta.Part.ImagePartDelta == nil {
+			return fmt.Errorf("type mismatch at index %d: existing type is image, incoming type is not image", delta.Index)
+		}
+		mergeImageDelta(existingData, delta.Part.ImagePartDelta)
 	case *AccumulatedAudioData:
 		if delta.Part.AudioPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is audio, incoming type is not audio", delta.Index)
@@ -187,6 +231,22 @@ func createToolCallPart(data *AccumulatedToolCallData, index int) (Part, error) 
 	return NewToolCallPart(*data.ToolCallID, data.ToolName, args), nil
 }
 
+// createImagePart creates an image part from accumulated image data
+func createImagePart(data *AccumulatedImageData, index int) (Part, error) {
+	if data.MimeType == nil || data.ImageData == "" {
+		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required fields at index %d: ImageData=%v, MimeType=%v", index, data.ImageData, data.MimeType))
+	}
+
+	return Part{
+		ImagePart: &ImagePart{
+			ImageData: data.ImageData,
+			Width:     data.Width,
+			Height:    data.Height,
+			MimeType:  *data.MimeType,
+		},
+	}, nil
+}
+
 // createAudioPart creates an audio part from accumulated audio data
 func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 	if data.Format == nil {
@@ -226,6 +286,8 @@ func createPart(data AccumulatedData, index int) (Part, error) {
 		return createTextPart(d), nil
 	case *AccumulatedToolCallData:
 		return createToolCallPart(d, index)
+	case *AccumulatedImageData:
+		return createImagePart(d, index)
 	case *AccumulatedAudioData:
 		return createAudioPart(d)
 	default:

@@ -22,6 +22,7 @@
       "oneOf": [
         { "$ref": "#/definitions/TextPartDelta" },
         { "$ref": "#/definitions/ToolCallPartDelta" },
+        { "$ref": "#/definitions/ImagePartDelta" },
         { "$ref": "#/definitions/AudioPartDelta" }
       ]
     },
@@ -36,10 +37,10 @@
     "Modality": {
       "type": "string",
       "description": "Defines the modality of content (e.g., text or audio) in LLM responses.",
-      "enum": ["text", "audio"]
+      "enum": ["text", "image", "audio"]
     },
     "ToolChoiceOption": {
-      "description": "Determines the modality of content (e.g., text or audio) in LLM responses.\n- \"auto\": The model will automatically choose the tool to use or not use any tools.\n- \"none\": The model will not use any tools.\n- \"required\": The model will be forced to use a tool.\n- { type: \"tool\", toolName: \"toolName\" }: The model will use the specified tool.",
+      "description": "Determines how the model should choose which tool to use:\n- \"auto\": The model will automatically choose the tool to use or not use any tools.\n- \"none\": The model will not use any tools.\n- \"required\": The model will be forced to use a tool.\n- { type: \"tool\", toolName: \"toolName\" }: The model will use the specified tool.",
       "oneOf": [
         { "$ref": "#/definitions/ToolChoiceAuto" },
         { "$ref": "#/definitions/ToolChoiceNone" },
@@ -294,6 +295,31 @@
         "args": {
           "type": "string",
           "description": "The partial JSON string of the arguments to pass to the tool."
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ImagePartDelta": {
+      "type": "object",
+      "description": "A delta update for an image part, used in streaming of an image message.",
+      "properties": {
+        "type": { "const": "image" },
+        "mime_type": {
+          "type": "string",
+          "description": "The MIME type of the image. E.g. \"image/jpeg\", \"image/png\"."
+        },
+        "image_data": {
+          "type": "string",
+          "description": "The base64-encoded image data."
+        },
+        "width": {
+          "type": "number",
+          "description": "The width of the image in pixels."
+        },
+        "height": {
+          "type": "number",
+          "description": "The height of the image in pixels."
         }
       },
       "required": ["type"],

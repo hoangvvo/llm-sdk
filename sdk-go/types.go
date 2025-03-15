@@ -232,6 +232,7 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 type PartDelta struct {
 	TextPartDelta     *TextPartDelta     `json:"-"`
 	ToolCallPartDelta *ToolCallPartDelta `json:"-"`
+	ImagePartDelta    *ImagePartDelta    `json:"-"`
 	AudioPartDelta    *AudioPartDelta    `json:"-"`
 }
 
@@ -245,6 +246,18 @@ type ToolCallPartDelta struct {
 	ToolCallID *string `json:"tool_call_id,omitempty"`
 	ToolName   *string `json:"tool_name,omitempty"`
 	Args       *string `json:"args,omitempty"`
+}
+
+// ImagePartDelta represents a delta update for an image part, used in streaming of an image message.
+type ImagePartDelta struct {
+	// MimeType is the MIME type of the image. E.g. "image/jpeg", "image/png".
+	MimeType *string `json:"mime_type,omitempty"`
+	// ImageData is the base64-encoded image data.
+	ImageData *string `json:"image_data,omitempty"`
+	// Width is the width of the image in pixels.
+	Width *int `json:"width,omitempty"`
+	// Height is the height of the image in pixels.
+	Height *int `json:"height,omitempty"`
 }
 
 // AudioPartDelta represents a delta update for an audio part, used in streaming of an audio message.
@@ -275,6 +288,15 @@ func (p PartDelta) MarshalJSON() ([]byte, error) {
 		}{
 			Type:              "tool-call",
 			ToolCallPartDelta: p.ToolCallPartDelta,
+		})
+	}
+	if p.ImagePartDelta != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ImagePartDelta
+		}{
+			Type:           "image",
+			ImagePartDelta: p.ImagePartDelta,
 		})
 	}
 	if p.AudioPartDelta != nil {
@@ -428,6 +450,7 @@ type Modality string
 
 const (
 	ModalityText  Modality = "text"
+	ModalityImage Modality = "audio"
 	ModalityAudio Modality = "audio"
 )
 

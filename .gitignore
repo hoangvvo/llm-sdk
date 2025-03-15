@@ -137,3 +137,5 @@ packages/**/package-lock.json
 .tshy*
 
 target/
+
+**/examples/**/*.{png,jpg,jpeg,gif,pcm,wav,mp3}

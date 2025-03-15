@@ -37,6 +37,7 @@
     "audio-decode": "^2.2.2",
     "audio-play": "^2.3.1",
     "cohere-ai": "^7.15.4",
+    "open": "^10.1.0",
     "openai": "^4.85.0",
     "zod": "^3.24.2",
     "zod-to-json-schema": "^3.24.6"

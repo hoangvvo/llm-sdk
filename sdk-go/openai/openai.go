@@ -283,7 +283,11 @@ func convertToOpenAICreateParams(input *llmsdk.LanguageModelInput, modelID strin
 	if input.Modalities != nil {
 		var modalities []OpenAIModality
 		for _, modality := range input.Modalities {
-			modalities = append(modalities, convertToOpenAIModality(modality))
+			openaiModality, err := convertToOpenAIModality(modality)
+			if err != nil {
+				return nil, err
+			}
+			modalities = append(modalities, openaiModality)
 		}
 		params.Modalities = modalities
 	}
@@ -546,14 +550,14 @@ func convertToOpenAIResponseFormat(responseFormat llmsdk.ResponseFormatOption) *
 // MARK: - To Provider Modality
 
 // convertToOpenAIModality converts SDK modality to OpenAI format
-func convertToOpenAIModality(modality llmsdk.Modality) OpenAIModality {
+func convertToOpenAIModality(modality llmsdk.Modality) (OpenAIModality, error) {
 	switch modality {
 	case llmsdk.ModalityText:
-		return OpenAIModalityText
+		return OpenAIModalityText, nil
 	case llmsdk.ModalityAudio:
-		return OpenAIModalityAudio
+		return OpenAIModalityAudio, nil
 	default:
-		return OpenAIModalityText
+		return "", llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert modality to OpenAI modality for modality %s", modality))
 	}
 }
 

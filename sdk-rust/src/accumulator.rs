@@ -1,7 +1,7 @@
 use crate::{
-    audio_utils, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, LanguageModelError,
-    LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    TextPart, TextPartDelta, ToolCallPart, ToolCallPartDelta,
+    audio_utils, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ImagePart, ImagePartDelta,
+    LanguageModelError, LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta,
+    PartialModelResponse, TextPart, TextPartDelta, ToolCallPart, ToolCallPartDelta,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -20,6 +20,15 @@ struct AccumulatedToolCallData {
     args: String,
 }
 
+/// Internal representation of accumulated image data
+#[derive(Debug, Clone)]
+struct AccumulatedImageData {
+    image_data: String,
+    mime_type: Option<String>,
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
 /// Internal representation of accumulated audio data
 #[derive(Debug, Clone)]
 struct AccumulatedAudioData {
@@ -36,6 +45,7 @@ struct AccumulatedAudioData {
 enum AccumulatedData {
     Text(AccumulatedTextData),
     ToolCall(AccumulatedToolCallData),
+    Image(AccumulatedImageData),
     Audio(AccumulatedAudioData),
 }
 
@@ -49,6 +59,12 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             tool_name: tool_delta.tool_name.unwrap_or_default(),
             tool_call_id: tool_delta.tool_call_id,
             args: tool_delta.args.unwrap_or_default(),
+        }),
+        PartDelta::Image(image_delta) => AccumulatedData::Image(AccumulatedImageData {
+            image_data: image_delta.image_data.unwrap_or_default(),
+            mime_type: image_delta.mime_type,
+            width: image_delta.width,
+            height: image_delta.height,
         }),
         PartDelta::Audio(audio_delta) => AccumulatedData::Audio(AccumulatedAudioData {
             audio_data_chunks: audio_delta
@@ -82,6 +98,22 @@ fn merge_tool_call_delta(existing: &mut AccumulatedToolCallData, delta: ToolCall
     }
 }
 
+/// Merge image delta with existing image data
+fn merge_image_delta(existing: &mut AccumulatedImageData, delta: ImagePartDelta) {
+    if let Some(image_data) = delta.image_data {
+        existing.image_data.push_str(&image_data);
+    }
+    if delta.mime_type.is_some() {
+        existing.mime_type = delta.mime_type;
+    }
+    if delta.width.is_some() {
+        existing.width = delta.width;
+    }
+    if delta.height.is_some() {
+        existing.height = delta.height;
+    }
+}
+
 /// Merges audio delta with existing audio data
 fn merge_audio_delta(existing: &mut AccumulatedAudioData, delta: AudioPartDelta) {
     if let Some(audio_data) = delta.audio_data {
@@ -112,6 +144,9 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
         }
         (AccumulatedData::ToolCall(ref mut existing_tool), PartDelta::ToolCall(tool_delta)) => {
             merge_tool_call_delta(existing_tool, tool_delta);
+        }
+        (AccumulatedData::Image(ref mut existing_image), PartDelta::Image(image_delta)) => {
+            merge_image_delta(existing_image, image_delta);
         }
         (AccumulatedData::Audio(ref mut existing_audio), PartDelta::Audio(audio_delta)) => {
             merge_audio_delta(existing_audio, audio_delta);
@@ -164,6 +199,30 @@ fn create_tool_call_part(data: AccumulatedToolCallData, index: usize) -> Languag
     }))
 }
 
+/// Creates an image part from accumulated image data
+fn create_image_part(data: AccumulatedImageData, index: usize) -> LanguageModelResult<Part> {
+    let mime_type = data.mime_type.ok_or_else(|| {
+        LanguageModelError::Invariant(
+            "",
+            format!("Missing required field mime_type for image part at index {index}"),
+        )
+    })?;
+
+    if data.image_data.is_empty() {
+        return Err(LanguageModelError::Invariant(
+            "",
+            format!("Missing required field image_data for image part at index {index}"),
+        ));
+    }
+
+    Ok(Part::Image(ImagePart {
+        image_data: data.image_data,
+        mime_type,
+        width: data.width,
+        height: data.height,
+    }))
+}
+
 /// Creates an audio part from accumulated audio data
 fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
     let format = data.format.ok_or_else(|| {
@@ -203,6 +262,7 @@ fn create_part(data: AccumulatedData, index: usize) -> LanguageModelResult<Part>
     match data {
         AccumulatedData::Text(text_data) => Ok(create_text_part(text_data)),
         AccumulatedData::ToolCall(tool_data) => create_tool_call_part(tool_data, index),
+        AccumulatedData::Image(image_data) => create_image_part(image_data, index),
         AccumulatedData::Audio(audio_data) => create_audio_part(audio_data),
     }
 }

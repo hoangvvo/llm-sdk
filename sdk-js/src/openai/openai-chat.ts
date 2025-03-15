@@ -485,6 +485,12 @@ function convertToOpenAIModality(
       return "text";
     case "audio":
       return "audio";
+    default: {
+      throw new UnsupportedError(
+        PROVIDER,
+        `Cannot convert modality to OpenAI modality for modality ${modality}`,
+      );
+    }
   }
 }
 

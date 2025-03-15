@@ -2,7 +2,6 @@ import OpenAI from "openai";
 import {
   InvalidInputError,
   InvariantError,
-  NotImplementedError,
   RefusalError,
   UnsupportedError,
 } from "../errors.ts";
@@ -14,6 +13,7 @@ import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import type {
   ContentDelta,
+  ImagePartDelta,
   LanguageModelInput,
   Message,
   ModelResponse,
@@ -28,6 +28,10 @@ import type {
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 import type { OpenAIModelOptions } from "./options.ts";
+import type {
+  OpenAIPatchedImageGenerationCallPartialImage,
+  OpenAIPatchedResponsesImageGenerationCall,
+} from "./types.ts";
 
 const PROVIDER = "openai";
 
@@ -86,6 +90,8 @@ export class OpenAIModel implements LanguageModel {
     let refusal = "";
 
     for await (const event of stream) {
+      console.dir(event, { depth: null }); // For debugging purposes
+
       if (event.type === "response.refusal.delta") {
         refusal += event.delta;
       }
@@ -125,9 +131,10 @@ function convertToOpenAICreateParams(
     tools,
     tool_choice,
     extra,
+    modalities,
   } = input;
 
-  return {
+  const params: Omit<OpenAI.Responses.ResponseCreateParams, "stream"> = {
     store: false,
     model: modelId,
     input: convertToOpenAIInputs(messages),
@@ -144,8 +151,16 @@ function convertToOpenAICreateParams(
     ...(response_format && {
       text: convertToOpenAIResponseTextConfig(response_format),
     }),
-    ...extra,
   };
+
+  if (modalities?.includes("image")) {
+    params.tools = params.tools ?? [];
+    params.tools.push({
+      type: "image_generation",
+    });
+  }
+
+  return { ...params, ...extra };
 }
 
 // MARK: To Provider Messages
@@ -403,37 +418,33 @@ function mapOpenAIOutputItems(
           ];
         }
         case "image_generation_call": {
-          if (!item.result) {
+          const patchedItem = item as OpenAIPatchedResponsesImageGenerationCall;
+
+          if (!patchedItem.result) {
             throw new InvariantError(
               PROVIDER,
               "Image generation call did not return a result",
             );
           }
-          // item.result is base64 image url is the format of data:image/png;base64,<base64_data>
-          const match = /^data:image\/(png|jpeg|jpg);base64,(.+)$/.exec(
-            item.result,
-          );
-          const mimeType = match?.[1] ? `image/${match[1]}` : null;
-          const imageData = match?.[2] ?? null;
-          if (!mimeType || !imageData) {
-            throw new InvariantError(
-              PROVIDER,
-              "Image generation call returned invalid result",
-            );
+
+          let width: number | undefined;
+          let height: number | undefined;
+          if (patchedItem.size) {
+            [width, height] = patchedItem.size.split("x").map(Number);
           }
+
           return [
             {
               type: "image",
-              image_data: imageData,
-              mime_type: mimeType,
+              image_data: patchedItem.result,
+              mime_type: `image/${patchedItem.output_format}`,
+              ...(width && { width }),
+              ...(height && { height }),
             },
           ];
         }
         default: {
-          throw new NotImplementedError(
-            PROVIDER,
-            `Cannot map OpenAI Response Output type of ${item.type}`,
-          );
+          return [];
         }
       }
     })
@@ -487,12 +498,41 @@ function mapOpenAIStreamEvent(
         part,
       };
     }
+
     case "response.function_call_arguments.delta": {
       // Note: function name is added in "response.output_item.added"
       const part: ToolCallPartDelta = {
         type: "tool-call",
         args: event.delta,
       };
+      const index = event.output_index;
+      return {
+        index,
+        part,
+      };
+    }
+
+    case "response.image_generation_call.partial_image": {
+      const patchedEvent =
+        event as OpenAIPatchedImageGenerationCallPartialImage;
+
+      let width: number | undefined;
+      let height: number | undefined;
+
+      if (patchedEvent.size) {
+        [width, height] = patchedEvent.size.split("x").map(Number);
+      }
+
+      const part: ImagePartDelta = {
+        type: "image",
+        image_data: patchedEvent.partial_image_b64,
+        ...(patchedEvent.output_format && {
+          mime_type: `image/${patchedEvent.output_format}`,
+        }),
+        ...(width && { width }),
+        ...(height && { height }),
+      };
+
       const index = event.output_index;
       return {
         index,
