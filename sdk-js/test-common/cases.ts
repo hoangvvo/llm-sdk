@@ -566,6 +566,58 @@ export const TEST_CASE_SOURCE_PART_INPUT: TestCase = {
   type: "generate",
 };
 
+export const TEST_CASE_GENERATE_REASONING: TestCase = {
+  name: "generate reasoning",
+  input: {
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering.",
+          },
+        ],
+      },
+    ],
+  },
+  output: {
+    content: [
+      {
+        type: "reasoning",
+        text: /John/,
+      },
+    ],
+  },
+  type: "generate",
+};
+
+export const TEST_CASE_STREAM_REASONING: TestCase = {
+  name: "stream reasoning",
+  input: {
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering.",
+          },
+        ],
+      },
+    ],
+  },
+  output: {
+    content: [
+      {
+        type: "reasoning",
+        text: /John/,
+      },
+    ],
+  },
+  type: "stream",
+};
+
 export interface RunTestCaseOptions {
   /**
    * For newer models with structured outputs, all properties are required
@@ -586,6 +638,11 @@ export interface RunTestCaseOptions {
    * from the required list.
    */
   compatibleSchema?: boolean;
+
+  /**
+   * Extra parameters to pass to the model input.
+   */
+  additionalInputs?: Partial<LanguageModelInput>;
 }
 
 export async function runTestCase(
@@ -595,7 +652,7 @@ export async function runTestCase(
   options?: RunTestCaseOptions,
 ) {
   const { input, type, output } = testCase;
-  const modelInput = { ...input };
+  const modelInput = { ...input, ...options?.additionalInputs };
 
   if (options?.compatibleSchema) {
     if (modelInput.tools) {

@@ -11,12 +11,21 @@ interface ToolCallPartAssertionArgProp {
   [key: string]: RegExp | ToolCallPartAssertionArgProp;
 }
 
-export type PartAssertion = TextPartAssertion | ToolCallPartAssertion;
+export type PartAssertion =
+  | TextPartAssertion
+  | ToolCallPartAssertion
+  | ReasoningPartAssertion;
 
 export interface ToolCallPartAssertion {
   type: "tool_call";
   tool_name: string;
   args: ToolCallPartAssertionArgProp;
+}
+
+export interface ReasoningPartAssertion {
+  type: "reasoning";
+  text: RegExp;
+  summary?: RegExp;
 }
 
 export function assertContentPart(
@@ -32,6 +41,10 @@ export function assertContentPart(
       }
       case "tool_call": {
         assertToolCallPart(t, content, assertion);
+        break;
+      }
+      case "reasoning": {
+        assertReasoningPart(t, content, assertion);
         break;
       }
     }
@@ -70,6 +83,26 @@ export function assertToolCallPart(
     foundPart,
     `Expected matching tool call part:
 Expected tool ${assertion.tool_name} with args ${JSON.stringify(assertion.args)}
+Received:
+${JSON.stringify(content, null, 2)}`,
+  );
+}
+
+export function assertReasoningPart(
+  t: TestContext,
+  content: Part[],
+  assertion: ReasoningPartAssertion,
+) {
+  const foundPart = content.find(
+    (part) =>
+      part.type === "reasoning" &&
+      assertion.text.test(part.text) &&
+      (!assertion.summary || assertion.summary.test(part.summary ?? "")),
+  );
+  t.assert.ok(
+    foundPart,
+    `Expected matching reasoning part:
+Expected text ${String(assertion.text)}
 Received:
 ${JSON.stringify(content, null, 2)}`,
   );

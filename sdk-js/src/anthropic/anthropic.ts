@@ -17,6 +17,8 @@ import type {
   Part,
   PartDelta,
   PartialModelResponse,
+  ReasoningPart,
+  ReasoningPartDelta,
   SourcePart,
   TextPart,
   TextPartDelta,
@@ -190,6 +192,8 @@ function convertToAnthropicContentBlockParam(
       return convertToAnthropicToolUseBlockParam(part);
     case "tool-result":
       return convertToAnthropicToolResultBlockParam(part);
+    case "reasoning":
+      return convertToAnthropicThinkingBlockParam(part);
     default:
       throw new UnsupportedError(
         PROVIDER,
@@ -287,6 +291,23 @@ function convertToAnthropicToolResultBlockParam(
   };
 }
 
+export function convertToAnthropicThinkingBlockParam(
+  part: ReasoningPart,
+): Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam {
+  if (part.text === "" && part.signature) {
+    return {
+      type: "redacted_thinking",
+      data: part.signature,
+    };
+  }
+
+  return {
+    type: "thinking",
+    thinking: part.text,
+    signature: part.signature ?? "",
+  };
+}
+
 // MARK: To Provider Tools
 
 function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
@@ -337,6 +358,10 @@ function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock): Part {
       return mapAnthropicTextBlock(block);
     case "tool_use":
       return mapAnthropicToolUseBlock(block);
+    case "thinking":
+      return mapAnthropicThinkingBlock(block);
+    case "redacted_thinking":
+      return mapAnthropicRedactedThinkingBlock(block);
     default:
       throw new NotImplementedError(
         PROVIDER,
@@ -360,6 +385,26 @@ function mapAnthropicToolUseBlock(
     tool_call_id: block.id,
     tool_name: block.name,
     args: block.input as Record<string, unknown>,
+  };
+}
+
+function mapAnthropicThinkingBlock(
+  block: Anthropic.Messages.ThinkingBlock,
+): ReasoningPart {
+  return {
+    type: "reasoning",
+    text: block.thinking,
+    signature: block.signature,
+  };
+}
+
+function mapAnthropicRedactedThinkingBlock(
+  block: Anthropic.Messages.RedactedThinkingBlock,
+): ReasoningPart {
+  return {
+    type: "reasoning",
+    text: "",
+    signature: block.data,
   };
 }
 
@@ -404,6 +449,13 @@ function mapAnthropicRawContentBlockDelta(
       return mapAnthropicTextDelta(delta);
     case "input_json_delta":
       return mapAnthropicInputJSONDelta(delta);
+    case "thinking_delta":
+      return mapAnthropicThinkingDelta(delta);
+    case "signature_delta":
+      return {
+        type: "reasoning",
+        signature: delta.signature,
+      };
     default: {
       throw new NotImplementedError(
         PROVIDER,
@@ -426,6 +478,15 @@ function mapAnthropicInputJSONDelta(
   return {
     type: "tool-call",
     args: delta.partial_json,
+  };
+}
+
+function mapAnthropicThinkingDelta(
+  delta: Anthropic.ThinkingDelta,
+): ReasoningPartDelta {
+  return {
+    type: "reasoning",
+    text: delta.thinking,
   };
 }
 

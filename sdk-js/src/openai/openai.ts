@@ -20,6 +20,7 @@ import type {
   ModelUsage,
   Part,
   PartialModelResponse,
+  ReasoningPartDelta,
   ResponseFormatOption,
   TextPartDelta,
   Tool,
@@ -90,8 +91,6 @@ export class OpenAIModel implements LanguageModel {
     let refusal = "";
 
     for await (const event of stream) {
-      console.dir(event, { depth: null }); // For debugging purposes
-
       if (event.type === "response.refusal.delta") {
         refusal += event.delta;
       }
@@ -151,6 +150,9 @@ function convertToOpenAICreateParams(
     ...(response_format && {
       text: convertToOpenAIResponseTextConfig(response_format),
     }),
+    reasoning: {
+      summary: "auto",
+    },
   };
 
   if (modalities?.includes("image")) {
@@ -210,6 +212,28 @@ function convertToOpenAIInputs(
                         annotations: [],
                       },
                     ],
+                  };
+                case "reasoning":
+                  return {
+                    type: "reasoning",
+                    // Similar to assistant message parts, we generate a unique ID for each reasoning part.
+                    id: `reasoning_${genidForMessageId()}`,
+                    summary: [
+                      {
+                        type: "summary_text",
+                        text: part.summary ?? part.text,
+                      },
+                    ],
+                    content: [
+                      {
+                        type: "reasoning_text",
+                        text: part.text,
+                      },
+                    ],
+                    ...(part.signature && {
+                      encrypted_content: part.signature,
+                    }),
+                    status: "completed",
                   };
                 case "image":
                   return {
@@ -443,6 +467,19 @@ function mapOpenAIOutputItems(
             },
           ];
         }
+        case "reasoning": {
+          const summary = item.summary.map((s) => s.text).join("\n");
+          return [
+            {
+              type: "reasoning",
+              text: item.content?.map((c) => c.text).join("\n") ?? summary,
+              summary,
+              ...(item.encrypted_content && {
+                signature: item.encrypted_content,
+              }),
+            },
+          ];
+        }
         default: {
           return [];
         }
@@ -484,6 +521,21 @@ function mapOpenAIStreamEvent(
           index,
           part,
         };
+      }
+
+      if (event.item.type === "reasoning") {
+        if (event.item.encrypted_content) {
+          const part: ReasoningPartDelta = {
+            type: "reasoning",
+            signature: event.item.encrypted_content,
+          };
+
+          const index = event.output_index;
+          return {
+            index,
+            part,
+          };
+        }
       }
       break;
     }
@@ -533,6 +585,30 @@ function mapOpenAIStreamEvent(
         ...(height && { height }),
       };
 
+      const index = event.output_index;
+      return {
+        index,
+        part,
+      };
+    }
+
+    case "response.reasoning_text.delta": {
+      const part: ReasoningPartDelta = {
+        type: "reasoning",
+        text: event.delta,
+      };
+      const index = event.output_index;
+      return {
+        index,
+        part,
+      };
+    }
+
+    case "response.reasoning_summary_text.delta": {
+      const part: ReasoningPartDelta = {
+        type: "reasoning",
+        summary: event.delta,
+      };
       const index = event.output_index;
       return {
         index,

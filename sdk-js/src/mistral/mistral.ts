@@ -17,6 +17,7 @@ import {
   looselyConvertPartToPartDelta,
 } from "../stream.utils.ts";
 import type {
+  AudioPart,
   ContentDelta,
   ImagePart,
   LanguageModelInput,
@@ -69,7 +70,7 @@ export class MistralModel implements LanguageModel {
     const request = convertToMistralRequest(input, this.modelId);
     const response = await this.#client.chat.complete(request);
 
-    const choice = response.choices?.[0];
+    const choice = response.choices[0];
     if (!choice) {
       throw new InvariantError(
         PROVIDER,
@@ -284,6 +285,8 @@ function convertToMistralContentChunk(
       return convertToMistralTextChunk(part);
     case "image":
       return convertToMistralImageURLChunk(part);
+    case "audio":
+      return convertToMistralAudioChunk(part);
     default:
       throw new UnsupportedError(
         PROVIDER,
@@ -309,6 +312,15 @@ function convertToMistralImageURLChunk(
     imageUrl: {
       url: `data:${part.mime_type};base64,${part.image_data}`,
     },
+  };
+}
+
+function convertToMistralAudioChunk(
+  part: AudioPart,
+): MistralComponents.AudioChunk & { type: "input_audio" } {
+  return {
+    type: "input_audio",
+    inputAudio: part.audio_data,
   };
 }
 
@@ -420,6 +432,15 @@ function mapMistralContentChunk(chunk: MistralComponents.ContentChunk): Part {
         text: chunk.text,
       };
     }
+    case "thinking": {
+      return {
+        type: "reasoning",
+        text: chunk.thinking
+          .map((item) => item.type === "text" && item.text)
+          .filter((text) => text)
+          .join("\n"),
+      };
+    }
     default:
       throw new NotImplementedError(
         PROVIDER,
@@ -506,7 +527,7 @@ export function mapMistralDelta(
 
 function mapMistralUsageInfo(usage: MistralComponents.UsageInfo): ModelUsage {
   return {
-    input_tokens: usage.promptTokens,
-    output_tokens: usage.completionTokens,
+    input_tokens: usage.promptTokens ?? 0,
+    output_tokens: usage.completionTokens ?? 0,
   };
 }

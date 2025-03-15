@@ -27,6 +27,7 @@ import type {
   ToolChoiceOption,
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
+import type { PatchedAssistantMessageV2ContentItem } from "./types.ts";
 
 const PROVIDER = "cohere";
 
@@ -78,7 +79,6 @@ export class CohereModel implements LanguageModel {
 
     for await (const event of stream) {
       switch (event.type) {
-        case "content-start":
         case "content-delta": {
           const incomingContentDelta = mapCohereStreamedContent(event);
           if (incomingContentDelta) {
@@ -206,7 +206,7 @@ function convertToCohereMessages(
           Cohere.ChatMessageV2.Assistant,
           "content"
         > & {
-          content?: Cohere.AssistantMessageContentItem[];
+          content?: PatchedAssistantMessageV2ContentItem[];
         } = {
           role: "assistant",
         };
@@ -218,6 +218,15 @@ function convertToCohereMessages(
               cohereAssistantMessage.content.push(
                 convertToCohereTextContent(part),
               );
+              break;
+            }
+            case "reasoning": {
+              cohereAssistantMessage.content =
+                cohereAssistantMessage.content ?? [];
+              cohereAssistantMessage.content.push({
+                type: "thinking",
+                thinking: part.text,
+              });
               break;
             }
             case "tool-call": {
@@ -446,7 +455,7 @@ function mapCohereMessageResponse(
 
   if (messageResponse.content) {
     messageResponse.content.forEach((contentItem) => {
-      parts.push(mapCohereTextContent(contentItem));
+      parts.push(mapCohereResponseContentItem(contentItem));
     });
   }
 
@@ -459,11 +468,23 @@ function mapCohereMessageResponse(
   return parts;
 }
 
-function mapCohereTextContent(content: Cohere.Content.Text): Part {
-  return {
-    type: "text",
-    text: content.text,
-  };
+function mapCohereResponseContentItem(
+  content: Cohere.AssistantMessageResponseContentItem,
+): Part {
+  switch (content.type) {
+    case "text": {
+      return {
+        type: "text",
+        text: content.text,
+      };
+    }
+    case "thinking": {
+      return {
+        type: "reasoning",
+        text: (content as unknown as { thinking: string }).thinking,
+      };
+    }
+  }
 }
 
 function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
@@ -491,22 +512,33 @@ function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
 // MARK: To SDK Delta
 
 function mapCohereStreamedContent(
-  event:
-    | Cohere.StreamedChatResponseV2.ContentDelta
-    | Cohere.StreamedChatResponseV2.ContentStart,
+  event: Cohere.V2ChatStreamResponse.ContentDelta,
 ): ContentDelta | null {
   const text = event.delta?.message?.content?.text;
+  const thinking = event.delta?.message?.content?.thinking;
   const index = event.index;
-  if (!text || typeof index !== "number") {
+  if (typeof index !== "number") {
     return null;
   }
-  return {
-    index: index,
-    part: {
-      type: "text",
-      text,
-    },
-  };
+  if (text) {
+    return {
+      index,
+      part: {
+        type: "text",
+        text,
+      },
+    };
+  }
+  if (thinking) {
+    return {
+      index,
+      part: {
+        type: "reasoning",
+        text: thinking,
+      },
+    };
+  }
+  return null;
 }
 
 function mapCohereToolCallStartEvent(

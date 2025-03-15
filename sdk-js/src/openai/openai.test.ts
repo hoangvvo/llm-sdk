@@ -2,6 +2,7 @@
 
 import {
   TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS,
+  TEST_CASE_GENERATE_REASONING,
   TEST_CASE_GENERATE_TEXT,
   TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_GENERATE_TOOL_CALL,
@@ -9,6 +10,7 @@ import {
   TEST_CASE_SOURCE_PART_INPUT,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+  TEST_CASE_STREAM_REASONING,
   TEST_CASE_STREAM_TEXT,
   TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_STREAM_TOOL_CALL,
@@ -32,6 +34,11 @@ suite("OpenAIModel", () => {
 
   const audioModel = new OpenAIModel({
     modelId: "gpt-4o-audio-preview",
+    apiKey: process.env["OPENAI_API_KEY"],
+  });
+
+  const reasoningModel = new OpenAIModel({
+    modelId: "o1",
     apiKey: process.env["OPENAI_API_KEY"],
   });
 
@@ -128,4 +135,8 @@ suite("OpenAIModel", () => {
     t.assert.ok(audioPart.transcript, "Transcript must be present");
     t.assert.ok(audioPart.audio_id, "Audio part ID must be present");
   });
+
+  testTestCase(reasoningModel, TEST_CASE_GENERATE_REASONING);
+
+  testTestCase(reasoningModel, TEST_CASE_STREAM_REASONING);
 });

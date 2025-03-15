@@ -86,6 +86,12 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
           args: JSON.stringify(part.args),
         }),
       };
+    case "reasoning":
+      return {
+        type: "reasoning",
+        text: part.text,
+        ...(part.signature && { signature: part.signature }),
+      };
     default: {
       throw new InvariantError(
         "",

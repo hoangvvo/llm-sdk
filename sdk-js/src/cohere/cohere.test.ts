@@ -2,6 +2,7 @@
 
 import {
   TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS,
+  TEST_CASE_GENERATE_REASONING,
   TEST_CASE_GENERATE_TEXT,
   TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_GENERATE_TOOL_CALL,
@@ -9,6 +10,7 @@ import {
   TEST_CASE_SOURCE_PART_INPUT,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+  TEST_CASE_STREAM_REASONING,
   TEST_CASE_STREAM_TEXT,
   TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_STREAM_TOOL_CALL,
@@ -24,6 +26,11 @@ suite("CohereModel", () => {
   const model = new CohereModel({
     apiKey: process.env["CO_API_KEY"],
     modelId: "command-r-plus",
+  });
+
+  const reasoningModel = new CohereModel({
+    apiKey: process.env["CO_API_KEY"],
+    modelId: "command-a",
   });
 
   const runTestOptions = { compatibleSchema: true };
@@ -55,4 +62,24 @@ suite("CohereModel", () => {
   testTestCase(model, TEST_CASE_STRUCTURED_RESPONSE_FORMAT, runTestOptions);
 
   testTestCase(model, TEST_CASE_SOURCE_PART_INPUT);
+
+  testTestCase(reasoningModel, TEST_CASE_GENERATE_REASONING, {
+    additionalInputs: {
+      extra: {
+        thinking: {
+          type: "enabled",
+        },
+      },
+    },
+  });
+
+  testTestCase(reasoningModel, TEST_CASE_STREAM_REASONING, {
+    additionalInputs: {
+      extra: {
+        thinking: {
+          type: "enabled",
+        },
+      },
+    },
+  });
 });

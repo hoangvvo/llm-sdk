@@ -19,7 +19,8 @@ export type Part =
   | AudioPart
   | SourcePart
   | ToolCallPart
-  | ToolResultPart;
+  | ToolResultPart
+  | ReasoningPart;
 /**
  * Delta parts used in partial updates.
  */
@@ -27,7 +28,8 @@ export type PartDelta =
   | TextPartDelta
   | ToolCallPartDelta
   | ImagePartDelta
-  | AudioPartDelta;
+  | AudioPartDelta
+  | ReasoningPartDelta;
 /**
  * A message in an LLM conversation history.
  */
@@ -179,6 +181,25 @@ export interface ToolResultPart {
   is_error?: boolean;
 }
 /**
+ * A part of the message that represents the model reasoning.
+ */
+export interface ReasoningPart {
+  type: "reasoning";
+  /**
+   * The reasoning text content
+   */
+  text: string;
+  /**
+   * The reasoning summary
+   */
+  summary?: string;
+  /**
+   * The reasoning internal signature
+   */
+  signature?: string;
+}
+
+/**
  * Represents a citation for a part.
  */
 export interface Citation {
@@ -283,6 +304,24 @@ export interface AudioPartDelta {
    * The audio ID, if applicable.
    */
   audio_id?: string;
+}
+/**
+ * A delta update for a reasoning part, used in streaming of reasoning messages.
+ */
+export interface ReasoningPartDelta {
+  type: "reasoning";
+  /**
+   * The reasoning text content
+   */
+  text?: string;
+  /**
+   * The reasoning summary
+   */
+  summary?: string;
+  /**
+   * The reasoning internal signature
+   */
+  signature?: string;
 }
 /**
  * Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.

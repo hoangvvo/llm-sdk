@@ -11,6 +11,7 @@ Two libraries are provided:
 
 - Supports multiple LLM providers with a unified API.
 - Handles multiple modalities: Text, Image, and Audio. Support streaming, including for audio.
+- Supports reasoning for supported models.
 - Supports citations for supported providers.
 - Reports token usage and calculates the cost of a request when provided with the model's pricing information.
 - Offers consistent serialization for data storage across different programming languages.
@@ -46,6 +47,7 @@ We provide SDKs to interact with various LLM providers in the following programm
 | Text Output       | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
 | Image Output      | ✅                                                                | ➖                       | ➖                                                        | ✅                   | ➖     | ➖                   |
 | Audio Output      | ➖                                                                | ✅                       | ➖                                                        | ➖                   | ➖     | ➖                   |
+| Reasoning         | ✅                                                                | ➖                       | ✅                                                        | ✅                   | ✅     | ✅                   |
 
 Keys:
 
@@ -92,7 +94,7 @@ See [Message](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L29).
 > [!NOTE]
 > The `ToolResultPart` content is an array of `Part` instead of a string or an object. This enables non-text results to be returned for LLM providers that support them (e.g., Anthropic Function Calling supports images in tool results).
 
-The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `SourcePart` (for citation), `ToolCallPart`, and `ToolResultPart`.
+The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `SourcePart` (for citation), `ToolCallPart`, `ToolResultPart`, and `ReasoningPart`.
 
 See [`Part`](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L16).
 

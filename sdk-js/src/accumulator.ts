@@ -13,6 +13,7 @@ import type {
   ModelUsage,
   Part,
   PartialModelResponse,
+  ReasoningPartDelta,
   TextPartDelta,
   ToolCallPartDelta,
 } from "./types.ts";
@@ -34,6 +35,7 @@ type AccumulatedData =
   | TextPartDelta
   | ToolCallPartDelta
   | ImagePartDelta
+  | ReasoningPartDelta
   | AccumulatedAudioData;
 
 /**
@@ -85,6 +87,14 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
           transcript: delta.part.transcript,
         }),
         ...(delta.part.audio_id && { audio_id: delta.part.audio_id }),
+      };
+
+    case "reasoning":
+      return {
+        type: "reasoning",
+        ...(delta.part.text && { text: delta.part.text }),
+        ...(delta.part.summary && { summary: delta.part.summary }),
+        ...(delta.part.signature && { signature: delta.part.signature }),
       };
   }
 }
@@ -164,6 +174,24 @@ function mergeAudioDelta(
 }
 
 /**
+ * Merges reasoning delta with existing reasoning data
+ */
+function mergeReasoningDelta(
+  existing: ReasoningPartDelta,
+  delta: ReasoningPartDelta,
+): void {
+  if (delta.text) {
+    existing.text = (existing.text ?? "") + delta.text;
+  }
+  if (delta.summary) {
+    existing.summary = (existing.summary ?? "") + delta.summary;
+  }
+  if (delta.signature) {
+    existing.signature = delta.signature;
+  }
+}
+
+/**
  * Merges an incoming delta with existing accumulated data
  */
 function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
@@ -191,6 +219,9 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
     case "audio":
       mergeAudioDelta(existing as AccumulatedAudioData, delta.part);
       break;
+
+    case "reasoning":
+      mergeReasoningDelta(existing as ReasoningPartDelta, delta.part);
   }
 }
 
@@ -274,6 +305,30 @@ function createAudioPart(data: AccumulatedAudioData): Part {
 }
 
 /**
+ * Creates a reasoning part from accumulated reasoning data
+ */
+function createReasoningPart(data: ReasoningPartDelta, index: number): Part {
+  if (data.text === undefined) {
+    if (data.summary) {
+      // Fall back to summary if text is not available
+      data.text = data.summary;
+    } else {
+      throw new Error(
+        `Missing required fields at index ${String(index)}: ` +
+          `text=${String(data.text)}, summary=${String(data.summary)}, signature=${String(data.signature)}`,
+      );
+    }
+  }
+
+  return {
+    type: "reasoning",
+    text: data.text,
+    ...(data.summary && { summary: data.summary }),
+    ...(data.signature && { signature: data.signature }),
+  };
+}
+
+/**
  * Creates a final Part from accumulated data
  */
 function createPart(data: AccumulatedData, index: number): Part {
@@ -289,6 +344,9 @@ function createPart(data: AccumulatedData, index: number): Part {
 
     case "audio":
       return createAudioPart(data);
+
+    case "reasoning":
+      return createReasoningPart(data, index);
   }
 }
 
