@@ -29,6 +29,7 @@ type Part struct {
 	SourcePart     *SourcePart     `json:"-"`
 	ToolCallPart   *ToolCallPart   `json:"-"`
 	ToolResultPart *ToolResultPart `json:"-"`
+	ReasoningPart  *ReasoningPart  `json:"-"`
 }
 
 type PartType string
@@ -40,6 +41,7 @@ const (
 	PartTypeSource     PartType = "source"
 	PartTypeToolCall   PartType = "tool-call"
 	PartTypeToolResult PartType = "tool-result"
+	PartTypeReasoning  PartType = "reasoning"
 )
 
 func (p Part) Type() PartType {
@@ -54,6 +56,8 @@ func (p Part) Type() PartType {
 		return PartTypeToolCall
 	case p.ToolResultPart != nil:
 		return PartTypeToolResult
+	case p.ReasoningPart != nil:
+		return PartTypeReasoning
 	default:
 		return ""
 	}
@@ -122,6 +126,16 @@ type ToolResultPart struct {
 	IsError bool `json:"is_error,omitempty"`
 }
 
+// ReasoningPart represents part of the message that represents the model reasoning.
+type ReasoningPart struct {
+	// The reasoning text content
+	Text string `json:"text"`
+	// The reasoning summary
+	Summary *string `json:"summary,omitempty"`
+	//  The reasoning internal signature
+	Signature *string `json:"signature,omitempty"`
+}
+
 // MarshalJSON implements custom JSON marshaling for Part
 func (p Part) MarshalJSON() ([]byte, error) {
 	if p.TextPart != nil {
@@ -178,6 +192,15 @@ func (p Part) MarshalJSON() ([]byte, error) {
 			ToolResultPart: p.ToolResultPart,
 		})
 	}
+	if p.ReasoningPart != nil {
+		return json.Marshal(struct {
+			Type PartType `json:"type"`
+			*ReasoningPart
+		}{
+			Type:          PartTypeReasoning,
+			ReasoningPart: p.ReasoningPart,
+		})
+	}
 	return nil, fmt.Errorf("part has no content")
 }
 
@@ -209,6 +232,12 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.AudioPart = &a
+	case "source":
+		var s SourcePart
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		p.SourcePart = &s
 	case "tool-call":
 		var tc ToolCallPart
 		if err := json.Unmarshal(data, &tc); err != nil {
@@ -221,6 +250,12 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.ToolResultPart = &tr
+	case "reasoning":
+		var r ReasoningPart
+		if err := json.Unmarshal(data, &r); err != nil {
+			return err
+		}
+		p.ReasoningPart = &r
 	default:
 		return fmt.Errorf("unknown part type: %s", temp.Type)
 	}
@@ -230,10 +265,11 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 
 // PartDelta represents delta parts used in partial updates.
 type PartDelta struct {
-	TextPartDelta     *TextPartDelta     `json:"-"`
-	ToolCallPartDelta *ToolCallPartDelta `json:"-"`
-	ImagePartDelta    *ImagePartDelta    `json:"-"`
-	AudioPartDelta    *AudioPartDelta    `json:"-"`
+	TextPartDelta      *TextPartDelta      `json:"-"`
+	ToolCallPartDelta  *ToolCallPartDelta  `json:"-"`
+	ImagePartDelta     *ImagePartDelta     `json:"-"`
+	AudioPartDelta     *AudioPartDelta     `json:"-"`
+	ReasoningPartDelta *ReasoningPartDelta `json:"-"`
 }
 
 // TextPartDelta represents a delta update for a text part, used in streaming or incremental updates of a message.
@@ -268,6 +304,13 @@ type AudioPartDelta struct {
 	Channels   *int         `json:"channels,omitempty"`
 	Transcript *string      `json:"transcript,omitempty"`
 	AudioID    *string      `json:"audio_id,omitempty"`
+}
+
+// ReasoningPartDelta represents a delta update for a reasoning part, used in streaming of reasoning messages.
+type ReasoningPartDelta struct {
+	Text      *string `json:"text,omitempty"`
+	Summary   *string `json:"summary,omitempty"`
+	Signature *string `json:"signature,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for PartDelta
@@ -308,6 +351,15 @@ func (p PartDelta) MarshalJSON() ([]byte, error) {
 			AudioPartDelta: p.AudioPartDelta,
 		})
 	}
+	if p.ReasoningPartDelta != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ReasoningPartDelta
+		}{
+			Type:               "reasoning",
+			ReasoningPartDelta: p.ReasoningPartDelta,
+		})
+	}
 	return nil, fmt.Errorf("part delta has no content")
 }
 
@@ -339,6 +391,12 @@ func (p *PartDelta) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.AudioPartDelta = &a
+	case "image":
+		var i ImagePartDelta
+		if err := json.Unmarshal(data, &i); err != nil {
+			return err
+		}
+		p.ImagePartDelta = &i
 	default:
 		return fmt.Errorf("unknown part delta type: %s", temp.Type)
 	}

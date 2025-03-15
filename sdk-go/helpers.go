@@ -85,6 +85,34 @@ func WithAudioID(audioID string) AudioPartOption {
 	}
 }
 
+func NewReasoningPart(text string, opts ...ReasoingPartOption) Part {
+	reasoningPart := &ReasoningPart{
+		Text: text,
+	}
+
+	for _, opt := range opts {
+		opt(reasoningPart)
+	}
+
+	return Part{
+		ReasoningPart: reasoningPart,
+	}
+}
+
+type ReasoingPartOption func(*ReasoningPart)
+
+func WithReasoningSummary(summary string) ReasoingPartOption {
+	return func(p *ReasoningPart) {
+		p.Summary = &summary
+	}
+}
+
+func WithReasoningSignature(signature string) ReasoingPartOption {
+	return func(p *ReasoningPart) {
+		p.Signature = &signature
+	}
+}
+
 // NewSourcePart creates a new source part
 func NewSourcePart(title string, content []Part) Part {
 	return Part{

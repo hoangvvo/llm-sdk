@@ -36,6 +36,12 @@ type AccumulatedAudioData struct {
 	AudioID         *string
 }
 
+type AccumulatedReasoningData struct {
+	Text      string
+	Summary   *string
+	Signature *string
+}
+
 // AccumulatedData represents accumulated data for different part types
 type AccumulatedData interface {
 	Type() PartType
@@ -55,6 +61,10 @@ func (a *AccumulatedImageData) Type() PartType {
 
 func (a *AccumulatedAudioData) Type() PartType {
 	return PartTypeAudio
+}
+
+func (a *AccumulatedReasoningData) Type() PartType {
+	return PartTypeReasoning
 }
 
 // newAccumulatedData creates accumulated data from a delta
@@ -106,64 +116,18 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 			Transcript:      transcript,
 			AudioID:         delta.Part.AudioPartDelta.AudioID,
 		}
+	case delta.Part.ReasoningPartDelta != nil:
+		text := ""
+		if delta.Part.ReasoningPartDelta.Text != nil {
+			text = *delta.Part.ReasoningPartDelta.Text
+		}
+		return &AccumulatedReasoningData{
+			Text:      text,
+			Summary:   delta.Part.ReasoningPartDelta.Summary,
+			Signature: delta.Part.ReasoningPartDelta.Signature,
+		}
 	default:
 		return nil
-	}
-}
-
-// mergeTextDelta merges text delta with existing text data
-func mergeTextDelta(existing *AccumulatedTextData, delta *TextPartDelta) {
-	existing.Text += delta.Text
-}
-
-// mergeToolCallDelta merges tool call delta with existing tool call data
-func mergeToolCallDelta(existing *AccumulatedToolCallData, delta *ToolCallPartDelta) {
-	if delta.ToolName != nil {
-		existing.ToolName += *delta.ToolName
-	}
-	if delta.ToolCallID != nil {
-		existing.ToolCallID = delta.ToolCallID
-	}
-	if delta.Args != nil {
-		existing.Args += *delta.Args
-	}
-}
-
-// mergeImageDelta merges image delta with existing image data
-func mergeImageDelta(existing *AccumulatedImageData, delta *ImagePartDelta) {
-	if delta.ImageData != nil {
-		existing.ImageData += *delta.ImageData
-	}
-	if delta.Width != nil {
-		existing.Width = delta.Width
-	}
-	if delta.Height != nil {
-		existing.Height = delta.Height
-	}
-	if delta.MimeType != nil {
-		existing.MimeType = delta.MimeType
-	}
-}
-
-// mergeAudioDelta merges audio delta with existing audio data
-func mergeAudioDelta(existing *AccumulatedAudioData, delta *AudioPartDelta) {
-	if delta.AudioData != nil {
-		existing.AudioDataChunks = append(existing.AudioDataChunks, *delta.AudioData)
-	}
-	if delta.Format != nil {
-		existing.Format = delta.Format
-	}
-	if delta.SampleRate != nil {
-		existing.SampleRate = delta.SampleRate
-	}
-	if delta.Channels != nil {
-		existing.Channels = delta.Channels
-	}
-	if delta.Transcript != nil {
-		existing.Transcript += *delta.Transcript
-	}
-	if delta.AudioID != nil {
-		existing.AudioID = delta.AudioID
 	}
 }
 
@@ -171,25 +135,84 @@ func mergeAudioDelta(existing *AccumulatedAudioData, delta *AudioPartDelta) {
 func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 	switch existingData := existing.(type) {
 	case *AccumulatedTextData:
-		if delta.Part.TextPartDelta == nil {
+		textPartDelta := delta.Part.TextPartDelta
+		if textPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is text, incoming type is not text", delta.Index)
 		}
-		mergeTextDelta(existingData, delta.Part.TextPartDelta)
+		existingData.Text += textPartDelta.Text
 	case *AccumulatedToolCallData:
-		if delta.Part.ToolCallPartDelta == nil {
+		toolCallPartDelta := delta.Part.ToolCallPartDelta
+		if toolCallPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is tool-call, incoming type is not tool-call", delta.Index)
 		}
-		mergeToolCallDelta(existingData, delta.Part.ToolCallPartDelta)
+		if toolCallPartDelta.ToolName != nil {
+			existingData.ToolName += *toolCallPartDelta.ToolName
+		}
+		if toolCallPartDelta.ToolCallID != nil {
+			existingData.ToolCallID = toolCallPartDelta.ToolCallID
+		}
+		if toolCallPartDelta.Args != nil {
+			existingData.Args += *toolCallPartDelta.Args
+		}
 	case *AccumulatedImageData:
-		if delta.Part.ImagePartDelta == nil {
+		imagePartDelta := delta.Part.ImagePartDelta
+		if imagePartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is image, incoming type is not image", delta.Index)
 		}
-		mergeImageDelta(existingData, delta.Part.ImagePartDelta)
+		if imagePartDelta.ImageData != nil {
+			existingData.ImageData += *imagePartDelta.ImageData
+		}
+		if imagePartDelta.Width != nil {
+			existingData.Width = imagePartDelta.Width
+		}
+		if imagePartDelta.Height != nil {
+			existingData.Height = imagePartDelta.Height
+		}
+		if imagePartDelta.MimeType != nil {
+			existingData.MimeType = imagePartDelta.MimeType
+		}
+
 	case *AccumulatedAudioData:
-		if delta.Part.AudioPartDelta == nil {
+		audioPartDelta := delta.Part.AudioPartDelta
+		if audioPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is audio, incoming type is not audio", delta.Index)
 		}
-		mergeAudioDelta(existingData, delta.Part.AudioPartDelta)
+		if audioPartDelta.AudioData != nil {
+			existingData.AudioDataChunks = append(existingData.AudioDataChunks, *audioPartDelta.AudioData)
+		}
+		if audioPartDelta.Format != nil {
+			existingData.Format = audioPartDelta.Format
+		}
+		if audioPartDelta.SampleRate != nil {
+			existingData.SampleRate = audioPartDelta.SampleRate
+		}
+		if audioPartDelta.Channels != nil {
+			existingData.Channels = audioPartDelta.Channels
+		}
+		if audioPartDelta.Transcript != nil {
+			existingData.Transcript += *audioPartDelta.Transcript
+		}
+		if audioPartDelta.AudioID != nil {
+			existingData.AudioID = audioPartDelta.AudioID
+		}
+
+	case *AccumulatedReasoningData:
+		reasoningPartDelta := delta.Part.ReasoningPartDelta
+		if reasoningPartDelta == nil {
+			return fmt.Errorf("type mismatch at index %d: existing type is reasoning, incoming type is not reasoning", delta.Index)
+		}
+		if reasoningPartDelta.Text != nil {
+			existingData.Text += *reasoningPartDelta.Text
+		}
+		if reasoningPartDelta.Summary != nil {
+			if existingData.Summary == nil {
+				existingData.Summary = new(string)
+			}
+			*existingData.Summary += *reasoningPartDelta.Summary
+		}
+		if reasoningPartDelta.Signature != nil {
+			existingData.Signature = reasoningPartDelta.Signature
+		}
 	default:
 		return fmt.Errorf("unknown accumulated data type at index %d", delta.Index)
 	}
@@ -279,6 +302,24 @@ func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 	}, nil
 }
 
+// createReasoningPart creates a reasoning part from accumulated reasoning data
+func createReasoningPart(data *AccumulatedReasoningData, index int) (Part, error) {
+	if data.Text == "" {
+		if data.Summary != nil {
+			data.Text = *data.Summary
+		} else {
+			return Part{}, NewInvariantError("", fmt.Sprintf("Missing required field text at index %d", index))
+		}
+	}
+	return Part{
+		ReasoningPart: &ReasoningPart{
+			Text:      data.Text,
+			Summary:   data.Summary,
+			Signature: data.Signature,
+		},
+	}, nil
+}
+
 // createPart creates a final Part from accumulated data
 func createPart(data AccumulatedData, index int) (Part, error) {
 	switch d := data.(type) {
@@ -290,6 +331,8 @@ func createPart(data AccumulatedData, index int) (Part, error) {
 		return createImagePart(d, index)
 	case *AccumulatedAudioData:
 		return createAudioPart(d)
+	case *AccumulatedReasoningData:
+		return createReasoningPart(d, index)
 	default:
 		return Part{}, fmt.Errorf("unknown accumulated data type at index %d", index)
 	}

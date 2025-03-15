@@ -30,6 +30,7 @@ pub enum Part {
     Source(SourcePart),
     ToolCall(ToolCallPart),
     ToolResult(ToolResultPart),
+    Reasoning(ReasoningPart),
 }
 
 /// Delta parts used in partial updates.
@@ -41,6 +42,7 @@ pub enum PartDelta {
     ToolCall(ToolCallPartDelta),
     Image(ImagePartDelta),
     Audio(AudioPartDelta),
+    Reasoning(ReasoningPartDelta),
 }
 
 /// A message in an LLM conversation history.
@@ -54,7 +56,7 @@ pub enum Message {
 }
 
 /// Defines the modality of content (e.g., text or audio) in LLM responses.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum Modality {
@@ -195,6 +197,19 @@ pub struct ToolResultPart {
     pub is_error: Option<bool>,
 }
 
+// A part of the message that represents the model reasoning.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ReasoningPart {
+    /// The reasoning text content.
+    pub text: String,
+    /// The reasoning summary
+    pub summary: Option<String>,
+    /// The reasoning internal signature
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+}
+
 /// Represents a message sent by the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -272,6 +287,21 @@ pub struct AudioPartDelta {
     /// The audio ID, if applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio_id: Option<String>,
+}
+
+// A delta update for a reasoning part, used in streaming of reasoning messages.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ReasoningPartDelta {
+    /// The reasoning text content.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// The reasoning summary
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// The reasoning internal signature
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// Represents a delta update in a message's content, enabling partial streaming

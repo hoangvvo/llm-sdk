@@ -7,6 +7,7 @@ import {
   TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_GENERATE_TOOL_CALL,
   TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT,
+  TEST_CASE_INPUT_REASONING,
   TEST_CASE_SOURCE_PART_INPUT,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
@@ -139,4 +140,9 @@ suite("OpenAIModel", () => {
   testTestCase(reasoningModel, TEST_CASE_GENERATE_REASONING);
 
   testTestCase(reasoningModel, TEST_CASE_STREAM_REASONING);
+
+  // It is expected that this test case fails or incorrectly passes because OpenAI requires
+  // encrypted_content to be present, the summary_text would just be ignored.
+  // We only need to make sure the API accepts our input
+  testTestCase(reasoningModel, TEST_CASE_INPUT_REASONING);
 });

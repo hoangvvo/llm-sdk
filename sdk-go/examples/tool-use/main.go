@@ -102,7 +102,7 @@ func main() {
 		var toolMessage *llmsdk.ToolMessage
 
 		for _, part := range response.Content {
-			if part.Type() == llmsdk.PartTypeToolCall {
+			if part.ToolCallPart != nil {
 				hasToolCalls = true
 
 				toolCallPart := part.ToolCallPart

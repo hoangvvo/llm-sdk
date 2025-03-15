@@ -1,5 +1,9 @@
-mod api;
+mod chat_api;
+mod chat_model;
 mod model;
+mod options;
+mod responses_api;
 
-pub use crate::types::*;
-pub use model::{OpenAIModel, OpenAIModelOptions};
+pub use chat_model::OpenAIChatModel;
+pub use model::OpenAIModel;
+pub use options::OpenAIModelOptions;

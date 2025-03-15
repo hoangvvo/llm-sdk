@@ -12,6 +12,7 @@ import type {
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import type {
+  AssistantMessage,
   ContentDelta,
   ImagePartDelta,
   LanguageModelInput,
@@ -26,6 +27,8 @@ import type {
   Tool,
   ToolCallPartDelta,
   ToolChoiceOption,
+  ToolMessage,
+  UserMessage,
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 import type { OpenAIModelOptions } from "./options.ts";
@@ -174,175 +177,177 @@ function convertToOpenAIInputs(
     .map((message): OpenAI.Responses.ResponseInputItem[] => {
       switch (message.role) {
         case "user": {
-          const messageParts = getCompatiblePartsWithoutSourceParts(
-            message.content,
-          );
-
-          return [
-            {
-              type: "message",
-              role: "user",
-              content: messageParts.map(convertToOpenAIResponseInputContent),
-            },
-          ];
+          return [convertUserMessageToResponseInputItem(message)];
         }
         case "assistant": {
-          const messageParts = getCompatiblePartsWithoutSourceParts(
-            message.content,
-          );
-
-          return messageParts.map(
-            (part): OpenAI.Responses.ResponseInputItem => {
-              switch (part.type) {
-                case "text":
-                  return {
-                    // Response output item requires an ID.
-                    // This usually applies if we enable OpenAI "store".
-                    // or that we propogate the message ID in output.
-                    // For compatibility, we want to avoid doing that, so we use a generated ID
-                    // to avoid the API from returning an error.
-                    id: "msg_" + genidForMessageId(),
-                    type: "message",
-                    role: "assistant",
-                    status: "completed",
-                    content: [
-                      {
-                        type: "output_text",
-                        text: part.text,
-                        annotations: [],
-                      },
-                    ],
-                  };
-                case "reasoning":
-                  return {
-                    type: "reasoning",
-                    // Similar to assistant message parts, we generate a unique ID for each reasoning part.
-                    id: `reasoning_${genidForMessageId()}`,
-                    summary: [
-                      {
-                        type: "summary_text",
-                        text: part.summary ?? part.text,
-                      },
-                    ],
-                    content: [
-                      {
-                        type: "reasoning_text",
-                        text: part.text,
-                      },
-                    ],
-                    ...(part.signature && {
-                      encrypted_content: part.signature,
-                    }),
-                    status: "completed",
-                  };
-                case "image":
-                  return {
-                    id: "",
-                    type: "image_generation_call",
-                    status: "completed",
-                    result: `data:${part.mime_type};base64,${part.image_data}`,
-                  };
-                case "tool-call":
-                  return {
-                    type: "function_call",
-                    call_id: part.tool_call_id,
-                    name: part.tool_name,
-                    arguments: JSON.stringify(part.args),
-                  };
-                default:
-                  throw new UnsupportedError(
-                    PROVIDER,
-                    `Cannot convert part to OpenAI ResponseInputItem for type ${part.type} of assistant message`,
-                  );
-              }
-            },
-          );
+          return convertAssistantMessageToResponseInputItems(message);
         }
         case "tool": {
-          return message.content
-            .map((part): OpenAI.Responses.ResponseInputItem[] => {
-              if (part.type !== "tool-result") {
-                throw new InvalidInputError(
-                  "Tool messages must contain only tool result parts",
-                );
-              }
-
-              const toolResultPartContent =
-                getCompatiblePartsWithoutSourceParts(part.content);
-
-              return toolResultPartContent.map(
-                (
-                  toolResultPartPart,
-                ): OpenAI.Responses.ResponseInputItem.FunctionCallOutput => {
-                  switch (toolResultPartPart.type) {
-                    case "text":
-                      return {
-                        type: "function_call_output",
-                        call_id: part.tool_call_id,
-                        output: toolResultPartPart.text,
-                      };
-                    default:
-                      throw new UnsupportedError(
-                        PROVIDER,
-                        `Cannot convert tool result part to OpenAI ResponseInputItem.FunctionCallOutput for type ${toolResultPartPart.type}`,
-                      );
-                  }
-                },
-              );
-            })
-            .flat();
+          return convertToolMessageToResponseInputItems(message);
         }
       }
     })
     .flat();
 }
 
-function convertToOpenAIResponseInputContent(
-  part: Part,
-): OpenAI.Responses.ResponseInputContent {
-  switch (part.type) {
-    case "text":
-      return { type: "input_text", text: part.text };
-    case "image":
-      return {
-        type: "input_image",
-        image_url: `data:${part.mime_type};base64,${part.image_data}`,
-        detail: "auto",
-      };
-    case "audio": {
-      let format: OpenAI.Responses.ResponseInputAudio.InputAudio["format"];
-      switch (part.format) {
-        case "mp3":
-          format = "mp3";
-          break;
-        case "wav":
-          format = "wav";
-          break;
+function convertUserMessageToResponseInputItem(
+  message: UserMessage,
+): OpenAI.Responses.ResponseInputItem {
+  const messageParts = getCompatiblePartsWithoutSourceParts(message.content);
+
+  return {
+    type: "message",
+    role: "user",
+    content: messageParts.map((part) => {
+      switch (part.type) {
+        case "text":
+          return { type: "input_text", text: part.text };
+        case "image":
+          return {
+            type: "input_image",
+            image_url: `data:${part.mime_type};base64,${part.image_data}`,
+            detail: "auto",
+          };
+        case "audio": {
+          let format: OpenAI.Responses.ResponseInputAudio.InputAudio["format"];
+          switch (part.format) {
+            case "mp3":
+              format = "mp3";
+              break;
+            case "wav":
+              format = "wav";
+              break;
+            default:
+              throw new UnsupportedError(
+                PROVIDER,
+                `Cannot convert audio format to OpenAI InputAudio format for format ${part.format}`,
+              );
+          }
+          return {
+            type: "input_audio",
+            input_audio: {
+              data: part.audio_data,
+              format,
+            },
+          };
+        }
         default:
           throw new UnsupportedError(
             PROVIDER,
-            `Cannot convert audio format to OpenAI InputAudio format for format ${part.format}`,
+            `Cannot convert part to OpenAI content part for type ${part.type}`,
           );
       }
-      return {
-        type: "input_audio",
-        input_audio: {
-          data: part.audio_data,
-          format,
-        },
-      };
+    }),
+  };
+}
+
+function convertAssistantMessageToResponseInputItems(
+  message: AssistantMessage,
+): OpenAI.Responses.ResponseInputItem[] {
+  const messageParts = getCompatiblePartsWithoutSourceParts(message.content);
+
+  return messageParts.map((part): OpenAI.Responses.ResponseInputItem => {
+    switch (part.type) {
+      case "text":
+        return {
+          // Response output item requires an ID.
+          // This usually applies if we enable OpenAI "store".
+          // or that we propogate the message ID in output.
+          // For compatibility, we want to avoid doing that, so we use a generated ID
+          // to avoid the API from returning an error.
+          id: "msg_" + genidForMessageId(),
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [
+            {
+              type: "output_text",
+              text: part.text,
+              annotations: [],
+            },
+          ],
+        };
+      case "reasoning":
+        return {
+          type: "reasoning",
+          // Similar to assistant message parts, we generate a unique ID for each reasoning part.
+          id: `rs_${genidForMessageId()}`,
+          summary: [
+            {
+              type: "summary_text",
+              text: part.summary ?? part.text,
+            },
+          ],
+          // ReasoningInputItem can not have content
+          content: [],
+          ...(part.signature && {
+            encrypted_content: part.signature,
+          }),
+        };
+      case "image":
+        return {
+          id: `ig_${genidForMessageId()}`,
+          type: "image_generation_call",
+          status: "completed",
+          result: `data:${part.mime_type};base64,${part.image_data}`,
+        };
+      case "tool-call":
+        return {
+          type: "function_call",
+          call_id: part.tool_call_id,
+          name: part.tool_name,
+          arguments: JSON.stringify(part.args),
+        };
+      default:
+        throw new UnsupportedError(
+          PROVIDER,
+          `Cannot convert part to OpenAI ResponseInputItem for type ${part.type} of assistant message`,
+        );
     }
-    default:
-      throw new UnsupportedError(
-        PROVIDER,
-        `Cannot convert part to OpenAI content part for type ${part.type}`,
+  });
+}
+
+function convertToolMessageToResponseInputItems(
+  message: ToolMessage,
+): OpenAI.Responses.ResponseInputItem[] {
+  return message.content
+    .map((part): OpenAI.Responses.ResponseInputItem[] => {
+      if (part.type !== "tool-result") {
+        throw new InvalidInputError(
+          "Tool messages must contain only tool result parts",
+        );
+      }
+
+      const toolResultPartContent = getCompatiblePartsWithoutSourceParts(
+        part.content,
       );
-  }
+
+      return toolResultPartContent.map(
+        (
+          toolResultPartPart,
+        ): OpenAI.Responses.ResponseInputItem.FunctionCallOutput => {
+          switch (toolResultPartPart.type) {
+            case "text":
+              return {
+                type: "function_call_output",
+                call_id: part.tool_call_id,
+                output: toolResultPartPart.text,
+              };
+            default:
+              throw new UnsupportedError(
+                PROVIDER,
+                `Cannot convert tool result part to OpenAI ResponseInputItem.FunctionCallOutput for type ${toolResultPartPart.type}`,
+              );
+          }
+        },
+      );
+    })
+    .flat();
 }
 
 // MARK: To Provider Tools
 
-function convertToOpenAITool(tool: Tool): OpenAI.Responses.Tool {
+function convertToOpenAITool(tool: Tool): OpenAI.Responses.FunctionTool {
   return {
     type: "function",
     name: tool.name,

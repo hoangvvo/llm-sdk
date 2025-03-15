@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("openai", "gpt-4o-audio-preview")
+	model := examples.GetModel("openai-chat-completion", "gpt-4o-audio-preview")
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Extra: map[string]any{
@@ -39,7 +39,7 @@ func main() {
 
 	// Find and play audio part
 	for _, part := range response.Content {
-		if part.Type() == llmsdk.PartTypeAudio && part.AudioPart != nil {
+		if part.AudioPart != nil {
 			audioData, err := base64.StdEncoding.DecodeString(part.AudioPart.AudioData)
 			if err != nil {
 				log.Printf("Failed to decode audio data: %v", err)

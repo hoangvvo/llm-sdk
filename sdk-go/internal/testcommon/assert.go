@@ -23,10 +23,16 @@ type ToolCallPartAssertion struct {
 	Args     ToolCallPartAssertionArgProp
 }
 
+type ReasoningPartAssertion struct {
+	Text    *regexp.Regexp
+	Summary *regexp.Regexp
+}
+
 // PartAssertion represents assertions for different part types
 type PartAssertion struct {
-	TextPart     *TextPartAssertion
-	ToolCallPart *ToolCallPartAssertion
+	TextPart      *TextPartAssertion
+	ToolCallPart  *ToolCallPartAssertion
+	ReasoningPart *ReasoningPartAssertion
 }
 
 // TestMethod represents the test method type
@@ -61,6 +67,9 @@ func assertContentPart(t *testing.T, content []llmsdk.Part, assertions []PartAss
 		}
 		if assertion.ToolCallPart != nil {
 			assertToolCallPart(t, content, *assertion.ToolCallPart)
+		}
+		if assertion.ReasoningPart != nil {
+			assertReasoningPart(t, content, *assertion.ReasoningPart)
 		}
 	}
 }
@@ -116,6 +125,29 @@ func matchToolCallArgs(raw json.RawMessage, expected ToolCallPartAssertionArgPro
 	return true
 }
 
+func assertReasoningPart(t *testing.T, content []llmsdk.Part, assertion ReasoningPartAssertion) {
+	t.Helper()
+
+	for _, part := range content {
+		if part.ReasoningPart != nil {
+			if assertion.Text != nil && !assertion.Text.MatchString(part.ReasoningPart.Text) {
+				t.Errorf("Expected matching reasoning text:\nExpected: %s\nReceived: %s", assertion.Text.String(), part.ReasoningPart.Text)
+				return
+			}
+			if assertion.Summary != nil && (part.ReasoningPart.Summary == nil || !assertion.Summary.MatchString(*part.ReasoningPart.Summary)) {
+				t.Errorf("Expected matching reasoning summary:\nExpected: %s\nReceived: %v", assertion.Summary.String(), part.ReasoningPart.Summary)
+				return
+			}
+
+			// pass
+			return
+		}
+	}
+
+	contentJSON, _ := json.MarshalIndent(content, "", "  ")
+	t.Errorf("Expected matching reasoning part:\nExpected: %s\nReceived:\n%s", assertion.Text.String(), string(contentJSON))
+}
+
 // NewTextAssertion creates a new text part assertion
 func NewTextAssertion(pattern string) PartAssertion {
 	return PartAssertion{
@@ -136,6 +168,22 @@ func NewToolCallAssertion(toolName string, args map[string]string) PartAssertion
 		ToolCallPart: &ToolCallPartAssertion{
 			ToolName: toolName,
 			Args:     argAssertions,
+		},
+	}
+}
+
+func NewReasoningAssertion(textPattern, summaryPattern string) PartAssertion {
+	var text, summary *regexp.Regexp
+	if textPattern != "" {
+		text = regexp.MustCompile(textPattern)
+	}
+	if summaryPattern != "" {
+		summary = regexp.MustCompile(summaryPattern)
+	}
+	return PartAssertion{
+		ReasoningPart: &ReasoningPartAssertion{
+			Text:    text,
+			Summary: summary,
 		},
 	}
 }

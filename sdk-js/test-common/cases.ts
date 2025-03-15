@@ -618,6 +618,54 @@ export const TEST_CASE_STREAM_REASONING: TestCase = {
   type: "stream",
 };
 
+export const TEST_CASE_INPUT_REASONING: TestCase = {
+  name: "input reasoning",
+  input: {
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "What is my secret number?",
+          },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "reasoning",
+            text: "Using my mind reading skill, I can deduce that your secret number is 42. But let's ask user if the number if greater than 30 just to be sure. If the user say yes, we are 100% sure it is 42 and can answer without asking further question.",
+          },
+          {
+            type: "text",
+            text: "Is the number greater than 30?",
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Yes, it is. Now use your reasoning and answer a number right now without asking further!",
+          },
+        ],
+      },
+    ],
+  },
+  output: {
+    content: [
+      {
+        type: "text",
+        text: /42/,
+      },
+    ],
+  },
+  type: "generate",
+};
+
 export interface RunTestCaseOptions {
   /**
    * For newer models with structured outputs, all properties are required

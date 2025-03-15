@@ -6,7 +6,6 @@ import {
 import { InvariantError } from "./errors.ts";
 import type {
   AudioFormat,
-  AudioPartDelta,
   ContentDelta,
   ImagePartDelta,
   ModelResponse,
@@ -100,98 +99,6 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
 }
 
 /**
- * Merges text delta with existing text data
- */
-function mergeTextDelta(existing: TextPartDelta, delta: TextPartDelta): void {
-  existing.text += delta.text;
-}
-
-/**
- * Merges tool call delta with existing tool call data
- */
-function mergeToolCallDelta(
-  existing: ToolCallPartDelta,
-  delta: ToolCallPartDelta,
-): void {
-  if (delta.tool_name) {
-    existing.tool_name = (existing.tool_name ?? "") + delta.tool_name;
-  }
-  if (delta.tool_call_id) {
-    existing.tool_call_id = delta.tool_call_id;
-  }
-  if (delta.args) {
-    existing.args = (existing.args ?? "") + delta.args;
-  }
-}
-
-/**
- * Merges image delta with existing image data
- */
-function mergeImageDelta(
-  existing: ImagePartDelta,
-  delta: ImagePartDelta,
-): void {
-  if (delta.image_data) {
-    existing.image_data = (existing.image_data ?? "") + delta.image_data;
-  }
-  if (delta.mime_type) {
-    existing.mime_type = delta.mime_type;
-  }
-  if (typeof delta.width === "number") {
-    existing.width = delta.width;
-  }
-  if (typeof delta.height === "number") {
-    existing.height = delta.height;
-  }
-}
-
-/**
- * Merges audio delta with existing audio data
- */
-function mergeAudioDelta(
-  existing: AccumulatedAudioData,
-  delta: AudioPartDelta,
-): void {
-  if (delta.audio_data) {
-    existing.audioDataChunks.push(delta.audio_data);
-  }
-  if (delta.format) {
-    existing.format = delta.format;
-  }
-  if (delta.sample_rate) {
-    existing.sampleRate = delta.sample_rate;
-  }
-  if (delta.channels) {
-    existing.channels = delta.channels;
-  }
-  if (delta.transcript) {
-    existing.transcript = existing.transcript ?? "";
-    existing.transcript += delta.transcript;
-  }
-  if (delta.audio_id) {
-    existing.audio_id = delta.audio_id;
-  }
-}
-
-/**
- * Merges reasoning delta with existing reasoning data
- */
-function mergeReasoningDelta(
-  existing: ReasoningPartDelta,
-  delta: ReasoningPartDelta,
-): void {
-  if (delta.text) {
-    existing.text = (existing.text ?? "") + delta.text;
-  }
-  if (delta.summary) {
-    existing.summary = (existing.summary ?? "") + delta.summary;
-  }
-  if (delta.signature) {
-    existing.signature = delta.signature;
-  }
-}
-
-/**
  * Merges an incoming delta with existing accumulated data
  */
 function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
@@ -204,24 +111,80 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
   }
 
   switch (delta.part.type) {
-    case "text":
-      mergeTextDelta(existing as TextPartDelta, delta.part);
+    case "text": {
+      const existingPart = existing as TextPartDelta;
+      existingPart.text += delta.part.text;
       break;
-
-    case "tool-call":
-      mergeToolCallDelta(existing as ToolCallPartDelta, delta.part);
+    }
+    case "tool-call": {
+      const existingPart = existing as ToolCallPartDelta;
+      if (delta.part.tool_name) {
+        existingPart.tool_name =
+          (existingPart.tool_name ?? "") + delta.part.tool_name;
+      }
+      if (delta.part.tool_call_id) {
+        existingPart.tool_call_id = delta.part.tool_call_id;
+      }
+      if (delta.part.args) {
+        existingPart.args = (existingPart.args ?? "") + delta.part.args;
+      }
       break;
+    }
 
-    case "image":
-      mergeImageDelta(existing as ImagePartDelta, delta.part);
+    case "image": {
+      const existingPart = existing as ImagePartDelta;
+      if (delta.part.image_data) {
+        existingPart.image_data =
+          (existingPart.image_data ?? "") + delta.part.image_data;
+      }
+      if (delta.part.mime_type) {
+        existingPart.mime_type = delta.part.mime_type;
+      }
+      if (typeof delta.part.width === "number") {
+        existingPart.width = delta.part.width;
+      }
+      if (typeof delta.part.height === "number") {
+        existingPart.height = delta.part.height;
+      }
       break;
+    }
 
-    case "audio":
-      mergeAudioDelta(existing as AccumulatedAudioData, delta.part);
+    case "audio": {
+      const existingPart = existing as AccumulatedAudioData;
+      if (delta.part.audio_data) {
+        existingPart.audioDataChunks.push(delta.part.audio_data);
+      }
+      if (delta.part.format) {
+        existingPart.format = delta.part.format;
+      }
+      if (delta.part.sample_rate) {
+        existingPart.sampleRate = delta.part.sample_rate;
+      }
+      if (delta.part.channels) {
+        existingPart.channels = delta.part.channels;
+      }
+      if (delta.part.transcript) {
+        existingPart.transcript = existingPart.transcript ?? "";
+        existingPart.transcript += delta.part.transcript;
+      }
+      if (delta.part.audio_id) {
+        existingPart.audio_id = delta.part.audio_id;
+      }
       break;
-
-    case "reasoning":
-      mergeReasoningDelta(existing as ReasoningPartDelta, delta.part);
+    }
+    case "reasoning": {
+      const existingPart = existing as ReasoningPartDelta;
+      if (delta.part.text) {
+        existingPart.text = (existingPart.text ?? "") + delta.part.text;
+      }
+      if (delta.part.summary) {
+        existingPart.summary =
+          (existingPart.summary ?? "") + delta.part.summary;
+      }
+      if (delta.part.signature) {
+        existingPart.signature = delta.part.signature;
+      }
+    }
   }
 }
 

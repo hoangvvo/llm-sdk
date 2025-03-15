@@ -7,6 +7,7 @@ import {
   TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_GENERATE_TOOL_CALL,
   TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT,
+  TEST_CASE_INPUT_REASONING,
   TEST_CASE_SOURCE_PART_INPUT,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
@@ -16,6 +17,7 @@ import {
   TEST_CASE_STREAM_TOOL_CALL,
   TEST_CASE_STRUCTURED_RESPONSE_FORMAT,
   testTestCase,
+  type RunTestCaseOptions,
 } from "#test-common/cases";
 import assert from "assert";
 import { suite } from "node:test";
@@ -63,7 +65,7 @@ suite("CohereModel", () => {
 
   testTestCase(model, TEST_CASE_SOURCE_PART_INPUT);
 
-  testTestCase(reasoningModel, TEST_CASE_GENERATE_REASONING, {
+  const reasoningOptions: Partial<RunTestCaseOptions> = {
     additionalInputs: {
       extra: {
         thinking: {
@@ -71,15 +73,11 @@ suite("CohereModel", () => {
         },
       },
     },
-  });
+  };
 
-  testTestCase(reasoningModel, TEST_CASE_STREAM_REASONING, {
-    additionalInputs: {
-      extra: {
-        thinking: {
-          type: "enabled",
-        },
-      },
-    },
-  });
+  testTestCase(reasoningModel, TEST_CASE_GENERATE_REASONING, reasoningOptions);
+
+  testTestCase(reasoningModel, TEST_CASE_STREAM_REASONING, reasoningOptions);
+
+  testTestCase(reasoningModel, TEST_CASE_INPUT_REASONING, reasoningOptions);
 });

@@ -1,6 +1,6 @@
 use crate::common::assert::{
-    OutputAssertion, PartAssertion, TextPartAssertion, ToolCallPartAssertion,
-    ToolCallpartAssertionArgPropValue,
+    OutputAssertion, PartAssertion, ReasoningPartAssertion, TextPartAssertion,
+    ToolCallPartAssertion, ToolCallpartAssertionArgPropValue,
 };
 use futures::stream::StreamExt;
 use llm_sdk::*;
@@ -338,7 +338,8 @@ pub async fn test_stream_parallel_tool_calls(
         input: LanguageModelInput {
             messages: vec![Message::User(UserMessage {
                 content: vec![Part::Text(TextPart {
-                    text: "Get me the weather in Boston and the stock price of AAPL. You must do both of them in one go."
+                    text: "Get me the weather in Boston and the stock price of AAPL. You must do \
+                           both of them in one go."
                         .to_string(),
                 })],
             })],
@@ -352,9 +353,7 @@ pub async fn test_stream_parallel_tool_calls(
                     tool_name: "get_weather".to_string(),
                     args: vec![(
                         "location".to_string(),
-                        ToolCallpartAssertionArgPropValue::Value(
-                            Regex::new(r"Boston").unwrap(),
-                        ),
+                        ToolCallpartAssertionArgPropValue::Value(Regex::new(r"Boston").unwrap()),
                     )],
                 }),
                 PartAssertion::ToolCall(ToolCallPartAssertion {
@@ -509,6 +508,81 @@ pub async fn test_source_part_input(model: &dyn LanguageModel) -> Result<(), Box
                 text: Regex::new(r"42").unwrap(),
             })],
         },
+    };
+    run_test_case(model, test_case).await
+}
+
+pub async fn test_generate_reasoning(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+    let test_case = TestCase {
+        input: LanguageModelInput {
+            messages: vec![Message::user(vec![Part::text(
+                "John is twice as old as his sister Jane. Four years ago, John was three times as \
+                 old. What is John's current age? Make sure to reason and think through first \
+                 before answering.",
+            )])],
+            ..Default::default()
+        },
+        output: OutputAssertion {
+            content: vec![PartAssertion::Reasoning(ReasoningPartAssertion {
+                text: Some(Regex::new(r"(?i)john").unwrap()),
+                summary: None,
+            })],
+        },
+        method: TestMethod::Generate,
+    };
+    run_test_case(model, test_case).await
+}
+
+pub async fn test_stream_reasoning(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+    let test_case = TestCase {
+        input: LanguageModelInput {
+            messages: vec![Message::user(vec![Part::text(
+                "John is twice as old as his sister Jane. Four years ago, John was three times as \
+                 old. What is John's current age? Make sure to reason and think through first \
+                 before answering.",
+            )])],
+            ..Default::default()
+        },
+        output: OutputAssertion {
+            content: vec![PartAssertion::Reasoning(ReasoningPartAssertion {
+                text: Some(Regex::new(r"(?i)john").unwrap()),
+                summary: None,
+            })],
+        },
+        method: TestMethod::Stream,
+    };
+    run_test_case(model, test_case).await
+}
+
+pub async fn test_input_reasoning(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+    let test_case = TestCase {
+        input: LanguageModelInput {
+            messages: vec![
+                Message::user(vec![Part::text("What is my secret number?")]),
+                Message::assistant(vec![
+                    Part::Reasoning(ReasoningPart {
+                        text: "Using my mind reading skill, I can deduce that your secret number \
+                               is 42. But let's ask user if the number if greater than 30 just to \
+                               be sure. If the user say yes, we are 100% sure it is 42 and can \
+                               answer without asking further question."
+                            .to_string(),
+                        ..Default::default()
+                    }),
+                    Part::text("Is the number greater than 30?"),
+                ]),
+                Message::user(vec![Part::text(
+                    "Yes, it is. Now use your reasoning and answer a number right now without \
+                     asking further!",
+                )]),
+            ],
+            ..Default::default()
+        },
+        output: OutputAssertion {
+            content: vec![PartAssertion::Text(TextPartAssertion {
+                text: Regex::new(r"42").unwrap(),
+            })],
+        },
+        method: TestMethod::Generate,
     };
     run_test_case(model, test_case).await
 }

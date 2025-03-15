@@ -2,13 +2,16 @@
 
 import {
   TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS,
+  TEST_CASE_GENERATE_REASONING,
   TEST_CASE_GENERATE_TEXT,
   TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_GENERATE_TOOL_CALL,
   TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT,
+  TEST_CASE_INPUT_REASONING,
   TEST_CASE_SOURCE_PART_INPUT,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+  TEST_CASE_STREAM_REASONING,
   TEST_CASE_STREAM_TEXT,
   TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_STREAM_TOOL_CALL,
@@ -22,6 +25,11 @@ import { MistralModel } from "./mistral.ts";
 suite("MistralModel", () => {
   assert(process.env["MISTRAL_API_KEY"], "MISTRAL_API_KEY must be set");
   const model = new MistralModel({
+    apiKey: process.env["MISTRAL_API_KEY"],
+    modelId: "mistral-small-2409",
+  });
+
+  const reasoningModel = new MistralModel({
     apiKey: process.env["MISTRAL_API_KEY"],
     modelId: "mistral-small-2409",
   });
@@ -55,4 +63,10 @@ suite("MistralModel", () => {
   testTestCase(model, TEST_CASE_STRUCTURED_RESPONSE_FORMAT, runTestOptions);
 
   testTestCase(model, TEST_CASE_SOURCE_PART_INPUT, runTestOptions);
+
+  testTestCase(reasoningModel, TEST_CASE_GENERATE_REASONING);
+
+  testTestCase(reasoningModel, TEST_CASE_STREAM_REASONING);
+
+  testTestCase(reasoningModel, TEST_CASE_INPUT_REASONING);
 });

@@ -1041,6 +1041,7 @@ dependencies = [
  "futures",
  "opentelemetry",
  "paste",
+ "rand",
  "regex",
  "reqwest",
  "rodio",

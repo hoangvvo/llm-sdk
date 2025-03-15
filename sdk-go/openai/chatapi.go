@@ -119,6 +119,7 @@ type ChatCompletionCreateParams struct {
 	// We generally recommend altering this or `temperature` but not both.
 	TopP *float64 `json:"top_p,omitempty"`
 
+	// to be flatten
 	Extra map[string]any `json:"-"`
 }
 

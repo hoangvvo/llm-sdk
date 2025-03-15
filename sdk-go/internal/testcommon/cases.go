@@ -10,11 +10,11 @@ import (
 
 // TestCase represents a complete test case
 type TestCase struct {
-	Name             string
-	Input            llmsdk.LanguageModelInput
-	Method           TestMethod
-	Output           OutputAssertion
-	CompatibleSchema bool
+	Name            string
+	Input           llmsdk.LanguageModelInput
+	Method          TestMethod
+	Output          OutputAssertion
+	AdditionalInput func(*llmsdk.LanguageModelInput)
 }
 
 // RunTestCase executes a single test case
@@ -23,15 +23,20 @@ func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCase TestCase) {
 
 	ctx := context.Background()
 
+	input := &testCase.Input
+	if testCase.AdditionalInput != nil {
+		testCase.AdditionalInput(input)
+	}
+
 	switch testCase.Method {
 	case Generate:
-		result, err := model.Generate(ctx, &testCase.Input)
+		result, err := model.Generate(ctx, input)
 		if err != nil {
 			t.Fatalf("Generate failed: %v", err)
 		}
 		assertContentPart(t, result.Content, testCase.Output.Content)
 	case Stream:
-		stream, err := model.Stream(ctx, &testCase.Input)
+		stream, err := model.Stream(ctx, input)
 		if err != nil {
 			t.Fatalf("Stream failed: %v", err)
 		}
@@ -384,4 +389,62 @@ var TestCaseSourcePartInput = TestCase{
 			NewTextAssertion("42"),
 		},
 	},
+}
+
+var TestCaseGenerateReasoning = TestCase{
+	Name: "generate reasoning",
+	Input: llmsdk.LanguageModelInput{
+		Messages: []llmsdk.Message{
+			llmsdk.NewUserMessage(
+				llmsdk.NewTextPart("John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering."),
+			),
+		},
+	},
+	Output: OutputAssertion{
+		Content: []PartAssertion{
+			NewReasoningAssertion("John", ""),
+		},
+	},
+	Method: Generate,
+}
+
+var TestCaseStreamReasoning = TestCase{
+	Name: "generate reasoning",
+	Input: llmsdk.LanguageModelInput{
+		Messages: []llmsdk.Message{
+			llmsdk.NewUserMessage(
+				llmsdk.NewTextPart("John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering."),
+			),
+		},
+	},
+	Output: OutputAssertion{
+		Content: []PartAssertion{
+			NewReasoningAssertion("John", ""),
+		},
+	},
+	Method: Stream,
+}
+
+var TestCaseInputReasoning = TestCase{
+	Name: "input reasoning",
+	Input: llmsdk.LanguageModelInput{
+		Messages: []llmsdk.Message{
+			llmsdk.NewUserMessage(
+				llmsdk.NewTextPart("What is my secret number?"),
+			),
+			llmsdk.NewAssistantMessage(
+				llmsdk.NewReasoningPart("Using my mind reading skill, I can deduce that your secret number is 42. But let's ask user if the number if greater than 30 just to be sure. If the user say yes, we are 100% sure it is 42 and can answer without asking further question."),
+				llmsdk.NewTextPart("Is the number greater than 30?"),
+			),
+			llmsdk.NewUserMessage(
+				llmsdk.NewTextPart("Yes, it is. Now use your reasoning and answer a number right now without asking further!"),
+			),
+		},
+	},
+	Output: OutputAssertion{
+		Content: []PartAssertion{
+			NewTextAssertion("42"),
+		},
+	},
+	Method: Stream,
 }

@@ -1,7 +1,7 @@
 use crate::{
-    audio_utils, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ImagePart, ImagePartDelta,
-    LanguageModelError, LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta,
-    PartialModelResponse, TextPart, TextPartDelta, ToolCallPart, ToolCallPartDelta,
+    audio_utils, AudioFormat, AudioPart, ContentDelta, ImagePart, LanguageModelError,
+    LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
+    ReasoningPart, TextPart, ToolCallPart,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -40,6 +40,14 @@ struct AccumulatedAudioData {
     audio_id: Option<String>,
 }
 
+/// Internal representation of accumulated reasoning data
+#[derive(Debug, Clone)]
+struct AccumulatedReasoningData {
+    text: String,
+    summary: Option<String>,
+    signature: Option<String>,
+}
+
 /// Represents accumulated data for different part types
 #[derive(Debug, Clone)]
 enum AccumulatedData {
@@ -47,6 +55,7 @@ enum AccumulatedData {
     ToolCall(AccumulatedToolCallData),
     Image(AccumulatedImageData),
     Audio(AccumulatedAudioData),
+    Reasoning(AccumulatedReasoningData),
 }
 
 /// Initializes accumulated data from a delta
@@ -77,62 +86,13 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             transcript: audio_delta.transcript.unwrap_or_default(),
             audio_id: audio_delta.audio_id,
         }),
-    }
-}
-
-/// Merges text delta with existing text data
-fn merge_text_delta(existing: &mut AccumulatedTextData, delta: &TextPartDelta) {
-    existing.text.push_str(&delta.text);
-}
-
-/// Merges tool call delta with existing tool call data
-fn merge_tool_call_delta(existing: &mut AccumulatedToolCallData, delta: ToolCallPartDelta) {
-    if let Some(tool_name) = delta.tool_name {
-        existing.tool_name.push_str(&tool_name);
-    }
-    if delta.tool_call_id.is_some() {
-        existing.tool_call_id = delta.tool_call_id;
-    }
-    if let Some(args) = delta.args {
-        existing.args.push_str(&args);
-    }
-}
-
-/// Merge image delta with existing image data
-fn merge_image_delta(existing: &mut AccumulatedImageData, delta: ImagePartDelta) {
-    if let Some(image_data) = delta.image_data {
-        existing.image_data.push_str(&image_data);
-    }
-    if delta.mime_type.is_some() {
-        existing.mime_type = delta.mime_type;
-    }
-    if delta.width.is_some() {
-        existing.width = delta.width;
-    }
-    if delta.height.is_some() {
-        existing.height = delta.height;
-    }
-}
-
-/// Merges audio delta with existing audio data
-fn merge_audio_delta(existing: &mut AccumulatedAudioData, delta: AudioPartDelta) {
-    if let Some(audio_data) = delta.audio_data {
-        existing.audio_data_chunks.push(audio_data);
-    }
-    if delta.format.is_some() {
-        existing.format = delta.format;
-    }
-    if delta.sample_rate.is_some() {
-        existing.sample_rate = delta.sample_rate;
-    }
-    if delta.channels.is_some() {
-        existing.channels = delta.channels;
-    }
-    if let Some(transcript) = delta.transcript {
-        existing.transcript.push_str(&transcript);
-    }
-    if delta.audio_id.is_some() {
-        existing.audio_id = delta.audio_id;
+        PartDelta::Reasoning(reasoning_delta) => {
+            AccumulatedData::Reasoning(AccumulatedReasoningData {
+                text: reasoning_delta.text.unwrap_or_default(),
+                summary: reasoning_delta.summary,
+                signature: reasoning_delta.signature,
+            })
+        }
     }
 }
 
@@ -140,16 +100,69 @@ fn merge_audio_delta(existing: &mut AccumulatedAudioData, delta: AudioPartDelta)
 fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<(), String> {
     match (existing, delta.part) {
         (AccumulatedData::Text(ref mut existing_text), PartDelta::Text(text_delta)) => {
-            merge_text_delta(existing_text, &text_delta);
+            existing_text.text.push_str(&text_delta.text);
         }
         (AccumulatedData::ToolCall(ref mut existing_tool), PartDelta::ToolCall(tool_delta)) => {
-            merge_tool_call_delta(existing_tool, tool_delta);
+            if let Some(tool_name) = tool_delta.tool_name {
+                existing_tool.tool_name.push_str(&tool_name);
+            }
+            if tool_delta.tool_call_id.is_some() {
+                existing_tool.tool_call_id = tool_delta.tool_call_id;
+            }
+            if let Some(args) = tool_delta.args {
+                existing_tool.args.push_str(&args);
+            }
         }
         (AccumulatedData::Image(ref mut existing_image), PartDelta::Image(image_delta)) => {
-            merge_image_delta(existing_image, image_delta);
+            if let Some(image_data) = image_delta.image_data {
+                existing_image.image_data.push_str(&image_data);
+            }
+            if image_delta.mime_type.is_some() {
+                existing_image.mime_type = image_delta.mime_type;
+            }
+            if image_delta.width.is_some() {
+                existing_image.width = image_delta.width;
+            }
+            if image_delta.height.is_some() {
+                existing_image.height = image_delta.height;
+            }
         }
         (AccumulatedData::Audio(ref mut existing_audio), PartDelta::Audio(audio_delta)) => {
-            merge_audio_delta(existing_audio, audio_delta);
+            if let Some(audio_data) = audio_delta.audio_data {
+                existing_audio.audio_data_chunks.push(audio_data);
+            }
+            if audio_delta.format.is_some() {
+                existing_audio.format = audio_delta.format;
+            }
+            if audio_delta.sample_rate.is_some() {
+                existing_audio.sample_rate = audio_delta.sample_rate;
+            }
+            if audio_delta.channels.is_some() {
+                existing_audio.channels = audio_delta.channels;
+            }
+            if let Some(transcript) = audio_delta.transcript {
+                existing_audio.transcript.push_str(&transcript);
+            }
+            if audio_delta.audio_id.is_some() {
+                existing_audio.audio_id = audio_delta.audio_id;
+            }
+        }
+        (
+            AccumulatedData::Reasoning(ref mut existing_reasoning),
+            PartDelta::Reasoning(reasoning_delta),
+        ) => {
+            if let Some(text) = reasoning_delta.text {
+                existing_reasoning.text.push_str(&text);
+            }
+            if let Some(summary) = reasoning_delta.summary {
+                existing_reasoning
+                    .summary
+                    .get_or_insert_with(String::new)
+                    .push_str(&summary);
+            }
+            if reasoning_delta.signature.is_some() {
+                existing_reasoning.signature = reasoning_delta.signature;
+            }
         }
         _ => Err(format!(
             "Type mismatch at index {}: existing type doesn't match incoming type",
@@ -257,6 +270,25 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
     }))
 }
 
+fn create_reasoning_part(mut data: AccumulatedReasoningData) -> LanguageModelResult<Part> {
+    if data.text.is_empty() {
+        if let Some(summary) = &data.summary {
+            data.text = summary.clone();
+        } else {
+            return Err(LanguageModelError::Invariant(
+                "",
+                "Missing required field text for reasoning part".to_string(),
+            ));
+        }
+    }
+
+    Ok(Part::Reasoning(ReasoningPart {
+        text: data.text,
+        summary: data.summary,
+        signature: data.signature,
+    }))
+}
+
 /// Creates a final Part from accumulated data
 fn create_part(data: AccumulatedData, index: usize) -> LanguageModelResult<Part> {
     match data {
@@ -264,6 +296,7 @@ fn create_part(data: AccumulatedData, index: usize) -> LanguageModelResult<Part>
         AccumulatedData::ToolCall(tool_data) => create_tool_call_part(tool_data, index),
         AccumulatedData::Image(image_data) => create_image_part(image_data, index),
         AccumulatedData::Audio(audio_data) => create_audio_part(audio_data),
+        AccumulatedData::Reasoning(reasoning_data) => create_reasoning_part(reasoning_data),
     }
 }
 

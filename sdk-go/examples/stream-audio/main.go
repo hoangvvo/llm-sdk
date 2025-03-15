@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("openai", "gpt-4o-audio-preview")
+	model := examples.GetModel("openai-chat-completion", "gpt-4o-audio-preview")
 
 	response, err := model.Stream(context.Background(), &llmsdk.LanguageModelInput{
 		Extra: map[string]any{

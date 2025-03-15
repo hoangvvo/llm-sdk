@@ -1,4 +1,5 @@
 use crate::Part;
+use llm_sdk::ReasoningPart;
 use regex::Regex;
 
 #[derive(Debug, Clone)]
@@ -96,9 +97,56 @@ impl ToolCallPartAssertion {
 }
 
 #[derive(Debug, Clone)]
+pub struct ReasoningPartAssertion {
+    pub text: Option<Regex>,
+    pub summary: Option<Regex>,
+}
+
+impl ReasoningPartAssertion {
+    pub fn assert(&self, content: &[Part]) -> Result<(), String> {
+        let found_part = content.iter().find(|part| {
+            if let Part::Reasoning(reasoning_part) = part {
+                let text_matches = if let Some(text_regex) = &self.text {
+                    text_regex.is_match(&reasoning_part.text)
+                } else {
+                    true
+                };
+
+                let summary_matches = if let Some(summary_regex) = &self.summary {
+                    if let Some(summary) = &reasoning_part.summary {
+                        summary_regex.is_match(summary)
+                    } else {
+                        false
+                    }
+                } else {
+                    true
+                };
+
+                text_matches && summary_matches
+            } else {
+                false
+            }
+        });
+
+        if found_part.is_none() {
+            return Err(format!(
+                "Expected matching reasoning part:\nExpected text: {:?}\nExpected summary: \
+                 {:?}\nReceived:\n{}",
+                self.text,
+                self.summary,
+                serde_json::to_string_pretty(content).unwrap()
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum PartAssertion {
     Text(TextPartAssertion),
     ToolCall(ToolCallPartAssertion),
+    Reasoning(ReasoningPartAssertion),
 }
 
 impl PartAssertion {
@@ -106,6 +154,7 @@ impl PartAssertion {
         match self {
             Self::Text(text_assertion) => text_assertion.assert(content),
             Self::ToolCall(tool_call_assertion) => tool_call_assertion.assert(content),
+            Self::Reasoning(reasoning_assertion) => reasoning_assertion.assert(content),
         }
     }
 }
