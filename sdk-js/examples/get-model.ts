@@ -3,7 +3,10 @@ import { AnthropicModel } from "@hoangvvo/llm-sdk/anthropic";
 import { CohereModel } from "@hoangvvo/llm-sdk/cohere";
 import { GoogleModel } from "@hoangvvo/llm-sdk/google";
 import { MistralModel } from "@hoangvvo/llm-sdk/mistral";
-import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
+import {
+  OpenAIChatCompletionModel,
+  OpenAIModel,
+} from "@hoangvvo/llm-sdk/openai";
 import assert from "node:assert";
 
 export function getModel(provider: string, modelId: string): LanguageModel {
@@ -11,6 +14,12 @@ export function getModel(provider: string, modelId: string): LanguageModel {
     case "openai":
       assert(process.env["OPENAI_API_KEY"]);
       return new OpenAIModel({
+        apiKey: process.env["OPENAI_API_KEY"],
+        modelId,
+      });
+    case "openai-chat-completion":
+      assert(process.env["OPENAI_API_KEY"]);
+      return new OpenAIChatCompletionModel({
         apiKey: process.env["OPENAI_API_KEY"],
         modelId,
       });

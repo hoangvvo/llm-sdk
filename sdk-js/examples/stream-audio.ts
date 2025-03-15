@@ -3,7 +3,7 @@ import { getModel } from "./get-model.ts";
 
 let speaker: Speaker | undefined;
 
-const model = getModel("openai", "gpt-4o-audio-preview");
+const model = getModel("openai-chat-completion", "gpt-4o-audio-preview");
 
 const response = model.stream({
   extra: {

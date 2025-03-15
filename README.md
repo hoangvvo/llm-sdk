@@ -34,18 +34,18 @@ We provide SDKs to interact with various LLM providers in the following programm
 
 ### Supported Providers
 
-|                   | OpenAI               | Anthropic                                                 | Google               | Cohere | Mistral              |
-| ----------------- | -------------------- | --------------------------------------------------------- | -------------------- | ------ | -------------------- |
-| Sampling Params   | ✅ except `top_k`    | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅                   | ✅     | ✅ except `top_k`    |
-| Function Calling  | ✅                   | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Structured Output | ✅                   | ➖                                                        | ✅                   | ✅     | ✅                   |
-| Text Input        | ✅                   | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Image Input       | ✅                   | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Audio Input       | ✅                   | ➖                                                        | ✅                   | ➖     | ➖                   |
-| Citation          | ➖ [^source-as-text] | ✅                                                        | ➖ [^source-as-text] | ✅     | 🚧 [^source-as-text] |
-| Text Output       | ✅                   | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Image Output      | 🚧                   | ➖                                                        | ✅                   | ➖     | ➖                   |
-| Audio Output      | ✅                   | ➖                                                        | ➖                   | ➖     | ➖                   |
+|                   | OpenAI (Responses)                                                | OpenAI (Chat Completion) | Anthropic                                                 | Google               | Cohere | Mistral              |
+| ----------------- | ----------------------------------------------------------------- | ------------------------ | --------------------------------------------------------- | -------------------- | ------ | -------------------- |
+| Sampling Params   | ✅ except `top_k`,`frequency_penalty`, `presence_penalty`, `seed` | ✅ except `top_k`        | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅                   | ✅     | ✅ except `top_k`    |
+| Function Calling  | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Structured Output | ✅                                                                | ✅                       | ➖                                                        | ✅                   | ✅     | ✅                   |
+| Text Input        | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Image Input       | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Audio Input       | ✅                                                                | ✅                       | ➖                                                        | ✅                   | ➖     | ➖                   |
+| Citation          | ➖ [^source-as-text]                                              | ➖ [^source-as-text]     | ✅                                                        | ➖ [^source-as-text] | ✅     | 🚧 [^source-as-text] |
+| Text Output       | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Image Output      | ✅                                                                | 🚧                       | ➖                                                        | ✅                   | ➖     | ➖                   |
+| Audio Output      | ➖                                                                | ✅                       | ➖                                                        | ➖                   | ➖     | ➖                   |
 
 Keys:
 

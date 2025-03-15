@@ -3,7 +3,7 @@ import decodeAudio from "audio-decode";
 import play from "audio-play";
 import { getModel } from "./get-model.ts";
 
-const model = getModel("openai", "gpt-4o-audio-preview");
+const model = getModel("openai-chat-completion", "gpt-4o-audio-preview");
 
 const response = await model.generate({
   extra: {

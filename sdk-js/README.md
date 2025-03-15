@@ -116,6 +116,7 @@ node --env-file=../.env examples/generate-text.ts
 
 ### To 0.3.0
 
+- **OpenAI Chat**. The existing Chat completion `OpenAIModel` has been renamed to `OpenAIChatModel`. The Responses API now powers the `OpenAIModel`.
 - **OpenAI Strict**. Response format and function calling schema now forces [`strict` mode](https://platform.openai.com/docs/guides/structured-outputs). The option to opt-in to strict mode has been removed.
 - **ESM Only**. The library is now ESM-only. CommonJS is no longer supported. You can continue using the library in CommonJS environment by [using the latest Node.js version](https://nodejs.org/api/modules.html#loading-ecmascript-modules-using-require).
 - **Tool result content.** Rename `result` to `content`. Tool result content is now an array of `Part` instead of an object to support Anthropic support for multi-modal tool result.

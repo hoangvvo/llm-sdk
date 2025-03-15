@@ -18,11 +18,11 @@ import {
 import assert from "node:assert";
 import test, { suite, type TestContext } from "node:test";
 import { StreamAccumulator } from "../accumulator.ts";
-import { OpenAIModel } from "./openai.ts";
+import { OpenAIChatCompletionModel } from "./openai-chat.ts";
 
-suite("OpenAIModel", () => {
+suite("OpenAIChatCompletionModel", () => {
   assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
-  const model = new OpenAIModel(
+  const model = new OpenAIChatCompletionModel(
     {
       apiKey: process.env["OPENAI_API_KEY"],
       modelId: "gpt-4o",
@@ -30,7 +30,7 @@ suite("OpenAIModel", () => {
     { capabilities: ["function-calling", "image-input", "structured-output"] },
   );
 
-  const audioModel = new OpenAIModel({
+  const audioModel = new OpenAIChatCompletionModel({
     modelId: "gpt-4o-audio-preview",
     apiKey: process.env["OPENAI_API_KEY"],
   });
@@ -59,7 +59,7 @@ suite("OpenAIModel", () => {
 
   testTestCase(model, TEST_CASE_SOURCE_PART_INPUT);
 
-  test("generate audio", { skip: true }, async (t: TestContext) => {
+  test("generate audio", async (t: TestContext) => {
     const response = await audioModel.generate({
       modalities: ["text", "audio"],
       messages: [
@@ -89,7 +89,7 @@ suite("OpenAIModel", () => {
     t.assert.ok(audioPart.audio_id, "Audio part ID must be present");
   });
 
-  test("stream audio", { skip: true }, async (t: TestContext) => {
+  test("stream audio", async (t: TestContext) => {
     const stream = audioModel.stream({
       modalities: ["text", "audio"],
       messages: [
