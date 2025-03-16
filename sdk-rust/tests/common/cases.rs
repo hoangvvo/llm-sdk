@@ -1,5 +1,5 @@
 use crate::common::assert::{
-    OutputAssertion, PartAssertion, ReasoningPartAssertion, TextPartAssertion,
+    AudioPartAssertion, OutputAssertion, PartAssertion, ReasoningPartAssertion, TextPartAssertion,
     ToolCallPartAssertion, ToolCallpartAssertionArgPropValue,
 };
 use futures::stream::StreamExt;
@@ -24,16 +24,24 @@ pub struct TestCase {
 pub async fn run_test_case(
     model: &dyn LanguageModel,
     test_case: TestCase,
+    options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
+    let mut input = test_case.input.clone();
+    if let Some(opts) = options {
+        if let Some(f) = opts.additional_input {
+            f(&mut input);
+        }
+    }
+
     match test_case.method {
         TestMethod::Generate => {
-            let result = model.generate(test_case.input).await?;
+            let result = model.generate(input).await?;
             for part_assertion in test_case.output.content {
                 part_assertion.assert(&result.content)?;
             }
         }
         TestMethod::Stream => {
-            let mut stream = model.stream(test_case.input).await?;
+            let mut stream = model.stream(input).await?;
 
             let mut accumulator = StreamAccumulator::new();
 
@@ -49,6 +57,11 @@ pub async fn run_test_case(
         }
     }
     Ok(())
+}
+
+#[derive(Clone, Default)]
+pub struct RunTestCaseOptions {
+    pub additional_input: Option<fn(&mut LanguageModelInput)>,
 }
 
 // MARK: common test set
@@ -84,7 +97,10 @@ fn get_stock_price_tool() -> Tool {
     }
 }
 
-pub async fn test_generate_text(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_generate_text(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
             messages: vec![Message::User(UserMessage {
@@ -101,10 +117,13 @@ pub async fn test_generate_text(model: &dyn LanguageModel) -> Result<(), Box<dyn
             })],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
-pub async fn test_stream_text(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_stream_text(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
             messages: vec![Message::User(UserMessage {
@@ -121,11 +140,12 @@ pub async fn test_stream_text(model: &dyn LanguageModel) -> Result<(), Box<dyn E
             })],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
 pub async fn test_generate_with_system_prompt(
     model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
@@ -144,10 +164,13 @@ pub async fn test_generate_with_system_prompt(
             })],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
-pub async fn test_generate_tool_call(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_generate_tool_call(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
             messages: vec![Message::User(UserMessage {
@@ -169,10 +192,13 @@ pub async fn test_generate_tool_call(model: &dyn LanguageModel) -> Result<(), Bo
             })],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
-pub async fn test_stream_tool_call(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_stream_tool_call(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
             messages: vec![Message::User(UserMessage {
@@ -194,11 +220,12 @@ pub async fn test_stream_tool_call(model: &dyn LanguageModel) -> Result<(), Box<
             })],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
 pub async fn test_generate_text_from_tool_result(
     model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
@@ -243,11 +270,12 @@ pub async fn test_generate_text_from_tool_result(
             })],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
 pub async fn test_stream_text_from_tool_result(
     model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
@@ -292,11 +320,12 @@ pub async fn test_stream_text_from_tool_result(
             })],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
 pub async fn test_generate_parallel_tool_calls(
     model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
@@ -328,11 +357,12 @@ pub async fn test_generate_parallel_tool_calls(
             ],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
 pub async fn test_stream_parallel_tool_calls(
     model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
@@ -366,11 +396,12 @@ pub async fn test_stream_parallel_tool_calls(
             ],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
 pub async fn test_stream_parallel_tool_calls_same_name(
     model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
@@ -402,11 +433,12 @@ pub async fn test_stream_parallel_tool_calls_same_name(
             ],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
 pub async fn test_structured_response_format(
     model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
@@ -467,10 +499,13 @@ pub async fn test_structured_response_format(
             ],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
-pub async fn test_source_part_input(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_source_part_input(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
             messages: vec![
@@ -509,31 +544,54 @@ pub async fn test_source_part_input(model: &dyn LanguageModel) -> Result<(), Box
             })],
         },
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
-pub async fn test_generate_reasoning(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_generate_audio(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
-            messages: vec![Message::user(vec![Part::text(
-                "John is twice as old as his sister Jane. Four years ago, John was three times as \
-                 old. What is John's current age? Make sure to reason and think through first \
-                 before answering.",
-            )])],
+            messages: vec![Message::user(vec![Part::text("Say 'Hello'")])],
             ..Default::default()
         },
         output: OutputAssertion {
-            content: vec![PartAssertion::Reasoning(ReasoningPartAssertion {
-                text: Some(Regex::new(r"(?i)john").unwrap()),
-                summary: None,
+            content: vec![PartAssertion::Audio(AudioPartAssertion {
+                audio_id: true,
+                transcript: Some(Regex::new(r"Hello").unwrap()),
             })],
         },
         method: TestMethod::Generate,
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
-pub async fn test_stream_reasoning(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_stream_audio(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    let test_case = TestCase {
+        input: LanguageModelInput {
+            messages: vec![Message::user(vec![Part::text("Say 'Hello'")])],
+            modalities: Some(vec![Modality::Text, Modality::Audio]),
+            ..Default::default()
+        },
+        output: OutputAssertion {
+            content: vec![PartAssertion::Audio(AudioPartAssertion {
+                audio_id: true,
+                transcript: Some(Regex::new(r"Hello").unwrap()),
+            })],
+        },
+        method: TestMethod::Stream,
+    };
+    run_test_case(model, test_case, options).await
+}
+
+pub async fn test_generate_reasoning(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
             messages: vec![Message::user(vec![Part::text(
@@ -545,16 +603,41 @@ pub async fn test_stream_reasoning(model: &dyn LanguageModel) -> Result<(), Box<
         },
         output: OutputAssertion {
             content: vec![PartAssertion::Reasoning(ReasoningPartAssertion {
-                text: Some(Regex::new(r"(?i)john").unwrap()),
-                summary: None,
+                text: Regex::new(r"(?i)john").unwrap(),
+            })],
+        },
+        method: TestMethod::Generate,
+    };
+    run_test_case(model, test_case, options).await
+}
+
+pub async fn test_stream_reasoning(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    let test_case = TestCase {
+        input: LanguageModelInput {
+            messages: vec![Message::user(vec![Part::text(
+                "John is twice as old as his sister Jane. Four years ago, John was three times as \
+                 old. What is John's current age? Make sure to reason and think through first \
+                 before answering.",
+            )])],
+            ..Default::default()
+        },
+        output: OutputAssertion {
+            content: vec![PartAssertion::Reasoning(ReasoningPartAssertion {
+                text: Regex::new(r"(?i)john").unwrap(),
             })],
         },
         method: TestMethod::Stream,
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
-pub async fn test_input_reasoning(model: &dyn LanguageModel) -> Result<(), Box<dyn Error>> {
+pub async fn test_input_reasoning(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
     let test_case = TestCase {
         input: LanguageModelInput {
             messages: vec![
@@ -584,7 +667,7 @@ pub async fn test_input_reasoning(model: &dyn LanguageModel) -> Result<(), Box<d
         },
         method: TestMethod::Generate,
     };
-    run_test_case(model, test_case).await
+    run_test_case(model, test_case, options).await
 }
 
 #[macro_export]
@@ -593,7 +676,33 @@ macro_rules! test_set {
         #[test]
         async fn $test_name() -> Result<(), Box<dyn Error>> {
             paste::paste! {
-                $crate::common::cases::[<test_ $test_name>](&*$model_name).await
+                $crate::common::cases::[<test_$test_name>](&*$model_name, None).await
+            }
+        }
+    };
+    ($model_name:ident, $test_name:ident, $options:expr) => {
+        #[test]
+        async fn $test_name() -> Result<(), Box<dyn Error>> {
+            paste::paste! {
+                $crate::common::cases::[<test_$test_name>](&*$model_name, $options).await
+            }
+        }
+    };
+    (ignore = $reason:literal, $model_name:ident, $test_name:ident) => {
+        #[test]
+        #[ignore = $reason]
+        async fn $test_name() -> Result<(), Box<dyn Error>> {
+            paste::paste! {
+                $crate::common::cases::[<test_$test_name>](&*$model_name, None).await
+            }
+        }
+    };
+    (ignore = $reason:literal, $model_name:ident, $test_name:ident, $options:expr) => {
+        #[test]
+        #[ignore = $reason]
+        async fn $test_name() -> Result<(), Box<dyn Error>> {
+            paste::paste! {
+                $crate::common::cases::[<test_$test_name>](&*$model_name, $options).await
             }
         }
     };

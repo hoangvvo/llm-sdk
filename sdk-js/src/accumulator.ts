@@ -90,10 +90,7 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
 
     case "reasoning":
       return {
-        type: "reasoning",
-        ...(delta.part.text && { text: delta.part.text }),
-        ...(delta.part.summary && { summary: delta.part.summary }),
-        ...(delta.part.signature && { signature: delta.part.signature }),
+        ...delta.part,
       };
   }
 }
@@ -176,10 +173,6 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
       const existingPart = existing as ReasoningPartDelta;
       if (delta.part.text) {
         existingPart.text = (existingPart.text ?? "") + delta.part.text;
-      }
-      if (delta.part.summary) {
-        existingPart.summary =
-          (existingPart.summary ?? "") + delta.part.summary;
       }
       if (delta.part.signature) {
         existingPart.signature = delta.part.signature;
@@ -270,23 +263,10 @@ function createAudioPart(data: AccumulatedAudioData): Part {
 /**
  * Creates a reasoning part from accumulated reasoning data
  */
-function createReasoningPart(data: ReasoningPartDelta, index: number): Part {
-  if (data.text === undefined) {
-    if (data.summary) {
-      // Fall back to summary if text is not available
-      data.text = data.summary;
-    } else {
-      throw new Error(
-        `Missing required fields at index ${String(index)}: ` +
-          `text=${String(data.text)}, summary=${String(data.summary)}, signature=${String(data.signature)}`,
-      );
-    }
-  }
-
+function createReasoningPart(data: ReasoningPartDelta): Part {
   return {
     type: "reasoning",
-    text: data.text,
-    ...(data.summary && { summary: data.summary }),
+    text: data.text ?? "",
     ...(data.signature && { signature: data.signature }),
   };
 }
@@ -309,7 +289,7 @@ function createPart(data: AccumulatedData, index: number): Part {
       return createAudioPart(data);
 
     case "reasoning":
-      return createReasoningPart(data, index);
+      return createReasoningPart(data);
   }
 }
 

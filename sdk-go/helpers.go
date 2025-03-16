@@ -101,12 +101,6 @@ func NewReasoningPart(text string, opts ...ReasoingPartOption) Part {
 
 type ReasoingPartOption func(*ReasoningPart)
 
-func WithReasoningSummary(summary string) ReasoingPartOption {
-	return func(p *ReasoningPart) {
-		p.Summary = &summary
-	}
-}
-
 func WithReasoningSignature(signature string) ReasoingPartOption {
 	return func(p *ReasoningPart) {
 		p.Signature = &signature

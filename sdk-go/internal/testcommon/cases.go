@@ -391,6 +391,42 @@ var TestCaseSourcePartInput = TestCase{
 	},
 }
 
+var TestCaseGenerateAudio = TestCase{
+	Name: "generate audio",
+	Input: llmsdk.LanguageModelInput{
+		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
+		Messages: []llmsdk.Message{
+			llmsdk.NewUserMessage(
+				llmsdk.NewTextPart("Respond by saying 'Hello'"),
+			),
+		},
+	},
+	Method: Generate,
+	Output: OutputAssertion{
+		Content: []PartAssertion{
+			NewAudioAssertion(true, "Hello"),
+		},
+	},
+}
+
+var TestCaseStreamAudio = TestCase{
+	Name: "stream audio",
+	Input: llmsdk.LanguageModelInput{
+		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
+		Messages: []llmsdk.Message{
+			llmsdk.NewUserMessage(
+				llmsdk.NewTextPart("Respond by saying 'Hello'"),
+			),
+		},
+	},
+	Method: Stream,
+	Output: OutputAssertion{
+		Content: []PartAssertion{
+			NewAudioAssertion(true, "Hello"),
+		},
+	},
+}
+
 var TestCaseGenerateReasoning = TestCase{
 	Name: "generate reasoning",
 	Input: llmsdk.LanguageModelInput{
@@ -402,7 +438,7 @@ var TestCaseGenerateReasoning = TestCase{
 	},
 	Output: OutputAssertion{
 		Content: []PartAssertion{
-			NewReasoningAssertion("John", ""),
+			NewReasoningAssertion("John"),
 		},
 	},
 	Method: Generate,
@@ -419,7 +455,7 @@ var TestCaseStreamReasoning = TestCase{
 	},
 	Output: OutputAssertion{
 		Content: []PartAssertion{
-			NewReasoningAssertion("John", ""),
+			NewReasoningAssertion("John"),
 		},
 	},
 	Method: Stream,

@@ -1,5 +1,4 @@
 use crate::Part;
-use llm_sdk::ReasoningPart;
 use regex::Regex;
 
 #[derive(Debug, Clone)]
@@ -32,7 +31,6 @@ impl TextPartAssertion {
 #[derive(Debug, Clone)]
 pub enum ToolCallpartAssertionArgPropValue {
     Value(Regex),
-    // Object(Vec<(String, ToolCallpartAssertionArgPropValue)>),
 }
 
 impl ToolCallpartAssertionArgPropValue {
@@ -41,22 +39,7 @@ impl ToolCallpartAssertionArgPropValue {
             Self::Value(regex) => {
                 let actual_str = actual.to_string();
                 regex.is_match(&actual_str)
-            } /* Self::Object(expected_props) => {
-               *     if let Some(actual_obj) = actual.as_object() {
-               *         for (key, expected_value) in expected_props {
-               *             if let Some(actual_value) = actual_obj.get(key) {
-               *                 if !expected_value.is_matched(actual_value) {
-               *                     return false;
-               *                 }
-               *             } else {
-               *                 return false;
-               *             }
-               *         }
-               *         true
-               *     } else {
-               *         false
-               *     }
-               * } */
+            }
         }
     }
 }
@@ -97,32 +80,58 @@ impl ToolCallPartAssertion {
 }
 
 #[derive(Debug, Clone)]
+pub struct AudioPartAssertion {
+    pub audio_id: bool,            // Whether the audio ID is present
+    pub transcript: Option<Regex>, // Optional transcript to match
+}
+
+impl AudioPartAssertion {
+    pub fn assert(&self, content: &[Part]) -> Result<(), String> {
+        let found_part = content.iter().find(|part| {
+            if let Part::Audio(audio_part) = part {
+                if audio_part.audio_data.is_empty() {
+                    return false; // Audio data must be present
+                }
+                if self.audio_id && audio_part.audio_id.is_none() {
+                    return false; // Audio ID must be present if required
+                }
+                if let Some(transcript) = &self.transcript {
+                    if let Some(audio_transcript) = &audio_part.transcript {
+                        if !transcript.is_match(audio_transcript) {
+                            return false;
+                        }
+                    } else {
+                        return false; // Transcript must be present if required
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        });
+        if found_part.is_none() {
+            return Err(format!(
+                "Expected matching audio part:\nExpected transcript: {:?}, audio_id present: \
+                 {}\nReceived:\n{}",
+                self.transcript,
+                self.audio_id,
+                serde_json::to_string_pretty(content).unwrap()
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ReasoningPartAssertion {
-    pub text: Option<Regex>,
-    pub summary: Option<Regex>,
+    pub text: Regex,
 }
 
 impl ReasoningPartAssertion {
     pub fn assert(&self, content: &[Part]) -> Result<(), String> {
         let found_part = content.iter().find(|part| {
             if let Part::Reasoning(reasoning_part) = part {
-                let text_matches = if let Some(text_regex) = &self.text {
-                    text_regex.is_match(&reasoning_part.text)
-                } else {
-                    true
-                };
-
-                let summary_matches = if let Some(summary_regex) = &self.summary {
-                    if let Some(summary) = &reasoning_part.summary {
-                        summary_regex.is_match(summary)
-                    } else {
-                        false
-                    }
-                } else {
-                    true
-                };
-
-                text_matches && summary_matches
+                self.text.is_match(&reasoning_part.text)
             } else {
                 false
             }
@@ -130,10 +139,8 @@ impl ReasoningPartAssertion {
 
         if found_part.is_none() {
             return Err(format!(
-                "Expected matching reasoning part:\nExpected text: {:?}\nExpected summary: \
-                 {:?}\nReceived:\n{}",
+                "Expected matching reasoning part:\nExpected text: {:?}\nReceived:\n{}",
                 self.text,
-                self.summary,
                 serde_json::to_string_pretty(content).unwrap()
             ));
         }
@@ -146,6 +153,7 @@ impl ReasoningPartAssertion {
 pub enum PartAssertion {
     Text(TextPartAssertion),
     ToolCall(ToolCallPartAssertion),
+    Audio(AudioPartAssertion),
     Reasoning(ReasoningPartAssertion),
 }
 
@@ -154,6 +162,7 @@ impl PartAssertion {
         match self {
             Self::Text(text_assertion) => text_assertion.assert(content),
             Self::ToolCall(tool_call_assertion) => tool_call_assertion.assert(content),
+            Self::Audio(audio_assertion) => audio_assertion.assert(content),
             Self::Reasoning(reasoning_assertion) => reasoning_assertion.assert(content),
         }
     }

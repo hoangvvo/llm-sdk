@@ -91,6 +91,18 @@ func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, testcommon.TestCaseSourcePartInput)
 }
 
+func TestGenerateAudio(t *testing.T) {
+	t.Skip("audio not supported in responses api")
+	tc := testcommon.TestCaseGenerateAudio
+	testcommon.RunTestCase(t, model, tc)
+}
+
+func TestStreamAudio(t *testing.T) {
+	t.Skip("audio not supported in responses api")
+	tc := testcommon.TestCaseStreamAudio
+	testcommon.RunTestCase(t, model, tc)
+}
+
 func TestGenerateReasoning(t *testing.T) {
 	testcommon.RunTestCase(t, reasoningModel, testcommon.TestCaseGenerateReasoning)
 }

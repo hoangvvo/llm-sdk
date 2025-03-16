@@ -130,8 +130,6 @@ type ToolResultPart struct {
 type ReasoningPart struct {
 	// The reasoning text content
 	Text string `json:"text"`
-	// The reasoning summary
-	Summary *string `json:"summary,omitempty"`
 	//  The reasoning internal signature
 	Signature *string `json:"signature,omitempty"`
 }
@@ -308,8 +306,7 @@ type AudioPartDelta struct {
 
 // ReasoningPartDelta represents a delta update for a reasoning part, used in streaming of reasoning messages.
 type ReasoningPartDelta struct {
-	Text      *string `json:"text,omitempty"`
-	Summary   *string `json:"summary,omitempty"`
+	Text      string  `json:"text,omitempty"`
 	Signature *string `json:"signature,omitempty"`
 }
 

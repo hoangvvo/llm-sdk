@@ -47,6 +47,18 @@ test_set!(OPENAI_MODEL, structured_response_format);
 
 test_set!(OPENAI_MODEL, source_part_input);
 
+test_set!(
+    ignore = "audio is not supported in responses api",
+    OPENAI_MODEL,
+    generate_audio
+);
+
+test_set!(
+    ignore = "audio is not supported in responses api",
+    OPENAI_MODEL,
+    stream_audio
+);
+
 test_set!(OPENAI_MODEL, generate_reasoning);
 
 test_set!(OPENAI_MODEL, stream_reasoning);

@@ -60,7 +60,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<u32>,
 
-    /// Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI
+    /// Model ID used to generate the response, like `gpt-4o` or `o3`. `OpenAI`
     /// offers a wide range of models with different capabilities,
     /// performance characteristics, and price points. Refer to the
     /// [model guide](https://platform.openai.com/docs/models) to browse and compare
@@ -125,14 +125,14 @@ pub struct ResponseCreateParams {
     ///
     /// We support the following categories of tools:
     ///
-    /// - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+    /// - **Built-in tools**: Tools that are provided by `OpenAI` that extend the model's
     ///   capabilities, like
     ///   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
     ///   [file search](https://platform.openai.com/docs/guides/tools-file-search).
     ///   Learn more about
     ///   [built-in tools](https://platform.openai.com/docs/guides/tools).
     /// - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
-    ///   predefined connectors such as Google Drive and SharePoint. Learn more about
+    ///   predefined connectors such as Google Drive and `SharePoint`. Learn more about
     ///   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
     /// - **Function calls (custom tools)**: Functions that are defined by you, enabling
     ///   the model to call your own code with strongly typed arguments and outputs.
@@ -143,7 +143,7 @@ pub struct ResponseCreateParams {
     pub tools: Option<Vec<Tool>>,
 
     /// An alternative to sampling with temperature, called nucleus sampling,
-    /// where the model considers the results of the tokens with top_p
+    /// where the model considers the results of the tokens with `top_p`
     /// probability mass. So 0.1 means only the tokens comprising the top
     /// 10% probability mass are considered.
     ///
@@ -227,7 +227,7 @@ impl Serialize for ResponseInputItem {
         use serde::ser::SerializeMap;
 
         match self {
-            ResponseInputItem::Message(msg) => {
+            Self::Message(msg) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "message")?;
                 map.serialize_entry("content", &msg.content)?;
@@ -237,7 +237,7 @@ impl Serialize for ResponseInputItem {
                 }
                 map.end()
             }
-            ResponseInputItem::OutputMessage(msg) => {
+            Self::OutputMessage(msg) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "message")?;
                 map.serialize_entry("id", &msg.id)?;
@@ -246,7 +246,7 @@ impl Serialize for ResponseInputItem {
                 map.serialize_entry("status", &msg.status)?;
                 map.end()
             }
-            ResponseInputItem::FunctionCall(fc) => {
+            Self::FunctionCall(fc) => {
                 #[derive(Serialize)]
                 struct Helper<'a> {
                     #[serde(rename = "type")]
@@ -260,7 +260,7 @@ impl Serialize for ResponseInputItem {
                 }
                 .serialize(serializer)
             }
-            ResponseInputItem::FunctionCallOutput(fco) => {
+            Self::FunctionCallOutput(fco) => {
                 #[derive(Serialize)]
                 struct Helper<'a> {
                     #[serde(rename = "type")]
@@ -274,7 +274,7 @@ impl Serialize for ResponseInputItem {
                 }
                 .serialize(serializer)
             }
-            ResponseInputItem::Reasoning(r) => {
+            Self::Reasoning(r) => {
                 #[derive(Serialize)]
                 struct Helper<'a> {
                     #[serde(rename = "type")]
@@ -288,7 +288,7 @@ impl Serialize for ResponseInputItem {
                 }
                 .serialize(serializer)
             }
-            ResponseInputItem::ImageGenerationCall(igc) => {
+            Self::ImageGenerationCall(igc) => {
                 #[derive(Serialize)]
                 struct Helper<'a> {
                     #[serde(rename = "type")]
@@ -383,6 +383,7 @@ pub struct ResponseInputItemMessage {
 /// A text input to the model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[allow(clippy::enum_variant_names)]
 pub enum ResponseInputContent {
     InputText(ResponseInputText),
     InputImage(ResponseInputImage),
@@ -695,7 +696,8 @@ pub struct ResponseCreateParamsStreamOptions {
     /// side-channel attacks. These obfuscation fields are included by
     /// default, but add a small amount of overhead to the data stream. You
     /// can set `include_obfuscation` to false to optimize for bandwidth if
-    /// you trust the network links between your application and the OpenAI API.
+    /// you trust the network links between your application and the `OpenAI`
+    /// API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_obfuscation: Option<bool>,
 }
@@ -1012,7 +1014,7 @@ pub struct Response {
     /// Unix timestamp (in seconds) of when this Response was created.
     pub created_at: i64,
 
-    /// Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI
+    /// Model ID used to generate the response, like `gpt-4o` or `o3`. `OpenAI`
     /// offers a wide range of models with different capabilities,
     /// performance characteristics, and price points. Refer to the
     /// [model guide](https://platform.openai.com/docs/models) to browse and compare

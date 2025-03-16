@@ -9,9 +9,8 @@ use crate::{
             ResponseInputItemFunctionCallOutput, ResponseInputItemMessage, ResponseInputText,
             ResponseOutputContent, ResponseOutputItem, ResponseOutputItemImageGenerationCall,
             ResponseOutputMessage, ResponseOutputText, ResponseReasoningItem,
-            ResponseReasoningItemContentUnion, ResponseReasoningItemSummary,
-            ResponseReasoningItemSummaryUnion, ResponseStreamEvent, ResponseTextConfig,
-            ResponseUsage, ToolChoiceFunction, ToolImageGeneration,
+            ResponseReasoningItemSummary, ResponseReasoningItemSummaryUnion, ResponseStreamEvent,
+            ResponseTextConfig, ResponseUsage, ToolChoiceFunction, ToolImageGeneration,
         },
         OpenAIModelOptions,
     },
@@ -308,8 +307,7 @@ impl TryFrom<UserMessage> for ResponseInputItem {
                         _ => Err(LanguageModelError::Unsupported(
                             PROVIDER,
                             format!(
-                                "Cannot convert part to OpenAI input content for part {:?}",
-                                part
+                                "Cannot convert part to OpenAI input content for part {part:?}"
                             ),
                         ))?,
                     })
@@ -354,10 +352,7 @@ fn convert_assistant_message_to_response_input_items(
                         id: format!("rs_{}", id_utils::generate_string(15)),
                         summary: vec![ResponseReasoningItemSummaryUnion::SummaryText(
                             ResponseReasoningItemSummary {
-                                // default to reasoning_part.text
-                                text: reasoning_part
-                                    .summary
-                                    .unwrap_or_else(|| reasoning_part.text.clone()),
+                                text: reasoning_part.text,
                             },
                         )],
                         // ReasoningInputItem can not have content
@@ -382,7 +377,7 @@ fn convert_assistant_message_to_response_input_items(
                         size: if let (Some(width), Some(height)) =
                             (image_part.width, image_part.height)
                         {
-                            Some(format!("{}x{}", width, height))
+                            Some(format!("{width}x{height}"))
                         } else {
                             None
                         },
@@ -399,10 +394,7 @@ fn convert_assistant_message_to_response_input_items(
                 }
                 _ => Err(LanguageModelError::Unsupported(
                     PROVIDER,
-                    format!(
-                        "Cannot convert part to OpenAI input item for part {:?}",
-                        part
-                    ),
+                    format!("Cannot convert part to OpenAI input item for part {part:?}"),
                 ))?,
             })
         })
@@ -412,7 +404,7 @@ fn convert_assistant_message_to_response_input_items(
 fn convert_tool_message_to_response_input_items(
     tool_message: ToolMessage,
 ) -> LanguageModelResult<Vec<ResponseInputItem>> {
-    return tool_message
+    tool_message
         .content
         .into_iter()
         .try_fold(Vec::new(), |mut acc, part| {
@@ -441,8 +433,7 @@ fn convert_tool_message_to_response_input_items(
                                 PROVIDER,
                                 format!(
                                     "Cannot convert tool result part to OpenAI input item for \
-                                     part {:?}",
-                                    tool_result_part_part
+                                     part {tool_result_part_part:?}"
                                 ),
                             ))?,
                         })
@@ -457,7 +448,7 @@ fn convert_tool_message_to_response_input_items(
                     "Tool messages must contain only tool result parts".to_string(),
                 ))
             }
-        });
+        })
 }
 
 impl From<Tool> for responses_api::Tool {
@@ -484,8 +475,7 @@ fn convert_to_openai_response_tool_choice(
         })
         .map_err(|e| {
             LanguageModelError::InvalidInput(format!(
-                "Failed to convert tool choice to OpenAI format: {}",
-                e
+                "Failed to convert tool choice to OpenAI format: {e}"
             ))
         }),
     }
@@ -556,7 +546,7 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                     serde_json::from_str(&function_tool_call.arguments).map_err(|e| {
                         LanguageModelError::Invariant(
                             PROVIDER,
-                            format!("Failed to parse function tool call arguments: {}", e),
+                            format!("Failed to parse function tool call arguments: {e}"),
                         )
                     })?,
                 );
@@ -598,30 +588,15 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                     .collect::<Vec<_>>()
                     .join("\n");
 
-                let text = if let Some(reasoning_item_content) = reasoning_item.content {
-                    reasoning_item_content
-                        .into_iter()
-                        .map(|summary_union| match summary_union {
-                            ResponseReasoningItemContentUnion::ReasoningText(reasoning_text) => {
-                                reasoning_text.text
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                } else {
-                    summary_text.clone()
-                };
-
                 let part = Part::Reasoning(ReasoningPart {
-                    text,
-                    summary: Some(summary_text),
+                    text: summary_text,
                     signature: reasoning_item.encrypted_content,
                 });
 
                 acc.push(part);
                 Ok(acc)
             }
-            _ => Ok(acc),
+            ResponseOutputItem::WebSearchCall(_) => Ok(acc),
         })
 }
 
@@ -640,7 +615,6 @@ fn map_openai_stream_event(
                         args: Some(function_tool_call.arguments),
                         tool_name: Some(function_tool_call.name),
                         tool_call_id: Some(function_tool_call.call_id),
-                        ..Default::default()
                     });
                     Ok(Some(ContentDelta {
                         index: output_item_added_event.output_index,
@@ -703,19 +677,9 @@ fn map_openai_stream_event(
                 part: image_part,
             }))
         }
-        ResponseStreamEvent::ReasoningTextDelta(reasoning_text_delta_event) => {
-            let reasoning_part = PartDelta::Reasoning(ReasoningPartDelta {
-                text: Some(reasoning_text_delta_event.delta),
-                ..Default::default()
-            });
-            Ok(Some(ContentDelta {
-                index: reasoning_text_delta_event.output_index,
-                part: reasoning_part,
-            }))
-        }
         ResponseStreamEvent::ReasoningSummaryTextDelta(reasoning_summary_text_delta_event) => {
             let reasoning_part = PartDelta::Reasoning(ReasoningPartDelta {
-                summary: Some(reasoning_summary_text_delta_event.delta),
+                text: Some(reasoning_summary_text_delta_event.delta),
                 ..Default::default()
             });
             Ok(Some(ContentDelta {
@@ -741,7 +705,7 @@ impl From<ResponseUsage> for ModelUsage {
 // into width, height if available
 fn parse_openai_image_size(size_dim: &str) -> (Option<u32>, Option<u32>) {
     let parts: Vec<&str> = size_dim.split('x').collect();
-    let width = parts.get(0).and_then(|w| w.parse().ok());
+    let width = parts.first().and_then(|w| w.parse().ok());
     let height = parts.get(1).and_then(|h| h.parse().ok());
     (width, height)
 }

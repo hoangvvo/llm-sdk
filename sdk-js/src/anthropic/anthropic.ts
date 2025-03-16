@@ -294,6 +294,7 @@ function convertToAnthropicToolResultBlockParam(
 export function convertToAnthropicThinkingBlockParam(
   part: ReasoningPart,
 ): Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam {
+  // redacted block will have data field of base64. we put that in signature instead of text
   if (part.text === "" && part.signature) {
     return {
       type: "redacted_thinking",

@@ -17,9 +17,8 @@ import {
   looselyConvertPartToPartDelta,
 } from "../stream.utils.ts";
 import type {
-  AudioPart,
+  AssistantMessage,
   ContentDelta,
-  ImagePart,
   LanguageModelInput,
   Message,
   ModelResponse,
@@ -27,11 +26,12 @@ import type {
   Part,
   PartialModelResponse,
   ResponseFormatOption,
-  TextPart,
   TextPartDelta,
   Tool,
   ToolCallPart,
   ToolChoiceOption,
+  ToolMessage,
+  UserMessage,
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 
@@ -185,88 +185,16 @@ function convertToMistralMessages(
   }
 
   const convertedMistralMessages = messages.map(
-    (
-      message,
-    ):
-      | MistralChatCompletionRequestMessage
-      | MistralChatCompletionRequestMessage[] => {
+    (message): MistralChatCompletionRequestMessage[] => {
       switch (message.role) {
         case "user": {
-          const messageParts = getCompatiblePartsWithoutSourceParts(
-            message.content,
-          );
-
-          return {
-            role: "user",
-            content: messageParts.map((part) =>
-              convertToMistralContentChunk(part),
-            ),
-          };
+          return [convertToMistralUserMessage(message)];
         }
         case "assistant": {
-          const mistralAssistantMessage: Omit<
-            MistralComponents.AssistantMessage,
-            "content"
-          > & {
-            content: MistralComponents.ContentChunk[] | null;
-          } = {
-            role: "assistant",
-            content: null,
-          };
-
-          const messageParts = getCompatiblePartsWithoutSourceParts(
-            message.content,
-          );
-
-          messageParts.forEach((part) => {
-            switch (part.type) {
-              case "text":
-              case "image": {
-                mistralAssistantMessage.content =
-                  mistralAssistantMessage.content ?? [];
-                mistralAssistantMessage.content.push(
-                  convertToMistralContentChunk(part),
-                );
-                break;
-              }
-              case "tool-call": {
-                mistralAssistantMessage.toolCalls =
-                  mistralAssistantMessage.toolCalls ?? [];
-                mistralAssistantMessage.toolCalls.push(
-                  convertToMistralToolCall(part),
-                );
-                break;
-              }
-              default: {
-                throw new UnsupportedError(
-                  PROVIDER,
-                  `Cannot convert Part to Mistral assistant message for type ${part.type}`,
-                );
-              }
-            }
-          });
-          return {
-            ...mistralAssistantMessage,
-            role: "assistant",
-          };
+          return [convertToMistralAssistantMessage(message)];
         }
         case "tool": {
-          return message.content.map((part) => {
-            if (part.type !== "tool-result") {
-              throw new InvalidInputError(
-                "Tool messages must contain only tool result parts",
-              );
-            }
-            const toolResultContent = getCompatiblePartsWithoutSourceParts(
-              part.content,
-            );
-            return {
-              role: "tool",
-              toolCallId: part.tool_call_id,
-              name: part.tool_name,
-              content: toolResultContent.map(convertToMistralContentChunk),
-            };
-          });
+          return convertToMistralToolMessages(message);
         }
       }
     },
@@ -277,51 +205,126 @@ function convertToMistralMessages(
   return mistralMessages;
 }
 
+function convertToMistralUserMessage(
+  userMessage: UserMessage,
+): MistralComponents.UserMessage & { role: "user" } {
+  const messageParts = getCompatiblePartsWithoutSourceParts(
+    userMessage.content,
+  );
+
+  return {
+    role: "user",
+    content: messageParts.map((part) => convertToMistralContentChunk(part)),
+  };
+}
+
+function convertToMistralAssistantMessage(
+  assistantMessage: AssistantMessage,
+): MistralComponents.AssistantMessage & { role: "assistant" } {
+  const mistralAssistantMessage: Omit<
+    MistralComponents.AssistantMessage,
+    "content"
+  > & {
+    content: MistralComponents.ContentChunk[] | null;
+  } = {
+    role: "assistant",
+    content: null,
+  };
+
+  const messageParts = getCompatiblePartsWithoutSourceParts(
+    assistantMessage.content,
+  );
+
+  messageParts.forEach((part) => {
+    switch (part.type) {
+      case "text":
+      case "image":
+      case "audio":
+      case "reasoning": {
+        mistralAssistantMessage.content = mistralAssistantMessage.content ?? [];
+        mistralAssistantMessage.content.push(
+          convertToMistralContentChunk(part),
+        );
+        break;
+      }
+      case "tool-call": {
+        mistralAssistantMessage.toolCalls =
+          mistralAssistantMessage.toolCalls ?? [];
+        mistralAssistantMessage.toolCalls.push(convertToMistralToolCall(part));
+        break;
+      }
+      default: {
+        throw new UnsupportedError(
+          PROVIDER,
+          `Cannot convert Part to Mistral assistant message for type ${part.type}`,
+        );
+      }
+    }
+  });
+  return {
+    ...mistralAssistantMessage,
+    role: "assistant",
+  };
+}
+
+function convertToMistralToolMessages(
+  toolMessage: ToolMessage,
+): (MistralComponents.ToolMessage & { role: "tool" })[] {
+  return toolMessage.content.map((part) => {
+    if (part.type !== "tool-result") {
+      throw new InvalidInputError(
+        "Tool messages must contain only tool result parts",
+      );
+    }
+    const toolResultContent = getCompatiblePartsWithoutSourceParts(
+      part.content,
+    );
+    return {
+      role: "tool",
+      toolCallId: part.tool_call_id,
+      name: part.tool_name,
+      content: toolResultContent.map(convertToMistralContentChunk),
+    };
+  });
+}
+
 function convertToMistralContentChunk(
   part: Part,
 ): MistralComponents.ContentChunk {
   switch (part.type) {
     case "text":
-      return convertToMistralTextChunk(part);
+      return {
+        type: "text",
+        text: part.text,
+      };
     case "image":
-      return convertToMistralImageURLChunk(part);
+      return {
+        type: "image_url",
+        imageUrl: {
+          url: `data:${part.mime_type};base64,${part.image_data}`,
+        },
+      };
     case "audio":
-      return convertToMistralAudioChunk(part);
+      return {
+        type: "input_audio",
+        inputAudio: part.audio_data,
+      };
+    case "reasoning":
+      return {
+        type: "thinking",
+        thinking: [
+          {
+            type: "text",
+            text: part.text,
+          },
+        ],
+      };
     default:
       throw new UnsupportedError(
         PROVIDER,
         `Cannot convert Part to Mistral ContentChunk for type ${part.type}`,
       );
   }
-}
-
-function convertToMistralTextChunk(
-  part: TextPart,
-): MistralComponents.TextChunk & { type: "text" } {
-  return {
-    type: "text",
-    text: part.text,
-  };
-}
-
-function convertToMistralImageURLChunk(
-  part: ImagePart,
-): MistralComponents.ImageURLChunk & { type: "image_url" } {
-  return {
-    type: "image_url",
-    imageUrl: {
-      url: `data:${part.mime_type};base64,${part.image_data}`,
-    },
-  };
-}
-
-function convertToMistralAudioChunk(
-  part: AudioPart,
-): MistralComponents.AudioChunk & { type: "input_audio" } {
-  return {
-    type: "input_audio",
-    inputAudio: part.audio_data,
-  };
 }
 
 function convertToMistralToolCall(

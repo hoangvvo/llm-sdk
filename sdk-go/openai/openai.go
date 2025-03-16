@@ -346,10 +346,6 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 			})
 
 		case part.ReasoningPart != nil:
-			summaryText := part.ReasoningPart.Text // default to text
-			if part.ReasoningPart.Summary != nil {
-				summaryText = *part.ReasoningPart.Summary
-			}
 			inputItems = append(inputItems, ResponseInputItem{
 				ResponseReasoningItem: &ResponseReasoningItem{
 					// Similar to assistant message parts, we generate a unique ID for each reasoning part.
@@ -357,7 +353,7 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 					Summary: []ResponseReasoningItemSummaryUnion{
 						{
 							ResponseReasoningItemSummary: &ResponseReasoningItemSummary{
-								Text: summaryText,
+								Text: part.ReasoningPart.Text,
 							},
 						},
 					},
@@ -565,16 +561,6 @@ func mapOpenAIOutputItems(items []ResponseOutputItem) ([]llmsdk.Part, error) {
 			})
 
 		case item.ResponseReasoningItem != nil:
-			var text *string
-			for _, content := range item.ResponseReasoningItem.Content {
-				if content.ReasoningText != nil {
-					if text == nil {
-						text = new(string)
-					}
-					*text += content.ReasoningText.Text
-				}
-			}
-
 			var summary = ""
 			for _, s := range item.ResponseReasoningItem.Summary {
 				if s.ResponseReasoningItemSummary != nil {
@@ -582,14 +568,9 @@ func mapOpenAIOutputItems(items []ResponseOutputItem) ([]llmsdk.Part, error) {
 				}
 			}
 
-			if text == nil {
-				text = &summary
-			}
-
 			parts = append(parts, llmsdk.Part{
 				ReasoningPart: &llmsdk.ReasoningPart{
-					Text:      *text,
-					Summary:   ptr.To(summary),
+					Text:      summary,
 					Signature: item.ResponseReasoningItem.EncryptedContent,
 				},
 			})
@@ -683,22 +664,12 @@ func mapOpenAIStreamEvent(event ResponseStreamEvent) (*llmsdk.ContentDelta, erro
 			},
 		}, nil
 
-	case event.ResponseReasoningTextDeltaEvent != nil:
-		return &llmsdk.ContentDelta{
-			Index: event.ResponseReasoningTextDeltaEvent.OutputIndex,
-			Part: llmsdk.PartDelta{
-				ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
-					Text: ptr.To(event.ResponseReasoningTextDeltaEvent.Delta),
-				},
-			},
-		}, nil
-
 	case event.ResponseReasoningSummaryTextDeltaEvent != nil:
 		return &llmsdk.ContentDelta{
 			Index: event.ResponseReasoningSummaryTextDeltaEvent.OutputIndex,
 			Part: llmsdk.PartDelta{
 				ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
-					Summary: ptr.To(event.ResponseReasoningSummaryTextDeltaEvent.Delta),
+					Text: event.ResponseReasoningSummaryTextDeltaEvent.Delta,
 				},
 			},
 		}, nil

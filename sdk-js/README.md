@@ -100,14 +100,14 @@ console.dir(response, { depth: null });
 
 Find examples in the [examples](./examples/) folder to learn how to:
 
-- [Generate text](./examples/generate-text.ts)
-- [Stream text](./examples/stream-text.ts)
-- [Describe image](./examples/describe-image.ts)
-- [Function calling](./examples/tool-use.ts)
-- [Generate audio](./examples/generate-audio.ts)
-- [Stream audio](./examples/stream-audio.ts)
-- [Describe audio](./examples/describe-audio.ts)
-- [Reasoning](./examples/generate-reasoning.ts)
+- [`generate-text`: Generate text](./examples/generate-text.ts)
+- [`stream-text`: Stream text](./examples/stream-text.ts)
+- [`describe-image`: Describe image](./examples/describe-image.ts)
+- [`function-calling`: Function calling](./examples/tool-use.ts)
+- [`generate-audio`: Generate audio](./examples/generate-audio.ts)
+- [`stream-audio`: Stream audio](./examples/stream-audio.ts)
+- [`describe-audio`: Describe audio](./examples/describe-audio.ts)
+- [`generate-reasoning`: Reasoning](./examples/generate-reasoning.ts)
 
 ```bash
 node --env-file=../.env examples/generate-text.ts

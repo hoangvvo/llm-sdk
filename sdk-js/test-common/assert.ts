@@ -14,7 +14,8 @@ interface ToolCallPartAssertionArgProp {
 export type PartAssertion =
   | TextPartAssertion
   | ToolCallPartAssertion
-  | ReasoningPartAssertion;
+  | ReasoningPartAssertion
+  | AudioPartAssertion;
 
 export interface ToolCallPartAssertion {
   type: "tool_call";
@@ -22,10 +23,15 @@ export interface ToolCallPartAssertion {
   args: ToolCallPartAssertionArgProp;
 }
 
+export interface AudioPartAssertion {
+  type: "audio";
+  audio_id?: boolean;
+  transcript?: RegExp;
+}
+
 export interface ReasoningPartAssertion {
   type: "reasoning";
   text: RegExp;
-  summary?: RegExp;
 }
 
 export function assertContentPart(
@@ -41,6 +47,10 @@ export function assertContentPart(
       }
       case "tool_call": {
         assertToolCallPart(t, content, assertion);
+        break;
+      }
+      case "audio": {
+        assertAudioPart(t, content, assertion);
         break;
       }
       case "reasoning": {
@@ -88,16 +98,42 @@ ${JSON.stringify(content, null, 2)}`,
   );
 }
 
+export function assertAudioPart(
+  t: TestContext,
+  content: Part[],
+  assertion: AudioPartAssertion,
+) {
+  const foundPart = content.find((part) => {
+    if (part.type !== "audio") {
+      return false;
+    }
+    if (!part.audio_data) {
+      return false;
+    }
+    if (assertion.audio_id && !part.audio_id) {
+      return false;
+    }
+    if (assertion.transcript && !assertion.transcript.test(part.transcript!)) {
+      return false;
+    }
+    return true;
+  });
+  t.assert.ok(
+    foundPart,
+    `Expected matching audio part:
+Expected: ${JSON.stringify(assertion)}
+Received:
+${JSON.stringify(content, null, 2)}`,
+  );
+}
+
 export function assertReasoningPart(
   t: TestContext,
   content: Part[],
   assertion: ReasoningPartAssertion,
 ) {
   const foundPart = content.find(
-    (part) =>
-      part.type === "reasoning" &&
-      assertion.text.test(part.text) &&
-      (!assertion.summary || assertion.summary.test(part.summary ?? "")),
+    (part) => part.type === "reasoning" && assertion.text.test(part.text),
   );
   t.assert.ok(
     foundPart,

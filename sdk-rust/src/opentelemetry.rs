@@ -107,11 +107,11 @@ impl LMSpan {
         if let Some(usage) = &self.usage {
             self.span.set_attribute(KeyValue::new(
                 "gen_ai.usage.input_tokens",
-                i64::try_from(usage.input_tokens).unwrap_or_default(),
+                i64::from(usage.input_tokens),
             ));
             self.span.set_attribute(KeyValue::new(
                 "gen_ai.usage.output_tokens",
-                i64::try_from(usage.output_tokens).unwrap_or_default(),
+                i64::from(usage.output_tokens),
             ));
         }
         if let Some(time_to_first_token) = self.time_to_first_token {
@@ -123,7 +123,7 @@ impl LMSpan {
         if let Some(max_tokens) = self.max_tokens {
             self.span.set_attribute(KeyValue::new(
                 "gen_ai.request.max_tokens",
-                i64::try_from(max_tokens).unwrap_or_default(),
+                i64::from(max_tokens),
             ));
         }
         if let Some(temperature) = self.temperature {

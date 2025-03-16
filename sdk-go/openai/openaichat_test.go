@@ -1,7 +1,6 @@
 package openai_test
 
 import (
-	"context"
 	"testing"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
@@ -57,108 +56,42 @@ func TestChatSourcePartInput(t *testing.T) {
 }
 
 func TestChatGenerateAudio(t *testing.T) {
-	ctx := context.Background()
-	response, err := audioChatModel.Generate(ctx, &llmsdk.LanguageModelInput{
-		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Hello"),
-			),
-		},
-		Extra: map[string]any{
+	tc := testcommon.TestCaseGenerateAudio
+	tc.AdditionalInput = func(input *llmsdk.LanguageModelInput) {
+		input.Extra = map[string]any{
 			"audio": map[string]any{
 				"voice":  "alloy",
 				"format": "mp3",
 			},
-		},
-	})
-
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
-	}
-
-	// Find audio part
-	var audioPart *llmsdk.AudioPart
-	for _, part := range response.Content {
-		if part.AudioPart != nil {
-			audioPart = part.AudioPart
-			break
 		}
 	}
-
-	if audioPart == nil {
-		t.Fatal("Audio part must be present")
-	}
-
-	if audioPart.AudioData == "" {
-		t.Fatal("Audio data must be present")
-	}
-
-	if audioPart.Transcript == nil || *audioPart.Transcript == "" {
-		t.Fatal("Transcript must be present")
-	}
+	testcommon.RunTestCase(t, audioChatModel, tc)
 }
 
 func TestChatStreamAudio(t *testing.T) {
-	ctx := context.Background()
-	stream, err := audioChatModel.Stream(ctx, &llmsdk.LanguageModelInput{
-		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Hello"),
-			),
-		},
-		Extra: map[string]any{
+	tc := testcommon.TestCaseStreamAudio
+	tc.AdditionalInput = func(input *llmsdk.LanguageModelInput) {
+		input.Extra = map[string]any{
 			"audio": map[string]any{
 				"voice":  "alloy",
-				"format": "pcm16",
+				"format": "mp3",
 			},
-		},
-	})
-
-	if err != nil {
-		t.Fatalf("Stream failed: %v", err)
-	}
-
-	accumulator := llmsdk.NewStreamAccumulator()
-	for stream.Next() {
-		partial := stream.Current()
-		if err := accumulator.AddPartial(*partial); err != nil {
-			t.Fatalf("Failed to add partial: %v", err)
 		}
 	}
+	testcommon.RunTestCase(t, audioChatModel, tc)
+}
 
-	if err := stream.Err(); err != nil {
-		t.Fatalf("Stream error: %v", err)
-	}
+func TestChatGenerateReasoning(t *testing.T) {
+	t.Skip("reasoning not supported in chat completion api")
+	testcommon.RunTestCase(t, reasoningModel, testcommon.TestCaseGenerateReasoning)
+}
 
-	response, err := accumulator.ComputeResponse()
-	if err != nil {
-		t.Fatalf("Failed to compute response: %v", err)
-	}
+func TestChatStreamReasoning(t *testing.T) {
+	t.Skip("reasoning not supported in chat completion api")
+	testcommon.RunTestCase(t, reasoningModel, testcommon.TestCaseStreamReasoning)
+}
 
-	// Find audio part
-	var audioPart *llmsdk.AudioPart
-	for _, part := range response.Content {
-		if part.AudioPart != nil {
-			audioPart = part.AudioPart
-			break
-		}
-	}
-
-	if audioPart == nil {
-		t.Fatal("Audio part must be present")
-	}
-
-	if audioPart.AudioData == "" {
-		t.Fatal("Audio data must be present")
-	}
-
-	if audioPart.Transcript == nil || *audioPart.Transcript == "" {
-		t.Fatal("Transcript must be present")
-	}
-
-	if audioPart.AudioID == nil || *audioPart.AudioID == "" {
-		t.Fatal("Audio part ID must be present")
-	}
+func TestChatInputReasoning(t *testing.T) {
+	t.Skip("reasoning not supported in chat completion api")
+	testcommon.RunTestCase(t, reasoningModel, testcommon.TestCaseInputReasoning)
 }

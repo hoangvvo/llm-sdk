@@ -1,4 +1,4 @@
-import { test, type TestContext, type TestOptions } from "node:test";
+import { type TestContext } from "node:test";
 import { StreamAccumulator } from "../src/accumulator.ts";
 import type { LanguageModel } from "../src/language-model.ts";
 import type { LanguageModelInput, Tool } from "../src/types.ts";
@@ -566,6 +566,56 @@ export const TEST_CASE_SOURCE_PART_INPUT: TestCase = {
   type: "generate",
 };
 
+export const TEST_CASE_GENERATE_AUDIO: TestCase = {
+  name: "generate audio",
+  input: {
+    modalities: ["text", "audio"],
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Respond in audio saying 'Hello'",
+          },
+        ],
+      },
+    ],
+  },
+  output: {
+    content: [
+      {
+        type: "audio",
+        audio_id: true,
+        transcript: /Hello/,
+      },
+    ],
+  },
+  type: "generate",
+};
+
+export const TEST_CASE_STREAM_AUDIO: TestCase = {
+  name: "stream audio",
+  input: {
+    modalities: ["text", "audio"],
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Respond in audio saying 'Hello'",
+          },
+        ],
+      },
+    ],
+  },
+  output: {
+    content: [{ type: "audio", audio_id: true, transcript: /Hello/ }],
+  },
+  type: "stream",
+};
+
 export const TEST_CASE_GENERATE_REASONING: TestCase = {
   name: "generate reasoning",
   input: {
@@ -739,15 +789,4 @@ export async function runTestCase(
       assertContentPart(t, result.content, output.content);
     }
   }
-}
-
-export function testTestCase(
-  model: LanguageModel,
-  testCase: TestCase,
-  options?: RunTestCaseOptions,
-  testOptions?: TestOptions,
-) {
-  return test(testCase.name, testOptions, async (t) => {
-    return runTestCase(t, model, testCase, options);
-  });
 }

@@ -275,7 +275,7 @@ function convertAssistantMessageToResponseInputItems(
           summary: [
             {
               type: "summary_text",
-              text: part.summary ?? part.text,
+              text: part.text,
             },
           ],
           // ReasoningInputItem can not have content
@@ -477,8 +477,7 @@ function mapOpenAIOutputItems(
           return [
             {
               type: "reasoning",
-              text: item.content?.map((c) => c.text).join("\n") ?? summary,
-              summary,
+              text: summary,
               ...(item.encrypted_content && {
                 signature: item.encrypted_content,
               }),
@@ -612,7 +611,7 @@ function mapOpenAIStreamEvent(
     case "response.reasoning_summary_text.delta": {
       const part: ReasoningPartDelta = {
         type: "reasoning",
-        summary: event.delta,
+        text: event.delta,
       };
       const index = event.output_index;
       return {

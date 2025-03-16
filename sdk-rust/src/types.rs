@@ -203,8 +203,6 @@ pub struct ToolResultPart {
 pub struct ReasoningPart {
     /// The reasoning text content.
     pub text: String,
-    /// The reasoning summary
-    pub summary: Option<String>,
     /// The reasoning internal signature
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,
@@ -296,9 +294,6 @@ pub struct ReasoningPartDelta {
     /// The reasoning text content.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
-    /// The reasoning summary
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub summary: Option<String>,
     /// The reasoning internal signature
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,

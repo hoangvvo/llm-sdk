@@ -525,7 +525,7 @@ impl TryFrom<Modality> for openai_api::Modality {
         match modality {
             Modality::Text => Ok(Self::Text),
             Modality::Audio => Ok(Self::Audio),
-            modality => Err(LanguageModelError::Unsupported(
+            Modality::Image => Err(LanguageModelError::Unsupported(
                 PROVIDER,
                 format!("Cannot convert modality to OpenAI modality for modality {modality:#?}"),
             )),

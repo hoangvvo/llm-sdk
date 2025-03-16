@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 
 import {
+  runTestCase,
+  TEST_CASE_GENERATE_AUDIO,
   TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS,
   TEST_CASE_GENERATE_REASONING,
   TEST_CASE_GENERATE_TEXT,
@@ -9,6 +11,7 @@ import {
   TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT,
   TEST_CASE_INPUT_REASONING,
   TEST_CASE_SOURCE_PART_INPUT,
+  TEST_CASE_STREAM_AUDIO,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS,
   TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
   TEST_CASE_STREAM_REASONING,
@@ -16,11 +19,9 @@ import {
   TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT,
   TEST_CASE_STREAM_TOOL_CALL,
   TEST_CASE_STRUCTURED_RESPONSE_FORMAT,
-  testTestCase,
 } from "#test-common/cases";
 import assert from "node:assert";
-import test, { suite, type TestContext } from "node:test";
-import { StreamAccumulator } from "../accumulator.ts";
+import test, { suite } from "node:test";
 import { OpenAIModel } from "./openai.ts";
 
 suite("OpenAIModel", () => {
@@ -43,106 +44,101 @@ suite("OpenAIModel", () => {
     apiKey: process.env["OPENAI_API_KEY"],
   });
 
-  testTestCase(model, TEST_CASE_GENERATE_TEXT);
-
-  testTestCase(model, TEST_CASE_STREAM_TEXT);
-
-  testTestCase(model, TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT);
-
-  testTestCase(model, TEST_CASE_GENERATE_TOOL_CALL);
-
-  testTestCase(model, TEST_CASE_STREAM_TOOL_CALL);
-
-  testTestCase(model, TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT);
-
-  testTestCase(model, TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT);
-
-  testTestCase(model, TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS);
-
-  testTestCase(model, TEST_CASE_STREAM_PARALLEL_TOOL_CALLS);
-
-  testTestCase(model, TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME);
-
-  testTestCase(model, TEST_CASE_STRUCTURED_RESPONSE_FORMAT);
-
-  testTestCase(model, TEST_CASE_SOURCE_PART_INPUT);
-
-  test("generate audio", { skip: true }, async (t: TestContext) => {
-    const response = await audioModel.generate({
-      modalities: ["text", "audio"],
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Hello",
-            },
-          ],
-        },
-      ],
-      extra: {
-        audio: {
-          voice: "alloy",
-          format: "mp3",
-        },
-      },
-    });
-
-    const audioPart = response.content.find((part) => part.type === "audio");
-
-    t.assert.ok(audioPart, "Audio part must be present");
-    t.assert.ok(audioPart.audio_data, "Audio data must be present");
-    t.assert.ok(audioPart.transcript, "Transcript must be present");
-    t.assert.ok(audioPart.audio_id, "Audio part ID must be present");
+  test(TEST_CASE_GENERATE_TEXT.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_GENERATE_TEXT);
   });
 
-  test("stream audio", { skip: true }, async (t: TestContext) => {
-    const stream = audioModel.stream({
-      modalities: ["text", "audio"],
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Hello",
-            },
-          ],
-        },
-      ],
-      extra: {
-        audio: {
-          voice: "alloy",
-          format: "pcm16",
-        },
-      },
-    });
-
-    const accumulator = new StreamAccumulator();
-
-    let current = await stream.next();
-    while (!current.done) {
-      accumulator.addPartial(current.value);
-      current = await stream.next();
-    }
-
-    const response = accumulator.computeResponse();
-
-    const audioPart = response.content.find((part) => part.type === "audio");
-
-    t.assert.ok(audioPart, "Audio part must be present");
-    t.assert.ok(audioPart.audio_data, "Audio data must be present");
-    t.assert.ok(audioPart.transcript, "Transcript must be present");
-    t.assert.ok(audioPart.audio_id, "Audio part ID must be present");
+  test(TEST_CASE_STREAM_TEXT.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_STREAM_TEXT);
   });
 
-  testTestCase(reasoningModel, TEST_CASE_GENERATE_REASONING);
+  test(TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT);
+  });
 
-  testTestCase(reasoningModel, TEST_CASE_STREAM_REASONING);
+  test(TEST_CASE_GENERATE_TOOL_CALL.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_GENERATE_TOOL_CALL);
+  });
 
-  // It is expected that this test case fails or incorrectly passes because OpenAI requires
-  // encrypted_content to be present, the summary_text would just be ignored.
-  // We only need to make sure the API accepts our input
-  testTestCase(reasoningModel, TEST_CASE_INPUT_REASONING);
+  test(TEST_CASE_STREAM_TOOL_CALL.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_STREAM_TOOL_CALL);
+  });
+
+  test(TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT);
+  });
+
+  test(TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT);
+  });
+
+  test(TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS);
+  });
+
+  test(TEST_CASE_STREAM_PARALLEL_TOOL_CALLS.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_STREAM_PARALLEL_TOOL_CALLS);
+  });
+
+  test(TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME.name, (t) => {
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+    );
+  });
+
+  test(TEST_CASE_STRUCTURED_RESPONSE_FORMAT.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_STRUCTURED_RESPONSE_FORMAT);
+  });
+
+  test(TEST_CASE_SOURCE_PART_INPUT.name, (t) => {
+    return runTestCase(t, model, TEST_CASE_SOURCE_PART_INPUT);
+  });
+
+  test(
+    TEST_CASE_GENERATE_AUDIO.name,
+    { skip: "responses api does not support audio" },
+    (t) => {
+      return runTestCase(t, audioModel, TEST_CASE_GENERATE_AUDIO, {
+        additionalInputs: {
+          extra: {
+            audio: {
+              voice: "alloy",
+              format: "mp3",
+            },
+          },
+        },
+      });
+    },
+  );
+
+  test(
+    TEST_CASE_STREAM_AUDIO.name,
+    { skip: "responses api does not support audio" },
+    (t) => {
+      return runTestCase(t, audioModel, TEST_CASE_STREAM_AUDIO, {
+        additionalInputs: {
+          extra: {
+            audio: {
+              voice: "alloy",
+              format: "pcm16",
+            },
+          },
+        },
+      });
+    },
+  );
+
+  test(TEST_CASE_GENERATE_REASONING.name, (t) => {
+    return runTestCase(t, reasoningModel, TEST_CASE_GENERATE_REASONING);
+  });
+
+  test(TEST_CASE_STREAM_REASONING.name, (t) => {
+    return runTestCase(t, reasoningModel, TEST_CASE_STREAM_REASONING);
+  });
+
+  test(TEST_CASE_INPUT_REASONING.name, (t) => {
+    return runTestCase(t, reasoningModel, TEST_CASE_INPUT_REASONING);
+  });
 });

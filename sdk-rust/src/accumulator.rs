@@ -44,7 +44,6 @@ struct AccumulatedAudioData {
 #[derive(Debug, Clone)]
 struct AccumulatedReasoningData {
     text: String,
-    summary: Option<String>,
     signature: Option<String>,
 }
 
@@ -89,7 +88,6 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
         PartDelta::Reasoning(reasoning_delta) => {
             AccumulatedData::Reasoning(AccumulatedReasoningData {
                 text: reasoning_delta.text.unwrap_or_default(),
-                summary: reasoning_delta.summary,
                 signature: reasoning_delta.signature,
             })
         }
@@ -153,12 +151,6 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
         ) => {
             if let Some(text) = reasoning_delta.text {
                 existing_reasoning.text.push_str(&text);
-            }
-            if let Some(summary) = reasoning_delta.summary {
-                existing_reasoning
-                    .summary
-                    .get_or_insert_with(String::new)
-                    .push_str(&summary);
             }
             if reasoning_delta.signature.is_some() {
                 existing_reasoning.signature = reasoning_delta.signature;
@@ -270,23 +262,11 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
     }))
 }
 
-fn create_reasoning_part(mut data: AccumulatedReasoningData) -> LanguageModelResult<Part> {
-    if data.text.is_empty() {
-        if let Some(summary) = &data.summary {
-            data.text = summary.clone();
-        } else {
-            return Err(LanguageModelError::Invariant(
-                "",
-                "Missing required field text for reasoning part".to_string(),
-            ));
-        }
-    }
-
-    Ok(Part::Reasoning(ReasoningPart {
+fn create_reasoning_part(data: AccumulatedReasoningData) -> Part {
+    Part::Reasoning(ReasoningPart {
         text: data.text,
-        summary: data.summary,
         signature: data.signature,
-    }))
+    })
 }
 
 /// Creates a final Part from accumulated data
@@ -296,7 +276,7 @@ fn create_part(data: AccumulatedData, index: usize) -> LanguageModelResult<Part>
         AccumulatedData::ToolCall(tool_data) => create_tool_call_part(tool_data, index),
         AccumulatedData::Image(image_data) => create_image_part(image_data, index),
         AccumulatedData::Audio(audio_data) => create_audio_part(audio_data),
-        AccumulatedData::Reasoning(reasoning_data) => create_reasoning_part(reasoning_data),
+        AccumulatedData::Reasoning(reasoning_data) => Ok(create_reasoning_part(reasoning_data)),
     }
 }
 

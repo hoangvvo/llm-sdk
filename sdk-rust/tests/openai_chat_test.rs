@@ -1,8 +1,9 @@
 mod common;
-use futures::stream::StreamExt;
-use llm_sdk::{openai::*, StreamAccumulator, *};
+use llm_sdk::{openai::*, *};
 use std::{env, error::Error, sync::LazyLock};
 use tokio::test;
+
+use crate::common::cases::RunTestCaseOptions;
 
 static OPENAI_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
     dotenvy::dotenv().ok();
@@ -70,101 +71,50 @@ test_set!(OPENAI_MODEL, structured_response_format);
 
 test_set!(OPENAI_MODEL, source_part_input);
 
-#[test]
-async fn test_generate_audio() -> Result<(), Box<dyn Error>> {
-    let response = OPENAI_AUDIO_MODEL
-        .generate(LanguageModelInput {
-            modalities: Some(vec![Modality::Text, Modality::Audio]),
-            extra: Some(serde_json::json!({
+test_set!(
+    OPENAI_AUDIO_MODEL,
+    generate_audio,
+    Some(RunTestCaseOptions {
+        additional_input: Some(|input| {
+            input.extra = Some(serde_json::json!({
                 "audio": {
                     "voice": "alloy",
                     "format": "pcm16"
                 }
-            })),
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "Hello".to_string(),
-                })],
-            })],
-            ..Default::default()
-        })
-        .await?;
+            }));
+        }),
+    })
+);
 
-    let audio_part = response
-        .content
-        .into_iter()
-        .find_map(|part| match part {
-            Part::Audio(audio) => Some(audio),
-            _ => None,
-        })
-        .ok_or_else(|| "Audio part must be present".to_string())?;
-
-    assert!(
-        !audio_part.audio_data.is_empty(),
-        "Audio data must be present"
-    );
-    assert!(
-        audio_part.transcript.is_some_and(|t| !t.is_empty()),
-        "Transcript must be present"
-    );
-    assert!(
-        audio_part.audio_id.is_some_and(|id| !id.is_empty()),
-        "Audio part ID must be present"
-    );
-
-    Ok(())
-}
-
-#[test]
-async fn test_stream_audio() -> Result<(), Box<dyn Error>> {
-    let mut stream = OPENAI_AUDIO_MODEL
-        .stream(LanguageModelInput {
-            modalities: Some(vec![Modality::Text, Modality::Audio]),
-            extra: Some(serde_json::json!({
+test_set!(
+    OPENAI_AUDIO_MODEL,
+    stream_audio,
+    Some(RunTestCaseOptions {
+        additional_input: Some(|input| {
+            input.extra = Some(serde_json::json!({
                 "audio": {
                     "voice": "alloy",
                     "format": "pcm16"
                 }
-            })),
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "Hello".to_string(),
-                })],
-            })],
-            ..Default::default()
-        })
-        .await?;
+            }));
+        }),
+    })
+);
 
-    let mut accumulator = StreamAccumulator::new();
+test_set!(
+    ignore = "reasoning is not supported in chat completion api",
+    OPENAI_MODEL,
+    generate_reasoning
+);
 
-    while let Some(partial_response) = stream.next().await {
-        let partial_response = partial_response.unwrap();
-        accumulator.add_partial(partial_response).unwrap();
-    }
+test_set!(
+    ignore = "reasoning is not supported in chat completion api",
+    OPENAI_MODEL,
+    stream_reasoning
+);
 
-    let response = accumulator.compute_response()?;
-
-    let audio_part = response
-        .content
-        .into_iter()
-        .find_map(|part| match part {
-            Part::Audio(audio) => Some(audio),
-            _ => None,
-        })
-        .ok_or_else(|| "Audio part must be present".to_string())?;
-
-    assert!(
-        !audio_part.audio_data.is_empty(),
-        "Audio data must be present"
-    );
-    assert!(
-        audio_part.transcript.is_some_and(|t| !t.is_empty()),
-        "Transcript must be present"
-    );
-    assert!(
-        audio_part.audio_id.is_some_and(|id| !id.is_empty()),
-        "Audio part ID must be present"
-    );
-
-    Ok(())
-}
+test_set!(
+    ignore = "reasoning is not supported in chat completion api",
+    OPENAI_MODEL,
+    input_reasoning
+);

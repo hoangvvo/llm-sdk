@@ -38,7 +38,6 @@ type AccumulatedAudioData struct {
 
 type AccumulatedReasoningData struct {
 	Text      string
-	Summary   *string
 	Signature *string
 }
 
@@ -117,13 +116,8 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 			AudioID:         delta.Part.AudioPartDelta.AudioID,
 		}
 	case delta.Part.ReasoningPartDelta != nil:
-		text := ""
-		if delta.Part.ReasoningPartDelta.Text != nil {
-			text = *delta.Part.ReasoningPartDelta.Text
-		}
 		return &AccumulatedReasoningData{
-			Text:      text,
-			Summary:   delta.Part.ReasoningPartDelta.Summary,
+			Text:      delta.Part.ReasoningPartDelta.Text,
 			Signature: delta.Part.ReasoningPartDelta.Signature,
 		}
 	default:
@@ -201,15 +195,7 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 		if reasoningPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is reasoning, incoming type is not reasoning", delta.Index)
 		}
-		if reasoningPartDelta.Text != nil {
-			existingData.Text += *reasoningPartDelta.Text
-		}
-		if reasoningPartDelta.Summary != nil {
-			if existingData.Summary == nil {
-				existingData.Summary = new(string)
-			}
-			*existingData.Summary += *reasoningPartDelta.Summary
-		}
+		existingData.Text += reasoningPartDelta.Text
 		if reasoningPartDelta.Signature != nil {
 			existingData.Signature = reasoningPartDelta.Signature
 		}
@@ -303,21 +289,13 @@ func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 }
 
 // createReasoningPart creates a reasoning part from accumulated reasoning data
-func createReasoningPart(data *AccumulatedReasoningData, index int) (Part, error) {
-	if data.Text == "" {
-		if data.Summary != nil {
-			data.Text = *data.Summary
-		} else {
-			return Part{}, NewInvariantError("", fmt.Sprintf("Missing required field text at index %d", index))
-		}
-	}
+func createReasoningPart(data *AccumulatedReasoningData) Part {
 	return Part{
 		ReasoningPart: &ReasoningPart{
 			Text:      data.Text,
-			Summary:   data.Summary,
 			Signature: data.Signature,
 		},
-	}, nil
+	}
 }
 
 // createPart creates a final Part from accumulated data
@@ -332,7 +310,7 @@ func createPart(data AccumulatedData, index int) (Part, error) {
 	case *AccumulatedAudioData:
 		return createAudioPart(d)
 	case *AccumulatedReasoningData:
-		return createReasoningPart(d, index)
+		return createReasoningPart(d), nil
 	default:
 		return Part{}, fmt.Errorf("unknown accumulated data type at index %d", index)
 	}

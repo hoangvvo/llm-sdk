@@ -190,10 +190,6 @@ export interface ReasoningPart {
    */
   text: string;
   /**
-   * The reasoning summary
-   */
-  summary?: string;
-  /**
    * The reasoning internal signature
    */
   signature?: string;
@@ -313,11 +309,7 @@ export interface ReasoningPartDelta {
   /**
    * The reasoning text content
    */
-  text?: string;
-  /**
-   * The reasoning summary
-   */
-  summary?: string;
+  text: string;
   /**
    * The reasoning internal signature
    */
