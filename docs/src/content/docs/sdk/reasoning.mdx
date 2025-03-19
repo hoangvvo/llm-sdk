@@ -1,0 +1,57 @@
+---
+title: Reasoning
+---
+
+import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import {
+  extractGoTypes,
+  extractTypescriptTypes,
+  extractRustTypes,
+} from "../../../utils/extract-types.ts";
+import jsGenerateTextCode from "../../../../../sdk-js/examples/generate-reasoning.ts?raw";
+import goGenerateTextCode from "../../../../../sdk-go/examples/generate-reasoning/main.go?raw";
+import rustGenerateTextCode from "../../../../../sdk-rust/examples/generate-reasoning.rs?raw";
+
+For reasoning models, the SDK also outputs `ReasoningPart`:
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["ReasoningPart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["ReasoningPart"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["ReasoningPart"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
+This is enabled by default for supported models, but depending on the provider, you might need to pass additional parameters to the `extra` field of the `LanguageModelInput` to enable it.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsGenerateTextCode}
+      lang="typescript"
+      title="generate-reasoning.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustGenerateTextCode} lang="rust" title="generate-reasoning.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goGenerateTextCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>

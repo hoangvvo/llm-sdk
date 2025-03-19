@@ -96,6 +96,8 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`tool-use`: Function calling](./examples/tool-use/main.go)
 - [`generate-audio`: Generate audio](./examples/generate-audio/main.go)
 - [`stream-audio`: Stream audio](./examples/stream-audio/main.go)
+- [`structured-output`: Structured output](./examples/structured-output/main.go)
+- [`generate-reasoning`: Reasoning](./examples/generate-reasoning/main.go)
 
 ```bash
 go run ./examples/generate-text

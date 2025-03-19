@@ -1,3 +1,4 @@
+import type { Part } from "@hoangvvo/llm-sdk";
 import { getModel } from "./get-model.ts";
 
 const model = getModel("openai", "o1");
@@ -21,4 +22,20 @@ const response = await model.generate({
   },
 });
 
-console.dir(response, { depth: null });
+const { reasoningParts, otherParts } = response.content.reduce(
+  (acc, part) => {
+    if (part.type === "reasoning") {
+      acc.reasoningParts.push(part);
+    } else {
+      acc.otherParts.push(part);
+    }
+    return acc;
+  },
+  { reasoningParts: [] as Part[], otherParts: [] as Part[] },
+);
+
+console.log("Reasoning");
+console.dir(reasoningParts, { depth: null });
+
+console.log("\nAnswer");
+console.dir(otherParts, { depth: null });

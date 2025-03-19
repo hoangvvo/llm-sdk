@@ -3,11 +3,11 @@ title: Structured output
 ---
 
 import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
-import jsStructuredOutputCode from "../../../../../agent-js/examples/structured-output.ts?raw";
-import rustStructuredOutputCode from "../../../../../agent-rust/examples/structured-output.rs?raw";
-import goStructuredOutputCode from "../../../../../agent-go/examples/structured-output/main.go?raw";
+import jsStructuredOutputCode from "../../../../../sdk-js/examples/structured-output.ts?raw";
+import rustStructuredOutputCode from "../../../../../sdk-rust/examples/structured-output.rs?raw";
+import goStructuredOutputCode from "../../../../../sdk-go/examples/structured-output/main.go?raw";
 
-Agents can combine tools to generate a structured output.
+We can ask the model to return a structured output by specifying a response format.
 The structured output will come as a `TextPart` and require parsing into an object.
 
 <Tabs>

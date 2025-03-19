@@ -165,33 +165,33 @@ func NewToolMessage(parts ...Part) Message {
 }
 
 // NewToolChoiceAuto creates an auto tool choice
-func NewToolChoiceAuto() ToolChoiceOption {
-	return ToolChoiceOption{Auto: &ToolChoiceAuto{}}
+func NewToolChoiceAuto() *ToolChoiceOption {
+	return &ToolChoiceOption{Auto: &ToolChoiceAuto{}}
 }
 
 // NewToolChoiceNone creates a none tool choice
-func NewToolChoiceNone() ToolChoiceOption {
-	return ToolChoiceOption{None: &ToolChoiceNone{}}
+func NewToolChoiceNone() *ToolChoiceOption {
+	return &ToolChoiceOption{None: &ToolChoiceNone{}}
 }
 
 // NewToolChoiceRequired creates a required tool choice
-func NewToolChoiceRequired() ToolChoiceOption {
-	return ToolChoiceOption{Required: &ToolChoiceRequired{}}
+func NewToolChoiceRequired() *ToolChoiceOption {
+	return &ToolChoiceOption{Required: &ToolChoiceRequired{}}
 }
 
 // NewToolChoiceTool creates a specific tool choice
-func NewToolChoiceTool(toolName string) ToolChoiceOption {
-	return ToolChoiceOption{Tool: &ToolChoiceTool{ToolName: toolName}}
+func NewToolChoiceTool(toolName string) *ToolChoiceOption {
+	return &ToolChoiceOption{Tool: &ToolChoiceTool{ToolName: toolName}}
 }
 
 // NewResponseFormatText creates a text response format
-func NewResponseFormatText() ResponseFormatOption {
-	return ResponseFormatOption{Text: &ResponseFormatText{}}
+func NewResponseFormatText() *ResponseFormatOption {
+	return &ResponseFormatOption{Text: &ResponseFormatText{}}
 }
 
 // NewResponseFormatJSON creates a JSON response format
-func NewResponseFormatJSON(name string, description *string, schema *JSONSchema) ResponseFormatOption {
-	return ResponseFormatOption{
+func NewResponseFormatJSON(name string, description *string, schema *JSONSchema) *ResponseFormatOption {
+	return &ResponseFormatOption{
 		JSON: &ResponseFormatJSON{
 			Name:        name,
 			Description: description,
