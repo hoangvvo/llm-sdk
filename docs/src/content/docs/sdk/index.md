@@ -21,7 +21,7 @@ We provide SDKs to interact with various LLM providers in the following programm
 | Citation          | ➖ [^source-as-text]                                              | ➖ [^source-as-text]     | ✅                                                        | ➖ [^source-as-text] | ✅     | 🚧 [^source-as-text] |
 | Text Output       | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
 | Image Output      | ✅                                                                | ➖                       | ➖                                                        | ✅                   | ➖     | ➖                   |
-| Audio Output      | ➖                                                                | ✅                       | ➖                                                        | ➖                   | ➖     | ➖                   |
+| Audio Output      | ➖                                                                | ✅                       | ➖                                                        | ✅                   | ➖     | ➖                   |
 | Reasoning         | ✅                                                                | ➖                       | ✅                                                        | ✅                   | ✅     | ✅                   |
 
 Keys:

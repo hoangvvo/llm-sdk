@@ -21,6 +21,7 @@ export default defineConfig({
             { slug: "sdk" },
             { slug: "sdk/language-model" },
             { slug: "sdk/text-generation" },
+            { slug: "sdk/image-generation" },
             { slug: "sdk/audio-generation" },
             { slug: "sdk/image-understanding" },
             { slug: "sdk/audio-understanding" },

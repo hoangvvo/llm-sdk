@@ -2,7 +2,7 @@ import { unlink, writeFile } from "node:fs/promises";
 import open from "open";
 import { getModel } from "./get-model.ts";
 
-const model = getModel("openai", "replace-with-image-model");
+const model = getModel("google", "gemini-2.0-flash-exp-image-generation");
 
 const response = await model.generate({
   modalities: ["text", "image"],

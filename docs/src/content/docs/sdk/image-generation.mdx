@@ -1,0 +1,52 @@
+---
+title: Image generation
+---
+
+import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import {
+  extractGoTypes,
+  extractTypescriptTypes,
+  extractRustTypes,
+} from "../../../utils/extract-types.ts";
+import jsGenerateImageCode from "../../../../../sdk-js/examples/generate-image.ts?raw";
+
+Image modality is represented as `ImagePart`s.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["ImagePart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["ImagePart"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["ImagePart"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
+## Generate images
+
+To generate image, specify `image` in the input `modalities`.
+Depending on the provider, you may have to pass additional parameters to their API, which can be done through the `extra` field.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsGenerateImageCode}
+      lang="typescript"
+      title="generate-image.ts"
+    />
+  </TabItem>
+</Tabs>
