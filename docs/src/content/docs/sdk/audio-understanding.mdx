@@ -3,9 +3,40 @@ title: Audio understanding
 ---
 
 import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
-import jsDescribeAudio from "../../../../../sdk-js/examples/describe-audio.ts?raw";
+import jsSummarizeAudio from "../../../../../sdk-js/examples/summarize-audio.ts?raw";
+import {
+  extractGoTypes,
+  extractTypescriptTypes,
+  extractRustTypes,
+} from "../../../utils/extract-types.ts";
 
-Audio can be sent to the model using an `AudioPart`. This enables use cases such as:
+Audio can be sent to the model using an `AudioPart`. 
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["AudioPart", "AudioFormat"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["AudioPart", "AudioFormat"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["AudioPart", "AudioFormat"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
+This enables use cases such as:
 
 - Transcribing audio to text
 - Summarizing spoken content
@@ -13,6 +44,6 @@ Audio can be sent to the model using an `AudioPart`. This enables use cases such
 
 <Tabs>
   <TabItem label="TypeScript">
-    <Code lang="ts" code={jsDescribeAudio} title="describe-audio.ts" />
+    <Code lang="ts" code={jsSummarizeAudio} title="summarize-audio.ts" />
   </TabItem>
 </Tabs>

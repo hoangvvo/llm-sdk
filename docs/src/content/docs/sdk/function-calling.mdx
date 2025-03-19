@@ -6,72 +6,89 @@ import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
 import jsToolUseCode from "../../../../../sdk-js/examples/tool-use.ts?raw";
 import rustToolUseCode from "../../../../../sdk-rust/examples/tool-use.rs?raw";
 import goToolUseCode from "../../../../../sdk-go/examples/tool-use/main.go?raw";
+import {
+  extractGoTypes,
+  extractTypescriptTypes,
+  extractRustTypes,
+} from "../../../utils/extract-types.ts";
 
 Functions can be provided to the model as `Tool`:
 
-```typescript
-/**
- * Represents a tool that can be used by the model.
- */
-export interface Tool {
-  /**
-   * The name of the tool.
-   */
-  name: string;
-  /**
-   * A description of the tool.
-   */
-  description: string;
-  /**
-   * The JSON schema of the parameters that the tool accepts. The type must be "object".
-   */
-  parameters: JSONSchema;
-}
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["Tool"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["Tool"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["Tool"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
-The model might returns one or many `ToolResultPart`:
+The model might returns one or many `ToolCallPart`s in its response to indicate that it wants to call a function:
 
-```typescript
-export interface ToolCallPart {
-  type: "tool-call";
-  /**
-   * The ID of the tool call, used to match the tool result with the tool call.
-   */
-  tool_call_id: string;
-  /**
-   * The name of the tool to call.
-   */
-  tool_name: string;
-  /**
-   * The arguments to pass to the tool.
-   */
-  args: Record<string, unknown>;
-}
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["ToolCallPart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["ToolCallPart"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["ToolCallPart"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
 Execute the tools in your application and return the results to the model as `ToolResultPart`:
 
-```typescript
-export interface ToolResultPart {
-  type: "tool-result";
-  /**
-   * The ID of the tool call from previous assistant message.
-   */
-  tool_call_id: string;
-  /**
-   * The name of the tool that was called.
-   */
-  tool_name: string;
-  /**
-   * The content of the tool result.
-   */
-  content: Part[];
-  /**
-   * Marks the tool result as an error.
-   */
-  is_error?: boolean;
-}
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["ToolResultPart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["ToolResultPart"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["ToolResultPart"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
 ## Function tool example
 

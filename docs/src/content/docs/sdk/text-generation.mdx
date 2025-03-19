@@ -9,16 +9,37 @@ import rustGenerateTextCode from "../../../../../sdk-rust/examples/generate-text
 import jsStreamTextCode from "../../../../../sdk-js/examples/stream-text.ts?raw";
 import goStreamTextCode from "../../../../../sdk-go/examples/stream-text/main.go?raw";
 import rustStreamTextCode from "../../../../../sdk-rust/examples/stream-text.rs?raw";
+import {
+  extractGoTypes,
+  extractTypescriptTypes,
+  extractRustTypes,
+} from "../../../utils/extract-types.ts";
 
 Text modality is represented as `TextPart`s.
 
-```ts
-export interface TextPart {
-  type: "text";
-  text: string;
-  citations?: Citation[];
-}
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["TextPart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["TextPart"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["TextPart"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
 ## Generate Text
 
@@ -44,12 +65,29 @@ Use `generate()` to call the language model with `TextPart` objects.
 
 Text generation can also be streamed using the `stream()` method. `TextPart` in streamed responses will be represented as `TextPartDelta`:
 
-```ts
-export interface TextPartDelta {
-  type: "text";
-  text: string;
-}
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["TextPartDelta"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["TextPartDelta"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["TextPartDelta"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
 Individual `text` chunks can be combined to create the final text output.
 

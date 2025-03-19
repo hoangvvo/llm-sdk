@@ -9,48 +9,37 @@ import rustGenerateAudioCode from "../../../../../sdk-rust/examples/generate-aud
 import jsStreamAudioCode from "../../../../../sdk-js/examples/stream-audio.ts?raw";
 import goStreamAudioCode from "../../../../../sdk-go/examples/stream-audio/main.go?raw";
 import rustStreamAudioCode from "../../../../../sdk-rust/examples/stream-audio.rs?raw";
+import {
+  extractGoTypes,
+  extractTypescriptTypes,
+  extractRustTypes,
+} from "../../../utils/extract-types.ts";
 
 Audio modality is represented as `AudioPart`s.
 
-```ts
-/**
- * A part of the message that contains an audio.
- */
-export interface AudioPart {
-  type: "audio";
-  /**
-   * The base64-encoded audio data.
-   */
-  audio_data: string;
-  format: AudioFormat;
-  /**
-   * The sample rate of the audio. E.g. 44100, 48000.
-   */
-  sample_rate?: number;
-  /**
-   * The number of channels of the audio. E.g. 1, 2.
-   */
-  channels?: number;
-  /**
-   * The transcript of the audio.
-   */
-  transcript?: string;
-  /**
-   * Audio ID, if applicable.
-   */
-  audio_id?: string;
-}
-
-export type AudioFormat =
-  | "wav"
-  | "mp3"
-  | "linear16"
-  | "flac"
-  | "mulaw"
-  | "alaw"
-  | "aac"
-  | "opus";
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["AudioPart", "AudioFormat"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["AudioPart", "AudioFormat"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["AudioPart", "AudioFormat"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
 To ensure the audio can be played correctly, the application code must consider the provided audio `format`, `sample_rate`, and `channels`.
 
@@ -79,35 +68,29 @@ Depending on the provider, you may have to pass additional parameters to their A
 
 Audio generation can also be streamed using the `stream()` method. In streamed responses, `AudioPart` will be represented as `AudioPartDelta`:
 
-```ts
-/**
- * A delta update for an audio part, used in streaming of an audio message.
- */
-export interface AudioPartDelta {
-  type: "audio";
-  /**
-   * The base64-encoded audio data.
-   */
-  audio_data?: string;
-  format?: AudioFormat;
-  /**
-   * The sample rate of the audio. E.g. 44100, 48000.
-   */
-  sample_rate?: number;
-  /**
-   * The number of channels of the audio. E.g. 1, 2.
-   */
-  channels?: number;
-  /**
-   * The transcript of the audio.
-   */
-  transcript?: string;
-  /**
-   * The audio ID, if applicable.
-   */
-  audio_id?: string;
-}
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["AudioPartDelta", "AudioFormat"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["AudioPartDelta", "AudioFormat"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["AudioPartDelta", "AudioFormat"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
 Individual `audio_data` chunks can be played back as they are received. They can be combined to create the final audio output.
 

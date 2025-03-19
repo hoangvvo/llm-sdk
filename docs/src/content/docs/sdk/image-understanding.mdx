@@ -3,33 +3,41 @@ title: Image understanding
 ---
 
 import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import { extractCombined } from "../../../utils/treesitter-extract.ts";
 import jsDescribeImageCode from "../../../../../sdk-js/examples/describe-image.ts?raw";
 import goDescribeImageCode from "../../../../../sdk-go/examples/describe-image/main.go?raw";
 import rustDescribeImageCode from "../../../../../sdk-rust/examples/describe-image.rs?raw";
+import {
+  extractGoTypes,
+  extractTypescriptTypes,
+  extractRustTypes,
+} from "../../../utils/extract-types.ts";
 
 Image modality is represented as `ImagePart`s.
 
-```ts
-export interface ImagePart {
-  type: "image";
-  /**
-   * The MIME type of the image. E.g. "image/jpeg", "image/png".
-   */
-  mime_type: string;
-  /**
-   * The base64-encoded image data.
-   */
-  image_data: string;
-  /**
-   * The width of the image in pixels.
-   */
-  width?: number;
-  /**
-   * The height of the image in pixels.
-   */
-  height?: number;
-}
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["ImagePart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["ImagePart"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["ImagePart"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
 Images can be sent to the model as `ImagePart` objects.
 
