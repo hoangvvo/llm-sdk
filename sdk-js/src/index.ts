@@ -5,3 +5,8 @@ export {
   type LanguageModelMetadata,
 } from "./language-model.ts";
 export * from "./types.ts";
+export {
+  calculateCost,
+  sumModelTokensDetails,
+  sumModelUsage,
+} from "./usage.utils.ts";

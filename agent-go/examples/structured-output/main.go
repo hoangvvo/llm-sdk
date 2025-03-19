@@ -244,7 +244,7 @@ func main() {
 			llmagent.InstructionParam[struct{}]{String: &staticInstruction},
 			llmagent.InstructionParam[struct{}]{Func: dynamicInstruction},
 		),
-		llmagent.WithResponseFormat[struct{}](responseFormat),
+		llmagent.WithResponseFormat[struct{}](*responseFormat),
 		llmagent.WithTools(
 			&SearchFlightsTool{},
 			&SearchHotelsTool{},

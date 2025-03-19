@@ -178,7 +178,7 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -264,7 +264,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -409,7 +409,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool1, tool2},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -540,7 +540,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -632,7 +632,7 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		2, // max turns is 2
 		nil, nil, nil, nil, nil,
 	)
@@ -680,7 +680,7 @@ func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -732,7 +732,7 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -795,7 +795,7 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -863,7 +863,7 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		&temp, &topP, &topK, &presencePenalty, &frequencyPenalty,
 	)
@@ -930,7 +930,7 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 		model,
 		instructions,
 		[]llmagent.AgentTool[map[string]interface{}]{},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -978,7 +978,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -1065,7 +1065,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)
@@ -1183,7 +1183,7 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		2, // max turns is 2
 		nil, nil, nil, nil, nil,
 	)
@@ -1238,7 +1238,7 @@ func TestRun_FinishCleansUpSessionResources(t *testing.T) {
 		model,
 		[]llmagent.InstructionParam[map[string]interface{}]{},
 		[]llmagent.AgentTool[map[string]interface{}]{},
-		llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 		10,
 		nil, nil, nil, nil, nil,
 	)

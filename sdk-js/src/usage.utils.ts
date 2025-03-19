@@ -1,4 +1,8 @@
-import type { LanguageModelPricing, ModelUsage } from "./types.ts";
+import type {
+  LanguageModelPricing,
+  ModelTokensDetails,
+  ModelUsage,
+} from "./types.ts";
 
 export function calculateCost(
   usage: ModelUsage,
@@ -30,5 +34,45 @@ export function calculateCost(
     outputTextTokens * (pricing.output_cost_per_text_token ?? 0) +
     outputAudioTokens * (pricing.output_cost_per_audio_token ?? 0) +
     outputImageTokens * (pricing.output_cost_per_image_token ?? 0)
+  );
+}
+
+export function sumModelUsage(usages: ModelUsage[]): ModelUsage {
+  return usages.reduce<ModelUsage>(
+    (acc, curr) => ({
+      input_tokens: acc.input_tokens + curr.input_tokens,
+      output_tokens: acc.output_tokens + curr.output_tokens,
+      input_tokens_details: sumModelTokensDetails([
+        acc.input_tokens_details ?? {},
+        curr.input_tokens_details ?? {},
+      ]),
+      output_tokens_details: sumModelTokensDetails([
+        acc.output_tokens_details ?? {},
+        curr.output_tokens_details ?? {},
+      ]),
+    }),
+    {
+      input_tokens: 0,
+      output_tokens: 0,
+    },
+  );
+}
+
+export function sumModelTokensDetails(
+  detailsArr: ModelTokensDetails[],
+): ModelTokensDetails {
+  return detailsArr.reduce<ModelTokensDetails>(
+    (acc, curr) => ({
+      text_tokens: (acc.text_tokens ?? 0) + (curr.text_tokens ?? 0),
+      audio_tokens: (acc.audio_tokens ?? 0) + (curr.audio_tokens ?? 0),
+      image_tokens: (acc.image_tokens ?? 0) + (curr.image_tokens ?? 0),
+      cached_text_tokens:
+        (acc.cached_text_tokens ?? 0) + (curr.cached_text_tokens ?? 0),
+      cached_audio_tokens:
+        (acc.cached_audio_tokens ?? 0) + (curr.cached_audio_tokens ?? 0),
+      cached_image_tokens:
+        (acc.cached_image_tokens ?? 0) + (curr.cached_image_tokens ?? 0),
+    }),
+    {},
   );
 }

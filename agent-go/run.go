@@ -17,7 +17,7 @@ type RunSession[C any] struct {
 	agentName        string
 	tools            []AgentTool[C]
 	model            llmsdk.LanguageModel
-	responseFormat   llmsdk.ResponseFormatOption
+	responseFormat   *llmsdk.ResponseFormatOption
 	instructions     []InstructionParam[C]
 	maxTurns         uint
 	temperature      *float64
@@ -33,7 +33,7 @@ func NewRunSession[C any](
 	model llmsdk.LanguageModel,
 	instructions []InstructionParam[C],
 	tools []AgentTool[C],
-	responseFormat llmsdk.ResponseFormatOption,
+	responseFormat *llmsdk.ResponseFormatOption,
 	maxTurns uint,
 	temperature *float64,
 	topP *float64,
@@ -344,7 +344,7 @@ func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]
 		Messages:         nil,
 		SystemPrompt:     &systemPrompt,
 		Tools:            tools,
-		ResponseFormat:   &s.responseFormat,
+		ResponseFormat:   s.responseFormat,
 		Temperature:      s.temperature,
 		TopP:             s.topP,
 		TopK:             s.topK,

@@ -11,7 +11,7 @@ type Agent[C any] struct {
 	model            llmsdk.LanguageModel
 	instructions     []InstructionParam[C]
 	tools            []AgentTool[C]
-	responseFormat   llmsdk.ResponseFormatOption
+	responseFormat   *llmsdk.ResponseFormatOption
 	maxTurns         uint
 	temperature      *float64
 	topP             *float64
@@ -69,7 +69,7 @@ func WithTools[C any](tools ...AgentTool[C]) AgentOption[C] {
 // WithResponseFormat sets the expected format of the response. Either text or structured output.
 func WithResponseFormat[C any](format llmsdk.ResponseFormatOption) AgentOption[C] {
 	return func(a *Agent[C]) {
-		a.responseFormat = format
+		a.responseFormat = &format
 	}
 }
 

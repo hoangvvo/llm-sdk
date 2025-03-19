@@ -28,7 +28,12 @@ suite("GoogleModel", () => {
   assert(process.env["GOOGLE_API_KEY"], "GOOGLE_API_KEY must be set");
   const model = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-1.5-pro",
+    modelId: "gemini-2.5-flash",
+  });
+
+  const thinkingModel = new GoogleModel({
+    apiKey: process.env["GOOGLE_API_KEY"],
+    modelId: "gemini-2.0-flash-thinking-exp-01-21",
   });
 
   const runTestOptions = { compatibleSchema: true };
@@ -133,14 +138,29 @@ suite("GoogleModel", () => {
   );
 
   test(TEST_CASE_GENERATE_REASONING.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_GENERATE_REASONING, runTestOptions);
+    return runTestCase(
+      t,
+      thinkingModel,
+      TEST_CASE_GENERATE_REASONING,
+      runTestOptions,
+    );
   });
 
   test(TEST_CASE_STREAM_REASONING.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_STREAM_REASONING, runTestOptions);
+    return runTestCase(
+      t,
+      thinkingModel,
+      TEST_CASE_STREAM_REASONING,
+      runTestOptions,
+    );
   });
 
   test(TEST_CASE_INPUT_REASONING.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_INPUT_REASONING, runTestOptions);
+    return runTestCase(
+      t,
+      thinkingModel,
+      TEST_CASE_INPUT_REASONING,
+      runTestOptions,
+    );
   });
 });
