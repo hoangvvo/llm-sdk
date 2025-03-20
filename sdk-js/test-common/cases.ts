@@ -1,9 +1,10 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { type TestContext } from "node:test";
 import { StreamAccumulator } from "../src/accumulator.ts";
 import type { LanguageModel } from "../src/language-model.ts";
 import type { LanguageModelInput, Tool } from "../src/types.ts";
 import { assertContentPart, type PartAssertion } from "./assert.ts";
-import { transformCompatibleSchema } from "./utils.ts";
 
 export interface TestCase {
   name: string;
@@ -14,729 +15,135 @@ export interface TestCase {
   };
 }
 
-const getWeatherTool: Tool = {
-  name: "get_weather",
-  description: "Get the weather",
-  parameters: {
-    type: "object",
-    properties: {
-      location: { type: "string" },
-      unit: { type: ["string", "null"], enum: ["c", "f"] },
-    },
-    required: ["location", "unit"],
-    additionalProperties: false,
-  },
-};
-
-const getStockPriceTool: Tool = {
-  name: "get_stock_price",
-  description: "Get the stock price",
-  parameters: {
-    type: "object",
-    properties: {
-      symbol: { type: "string" },
-    },
-    required: ["symbol"],
-    additionalProperties: false,
-  },
-};
-
-export const TEST_CASE_GENERATE_TEXT: TestCase = {
-  name: "generate text",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: `Respond by saying "Hello"`,
-          },
-        ],
-      },
-    ],
-  },
-  type: "generate",
-  output: {
-    content: [
-      {
-        type: "text",
-        text: /Hello/,
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_STREAM_TEXT: TestCase = {
-  name: "stream text",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: `Respond by saying "Hello"`,
-          },
-        ],
-      },
-    ],
-  },
-  type: "stream",
-  output: {
-    content: [
-      {
-        type: "text",
-        text: /Hello/,
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT: TestCase = {
-  name: "generate with system prompt",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Hello",
-          },
-        ],
-      },
-    ],
-    system_prompt: 'You must always start your message with "🤖"',
-  },
-  type: "generate",
-  output: {
-    content: [
-      {
-        type: "text",
-        text: /^🤖/,
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_GENERATE_TOOL_CALL: TestCase = {
-  name: "generate tool call",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "What's the weather like in Boston today?",
-          },
-        ],
-      },
-    ],
-    tools: [getWeatherTool],
-  },
-  type: "generate",
-  output: {
-    content: [
-      {
-        type: "tool_call",
-        tool_name: "get_weather",
-        args: {
-          location: /Boston/,
-        },
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_STREAM_TOOL_CALL: TestCase = {
-  name: "stream tool call",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "What's the weather like in Boston today?",
-          },
-        ],
-      },
-    ],
-    tools: [getWeatherTool],
-  },
-  type: "generate",
-  output: {
-    content: [
-      {
-        type: "tool_call",
-        tool_name: "get_weather",
-        args: {
-          location: /Boston/,
-        },
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT: TestCase = {
-  name: "generate text from tool result",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "What's the weather like in Boston today?",
-          },
-        ],
-      },
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "tool-call",
-            tool_call_id: "0mbnj08nt",
-            tool_name: "get_weather",
-            args: {
-              location: "Boston",
-            },
-          },
-        ],
-      },
-      {
-        role: "tool",
-        content: [
-          {
-            type: "tool-result",
-            tool_call_id: "0mbnj08nt",
-            tool_name: "get_weather",
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  temperature: 70,
-                  unit: "f",
-                  description: "Sunny",
-                }),
-              },
-            ],
-          },
-        ],
-      },
-    ],
-    tools: [getWeatherTool],
-  },
-  type: "generate",
-  output: {
-    content: [
-      {
-        type: "text",
-        text: /70.*sunny|sunny.*70/i,
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT: TestCase = {
-  name: "stream text from tool result",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "What's the weather like in Boston today?",
-          },
-        ],
-      },
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "tool-call",
-            tool_call_id: "0mbnj08nt",
-            tool_name: "get_weather",
-            args: {
-              location: "Boston",
-            },
-          },
-        ],
-      },
-      {
-        role: "tool",
-        content: [
-          {
-            type: "tool-result",
-            tool_call_id: "0mbnj08nt",
-            tool_name: "get_weather",
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  temperature: 70,
-                  unit: "f",
-                  description: "Sunny",
-                }),
-              },
-            ],
-          },
-        ],
-      },
-    ],
-    tools: [getWeatherTool],
-  },
-  type: "stream",
-  output: {
-    content: [
-      {
-        type: "text",
-        text: /70.*sunny|sunny.*70/i,
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS: TestCase = {
-  name: "generate parallel tool calls",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Get me the weather in Boston and the stock price of AAPL.",
-          },
-        ],
-      },
-    ],
-    tools: [getWeatherTool, getStockPriceTool],
-  },
-  type: "generate",
-  output: {
-    content: [
-      {
-        type: "tool_call",
-        tool_name: "get_weather",
-        args: {
-          location: /Boston/,
-        },
-      },
-      {
-        type: "tool_call",
-        tool_name: "get_stock_price",
-        args: {
-          symbol: /AAPL/,
-        },
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_STREAM_PARALLEL_TOOL_CALLS: TestCase = {
-  name: "stream parallel tool calls",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Get me the weather in Boston and the stock price of AAPL. You must do both of them in one go.",
-          },
-        ],
-      },
-    ],
-    tools: [getWeatherTool, getStockPriceTool],
-  },
-  type: "generate",
-  output: {
-    content: [
-      {
-        type: "tool_call",
-        tool_name: "get_weather",
-        args: {
-          location: /Boston/,
-        },
-      },
-      {
-        type: "tool_call",
-        tool_name: "get_stock_price",
-        args: {
-          symbol: /AAPL/,
-        },
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME: TestCase = {
-  name: "stream parallel tool calls of same name",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Get me the weather in Boston and the weather in New York.",
-          },
-        ],
-      },
-    ],
-    tools: [getWeatherTool],
-  },
-  type: "stream",
-  output: {
-    content: [
-      {
-        type: "tool_call",
-        tool_name: "get_weather",
-        args: {
-          location: /Boston/,
-        },
-      },
-      {
-        type: "tool_call",
-        tool_name: "get_weather",
-        args: {
-          location: /New York/,
-        },
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_STRUCTURED_RESPONSE_FORMAT: TestCase = {
-  name: "structured response format",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: 'Create a user with the id "a1b2c3", name "John Doe", email "john.doe@example.com", birthDate "1990-05-15", age 34, isActive true, role "user", accountBalance 500.75, phoneNumber "+1234567890123", tags ["developer", "gamer"], and lastLogin "2024-11-09T10:30:00Z".',
-          },
-        ],
-      },
-    ],
-    response_format: {
-      type: "json",
-      name: "user",
-      schema: {
-        type: "object",
-        properties: {
-          id: { type: "string" },
-          name: { type: "string" },
-          email: { type: "string" },
-          birthDate: { type: "string" },
-          age: { type: "integer" },
-          isActive: { type: "boolean" },
-          role: { type: "string" },
-          accountBalance: { type: "number" },
-          phoneNumber: { type: "string" },
-          tags: { type: "array", items: { type: "string" } },
-          lastLogin: { type: "string" },
-        },
-        required: [
-          "id",
-          "name",
-          "email",
-          "birthDate",
-          "age",
-          "isActive",
-          "role",
-          "accountBalance",
-          "phoneNumber",
-          "tags",
-          "lastLogin",
-        ],
-        additionalProperties: false,
-      },
-    },
-  },
-  type: "generate",
-  output: {
-    content: [
-      {
-        type: "text",
-        text: /"id"\s*:\s*"a1b2c3"/,
-      },
-      {
-        type: "text",
-        text: /"name"\s*:\s*"John Doe"/,
-      },
-      {
-        type: "text",
-        text: /"email"\s*:\s*"john\.doe@example\.com"/,
-      },
-    ],
-  },
-};
-
-export const TEST_CASE_SOURCE_PART_INPUT: TestCase = {
-  // all providers must accept the source part or translate them to a compatible part
-  name: "source part in content",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [{ type: "text", text: "What is my first secret number?" }],
-      },
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "tool-call",
-            tool_call_id: "0mbnj08nt",
-            args: {},
-            tool_name: "get_first_secret_number",
-          },
-        ],
-      },
-      {
-        role: "tool",
-        content: [
-          {
-            type: "tool-result",
-            tool_call_id: "0mbnj08nt",
-            tool_name: "get_first_secret_number",
-            content: [
-              {
-                type: "source",
-                title: "my secret number",
-                content: [
-                  {
-                    type: "text",
-                    text: "24",
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "text",
-            text: "Got it!",
-          },
-        ],
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "source",
-            title: "my secret number",
-            content: [
-              {
-                type: "text",
-                text: 'Remember that my second secret number is "42".',
-              },
-            ],
-          },
-          {
-            type: "text",
-            text: "What are the my two secret numbers?",
-          },
-        ],
-      },
-    ],
-  },
-  output: {
-    content: [
-      {
-        type: "text",
-        text: /24/,
-      },
-      {
-        type: "text",
-        text: /42/,
-      },
-    ],
-  },
-  type: "generate",
-};
-
-export const TEST_CASE_GENERATE_AUDIO: TestCase = {
-  name: "generate audio",
-  input: {
-    modalities: ["text", "audio"],
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Respond in audio saying 'Hello'",
-          },
-        ],
-      },
-    ],
-  },
-  output: {
-    content: [
-      {
-        type: "audio",
-        audio_id: true,
-        transcript: /Hello/,
-      },
-    ],
-  },
-  type: "generate",
-};
-
-export const TEST_CASE_STREAM_AUDIO: TestCase = {
-  name: "stream audio",
-  input: {
-    modalities: ["text", "audio"],
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Respond in audio saying 'Hello'",
-          },
-        ],
-      },
-    ],
-  },
-  output: {
-    content: [{ type: "audio", audio_id: true, transcript: /Hello/ }],
-  },
-  type: "stream",
-};
-
-export const TEST_CASE_GENERATE_REASONING: TestCase = {
-  name: "generate reasoning",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering.",
-          },
-        ],
-      },
-    ],
-  },
-  output: {
-    content: [
-      {
-        type: "reasoning",
-        text: /John/,
-      },
-    ],
-  },
-  type: "generate",
-};
-
-export const TEST_CASE_STREAM_REASONING: TestCase = {
-  name: "stream reasoning",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering.",
-          },
-        ],
-      },
-    ],
-  },
-  output: {
-    content: [
-      {
-        type: "reasoning",
-        text: /John/,
-      },
-    ],
-  },
-  type: "stream",
-};
-
-export const TEST_CASE_INPUT_REASONING: TestCase = {
-  name: "input reasoning",
-  input: {
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "What is my secret number?",
-          },
-        ],
-      },
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "reasoning",
-            text: "Using my mind reading skill, I can deduce that your secret number is 42. But let's ask user if the number if greater than 30 just to be sure. If the user say yes, we are 100% sure it is 42 and can answer without asking further question.",
-          },
-          {
-            type: "text",
-            text: "Is the number greater than 30?",
-          },
-        ],
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Yes, it is. Now use your reasoning and answer a number right now without asking further!",
-          },
-        ],
-      },
-    ],
-  },
-  output: {
-    content: [
-      {
-        type: "text",
-        text: /42/,
-      },
-    ],
-  },
-  type: "generate",
-};
-
-export interface RunTestCaseOptions {
-  /**
-   * For newer models with structured outputs, all properties are required
-   * but they can be marked optional using type: [type, "null"]. However,
-   * old model do not support that. To make the schema compatible with older models,
-   * we turn the array type back into a single type and remove that property
-   * from the required list.
-   */
-  compatibleSchema?: boolean;
+// Define types for JSON data structure
+interface TestDataJSON {
+  tools: Tool[];
+  test_cases: TestCaseJSON[];
 }
 
-export interface RunTestCaseOptions {
-  /**
-   * For newer models with structured outputs, all properties are required
-   * but they can be marked optional using type: [type, "null"]. However,
-   * old model do not support that. To make the schema compatible with older models,
-   * we turn the array type back into a single type and remove that property
-   * from the required list.
-   */
-  compatibleSchema?: boolean;
+interface TestCaseJSON {
+  name: string;
+  type: "generate" | "stream";
+  input: LanguageModelInput;
+  input_tools?: string[];
+  output: {
+    content: {
+      type: "text" | "tool_call" | "audio" | "reasoning";
+      text?: string;
+      tool_name?: string;
+      args?: Record<string, string>;
+      audio_id?: boolean;
+      transcript?: string;
+    }[];
+  };
+}
 
+// Load test data from JSON
+const testDataPath = path.join(
+  import.meta.dirname,
+  "../../sdk-tests/tests.json",
+);
+const testDataContent = fs.readFileSync(testDataPath, "utf-8");
+const testData: TestDataJSON = JSON.parse(testDataContent) as TestDataJSON;
+
+// Create tool map from JSON
+const toolsMap = new Map<string, Tool>();
+for (const tool of testData.tools) {
+  toolsMap.set(tool.name, tool);
+}
+
+// Helper function to resolve tools from names
+function resolveTools(toolNames: string[]): Tool[] {
+  return toolNames.map((name) => {
+    const tool = toolsMap.get(name);
+    if (!tool) throw new Error(`Tool ${name} not found in test data`);
+    return tool;
+  });
+}
+
+// Helper function to convert JSON test case to TestCase
+function jsonToTestCase(jsonCase: TestCaseJSON): TestCase {
+  const input: LanguageModelInput = { ...jsonCase.input };
+
+  // Resolve tool references
+  if (jsonCase.input_tools) {
+    input.tools = resolveTools(jsonCase.input_tools);
+  }
+
+  // Convert output assertions - always treat text as regex
+  const output = {
+    content: jsonCase.output.content.map((part): PartAssertion => {
+      if (part.type === "text" && part.text) {
+        return {
+          type: "text",
+          text: new RegExp(part.text),
+        } as PartAssertion;
+      } else if (part.type === "tool_call" && part.tool_name) {
+        return {
+          type: "tool_call",
+          tool_name: part.tool_name,
+          args: part.args
+            ? Object.entries(part.args).reduce<Record<string, RegExp>>(
+                (acc, [key, value]) => {
+                  if (typeof value === "string") {
+                    acc[key] = new RegExp(value);
+                  }
+                  return acc;
+                },
+                {},
+              )
+            : {},
+        } as PartAssertion;
+      } else if (part.type === "audio") {
+        return {
+          type: "audio",
+          audio_id: part.audio_id,
+          transcript: part.transcript ? new RegExp(part.transcript) : undefined,
+        } as PartAssertion;
+      } else if (part.type === "reasoning" && part.text) {
+        return {
+          type: "reasoning",
+          text: new RegExp(part.text),
+        } as PartAssertion;
+      }
+      throw new Error(`Invalid part assertion in test case ${jsonCase.name}`);
+    }),
+  };
+
+  return {
+    name: jsonCase.name,
+    input,
+    type: jsonCase.type,
+    output,
+  };
+}
+
+// Load test cases from JSON
+const testCasesFromJson = testData.test_cases.map(jsonToTestCase);
+
+// Test case names for easy reference
+export const TEST_CASE_NAMES = {
+  GENERATE_TEXT: "generate_text",
+  STREAM_TEXT: "stream_text",
+  GENERATE_WITH_SYSTEM_PROMPT: "generate_with_system_prompt",
+  GENERATE_TOOL_CALL: "generate_tool_call",
+  STREAM_TOOL_CALL: "stream_tool_call",
+  GENERATE_TEXT_FROM_TOOL_RESULT: "generate_text_from_tool_result",
+  STREAM_TEXT_FROM_TOOL_RESULT: "stream_text_from_tool_result",
+  GENERATE_PARALLEL_TOOL_CALLS: "generate_parallel_tool_calls",
+  STREAM_PARALLEL_TOOL_CALLS: "stream_parallel_tool_calls",
+  STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME:
+    "stream_parallel_tool_calls_of_same_name",
+  STRUCTURED_RESPONSE_FORMAT: "structured_response_format",
+  SOURCE_PART_INPUT: "source_part_input",
+  GENERATE_AUDIO: "generate_audio",
+  STREAM_AUDIO: "stream_audio",
+  GENERATE_REASONING: "generate_reasoning",
+  STREAM_REASONING: "stream_reasoning",
+  INPUT_REASONING: "input_reasoning",
+} as const;
+
+export interface RunTestCaseOptions {
   /**
    * Extra parameters to pass to the model input.
    */
@@ -746,30 +153,16 @@ export interface RunTestCaseOptions {
 export async function runTestCase(
   t: TestContext,
   model: LanguageModel,
-  testCase: TestCase,
+  testCaseName: string,
   options?: RunTestCaseOptions,
 ) {
+  const testCase = testCasesFromJson.find((tc) => tc.name === testCaseName);
+  if (!testCase) {
+    throw new Error(`Test case "${testCaseName}" not found`);
+  }
+
   const { input, type, output } = testCase;
   const modelInput = { ...input, ...options?.additionalInputs };
-
-  if (options?.compatibleSchema) {
-    if (modelInput.tools) {
-      modelInput.tools = modelInput.tools.map((tool) => {
-        return {
-          ...tool,
-          parameters: transformCompatibleSchema(tool.parameters),
-        };
-      });
-    }
-    if (
-      modelInput.response_format?.type === "json" &&
-      modelInput.response_format.schema
-    ) {
-      modelInput.response_format.schema = transformCompatibleSchema(
-        modelInput.response_format.schema,
-      );
-    }
-  }
 
   if (type === "generate") {
     const result = await model.generate(modelInput);

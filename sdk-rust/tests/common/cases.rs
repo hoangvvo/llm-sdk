@@ -5,8 +5,13 @@ use crate::common::assert::{
 use futures::stream::StreamExt;
 use llm_sdk::*;
 use regex::Regex;
-use serde_json::json;
+use serde::Deserialize;
+use serde_json::Value;
+use std::collections::HashMap;
 use std::error::Error;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::LazyLock;
 
 #[derive(Debug, Clone)]
 pub enum TestMethod {
@@ -21,11 +26,170 @@ pub struct TestCase {
     pub output: OutputAssertion,
 }
 
+#[derive(Debug, Deserialize)]
+struct TestDataJSON {
+    tools: Vec<Tool>,
+    test_cases: Vec<TestCaseJSON>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TestCaseJSON {
+    name: String,
+    #[serde(rename = "type")]
+    test_type: String,
+    input: LanguageModelInput,
+    #[serde(default)]
+    input_tools: Vec<String>,
+    output: Value,
+}
+
+// Load test data from JSON at compile time
+static TEST_DATA: LazyLock<TestDataJSON> = LazyLock::new(|| {
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("../sdk-tests/tests.json");
+
+    let data = fs::read_to_string(path).expect("Failed to read test data");
+    serde_json::from_str(&data).expect("Failed to parse test data")
+});
+
+static TOOLS_MAP: LazyLock<HashMap<String, Tool>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
+    for tool in &TEST_DATA.tools {
+        map.insert(tool.name.clone(), tool.clone());
+    }
+    map
+});
+
+static TEST_CASES: LazyLock<HashMap<String, TestCase>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
+    for tc in &TEST_DATA.test_cases {
+        map.insert(tc.name.clone(), convert_json_to_test_case(tc));
+    }
+    map
+});
+
+fn convert_json_to_test_case(tc: &TestCaseJSON) -> TestCase {
+    // Input is already a LanguageModelInput from JSON deserialization
+    let mut input = tc.input.clone();
+
+    // Handle tools
+    if !tc.input_tools.is_empty() {
+        let mut resolved_tools = Vec::new();
+        for tool_name in &tc.input_tools {
+            if let Some(tool) = TOOLS_MAP.get(tool_name) {
+                resolved_tools.push(tool.clone());
+            }
+        }
+        if !resolved_tools.is_empty() {
+            input.tools = Some(resolved_tools);
+        }
+    }
+
+    // Convert output
+    let mut output = OutputAssertion {
+        content: Vec::new(),
+    };
+    if let Some(content) = tc.output.get("content").and_then(|v| v.as_array()) {
+        output.content = convert_output_assertions(content);
+    }
+
+    // Determine method
+    let method = if tc.test_type == "stream" {
+        TestMethod::Stream
+    } else {
+        TestMethod::Generate
+    };
+
+    TestCase {
+        input,
+        method,
+        output,
+    }
+}
+
+fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
+    let mut assertions = Vec::new();
+
+    for part in content {
+        if let Some(part_obj) = part.as_object() {
+            let part_type = part_obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+            match part_type {
+                "text" => {
+                    if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {
+                        // Always treat as regex
+                        assertions.push(PartAssertion::Text(TextPartAssertion {
+                            text: Regex::new(text).unwrap(),
+                        }));
+                    }
+                }
+                "tool_call" => {
+                    let tool_name = part_obj
+                        .get("tool_name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let mut args = Vec::new();
+                    if let Some(args_obj) = part_obj.get("args").and_then(|v| v.as_object()) {
+                        for (key, value) in args_obj {
+                            if let Some(val_str) = value.as_str() {
+                                // Always treat as regex
+                                args.push((
+                                    key.clone(),
+                                    ToolCallpartAssertionArgPropValue::Value(
+                                        Regex::new(val_str).unwrap(),
+                                    ),
+                                ));
+                            }
+                        }
+                    }
+                    assertions.push(PartAssertion::ToolCall(ToolCallPartAssertion {
+                        tool_name,
+                        args,
+                    }));
+                }
+                "audio" => {
+                    let audio_id = part_obj
+                        .get("audio_id")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let transcript = part_obj
+                        .get("transcript")
+                        .and_then(|v| v.as_str())
+                        .map(|t| {
+                            // Always treat as regex
+                            Regex::new(t).unwrap()
+                        });
+                    assertions.push(PartAssertion::Audio(AudioPartAssertion {
+                        audio_id,
+                        transcript,
+                    }));
+                }
+                "reasoning" => {
+                    if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {
+                        assertions.push(PartAssertion::Reasoning(ReasoningPartAssertion {
+                            text: Regex::new(text).unwrap(),
+                        }));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    assertions
+}
+
 pub async fn run_test_case(
     model: &dyn LanguageModel,
-    test_case: TestCase,
+    test_case_name: &str,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
+    let test_case = TEST_CASES
+        .get(test_case_name)
+        .ok_or_else(|| format!("Test case '{}' not found", test_case_name))?
+        .clone();
+
     let mut input = test_case.input.clone();
     if let Some(opts) = options {
         if let Some(f) = opts.additional_input {
@@ -64,610 +228,123 @@ pub struct RunTestCaseOptions {
     pub additional_input: Option<fn(&mut LanguageModelInput)>,
 }
 
-// MARK: common test set
-
-fn get_weather_tool() -> Tool {
-    Tool {
-        name: "get_weather".to_string(),
-        description: "Get the weather".to_string(),
-        parameters: json!({
-            "type": "object",
-            "properties": {
-                "location": { "type": "string" },
-                "unit": { "type": ["string", "null"], "enum": ["c", "f"] },
-            },
-            "required": ["location", "unit"],
-            "additionalProperties": false,
-        }),
-    }
-}
-
-fn get_stock_price_tool() -> Tool {
-    Tool {
-        name: "get_stock_price".to_string(),
-        description: "Get the stock price".to_string(),
-        parameters: json!({
-            "type": "object",
-            "properties": {
-                "symbol": { "type": "string" },
-            },
-            "required": ["symbol"],
-            "additionalProperties": false,
-        }),
-    }
-}
-
 pub async fn test_generate_text(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: r#"Respond by saying "Hello""#.to_string(),
-                })],
-            })],
-            ..Default::default()
-        },
-        method: TestMethod::Generate,
-        output: OutputAssertion {
-            content: vec![PartAssertion::Text(TextPartAssertion {
-                text: Regex::new(r"Hello").unwrap(),
-            })],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "generate_text", options).await
 }
 
 pub async fn test_stream_text(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: r#"Respond by saying "Hello""#.to_string(),
-                })],
-            })],
-            ..Default::default()
-        },
-        method: TestMethod::Stream,
-        output: OutputAssertion {
-            content: vec![PartAssertion::Text(TextPartAssertion {
-                text: Regex::new(r"Hello").unwrap(),
-            })],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "stream_text", options).await
 }
 
 pub async fn test_generate_with_system_prompt(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            system_prompt: Some(r#"You must always start your message with "🤖""#.to_string()),
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "Hello".to_string(),
-                })],
-            })],
-            ..Default::default()
-        },
-        method: TestMethod::Generate,
-        output: OutputAssertion {
-            content: vec![PartAssertion::Text(TextPartAssertion {
-                text: Regex::new(r"^🤖").unwrap(),
-            })],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "generate_with_system_prompt", options).await
 }
 
 pub async fn test_generate_tool_call(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "What's the weather like in Boston today?".to_string(),
-                })],
-            })],
-            tools: Some(vec![get_weather_tool()]),
-            ..Default::default()
-        },
-        method: TestMethod::Generate,
-        output: OutputAssertion {
-            content: vec![PartAssertion::ToolCall(ToolCallPartAssertion {
-                tool_name: "get_weather".to_string(),
-                args: vec![(
-                    "location".to_string(),
-                    ToolCallpartAssertionArgPropValue::Value(Regex::new(r"Boston").unwrap()),
-                )],
-            })],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "generate_tool_call", options).await
 }
 
 pub async fn test_stream_tool_call(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "What's the weather like in Boston today?".to_string(),
-                })],
-            })],
-            tools: Some(vec![get_weather_tool()]),
-            ..Default::default()
-        },
-        method: TestMethod::Stream,
-        output: OutputAssertion {
-            content: vec![PartAssertion::ToolCall(ToolCallPartAssertion {
-                tool_name: "get_weather".to_string(),
-                args: vec![(
-                    "location".to_string(),
-                    ToolCallpartAssertionArgPropValue::Value(Regex::new(r"Boston").unwrap()),
-                )],
-            })],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "stream_tool_call", options).await
 }
 
 pub async fn test_generate_text_from_tool_result(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![
-                Message::User(UserMessage {
-                    content: vec![Part::Text(TextPart {
-                        text: "What's the weather like in Boston today?".to_string(),
-                    })],
-                }),
-                Message::Assistant(AssistantMessage {
-                    content: vec![Part::ToolCall(ToolCallPart {
-                        tool_call_id: "0mbnj08nt".to_string(),
-                        tool_name: "get_weather".to_string(),
-                        args: json!({
-                            "location": "Boston",
-                        }),
-                    })],
-                }),
-                Message::Tool(ToolMessage {
-                    content: vec![Part::ToolResult(ToolResultPart {
-                        tool_call_id: "0mbnj08nt".to_string(),
-                        tool_name: "get_weather".to_string(),
-                        content: vec![Part::Text(TextPart {
-                            text: json!({
-                                "temperature": 70,
-                                "unit": "f",
-                                "description": "Sunny",
-                            })
-                            .to_string(),
-                        })],
-                        is_error: None,
-                    })],
-                }),
-            ],
-            tools: Some(vec![get_weather_tool()]),
-            ..Default::default()
-        },
-        method: TestMethod::Generate,
-        output: OutputAssertion {
-            content: vec![PartAssertion::Text(TextPartAssertion {
-                text: Regex::new(r"(?i)70.*sunny|sunny.*70").unwrap(),
-            })],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "generate_text_from_tool_result", options).await
 }
 
 pub async fn test_stream_text_from_tool_result(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![
-                Message::User(UserMessage {
-                    content: vec![Part::Text(TextPart {
-                        text: "What's the weather like in Boston today?".to_string(),
-                    })],
-                }),
-                Message::Assistant(AssistantMessage {
-                    content: vec![Part::ToolCall(ToolCallPart {
-                        tool_call_id: "0mbnj08nt".to_string(),
-                        tool_name: "get_weather".to_string(),
-                        args: json!({
-                            "location": "Boston",
-                        }),
-                    })],
-                }),
-                Message::Tool(ToolMessage {
-                    content: vec![Part::ToolResult(ToolResultPart {
-                        tool_call_id: "0mbnj08nt".to_string(),
-                        tool_name: "get_weather".to_string(),
-                        content: vec![Part::Text(TextPart {
-                            text: json!({
-                                "temperature": 70,
-                                "unit": "f",
-                                "description": "Sunny",
-                            })
-                            .to_string(),
-                        })],
-                        is_error: None,
-                    })],
-                }),
-            ],
-            tools: Some(vec![get_weather_tool()]),
-            ..Default::default()
-        },
-        method: TestMethod::Stream,
-        output: OutputAssertion {
-            content: vec![PartAssertion::Text(TextPartAssertion {
-                text: Regex::new(r"(?i)70.*sunny|sunny.*70").unwrap(),
-            })],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "stream_text_from_tool_result", options).await
 }
 
 pub async fn test_generate_parallel_tool_calls(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "Get me the weather in Boston and the stock price of AAPL.".to_string(),
-                })],
-            })],
-            tools: Some(vec![get_weather_tool(), get_stock_price_tool()]),
-            ..Default::default()
-        },
-        method: TestMethod::Generate,
-        output: OutputAssertion {
-            content: vec![
-                PartAssertion::ToolCall(ToolCallPartAssertion {
-                    tool_name: "get_weather".to_string(),
-                    args: vec![(
-                        "location".to_string(),
-                        ToolCallpartAssertionArgPropValue::Value(Regex::new(r"Boston").unwrap()),
-                    )],
-                }),
-                PartAssertion::ToolCall(ToolCallPartAssertion {
-                    tool_name: "get_stock_price".to_string(),
-                    args: vec![(
-                        "symbol".to_string(),
-                        ToolCallpartAssertionArgPropValue::Value(Regex::new(r"AAPL").unwrap()),
-                    )],
-                }),
-            ],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "generate_parallel_tool_calls", options).await
 }
 
 pub async fn test_stream_parallel_tool_calls(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "Get me the weather in Boston and the stock price of AAPL. You must do \
-                           both of them in one go."
-                        .to_string(),
-                })],
-            })],
-            tools: Some(vec![get_weather_tool(), get_stock_price_tool()]),
-            ..Default::default()
-        },
-        method: TestMethod::Stream,
-        output: OutputAssertion {
-            content: vec![
-                PartAssertion::ToolCall(ToolCallPartAssertion {
-                    tool_name: "get_weather".to_string(),
-                    args: vec![(
-                        "location".to_string(),
-                        ToolCallpartAssertionArgPropValue::Value(Regex::new(r"Boston").unwrap()),
-                    )],
-                }),
-                PartAssertion::ToolCall(ToolCallPartAssertion {
-                    tool_name: "get_stock_price".to_string(),
-                    args: vec![(
-                        "symbol".to_string(),
-                        ToolCallpartAssertionArgPropValue::Value(Regex::new(r"AAPL").unwrap()),
-                    )],
-                }),
-            ],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "stream_parallel_tool_calls", options).await
 }
 
 pub async fn test_stream_parallel_tool_calls_same_name(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: "Get me the weather in Boston and the weather in New York.".to_string(),
-                })],
-            })],
-            tools: Some(vec![get_weather_tool()]),
-            ..Default::default()
-        },
-        method: TestMethod::Stream,
-        output: OutputAssertion {
-            content: vec![
-                PartAssertion::ToolCall(ToolCallPartAssertion {
-                    tool_name: "get_weather".to_string(),
-                    args: vec![(
-                        "location".to_string(),
-                        ToolCallpartAssertionArgPropValue::Value(Regex::new(r"Boston").unwrap()),
-                    )],
-                }),
-                PartAssertion::ToolCall(ToolCallPartAssertion {
-                    tool_name: "get_weather".to_string(),
-                    args: vec![(
-                        "location".to_string(),
-                        ToolCallpartAssertionArgPropValue::Value(Regex::new(r"New York").unwrap()),
-                    )],
-                }),
-            ],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "stream_parallel_tool_calls_of_same_name", options).await
 }
 
 pub async fn test_structured_response_format(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::User(UserMessage {
-                content: vec![Part::Text(TextPart {
-                    text: r#"Create a user with the id "a1b2c3", name "John Doe", email "john.doe@example.com", birthDate "1990-05-15", age 34, isActive true, role "user", accountBalance 500.75, phoneNumber "+1234567890123", tags ["developer", "gamer"], and lastLogin "2024-11-09T10:30:00Z"."#
-                        .to_string(),
-                })],
-            })],
-            response_format: Some(ResponseFormatOption::Json(ResponseFormatJson {
-                name: "user".to_string(),
-                description: None,
-                schema: Some(json!({
-                    "type": "object",
-                    "properties": {
-                        "id": { "type": "string" },
-                        "name": { "type": "string" },
-                        "email": { "type": "string" },
-                        "birthDate": { "type": "string" },
-                        "age": { "type": "integer" },
-                        "isActive": { "type": "boolean" },
-                        "role": { "type": "string" },
-                        "accountBalance": { "type": "number" },
-                        "phoneNumber": { "type": "string" },
-                        "tags": { "type": "array", "items": { "type": "string" } },
-                        "lastLogin": { "type": "string" },
-                    },
-                    "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "birthDate",
-                        "age",
-                        "isActive",
-                        "role",
-                        "accountBalance",
-                        "phoneNumber",
-                        "tags",
-                        "lastLogin",
-                    ],
-                    "additionalProperties": false,
-                })),
-            })),
-            ..Default::default()
-        },
-        method: TestMethod::Generate,
-        output: OutputAssertion {
-            content: vec![
-                PartAssertion::Text(TextPartAssertion {
-                    text: Regex::new(r#""id"\s*:\s*"a1b2c3""#).unwrap(),
-                }),
-                PartAssertion::Text(TextPartAssertion {
-                    text: Regex::new(r#""name"\s*:\s*"John Doe""#).unwrap(),
-                }),
-                PartAssertion::Text(TextPartAssertion {
-                    text: Regex::new(r#""email"\s*:\s*"john\.doe@example\.com""#).unwrap(),
-                }),
-            ],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "structured_response_format", options).await
 }
 
 pub async fn test_source_part_input(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![
-                Message::user(vec![Part::Text("What is my first secret number?".into())]),
-                Message::assistant(vec![Part::ToolCall(ToolCallPart {
-                    tool_call_id: "0mbnj08nt".to_string(),
-                    tool_name: "get_first_secret_number".to_string(),
-                    args: json!({}),
-                })]),
-                Message::tool(vec![Part::ToolResult(ToolResultPart {
-                    tool_call_id: "0mbnj08nt".to_string(),
-                    tool_name: "get_first_secret_number".to_string(),
-                    content: vec![Part::Text(TextPart {
-                        text: "24".to_string(),
-                    })],
-                    is_error: None,
-                })]),
-                Message::user(vec![
-                    Part::Source(SourcePart {
-                        title: "my secret number".to_string(),
-                        content: vec![Part::Text(TextPart {
-                            text: "Rember that second secret number is 42.".to_string(),
-                        })],
-                    }),
-                    Part::Text(TextPart {
-                        text: "What are my secret numbers?".to_string(),
-                    }),
-                ]),
-            ],
-            ..Default::default()
-        },
-        method: TestMethod::Generate,
-        output: OutputAssertion {
-            content: vec![PartAssertion::Text(TextPartAssertion {
-                text: Regex::new(r"42").unwrap(),
-            })],
-        },
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "source_part_input", options).await
 }
 
 pub async fn test_generate_audio(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::user(vec![Part::text("Say 'Hello'")])],
-            ..Default::default()
-        },
-        output: OutputAssertion {
-            content: vec![PartAssertion::Audio(AudioPartAssertion {
-                audio_id: true,
-                transcript: Some(Regex::new(r"Hello").unwrap()),
-            })],
-        },
-        method: TestMethod::Generate,
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "generate_audio", options).await
 }
 
 pub async fn test_stream_audio(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::user(vec![Part::text("Say 'Hello'")])],
-            modalities: Some(vec![Modality::Text, Modality::Audio]),
-            ..Default::default()
-        },
-        output: OutputAssertion {
-            content: vec![PartAssertion::Audio(AudioPartAssertion {
-                audio_id: true,
-                transcript: Some(Regex::new(r"Hello").unwrap()),
-            })],
-        },
-        method: TestMethod::Stream,
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "stream_audio", options).await
 }
 
 pub async fn test_generate_reasoning(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::user(vec![Part::text(
-                "John is twice as old as his sister Jane. Four years ago, John was three times as \
-                 old. What is John's current age? Make sure to reason and think through first \
-                 before answering.",
-            )])],
-            ..Default::default()
-        },
-        output: OutputAssertion {
-            content: vec![PartAssertion::Reasoning(ReasoningPartAssertion {
-                text: Regex::new(r"(?i)john").unwrap(),
-            })],
-        },
-        method: TestMethod::Generate,
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "generate_reasoning", options).await
 }
 
 pub async fn test_stream_reasoning(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![Message::user(vec![Part::text(
-                "John is twice as old as his sister Jane. Four years ago, John was three times as \
-                 old. What is John's current age? Make sure to reason and think through first \
-                 before answering.",
-            )])],
-            ..Default::default()
-        },
-        output: OutputAssertion {
-            content: vec![PartAssertion::Reasoning(ReasoningPartAssertion {
-                text: Regex::new(r"(?i)john").unwrap(),
-            })],
-        },
-        method: TestMethod::Stream,
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "stream_reasoning", options).await
 }
 
 pub async fn test_input_reasoning(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
-    let test_case = TestCase {
-        input: LanguageModelInput {
-            messages: vec![
-                Message::user(vec![Part::text("What is my secret number?")]),
-                Message::assistant(vec![
-                    Part::Reasoning(ReasoningPart {
-                        text: "Using my mind reading skill, I can deduce that your secret number \
-                               is 42. But let's ask user if the number if greater than 30 just to \
-                               be sure. If the user say yes, we are 100% sure it is 42 and can \
-                               answer without asking further question."
-                            .to_string(),
-                        ..Default::default()
-                    }),
-                    Part::text("Is the number greater than 30?"),
-                ]),
-                Message::user(vec![Part::text(
-                    "Yes, it is. Now use your reasoning and answer a number right now without \
-                     asking further!",
-                )]),
-            ],
-            ..Default::default()
-        },
-        output: OutputAssertion {
-            content: vec![PartAssertion::Text(TextPartAssertion {
-                text: Regex::new(r"42").unwrap(),
-            })],
-        },
-        method: TestMethod::Generate,
-    };
-    run_test_case(model, test_case, options).await
+    run_test_case(model, "input_reasoning", options).await
 }
 
 #[macro_export]

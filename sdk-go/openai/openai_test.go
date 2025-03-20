@@ -44,73 +44,71 @@ func TestMain(m *testing.M) {
 }
 
 func TestGenerateText(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateText)
+	testcommon.RunTestCase(t, model, "generate_text")
 }
 
 func TestStreamText(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamText)
+	testcommon.RunTestCase(t, model, "stream_text")
 }
 
 func TestGenerateWithSystemPrompt(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateWithSystemPrompt)
+	testcommon.RunTestCase(t, model, "generate_with_system_prompt")
 }
 
 func TestGenerateToolCall(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateToolCall)
+	testcommon.RunTestCase(t, model, "generate_tool_call")
 }
 
 func TestStreamToolCall(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamToolCall)
+	testcommon.RunTestCase(t, model, "stream_tool_call")
 }
 
 func TestGenerateTextWithToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateTextWithToolResult)
+	testcommon.RunTestCase(t, model, "generate_text_from_tool_result")
 }
 
 func TestStreamTextWithToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamTextWithToolResult)
+	testcommon.RunTestCase(t, model, "stream_text_from_tool_result")
 }
 
 func TestGenerateParallelToolCalls(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseGenerateParallelToolCalls)
+	testcommon.RunTestCase(t, model, "generate_parallel_tool_calls")
 }
 
 func TestStreamParallelToolCalls(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamParallelToolCalls)
+	testcommon.RunTestCase(t, model, "stream_parallel_tool_calls")
 }
 
 func TestStreamParallelToolCallsOfSameName(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseStreamParallelToolCallsOfSameName)
+	testcommon.RunTestCase(t, model, "stream_parallel_tool_calls_of_same_name")
 }
 
 func TestStructuredResponseFormat(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseStructuredResponseFormat)
+	testcommon.RunTestCase(t, model, "structured_response_format")
 }
 
 func TestSourcePartInput(t *testing.T) {
-	testcommon.RunTestCase(t, model, testcommon.TestCaseSourcePartInput)
+	testcommon.RunTestCase(t, model, "source_part_input")
 }
 
 func TestGenerateAudio(t *testing.T) {
 	t.Skip("audio not supported in responses api")
-	tc := testcommon.TestCaseGenerateAudio
-	testcommon.RunTestCase(t, model, tc)
+	testcommon.RunTestCase(t, model, "generate_audio")
 }
 
 func TestStreamAudio(t *testing.T) {
 	t.Skip("audio not supported in responses api")
-	tc := testcommon.TestCaseStreamAudio
-	testcommon.RunTestCase(t, model, tc)
+	testcommon.RunTestCase(t, model, "stream_audio")
 }
 
 func TestGenerateReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, testcommon.TestCaseGenerateReasoning)
+	testcommon.RunTestCase(t, reasoningModel, "generate_reasoning")
 }
 
 func TestStreamReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, testcommon.TestCaseStreamReasoning)
+	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
 }
 
 func TestInputReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, testcommon.TestCaseInputReasoning)
+	testcommon.RunTestCase(t, reasoningModel, "input_reasoning")
 }

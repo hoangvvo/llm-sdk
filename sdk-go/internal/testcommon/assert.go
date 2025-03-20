@@ -154,7 +154,7 @@ type OutputAssertion struct {
 func RunTests(t *testing.T, testCases []TestCase, model llmsdk.LanguageModel) {
 	for _, testCase := range testCases {
 		t.Run(fmt.Sprintf("%s / %s", model.Provider(), testCase.Name), func(t *testing.T) {
-			RunTestCase(t, model, testCase)
+			RunTestCase(t, model, testCase.Name)
 		})
 	}
 }

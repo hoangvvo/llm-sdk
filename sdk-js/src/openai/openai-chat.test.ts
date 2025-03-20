@@ -1,25 +1,6 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 
-import {
-  runTestCase,
-  TEST_CASE_GENERATE_AUDIO,
-  TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS,
-  TEST_CASE_GENERATE_REASONING,
-  TEST_CASE_GENERATE_TEXT,
-  TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT,
-  TEST_CASE_GENERATE_TOOL_CALL,
-  TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT,
-  TEST_CASE_INPUT_REASONING,
-  TEST_CASE_SOURCE_PART_INPUT,
-  TEST_CASE_STREAM_AUDIO,
-  TEST_CASE_STREAM_PARALLEL_TOOL_CALLS,
-  TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
-  TEST_CASE_STREAM_REASONING,
-  TEST_CASE_STREAM_TEXT,
-  TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT,
-  TEST_CASE_STREAM_TOOL_CALL,
-  TEST_CASE_STRUCTURED_RESPONSE_FORMAT,
-} from "#test-common/cases";
+import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
 import { OpenAIChatCompletionModel } from "./openai-chat.ts";
@@ -39,60 +20,64 @@ suite("OpenAIChatCompletionModel", () => {
     apiKey: process.env["OPENAI_API_KEY"],
   });
 
-  test(TEST_CASE_GENERATE_TEXT.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_GENERATE_TEXT);
+  test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TEXT);
   });
 
-  test(TEST_CASE_STREAM_TEXT.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_STREAM_TEXT);
+  test(TEST_CASE_NAMES.STREAM_TEXT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT);
   });
 
-  test(TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_GENERATE_WITH_SYSTEM_PROMPT);
+  test(TEST_CASE_NAMES.GENERATE_WITH_SYSTEM_PROMPT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_WITH_SYSTEM_PROMPT);
   });
 
-  test(TEST_CASE_GENERATE_TOOL_CALL.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_GENERATE_TOOL_CALL);
+  test(TEST_CASE_NAMES.GENERATE_TOOL_CALL, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TOOL_CALL);
   });
 
-  test(TEST_CASE_STREAM_TOOL_CALL.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_STREAM_TOOL_CALL);
+  test(TEST_CASE_NAMES.STREAM_TOOL_CALL, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TOOL_CALL);
   });
 
-  test(TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_GENERATE_TEXT_FROM_TOOL_RESULT);
-  });
-
-  test(TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_STREAM_TEXT_FROM_TOOL_RESULT);
-  });
-
-  test(TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_GENERATE_PARALLEL_TOOL_CALLS);
-  });
-
-  test(TEST_CASE_STREAM_PARALLEL_TOOL_CALLS.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_STREAM_PARALLEL_TOOL_CALLS);
-  });
-
-  test(TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME.name, (t) => {
+  test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT, (t) => {
     return runTestCase(
       t,
       model,
-      TEST_CASE_STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+      TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT,
     );
   });
 
-  test(TEST_CASE_STRUCTURED_RESPONSE_FORMAT.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_STRUCTURED_RESPONSE_FORMAT);
+  test(TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT);
   });
 
-  test(TEST_CASE_SOURCE_PART_INPUT.name, (t) => {
-    return runTestCase(t, model, TEST_CASE_SOURCE_PART_INPUT);
+  test(TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS);
   });
 
-  test(TEST_CASE_GENERATE_AUDIO.name, (t) => {
-    return runTestCase(t, audioModel, TEST_CASE_GENERATE_AUDIO, {
+  test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME, (t) => {
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+    );
+  });
+
+  test(TEST_CASE_NAMES.STRUCTURED_RESPONSE_FORMAT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STRUCTURED_RESPONSE_FORMAT);
+  });
+
+  test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
+    return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
       additionalInputs: {
         extra: {
           audio: {
@@ -104,8 +89,8 @@ suite("OpenAIChatCompletionModel", () => {
     });
   });
 
-  test(TEST_CASE_STREAM_AUDIO.name, (t) => {
-    return runTestCase(t, audioModel, TEST_CASE_STREAM_AUDIO, {
+  test(TEST_CASE_NAMES.STREAM_AUDIO, (t) => {
+    return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
       additionalInputs: {
         extra: {
           audio: {
@@ -118,26 +103,26 @@ suite("OpenAIChatCompletionModel", () => {
   });
 
   test(
-    TEST_CASE_GENERATE_REASONING.name,
+    TEST_CASE_NAMES.GENERATE_REASONING,
     { skip: "chat completion does not support reasoning" },
     (t) => {
-      return runTestCase(t, model, TEST_CASE_GENERATE_REASONING);
+      return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_REASONING);
     },
   );
 
   test(
-    TEST_CASE_STREAM_REASONING.name,
+    TEST_CASE_NAMES.STREAM_REASONING,
     { skip: "chat completion does not support reasoning" },
     (t) => {
-      return runTestCase(t, model, TEST_CASE_STREAM_REASONING);
+      return runTestCase(t, model, TEST_CASE_NAMES.STREAM_REASONING);
     },
   );
 
   test(
-    TEST_CASE_INPUT_REASONING.name,
+    TEST_CASE_NAMES.INPUT_REASONING,
     { skip: "chat completion does not support reasoning" },
     (t) => {
-      return runTestCase(t, model, TEST_CASE_INPUT_REASONING);
+      return runTestCase(t, model, TEST_CASE_NAMES.INPUT_REASONING);
     },
   );
 });

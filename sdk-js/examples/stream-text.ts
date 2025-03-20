@@ -1,4 +1,4 @@
-import { StreamAccumulator } from "../src/accumulator.ts";
+import { StreamAccumulator } from "@hoangvvo/llm-sdk";
 import { getModel } from "./get-model.ts";
 
 const model = getModel("openai", "gpt-4o");

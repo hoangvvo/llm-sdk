@@ -2,10 +2,15 @@ package testcommon
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
 	"testing"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
 // TestCase represents a complete test case
@@ -17,9 +22,147 @@ type TestCase struct {
 	AdditionalInput func(*llmsdk.LanguageModelInput)
 }
 
-// RunTestCase executes a single test case
-func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCase TestCase) {
+// TestDataJSON represents the structure of the JSON test data
+type TestDataJSON struct {
+	Tools     []llmsdk.Tool  `json:"tools"`
+	TestCases []TestCaseJSON `json:"test_cases"`
+}
+
+// TestCaseJSON represents a test case in JSON format
+type TestCaseJSON struct {
+	Name       string                    `json:"name"`
+	Type       string                    `json:"type"`
+	Input      llmsdk.LanguageModelInput `json:"input"`
+	InputTools []string                  `json:"input_tools,omitempty"`
+	Output     map[string]interface{}    `json:"output"`
+}
+
+var (
+	testData  *TestDataJSON
+	toolsMap  map[string]llmsdk.Tool
+	testCases map[string]TestCase
+	initOnce  sync.Once
+)
+
+func ensureInitialized() {
+	initOnce.Do(func() {
+		// Load test data from JSON
+		_, filename, _, _ := runtime.Caller(0)
+		dir := filepath.Dir(filename)
+		jsonPath := filepath.Join(dir, "..", "..", "..", "sdk-tests", "tests.json")
+
+		data, err := os.ReadFile(jsonPath)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to read test data: %v", err))
+		}
+
+		testData = &TestDataJSON{}
+		if err := json.Unmarshal(data, testData); err != nil {
+			panic(fmt.Sprintf("Failed to parse test data: %v", err))
+		}
+
+		// Build tools map
+		toolsMap = make(map[string]llmsdk.Tool)
+		for _, tool := range testData.Tools {
+			toolsMap[tool.Name] = tool
+		}
+
+		// Build test cases
+		testCases = make(map[string]TestCase)
+		for _, tc := range testData.TestCases {
+			testCase := convertJSONToTestCase(tc)
+			testCases[tc.Name] = testCase
+		}
+	})
+}
+
+func convertJSONToTestCase(tc TestCaseJSON) TestCase {
+	// Input is already a LanguageModelInput from JSON unmarshaling
+	input := tc.Input
+
+	// Handle tools
+	if len(tc.InputTools) > 0 {
+		input.Tools = []llmsdk.Tool{}
+		for _, toolName := range tc.InputTools {
+			if tool, exists := toolsMap[toolName]; exists {
+				input.Tools = append(input.Tools, tool)
+			}
+		}
+	}
+
+	// Convert output
+	output := OutputAssertion{}
+	if content, ok := tc.Output["content"].([]interface{}); ok {
+		output.Content = convertOutputAssertions(content)
+	}
+
+	// Determine method
+	method := Generate
+	if tc.Type == "stream" {
+		method = Stream
+	}
+
+	return TestCase{
+		Name:   tc.Name,
+		Input:  input,
+		Method: method,
+		Output: output,
+	}
+}
+
+func convertOutputAssertions(content []interface{}) []PartAssertion {
+	assertions := []PartAssertion{}
+
+	for _, part := range content {
+		partMap := part.(map[string]interface{})
+		partType := partMap["type"].(string)
+
+		switch partType {
+		case "text":
+			text := partMap["text"].(string)
+			// Always treat as regex
+			assertions = append(assertions, NewTextAssertion(text))
+		case "tool_call":
+			args := make(map[string]string)
+			if argsMap, ok := partMap["args"].(map[string]interface{}); ok {
+				for k, v := range argsMap {
+					args[k] = fmt.Sprintf("%v", v)
+				}
+			}
+			assertions = append(assertions, NewToolCallAssertion(
+				partMap["tool_name"].(string),
+				args,
+			))
+		case "audio":
+			var transcript string
+			if t, ok := partMap["transcript"].(string); ok {
+				transcript = t
+			}
+			assertions = append(assertions, NewAudioAssertion(
+				partMap["audio_id"].(bool),
+				transcript,
+			))
+		case "reasoning":
+			assertions = append(assertions, NewReasoningAssertion(partMap["text"].(string)))
+		}
+	}
+
+	return assertions
+}
+
+// RunTestCase executes a single test case by name
+func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCaseName string, opts ...TestCaseOption) {
 	t.Helper()
+
+	ensureInitialized()
+	testCase, exists := testCases[testCaseName]
+	if !exists {
+		t.Fatalf("Test case %q not found", testCaseName)
+	}
+
+	for _, opt := range opts {
+		opt(&testCase)
+	}
 
 	ctx := context.Background()
 
@@ -61,426 +204,22 @@ func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCase TestCase) {
 	}
 }
 
+type TestCaseOption func(*TestCase)
+
+func WithAdditionalInput(f func(*llmsdk.LanguageModelInput)) TestCaseOption {
+	return func(tc *TestCase) {
+		tc.AdditionalInput = f
+	}
+}
+
 // GetWeatherTool returns the standard weather tool for testing
 func GetWeatherTool() llmsdk.Tool {
-	return llmsdk.Tool{
-		Name:        "get_weather",
-		Description: "Get the weather",
-		Parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"location": map[string]any{"type": "string"},
-				"unit":     map[string]any{"type": []string{"string", "null"}, "enum": []string{"c", "f"}},
-			},
-			"required":             []string{"location", "unit"},
-			"additionalProperties": false,
-		},
-	}
+	ensureInitialized()
+	return toolsMap["get_weather"]
 }
 
 // GetStockPriceTool returns the standard stock price tool for testing
 func GetStockPriceTool() llmsdk.Tool {
-	return llmsdk.Tool{
-		Name:        "get_stock_price",
-		Description: "Get the stock price",
-		Parameters: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"symbol": map[string]any{"type": "string"},
-			},
-			"required":             []string{"symbol"},
-			"additionalProperties": false,
-		},
-	}
-}
-
-var TestCaseGenerateText = TestCase{
-	Name: "generate text",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart(`Respond by saying "Hello"`),
-			),
-		},
-	},
-	Method: Generate,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewTextAssertion("Hello"),
-		},
-	},
-}
-
-var TestCaseStreamText = TestCase{
-	Name: "stream text",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart(`Respond by saying "Hello"`),
-			),
-		},
-	},
-	Method: Stream,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewTextAssertion("Hello"),
-		},
-	},
-}
-
-var TestCaseGenerateWithSystemPrompt = TestCase{
-	Name: "generate with system prompt",
-	Input: llmsdk.LanguageModelInput{
-		SystemPrompt: ptr.To(`You must always start your message with "🤖"`),
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Hello"),
-			),
-		},
-	},
-	Method: Generate,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewTextAssertion("^🤖"),
-		},
-	},
-}
-
-var TestCaseGenerateToolCall = TestCase{
-	Name: "generate tool call",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What's the weather like in Boston today?"),
-			),
-		},
-		Tools: []llmsdk.Tool{GetWeatherTool()},
-	},
-	Method: Generate,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewToolCallAssertion("get_weather", map[string]string{
-				"location": "Boston",
-			}),
-		},
-	},
-}
-
-var TestCaseStreamToolCall = TestCase{
-	Name: "stream tool call",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What's the weather like in Boston today?"),
-			),
-		},
-		Tools: []llmsdk.Tool{GetWeatherTool()},
-	},
-	Method: Stream,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewToolCallAssertion("get_weather", map[string]string{
-				"location": "Boston",
-			}),
-		},
-	},
-}
-
-var TestCaseGenerateTextWithToolResult = TestCase{
-	Name: "generate text with tool result",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What's the weather like in Boston today?"),
-			),
-			llmsdk.NewAssistantMessage(
-				llmsdk.NewToolCallPart("0mbnj08nt", "get_weather", map[string]any{
-					"location": "Boston",
-				}),
-			),
-			llmsdk.NewToolMessage(
-				llmsdk.NewToolResultPart("0mbnj08nt", "get_weather", []llmsdk.Part{
-					llmsdk.NewTextPart(`{"temperature": 70, "unit": "f", "description": "Sunny"}`),
-				}, false),
-			),
-		},
-		Tools: []llmsdk.Tool{GetWeatherTool()},
-	},
-	Method: Generate,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewTextAssertion("(?i)70.*sunny|sunny.*70"),
-		},
-	},
-}
-
-var TestCaseStreamTextWithToolResult = TestCase{
-	Name: "stream text from tool result",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What's the weather like in Boston today?"),
-			),
-			llmsdk.NewAssistantMessage(
-				llmsdk.NewToolCallPart("0mbnj08nt", "get_weather", map[string]any{
-					"location": "Boston",
-				}),
-			),
-			llmsdk.NewToolMessage(
-				llmsdk.NewToolResultPart("0mbnj08nt", "get_weather", []llmsdk.Part{
-					llmsdk.NewTextPart(`{"temperature": 70, "unit": "f", "description": "Sunny"}`),
-				}, false),
-			),
-		},
-		Tools: []llmsdk.Tool{GetWeatherTool()},
-	},
-	Method: Stream,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewTextAssertion("(?i)70.*sunny|sunny.*70"),
-		},
-	},
-}
-
-var TestCaseGenerateParallelToolCalls = TestCase{
-	Name: "generate parallel tool calls",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Get me the weather in Boston and the stock price of AAPL."),
-			),
-		},
-		Tools: []llmsdk.Tool{GetWeatherTool(), GetStockPriceTool()},
-	},
-	Method: Generate,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewToolCallAssertion("get_weather", map[string]string{
-				"location": "Boston",
-			}),
-			NewToolCallAssertion("get_stock_price", map[string]string{
-				"symbol": "AAPL",
-			}),
-		},
-	},
-}
-
-var TestCaseStreamParallelToolCalls = TestCase{
-	Name: "stream parallel tool calls",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Get me the weather in Boston and the stock price of AAPL. You must do both of them in one go."),
-			),
-		},
-		Tools: []llmsdk.Tool{GetWeatherTool(), GetStockPriceTool()},
-	},
-	Method: Stream,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewToolCallAssertion("get_weather", map[string]string{
-				"location": "Boston",
-			}),
-			NewToolCallAssertion("get_stock_price", map[string]string{
-				"symbol": "AAPL",
-			}),
-		},
-	},
-}
-
-var TestCaseStreamParallelToolCallsOfSameName = TestCase{
-	Name: "stream parallel tool calls of same name",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Get me the weather in Boston and the weather in New York."),
-			),
-		},
-		Tools: []llmsdk.Tool{GetWeatherTool()},
-	},
-	Method: Stream,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewToolCallAssertion("get_weather", map[string]string{
-				"location": "Boston",
-			}),
-			NewToolCallAssertion("get_weather", map[string]string{
-				"location": "New York",
-			}),
-		},
-	},
-}
-
-var TestCaseStructuredResponseFormat = TestCase{
-	Name: "structured response format",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart(`Create a user with the id "a1b2c3", name "John Doe", email "john.doe@example.com", birthDate "1990-05-15", age 34, isActive true, role "user", accountBalance 500.75, phoneNumber "+1234567890123", tags ["developer", "gamer"], and lastLogin "2024-11-09T10:30:00Z".`),
-			),
-		},
-		ResponseFormat: &llmsdk.ResponseFormatOption{
-			JSON: &llmsdk.ResponseFormatJSON{
-				Name: "user",
-				Schema: &llmsdk.JSONSchema{
-					"type": "object",
-					"properties": map[string]any{
-						"id":             map[string]any{"type": "string"},
-						"name":           map[string]any{"type": "string"},
-						"email":          map[string]any{"type": "string"},
-						"birthDate":      map[string]any{"type": "string"},
-						"age":            map[string]any{"type": "integer"},
-						"isActive":       map[string]any{"type": "boolean"},
-						"role":           map[string]any{"type": "string"},
-						"accountBalance": map[string]any{"type": "number"},
-						"phoneNumber":    map[string]any{"type": "string"},
-						"tags":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-						"lastLogin":      map[string]any{"type": "string"},
-					},
-					"required": []string{
-						"id", "name", "email", "birthDate", "age", "isActive",
-						"role", "accountBalance", "phoneNumber", "tags", "lastLogin",
-					},
-					"additionalProperties": false,
-				},
-			},
-		},
-	},
-	Method: Generate,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewTextAssertion(`"id"\s*:\s*"a1b2c3"`),
-			NewTextAssertion(`"name"\s*:\s*"John Doe"`),
-			NewTextAssertion(`"email"\s*:\s*"john\.doe@example\.com"`),
-		},
-	},
-}
-
-var TestCaseSourcePartInput = TestCase{
-	Name: "source part in content",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What is my first secret number?"),
-			),
-			llmsdk.NewAssistantMessage(
-				llmsdk.NewToolCallPart("0mbnj08nt", "get_first_secret_number", map[string]any{}),
-			),
-			llmsdk.NewToolMessage(
-				llmsdk.NewToolResultPart("0mbnj08nt", "get_first_secret_number", []llmsdk.Part{
-					llmsdk.NewTextPart(`{"number": 24}`),
-				}, false),
-			),
-			llmsdk.NewAssistantMessage(
-				llmsdk.NewTextPart("Got it!"),
-			),
-			llmsdk.NewUserMessage(
-				llmsdk.NewSourcePart("my secret number", []llmsdk.Part{
-					llmsdk.NewTextPart("Remember that my second secret number is \"42\"."),
-				}),
-				llmsdk.NewTextPart(" What are my two secret numbers?"),
-			),
-		},
-	},
-	Method: Generate,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewTextAssertion("24"),
-			NewTextAssertion("42"),
-		},
-	},
-}
-
-var TestCaseGenerateAudio = TestCase{
-	Name: "generate audio",
-	Input: llmsdk.LanguageModelInput{
-		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Respond by saying 'Hello'"),
-			),
-		},
-	},
-	Method: Generate,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewAudioAssertion(true, "Hello"),
-		},
-	},
-}
-
-var TestCaseStreamAudio = TestCase{
-	Name: "stream audio",
-	Input: llmsdk.LanguageModelInput{
-		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Respond by saying 'Hello'"),
-			),
-		},
-	},
-	Method: Stream,
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewAudioAssertion(true, "Hello"),
-		},
-	},
-}
-
-var TestCaseGenerateReasoning = TestCase{
-	Name: "generate reasoning",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering."),
-			),
-		},
-	},
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewReasoningAssertion("John"),
-		},
-	},
-	Method: Generate,
-}
-
-var TestCaseStreamReasoning = TestCase{
-	Name: "generate reasoning",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering."),
-			),
-		},
-	},
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewReasoningAssertion("John"),
-		},
-	},
-	Method: Stream,
-}
-
-var TestCaseInputReasoning = TestCase{
-	Name: "input reasoning",
-	Input: llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("What is my secret number?"),
-			),
-			llmsdk.NewAssistantMessage(
-				llmsdk.NewReasoningPart("Using my mind reading skill, I can deduce that your secret number is 42. But let's ask user if the number if greater than 30 just to be sure. If the user say yes, we are 100% sure it is 42 and can answer without asking further question."),
-				llmsdk.NewTextPart("Is the number greater than 30?"),
-			),
-			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Yes, it is. Now use your reasoning and answer a number right now without asking further!"),
-			),
-		},
-	},
-	Output: OutputAssertion{
-		Content: []PartAssertion{
-			NewTextAssertion("42"),
-		},
-	},
-	Method: Stream,
+	ensureInitialized()
+	return toolsMap["get_stock_price"]
 }
