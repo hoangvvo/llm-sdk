@@ -1,7 +1,7 @@
 use crate::{
     client_utils,
     language_model::{LanguageModelMetadata, LanguageModelStream},
-    openai::{chat_api as openai_api, OpenAIModelOptions},
+    openai::chat_api as openai_api,
     source_part_utils, stream_utils,
     usage_utils::calculate_cost,
     AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ImagePart,
@@ -27,18 +27,27 @@ pub struct OpenAIChatModel {
     metadata: Option<LanguageModelMetadata>,
 }
 
+#[derive(Clone, Default)]
+pub struct OpenAIChatModelOptions {
+    pub base_url: Option<String>,
+    pub api_key: String,
+}
+
 impl OpenAIChatModel {
     #[must_use]
-    pub fn new(options: OpenAIModelOptions) -> Self {
+    pub fn new(model_id: String, options: OpenAIChatModelOptions) -> Self {
         let client = Client::new();
 
-        let model_id = options.model_id;
         let api_key = options.api_key;
+
+        let base_url = options
+            .base_url
+            .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
 
         Self {
             model_id,
             api_key,
-            base_url: "https://api.openai.com/v1".to_string(),
+            base_url,
             client,
             metadata: None,
         }

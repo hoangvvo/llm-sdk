@@ -11,6 +11,7 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/randutil"
 )
@@ -24,14 +25,20 @@ type OpenAIModel struct {
 	metadata *llmsdk.LanguageModelMetadata
 }
 
-func NewOpenAIModel(options OpenAIModelOptions) *OpenAIModel {
+// OpenAIModelOptions represents configuration options for OpenAI model
+type OpenAIModelOptions struct {
+	BaseURL string
+	APIKey  string
+}
+
+func NewOpenAIModel(modelID string, options OpenAIModelOptions) *OpenAIModel {
 	baseURL := options.BaseURL
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}
 
 	return &OpenAIModel{
-		modelID: options.ModelID,
+		modelID: modelID,
 		apiKey:  options.APIKey,
 		baseURL: baseURL,
 		client:  &http.Client{},
@@ -78,7 +85,7 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 
 	params.Stream = ptr.To(false)
 
-	response, err := clientutils.DoJSON[Response](ctx, m.client, clientutils.JSONRequestConfig{
+	response, err := clientutils.DoJSON[openaiapi.Response](ctx, m.client, clientutils.JSONRequestConfig{
 		URL:  fmt.Sprintf("%s/responses", m.baseURL),
 		Body: params,
 		Headers: map[string]string{
@@ -121,7 +128,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 	}
 	params.Stream = ptr.To(true)
 
-	sseStream, err := clientutils.DoSSE[ResponseStreamEvent](ctx, m.client, clientutils.SSERequestConfig{
+	sseStream, err := clientutils.DoSSE[openaiapi.ResponseStreamEvent](ctx, m.client, clientutils.SSERequestConfig{
 		URL:  fmt.Sprintf("%s/responses", m.baseURL),
 		Body: params,
 		Headers: map[string]string{
@@ -154,7 +161,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 		refusal := ""
 
 		for sseStream.Next() {
-			var streamEvent *ResponseStreamEvent
+			var streamEvent *openaiapi.ResponseStreamEvent
 			streamEvent, err = sseStream.Current()
 			if err != nil {
 				errCh <- fmt.Errorf("failed to get sse event: %w", err)
@@ -211,13 +218,13 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 
 // MARK: - Convert To OpenAI API Types
 
-func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID string) (*ResponseCreateParams, error) {
+func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID string) (*openaiapi.ResponseCreateParams, error) {
 	inputItems, err := convertToOpenAIInputs(input.Messages)
 	if err != nil {
 		return nil, err
 	}
 
-	params := &ResponseCreateParams{
+	params := &openaiapi.ResponseCreateParams{
 		Store:           ptr.To(false),
 		Model:           ptr.To(modelID),
 		Instructions:    input.SystemPrompt,
@@ -225,17 +232,17 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 		Temperature:     input.Temperature,
 		TopP:            input.TopP,
 		MaxOutputTokens: input.MaxTokens,
-		Reasoning: &Reasoning{
+		Reasoning: &openaiapi.Reasoning{
 			Summary: ptr.To("auto"),
 		},
 		Extra: input.Extra,
 	}
 
 	if input.Tools != nil {
-		var tools []Tool
+		var tools []openaiapi.Tool
 		for _, tool := range input.Tools {
-			openAITool := Tool{
-				FunctionTool: &FunctionTool{
+			openAITool := openaiapi.Tool{
+				FunctionTool: &openaiapi.FunctionTool{
 					Name:        tool.Name,
 					Description: &tool.Description,
 					Parameters:  tool.Parameters,
@@ -257,8 +264,8 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 
 	if input.Modalities != nil {
 		if slices.Contains(input.Modalities, llmsdk.ModalityImage) {
-			params.Tools = append(params.Tools, Tool{
-				ToolImageGeneration: &ToolImageGeneration{},
+			params.Tools = append(params.Tools, openaiapi.Tool{
+				ToolImageGeneration: &openaiapi.ToolImageGeneration{},
 			})
 		}
 	}
@@ -268,8 +275,8 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 
 // MARK: - To Provider Messages
 
-func convertToOpenAIInputs(messages []llmsdk.Message) ([]ResponseInputItem, error) {
-	var inputItems []ResponseInputItem
+func convertToOpenAIInputs(messages []llmsdk.Message) ([]openaiapi.ResponseInputItem, error) {
+	var inputItems []openaiapi.ResponseInputItem
 
 	for _, message := range messages {
 		switch {
@@ -299,35 +306,35 @@ func convertToOpenAIInputs(messages []llmsdk.Message) ([]ResponseInputItem, erro
 	return inputItems, nil
 }
 
-func convertUserMessageToOpenAIInputItem(userMessage *llmsdk.UserMessage) (ResponseInputItem, error) {
+func convertUserMessageToOpenAIInputItem(userMessage *llmsdk.UserMessage) (openaiapi.ResponseInputItem, error) {
 	messageParts := llmsdk.GetCompatiblePartsWithoutSourceParts(userMessage.Content)
-	var content []ResponseInputContent
+	var content []openaiapi.ResponseInputContent
 
 	for _, part := range messageParts {
 		inputContent, err := convertToOpenAIResponseInputContent(part)
 		if err != nil {
-			return ResponseInputItem{}, err
+			return openaiapi.ResponseInputItem{}, err
 		}
 		content = append(content, *inputContent)
 	}
 
-	return ResponseInputItem{
-		ResponseInputItemMessage: &ResponseInputItemMessage{
+	return openaiapi.ResponseInputItem{
+		ResponseInputItemMessage: &openaiapi.ResponseInputItemMessage{
 			Role:    "user",
-			Content: ResponseInputMessageContentList(content),
+			Content: openaiapi.ResponseInputMessageContentList(content),
 		},
 	}, nil
 }
 
-func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.AssistantMessage) ([]ResponseInputItem, error) {
+func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.AssistantMessage) ([]openaiapi.ResponseInputItem, error) {
 	messageParts := llmsdk.GetCompatiblePartsWithoutSourceParts(assistantMessage.Content)
-	var inputItems []ResponseInputItem
+	var inputItems []openaiapi.ResponseInputItem
 
 	for _, part := range messageParts {
 		switch {
 		case part.TextPart != nil:
-			inputItems = append(inputItems, ResponseInputItem{
-				ResponseOutputMessage: &ResponseOutputMessage{
+			inputItems = append(inputItems, openaiapi.ResponseInputItem{
+				ResponseOutputMessage: &openaiapi.ResponseOutputMessage{
 					// Response output item requires an ID.
 					// This usually applies if we enable OpenAI "store".
 					// or that we propogate the message ID in output.
@@ -336,36 +343,36 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 					ID:     fmt.Sprintf("msg_%s", randutil.String(15)),
 					Role:   "assistant",
 					Status: "completed",
-					Content: []ResponseOutputContent{{
-						ResponseOutputText: &ResponseOutputText{
+					Content: []openaiapi.ResponseOutputContent{{
+						ResponseOutputText: &openaiapi.ResponseOutputText{
 							Text:        part.TextPart.Text,
-							Annotations: []ResponseOutputTextAnnotation{},
+							Annotations: []openaiapi.ResponseOutputTextAnnotation{},
 						},
 					}},
 				},
 			})
 
 		case part.ReasoningPart != nil:
-			inputItems = append(inputItems, ResponseInputItem{
-				ResponseReasoningItem: &ResponseReasoningItem{
+			inputItems = append(inputItems, openaiapi.ResponseInputItem{
+				ResponseReasoningItem: &openaiapi.ResponseReasoningItem{
 					// Similar to assistant message parts, we generate a unique ID for each reasoning part.
 					ID: fmt.Sprintf("rs_%s", randutil.String(15)),
-					Summary: []ResponseReasoningItemSummaryUnion{
+					Summary: []openaiapi.ResponseReasoningItemSummaryUnion{
 						{
-							ResponseReasoningItemSummary: &ResponseReasoningItemSummary{
+							ResponseReasoningItemSummary: &openaiapi.ResponseReasoningItemSummary{
 								Text: part.ReasoningPart.Text,
 							},
 						},
 					},
 					// ReasoningInputItem can not have content
-					Content:          []ResponseReasoningItemContentUnion{},
+					Content:          []openaiapi.ResponseReasoningItemContentUnion{},
 					EncryptedContent: part.ReasoningPart.Signature,
 				},
 			})
 
 		case part.ImagePart != nil:
-			inputItems = append(inputItems, ResponseInputItem{
-				ResponseOutputItemImageGenerationCall: &ResponseOutputItemImageGenerationCall{
+			inputItems = append(inputItems, openaiapi.ResponseInputItem{
+				ResponseOutputItemImageGenerationCall: &openaiapi.ResponseOutputItemImageGenerationCall{
 					ID:     fmt.Sprintf("ig_%s", randutil.String(15)),
 					Status: "completed",
 					Result: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.ImageData)),
@@ -374,8 +381,8 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 
 		case part.ToolCallPart != nil:
 			args, _ := json.Marshal(part.ToolCallPart.Args)
-			inputItems = append(inputItems, ResponseInputItem{
-				ResponseFunctionToolCall: &ResponseFunctionToolCall{
+			inputItems = append(inputItems, openaiapi.ResponseInputItem{
+				ResponseFunctionToolCall: &openaiapi.ResponseFunctionToolCall{
 					Arguments: string(args),
 					CallID:    part.ToolCallPart.ToolCallID,
 					Name:      part.ToolCallPart.ToolName,
@@ -390,8 +397,8 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 	return inputItems, nil
 }
 
-func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]ResponseInputItem, error) {
-	var inputItems []ResponseInputItem
+func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]openaiapi.ResponseInputItem, error) {
+	var inputItems []openaiapi.ResponseInputItem
 	for _, part := range toolMessage.Content {
 		if part.ToolResultPart == nil {
 			return nil, fmt.Errorf("tool messages must contain only tool result parts")
@@ -401,8 +408,8 @@ func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]Re
 		for _, toolResultPart := range toolResultPartContent {
 			switch {
 			case toolResultPart.TextPart != nil:
-				inputItems = append(inputItems, ResponseInputItem{
-					ResponseInputItemFunctionCallOutput: &ResponseInputItemFunctionCallOutput{
+				inputItems = append(inputItems, openaiapi.ResponseInputItem{
+					ResponseInputItemFunctionCallOutput: &openaiapi.ResponseInputItemFunctionCallOutput{
 						CallID: part.ToolResultPart.ToolCallID,
 						Output: toolResultPart.TextPart.Text,
 					},
@@ -415,18 +422,18 @@ func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]Re
 	return inputItems, nil
 }
 
-func convertToOpenAIResponseInputContent(part llmsdk.Part) (*ResponseInputContent, error) {
+func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.ResponseInputContent, error) {
 	switch {
 	case part.TextPart != nil:
-		return &ResponseInputContent{
-			ResponseInputText: &ResponseInputText{
+		return &openaiapi.ResponseInputContent{
+			ResponseInputText: &openaiapi.ResponseInputText{
 				Text: part.TextPart.Text,
 			},
 		}, nil
 
 	case part.ImagePart != nil:
-		return &ResponseInputContent{
-			ResponseInputImage: &ResponseInputImage{
+		return &openaiapi.ResponseInputContent{
+			ResponseInputImage: &openaiapi.ResponseInputImage{
 				Detail:   "auto",
 				ImageURL: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.ImageData)),
 			},
@@ -443,9 +450,9 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*ResponseInputConten
 			return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert audio format to OpenAI InputAudio format for format %s", part.AudioPart.Format))
 		}
 
-		return &ResponseInputContent{
-			ResponseInputAudio: &ResponseInputAudio{
-				InputAudio: ResponseInputAudioInputAudio{
+		return &openaiapi.ResponseInputContent{
+			ResponseInputAudio: &openaiapi.ResponseInputAudio{
+				InputAudio: openaiapi.ResponseInputAudioInputAudio{
 					Data:   part.AudioPart.AudioData,
 					Format: format,
 				},
@@ -480,20 +487,20 @@ func convertToOpenAIResponseToolChoice(toolChoice llmsdk.ToolChoiceOption) any {
 
 // MARK: - To Provider Response Format
 
-func convertToOpenAIResponseTextConfig(responseFormat llmsdk.ResponseFormatOption) *ResponseTextConfig {
+func convertToOpenAIResponseTextConfig(responseFormat llmsdk.ResponseFormatOption) *openaiapi.ResponseTextConfig {
 	if responseFormat.Text != nil {
-		return &ResponseTextConfig{
-			Format: &ResponseFormatTextConfig{
-				ResponseFormatText: &ResponseFormatText{},
+		return &openaiapi.ResponseTextConfig{
+			Format: &openaiapi.ResponseFormatTextConfig{
+				ResponseFormatText: &openaiapi.ResponseFormatText{},
 			},
 		}
 	}
 
 	if responseFormat.JSON != nil {
 		if responseFormat.JSON.Schema != nil {
-			return &ResponseTextConfig{
-				Format: &ResponseFormatTextConfig{
-					ResponseFormatTextJSONSchemaConfig: &ResponseFormatTextJSONSchemaConfig{
+			return &openaiapi.ResponseTextConfig{
+				Format: &openaiapi.ResponseFormatTextConfig{
+					ResponseFormatTextJSONSchemaConfig: &openaiapi.ResponseFormatTextJSONSchemaConfig{
 						Name:        responseFormat.JSON.Name,
 						Schema:      *responseFormat.JSON.Schema,
 						Description: responseFormat.JSON.Description,
@@ -502,9 +509,9 @@ func convertToOpenAIResponseTextConfig(responseFormat llmsdk.ResponseFormatOptio
 				},
 			}
 		}
-		return &ResponseTextConfig{
-			Format: &ResponseFormatTextConfig{
-				ResponseFormatJSONObject: &ResponseFormatJSONObject{},
+		return &openaiapi.ResponseTextConfig{
+			Format: &openaiapi.ResponseFormatTextConfig{
+				ResponseFormatJSONObject: &openaiapi.ResponseFormatJSONObject{},
 			},
 		}
 	}
@@ -513,7 +520,7 @@ func convertToOpenAIResponseTextConfig(responseFormat llmsdk.ResponseFormatOptio
 
 // MARK: - To SDK Message
 
-func mapOpenAIOutputItems(items []ResponseOutputItem) ([]llmsdk.Part, error) {
+func mapOpenAIOutputItems(items []openaiapi.ResponseOutputItem) ([]llmsdk.Part, error) {
 	var parts []llmsdk.Part
 
 	for _, item := range items {
@@ -582,7 +589,7 @@ func mapOpenAIOutputItems(items []ResponseOutputItem) ([]llmsdk.Part, error) {
 
 // MARK: - To SDK Delta
 
-func mapOpenAIStreamEvent(event ResponseStreamEvent) (*llmsdk.ContentDelta, error) {
+func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentDelta, error) {
 	switch {
 	case event.ResponseFailedEvent != nil:
 		// Handle failed response - convert to error
@@ -681,7 +688,7 @@ func mapOpenAIStreamEvent(event ResponseStreamEvent) (*llmsdk.ContentDelta, erro
 
 // MARK: - To SDK Usage
 
-func mapOpenAIUsage(usage ResponseUsage) *llmsdk.ModelUsage {
+func mapOpenAIUsage(usage openaiapi.ResponseUsage) *llmsdk.ModelUsage {
 	return &llmsdk.ModelUsage{
 		InputTokens:  usage.InputTokens,
 		OutputTokens: usage.OutputTokens,

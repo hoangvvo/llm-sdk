@@ -8,13 +8,15 @@ use crate::common::cases::RunTestCaseOptions;
 static OPENAI_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
     dotenvy::dotenv().ok();
 
-    OpenAIChatModel::new(OpenAIModelOptions {
-        model_id: "gpt-4o".to_string(),
-        api_key: env::var("OPENAI_API_KEY")
-            .expect("OPENAI_API_KEY must be set")
-            .to_string(),
-        ..Default::default()
-    })
+    OpenAIChatModel::new(
+        "gpt-4o".to_string(),
+        OpenAIChatModelOptions {
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY must be set")
+                .to_string(),
+            ..Default::default()
+        },
+    )
     .with_metadata(LanguageModelMetadata {
         capabilities: Some(vec![
             LanguageModelCapability::FunctionCalling,
@@ -28,13 +30,15 @@ static OPENAI_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
 static OPENAI_AUDIO_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
     dotenvy::dotenv().ok();
 
-    OpenAIChatModel::new(OpenAIModelOptions {
-        model_id: "gpt-4o-audio-preview".to_string(),
-        api_key: env::var("OPENAI_API_KEY")
-            .expect("OPENAI_API_KEY must be set")
-            .to_string(),
-        ..Default::default()
-    })
+    OpenAIChatModel::new(
+        "gpt-4o-audio-preview".to_string(),
+        OpenAIChatModelOptions {
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY must be set")
+                .to_string(),
+            ..Default::default()
+        },
+    )
     .with_metadata(LanguageModelMetadata {
         capabilities: Some(vec![
             LanguageModelCapability::AudioInput,

@@ -21,18 +21,16 @@ func GetModel(provider, modelID string) llmsdk.LanguageModel {
 		if apiKey == "" {
 			panic("OPENAI_API_KEY environment variable is required")
 		}
-		return openai.NewOpenAIModel(openai.OpenAIModelOptions{
-			APIKey:  apiKey,
-			ModelID: modelID,
+		return openai.NewOpenAIModel(modelID, openai.OpenAIModelOptions{
+			APIKey: apiKey,
 		})
 	case "openai-chat-completion":
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
 			panic("OPENAI_API_KEY environment variable is required")
 		}
-		return openai.NewOpenAIChatModel(openai.OpenAIModelOptions{
-			APIKey:  apiKey,
-			ModelID: modelID,
+		return openai.NewOpenAIChatModel(modelID, openai.OpenAIChatModelOptions{
+			APIKey: apiKey,
 		})
 	default:
 		panic(fmt.Sprintf("Unsupported provider: %s", provider))

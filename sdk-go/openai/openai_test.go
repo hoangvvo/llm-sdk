@@ -22,22 +22,18 @@ func TestMain(m *testing.M) {
 		panic("OPENAI_API_KEY must be set")
 	}
 
-	model = openai.NewOpenAIModel(openai.OpenAIModelOptions{
-		APIKey:  apiKey,
-		ModelID: "gpt-4o",
+	model = openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{
+		APIKey: apiKey,
 	})
-	reasoningModel = openai.NewOpenAIModel(openai.OpenAIModelOptions{
-		APIKey:  apiKey,
-		ModelID: "o1",
+	reasoningModel = openai.NewOpenAIModel("o1", openai.OpenAIModelOptions{
+		APIKey: apiKey,
 	})
 
-	chatModel = openai.NewOpenAIChatModel(openai.OpenAIModelOptions{
-		APIKey:  apiKey,
-		ModelID: "gpt-4o",
+	chatModel = openai.NewOpenAIChatModel("gpt-4o", openai.OpenAIChatModelOptions{
+		APIKey: apiKey,
 	})
-	audioChatModel = openai.NewOpenAIChatModel(openai.OpenAIModelOptions{
-		APIKey:  apiKey,
-		ModelID: "gpt-4o-audio-preview",
+	audioChatModel = openai.NewOpenAIChatModel("gpt-4o-audio-preview", openai.OpenAIChatModelOptions{
+		APIKey: apiKey,
 	})
 
 	m.Run()

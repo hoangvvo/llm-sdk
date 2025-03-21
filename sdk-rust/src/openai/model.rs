@@ -1,18 +1,15 @@
 use crate::{
     client_utils, id_utils,
-    openai::{
-        responses_api::{
-            self, FunctionTool, Reasoning, ResponseCreateParams, ResponseFormatJSONObject,
-            ResponseFormatText, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-            ResponseFunctionToolCall, ResponseInputAudio, ResponseInputAudioInputAudio,
-            ResponseInputContent, ResponseInputImage, ResponseInputItem,
-            ResponseInputItemFunctionCallOutput, ResponseInputItemMessage, ResponseInputText,
-            ResponseOutputContent, ResponseOutputItem, ResponseOutputItemImageGenerationCall,
-            ResponseOutputMessage, ResponseOutputText, ResponseReasoningItem,
-            ResponseReasoningItemSummary, ResponseReasoningItemSummaryUnion, ResponseStreamEvent,
-            ResponseTextConfig, ResponseUsage, ToolChoiceFunction, ToolImageGeneration,
-        },
-        OpenAIModelOptions,
+    openai::responses_api::{
+        self, FunctionTool, Reasoning, ResponseCreateParams, ResponseFormatJSONObject,
+        ResponseFormatText, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
+        ResponseFunctionToolCall, ResponseInputAudio, ResponseInputAudioInputAudio,
+        ResponseInputContent, ResponseInputImage, ResponseInputItem,
+        ResponseInputItemFunctionCallOutput, ResponseInputItemMessage, ResponseInputText,
+        ResponseOutputContent, ResponseOutputItem, ResponseOutputItemImageGenerationCall,
+        ResponseOutputMessage, ResponseOutputText, ResponseReasoningItem,
+        ResponseReasoningItemSummary, ResponseReasoningItemSummaryUnion, ResponseStreamEvent,
+        ResponseTextConfig, ResponseUsage, ToolChoiceFunction, ToolImageGeneration,
     },
     source_part_utils,
     usage_utils::calculate_cost,
@@ -36,18 +33,26 @@ pub struct OpenAIModel {
     metadata: Option<LanguageModelMetadata>,
 }
 
+#[derive(Clone, Default)]
+pub struct OpenAIModelOptions {
+    pub base_url: Option<String>,
+    pub api_key: String,
+}
+
 impl OpenAIModel {
     #[must_use]
-    pub fn new(options: OpenAIModelOptions) -> Self {
+    pub fn new(model_id: String, options: OpenAIModelOptions) -> Self {
         let client = Client::new();
 
-        let model_id = options.model_id;
+        let base_url = options
+            .base_url
+            .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
         let api_key = options.api_key;
 
         Self {
             model_id,
             api_key,
-            base_url: "https://api.openai.com/v1".to_string(),
+            base_url,
             client,
             metadata: None,
         }
