@@ -1,5 +1,8 @@
+import goAgentToolTypes from "../../../agent-go/tool.go?raw";
 import goAgentTypes from "../../../agent-go/types.go?raw";
+import jsAgentToolTypes from "../../../agent-js/src/tool.ts?raw";
 import jsAgentTypes from "../../../agent-js/src/types.ts?raw";
+import rustAgentToolTypes from "../../../agent-rust/src/tool.rs?raw";
 import rustAgentTypes from "../../../agent-rust/src/types.rs?raw";
 import goTypes from "../../../sdk-go/types.go?raw";
 import jsTypes from "../../../sdk-js/src/types.ts?raw";
@@ -23,3 +26,12 @@ export const extractRustAgentTypes = (typeNames: string[]) =>
 
 export const extractTypescriptAgentTypes = (typeNames: string[]) =>
   extractCombined(jsAgentTypes, typeNames, "ts");
+
+export const extractGoAgentToolTypes = (typeNames: string[]) =>
+  extractCombined(goAgentToolTypes, typeNames, "go");
+
+export const extractRustAgentToolTypes = (typeNames: string[]) =>
+  extractCombined(rustAgentToolTypes, typeNames, "rust");
+
+export const extractTypescriptAgentToolTypes = (typeNames: string[]) =>
+  extractCombined(jsAgentToolTypes, typeNames, "ts");

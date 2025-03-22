@@ -1,0 +1,36 @@
+---
+title: Overview
+---
+
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goAgentCode from "../../../../../agent-go/examples/agent/main.go?raw";
+import jsAgentCode from "../../../../../agent-js/examples/agent.ts?raw";
+import rustAgentCode from "../../../../../agent-rust/examples/agent.rs?raw";
+
+Agents enable the development of agentic AI applications that can generate responses and execute tasks autonomously. Agents utilize the LLM SDK to interact with different language models and allow definitions of instructions, tools, and other language model parameters.
+
+We provide Agent implementations in the following programming languages:
+
+- [JavaScript](https://github.com/hoangvvo/llm-sdk/tree/main/agent-js)
+- [Rust](https://github.com/hoangvvo/llm-sdk/tree/main/agent-rust)
+- [Go](https://github.com/hoangvvo/llm-sdk/tree/main/agent-go)
+
+Below is an example of how to implement an agent in each language:
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsAgentCode} lang="typescript" title="agent.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustAgentCode} lang="rust" title="agent.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goAgentCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Agent Patterns
+
+Unlike other agent frameworks, this library does not hardcode any hidden prompt templates or parsing logic. This design choice avoids unnecessary constraints, reduces complexity, and prevents the loss of control that comes with excessive abstraction (see this [blog post](https://hamel.dev/blog/posts/prompt/) for a deeper discussion).
+
+However, this prevents the library from implementing specific agent patterns, such as hand-off, memory, and others. The examples folder in each agent library contains implementations of various agent patterns to serve as references.

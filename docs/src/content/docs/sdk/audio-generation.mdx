@@ -43,10 +43,35 @@ Audio modality is represented as `AudioPart`s.
 
 To ensure the audio can be played correctly, the application code must consider the provided audio `format`, `sample_rate`, and `channels`.
 
+Depending on the provider, you may have to pass additional parameters to their API, such as `voice` or `format`, using the `audio` field.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["AudioOptions"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["AudioOptions"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["AudioOptions"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
 ## Generate audio
 
 To generate audio, specify `audio` in the input `modalities`.
-Depending on the provider, you may have to pass additional parameters to their API, such as `voice` or `format`, using the `audio` field.
 
 <Tabs>
   <TabItem label="TypeScript">
