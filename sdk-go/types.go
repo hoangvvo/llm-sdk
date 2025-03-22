@@ -505,7 +505,7 @@ type Modality string
 
 const (
 	ModalityText  Modality = "text"
-	ModalityImage Modality = "audio"
+	ModalityImage Modality = "image"
 	ModalityAudio Modality = "audio"
 )
 

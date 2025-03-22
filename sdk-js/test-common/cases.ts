@@ -147,7 +147,7 @@ export interface RunTestCaseOptions {
   /**
    * Extra parameters to pass to the model input.
    */
-  additionalInputs?: Partial<LanguageModelInput>;
+  additionalInputs?: (input: LanguageModelInput) => LanguageModelInput;
 }
 
 export async function runTestCase(
@@ -162,7 +162,9 @@ export async function runTestCase(
   }
 
   const { input, type, output } = testCase;
-  const modelInput = { ...input, ...options?.additionalInputs };
+  const modelInput = options?.additionalInputs
+    ? options.additionalInputs(input)
+    : input;
 
   if (type === "generate") {
     const result = await model.generate(modelInput);

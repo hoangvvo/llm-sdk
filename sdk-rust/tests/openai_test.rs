@@ -6,13 +6,15 @@ use tokio::test;
 static OPENAI_MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
     dotenvy::dotenv().ok();
 
-    OpenAIModel::new(OpenAIModelOptions {
-        model_id: "o1".to_string(),
-        api_key: env::var("OPENAI_API_KEY")
-            .expect("OPENAI_API_KEY must be set")
-            .to_string(),
-        ..Default::default()
-    })
+    OpenAIModel::new(
+        "o1".to_string(),
+        OpenAIModelOptions {
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY must be set")
+                .to_string(),
+            ..Default::default()
+        },
+    )
     .with_metadata(LanguageModelMetadata {
         capabilities: Some(vec![
             LanguageModelCapability::FunctionCalling,

@@ -78,27 +78,29 @@ suite("OpenAIChatCompletionModel", () => {
 
   test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
-      additionalInputs: {
+      additionalInputs: (input) => ({
+        ...input,
         extra: {
           audio: {
             voice: "alloy",
             format: "mp3",
           },
         },
-      },
+      }),
     });
   });
 
   test(TEST_CASE_NAMES.STREAM_AUDIO, (t) => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
-      additionalInputs: {
+      additionalInputs: (input) => ({
+        ...input,
         extra: {
           audio: {
             voice: "alloy",
             format: "pcm16",
           },
         },
-      },
+      }),
     });
   });
 

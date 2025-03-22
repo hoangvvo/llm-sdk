@@ -16,15 +16,16 @@ suite("AnthropicModel", () => {
     modelId: "claude-3-7-sonnet-20250219",
   });
 
-  const reasoningOptions: Partial<RunTestCaseOptions> = {
-    additionalInputs: {
+  const reasoningOptions: RunTestCaseOptions = {
+    additionalInputs: (input) => ({
+      ...input,
       extra: {
         thinking: {
           type: "enabled",
           budget_tokens: 3000,
         },
       },
-    },
+    }),
   };
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {

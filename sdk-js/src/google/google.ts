@@ -173,15 +173,15 @@ function convertToGenerateContentParameters(
       ...(tools && {
         tools: [{ functionDeclarations: tools.map(convertToGoogleTool) }],
       }),
-      ...(responseSchemaTuple && {
-        responseMimeType: responseSchemaTuple[0],
-        responseJsonSchema: responseSchemaTuple[1],
-      }),
       ...(tool_choice && {
         toolConfig: {
           functionCallingConfig:
             convertToGoogleFunctionCallingConfig(tool_choice),
         },
+      }),
+      ...(responseSchemaTuple && {
+        responseMimeType: responseSchemaTuple[0],
+        responseJsonSchema: responseSchemaTuple[1],
       }),
       ...(modalities && {
         responseModalities: modalities.map(convertToGoogleModality),
@@ -198,21 +198,22 @@ function convertToGenerateContentParameters(
 
 function convertToGoogleContents(messages: Message[]): Content[] {
   return messages.map((message): Content => {
+    const parts = message.content.map(convertToGoogleParts).flat();
     switch (message.role) {
       case "user":
         return {
           role: "user",
-          parts: message.content.map(convertToGoogleParts).flat(),
+          parts,
         };
       case "assistant":
         return {
           role: "model",
-          parts: message.content.map(convertToGoogleParts).flat(),
+          parts,
         };
       case "tool":
         return {
           role: "user",
-          parts: message.content.map(convertToGoogleParts).flat(),
+          parts,
         };
     }
   });

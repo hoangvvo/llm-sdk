@@ -139,3 +139,5 @@ packages/**/package-lock.json
 target/
 
 **/examples/**/*.{png,jpg,jpeg,gif,pcm,wav,mp3}
+
+secret.md

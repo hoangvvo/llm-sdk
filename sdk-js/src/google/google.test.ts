@@ -12,6 +12,11 @@ suite("GoogleModel", () => {
     modelId: "gemini-2.5-flash",
   });
 
+  const audioModel = new GoogleModel({
+    apiKey: process.env["GOOGLE_API_KEY"],
+    modelId: "gemini-2.5-flash-preview-tts",
+  });
+
   const thinkingModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
     modelId: "gemini-2.0-flash-thinking-exp-01-21",
@@ -73,21 +78,23 @@ suite("GoogleModel", () => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
   });
 
-  test(
-    TEST_CASE_NAMES.GENERATE_AUDIO,
-    { skip: "model does not support audio" },
-    (t) => {
-      return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_AUDIO);
-    },
-  );
+  test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
+    return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
+      additionalInputs: (input) => ({
+        ...input,
+        modalities: ["audio"],
+      }),
+    });
+  });
 
-  test(
-    TEST_CASE_NAMES.STREAM_AUDIO,
-    { skip: "model does not support audio" },
-    (t) => {
-      return runTestCase(t, model, TEST_CASE_NAMES.STREAM_AUDIO);
-    },
-  );
+  test(TEST_CASE_NAMES.STREAM_AUDIO, (t) => {
+    return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
+      additionalInputs: (input) => ({
+        ...input,
+        modalities: ["audio"],
+      }),
+    });
+  });
 
   test(TEST_CASE_NAMES.GENERATE_REASONING, (t) => {
     return runTestCase(t, thinkingModel, TEST_CASE_NAMES.GENERATE_REASONING);

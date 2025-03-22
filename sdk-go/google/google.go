@@ -1,0 +1,717 @@
+package google
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+
+	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/google/googleapi"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/randutil"
+)
+
+const Provider llmsdk.ProviderName = "google"
+
+type GoogleModelOptions struct {
+	BaseURL    string
+	APIKey     string
+	APIVersion string
+}
+
+type GoogleModel struct {
+	baseURL    string
+	apiKey     string
+	apiVersion string
+	modelID    string
+	client     *http.Client
+	metadata   *llmsdk.LanguageModelMetadata
+}
+
+func NewGoogleModel(modelID string, options GoogleModelOptions) *GoogleModel {
+	baseURL := "https://generativelanguage.googleapis.com"
+	if options.BaseURL != "" {
+		baseURL = options.BaseURL
+	}
+	apiVersion := "v1beta"
+	if options.APIVersion != "" {
+		apiVersion = options.APIVersion
+	}
+
+	return &GoogleModel{
+		baseURL:    baseURL,
+		apiKey:     options.APIKey,
+		apiVersion: apiVersion,
+		modelID:    modelID,
+		client:     &http.Client{},
+	}
+}
+
+func (m *GoogleModel) WithMetadata(metadata llmsdk.LanguageModelMetadata) *GoogleModel {
+	m.metadata = &metadata
+	return m
+}
+
+func (m *GoogleModel) Provider() llmsdk.ProviderName {
+	return Provider
+}
+
+func (m *GoogleModel) ModelID() string {
+	return m.modelID
+}
+
+func (m *GoogleModel) Metadata() *llmsdk.LanguageModelMetadata {
+	return m.metadata
+}
+
+func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
+	spanCtx, span := llmsdk.NewLMSpan(ctx, string(Provider), m.modelID, "generate", input)
+	ctx = spanCtx
+
+	var err error
+	defer func() {
+		if err != nil {
+			span.OnError(err)
+		}
+		span.OnEnd()
+	}()
+
+	params, err := convertToGenerateContentParameters(input, m.modelID)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := clientutils.DoJSON[googleapi.GenerateContentResponse](ctx, m.client, clientutils.JSONRequestConfig{
+		URL: fmt.Sprintf("%s/%s/models/%s:generateContent", m.baseURL, m.apiVersion, m.modelID),
+		Headers: map[string]string{
+			"x-goog-api-key": m.apiKey,
+			"Content-Type":   "application/json",
+		},
+		Body: params,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(response.Candidates) == 0 {
+		return nil, llmsdk.NewInvariantError(Provider, "no candidates returned")
+	}
+
+	content, err := mapGoogleContent(response.Candidates[0].Content.Parts)
+	if err != nil {
+		return nil, err
+	}
+
+	var usage *llmsdk.ModelUsage
+	if response.UsageMetadata != nil {
+		usage = mapGoogleUsageMetadata(*response.UsageMetadata)
+	}
+
+	result := &llmsdk.ModelResponse{
+		Content: content,
+		Usage:   usage,
+	}
+
+	if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
+		cost := llmsdk.CalculateCost(*usage, *m.metadata.Pricing)
+		result.Cost = &cost
+	}
+
+	span.OnResponse(result)
+	return result, nil
+}
+
+func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.LanguageModelStream, error) {
+	params, err := convertToGenerateContentParameters(input, m.modelID)
+	if err != nil {
+		return nil, err
+	}
+
+	sseStream, err := clientutils.DoSSE[googleapi.GenerateContentResponse](ctx, m.client, clientutils.SSERequestConfig{
+		URL: fmt.Sprintf("%s/%s/models/%s:streamGenerateContent?alt=sse", m.baseURL, m.apiVersion, m.modelID),
+		Headers: map[string]string{
+			"x-goog-api-key": m.apiKey,
+		},
+		Body: params,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	responseCh := make(chan *llmsdk.PartialModelResponse)
+	errCh := make(chan error, 1)
+
+	go func() {
+		defer close(responseCh)
+		defer close(errCh)
+		defer sseStream.Close()
+
+		spanCtx, span := llmsdk.NewLMSpan(ctx, string(Provider), m.modelID, "stream", input)
+		ctx = spanCtx
+
+		var err error
+		defer func() {
+			if err != nil {
+				span.OnError(err)
+			}
+			span.OnEnd()
+		}()
+
+		allContentDeltas := []llmsdk.ContentDelta{}
+
+		for sseStream.Next() {
+			var streamEvent *googleapi.GenerateContentResponse
+			streamEvent, err = sseStream.Current()
+
+			if err != nil {
+				errCh <- fmt.Errorf("failed to get sse event: %w", err)
+				return
+			}
+			if streamEvent == nil || len(streamEvent.Candidates) == 0 {
+				continue
+			}
+
+			candidate := streamEvent.Candidates[0]
+			if candidate.Content != nil {
+				var incomingContentDeltas []llmsdk.ContentDelta
+				incomingContentDeltas, err = mapGoogleContentToDelta(*candidate.Content, allContentDeltas)
+				if err != nil {
+					errCh <- fmt.Errorf("failed to map content delta: %w", err)
+					return
+				}
+
+				allContentDeltas = append(allContentDeltas, incomingContentDeltas...)
+
+				for _, delta := range incomingContentDeltas {
+					partial := &llmsdk.PartialModelResponse{Delta: &delta}
+					span.OnStreamPartial(partial)
+					responseCh <- partial
+				}
+			}
+
+			if streamEvent.UsageMetadata != nil {
+				usage := mapGoogleUsageMetadata(*streamEvent.UsageMetadata)
+				partial := &llmsdk.PartialModelResponse{Usage: usage}
+				span.OnStreamPartial(partial)
+				responseCh <- partial
+			}
+		}
+
+		if err = sseStream.Err(); err != nil {
+			errCh <- fmt.Errorf("scanner error: %w", err)
+			return
+		}
+	}()
+
+	return llmsdk.NewLanguageModelStream(responseCh, errCh), nil
+}
+
+func convertToGenerateContentParameters(input *llmsdk.LanguageModelInput, modelID string) (*googleapi.GenerateContentParameters, error) {
+	contents, err := convertToGoogleContents(input.Messages)
+	if err != nil {
+		return nil, err
+	}
+
+	params := &googleapi.GenerateContentParameters{
+		Contents: contents,
+		Model:    modelID,
+		GenerationConfig: &googleapi.GenerateContentConfig{
+			Temperature:      input.Temperature,
+			TopP:             input.TopP,
+			TopK:             input.TopK,
+			PresencePenalty:  input.PresencePenalty,
+			FrequencyPenalty: input.FrequencyPenalty,
+			Seed:             input.Seed,
+			MaxOutputTokens:  input.MaxTokens,
+		},
+	}
+
+	if input.SystemPrompt != nil {
+		params.SystemInstruction = &googleapi.Content{
+			Role:  "system", // ignored by Google API
+			Parts: []googleapi.Part{{Text: input.SystemPrompt}},
+		}
+	}
+
+	if input.Tools != nil {
+		params.Tools = []googleapi.Tool{
+			{
+				FunctionDeclarations: sliceutils.Map(input.Tools, convertToGoogleTool),
+			},
+		}
+	}
+
+	if input.ToolChoice != nil {
+		params.ToolConfig = &googleapi.ToolConfig{
+			FunctionCallingConfig: convertToGoogleFunctionCallingConfig(input.ToolChoice),
+		}
+	}
+
+	if input.ResponseFormat != nil {
+		mimeType, schema := convertToGoogleResponseSchema(input.ResponseFormat)
+		params.GenerationConfig.ResponseMimeType = &mimeType
+		params.GenerationConfig.ResponseJsonSchema = schema
+	}
+
+	if input.Modalities != nil {
+		params.GenerationConfig.ResponseModalities = sliceutils.Map(input.Modalities, convertToGoogleModality)
+	}
+
+	return params, nil
+}
+
+func convertToGoogleContents(messages []llmsdk.Message) ([]googleapi.Content, error) {
+	contents := make([]googleapi.Content, len(messages))
+	for i, message := range messages {
+		switch {
+		case message.UserMessage != nil:
+			parts, err := sliceutils.MapErr(message.UserMessage.Content, convertToGoogleParts)
+			if err != nil {
+				return nil, err
+			}
+			contents[i] = googleapi.Content{
+				Role:  "user",
+				Parts: sliceutils.Flat(parts),
+			}
+		case message.AssistantMessage != nil:
+			parts, err := sliceutils.MapErr(message.AssistantMessage.Content, convertToGoogleParts)
+			if err != nil {
+				return nil, err
+			}
+			contents[i] = googleapi.Content{
+				Role:  "model",
+				Parts: sliceutils.Flat(parts),
+			}
+		case message.ToolMessage != nil:
+			parts, err := sliceutils.MapErr(message.ToolMessage.Content, convertToGoogleParts)
+			if err != nil {
+				return nil, err
+			}
+			contents[i] = googleapi.Content{
+				Role:  "user",
+				Parts: sliceutils.Flat(parts),
+			}
+		default:
+			return nil, llmsdk.NewInvalidInputError(fmt.Sprintf("unknown message type: %T", message))
+		}
+	}
+	return contents, nil
+}
+
+func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
+	switch {
+	case part.TextPart != nil:
+		return []googleapi.Part{{Text: &part.TextPart.Text}}, nil
+	case part.ImagePart != nil:
+		return []googleapi.Part{{
+			InlineData: &googleapi.Blob2{
+				Data:     &part.ImagePart.ImageData,
+				MimeType: &part.ImagePart.MimeType,
+			},
+		}}, nil
+	case part.AudioPart != nil:
+		return []googleapi.Part{{
+			InlineData: &googleapi.Blob2{
+				Data:     &part.AudioPart.AudioData,
+				MimeType: ptr.To(llmsdk.MapAudioFormatToMimeType(part.AudioPart.Format)),
+			},
+		}}, nil
+	case part.ReasoningPart != nil:
+		return []googleapi.Part{{
+			Text:             &part.ReasoningPart.Text,
+			Thought:          ptr.To(true),
+			ThoughtSignature: part.ReasoningPart.Signature,
+		}}, nil
+	case part.SourcePart != nil:
+		parts, err := sliceutils.MapErr(part.SourcePart.Content, convertToGoogleParts)
+		if err != nil {
+			return nil, err
+		}
+		return sliceutils.Flat(
+			parts,
+		), nil
+	case part.ToolCallPart != nil:
+		return []googleapi.Part{{
+			FunctionCall: &googleapi.FunctionCall{
+				Name: &part.ToolCallPart.ToolName,
+				Args: part.ToolCallPart.Args,
+				Id:   &part.ToolCallPart.ToolCallID,
+			},
+		}}, nil
+	case part.ToolResultPart != nil:
+		response, err := convertToGoogleFunctionResponseResponse(part.ToolResultPart.Content, part.ToolResultPart.IsError)
+		if err != nil {
+			return nil, err
+		}
+		return []googleapi.Part{{
+			FunctionResponse: &googleapi.FunctionResponse{
+				Id:       &part.ToolResultPart.ToolCallID,
+				Name:     &part.ToolResultPart.ToolName,
+				Response: response,
+			},
+		}}, nil
+	}
+	return []googleapi.Part{}, nil
+}
+
+func convertToGoogleFunctionResponseResponse(parts []llmsdk.Part, isError bool) (map[string]any, error) {
+	compatibleParts := llmsdk.GetCompatiblePartsWithoutSourceParts(parts)
+	textParts := []llmsdk.TextPart{}
+	for _, part := range compatibleParts {
+		if part.TextPart != nil {
+			textParts = append(textParts, *part.TextPart)
+		} else {
+			return nil, llmsdk.NewUnsupportedError(
+				Provider,
+				fmt.Sprintf("Google model tool result only supports text parts, got %T",
+					part),
+			)
+		}
+	}
+
+	responses := make([]map[string]any, len(textParts))
+	for i, part := range textParts {
+		// parse to map[string]any if possible
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(part.Text), &parsed); err != nil {
+			responses[i] = map[string]any{"data": part.Text}
+		} else {
+			responses[i] = parsed
+		}
+	}
+
+	if len(responses) == 0 {
+		return nil, llmsdk.NewInvalidInputError("Google model tool result must have at least one text part")
+	}
+
+	// Use "output" key to specify function output and "error" key to specify error details
+	if isError {
+		if len(responses) == 1 {
+			return map[string]any{"error": responses[0]}, nil
+		}
+		return map[string]any{"error": responses}, nil
+	} else {
+		if len(responses) == 1 {
+			return map[string]any{"output": responses[0]}, nil
+		}
+		return map[string]any{"output": responses}, nil
+	}
+}
+
+func convertToGoogleTool(tool llmsdk.Tool) googleapi.FunctionDeclaration {
+	return googleapi.FunctionDeclaration{
+		Name:                 &tool.Name,
+		Description:          &tool.Description,
+		ParametersJsonSchema: tool.Parameters,
+	}
+}
+
+func convertToGoogleFunctionCallingConfig(choice *llmsdk.ToolChoiceOption) *googleapi.FunctionCallingConfig {
+	switch {
+	case choice.Auto != nil:
+		return &googleapi.FunctionCallingConfig{Mode: ptr.To(googleapi.FunctionCallingConfigModeAuto)}
+	case choice.Tool != nil:
+		return &googleapi.FunctionCallingConfig{
+			Mode: ptr.To(googleapi.FunctionCallingConfigModeAny),
+			AllowedFunctionNames: []string{
+				choice.Tool.ToolName,
+			},
+		}
+	case choice.Required != nil:
+		return &googleapi.FunctionCallingConfig{
+			Mode: ptr.To(googleapi.FunctionCallingConfigModeAny),
+		}
+	case choice.None != nil:
+		return &googleapi.FunctionCallingConfig{Mode: ptr.To(googleapi.FunctionCallingConfigModeNone)}
+	}
+	return nil
+}
+
+func convertToGoogleResponseSchema(format *llmsdk.ResponseFormatOption) (string, any) {
+	if format.JSON != nil {
+		if format.JSON.Schema != nil {
+			return "application/json", *format.JSON.Schema
+		}
+		return "application/json", nil
+	}
+	if format.Text != nil {
+		return "text/plain", nil
+	}
+	return "", nil
+}
+
+func convertToGoogleModality(modality llmsdk.Modality) string {
+	switch modality {
+	case llmsdk.ModalityText:
+		return "TEXT"
+	case llmsdk.ModalityImage:
+		return "IMAGE"
+	case llmsdk.ModalityAudio:
+		return "AUDIO"
+	}
+	return ""
+}
+
+// mapGoogleContent maps Google API parts to SDK parts
+func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
+	var result []llmsdk.Part
+
+	for _, part := range parts {
+		if part.Thought != nil && *part.Thought {
+			reasoningPart := llmsdk.Part{
+				ReasoningPart: &llmsdk.ReasoningPart{
+					Text:      "",
+					Signature: part.ThoughtSignature,
+				},
+			}
+			if part.Text != nil {
+				reasoningPart.ReasoningPart.Text = *part.Text
+			}
+			result = append(result, reasoningPart)
+			continue
+		}
+
+		if part.Text != nil {
+			result = append(result, llmsdk.Part{
+				TextPart: &llmsdk.TextPart{
+					Text: *part.Text,
+				},
+			})
+			continue
+		}
+
+		if part.InlineData != nil {
+			if part.InlineData.MimeType != nil && part.InlineData.Data != nil {
+				if strings.HasPrefix(*part.InlineData.MimeType, "image/") {
+					result = append(result, llmsdk.Part{
+						ImagePart: &llmsdk.ImagePart{
+							ImageData: *part.InlineData.Data,
+							MimeType:  *part.InlineData.MimeType,
+						},
+					})
+					continue
+				}
+
+				if strings.HasPrefix(*part.InlineData.MimeType, "audio/") {
+					format, err := llmsdk.MapMimeTypeToAudioFormat(*part.InlineData.MimeType)
+					if err != nil {
+						return nil, llmsdk.NewInvariantError(Provider, fmt.Sprintf("unsupported audio mime type: %s", *part.InlineData.MimeType))
+					}
+					result = append(result, llmsdk.Part{
+						AudioPart: &llmsdk.AudioPart{
+							AudioData: *part.InlineData.Data,
+							Format:    format,
+						},
+					})
+					continue
+				}
+			}
+		}
+
+		if part.FunctionCall != nil {
+			if part.FunctionCall.Name == nil {
+				return nil, llmsdk.NewInvariantError(Provider, "function call name is missing")
+			}
+			toolCallID := ""
+			if part.FunctionCall.Id != nil {
+				toolCallID = *part.FunctionCall.Id
+			} else {
+				toolCallID = fmt.Sprintf("call_%s", randutil.String(10))
+			}
+			result = append(result, llmsdk.Part{
+				ToolCallPart: &llmsdk.ToolCallPart{
+					ToolCallID: toolCallID,
+					ToolName:   *part.FunctionCall.Name,
+					Args:       part.FunctionCall.Args,
+				},
+			})
+			continue
+		}
+	}
+
+	return result, nil
+}
+
+// mapGoogleContentToDelta maps Google API content to content deltas for streaming
+func mapGoogleContentToDelta(content googleapi.Content, existingContentDeltas []llmsdk.ContentDelta) ([]llmsdk.ContentDelta, error) {
+	if len(content.Parts) == 0 {
+		return []llmsdk.ContentDelta{}, nil
+	}
+
+	contentDeltas := []llmsdk.ContentDelta{}
+	parts, err := mapGoogleContent(content.Parts)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, part := range parts {
+		partDelta := looselyConvertPartToPartDelta(part)
+		index := llmsdk.GuessDeltaIndex(partDelta, append(existingContentDeltas, contentDeltas...), nil)
+		contentDeltas = append(contentDeltas, llmsdk.ContentDelta{
+			Index: index,
+			Part:  partDelta,
+		})
+	}
+
+	return contentDeltas, nil
+}
+
+// looselyConvertPartToPartDelta converts a Part to a PartDelta
+func looselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
+	switch {
+	case part.TextPart != nil:
+		return llmsdk.PartDelta{
+			TextPartDelta: &llmsdk.TextPartDelta{
+				Text: part.TextPart.Text,
+			},
+		}
+	case part.ToolCallPart != nil:
+		argsStr := string(part.ToolCallPart.Args)
+		return llmsdk.PartDelta{
+			ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolCallID: &part.ToolCallPart.ToolCallID,
+				ToolName:   &part.ToolCallPart.ToolName,
+				Args:       &argsStr,
+			},
+		}
+	case part.ReasoningPart != nil:
+		return llmsdk.PartDelta{
+			ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
+				Text:      part.ReasoningPart.Text,
+				Signature: part.ReasoningPart.Signature,
+			},
+		}
+	case part.ImagePart != nil:
+		return llmsdk.PartDelta{
+			ImagePartDelta: &llmsdk.ImagePartDelta{
+				MimeType:  &part.ImagePart.MimeType,
+				ImageData: &part.ImagePart.ImageData,
+				Width:     part.ImagePart.Width,
+				Height:    part.ImagePart.Height,
+			},
+		}
+	case part.AudioPart != nil:
+		return llmsdk.PartDelta{
+			AudioPartDelta: &llmsdk.AudioPartDelta{
+				AudioData:  &part.AudioPart.AudioData,
+				Format:     &part.AudioPart.Format,
+				SampleRate: part.AudioPart.SampleRate,
+				Channels:   part.AudioPart.Channels,
+				Transcript: part.AudioPart.Transcript,
+				AudioID:    part.AudioPart.AudioID,
+			},
+		}
+	default:
+		return llmsdk.PartDelta{}
+	}
+}
+
+// mapGoogleUsageMetadata maps Google usage metadata to SDK usage
+func mapGoogleUsageMetadata(usageMetadata googleapi.GenerateContentResponseUsageMetadata) *llmsdk.ModelUsage {
+	usage := &llmsdk.ModelUsage{
+		InputTokens:  0,
+		OutputTokens: 0,
+	}
+
+	if usageMetadata.PromptTokenCount != nil {
+		usage.InputTokens = *usageMetadata.PromptTokenCount
+	}
+
+	if usageMetadata.CandidatesTokenCount != nil {
+		usage.OutputTokens = *usageMetadata.CandidatesTokenCount
+	}
+
+	if len(usageMetadata.PromptTokensDetails) > 0 {
+		usage.InputTokensDetails = sumModelTokensDetails(
+			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.PromptTokensDetails),
+		)
+	}
+
+	if len(usageMetadata.CandidatesTokensDetails) > 0 {
+		usage.OutputTokensDetails = sumModelTokensDetails(
+			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.CandidatesTokensDetails),
+		)
+	}
+
+	return usage
+}
+
+// mapGoogleModalityTokenCountToUsageDetails maps Google modality token counts to usage details
+func mapGoogleModalityTokenCountToUsageDetails(modalityTokenCounts []googleapi.ModalityTokenCount) []llmsdk.ModelTokensDetails {
+	var details []llmsdk.ModelTokensDetails
+
+	for _, modalityTokenCount := range modalityTokenCounts {
+		if modalityTokenCount.TokenCount == nil {
+			continue
+		}
+
+		detail := llmsdk.ModelTokensDetails{}
+		if modalityTokenCount.Modality != nil {
+			switch *modalityTokenCount.Modality {
+			case googleapi.MediaModalityText:
+				detail.TextTokens = modalityTokenCount.TokenCount
+			case googleapi.MediaModalityImage:
+				detail.ImageTokens = modalityTokenCount.TokenCount
+			case googleapi.MediaModalityAudio:
+				detail.AudioTokens = modalityTokenCount.TokenCount
+			}
+		}
+		details = append(details, detail)
+	}
+
+	return details
+}
+
+// sumModelTokensDetails sums multiple ModelTokensDetails into one
+func sumModelTokensDetails(detailsList []llmsdk.ModelTokensDetails) *llmsdk.ModelTokensDetails {
+	if len(detailsList) == 0 {
+		return nil
+	}
+
+	result := &llmsdk.ModelTokensDetails{}
+
+	for _, details := range detailsList {
+		if details.TextTokens != nil {
+			if result.TextTokens == nil {
+				result.TextTokens = ptr.To(0)
+			}
+			*result.TextTokens += *details.TextTokens
+		}
+		if details.CachedTextTokens != nil {
+			if result.CachedTextTokens == nil {
+				result.CachedTextTokens = ptr.To(0)
+			}
+			*result.CachedTextTokens += *details.CachedTextTokens
+		}
+		if details.AudioTokens != nil {
+			if result.AudioTokens == nil {
+				result.AudioTokens = ptr.To(0)
+			}
+			*result.AudioTokens += *details.AudioTokens
+		}
+		if details.CachedAudioTokens != nil {
+			if result.CachedAudioTokens == nil {
+				result.CachedAudioTokens = ptr.To(0)
+			}
+			*result.CachedAudioTokens += *details.CachedAudioTokens
+		}
+		if details.ImageTokens != nil {
+			if result.ImageTokens == nil {
+				result.ImageTokens = ptr.To(0)
+			}
+			*result.ImageTokens += *details.ImageTokens
+		}
+		if details.CachedImageTokens != nil {
+			if result.CachedImageTokens == nil {
+				result.CachedImageTokens = ptr.To(0)
+			}
+			*result.CachedImageTokens += *details.CachedImageTokens
+		}
+	}
+
+	return result
+}

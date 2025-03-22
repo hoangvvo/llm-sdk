@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 // base64ToInt16Samples converts base64 string to int16 samples
@@ -50,4 +51,35 @@ func concatenateB64AudioChunks(chunks []string) (string, error) {
 	}
 
 	return int16SamplesToBase64(allSamples), nil
+}
+
+var audioFormatToMimeTypeMap = map[AudioFormat]string{
+	AudioFormatWav:      "audio/wav",
+	AudioFormatLinear16: "audio/L16",
+	AudioFormatFLAC:     "audio/flac",
+	AudioFormatMulaw:    "audio/basic",
+	AudioFormatAlaw:     "audio/basic",
+	AudioFormatMP3:      "audio/mpeg",
+	AudioFormatOpus:     `audio/ogg; codecs="opus"`,
+	AudioFormatAAC:      "audio/aac",
+}
+
+func MapAudioFormatToMimeType(format AudioFormat) string {
+	if mimeType, ok := audioFormatToMimeTypeMap[format]; ok {
+		return mimeType
+	}
+	return "application/octet-stream"
+}
+
+func MapMimeTypeToAudioFormat(mimeType string) (AudioFormat, error) {
+	// strip out the parts after ;
+	if idx := strings.Index(mimeType, ";"); idx != -1 {
+		mimeType = strings.TrimSpace(mimeType[:idx])
+	}
+	for format, mt := range audioFormatToMimeTypeMap {
+		if mimeType == mt {
+			return format, nil
+		}
+	}
+	return "", fmt.Errorf("unsupported audio format for mime type: %s", mimeType)
 }

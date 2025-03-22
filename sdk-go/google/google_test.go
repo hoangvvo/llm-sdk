@@ -1,0 +1,107 @@
+package google_test
+
+import (
+	"os"
+	"testing"
+
+	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/google"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
+	"github.com/joho/godotenv"
+)
+
+var model *google.GoogleModel
+var audioModel *google.GoogleModel
+var reasoningModel *google.GoogleModel
+
+func TestMain(m *testing.M) {
+	godotenv.Load("../../.env")
+	apiKey := os.Getenv("GOOGLE_API_KEY")
+	if apiKey == "" {
+		panic("GOOGLE_API_KEY must be set")
+	}
+
+	model = google.NewGoogleModel("gemini-2.5-flash", google.GoogleModelOptions{
+		APIKey: apiKey,
+	})
+	audioModel = google.NewGoogleModel("gemini-2.5-flash-preview-tts", google.GoogleModelOptions{
+		APIKey: apiKey,
+	})
+	reasoningModel = google.NewGoogleModel("gemini-2.0-flash-thinking-exp-01-21", google.GoogleModelOptions{
+		APIKey: apiKey,
+	})
+
+	m.Run()
+}
+
+func TestGenerateText(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_text")
+}
+
+func TestStreamText(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_text")
+}
+
+func TestGenerateWithSystemPrompt(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_with_system_prompt")
+}
+
+func TestGenerateToolCall(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_tool_call")
+}
+
+func TestStreamToolCall(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_tool_call")
+}
+
+func TestGenerateTextWithToolResult(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_text_from_tool_result")
+}
+
+func TestStreamTextWithToolResult(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_text_from_tool_result")
+}
+
+func TestGenerateParallelToolCalls(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_parallel_tool_calls")
+}
+
+func TestStreamParallelToolCalls(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_parallel_tool_calls")
+}
+
+func TestStreamParallelToolCallsOfSameName(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_parallel_tool_calls_of_same_name")
+}
+
+func TestStructuredResponseFormat(t *testing.T) {
+	testcommon.RunTestCase(t, model, "structured_response_format")
+}
+
+func TestSourcePartInput(t *testing.T) {
+	testcommon.RunTestCase(t, model, "source_part_input")
+}
+
+func TestGenerateAudio(t *testing.T) {
+	testcommon.RunTestCase(t, audioModel, "generate_audio", testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
+		lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
+	}))
+}
+
+func TestStreamAudio(t *testing.T) {
+	testcommon.RunTestCase(t, audioModel, "stream_audio", testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
+		lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
+	}))
+}
+
+func TestGenerateReasoning(t *testing.T) {
+	testcommon.RunTestCase(t, reasoningModel, "generate_reasoning")
+}
+
+func TestStreamReasoning(t *testing.T) {
+	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
+}
+
+func TestInputReasoning(t *testing.T) {
+	testcommon.RunTestCase(t, reasoningModel, "input_reasoning")
+}

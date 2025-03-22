@@ -86,14 +86,15 @@ suite("OpenAIModel", () => {
     { skip: "responses api does not support audio" },
     (t) => {
       return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
-        additionalInputs: {
+        additionalInputs: (input) => ({
+          ...input,
           extra: {
             audio: {
               voice: "alloy",
               format: "mp3",
             },
           },
-        },
+        }),
       });
     },
   );
@@ -103,14 +104,15 @@ suite("OpenAIModel", () => {
     { skip: "responses api does not support audio" },
     (t) => {
       return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
-        additionalInputs: {
+        additionalInputs: (input) => ({
+          ...input,
           extra: {
             audio: {
               voice: "alloy",
               format: "pcm16",
             },
           },
-        },
+        }),
       });
     },
   );
