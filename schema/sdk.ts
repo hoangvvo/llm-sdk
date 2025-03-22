@@ -453,6 +453,19 @@ export interface AudioOptions {
   language?: string;
 }
 /**
+ * Options for reasoning generation.
+ */
+export interface ReasoningOptions {
+  /**
+   * Whether to enable reasoning output.
+   */
+  enabled: boolean;
+  /**
+   * Specify the budget tokens for reasoning generation.
+   */
+  budget_tokens?: number;
+}
+/**
  * Defines the input parameters for the language model completion.
  */
 export interface LanguageModelInput {
@@ -506,6 +519,10 @@ export interface LanguageModelInput {
    * Options for audio generation.
    */
   audio?: AudioOptions;
+  /**
+   * Options for reasoning generation.
+   */
+  reasoning?: ReasoningOptions;
   /**
    * A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.
    */

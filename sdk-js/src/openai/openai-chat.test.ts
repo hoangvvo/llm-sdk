@@ -3,11 +3,11 @@
 import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
-import { OpenAIChatCompletionModel } from "./openai-chat.ts";
+import { OpenAIChatModel } from "./openai-chat.ts";
 
-suite("OpenAIChatCompletionModel", () => {
+suite("OpenAIChatModel", () => {
   assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
-  const model = new OpenAIChatCompletionModel(
+  const model = new OpenAIChatModel(
     {
       apiKey: process.env["OPENAI_API_KEY"],
       modelId: "gpt-4o",
@@ -15,7 +15,7 @@ suite("OpenAIChatCompletionModel", () => {
     { capabilities: ["function-calling", "image-input", "structured-output"] },
   );
 
-  const audioModel = new OpenAIChatCompletionModel({
+  const audioModel = new OpenAIChatModel({
     modelId: "gpt-4o-audio-preview",
     apiKey: process.env["OPENAI_API_KEY"],
   });

@@ -10,19 +10,14 @@ We provide SDKs to interact with various LLM providers in the following programm
 
 ## Supported Providers
 
-|                   | OpenAI (Responses)                                                | OpenAI (Chat Completion) | Anthropic                                                 | Google               | Cohere | Mistral              |
-| ----------------- | ----------------------------------------------------------------- | ------------------------ | --------------------------------------------------------- | -------------------- | ------ | -------------------- |
-| Sampling Params   | ✅ except `top_k`,`frequency_penalty`, `presence_penalty`, `seed` | ✅ except `top_k`        | ✅ except `frequency_penalty`, `presence_penalty`, `seed` | ✅                   | ✅     | ✅ except `top_k`    |
-| Function Calling  | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Structured Output | ✅                                                                | ✅                       | ➖                                                        | ✅                   | ✅     | ✅                   |
-| Text Input        | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Image Input       | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Audio Input       | ✅                                                                | ✅                       | ➖                                                        | ✅                   | ➖     | ➖                   |
-| Citation          | ➖ [^source-as-text]                                              | ➖ [^source-as-text]     | ✅                                                        | ➖ [^source-as-text] | ✅     | 🚧 [^source-as-text] |
-| Text Output       | ✅                                                                | ✅                       | ✅                                                        | ✅                   | ✅     | ✅                   |
-| Image Output      | ✅                                                                | ➖                       | ➖                                                        | ✅                   | ➖     | ➖                   |
-| Audio Output      | ➖                                                                | ✅                       | ➖                                                        | ✅                   | ➖     | ➖                   |
-| Reasoning         | ✅                                                                | ➖                       | ✅                                                        | ✅                   | ✅     | ✅                   |
+| Provider                     | Sampling Params                                                   | Function Calling | Structured Output | Text Input | Image Input | Audio Input | Citation [^source-as-text] | Text Output | Image Output | Audio Output | Reasoning |
+| ---------------------------- | ----------------------------------------------------------------- | ---------------- | ----------------- | ---------- | ----------- | ----------- | -------------------------- | ----------- | ------------ | ------------ | --------- |
+| **OpenAI (Responses)**       | ✅ except `top_k`,`frequency_penalty`, `presence_penalty`, `seed` | ✅               | ✅                | ✅         | ✅          | ✅          | ➖                         | ✅          | ✅           | ➖           | ✅        |
+| **OpenAI (Chat Completion)** | ✅ except `top_k`                                                 | ✅               | ✅                | ✅         | ✅          | ✅          | ➖                         | ✅          | ➖           | ✅           | ➖        |
+| **Anthropic**                | ✅ except `frequency_penalty`, `presence_penalty`, `seed`         | ✅               | ➖                | ✅         | ✅          | ➖          | ✅                         | ✅          | ➖           | ➖           | ✅        |
+| **Google**                   | ✅                                                                | ✅               | ✅                | ✅         | ✅          | ✅          | ➖                         | ✅          | ✅           | ✅           | ✅        |
+| **Cohere**                   | ✅                                                                | ✅               | ✅                | ✅         | ✅          | ➖          | ✅                         | ✅          | ➖           | ➖           | ✅        |
+| **Mistral**                  | ✅ except `top_k`                                                 | ✅               | ✅                | ✅         | ✅          | ✅          | 🚧                         | ✅          | ➖           | ➖           | ✅        |
 
 Keys:
 

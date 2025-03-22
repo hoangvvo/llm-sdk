@@ -1,4 +1,4 @@
-use crate::{JSONSchema, LanguageModelInputExtra};
+use crate::{openai::responses_api::ReasoningEffort, JSONSchema, LanguageModelInputExtra};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -58,6 +58,13 @@ pub struct ChatCompletionCreateParams {
     /// likelihood to talk about new topics.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub presence_penalty: Option<f64>,
+
+    // Constrains effort on reasoning for
+    // [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+    // supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+    // effort can result in faster responses and fewer tokens used on reasoning in a
+    // response.
+    pub reasoning_effort: Option<ReasoningEffort>,
 
     /// An object specifying the format that the model must output.
     ///

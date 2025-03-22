@@ -54,6 +54,13 @@ type ChatCompletionCreateParams struct {
 	// likelihood to talk about new topics.
 	PresencePenalty *float64 `json:"presence_penalty,omitempty"`
 
+	// Constrains effort on reasoning for
+	// [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
+	// supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
+	// effort can result in faster responses and fewer tokens used on reasoning in a
+	// response.
+	ReasoningEffort *ReasoningEffort
+
 	// An object specifying the format that the model must output.
 	//
 	// Setting to `{ "type": "json_schema", "json_schema": {...} }` enables

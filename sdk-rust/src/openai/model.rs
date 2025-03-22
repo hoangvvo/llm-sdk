@@ -1,23 +1,24 @@
 use crate::{
     client_utils, id_utils,
     openai::responses_api::{
-        self, FunctionTool, Reasoning, ResponseCreateParams, ResponseFormatJSONObject,
-        ResponseFormatText, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-        ResponseFunctionToolCall, ResponseInputAudio, ResponseInputAudioInputAudio,
-        ResponseInputContent, ResponseInputImage, ResponseInputItem,
-        ResponseInputItemFunctionCallOutput, ResponseInputItemMessage, ResponseInputText,
-        ResponseOutputContent, ResponseOutputItem, ResponseOutputItemImageGenerationCall,
-        ResponseOutputMessage, ResponseOutputText, ResponseReasoningItem,
-        ResponseReasoningItemSummary, ResponseReasoningItemSummaryUnion, ResponseStreamEvent,
-        ResponseTextConfig, ResponseUsage, ToolChoiceFunction, ToolImageGeneration,
+        self, FunctionTool, ResponseCreateParams, ResponseFormatJSONObject, ResponseFormatText,
+        ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig, ResponseFunctionToolCall,
+        ResponseIncludable, ResponseInputAudio, ResponseInputAudioInputAudio, ResponseInputContent,
+        ResponseInputImage, ResponseInputItem, ResponseInputItemFunctionCallOutput,
+        ResponseInputItemMessage, ResponseInputText, ResponseOutputContent, ResponseOutputItem,
+        ResponseOutputItemImageGenerationCall, ResponseOutputMessage, ResponseOutputText,
+        ResponseReasoningItem, ResponseReasoningItemSummary, ResponseReasoningItemSummaryUnion,
+        ResponseStreamEvent, ResponseTextConfig, ResponseUsage, ToolChoiceFunction,
+        ToolImageGeneration,
     },
     source_part_utils,
     usage_utils::calculate_cost,
     AssistantMessage, AudioFormat, ContentDelta, ImagePart, ImagePartDelta, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
     LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPartDelta,
-    Tool, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart, UserMessage,
+    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption,
+    TextPartDelta, Tool, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart,
+    UserMessage,
 };
 use async_stream::try_stream;
 use futures::StreamExt;
@@ -207,6 +208,7 @@ fn convert_to_response_create_params(
         tool_choice,
         extra,
         modalities,
+        reasoning,
         ..
     } = input;
 
@@ -223,10 +225,12 @@ fn convert_to_response_create_params(
             .map(convert_to_openai_response_tool_choice)
             .transpose()?,
         text: response_format.map(Into::into),
-        reasoning: Some(Reasoning {
-            effort: None,
-            summary: Some("auto".to_string()),
-        }),
+        include: if reasoning.as_ref().is_some_and(|r| r.enabled) {
+            Some(vec![ResponseIncludable::ReasoningEncryptedContent])
+        } else {
+            None
+        },
+        reasoning: reasoning.map(TryInto::try_into).transpose()?,
         extra,
         ..Default::default()
     };
@@ -520,6 +524,17 @@ impl From<ResponseFormatOption> for ResponseTextConfig {
                 verbosity: None,
             },
         }
+    }
+}
+
+impl TryFrom<ReasoningOptions> for responses_api::Reasoning {
+    type Error = LanguageModelError;
+
+    fn try_from(value: ReasoningOptions) -> Result<Self, Self::Error> {
+        Ok(Self {
+            summary: value.enabled.then(|| "auto".to_string()),
+            effort: value.budget_tokens.map(TryInto::try_into).transpose()?,
+        })
     }
 }
 

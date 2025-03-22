@@ -18,6 +18,7 @@ import type {
   ModelUsage,
   Part,
   PartialModelResponse,
+  ReasoningOptions,
   ResponseFormatOption,
   SourcePart,
   TextPart,
@@ -131,40 +132,58 @@ function convertToCohereChatRequest(
     tool_choice,
     response_format,
     extra,
+    reasoning,
   } = input;
-
-  const toolChoice = tool_choice
-    ? convertToCohereToolChoice(tool_choice)
-    : undefined;
 
   const { messages: cohereMessages, documents: cohereDocuments } =
     convertToCohereMessages(messages, system_prompt);
 
-  return {
+  const request: Cohere.V2ChatRequest = {
     model: modelId,
     messages: cohereMessages,
     documents: cohereDocuments,
-    ...(typeof max_tokens === "number" && { maxTokens: max_tokens }),
-    ...(typeof temperature === "number" && { temperature }),
-    ...(typeof top_p === "number" && { p: top_p }),
-    ...(typeof top_k === "number" && { k: top_k }),
-    ...(typeof presence_penalty === "number" && {
-      presencePenalty: presence_penalty,
-    }),
-    ...(typeof frequency_penalty === "number" && {
-      frequencyPenalty: frequency_penalty,
-    }),
-    ...(typeof seed === "number" && { seed }),
-    ...(tools && {
-      tools: tools.map(convertToCohereTool),
-      strictTools: true,
-    }),
-    ...(toolChoice && { toolChoice }),
-    ...(response_format && {
-      responseFormat: convertToCohereResponseFormat(response_format),
-    }),
     ...extra,
   };
+
+  if (typeof max_tokens === "number") {
+    request.maxTokens = max_tokens;
+  }
+  if (typeof temperature === "number") {
+    request.temperature = temperature;
+  }
+  if (typeof top_p === "number") {
+    request.p = top_p;
+  }
+  if (typeof top_k === "number") {
+    request.k = top_k;
+  }
+  if (typeof presence_penalty === "number") {
+    request.presencePenalty = presence_penalty;
+  }
+  if (typeof frequency_penalty === "number") {
+    request.frequencyPenalty = frequency_penalty;
+  }
+  if (typeof seed === "number") {
+    request.seed = seed;
+  }
+  if (tools) {
+    request.tools = tools.map(convertToCohereTool);
+    request.strictTools = true;
+  }
+  if (tool_choice) {
+    const toolChoice = convertToCohereToolChoice(tool_choice);
+    if (toolChoice) {
+      request.toolChoice = toolChoice;
+    }
+  }
+  if (response_format) {
+    request.responseFormat = convertToCohereResponseFormat(response_format);
+  }
+  if (reasoning) {
+    request.thinking = convertToCohereThinking(reasoning);
+  }
+
+  return request;
 }
 
 // MARK: To Provider Messages
@@ -444,6 +463,13 @@ function convertToCohereResponseFormat(
       return { type: "text" };
     }
   }
+}
+
+function convertToCohereThinking(reasoning: ReasoningOptions): Cohere.Thinking {
+  return {
+    type: reasoning.enabled ? "enabled" : "disabled",
+    ...(reasoning.budget_tokens && { tokenBudget: reasoning.budget_tokens }),
+  };
 }
 
 // MARK: To SDK Message

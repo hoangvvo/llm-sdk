@@ -17,6 +17,7 @@ import type {
   Part,
   PartDelta,
   PartialModelResponse,
+  ReasoningOptions,
   ReasoningPart,
   ReasoningPartDelta,
   SourcePart,
@@ -135,24 +136,43 @@ function convertToAnthropicCreateParams(
     tools,
     tool_choice,
     extra,
+    reasoning,
   } = input;
 
-  return {
+  const maxTokens = max_tokens ?? 4096;
+
+  const params: Omit<Anthropic.Messages.MessageCreateParams, "stream"> = {
     model: modelId,
     messages: convertToAnthropicMessages(messages),
-    ...(system_prompt && { system: system_prompt }),
-    max_tokens: max_tokens ?? 4096,
-    ...(typeof temperature === "number" && {
-      temperature,
-    }),
-    ...(typeof top_p === "number" && { top_p }),
-    ...(typeof top_k === "number" && { top_k }),
-    ...(tools && { tools: tools.map(convertToAnthropicTool) }),
-    ...(tool_choice && {
-      tool_choice: convertToAnthropicToolChoice(tool_choice),
-    }),
+    max_tokens: maxTokens,
     ...extra,
   };
+  if (system_prompt) {
+    params.system = system_prompt;
+  }
+  if (typeof temperature === "number") {
+    params.temperature = temperature;
+  }
+  if (typeof top_p === "number") {
+    params.top_p = top_p;
+  }
+  if (typeof top_k === "number") {
+    params.top_k = top_k;
+  }
+  if (tools) {
+    params.tools = tools.map(convertToAnthropicTool);
+  }
+  if (tool_choice) {
+    params.tool_choice = convertToAnthropicToolChoice(tool_choice);
+  }
+  if (reasoning) {
+    params.thinking = convertToAnthropicThinkingConfigParam(
+      reasoning,
+      maxTokens,
+    );
+  }
+
+  return params;
 }
 
 // MARK: To Provider Messages
@@ -343,6 +363,21 @@ function convertToAnthropicToolChoice(
       };
     }
   }
+}
+
+function convertToAnthropicThinkingConfigParam(
+  reasoning: ReasoningOptions,
+  maxTokens: number,
+): Anthropic.ThinkingConfigParam {
+  if (!reasoning.enabled) {
+    return {
+      type: "disabled",
+    };
+  }
+  return {
+    type: "enabled",
+    budget_tokens: reasoning.budget_tokens ?? maxTokens - 1,
+  };
 }
 
 // MARK: To SDK Message

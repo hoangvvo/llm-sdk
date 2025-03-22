@@ -657,6 +657,14 @@ type AudioOptions struct {
 	LanguageCode *string `json:"language_code,omitempty"`
 }
 
+// Options for reasoning generation.
+type ReasoningOptions struct {
+	// Whether to enable reasoning output.
+	Enabled bool `json:"enabled"`
+	// Specify the budget tokens for reasoning generation.
+	BudgetTokens *uint32 `json:"budget_tokens,omitempty"`
+}
+
 // LanguageModelCapability represents a metadata property that describes the capability of the model.
 type LanguageModelCapability string
 
@@ -753,6 +761,8 @@ type LanguageModelInput struct {
 	Metadata map[string]string `json:"metadata,omitempty"`
 	// Options for audio generation.
 	Audio *AudioOptions `json:"audio,omitempty"`
+	// Options for reasoning generation.
+	Reasoning *ReasoningOptions `json:"reasoning,omitempty"`
 	// Extra options that the model may support.
 	Extra map[string]any `json:"extra,omitempty"`
 }

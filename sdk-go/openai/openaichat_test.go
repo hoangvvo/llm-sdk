@@ -5,6 +5,7 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
 func TestChatGenerateText(t *testing.T) {
@@ -58,11 +59,9 @@ func TestChatSourcePartInput(t *testing.T) {
 func TestChatGenerateAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioChatModel, "generate_audio", testcommon.WithAdditionalInput(
 		func(input *llmsdk.LanguageModelInput) {
-			input.Extra = map[string]any{
-				"audio": map[string]any{
-					"voice":  "alloy",
-					"format": "mp3",
-				},
+			input.Audio = &llmsdk.AudioOptions{
+				Format: ptr.To(llmsdk.AudioFormatMP3),
+				Voice:  ptr.To("alloy"),
 			}
 		}))
 }
@@ -70,11 +69,9 @@ func TestChatGenerateAudio(t *testing.T) {
 func TestChatStreamAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioChatModel, "stream_audio", testcommon.WithAdditionalInput(
 		func(input *llmsdk.LanguageModelInput) {
-			input.Extra = map[string]any{
-				"audio": map[string]any{
-					"voice":  "alloy",
-					"format": "pcm16",
-				},
+			input.Audio = &llmsdk.AudioOptions{
+				Format: ptr.To(llmsdk.AudioFormatLinear16),
+				Voice:  ptr.To("alloy"),
 			}
 		}))
 }

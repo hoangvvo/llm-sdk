@@ -5,6 +5,7 @@ import type {
   Part as GooglePart,
   ModalityTokenCount,
   SpeechConfig,
+  ThinkingConfig,
   UsageMetadata,
 } from "@google/genai";
 import {
@@ -45,6 +46,7 @@ import type {
   ModelUsage,
   Part,
   PartialModelResponse,
+  ReasoningOptions,
   ResponseFormatOption,
   TextPart,
   Tool,
@@ -155,6 +157,7 @@ function convertToGenerateContentParameters(
     modalities,
     audio,
     extra,
+    reasoning,
   } = input;
 
   const params: GenerateContentParameters = {
@@ -162,9 +165,6 @@ function convertToGenerateContentParameters(
     model: modelId,
     ...extra,
     config: {
-      thinkingConfig: {
-        includeThoughts: true,
-      },
       ...(extra?.["config"] as object),
     },
   };
@@ -214,6 +214,9 @@ function convertToGenerateContentParameters(
   }
   if (audio) {
     config.speechConfig = convertToGoogleSpeechConfig(audio);
+  }
+  if (reasoning) {
+    config.thinkingConfig = convertToGoogleThinkingConfig(reasoning);
   }
 
   return {
@@ -404,7 +407,16 @@ function convertToGoogleSpeechConfig(audio: AudioOptions): SpeechConfig {
         ...(audio.voice && { voiceName: audio.voice }),
       },
     },
-    ...(audio.language_code && { languageCode: audio.language_code }),
+    ...(audio.language && { languageCode: audio.language }),
+  };
+}
+
+function convertToGoogleThinkingConfig(
+  reasoning: ReasoningOptions,
+): ThinkingConfig {
+  return {
+    includeThoughts: reasoning.enabled,
+    ...(reasoning.budget_tokens && { thinkingBudget: reasoning.budget_tokens }),
   };
 }
 

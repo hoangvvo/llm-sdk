@@ -140,28 +140,46 @@ function convertToMistralRequest(
     tools,
     tool_choice,
     extra,
+    reasoning,
   } = input;
 
-  return {
+  const request: MistralComponents.ChatCompletionRequest = {
     model: modelId,
     messages: convertToMistralMessages(messages, system_prompt),
-    ...(typeof max_tokens === "number" && { maxTokens: max_tokens }),
-    ...(typeof temperature === "number" && { temperature }),
-    ...(typeof top_p === "number" && { topP: top_p }),
-    ...(typeof presence_penalty === "number" && {
-      presencePenalty: presence_penalty,
-    }),
-    ...(typeof frequency_penalty === "number" && {
-      frequencyPenalty: frequency_penalty,
-    }),
-    ...(typeof seed === "number" && { randomSeed: seed }),
-    ...(tools && { tools: tools.map(convertToMistralTool) }),
-    ...(tool_choice && { toolChoice: convertToMistralToolChoice(tool_choice) }),
-    ...(response_format && {
-      responseFormat: convertToMistralResponseFormat(response_format),
-    }),
     ...extra,
   };
+  if (typeof max_tokens === "number") {
+    request.maxTokens = max_tokens;
+  }
+  if (typeof temperature === "number") {
+    request.temperature = temperature;
+  }
+  if (typeof top_p === "number") {
+    request.topP = top_p;
+  }
+  if (typeof presence_penalty === "number") {
+    request.presencePenalty = presence_penalty;
+  }
+  if (typeof frequency_penalty === "number") {
+    request.frequencyPenalty = frequency_penalty;
+  }
+  if (typeof seed === "number") {
+    request.randomSeed = seed;
+  }
+  if (tools) {
+    request.tools = tools.map(convertToMistralTool);
+  }
+  if (tool_choice) {
+    request.toolChoice = convertToMistralToolChoice(tool_choice);
+  }
+  if (response_format) {
+    request.responseFormat = convertToMistralResponseFormat(response_format);
+  }
+  if (reasoning) {
+    request.promptMode = reasoning.enabled ? "reasoning" : null;
+  }
+
+  return request;
 }
 
 // MARK: To Provider Messages

@@ -224,6 +224,7 @@ fn into_openai_create_params(
         extra,
         modalities,
         audio,
+        reasoning,
         ..
     } = input;
 
@@ -251,6 +252,10 @@ fn into_openai_create_params(
             },
         )?,
         audio: audio.map(TryInto::try_into).transpose()?,
+        reasoning_effort: reasoning
+            .and_then(|r| r.budget_tokens)
+            .map(|b| b.try_into())
+            .transpose()?,
         extra,
         ..Default::default()
     })

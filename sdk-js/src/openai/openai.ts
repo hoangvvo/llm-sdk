@@ -21,6 +21,7 @@ import type {
   ModelUsage,
   Part,
   PartialModelResponse,
+  ReasoningOptions,
   ReasoningPartDelta,
   ResponseFormatOption,
   TextPartDelta,
@@ -38,6 +39,17 @@ import type {
 } from "./types.ts";
 
 const PROVIDER = "openai";
+
+/**
+ * OpenAI does not have an equivalent of reasoning budget tokens, but
+ * we can use the property to indicate the level of reasoning effort.
+ */
+export const OpenAIReasoningEffort = {
+  Minimal: 1000,
+  Low: 2000,
+  Medium: 3000,
+  High: 4000,
+};
 
 export class OpenAIModel implements LanguageModel {
   provider: string;
@@ -134,20 +146,20 @@ function convertToOpenAICreateParams(
     tool_choice,
     extra,
     modalities,
+    reasoning,
   } = input;
 
   const params: Omit<OpenAI.Responses.ResponseCreateParams, "stream"> = {
     store: false,
     model: modelId,
     input: convertToOpenAIInputs(messages),
-    ...(system_prompt && { instructions: system_prompt }),
     max_output_tokens: max_tokens ?? null,
     temperature: temperature ?? null,
     top_p: top_p ?? null,
-    reasoning: {
-      summary: "auto",
-    },
   };
+  if (system_prompt) {
+    params.instructions = system_prompt;
+  }
   if (tools) {
     params.tools = tools.map(convertToOpenAITool);
   }
@@ -162,6 +174,10 @@ function convertToOpenAICreateParams(
     params.tools.push({
       type: "image_generation",
     });
+  }
+  if (reasoning) {
+    params.include = ["reasoning.encrypted_content"];
+    params.reasoning = convertToOpenAIReasoning(reasoning);
   }
 
   return { ...params, ...extra };
@@ -412,6 +428,36 @@ function convertToOpenAIResponseTextConfig(
       };
     }
   }
+}
+
+function convertToOpenAIReasoning(
+  reasoning: ReasoningOptions,
+): OpenAI.Reasoning {
+  const openaiReasoning: OpenAI.Reasoning = {
+    summary: reasoning.enabled ? "auto" : null,
+  };
+  if (reasoning.budget_tokens) {
+    switch (reasoning.budget_tokens) {
+      case OpenAIReasoningEffort.Minimal:
+        openaiReasoning.effort = "minimal";
+        break;
+      case OpenAIReasoningEffort.Low:
+        openaiReasoning.effort = "low";
+        break;
+      case OpenAIReasoningEffort.Medium:
+        openaiReasoning.effort = "medium";
+        break;
+      case OpenAIReasoningEffort.High:
+        openaiReasoning.effort = "high";
+        break;
+      default:
+        throw new UnsupportedError(
+          PROVIDER,
+          `Budget tokens property is not supported for OpenAI reasoning. You may use OpenAIReasoningEffort enum values to map it to OpenAI reasoning effort levels.`,
+        );
+    }
+  }
+  return openaiReasoning;
 }
 
 // MARK: To SDK Message

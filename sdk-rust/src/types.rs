@@ -419,6 +419,17 @@ pub struct AudioOptions {
     pub language: Option<String>,
 }
 
+/// Options for reasoning generation.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ReasoningOptions {
+    /// Whether to enable reasoning output.
+    pub enabled: bool,
+    /// Specify the budget tokens for reasoning generation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_tokens: Option<u32>,
+}
+
 /// Defines the input parameters for the language model completion.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -475,6 +486,8 @@ pub struct LanguageModelInput {
     /// Options for audio generation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<AudioOptions>,
+    /// Options for reasoning generation.
+    pub reasoning: Option<ReasoningOptions>,
     /// Extra options that the model may support.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra: Option<LanguageModelInputExtra>,

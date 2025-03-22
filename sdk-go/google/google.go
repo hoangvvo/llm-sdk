@@ -265,6 +265,10 @@ func convertToGenerateContentParameters(input *llmsdk.LanguageModelInput, modelI
 		params.GenerationConfig.SpeechConfig = convertToGoogleSpeechConfig(*input.Audio)
 	}
 
+	if input.Reasoning != nil {
+		params.GenerationConfig.ThinkingConfig = convertToGoogleThinkingConfig(*input.Reasoning)
+	}
+
 	return params, nil
 }
 
@@ -471,6 +475,16 @@ func convertToGoogleSpeechConfig(audio llmsdk.AudioOptions) *googleapi.SpeechCon
 	}
 }
 
+func convertToGoogleThinkingConfig(reasoning llmsdk.ReasoningOptions) *googleapi.ThinkingConfig {
+	c := &googleapi.ThinkingConfig{
+		IncludeThoughts: ptr.To(reasoning.Enabled),
+	}
+	if reasoning.BudgetTokens != nil {
+		c.ThinkingBudget = ptr.To(int(*reasoning.BudgetTokens))
+	}
+	return c
+}
+
 // mapGoogleContent maps Google API parts to SDK parts
 func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 	var result []llmsdk.Part
@@ -564,7 +578,7 @@ func mapGoogleContentToDelta(content googleapi.Content, existingContentDeltas []
 	}
 
 	for _, part := range parts {
-		partDelta := looselyConvertPartToPartDelta(part)
+		partDelta := llmsdk.LooselyConvertPartToPartDelta(part)
 		index := llmsdk.GuessDeltaIndex(partDelta, append(existingContentDeltas, contentDeltas...), nil)
 		contentDeltas = append(contentDeltas, llmsdk.ContentDelta{
 			Index: index,
@@ -573,56 +587,6 @@ func mapGoogleContentToDelta(content googleapi.Content, existingContentDeltas []
 	}
 
 	return contentDeltas, nil
-}
-
-// looselyConvertPartToPartDelta converts a Part to a PartDelta
-func looselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
-	switch {
-	case part.TextPart != nil:
-		return llmsdk.PartDelta{
-			TextPartDelta: &llmsdk.TextPartDelta{
-				Text: part.TextPart.Text,
-			},
-		}
-	case part.ToolCallPart != nil:
-		argsStr := string(part.ToolCallPart.Args)
-		return llmsdk.PartDelta{
-			ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-				ToolCallID: &part.ToolCallPart.ToolCallID,
-				ToolName:   &part.ToolCallPart.ToolName,
-				Args:       &argsStr,
-			},
-		}
-	case part.ReasoningPart != nil:
-		return llmsdk.PartDelta{
-			ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
-				Text:      part.ReasoningPart.Text,
-				Signature: part.ReasoningPart.Signature,
-			},
-		}
-	case part.ImagePart != nil:
-		return llmsdk.PartDelta{
-			ImagePartDelta: &llmsdk.ImagePartDelta{
-				MimeType:  &part.ImagePart.MimeType,
-				ImageData: &part.ImagePart.ImageData,
-				Width:     part.ImagePart.Width,
-				Height:    part.ImagePart.Height,
-			},
-		}
-	case part.AudioPart != nil:
-		return llmsdk.PartDelta{
-			AudioPartDelta: &llmsdk.AudioPartDelta{
-				AudioData:  &part.AudioPart.AudioData,
-				Format:     &part.AudioPart.Format,
-				SampleRate: part.AudioPart.SampleRate,
-				Channels:   part.AudioPart.Channels,
-				Transcript: part.AudioPart.Transcript,
-				AudioID:    part.AudioPart.AudioID,
-			},
-		}
-	default:
-		return llmsdk.PartDelta{}
-	}
 }
 
 // mapGoogleUsageMetadata maps Google usage metadata to SDK usage

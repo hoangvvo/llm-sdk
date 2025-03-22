@@ -290,6 +290,21 @@ func convertToOpenAICreateParams(input *llmsdk.LanguageModelInput, modelID strin
 		}
 	}
 
+	if input.Reasoning != nil && input.Reasoning.BudgetTokens != nil {
+		switch OpenAIReasoningEffort(*input.Reasoning.BudgetTokens) {
+		case OpenAIReasoningEffortMinimal:
+			params.ReasoningEffort = ptr.To(openaiapi.ReasoningEffortMinimal)
+		case OpenAIReasoningEffortLow:
+			params.ReasoningEffort = ptr.To(openaiapi.ReasoningEffortLow)
+		case OpenAIReasoningEffortMedium:
+			params.ReasoningEffort = ptr.To(openaiapi.ReasoningEffortMedium)
+		case OpenAIReasoningEffortHigh:
+			params.ReasoningEffort = ptr.To(openaiapi.ReasoningEffortHigh)
+		default:
+			return nil, llmsdk.NewUnsupportedError(Provider, "Budget tokens property is not supported for OpenAI reasoning. You may use OpenAIChatCompletionReasoningEffort enum values to map it to OpenAI reasoning effort levels.")
+		}
+	}
+
 	return params, nil
 }
 

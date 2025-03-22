@@ -36,9 +36,10 @@ import type {
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 import type { OpenAIModelOptions } from "./options.ts";
-import type {
-  OpenAIPatchedCompletionTokenDetails,
-  OpenAIPatchedPromptTokensDetails,
+import {
+  OpenAIReasoningEffort,
+  type OpenAIPatchedCompletionTokenDetails,
+  type OpenAIPatchedPromptTokensDetails,
 } from "./types.ts";
 
 const PROVIDER = "openai";
@@ -46,7 +47,7 @@ const PROVIDER = "openai";
 const OPENAI_AUDIO_SAMPLE_RATE = 24_000;
 const OPENAI_AUDIO_CHANNELS = 1;
 
-export class OpenAIChatCompletionModel implements LanguageModel {
+export class OpenAIChatModel implements LanguageModel {
   provider: string;
   modelId: string;
   metadata?: LanguageModelMetadata;
@@ -169,6 +170,7 @@ function convertToOpenAICreateParams(
     tool_choice,
     modalities,
     audio,
+    reasoning,
     extra,
   } = input;
   const params: Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> = {
@@ -194,6 +196,27 @@ function convertToOpenAICreateParams(
   }
   if (audio) {
     params.audio = convertToOpenAIAudio(audio);
+  }
+  if (reasoning?.budget_tokens) {
+    switch (reasoning.budget_tokens) {
+      case OpenAIReasoningEffort.Minimal:
+        params.reasoning_effort = "minimal";
+        break;
+      case OpenAIReasoningEffort.Low:
+        params.reasoning_effort = "low";
+        break;
+      case OpenAIReasoningEffort.Medium:
+        params.reasoning_effort = "medium";
+        break;
+      case OpenAIReasoningEffort.High:
+        params.reasoning_effort = "high";
+        break;
+      default:
+        throw new UnsupportedError(
+          PROVIDER,
+          "Budget tokens property is not supported for OpenAI reasoning. You may use OpenAIChatCompletionReasoningEffort enum values to map it to OpenAI reasoning effort levels.",
+        );
+    }
   }
   return params;
 }

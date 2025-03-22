@@ -78,3 +78,14 @@ export interface OpenAIPatchedImageGenerationCallPartialImage {
   size?: `${number}x${number}`;
   output_format?: string; // png, jpeg, etc.
 }
+
+/**
+ * OpenAI does not have an equivalent of reasoning budget tokens, but
+ * we can use the property to indicate the level of reasoning effort.
+ */
+export const OpenAIReasoningEffort = {
+  Minimal: 1000,
+  Low: 2000,
+  Medium: 3000,
+  High: 4000,
+};

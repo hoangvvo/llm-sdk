@@ -89,3 +89,52 @@ func GuessDeltaIndex(part PartDelta, allContentDeltas []ContentDelta, toolCallIn
 		return maxIndex + 1
 	}
 }
+
+func LooselyConvertPartToPartDelta(part Part) PartDelta {
+	switch {
+	case part.TextPart != nil:
+		return PartDelta{
+			TextPartDelta: &TextPartDelta{
+				Text: part.TextPart.Text,
+			},
+		}
+	case part.ToolCallPart != nil:
+		argsStr := string(part.ToolCallPart.Args)
+		return PartDelta{
+			ToolCallPartDelta: &ToolCallPartDelta{
+				ToolCallID: &part.ToolCallPart.ToolCallID,
+				ToolName:   &part.ToolCallPart.ToolName,
+				Args:       &argsStr,
+			},
+		}
+	case part.ReasoningPart != nil:
+		return PartDelta{
+			ReasoningPartDelta: &ReasoningPartDelta{
+				Text:      part.ReasoningPart.Text,
+				Signature: part.ReasoningPart.Signature,
+			},
+		}
+	case part.ImagePart != nil:
+		return PartDelta{
+			ImagePartDelta: &ImagePartDelta{
+				MimeType:  &part.ImagePart.MimeType,
+				ImageData: &part.ImagePart.ImageData,
+				Width:     part.ImagePart.Width,
+				Height:    part.ImagePart.Height,
+			},
+		}
+	case part.AudioPart != nil:
+		return PartDelta{
+			AudioPartDelta: &AudioPartDelta{
+				AudioData:  &part.AudioPart.AudioData,
+				Format:     &part.AudioPart.Format,
+				SampleRate: part.AudioPart.SampleRate,
+				Channels:   part.AudioPart.Channels,
+				Transcript: part.AudioPart.Transcript,
+				AudioID:    part.AudioPart.AudioID,
+			},
+		}
+	default:
+		return PartDelta{}
+	}
+}

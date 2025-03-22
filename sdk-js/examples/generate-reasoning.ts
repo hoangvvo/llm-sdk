@@ -17,8 +17,8 @@ const response = await model.generate({
       ],
     },
   ],
-  extra: {
-    include: ["reasoning.encrypted_content"],
+  reasoning: {
+    enabled: true,
   },
 });
 

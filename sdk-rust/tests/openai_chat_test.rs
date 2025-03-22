@@ -80,12 +80,11 @@ test_set!(
     generate_audio,
     Some(RunTestCaseOptions {
         additional_input: Some(|input| {
-            input.extra = Some(serde_json::json!({
-                "audio": {
-                    "voice": "alloy",
-                    "format": "pcm16"
-                }
-            }));
+            input.audio = Some(AudioOptions {
+                format: Some(AudioFormat::Mp3),
+                voice: Some("alloy".to_string()),
+                ..Default::default()
+            });
         }),
     })
 );
@@ -95,12 +94,11 @@ test_set!(
     stream_audio,
     Some(RunTestCaseOptions {
         additional_input: Some(|input| {
-            input.extra = Some(serde_json::json!({
-                "audio": {
-                    "voice": "alloy",
-                    "format": "pcm16"
-                }
-            }));
+            input.audio = Some(AudioOptions {
+                format: Some(AudioFormat::Linear16),
+                voice: Some("alloy".to_string()),
+                ..Default::default()
+            });
         }),
     })
 );

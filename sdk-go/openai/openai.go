@@ -31,6 +31,15 @@ type OpenAIModelOptions struct {
 	APIKey  string
 }
 
+type OpenAIReasoningEffort uint32
+
+const (
+	OpenAIReasoningEffortMinimal OpenAIReasoningEffort = 1000
+	OpenAIReasoningEffortLow     OpenAIReasoningEffort = 2000
+	OpenAIReasoningEffortMedium  OpenAIReasoningEffort = 3000
+	OpenAIReasoningEffortHigh    OpenAIReasoningEffort = 4000
+)
+
 func NewOpenAIModel(modelID string, options OpenAIModelOptions) *OpenAIModel {
 	baseURL := options.BaseURL
 	if baseURL == "" {
@@ -267,6 +276,16 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 			params.Tools = append(params.Tools, openaiapi.Tool{
 				ToolImageGeneration: &openaiapi.ToolImageGeneration{},
 			})
+		}
+	}
+
+	if input.Reasoning != nil {
+		params.Include = []openaiapi.ResponseIncludable{
+			openaiapi.ResponseIncludableReasoningEncryptedContent,
+		}
+		params.Reasoning, err = convertToOpenAIReasoning(*input.Reasoning)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -516,6 +535,28 @@ func convertToOpenAIResponseTextConfig(responseFormat llmsdk.ResponseFormatOptio
 		}
 	}
 	return nil
+}
+
+func convertToOpenAIReasoning(reasoning llmsdk.ReasoningOptions) (*openaiapi.Reasoning, error) {
+	openaiReasoning := &openaiapi.Reasoning{}
+	if reasoning.Enabled {
+		openaiReasoning.Summary = ptr.To("auto")
+	}
+	if reasoning.BudgetTokens != nil {
+		switch OpenAIReasoningEffort(*reasoning.BudgetTokens) {
+		case OpenAIReasoningEffortMinimal:
+			openaiReasoning.Effort = ptr.To(openaiapi.ReasoningEffortMinimal)
+		case OpenAIReasoningEffortLow:
+			openaiReasoning.Effort = ptr.To(openaiapi.ReasoningEffortLow)
+		case OpenAIReasoningEffortMedium:
+			openaiReasoning.Effort = ptr.To(openaiapi.ReasoningEffortMedium)
+		case OpenAIReasoningEffortHigh:
+			openaiReasoning.Effort = ptr.To(openaiapi.ReasoningEffortHigh)
+		default:
+			return nil, llmsdk.NewUnsupportedError(Provider, "Budget tokens property is not supported for OpenAI reasoning. You may use OpenAIReasoningEffort enum values to map it to OpenAI reasoning effort levels.")
+		}
+	}
+	return openaiReasoning, nil
 }
 
 // MARK: - To SDK Message

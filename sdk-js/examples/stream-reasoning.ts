@@ -17,8 +17,8 @@ const stream = model.stream({
       ],
     },
   ],
-  extra: {
-    include: ["reasoning.encrypted_content"],
+  reasoning: {
+    enabled: true,
   },
 });
 

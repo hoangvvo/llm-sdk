@@ -19,11 +19,9 @@ suite("AnthropicModel", () => {
   const reasoningOptions: RunTestCaseOptions = {
     additionalInputs: (input) => ({
       ...input,
-      extra: {
-        thinking: {
-          type: "enabled",
-          budget_tokens: 3000,
-        },
+      reasoning: {
+        enabled: true,
+        budget_tokens: 3000,
       },
     }),
   };

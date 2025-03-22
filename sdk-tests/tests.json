@@ -621,7 +621,10 @@
               }
             ]
           }
-        ]
+        ],
+        "reasoning": {
+          "enabled": true
+        }
       },
       "output": {
         "content": [
@@ -646,7 +649,10 @@
               }
             ]
           }
-        ]
+        ],
+        "reasoning": {
+          "enabled": true
+        }
       },
       "output": {
         "content": [
@@ -693,7 +699,10 @@
               }
             ]
           }
-        ]
+        ],
+        "reasoning": {
+          "enabled": true
+        }
       },
       "output": {
         "content": [
