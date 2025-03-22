@@ -9,6 +9,7 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
@@ -273,25 +274,19 @@ func convertToOpenAICreateParams(input *llmsdk.LanguageModelInput, modelID strin
 	}
 
 	if input.Modalities != nil {
-		var modalities []openaiapi.OpenAIModality
-		for _, modality := range input.Modalities {
-			openaiModality, err := convertToOpenAIModality(modality)
-			if err != nil {
-				return nil, err
-			}
-			modalities = append(modalities, openaiModality)
+		modalities, err := sliceutils.MapErr(input.Modalities, func(modality llmsdk.Modality) (openaiapi.OpenAIModality, error) {
+			return convertToOpenAIModality(modality)
+		})
+		if err != nil {
+			return nil, err
 		}
 		params.Modalities = modalities
 	}
 
-	// Handle audio parameter from extra
-	if input.Extra != nil {
-		if audioValue, exists := input.Extra["audio"]; exists {
-			audioBytes, _ := json.Marshal(audioValue)
-			var audioParam openaiapi.ChatCompletionAudioParam
-			if json.Unmarshal(audioBytes, &audioParam) == nil {
-				params.Audio = &audioParam
-			}
+	if input.Audio != nil {
+		params.Audio, err = convertToOpenAIAudio(*input.Audio)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -551,6 +546,37 @@ func convertToOpenAIModality(modality llmsdk.Modality) (openaiapi.OpenAIModality
 	default:
 		return "", llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert modality to OpenAI modality for modality %s", modality))
 	}
+}
+
+func convertToOpenAIAudio(audio llmsdk.AudioOptions) (*openaiapi.ChatCompletionAudioParam, error) {
+	if audio.Voice == nil {
+		return nil, llmsdk.NewInvalidInputError("Audio voice is required for OpenAI audio generation")
+	}
+
+	var format openaiapi.AudioOutputFormat
+	switch *audio.Format {
+	case llmsdk.AudioFormatWav:
+		format = openaiapi.AudioOutputFormatWav
+	case llmsdk.AudioFormatMP3:
+		format = openaiapi.AudioOutputFormatMp3
+	case llmsdk.AudioFormatFLAC:
+		format = openaiapi.AudioOutputFormatFlac
+	case llmsdk.AudioFormatAAC:
+		format = openaiapi.AudioOutputFormatAac
+	case llmsdk.AudioFormatOpus:
+		format = openaiapi.AudioOutputFormatOpus
+	case llmsdk.AudioFormatLinear16:
+		format = openaiapi.AudioOutputFormatPcm16
+	default:
+		return nil, llmsdk.NewInvalidInputError(fmt.Sprintf("unsupported audio format for OpenAI: %s", *audio.Format))
+	}
+
+	audioParam := &openaiapi.ChatCompletionAudioParam{
+		Format: format,
+		Voice:  *audio.Voice,
+	}
+
+	return audioParam, nil
 }
 
 // MARK: - Map From OpenAI API Types

@@ -6,13 +6,11 @@ let speaker: Speaker | undefined;
 const model = getModel("openai-chat-completion", "gpt-4o-audio-preview");
 
 const response = model.stream({
-  extra: {
-    audio: {
-      voice: "alloy",
-      format: "pcm16",
-    },
-  },
   modalities: ["text", "audio"],
+  audio: {
+    format: "linear16",
+    voice: "alloy",
+  },
   messages: [
     {
       role: "user",

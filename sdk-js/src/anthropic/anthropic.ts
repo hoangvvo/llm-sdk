@@ -456,6 +456,7 @@ function mapAnthropicRawContentBlockDelta(
       return {
         type: "reasoning",
         signature: delta.signature,
+        text: "",
       };
     default: {
       throw new NotImplementedError(

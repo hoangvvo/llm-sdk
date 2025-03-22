@@ -4,9 +4,9 @@ use crate::{
     openai::chat_api as openai_api,
     source_part_utils, stream_utils,
     usage_utils::calculate_cost,
-    AssistantMessage, AudioFormat, AudioPart, AudioPartDelta, ContentDelta, ImagePart,
-    LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult, Message, Modality,
-    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
+    AssistantMessage, AudioFormat, AudioOptions, AudioPart, AudioPartDelta, ContentDelta,
+    ImagePart, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult, Message,
+    Modality, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
     ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
     ToolChoiceOption, ToolMessage, UserMessage,
 };
@@ -223,6 +223,7 @@ fn into_openai_create_params(
         tool_choice,
         extra,
         modalities,
+        audio,
         ..
     } = input;
 
@@ -249,12 +250,7 @@ fn into_openai_create_params(
                 ))
             },
         )?,
-        audio: extra
-            .as_ref()
-            .and_then(|extra| extra.get("audio").cloned())
-            .and_then(|value| {
-                serde_json::from_value::<openai_api::ChatCompletionAudioParam>(value).ok()
-            }),
+        audio: audio.map(TryInto::try_into).transpose()?,
         extra,
         ..Default::default()
     })
@@ -539,6 +535,36 @@ impl TryFrom<Modality> for openai_api::Modality {
                 format!("Cannot convert modality to OpenAI modality for modality {modality:#?}"),
             )),
         }
+    }
+}
+
+impl TryFrom<AudioOptions> for openai_api::ChatCompletionAudioParam {
+    type Error = LanguageModelError;
+
+    fn try_from(options: AudioOptions) -> Result<Self, Self::Error> {
+        Ok(Self {
+            format: match options.format {
+                Some(AudioFormat::Wav) => Ok(openai_api::AudioOutputFormat::Wav),
+                Some(AudioFormat::Mp3) => Ok(openai_api::AudioOutputFormat::Mp3),
+                Some(AudioFormat::Aac) => Ok(openai_api::AudioOutputFormat::Aac),
+                Some(AudioFormat::Flac) => Ok(openai_api::AudioOutputFormat::Flac),
+                Some(AudioFormat::Opus) => Ok(openai_api::AudioOutputFormat::Opus),
+                Some(AudioFormat::Linear16) => Ok(openai_api::AudioOutputFormat::Pcm16),
+                _ => Err(LanguageModelError::Unsupported(
+                    PROVIDER,
+                    format!(
+                        "Cannot convert audio format to OpenAI Audio format for format {:?}",
+                        options.format
+                    ),
+                )),
+            }?,
+            voice: options.voice.ok_or_else(|| {
+                LanguageModelError::Invariant(
+                    PROVIDER,
+                    "Audio voice is required for OpenAI audio".to_string(),
+                )
+            })?,
+        })
     }
 }
 

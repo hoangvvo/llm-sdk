@@ -1,9 +1,8 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
 use futures::StreamExt;
-use llm_sdk::{LanguageModelInput, Message, Modality, Part, PartDelta};
+use llm_sdk::{AudioFormat, AudioOptions, LanguageModelInput, Message, Modality, Part, PartDelta};
 use rodio::{buffer::SamplesBuffer, OutputStream, Sink};
-use serde_json::json;
 
 mod common;
 
@@ -23,13 +22,15 @@ async fn main() {
 
     let mut stream = model
         .stream(LanguageModelInput {
-            extra: Some(json!({
-                "audio": { "voice": "alloy", "format": "pcm16" }
-            })),
             modalities: Some(vec![Modality::Text, Modality::Audio]),
             messages: vec![Message::user(vec![Part::text(
                 "Is a golden retriever a good family dog?",
             )])],
+            audio: Some(AudioOptions {
+                format: Some(AudioFormat::Linear16),
+                voice: Some("alloy".into()),
+                ..Default::default()
+            }),
             ..Default::default()
         })
         .await

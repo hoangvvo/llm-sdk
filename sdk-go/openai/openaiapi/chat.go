@@ -651,7 +651,7 @@ type ChatCompletionAudioParam struct {
 	// The voice the model uses to respond. Supported voices are `alloy`,
 	// `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`,
 	// and `shimmer`.
-	Voice Voice `json:"voice"`
+	Voice string `json:"voice"`
 }
 
 // AudioOutputFormat represents audio output formats
@@ -664,20 +664,6 @@ const (
 	AudioOutputFormatFlac  AudioOutputFormat = "flac"
 	AudioOutputFormatOpus  AudioOutputFormat = "opus"
 	AudioOutputFormatPcm16 AudioOutputFormat = "pcm16"
-)
-
-// Voice represents available voices
-type Voice string
-
-const (
-	VoiceAlloy   Voice = "alloy"
-	VoiceAsh     Voice = "ash"
-	VoiceBallad  Voice = "ballad"
-	VoiceCoral   Voice = "coral"
-	VoiceEcho    Voice = "echo"
-	VoiceSage    Voice = "sage"
-	VoiceShimmer Voice = "shimmer"
-	VoiceVerse   Voice = "verse"
 )
 
 // Controls which (if any) tool is called by the model. `none` means the model

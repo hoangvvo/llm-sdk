@@ -313,9 +313,8 @@ func main() {
 		log.Fatal("OPENAI_API_KEY environment variable must be set")
 	}
 
-	model := openai.NewOpenAIModel(openai.OpenAIModelOptions{
-		APIKey:  apiKey,
-		ModelID: "gpt-4o",
+	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{
+		APIKey: apiKey,
 	})
 
 	// Order processing agent

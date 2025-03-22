@@ -261,6 +261,10 @@ func convertToGenerateContentParameters(input *llmsdk.LanguageModelInput, modelI
 		params.GenerationConfig.ResponseModalities = sliceutils.Map(input.Modalities, convertToGoogleModality)
 	}
 
+	if input.Audio != nil {
+		params.GenerationConfig.SpeechConfig = convertToGoogleSpeechConfig(*input.Audio)
+	}
+
 	return params, nil
 }
 
@@ -454,6 +458,17 @@ func convertToGoogleModality(modality llmsdk.Modality) string {
 		return "AUDIO"
 	}
 	return ""
+}
+
+func convertToGoogleSpeechConfig(audio llmsdk.AudioOptions) *googleapi.SpeechConfig {
+	return &googleapi.SpeechConfig{
+		VoiceConfig: &googleapi.VoiceConfig{
+			PrebuiltVoiceConfig: &googleapi.PrebuiltVoiceConfig{
+				VoiceName: audio.Voice,
+			},
+		},
+		LanguageCode: audio.LanguageCode,
+	}
 }
 
 // mapGoogleContent maps Google API parts to SDK parts

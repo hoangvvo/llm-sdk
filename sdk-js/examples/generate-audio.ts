@@ -6,13 +6,11 @@ import { getModel } from "./get-model.ts";
 const model = getModel("openai-chat-completion", "gpt-4o-audio-preview");
 
 const response = await model.generate({
-  extra: {
-    audio: {
-      voice: "alloy",
-      format: "mp3",
-    },
-  },
   modalities: ["text", "audio"],
+  audio: {
+    format: "mp3",
+    voice: "alloy",
+  },
   messages: [
     {
       role: "user",

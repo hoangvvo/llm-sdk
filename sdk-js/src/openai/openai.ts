@@ -144,20 +144,19 @@ function convertToOpenAICreateParams(
     max_output_tokens: max_tokens ?? null,
     temperature: temperature ?? null,
     top_p: top_p ?? null,
-    ...(tools && {
-      tools: tools.map(convertToOpenAITool),
-    }),
-    ...(tool_choice && {
-      tool_choice: convertToOpenAIToolChoice(tool_choice),
-    }),
-    ...(response_format && {
-      text: convertToOpenAIResponseTextConfig(response_format),
-    }),
     reasoning: {
       summary: "auto",
     },
   };
-
+  if (tools) {
+    params.tools = tools.map(convertToOpenAITool);
+  }
+  if (tool_choice) {
+    params.tool_choice = convertToOpenAIToolChoice(tool_choice);
+  }
+  if (response_format) {
+    params.text = convertToOpenAIResponseTextConfig(response_format);
+  }
   if (modalities?.includes("image")) {
     params.tools = params.tools ?? [];
     params.tools.push({
@@ -531,6 +530,7 @@ function mapOpenAIStreamEvent(
         if (event.item.encrypted_content) {
           const part: ReasoningPartDelta = {
             type: "reasoning",
+            text: "",
             signature: event.item.encrypted_content,
           };
 

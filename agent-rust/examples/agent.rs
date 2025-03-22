@@ -127,12 +127,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
     // Define the model to use for the Agent
-    let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
-        api_key: env::var("OPENAI_API_KEY")
-            .expect("OPENAI_API_KEY environment variable must be set"),
-        model_id: "gpt-4o".to_string(),
-        ..Default::default()
-    }));
+    let model = Arc::new(OpenAIModel::new(
+        "gpt-4o",
+        OpenAIModelOptions {
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY environment variable must be set"),
+            ..Default::default()
+        },
+    ));
 
     // Create the Agent
     let my_assistant = Agent::<MyContext>::builder("Mai", model)

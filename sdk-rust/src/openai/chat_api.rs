@@ -363,7 +363,7 @@ pub struct ChatCompletionAudioParam {
     /// The voice the model uses to respond. Supported voices are `alloy`,
     /// `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`,
     /// and `shimmer`.
-    pub voice: Voice,
+    pub voice: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -375,29 +375,6 @@ pub enum AudioOutputFormat {
     Flac,
     Opus,
     Pcm16,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum Voice {
-    #[serde(rename = "alloy")]
-    Alloy,
-    #[serde(rename = "ash")]
-    Ash,
-    #[serde(rename = "ballad")]
-    Ballad,
-    #[serde(rename = "coral")]
-    Coral,
-    #[serde(rename = "echo")]
-    Echo,
-    #[serde(rename = "sage")]
-    Sage,
-    #[serde(rename = "shimmer")]
-    Shimmer,
-    #[serde(rename = "verse")]
-    Verse,
-    /// Custom voice
-    Custom(String),
 }
 
 /// Controls which (if any) tool is called by the model. `none` means the model

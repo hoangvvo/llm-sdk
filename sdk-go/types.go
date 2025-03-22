@@ -647,6 +647,16 @@ func (r *ResponseFormatOption) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// AudioOptions represents options for audio generation.
+type AudioOptions struct {
+	// The desired audio format.
+	Format *AudioFormat `json:"format,omitempty"`
+	// The provider-specific voice ID to use for audio generation.
+	Voice *string `json:"voice,omitempty"`
+	// The language code for the audio generation
+	LanguageCode *string `json:"language_code,omitempty"`
+}
+
 // LanguageModelCapability represents a metadata property that describes the capability of the model.
 type LanguageModelCapability string
 
@@ -741,6 +751,8 @@ type LanguageModelInput struct {
 	Modalities []Modality `json:"modalities,omitempty"`
 	// A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.
 	Metadata map[string]string `json:"metadata,omitempty"`
+	// Options for audio generation.
+	Audio *AudioOptions `json:"audio,omitempty"`
 	// Extra options that the model may support.
 	Extra map[string]any `json:"extra,omitempty"`
 }

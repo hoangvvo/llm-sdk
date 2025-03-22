@@ -131,12 +131,14 @@ impl AgentTool<()> for SearchHotelsTool {
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
-    let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
-        api_key: env::var("OPENAI_API_KEY")
-            .expect("OPENAI_API_KEY environment variable must be set"),
-        model_id: "gpt-4o".to_string(),
-        ..Default::default()
-    }));
+    let model = Arc::new(OpenAIModel::new(
+        "gpt-4o",
+        OpenAIModelOptions {
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY environment variable must be set"),
+            ..Default::default()
+        },
+    ));
 
     // Define the response format
     let response_format = ResponseFormatOption::Json(ResponseFormatJson {

@@ -404,6 +404,21 @@ pub struct ResponseFormatJson {
     pub schema: Option<JSONSchema>,
 }
 
+/// Options for audio generation.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct AudioOptions {
+    /// The format of the audio.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<AudioFormat>,
+    /// The provider-specifc voice ID to use for audio generation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voice: Option<String>,
+    /// The language code for the audio generation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+}
+
 /// Defines the input parameters for the language model completion.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -457,6 +472,9 @@ pub struct LanguageModelInput {
     /// request. This is forwarded to the model provider if supported.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, String>>,
+    /// Options for audio generation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audio: Option<AudioOptions>,
     /// Extra options that the model may support.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra: Option<LanguageModelInputExtra>,

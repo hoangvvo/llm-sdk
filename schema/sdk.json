@@ -526,6 +526,25 @@
       "required": ["type", "name"],
       "additionalProperties": false
     },
+    "AudioOptions": {
+      "type": "object",
+      "description": "Options for audio generation.",
+      "properties": {
+        "format": {
+          "$ref": "#/definitions/AudioFormat",
+          "description": "The desired audio format for generation."
+        },
+        "voice": {
+          "type": "string",
+          "description": "The provider-specific voice ID to use for audio generation."
+        },
+        "language": {
+          "type": "string",
+          "description": "The language code for the audio generation."
+        }
+      },
+      "additionalProperties": false
+    },
     "LanguageModelInput": {
       "type": "object",
       "description": "Defines the input parameters for the language model completion.",
@@ -578,6 +597,10 @@
           "type": "array",
           "description": "The modalities that the model should support.",
           "items": { "$ref": "#/definitions/Modality" }
+        },
+        "audio": {
+          "$ref": "#/definitions/AudioOptions",
+          "description": "Options for audio generation."
         },
         "metadata": {
           "type": "object",

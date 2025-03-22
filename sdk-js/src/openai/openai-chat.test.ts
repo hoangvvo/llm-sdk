@@ -80,11 +80,9 @@ suite("OpenAIChatCompletionModel", () => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
       additionalInputs: (input) => ({
         ...input,
-        extra: {
-          audio: {
-            voice: "alloy",
-            format: "mp3",
-          },
+        audio: {
+          format: "linear16",
+          voice: "alloy",
         },
       }),
     });
@@ -94,11 +92,9 @@ suite("OpenAIChatCompletionModel", () => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
       additionalInputs: (input) => ({
         ...input,
-        extra: {
-          audio: {
-            voice: "alloy",
-            format: "pcm16",
-          },
+        audio: {
+          format: "linear16",
+          voice: "alloy",
         },
       }),
     });

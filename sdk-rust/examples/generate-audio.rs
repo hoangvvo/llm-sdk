@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
-use llm_sdk::{LanguageModelInput, Message, Modality, Part};
+use llm_sdk::{AudioFormat, AudioOptions, LanguageModelInput, Message, Modality, Part};
 use std::io::Cursor;
 
 mod common;
@@ -13,16 +13,15 @@ async fn main() {
 
     let response = model
         .generate(LanguageModelInput {
-            extra: Some(serde_json::json!({
-                "audio": {
-                    "voice": "alloy",
-                    "format": "mp3"
-                }
-            })),
             modalities: Some(vec![Modality::Text, Modality::Audio]),
             messages: vec![Message::user(vec![Part::text(
                 "Is a golden retriever a good family dog?",
             )])],
+            audio: Some(AudioOptions {
+                format: Some(AudioFormat::Mp3),
+                voice: Some("alloy".into()),
+                ..Default::default()
+            }),
             ..Default::default()
         })
         .await

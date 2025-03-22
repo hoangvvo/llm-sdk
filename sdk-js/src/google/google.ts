@@ -1,8 +1,10 @@
 import type {
   FunctionCallingConfig,
   FunctionDeclaration,
+  GenerateContentConfig,
   Part as GooglePart,
   ModalityTokenCount,
+  SpeechConfig,
   UsageMetadata,
 } from "@google/genai";
 import {
@@ -33,6 +35,7 @@ import {
   looselyConvertPartToPartDelta,
 } from "../stream.utils.ts";
 import type {
+  AudioOptions,
   ContentDelta,
   LanguageModelInput,
   Message,
@@ -150,50 +153,73 @@ function convertToGenerateContentParameters(
     frequency_penalty,
     seed,
     modalities,
+    audio,
     extra,
   } = input;
-
-  const responseSchemaTuple = response_format
-    ? convertToGoogleResponseSchema(response_format)
-    : null;
 
   const params: GenerateContentParameters = {
     contents: convertToGoogleContents(messages),
     model: modelId,
     ...extra,
     config: {
-      ...(system_prompt && { systemInstruction: system_prompt }),
-      ...(temperature && { temperature }),
-      ...(top_p && { topP: top_p }),
-      ...(top_k && { topK: top_k }),
-      ...(presence_penalty && { presencePenalty: presence_penalty }),
-      ...(frequency_penalty && { frequencyPenalty: frequency_penalty }),
-      ...(seed && { seed }),
-      ...(max_tokens && { maxOutputTokens: max_tokens }),
-      ...(tools && {
-        tools: [{ functionDeclarations: tools.map(convertToGoogleTool) }],
-      }),
-      ...(tool_choice && {
-        toolConfig: {
-          functionCallingConfig:
-            convertToGoogleFunctionCallingConfig(tool_choice),
-        },
-      }),
-      ...(responseSchemaTuple && {
-        responseMimeType: responseSchemaTuple[0],
-        responseJsonSchema: responseSchemaTuple[1],
-      }),
-      ...(modalities && {
-        responseModalities: modalities.map(convertToGoogleModality),
-      }),
       thinkingConfig: {
         includeThoughts: true,
       },
       ...(extra?.["config"] as object),
     },
   };
+  const config: GenerateContentConfig = {
+    ...(extra?.["config"] as object),
+  };
+  if (system_prompt) {
+    config.systemInstruction = system_prompt;
+  }
+  if (temperature) {
+    config.temperature = temperature;
+  }
+  if (top_p) {
+    config.topP = top_p;
+  }
+  if (top_k) {
+    config.topK = top_k;
+  }
+  if (presence_penalty) {
+    config.presencePenalty = presence_penalty;
+  }
+  if (frequency_penalty) {
+    config.frequencyPenalty = frequency_penalty;
+  }
+  if (seed) {
+    config.seed = seed;
+  }
+  if (max_tokens) {
+    config.maxOutputTokens = max_tokens;
+  }
+  if (tools) {
+    config.tools = [{ functionDeclarations: tools.map(convertToGoogleTool) }];
+  }
+  if (tool_choice) {
+    config.toolConfig = {
+      functionCallingConfig: convertToGoogleFunctionCallingConfig(tool_choice),
+    };
+  }
+  if (response_format) {
+    const [responseMimeType, responseJsonSchema] =
+      convertToGoogleResponseSchema(response_format);
+    config.responseMimeType = responseMimeType;
+    config.responseJsonSchema = responseJsonSchema;
+  }
+  if (modalities) {
+    config.responseModalities = modalities.map(convertToGoogleModality);
+  }
+  if (audio) {
+    config.speechConfig = convertToGoogleSpeechConfig(audio);
+  }
 
-  return params;
+  return {
+    ...params,
+    config,
+  };
 }
 
 function convertToGoogleContents(messages: Message[]): Content[] {
@@ -369,6 +395,17 @@ function convertToGoogleModality(modality: Modality): string {
     case "audio":
       return "AUDIO";
   }
+}
+
+function convertToGoogleSpeechConfig(audio: AudioOptions): SpeechConfig {
+  return {
+    voiceConfig: {
+      prebuiltVoiceConfig: {
+        ...(audio.voice && { voiceName: audio.voice }),
+      },
+    },
+    ...(audio.language_code && { languageCode: audio.language_code }),
+  };
 }
 
 function mapGoogleContent(parts: GooglePart[]): Part[] {

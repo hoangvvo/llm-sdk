@@ -309,7 +309,7 @@ export interface ReasoningPartDelta {
   /**
    * The reasoning text content
    */
-  text?: string;
+  text: string;
   /**
    * The reasoning internal signature
    */
@@ -436,6 +436,23 @@ export interface ResponseFormatJson {
   schema?: JSONSchema;
 }
 /**
+ * Options for audio generation.
+ */
+export interface AudioOptions {
+  /**
+   * The desired audio format.
+   */
+  format?: AudioFormat;
+  /**
+   * The provider-specific voice ID to use for audio generation.
+   */
+  voice?: string;
+  /**
+   * The language code for the audio generation
+   */
+  language_code?: string;
+}
+/**
  * Defines the input parameters for the language model completion.
  */
 export interface LanguageModelInput {
@@ -485,6 +502,10 @@ export interface LanguageModelInput {
    * The modalities that the model should support.
    */
   modalities?: Modality[];
+  /**
+   * Options for audio generation.
+   */
+  audio?: AudioOptions;
   /**
    * A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.
    */

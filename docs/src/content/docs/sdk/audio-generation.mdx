@@ -2,17 +2,17 @@
 title: Audio generation
 ---
 
-import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
-import jsGenerateAudioCode from "../../../../../sdk-js/examples/generate-audio.ts?raw";
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
 import goGenerateAudioCode from "../../../../../sdk-go/examples/generate-audio/main.go?raw";
-import rustGenerateAudioCode from "../../../../../sdk-rust/examples/generate-audio.rs?raw";
-import jsStreamAudioCode from "../../../../../sdk-js/examples/stream-audio.ts?raw";
 import goStreamAudioCode from "../../../../../sdk-go/examples/stream-audio/main.go?raw";
+import jsGenerateAudioCode from "../../../../../sdk-js/examples/generate-audio.ts?raw";
+import jsStreamAudioCode from "../../../../../sdk-js/examples/stream-audio.ts?raw";
+import rustGenerateAudioCode from "../../../../../sdk-rust/examples/generate-audio.rs?raw";
 import rustStreamAudioCode from "../../../../../sdk-rust/examples/stream-audio.rs?raw";
 import {
   extractGoTypes,
-  extractTypescriptTypes,
   extractRustTypes,
+  extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
 
 Audio modality is represented as `AudioPart`s.
@@ -46,7 +46,7 @@ To ensure the audio can be played correctly, the application code must consider 
 ## Generate audio
 
 To generate audio, specify `audio` in the input `modalities`.
-Depending on the provider, you may have to pass additional parameters to their API, which can be done through the `extra` field.
+Depending on the provider, you may have to pass additional parameters to their API, such as `voice` or `format`, using the `audio` field.
 
 <Tabs>
   <TabItem label="TypeScript">

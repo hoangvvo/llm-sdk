@@ -13,6 +13,7 @@ import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import { guessDeltaIndex } from "../stream.utils.ts";
 import type {
   AudioFormat,
+  AudioOptions,
   AudioPart,
   AudioPartDelta,
   ContentDelta,
@@ -167,9 +168,10 @@ function convertToOpenAICreateParams(
     tools,
     tool_choice,
     modalities,
+    audio,
     extra,
   } = input;
-  return {
+  const params: Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> = {
     model: modelId,
     messages: convertToOpenAIMessages(messages, system_prompt),
     max_tokens: max_tokens ?? null,
@@ -178,18 +180,22 @@ function convertToOpenAICreateParams(
     presence_penalty: presence_penalty ?? null,
     frequency_penalty: frequency_penalty ?? null,
     seed: seed ?? null,
-    ...(tools && {
-      tools: tools.map(convertToOpenAITool),
-    }),
-    ...(tool_choice && {
-      tool_choice: convertToOpenAIToolChoice(tool_choice),
-    }),
-    ...(response_format && {
-      response_format: convertToOpenAIResponseFormat(response_format),
-    }),
     modalities: modalities?.map(convertToOpenAIModality) ?? null,
     ...extra,
   };
+  if (tools) {
+    params.tools = tools.map(convertToOpenAITool);
+  }
+  if (tool_choice) {
+    params.tool_choice = convertToOpenAIToolChoice(tool_choice);
+  }
+  if (response_format) {
+    params.response_format = convertToOpenAIResponseFormat(response_format);
+  }
+  if (audio) {
+    params.audio = convertToOpenAIAudio(audio);
+  }
+  return params;
 }
 
 // MARK: To Provider Messages
@@ -492,6 +498,44 @@ function convertToOpenAIModality(
       );
     }
   }
+}
+
+function convertToOpenAIAudio(
+  audio: AudioOptions,
+): OpenAI.Chat.Completions.ChatCompletionAudioParam {
+  if (!audio.voice) {
+    throw new InvalidInputError("Audio voice is required for OpenAI audio");
+  }
+  let format: OpenAI.Chat.Completions.ChatCompletionAudioParam["format"];
+  switch (audio.format) {
+    case "wav":
+      format = "wav";
+      break;
+    case "mp3":
+      format = "mp3";
+      break;
+    case "flac":
+      format = "flac";
+      break;
+    case "aac":
+      format = "aac";
+      break;
+    case "opus":
+      format = "opus";
+      break;
+    case "linear16":
+      format = "pcm16";
+      break;
+    default:
+      throw new UnsupportedError(
+        PROVIDER,
+        `Cannot convert audio format to OpenAI Audio format for format ${String(audio.format)}`,
+      );
+  }
+  return {
+    voice: audio.voice,
+    format,
+  };
 }
 
 // MARK: To SDK Message

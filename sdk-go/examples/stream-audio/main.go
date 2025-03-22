@@ -11,19 +11,18 @@ import (
 	"github.com/ebitengine/oto/v3"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
 func main() {
 	model := examples.GetModel("openai-chat-completion", "gpt-4o-audio-preview")
 
 	response, err := model.Stream(context.Background(), &llmsdk.LanguageModelInput{
-		Extra: map[string]any{
-			"audio": map[string]any{
-				"voice":  "alloy",
-				"format": "pcm16",
-			},
-		},
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},
+		Audio: &llmsdk.AudioOptions{
+			Format: ptr.To(llmsdk.AudioFormatLinear16),
+			Voice:  ptr.To("alloy"),
+		},
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
 				llmsdk.NewTextPart("Is a golden retriever a good family dog?"),

@@ -83,6 +83,9 @@ suite("GoogleModel", () => {
       additionalInputs: (input) => ({
         ...input,
         modalities: ["audio"],
+        audio: {
+          voice: "Zephyr",
+        },
       }),
     });
   });
@@ -92,6 +95,9 @@ suite("GoogleModel", () => {
       additionalInputs: (input) => ({
         ...input,
         modalities: ["audio"],
+        audio: {
+          voice: "Zephyr",
+        },
       }),
     });
   });

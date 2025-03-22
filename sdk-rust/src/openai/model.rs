@@ -41,7 +41,7 @@ pub struct OpenAIModelOptions {
 
 impl OpenAIModel {
     #[must_use]
-    pub fn new(model_id: String, options: OpenAIModelOptions) -> Self {
+    pub fn new(model_id: impl ToString, options: OpenAIModelOptions) -> Self {
         let client = Client::new();
 
         let base_url = options
@@ -50,7 +50,7 @@ impl OpenAIModel {
         let api_key = options.api_key;
 
         Self {
-            model_id,
+            model_id: model_id.to_string(),
             api_key,
             base_url,
             client,
