@@ -10,7 +10,6 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
-	examplescommon "github.com/hoangvvo/llm-sdk/sdk-go/examples"
 )
 
 func main() {
@@ -49,5 +48,5 @@ func main() {
 		log.Fatalf("Generation failed: %v", err)
 	}
 
-	fmt.Println(examplescommon.ToJSONString(response))
+	fmt.Println(examples.ToJSONString(response))
 }

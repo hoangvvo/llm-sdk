@@ -68,7 +68,7 @@ impl ToolCallPartAssertion {
 
         if found_part.is_none() {
             return Err(format!(
-                "Expected matching tool call part:\nExpected tool {} with args {:?}\nReceived:\n{}",
+                "Expected matching tool call part:\nExpected tool {} with args {:#?}\nReceived:\n{}",
                 self.tool_name,
                 self.args,
                 serde_json::to_string_pretty(content).unwrap()
@@ -111,7 +111,7 @@ impl AudioPartAssertion {
         });
         if found_part.is_none() {
             return Err(format!(
-                "Expected matching audio part:\nExpected transcript: {:?}, audio_id present: \
+                "Expected matching audio part:\nExpected transcript: {:#?}, audio_id present: \
                  {}\nReceived:\n{}",
                 self.transcript,
                 self.audio_id,
@@ -139,7 +139,7 @@ impl ReasoningPartAssertion {
 
         if found_part.is_none() {
             return Err(format!(
-                "Expected matching reasoning part:\nExpected text: {:?}\nReceived:\n{}",
+                "Expected matching reasoning part:\nExpected text: {:#?}\nReceived:\n{}",
                 self.text,
                 serde_json::to_string_pretty(content).unwrap()
             ));

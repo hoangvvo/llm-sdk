@@ -1,9 +1,8 @@
 mod common;
+use crate::common::cases::RunTestCaseOptions;
 use llm_sdk::{openai::*, *};
 use std::{env, error::Error, sync::LazyLock};
 use tokio::test;
-
-use crate::common::cases::RunTestCaseOptions;
 
 static OPENAI_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
     dotenvy::dotenv().ok();
@@ -17,14 +16,6 @@ static OPENAI_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
             ..Default::default()
         },
     )
-    .with_metadata(LanguageModelMetadata {
-        capabilities: Some(vec![
-            LanguageModelCapability::FunctionCalling,
-            LanguageModelCapability::ImageInput,
-            LanguageModelCapability::StructuredOutput,
-        ]),
-        ..Default::default()
-    })
 });
 
 static OPENAI_AUDIO_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
@@ -39,16 +30,6 @@ static OPENAI_AUDIO_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
             ..Default::default()
         },
     )
-    .with_metadata(LanguageModelMetadata {
-        capabilities: Some(vec![
-            LanguageModelCapability::AudioInput,
-            LanguageModelCapability::AudioOutput,
-            LanguageModelCapability::FunctionCalling,
-            LanguageModelCapability::ImageInput,
-            LanguageModelCapability::StructuredOutput,
-        ]),
-        ..Default::default()
-    })
 });
 
 test_set!(OPENAI_MODEL, generate_text);
@@ -113,10 +94,4 @@ test_set!(
     ignore = "reasoning is not supported in chat completion api",
     OPENAI_MODEL,
     stream_reasoning
-);
-
-test_set!(
-    ignore = "reasoning is not supported in chat completion api",
-    OPENAI_MODEL,
-    input_reasoning
 );

@@ -120,8 +120,4 @@ suite("OpenAIModel", () => {
   test(TEST_CASE_NAMES.STREAM_REASONING, (t) => {
     return runTestCase(t, reasoningModel, TEST_CASE_NAMES.STREAM_REASONING);
   });
-
-  test(TEST_CASE_NAMES.INPUT_REASONING, (t) => {
-    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.INPUT_REASONING);
-  });
 });

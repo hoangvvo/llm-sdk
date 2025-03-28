@@ -2,6 +2,7 @@ mod accumulator;
 mod audio_utils;
 mod client_utils;
 mod errors;
+pub mod google;
 mod id_utils;
 mod language_model;
 pub mod openai;

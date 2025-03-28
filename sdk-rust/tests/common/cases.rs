@@ -340,13 +340,6 @@ pub async fn test_stream_reasoning(
     run_test_case(model, "stream_reasoning", options).await
 }
 
-pub async fn test_input_reasoning(
-    model: &dyn LanguageModel,
-    options: Option<RunTestCaseOptions>,
-) -> Result<(), Box<dyn Error>> {
-    run_test_case(model, "input_reasoning", options).await
-}
-
 #[macro_export]
 macro_rules! test_set {
     ($model_name:ident, $test_name:ident) => {

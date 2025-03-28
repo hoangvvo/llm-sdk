@@ -19,11 +19,7 @@ import {
   mapAudioFormatToMimeType,
   mapMimeTypeToAudioFormat,
 } from "../audio.utils.ts";
-import {
-  InvalidInputError,
-  InvariantError,
-  UnsupportedError,
-} from "../errors.ts";
+import { InvalidInputError, InvariantError } from "../errors.ts";
 import { generateString } from "../id.utils.ts";
 import type {
   LanguageModel,
@@ -319,11 +315,6 @@ function convertToGoogleFunctionResponseResponse(
   for (const part of compatibleParts) {
     if (part.type === "text") {
       textParts.push(part);
-    } else {
-      throw new UnsupportedError(
-        PROVIDER,
-        `Google model tool result only supports text parts, got ${part.type}`,
-      );
     }
   }
 
@@ -334,12 +325,10 @@ function convertToGoogleFunctionResponseResponse(
     );
   }
 
-  // Use "output" key to specify function output and "error" key to specify error details
-  if (isError) {
-    return { error: responses.length === 1 ? responses[0] : responses };
-  } else {
-    return { output: responses.length === 1 ? responses[0] : responses };
-  }
+  // Use "output" key to specify function output and "error" key to specify error details,
+  // as per Google API specification
+  const key = isError ? "error" : "output";
+  return { [key]: responses.length === 1 ? responses[0] : responses };
 }
 
 function maybeParseJSON(text: string) {
@@ -438,17 +427,15 @@ function mapGoogleContent(parts: GooglePart[]): Part[] {
           text: googlePart.text,
         };
       }
-      if (googlePart.inlineData) {
-        if (googlePart.inlineData.mimeType?.startsWith("image/")) {
-          if (!googlePart.inlineData.data) {
-            throw new InvariantError(PROVIDER, "Image data is empty");
-          }
-          return {
-            type: "image",
-            image_data: googlePart.inlineData.data,
-            mime_type: googlePart.inlineData.mimeType,
-          };
+      if (googlePart.inlineData?.mimeType?.startsWith("image/")) {
+        if (!googlePart.inlineData.data) {
+          throw new InvariantError(PROVIDER, "Image data is empty");
         }
+        return {
+          type: "image",
+          image_data: googlePart.inlineData.data,
+          mime_type: googlePart.inlineData.mimeType,
+        };
       }
       if (googlePart.inlineData?.mimeType?.startsWith("audio/")) {
         if (!googlePart.inlineData.data) {
@@ -506,17 +493,14 @@ function mapGoogleUsageMetadata(usageMetadata: UsageMetadata): ModelUsage {
     output_tokens: usageMetadata.responseTokenCount ?? 0,
   };
   if (usageMetadata.promptTokensDetails) {
-    usage.input_tokens_details = sumModelTokensDetails(
-      mapGoogleModalityTokenCountToUsageDetails(
-        usageMetadata.promptTokensDetails,
-      ),
+    usage.input_tokens_details = mapGoogleModalityTokenCountToUsageDetails(
+      usageMetadata.promptTokensDetails,
+      usageMetadata.cacheTokensDetails,
     );
   }
   if (usageMetadata.responseTokensDetails) {
-    usage.output_tokens_details = sumModelTokensDetails(
-      mapGoogleModalityTokenCountToUsageDetails(
-        usageMetadata.responseTokensDetails,
-      ),
+    usage.output_tokens_details = mapGoogleModalityTokenCountToUsageDetails(
+      usageMetadata.responseTokensDetails,
     );
   }
 
@@ -525,26 +509,62 @@ function mapGoogleUsageMetadata(usageMetadata: UsageMetadata): ModelUsage {
 
 function mapGoogleModalityTokenCountToUsageDetails(
   modalityTokenCounts: ModalityTokenCount[],
-): ModelTokensDetails[] {
-  return modalityTokenCounts.map((modalityTokenCount): ModelTokensDetails => {
-    if (modalityTokenCount.tokenCount === undefined) {
-      return {};
+  cachedTokensDetails?: ModalityTokenCount[],
+): ModelTokensDetails {
+  let tokensDetails: ModelTokensDetails = {};
+  for (const detail of modalityTokenCounts) {
+    if (detail.tokenCount === undefined) {
+      continue;
     }
-    switch (modalityTokenCount.modality) {
+    switch (detail.modality) {
       case MediaModality.TEXT:
-        return {
-          text_tokens: modalityTokenCount.tokenCount,
-        };
+        tokensDetails = sumModelTokensDetails([
+          tokensDetails,
+          { text_tokens: detail.tokenCount },
+        ]);
+        break;
       case MediaModality.IMAGE:
-        return {
-          image_tokens: modalityTokenCount.tokenCount,
-        };
+        tokensDetails = sumModelTokensDetails([
+          tokensDetails,
+          { image_tokens: detail.tokenCount },
+        ]);
+        break;
       case MediaModality.AUDIO:
-        return {
-          audio_tokens: modalityTokenCount.tokenCount,
-        };
+        tokensDetails = sumModelTokensDetails([
+          tokensDetails,
+          { audio_tokens: detail.tokenCount },
+        ]);
+        break;
       default:
-        return {};
+        break;
     }
-  });
+  }
+  for (const detail of cachedTokensDetails ?? []) {
+    if (detail.tokenCount === undefined) {
+      continue;
+    }
+    switch (detail.modality) {
+      case MediaModality.TEXT:
+        tokensDetails = sumModelTokensDetails([
+          tokensDetails,
+          { cached_text_tokens: detail.tokenCount },
+        ]);
+        break;
+      case MediaModality.IMAGE:
+        tokensDetails = sumModelTokensDetails([
+          tokensDetails,
+          { cached_image_tokens: detail.tokenCount },
+        ]);
+        break;
+      case MediaModality.AUDIO:
+        tokensDetails = sumModelTokensDetails([
+          tokensDetails,
+          { cached_audio_tokens: detail.tokenCount },
+        ]);
+        break;
+      default:
+        break;
+    }
+  }
+  return tokensDetails;
 }

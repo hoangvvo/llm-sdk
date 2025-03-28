@@ -99,10 +99,11 @@ Find examples in the [examples](./examples/) folder to learn how to:
 
 - [`generate-text`: Generate text](./examples/generate-text/main.go)
 - [`stream-text`: Stream text](./examples/stream-text/main.go)
-- [`describe-image`: Describe image](./examples/describe-image/main.go)
-- [`tool-use`: Function calling](./examples/tool-use/main.go)
 - [`generate-audio`: Generate audio](./examples/generate-audio/main.go)
 - [`stream-audio`: Stream audio](./examples/stream-audio/main.go)
+- [`describe-image`: Describe image](./examples/describe-image/main.go)
+- [`summarize-audio`: Summarize audio](./examples/summarize-audio/main.go)
+- [`tool-use`: Function calling](./examples/tool-use/main.go)
 - [`structured-output`: Structured output](./examples/structured-output/main.go)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning/main.go)
 

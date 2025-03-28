@@ -66,10 +66,11 @@ Find examples in the [examples](./examples/) folder to learn how to:
 
 - [`generate-text`: Generate text](./examples/generate-text.rs)
 - [`stream-text`: Stream text](./examples/stream-text.rs)
-- [`describe-image`: Describe image](./examples/describe-image.rs)
-- [`tool-use`: Function calling](./examples/tool-use.rs)
 - [`generate-audio`: Generate audio](./examples/generate-audio.rs)
 - [`stream-audio`: Stream audio](./examples/stream-audio.rs)
+- [`describe-image`: Describe image](./examples/describe-image.rs)
+- [`summarize-audio`: Summarize audio](./examples/summarize-audio.rs)
+- [`tool-use`: Function calling](./examples/tool-use.rs)
 - [`structured-output`: Structured output](./examples/structured-output.rs)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning.rs)
 

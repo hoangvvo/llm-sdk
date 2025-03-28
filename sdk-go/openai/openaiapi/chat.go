@@ -59,7 +59,7 @@ type ChatCompletionCreateParams struct {
 	// supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
 	// effort can result in faster responses and fewer tokens used on reasoning in a
 	// response.
-	ReasoningEffort *ReasoningEffort
+	ReasoningEffort *ReasoningEffort `json:"reasoning_effort,omitempty"`
 
 	// An object specifying the format that the model must output.
 	//

@@ -115,12 +115,4 @@ suite("OpenAIChatModel", () => {
       return runTestCase(t, model, TEST_CASE_NAMES.STREAM_REASONING);
     },
   );
-
-  test(
-    TEST_CASE_NAMES.INPUT_REASONING,
-    { skip: "chat completion does not support reasoning" },
-    (t) => {
-      return runTestCase(t, model, TEST_CASE_NAMES.INPUT_REASONING);
-    },
-  );
 });

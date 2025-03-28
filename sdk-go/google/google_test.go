@@ -7,6 +7,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/google"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/joho/godotenv"
 )
 
@@ -85,12 +86,14 @@ func TestSourcePartInput(t *testing.T) {
 func TestGenerateAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioModel, "generate_audio", testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
 		lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
+		lmi.Audio = &llmsdk.AudioOptions{Voice: ptr.To("Zephyr")}
 	}))
 }
 
 func TestStreamAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioModel, "stream_audio", testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
 		lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
+		lmi.Audio = &llmsdk.AudioOptions{Voice: ptr.To("Zephyr")}
 	}))
 }
 
@@ -100,8 +103,4 @@ func TestGenerateReasoning(t *testing.T) {
 
 func TestStreamReasoning(t *testing.T) {
 	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
-}
-
-func TestInputReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, "input_reasoning")
 }

@@ -1,4 +1,7 @@
-use crate::{ContentDelta, PartDelta};
+use crate::{
+    AudioPartDelta, ContentDelta, ImagePartDelta, LanguageModelError, LanguageModelResult, Part,
+    PartDelta, ReasoningPartDelta, TextPartDelta, ToolCallPartDelta,
+};
 
 /// Because of the difference in mapping, especially in `OpenAI` cases,
 /// where text and audio part does not have indexes
@@ -88,4 +91,39 @@ pub fn guess_delta_index(
     } else {
         max_index + 1
     }
+}
+
+pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<PartDelta> {
+    Ok(match part {
+        Part::Text(text_part) => PartDelta::Text(TextPartDelta {
+            text: text_part.text,
+        }),
+        Part::Image(image_part) => PartDelta::Image(ImagePartDelta {
+            image_data: Some(image_part.image_data),
+            mime_type: Some(image_part.mime_type),
+            width: image_part.width,
+            height: image_part.height,
+        }),
+        Part::Audio(audio_part) => PartDelta::Audio(AudioPartDelta {
+            audio_data: Some(audio_part.audio_data),
+            format: Some(audio_part.format),
+            sample_rate: audio_part.sample_rate,
+            channels: audio_part.channels,
+            audio_id: audio_part.audio_id,
+            transcript: audio_part.transcript,
+        }),
+        Part::ToolCall(tool_call_part) => PartDelta::ToolCall(ToolCallPartDelta {
+            tool_name: Some(tool_call_part.tool_name),
+            args: Some(tool_call_part.args.to_string()),
+            tool_call_id: Some(tool_call_part.tool_call_id),
+        }),
+        Part::Reasoning(reasoning_part) => PartDelta::Reasoning(ReasoningPartDelta {
+            text: Some(reasoning_part.text),
+            signature: reasoning_part.signature,
+        }),
+        _ => Err(LanguageModelError::Invariant(
+            "",
+            "Cannot convert part to part delta".to_string(),
+        ))?,
+    })
 }

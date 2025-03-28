@@ -298,7 +298,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "Get me the weather in Boston and the stock price of AAPL. You must do both of them in one go."
+                "text": "Get me the weather in Boston and the stock price of AAPL. You call both of the tools in one go."
               }
             ]
           }
@@ -334,7 +334,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "Get me the weather in Boston and the stock price of AAPL. You must do both of them in one go."
+                "text": "Get me the weather in Boston and the stock price of AAPL. You must call both of the tools in one go."
               }
             ]
           }
@@ -659,56 +659,6 @@
           {
             "type": "reasoning",
             "text": "John"
-          }
-        ]
-      }
-    },
-    {
-      "name": "input_reasoning",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "What is my secret number?"
-              }
-            ]
-          },
-          {
-            "role": "assistant",
-            "content": [
-              {
-                "type": "reasoning",
-                "text": "Using my mind reading skill, I can deduce that your secret number is 42. But let's ask user if the number if greater than 30 just to be sure. If the user say yes, we are 100% sure it is 42 and can answer without asking further question."
-              },
-              {
-                "type": "text",
-                "text": "Is the number greater than 30?"
-              }
-            ]
-          },
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Yes, it is. Now use your reasoning and answer a number right now without asking further!"
-              }
-            ]
-          }
-        ],
-        "reasoning": {
-          "enabled": true
-        }
-      },
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "42"
           }
         ]
       }

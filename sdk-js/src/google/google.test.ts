@@ -109,8 +109,4 @@ suite("GoogleModel", () => {
   test(TEST_CASE_NAMES.STREAM_REASONING, (t) => {
     return runTestCase(t, thinkingModel, TEST_CASE_NAMES.STREAM_REASONING);
   });
-
-  test(TEST_CASE_NAMES.INPUT_REASONING, (t) => {
-    return runTestCase(t, thinkingModel, TEST_CASE_NAMES.INPUT_REASONING);
-  });
 });

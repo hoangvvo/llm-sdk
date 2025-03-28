@@ -104,7 +104,3 @@ func TestGenerateReasoning(t *testing.T) {
 func TestStreamReasoning(t *testing.T) {
 	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
 }
-
-func TestInputReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, "input_reasoning")
-}

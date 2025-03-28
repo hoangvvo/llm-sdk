@@ -1,5 +1,7 @@
 package llmsdk
 
+import "github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
+
 // CalculateCost calculates the total cost based on usage statistics and pricing information
 func CalculateCost(usage ModelUsage, pricing LanguageModelPricing) float64 {
 	// Extract input token counts with fallbacks
@@ -105,4 +107,54 @@ func CalculateCost(usage ModelUsage, pricing LanguageModelPricing) float64 {
 		outputTextCost +
 		outputAudioCost +
 		outputImageCost
+}
+
+// sumModelTokensDetails sums multiple ModelTokensDetails into one
+func SumModelTokensDetails(detailsList []ModelTokensDetails) *ModelTokensDetails {
+	if len(detailsList) == 0 {
+		return nil
+	}
+
+	result := &ModelTokensDetails{}
+
+	for _, details := range detailsList {
+		if details.TextTokens != nil {
+			if result.TextTokens == nil {
+				result.TextTokens = ptr.To(0)
+			}
+			*result.TextTokens += *details.TextTokens
+		}
+		if details.CachedTextTokens != nil {
+			if result.CachedTextTokens == nil {
+				result.CachedTextTokens = ptr.To(0)
+			}
+			*result.CachedTextTokens += *details.CachedTextTokens
+		}
+		if details.AudioTokens != nil {
+			if result.AudioTokens == nil {
+				result.AudioTokens = ptr.To(0)
+			}
+			*result.AudioTokens += *details.AudioTokens
+		}
+		if details.CachedAudioTokens != nil {
+			if result.CachedAudioTokens == nil {
+				result.CachedAudioTokens = ptr.To(0)
+			}
+			*result.CachedAudioTokens += *details.CachedAudioTokens
+		}
+		if details.ImageTokens != nil {
+			if result.ImageTokens == nil {
+				result.ImageTokens = ptr.To(0)
+			}
+			*result.ImageTokens += *details.ImageTokens
+		}
+		if details.CachedImageTokens != nil {
+			if result.CachedImageTokens == nil {
+				result.CachedImageTokens = ptr.To(0)
+			}
+			*result.CachedImageTokens += *details.CachedImageTokens
+		}
+	}
+
+	return result
 }

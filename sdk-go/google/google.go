@@ -372,12 +372,6 @@ func convertToGoogleFunctionResponseResponse(parts []llmsdk.Part, isError bool) 
 	for _, part := range compatibleParts {
 		if part.TextPart != nil {
 			textParts = append(textParts, *part.TextPart)
-		} else {
-			return nil, llmsdk.NewUnsupportedError(
-				Provider,
-				fmt.Sprintf("Google model tool result only supports text parts, got %T",
-					part),
-			)
 		}
 	}
 
@@ -396,18 +390,20 @@ func convertToGoogleFunctionResponseResponse(parts []llmsdk.Part, isError bool) 
 		return nil, llmsdk.NewInvalidInputError("Google model tool result must have at least one text part")
 	}
 
-	// Use "output" key to specify function output and "error" key to specify error details
+	// Use "output" key to specify function output and "error" key to specify error details,
+	// as per Google API specification
+	key := "output"
 	if isError {
-		if len(responses) == 1 {
-			return map[string]any{"error": responses[0]}, nil
-		}
-		return map[string]any{"error": responses}, nil
-	} else {
-		if len(responses) == 1 {
-			return map[string]any{"output": responses[0]}, nil
-		}
-		return map[string]any{"output": responses}, nil
+		key = "error"
 	}
+	return map[string]any{
+		key: func() any {
+			if len(responses) == 1 {
+				return responses[0]
+			}
+			return responses
+		}(),
+	}, nil
 }
 
 func convertToGoogleTool(tool llmsdk.Tool) googleapi.FunctionDeclaration {
@@ -605,92 +601,76 @@ func mapGoogleUsageMetadata(usageMetadata googleapi.GenerateContentResponseUsage
 	}
 
 	if len(usageMetadata.PromptTokensDetails) > 0 {
-		usage.InputTokensDetails = sumModelTokensDetails(
-			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.PromptTokensDetails),
-		)
+		usage.InputTokensDetails =
+			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.PromptTokensDetails, usageMetadata.CacheTokensDetails)
 	}
 
 	if len(usageMetadata.CandidatesTokensDetails) > 0 {
-		usage.OutputTokensDetails = sumModelTokensDetails(
-			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.CandidatesTokensDetails),
-		)
+		usage.OutputTokensDetails =
+			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.CandidatesTokensDetails, nil)
 	}
 
 	return usage
 }
 
 // mapGoogleModalityTokenCountToUsageDetails maps Google modality token counts to usage details
-func mapGoogleModalityTokenCountToUsageDetails(modalityTokenCounts []googleapi.ModalityTokenCount) []llmsdk.ModelTokensDetails {
-	var details []llmsdk.ModelTokensDetails
+func mapGoogleModalityTokenCountToUsageDetails(
+	modalityTokenCounts []googleapi.ModalityTokenCount,
+	cachedTokenCounts []googleapi.ModalityTokenCount,
+) *llmsdk.ModelTokensDetails {
+	var details llmsdk.ModelTokensDetails
 
 	for _, modalityTokenCount := range modalityTokenCounts {
 		if modalityTokenCount.TokenCount == nil {
 			continue
 		}
 
-		detail := llmsdk.ModelTokensDetails{}
 		if modalityTokenCount.Modality != nil {
 			switch *modalityTokenCount.Modality {
 			case googleapi.MediaModalityText:
-				detail.TextTokens = modalityTokenCount.TokenCount
+				if details.TextTokens == nil {
+					details.TextTokens = ptr.To(0)
+				}
+				*details.TextTokens += *modalityTokenCount.TokenCount
 			case googleapi.MediaModalityImage:
-				detail.ImageTokens = modalityTokenCount.TokenCount
+				if details.ImageTokens == nil {
+					details.ImageTokens = ptr.To(0)
+				}
+				*details.ImageTokens += *modalityTokenCount.TokenCount
 			case googleapi.MediaModalityAudio:
-				detail.AudioTokens = modalityTokenCount.TokenCount
+				if details.AudioTokens == nil {
+					details.AudioTokens = ptr.To(0)
+				}
+				*details.AudioTokens += *modalityTokenCount.TokenCount
 			}
-		}
-		details = append(details, detail)
-	}
-
-	return details
-}
-
-// sumModelTokensDetails sums multiple ModelTokensDetails into one
-func sumModelTokensDetails(detailsList []llmsdk.ModelTokensDetails) *llmsdk.ModelTokensDetails {
-	if len(detailsList) == 0 {
-		return nil
-	}
-
-	result := &llmsdk.ModelTokensDetails{}
-
-	for _, details := range detailsList {
-		if details.TextTokens != nil {
-			if result.TextTokens == nil {
-				result.TextTokens = ptr.To(0)
-			}
-			*result.TextTokens += *details.TextTokens
-		}
-		if details.CachedTextTokens != nil {
-			if result.CachedTextTokens == nil {
-				result.CachedTextTokens = ptr.To(0)
-			}
-			*result.CachedTextTokens += *details.CachedTextTokens
-		}
-		if details.AudioTokens != nil {
-			if result.AudioTokens == nil {
-				result.AudioTokens = ptr.To(0)
-			}
-			*result.AudioTokens += *details.AudioTokens
-		}
-		if details.CachedAudioTokens != nil {
-			if result.CachedAudioTokens == nil {
-				result.CachedAudioTokens = ptr.To(0)
-			}
-			*result.CachedAudioTokens += *details.CachedAudioTokens
-		}
-		if details.ImageTokens != nil {
-			if result.ImageTokens == nil {
-				result.ImageTokens = ptr.To(0)
-			}
-			*result.ImageTokens += *details.ImageTokens
-		}
-		if details.CachedImageTokens != nil {
-			if result.CachedImageTokens == nil {
-				result.CachedImageTokens = ptr.To(0)
-			}
-			*result.CachedImageTokens += *details.CachedImageTokens
 		}
 	}
 
-	return result
+	for _, cachedTokenCount := range cachedTokenCounts {
+		if cachedTokenCount.TokenCount == nil {
+			continue
+		}
+
+		if cachedTokenCount.Modality != nil {
+			switch *cachedTokenCount.Modality {
+			case googleapi.MediaModalityText:
+				if details.CachedTextTokens == nil {
+					details.CachedTextTokens = ptr.To(0)
+				}
+				*details.CachedTextTokens += *cachedTokenCount.TokenCount
+			case googleapi.MediaModalityImage:
+				if details.CachedImageTokens == nil {
+					details.CachedImageTokens = ptr.To(0)
+				}
+				*details.CachedImageTokens += *cachedTokenCount.TokenCount
+			case googleapi.MediaModalityAudio:
+				if details.CachedAudioTokens == nil {
+					details.CachedAudioTokens = ptr.To(0)
+				}
+				*details.CachedAudioTokens += *cachedTokenCount.TokenCount
+			}
+		}
+	}
+
+	return &details
 }

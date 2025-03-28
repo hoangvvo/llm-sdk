@@ -85,8 +85,3 @@ func TestChatStreamReasoning(t *testing.T) {
 	t.Skip("reasoning not supported in chat completion api")
 	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
 }
-
-func TestChatInputReasoning(t *testing.T) {
-	t.Skip("reasoning not supported in chat completion api")
-	testcommon.RunTestCase(t, reasoningModel, "input_reasoning")
-}

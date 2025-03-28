@@ -92,6 +92,8 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
         text: part.text,
         ...(part.signature && { signature: part.signature }),
       };
+    case "image":
+      return part;
     default: {
       throw new InvariantError(
         "",

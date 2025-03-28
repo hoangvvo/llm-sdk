@@ -64,6 +64,7 @@ pub struct ChatCompletionCreateParams {
     // supported values are `minimal`, `low`, `medium`, and `high`. Reducing reasoning
     // effort can result in faster responses and fewer tokens used on reasoning in a
     // response.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<ReasoningEffort>,
 
     /// An object specifying the format that the model must output.

@@ -106,7 +106,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`generate-audio`: Generate audio](./examples/generate-audio.ts)
 - [`stream-audio`: Stream audio](./examples/stream-audio.ts)
 - [`describe-image`: Describe image](./examples/describe-image.ts)
-- [`describe-audio`: Describe audio](./examples/describe-audio.ts)
+- [`summarize-audio`: Summarize audio](./examples/summarize-audio.ts)
 - [`function-calling`: Function calling](./examples/tool-use.ts)
 - [`structured-output`: Structured output](./examples/structured-output.ts)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning.ts)

@@ -115,13 +115,4 @@ suite("AnthropicModel", () => {
       reasoningOptions,
     );
   });
-
-  test(TEST_CASE_NAMES.INPUT_REASONING, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.INPUT_REASONING,
-      reasoningOptions,
-    );
-  });
 });

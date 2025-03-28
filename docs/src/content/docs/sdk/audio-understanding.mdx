@@ -2,12 +2,14 @@
 title: Audio understanding
 ---
 
-import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goSummarizeAudio from "../../../../../sdk-go/examples/summarize-audio/main.go?raw";
 import jsSummarizeAudio from "../../../../../sdk-js/examples/summarize-audio.ts?raw";
+import rustSummarizeAudio from "../../../../../sdk-rust/examples/summarize-audio.rs?raw";
 import {
   extractGoTypes,
-  extractTypescriptTypes,
   extractRustTypes,
+  extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
 
 Audio can be sent to the model using an `AudioPart`. 
@@ -45,5 +47,19 @@ This enables use cases such as:
 <Tabs>
   <TabItem label="TypeScript">
     <Code lang="ts" code={jsSummarizeAudio} title="summarize-audio.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      lang="rs"
+      code={rustSummarizeAudio}
+      title="summarize-audio.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      lang="go"
+      code={goSummarizeAudio}
+      title="main.go"
+    />
   </TabItem>
 </Tabs>

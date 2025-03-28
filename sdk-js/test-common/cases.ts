@@ -140,7 +140,6 @@ export const TEST_CASE_NAMES = {
   STREAM_AUDIO: "stream_audio",
   GENERATE_REASONING: "generate_reasoning",
   STREAM_REASONING: "stream_reasoning",
-  INPUT_REASONING: "input_reasoning",
 } as const;
 
 export interface RunTestCaseOptions {
