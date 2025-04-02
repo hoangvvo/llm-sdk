@@ -174,13 +174,14 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 	})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
 	)
 
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -260,13 +261,14 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
 	)
 
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -405,13 +407,14 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{tool1, tool2},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool1, tool2},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
 	)
 
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -536,13 +539,14 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
 	)
 
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -628,13 +632,14 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		2, // max turns is 2
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       2,
+		},
 	)
 
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -676,13 +681,14 @@ func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
 	})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       10,
+		},
 	)
 
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -728,13 +734,14 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 	})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       10,
+		},
 	)
 
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -791,13 +798,14 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       10,
+		},
 	)
 
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -859,13 +867,19 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 	frequencyPenalty := 0.2
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		&temp, &topP, &topK, &presencePenalty, &frequencyPenalty,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:             "test_agent",
+			Model:            model,
+			Instructions:     []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:            []llmagent.AgentTool[map[string]interface{}]{},
+			ResponseFormat:   &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:         10,
+			Temperature:      &temp,
+			TopP:             &topP,
+			TopK:             &topK,
+			PresencePenalty:  &presencePenalty,
+			FrequencyPenalty: &frequencyPenalty,
+		},
 	)
 
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -926,13 +940,14 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 	}
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		instructions,
-		[]llmagent.AgentTool[map[string]interface{}]{},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   instructions,
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       10,
+		},
 	)
 
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -974,13 +989,14 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 	})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       10,
+		},
 	)
 
 	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -1061,13 +1077,14 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       10,
+		},
 	)
 
 	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -1179,13 +1196,14 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 		})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{tool},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		2, // max turns is 2
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       2,
+		},
 	)
 
 	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
@@ -1234,13 +1252,14 @@ func TestRun_FinishCleansUpSessionResources(t *testing.T) {
 	})
 
 	session := llmagent.NewRunSession(
-		"test_agent",
-		model,
-		[]llmagent.InstructionParam[map[string]interface{}]{},
-		[]llmagent.AgentTool[map[string]interface{}]{},
-		&llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-		10,
-		nil, nil, nil, nil, nil,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "test_agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
+			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
+			MaxTurns:       10,
+		},
 	)
 
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{

@@ -14,45 +14,15 @@ import (
 // Once finish, the session cleans up any resources used during the run.
 // The session can be reused in multiple runs.
 type RunSession[C any] struct {
-	agentName        string
-	tools            []AgentTool[C]
-	model            llmsdk.LanguageModel
-	responseFormat   *llmsdk.ResponseFormatOption
-	instructions     []InstructionParam[C]
-	maxTurns         uint
-	temperature      *float64
-	topP             *float64
-	topK             *float64
-	presencePenalty  *float64
-	frequencyPenalty *float64
+	params *AgentParams[C]
 }
 
 // NewRunSession creates a new run session and initializes dependencies
 func NewRunSession[C any](
-	agentName string,
-	model llmsdk.LanguageModel,
-	instructions []InstructionParam[C],
-	tools []AgentTool[C],
-	responseFormat *llmsdk.ResponseFormatOption,
-	maxTurns uint,
-	temperature *float64,
-	topP *float64,
-	topK *float64,
-	presencePenalty *float64,
-	frequencyPenalty *float64,
+	params *AgentParams[C],
 ) *RunSession[C] {
 	return &RunSession[C]{
-		agentName:        agentName,
-		tools:            tools,
-		model:            model,
-		responseFormat:   responseFormat,
-		instructions:     instructions,
-		maxTurns:         maxTurns,
-		temperature:      temperature,
-		topP:             topP,
-		topK:             topK,
-		presencePenalty:  presencePenalty,
-		frequencyPenalty: frequencyPenalty,
+		params: params,
 	}
 }
 
@@ -87,7 +57,7 @@ func (s *RunSession[C]) process(
 
 	for _, toolCallPart := range toolCallParts {
 		var agentTool AgentTool[C]
-		for _, tool := range s.tools {
+		for _, tool := range s.params.Tools {
 			if tool.Name() == toolCallPart.ToolName {
 				agentTool = tool
 				break
@@ -138,7 +108,7 @@ func (s *RunSession[C]) process(
 
 // Run runs a non-streaming execution of the agent.
 func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResponse, error) {
-	span, ctx := NewAgentSpan(ctx, s.agentName, "run")
+	span, ctx := NewAgentSpan(ctx, s.params.Name, "run")
 	var err error
 	defer func() {
 		if err != nil {
@@ -147,7 +117,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 		span.OnEnd()
 	}()
 
-	state := NewRunState(request.Input, s.maxTurns)
+	state := NewRunState(request.Input, s.params.MaxTurns)
 
 	input, err := s.getLLMInput(ctx, request)
 	if err != nil {
@@ -158,7 +128,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 	for {
 		input.Messages = state.GetTurnMessages()
 		var modelResponse *llmsdk.ModelResponse
-		modelResponse, err = s.model.Generate(ctx, input)
+		modelResponse, err = s.params.Model.Generate(ctx, input)
 		if err != nil {
 			err = NewLanguageModelError(err)
 			return nil, err
@@ -171,8 +141,8 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 		state.AppendModelCall(ModelCallInfo{
 			Usage:    modelResponse.Usage,
 			Cost:     modelResponse.Cost,
-			ModelID:  s.model.ModelID(),
-			Provider: s.model.Provider(),
+			ModelID:  s.params.Model.ModelID(),
+			Provider: s.params.Model.Provider(),
 		})
 
 		var result ProcessResult
@@ -199,9 +169,9 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 // Run a streaming execution of the agent.
 func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*AgentStream, error) {
-	span, ctx := NewAgentSpan(ctx, s.agentName, "run_stream")
+	span, ctx := NewAgentSpan(ctx, s.params.Name, "run_stream")
 
-	state := NewRunState(request.Input, s.maxTurns)
+	state := NewRunState(request.Input, s.params.MaxTurns)
 
 	input, err := s.getLLMInput(ctx, request)
 	if err != nil {
@@ -227,7 +197,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 			input.Messages = state.GetTurnMessages()
 
 			var modelStream *llmsdk.LanguageModelStream
-			modelStream, err = s.model.Stream(ctx, input)
+			modelStream, err = s.params.Model.Stream(ctx, input)
 			if err != nil {
 				err := NewLanguageModelError(err)
 				errChan <- err
@@ -276,8 +246,8 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 			state.AppendModelCall(ModelCallInfo{
 				Usage:    modelResponse.Usage,
 				Cost:     modelResponse.Cost,
-				ModelID:  s.model.ModelID(),
-				Provider: s.model.Provider(),
+				ModelID:  s.params.Model.ModelID(),
+				Provider: s.params.Model.Provider(),
 			})
 
 			eventChan <- &AgentStreamEvent{
@@ -326,7 +296,7 @@ func (s *RunSession[C]) Finish() {
 func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]) (*llmsdk.LanguageModelInput, error) {
 	// Convert AgentTool to SDK Tool
 	var tools []llmsdk.Tool
-	for _, tool := range s.tools {
+	for _, tool := range s.params.Tools {
 		tools = append(tools, llmsdk.Tool{
 			Name:        tool.Name(),
 			Description: tool.Description(),
@@ -334,7 +304,7 @@ func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]
 		})
 	}
 
-	systemPrompt, err := getPrompt(ctx, s.instructions, request.Context)
+	systemPrompt, err := getPrompt(ctx, s.params.Instructions, request.Context)
 	if err != nil {
 		return nil, NewInitError(err)
 	}
@@ -344,12 +314,15 @@ func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]
 		Messages:         nil,
 		SystemPrompt:     &systemPrompt,
 		Tools:            tools,
-		ResponseFormat:   s.responseFormat,
-		Temperature:      s.temperature,
-		TopP:             s.topP,
-		TopK:             s.topK,
-		PresencePenalty:  s.presencePenalty,
-		FrequencyPenalty: s.frequencyPenalty,
+		ResponseFormat:   s.params.ResponseFormat,
+		Temperature:      s.params.Temperature,
+		TopP:             s.params.TopP,
+		TopK:             s.params.TopK,
+		PresencePenalty:  s.params.PresencePenalty,
+		FrequencyPenalty: s.params.FrequencyPenalty,
+		Modalities:       s.params.Modalities,
+		Audio:            s.params.Audio,
+		Reasoning:        s.params.Reasoning,
 	}, nil
 }
 

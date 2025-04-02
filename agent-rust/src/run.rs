@@ -1,12 +1,12 @@
 use crate::{
     instruction,
     types::{AgentStream, AgentStreamEvent},
-    AgentError, AgentItem, AgentRequest, AgentResponse, AgentTool, InstructionParam, ModelCallInfo,
+    AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse, ModelCallInfo,
 };
 use futures::{lock::Mutex, stream::StreamExt};
 use llm_sdk::{
-    AssistantMessage, LanguageModel, LanguageModelInput, Message, ModelResponse, Part,
-    ResponseFormatOption, StreamAccumulator, ToolCallPart, ToolMessage, ToolResultPart,
+    AssistantMessage, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
+    ToolCallPart, ToolMessage, ToolResultPart,
 };
 use std::sync::Arc;
 
@@ -16,16 +16,7 @@ use std::sync::Arc;
 /// Once finish, the session cleans up any resources used during the run.
 /// The session can be reused in multiple runs.
 pub struct RunSession<TCtx> {
-    tools: Arc<Vec<Box<dyn AgentTool<TCtx>>>>,
-    model: Arc<dyn LanguageModel + Send + Sync>,
-    response_format: ResponseFormatOption,
-    instructions: Arc<Vec<InstructionParam<TCtx>>>,
-    max_turns: usize,
-    temperature: Option<f64>,
-    top_p: Option<f64>,
-    top_k: Option<f64>,
-    presence_penalty: Option<f64>,
-    frequency_penalty: Option<f64>,
+    params: Arc<AgentParams<TCtx>>,
 }
 
 impl<TCtx> RunSession<TCtx>
@@ -35,30 +26,8 @@ where
     /// Creates a new run session and initializes dependencies
     #[allow(clippy::unused_async)]
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
-        model: Arc<dyn LanguageModel + Send + Sync>,
-        instructions: Arc<Vec<InstructionParam<TCtx>>>,
-        tools: Arc<Vec<Box<dyn AgentTool<TCtx>>>>,
-        response_format: ResponseFormatOption,
-        max_turns: usize,
-        temperature: Option<f64>,
-        top_p: Option<f64>,
-        top_k: Option<f64>,
-        presence_penalty: Option<f64>,
-        frequency_penalty: Option<f64>,
-    ) -> Self {
-        Self {
-            tools,
-            model,
-            response_format,
-            instructions,
-            max_turns,
-            temperature,
-            top_p,
-            top_k,
-            presence_penalty,
-            frequency_penalty,
-        }
+    pub async fn new(params: Arc<AgentParams<TCtx>>) -> Self {
+        Self { params }
     }
 
     /// Process the model response and decide whether to continue the loop or
@@ -99,6 +68,7 @@ where
             } = tool_call_part;
 
             let agent_tool = self
+                .params
                 .tools
                 .iter()
                 .find(|tool| tool.name() == tool_name)
@@ -126,7 +96,7 @@ where
 
     /// Run a non-streaming execution of the agent.
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
-        let state = RunState::new(request.input.clone(), self.max_turns);
+        let state = RunState::new(request.input.clone(), self.params.max_turns);
 
         let (input, context) = self.get_llm_input(request).await?;
 
@@ -138,7 +108,7 @@ where
                 content,
                 usage,
                 cost,
-            } = self.model.generate(input).await?;
+            } = self.params.model.generate(input).await?;
 
             state
                 .append_messages(vec![Message::assistant(content.clone())])
@@ -148,8 +118,8 @@ where
                 .append_model_call(ModelCallInfo {
                     usage,
                     cost,
-                    model_id: self.model.model_id(),
-                    provider: self.model.provider().to_string(),
+                    model_id: self.params.model.model_id(),
+                    provider: self.params.model.provider().to_string(),
                 })
                 .await;
 
@@ -168,21 +138,12 @@ where
 
     /// Run a streaming execution of the agent.
     pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
-        let state = Arc::new(RunState::new(request.input.clone(), self.max_turns));
+        let state = Arc::new(RunState::new(request.input.clone(), self.params.max_turns));
 
         let (input, context) = self.get_llm_input(request).await?;
 
         let session = Arc::new(Self {
-            tools: self.tools.clone(),
-            model: self.model.clone(),
-            response_format: self.response_format.clone(),
-            instructions: self.instructions.clone(),
-            max_turns: self.max_turns,
-            temperature: self.temperature,
-            top_p: self.top_p,
-            top_k: self.top_k,
-            presence_penalty: self.presence_penalty,
-            frequency_penalty: self.frequency_penalty,
+            params: self.params.clone(),
         });
 
         let stream = async_stream::try_stream! {
@@ -191,7 +152,7 @@ where
 
                 input.messages = state.get_turn_messages().await;
 
-                let mut model_stream = session.model.stream(input).await?;
+                let mut model_stream = session.params.model.stream(input).await?;
 
                 let mut accumulator = StreamAccumulator::new();
 
@@ -216,8 +177,8 @@ where
                 state.append_model_call(ModelCallInfo {
                     usage,
                     cost,
-                    model_id: session.model.model_id(),
-                    provider: session.model.provider().to_string(),
+                    model_id: session.params.model.model_id(),
+                    provider: session.params.model.provider().to_string(),
                 }).await;
 
                 yield AgentStreamEvent::Message(assistant_message);
@@ -248,7 +209,7 @@ where
         &self,
         request: AgentRequest<TCtx>,
     ) -> Result<(LanguageModelInput, Arc<TCtx>), AgentError> {
-        let system_prompt = instruction::get_prompt(&self.instructions, &request.context)
+        let system_prompt = instruction::get_prompt(&self.params.instructions, &request.context)
             .await
             .map_err(AgentError::Init)?;
 
@@ -257,13 +218,22 @@ where
                 // messages will be computed from getTurnMessages
                 messages: vec![],
                 system_prompt: Some(system_prompt),
-                tools: Some(self.tools.iter().map(|tool| tool.as_ref().into()).collect()),
-                response_format: Some(self.response_format.clone()),
-                temperature: self.temperature,
-                top_p: self.top_p,
-                top_k: self.top_k,
-                presence_penalty: self.presence_penalty,
-                frequency_penalty: self.frequency_penalty,
+                tools: Some(
+                    self.params
+                        .tools
+                        .iter()
+                        .map(|tool| tool.as_ref().into())
+                        .collect(),
+                ),
+                response_format: Some(self.params.response_format.clone()),
+                temperature: self.params.temperature,
+                top_p: self.params.top_p,
+                top_k: self.params.top_k,
+                presence_penalty: self.params.presence_penalty,
+                frequency_penalty: self.params.frequency_penalty,
+                modalities: self.params.modalities.clone(),
+                reasoning: self.params.reasoning.clone(),
+                audio: self.params.audio.clone(),
                 ..Default::default()
             },
             Arc::new(request.context),

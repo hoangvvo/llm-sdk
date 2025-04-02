@@ -279,29 +279,49 @@ async fn main() -> Result<(), Box<dyn Error>> {
     ));
 
     // Order processing agent
-    let order_agent =  Agent::<MyContext>::builder("order", model.clone())
-            .add_instruction("You are an order processing agent. Your job is to handle customer orders efficiently and accurately.")
-            .add_tool(CreateOrderTool)
-            .add_tool(GetOrdersTool)
-            .build();
+    let order_agent = Agent::<MyContext>::builder("order", model.clone())
+        .add_instruction(
+            "You are an order processing agent. Your job is to handle customer orders efficiently \
+             and accurately.",
+        )
+        .add_tool(CreateOrderTool)
+        .add_tool(GetOrdersTool)
+        .build();
 
     // Delivery agent
-    let delivery_agent =   Agent::<MyContext>::builder("delivery", model.clone())
-            .add_instruction("You are a delivery agent. Your job is to ensure timely and accurate delivery of customer orders.")
-            .add_tool(DeliverOrderTool)
-            .build();
+    let delivery_agent = Agent::<MyContext>::builder("delivery", model.clone())
+        .add_instruction(
+            "You are a delivery agent. Your job is to ensure timely and accurate delivery of \
+             customer orders.",
+        )
+        .add_tool(DeliverOrderTool)
+        .build();
 
     // Coordinator agent
-    let coordinator =  Agent::<MyContext>::builder("coordinator", model.clone())
-            .add_instruction("You are a coordinator agent. Your job is to delegate tasks to the appropriate sub-agents (order processing and delivery) and ensure smooth operation.
-You should also poll the order status in every turn to send them for delivery once they are ready.")
-            .add_instruction("Respond by letting me know what you did and what is the result from the sub-agents.")
-            .add_instruction("For the purpose of demo:
-- you can think of random customer name and address. To be fun, use those from fictions and literatures.
-- every time you are called (NEXT), you should randomly create 0 to 1 order.")
-            .add_tool(AgentTransferTool::new(order_agent, "handling customer orders and get order statuses")) // Delegate order creation to order agent
-            .add_tool(AgentTransferTool::new(delivery_agent, "delivering processed orders")) // Delegate delivery to delivery agent
-            .build();
+    let coordinator = Agent::<MyContext>::builder("coordinator", model.clone())
+        .add_instruction(
+            "You are a coordinator agent. Your job is to delegate tasks to the appropriate \
+             sub-agents (order processing and delivery) and ensure smooth operation.
+You should also poll the order status in every turn to send them for delivery once they are ready.",
+        )
+        .add_instruction(
+            "Respond by letting me know what you did and what is the result from the sub-agents.",
+        )
+        .add_instruction(
+            "For the purpose of demo:
+- you can think of random customer name and address. To be fun, use those from fictions and \
+             literatures.
+- every time you are called (NEXT), you should randomly create 0 to 1 order.",
+        )
+        .add_tool(AgentTransferTool::new(
+            order_agent,
+            "handling customer orders and get order statuses",
+        )) // Delegate order creation to order agent
+        .add_tool(AgentTransferTool::new(
+            delivery_agent,
+            "delivering processed orders",
+        )) // Delegate delivery to delivery agent
+        .build();
 
     let orders: Arc<Mutex<Vec<Order>>> = Arc::new(Mutex::new(Vec::<Order>::new()));
 

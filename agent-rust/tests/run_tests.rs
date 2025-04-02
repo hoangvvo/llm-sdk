@@ -1,17 +1,16 @@
 use futures::StreamExt;
 use llm_agent::{
-    AgentError, AgentItem, AgentRequest, AgentResponse, AgentStreamEvent, AgentTool,
+    AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse, AgentStreamEvent, AgentTool,
     AgentToolResult, InstructionParam, ModelCallInfo, RunSession, RunState,
 };
 use llm_sdk::{
     AssistantMessage, ContentDelta, JSONSchema, LanguageModel, LanguageModelError,
     LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
-    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatOption,
-    TextPartDelta, ToolCallPart, ToolCallPartDelta, UserMessage,
+    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, TextPartDelta, ToolCallPart,
+    ToolCallPartDelta, UserMessage,
 };
 use serde_json::Value;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 #[derive(Clone)]
 struct MockLanguageModel {
@@ -198,19 +197,7 @@ async fn test_run_session_returns_response_when_no_tool_call() {
         ..Default::default()
     }));
 
-    let session = RunSession::new(
-        model,
-        Arc::new(vec![]),
-        Arc::new(vec![]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .await;
+    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model))).await;
 
     let response = session
         .run(AgentRequest {
@@ -242,11 +229,7 @@ async fn test_run_session_returns_response_when_no_tool_call() {
 
 #[tokio::test]
 async fn test_run_session_executes_single_tool_call_and_returns_response() {
-    let tool = Box::new(MockTool::new(
-        "test_tool",
-        vec![create_text_part("Tool result")],
-        false,
-    ));
+    let tool = MockTool::new("test_tool", vec![create_text_part("Tool result")], false);
 
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
@@ -268,18 +251,9 @@ async fn test_run_session_executes_single_tool_call_and_returns_response() {
         },
     ]));
 
-    let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![tool]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
+    let session = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model).add_tool(tool),
+    ))
     .await;
 
     let response = session
@@ -341,11 +315,7 @@ async fn test_run_session_executes_single_tool_call_and_returns_response() {
 
 #[tokio::test]
 async fn test_run_session_throws_max_turns_exceeded_error() {
-    let tool = Box::new(MockTool::new(
-        "test_tool",
-        vec![create_text_part("Tool result")],
-        false,
-    ));
+    let tool = MockTool::new("test_tool", vec![create_text_part("Tool result")], false);
 
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
@@ -377,18 +347,11 @@ async fn test_run_session_throws_max_turns_exceeded_error() {
         },
     ]));
 
-    let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![tool]),
-        ResponseFormatOption::Text,
-        2, // max_turns = 2
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
+    let session = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model)
+            .add_tool(tool)
+            .max_turns(2),
+    ))
     .await;
 
     let result = session
@@ -420,19 +383,7 @@ async fn test_run_session_throws_invariant_error_when_tool_not_found() {
         cost: Some(0.0),
     }));
 
-    let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .await;
+    let session = RunSession::new(AgentParams::new("test_agent", model).into()).await;
 
     let result = session
         .run(AgentRequest {
@@ -453,8 +404,7 @@ async fn test_run_session_throws_invariant_error_when_tool_not_found() {
 
 #[tokio::test]
 async fn test_run_session_throws_tool_execution_error_when_tool_execution_fails() {
-    let tool =
-        Box::new(MockTool::new("failing_tool", vec![create_text_part("")], false).with_error());
+    let tool = MockTool::new("failing_tool", vec![create_text_part("")], false).with_error();
 
     let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
         content: vec![Part::ToolCall(ToolCallPart {
@@ -466,19 +416,8 @@ async fn test_run_session_throws_tool_execution_error_when_tool_execution_fails(
         cost: Some(0.0),
     }));
 
-    let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![tool]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .await;
+    let session =
+        RunSession::new(AgentParams::new("test_agent", model).add_tool(tool).into()).await;
 
     let result = session
         .run(AgentRequest {
@@ -499,11 +438,11 @@ async fn test_run_session_throws_tool_execution_error_when_tool_execution_fails(
 
 #[tokio::test]
 async fn test_run_session_handles_tool_returning_error_result() {
-    let tool = Box::new(MockTool::new(
+    let tool = MockTool::new(
         "test_tool",
         vec![create_text_part("Error: Invalid parameters")],
         true,
-    ));
+    );
 
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
@@ -523,16 +462,9 @@ async fn test_run_session_handles_tool_returning_error_result() {
     ]));
 
     let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![tool]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
+        AgentParams::new("test_agent", model.clone())
+            .add_tool(tool)
+            .into(),
     )
     .await;
 
@@ -546,7 +478,8 @@ async fn test_run_session_handles_tool_returning_error_result() {
         .await
         .unwrap();
 
-    // For now, just check that we got a response - tool handling details may be implementation specific
+    // For now, just check that we got a response - tool handling details may be
+    // implementation specific
 
     // Check final response
     assert_eq!(response.content.len(), 1);
@@ -564,16 +497,13 @@ async fn test_run_session_passes_sampling_parameters_to_model() {
     }));
 
     let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![]),
-        ResponseFormatOption::Text,
-        10,
-        Some(0.7),  // temperature
-        Some(0.9),  // top_p
-        Some(40.0), // top_k
-        Some(0.1),  // presence_penalty
-        Some(0.2),  // frequency_penalty
+        AgentParams::new("test_agent", model.clone())
+            .temperature(0.7)
+            .top_p(0.9)
+            .top_k(40.0)
+            .presence_penalty(0.1)
+            .frequency_penalty(0.2)
+            .into(),
     )
     .await;
 
@@ -599,17 +529,9 @@ async fn test_run_session_passes_sampling_parameters_to_model() {
 
 #[tokio::test]
 async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
-    let tool1 = Box::new(MockTool::new(
-        "tool_1",
-        vec![create_text_part("Tool 1 result")],
-        false,
-    ));
+    let tool1 = MockTool::new("tool_1", vec![create_text_part("Tool 1 result")], false);
 
-    let tool2 = Box::new(MockTool::new(
-        "tool_2",
-        vec![create_text_part("Tool 2 result")],
-        false,
-    ));
+    let tool2 = MockTool::new("tool_2", vec![create_text_part("Tool 2 result")], false);
 
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
@@ -644,16 +566,10 @@ async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
     ]));
 
     let session = RunSession::new(
-        model,
-        Arc::new(vec![]),
-        Arc::new(vec![tool1, tool2]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
+        AgentParams::new("test_agent", model.clone())
+            .add_tool(tool1.clone())
+            .add_tool(tool2.clone())
+            .into(),
     )
     .await;
 
@@ -736,11 +652,11 @@ async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
 
 #[tokio::test]
 async fn test_run_session_handles_multiple_turns_with_tool_calls() {
-    let tool = Box::new(MockTool::new(
+    let tool = MockTool::new(
         "calculator",
         vec![create_text_part("Calculation result")],
         false,
-    ));
+    );
 
     let model = Arc::new(MockLanguageModel::new().add_responses(vec![
         ModelResponse {
@@ -776,19 +692,8 @@ async fn test_run_session_handles_multiple_turns_with_tool_calls() {
         },
     ]));
 
-    let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![tool]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .await;
+    let session =
+        RunSession::new(AgentParams::new("test_agent", model).add_tool(tool).into()).await;
 
     let response = session
         .run(AgentRequest {
@@ -816,19 +721,7 @@ async fn test_run_session_throws_language_model_error_when_generation_fails() {
         )),
     );
 
-    let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .await;
+    let session = RunSession::new(AgentParams::new("test_agent", model.clone()).into()).await;
 
     let result = session
         .run(AgentRequest {
@@ -879,19 +772,7 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
         },
     ]));
 
-    let session = RunSession::new(
-        model,
-        Arc::new(vec![]),
-        Arc::new(vec![]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .await;
+    let session = RunSession::new(AgentParams::new("test_agent", model.clone()).into()).await;
 
     let stream = session
         .run_stream(AgentRequest {
@@ -925,19 +806,7 @@ async fn test_run_session_streaming_throws_language_model_error() {
         LanguageModelError::InvalidInput("Rate limit exceeded".to_string()),
     ));
 
-    let session = RunSession::new(
-        model.clone(),
-        Arc::new(vec![]),
-        Arc::new(vec![]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .await;
+    let session = RunSession::new(AgentParams::new("test_agent", model).into()).await;
 
     let result = session
         .run_stream(AgentRequest {
@@ -986,18 +855,11 @@ async fn test_run_session_includes_string_and_dynamic_function_instructions() {
         InstructionParam::String("Always be polite.".to_string()),
     ];
 
-    let session: RunSession<TestContext> = RunSession::new(
-        model.clone(),
-        Arc::new(instructions),
-        Arc::new(vec![]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
+    let session: RunSession<TestContext> = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model.clone())
+            .instructions(instructions)
+            .into(),
+    ))
     .await;
 
     session
@@ -1025,11 +887,7 @@ async fn test_run_session_includes_string_and_dynamic_function_instructions() {
 
 #[tokio::test]
 async fn test_run_session_streaming_tool_call_execution() {
-    let tool = Box::new(MockTool::new(
-        "test_tool",
-        vec![create_text_part("Tool result")],
-        false,
-    ));
+    let tool = MockTool::new("test_tool", vec![create_text_part("Tool result")], false);
 
     let model =
         Arc::new(
@@ -1047,16 +905,9 @@ async fn test_run_session_streaming_tool_call_execution() {
         );
 
     let session = RunSession::new(
-        model,
-        Arc::new(vec![]),
-        Arc::new(vec![tool]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
+        AgentParams::new("test_agent", model.clone())
+            .add_tool(tool)
+            .into(),
     )
     .await;
 
@@ -1088,11 +939,11 @@ async fn test_run_session_streaming_tool_call_execution() {
 
 #[tokio::test]
 async fn test_run_session_streaming_multiple_turns() {
-    let tool = Box::new(MockTool::new(
+    let tool = MockTool::new(
         "calculator",
         vec![create_text_part("Calculation done")],
         false,
-    ));
+    );
 
     let model = Arc::new(
         MockLanguageModel::new()
@@ -1130,16 +981,9 @@ async fn test_run_session_streaming_multiple_turns() {
     );
 
     let session = RunSession::new(
-        model,
-        Arc::new(vec![]),
-        Arc::new(vec![tool]),
-        ResponseFormatOption::Text,
-        10,
-        None,
-        None,
-        None,
-        None,
-        None,
+        AgentParams::new("test_agent", model.clone())
+            .add_tool(tool)
+            .into(),
     )
     .await;
 
@@ -1169,11 +1013,7 @@ async fn test_run_session_streaming_multiple_turns() {
 
 #[tokio::test]
 async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
-    let tool = Box::new(MockTool::new(
-        "test_tool",
-        vec![create_text_part("Tool result")],
-        false,
-    ));
+    let tool = MockTool::new("test_tool", vec![create_text_part("Tool result")], false);
 
     let model = Arc::new(
         MockLanguageModel::new()
@@ -1212,18 +1052,11 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
             }]),
     );
 
-    let session = RunSession::new(
-        model,
-        Arc::new(vec![]),
-        Arc::new(vec![tool]),
-        ResponseFormatOption::Text,
-        2, // max_turns = 2
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
+    let session = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model)
+            .add_tool(tool)
+            .max_turns(2),
+    ))
     .await;
 
     let stream = session

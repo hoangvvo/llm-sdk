@@ -1,12 +1,10 @@
 import {
   LanguageModelError,
   StreamAccumulator,
-  type LanguageModel,
   type LanguageModelInput,
   type Message,
   type ModelResponse,
   type Part,
-  type ResponseFormatOption,
   type ToolMessage,
 } from "@hoangvvo/llm-sdk";
 import {
@@ -16,12 +14,13 @@ import {
   AgentMaxTurnsExceededError,
   AgentToolExecutionError,
 } from "./errors.ts";
-import {
-  getPromptForInstructionParams,
-  type InstructionParam,
-} from "./instruction.ts";
+import { getPromptForInstructionParams } from "./instruction.ts";
 import { AgentSpan, startActiveToolSpan } from "./opentelemetry.ts";
-import type { AgentTool } from "./tool.ts";
+import {
+  agentParamsWithDefaults,
+  type AgentParams,
+  type AgentParamsWithDefaults,
+} from "./params.ts";
 import type {
   AgentItem,
   AgentItemMessage,
@@ -39,53 +38,19 @@ import type {
  * The session can be reused in multiple runs.
  */
 export class RunSession<TContext> {
-  readonly #agentName: string;
-  readonly #instructions: InstructionParam<TContext>[];
-  readonly #model: LanguageModel;
-  readonly #responseFormat: ResponseFormatOption;
-  readonly #tools: AgentTool<TContext>[];
-  readonly #maxTurns: number;
-  readonly #temperature: number | undefined;
-  readonly #topP: number | undefined;
-  readonly #topK: number | undefined;
-  readonly #presencePenalty: number | undefined;
-  readonly #frequencyPenalty: number | undefined;
-
   #initialized: boolean;
+  #params: AgentParamsWithDefaults<TContext>;
 
-  constructor({
-    agentName,
-    instructions,
-    model,
-    responseFormat,
-    tools,
-    maxTurns,
-    temperature,
-    topP,
-    topK,
-    presencePenalty,
-    frequencyPenalty,
-  }: RunSessionParams<TContext>) {
-    this.#agentName = agentName;
-    this.#instructions = instructions;
-    this.#model = model;
-    this.#responseFormat = responseFormat;
-    this.#tools = tools;
-    this.#maxTurns = maxTurns;
-    this.#temperature = temperature;
-    this.#topP = topP;
-    this.#topK = topK;
-    this.#presencePenalty = presencePenalty;
-    this.#frequencyPenalty = frequencyPenalty;
-
+  constructor(inputParams: AgentParams<TContext>) {
     this.#initialized = false;
+    this.#params = agentParamsWithDefaults(inputParams);
   }
 
   /**
    * Create a new run session and initializes dependencies
    */
   static async create<TContext>(
-    params: RunSessionParams<TContext>,
+    params: AgentParams<TContext>,
   ): Promise<RunSession<TContext>> {
     const session = new RunSession(params);
     await session.#initialize();
@@ -122,7 +87,7 @@ export class RunSession<TContext> {
     };
 
     for (const toolCallPart of toolCallParts) {
-      const agentTool = this.#tools.find(
+      const agentTool = this.#params.tools.find(
         (tool) => tool.name === toolCallPart.tool_name,
       );
 
@@ -168,10 +133,10 @@ export class RunSession<TContext> {
       throw new Error("RunSession not initialized.");
     }
 
-    const span = new AgentSpan(this.#agentName, "run");
+    const span = new AgentSpan(this.#params.name, "run");
 
     try {
-      const state = new RunState(request.input, this.#maxTurns);
+      const state = new RunState(request.input, this.#params.max_turns);
 
       const input = await span.withContext(() => this.#getLlmInput(request));
       const context = request.context;
@@ -180,7 +145,7 @@ export class RunSession<TContext> {
         const modelResponse: ModelResponse = await span.withContext(
           async () => {
             try {
-              const response = await this.#model.generate({
+              const response = await this.#params.model.generate({
                 ...input,
                 messages: state.getTurnMessages(),
               });
@@ -206,8 +171,8 @@ export class RunSession<TContext> {
         state.appendModelCall({
           usage: usage ?? null,
           cost: cost ?? null,
-          model_id: this.#model.modelId,
-          provider: this.#model.provider,
+          model_id: this.#params.model.modelId,
+          provider: this.#params.model.provider,
         });
 
         const processResult = await span.withContext(() =>
@@ -243,16 +208,16 @@ export class RunSession<TContext> {
       throw new Error("RunSession not initialized.");
     }
 
-    const span = new AgentSpan(this.#agentName, "run_stream");
+    const span = new AgentSpan(this.#params.name, "run_stream");
 
     try {
-      const state = new RunState(request.input, this.#maxTurns);
+      const state = new RunState(request.input, this.#params.max_turns);
 
       const input = await span.withContext(() => this.#getLlmInput(request));
       const context = request.context;
 
       for (;;) {
-        const modelStream = this.#model.stream({
+        const modelStream = this.#params.model.stream({
           ...input,
           messages: state.getTurnMessages(),
         });
@@ -290,8 +255,8 @@ export class RunSession<TContext> {
         state.appendModelCall({
           usage: usage ?? null,
           cost: cost ?? null,
-          model_id: this.#model.modelId,
-          provider: this.#model.provider,
+          model_id: this.#params.model.modelId,
+          provider: this.#params.model.provider,
         });
 
         yield {
@@ -344,7 +309,7 @@ export class RunSession<TContext> {
   ): Promise<LanguageModelInput> {
     try {
       const systemPrompt = await getPromptForInstructionParams(
-        this.#instructions,
+        this.#params.instructions,
         request.context,
       );
 
@@ -352,28 +317,37 @@ export class RunSession<TContext> {
         // messages will be computed from getTurnMessages
         messages: [],
         system_prompt: systemPrompt,
-        tools: this.#tools.map((tool) => ({
+        tools: this.#params.tools.map((tool) => ({
           name: tool.name,
           description: tool.description,
           parameters: tool.parameters,
         })),
-        response_format: this.#responseFormat,
+        response_format: this.#params.response_format,
       };
 
-      if (this.#temperature !== undefined) {
-        input.temperature = this.#temperature;
+      if (this.#params.temperature !== undefined) {
+        input.temperature = this.#params.temperature;
       }
-      if (this.#topP !== undefined) {
-        input.top_p = this.#topP;
+      if (this.#params.top_p !== undefined) {
+        input.top_p = this.#params.top_p;
       }
-      if (this.#topK !== undefined) {
-        input.top_k = this.#topK;
+      if (this.#params.top_k !== undefined) {
+        input.top_k = this.#params.top_k;
       }
-      if (this.#presencePenalty !== undefined) {
-        input.presence_penalty = this.#presencePenalty;
+      if (this.#params.presence_penalty !== undefined) {
+        input.presence_penalty = this.#params.presence_penalty;
       }
-      if (this.#frequencyPenalty !== undefined) {
-        input.frequency_penalty = this.#frequencyPenalty;
+      if (this.#params.frequency_penalty !== undefined) {
+        input.frequency_penalty = this.#params.frequency_penalty;
+      }
+      if (this.#params.modalities !== undefined) {
+        input.modalities = this.#params.modalities;
+      }
+      if (this.#params.audio !== undefined) {
+        input.audio = this.#params.audio;
+      }
+      if (this.#params.reasoning !== undefined) {
+        input.reasoning = this.#params.reasoning;
       }
 
       return input;
@@ -381,20 +355,6 @@ export class RunSession<TContext> {
       throw new AgentInitError(err);
     }
   }
-}
-
-interface RunSessionParams<TContext> {
-  agentName: string;
-  model: LanguageModel;
-  instructions: InstructionParam<TContext>[];
-  tools: AgentTool<TContext>[];
-  responseFormat: ResponseFormatOption;
-  maxTurns: number;
-  temperature?: number;
-  topP?: number;
-  topK?: number;
-  presencePenalty?: number;
-  frequencyPenalty?: number;
 }
 
 type ProcessResult = ProcessResultResponse | ProcessResultNext;
