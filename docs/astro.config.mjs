@@ -35,6 +35,7 @@ export default defineConfig({
           items: [
             { slug: "agent" },
             { slug: "agent/agent" },
+            { slug: "agent/instructions" },
             { slug: "agent/tools" },
             { slug: "agent/execution" },
             { slug: "agent/structured-output" },

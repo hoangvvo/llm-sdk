@@ -3,6 +3,7 @@ title: Agent
 ---
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import { extractGoAgentParamsTypes, extractRustAgentParamsTypes, extractTypescriptAgentParamsTypes } from "../../../utils/extract-types.ts";
 
 An agent is constructed with the following parameters:
 
@@ -16,3 +17,33 @@ An agent is constructed with the following parameters:
 - Model output options such as `modalities`, `thinking`, and `audio`.
 
 In addition, the agent is defined with a `context` generic type that can be accessed in the instructions (for dynamic instructions) and tools.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptAgentParamsTypes([
+        "AgentParams",
+      ])}
+      lang="typescript"
+      title="params.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustAgentParamsTypes([
+        "AgentParams",
+      ])}
+      lang="rust"
+      title="params.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoAgentParamsTypes([
+        "AgentParams",
+      ])}
+      lang="go"
+      title="params.go"
+    />
+  </TabItem>
+</Tabs>

@@ -1,0 +1,35 @@
+---
+title: Instructions
+---
+
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import { extractGoAgentInstructionTypes, extractRustAgentInstructionTypes, extractTypescriptAgentInstructionTypes } from "../../../utils/extract-types.ts";
+
+Instructions are used to guide the agent's behavior and can be either static or dynamic. They are injected into the system prompt to provide context and directives for the agent.
+
+Dynamic instructions receive the `context` provided in the `AgentRequest`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptAgentInstructionTypes(["InstructionParam"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustAgentInstructionTypes(["InstructionParam"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoAgentInstructionTypes(["InstructionParam"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
