@@ -147,6 +147,7 @@ export interface RunTestCaseOptions {
    * Extra parameters to pass to the model input.
    */
   additionalInputs?: (input: LanguageModelInput) => LanguageModelInput;
+  customOutputContent?: (content: PartAssertion[]) => PartAssertion[];
 }
 
 export async function runTestCase(
@@ -165,10 +166,14 @@ export async function runTestCase(
     ? options.additionalInputs(input)
     : input;
 
+  const content = options?.customOutputContent
+    ? options.customOutputContent(output.content)
+    : output.content;
+
   if (type === "generate") {
     const result = await model.generate(modelInput);
-    if (output.content.length > 0) {
-      assertContentPart(t, result.content, output.content);
+    if (content.length > 0) {
+      assertContentPart(t, result.content, content);
     }
   } else {
     const stream = model.stream(modelInput);
@@ -179,8 +184,8 @@ export async function runTestCase(
     }
 
     const result = accumulator.computeResponse();
-    if (output.content.length > 0) {
-      assertContentPart(t, result.content, output.content);
+    if (content.length > 0) {
+      assertContentPart(t, result.content, content);
     }
   }
 }

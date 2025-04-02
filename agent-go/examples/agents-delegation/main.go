@@ -14,6 +14,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
+	"github.com/sanity-io/litter"
 )
 
 type DelegateParams struct {
@@ -381,11 +382,7 @@ You should also poll the order status in every turn to send them for delivery on
 			log.Fatal(err)
 		}
 
-		prettyJSON, err := json.MarshalIndent(response.Content, "", "  ")
-		if err != nil {
-			log.Fatalf("Failed to format JSON: %v", err)
-		}
-		fmt.Printf("%s\n", string(prettyJSON))
+		litter.Dump(response)
 
 		// Append items with the output items
 		items = append(items, response.Output...)

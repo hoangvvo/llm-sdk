@@ -33,5 +33,5 @@ async fn main() {
     }
 
     let final_response = accumulator.compute_response();
-    println!("Final response: {final_response:#?}");
+    println!("{final_response:#?}");
 }

@@ -1,2 +1,2 @@
-mod assert;
+pub mod assert;
 pub mod cases;

@@ -320,7 +320,7 @@ You should also poll the order status in every turn to send them for delivery on
             })
             .await?;
 
-        println!("Response: {:?}", response.content);
+        println!("{response:?}");
 
         // Append items with the output items
         input.extend(response.output.clone());

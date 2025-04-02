@@ -8,6 +8,7 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
+	"github.com/sanity-io/litter"
 )
 
 var myBalance = 1000
@@ -150,5 +151,5 @@ func main() {
 		maxTurnLeft--
 	}
 
-	fmt.Printf("Final response: %s\n", examples.ToJSONString(response))
+	litter.Dump(response)
 }

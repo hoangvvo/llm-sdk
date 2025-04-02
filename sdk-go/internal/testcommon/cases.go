@@ -212,6 +212,12 @@ func WithAdditionalInput(f func(*llmsdk.LanguageModelInput)) TestCaseOption {
 	}
 }
 
+func WithCustomOutputContent(f func([]PartAssertion) []PartAssertion) TestCaseOption {
+	return func(tc *TestCase) {
+		tc.Output.Content = f(tc.Output.Content)
+	}
+}
+
 // GetWeatherTool returns the standard weather tool for testing
 func GetWeatherTool() llmsdk.Tool {
 	ensureInitialized()

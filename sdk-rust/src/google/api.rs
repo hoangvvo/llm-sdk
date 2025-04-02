@@ -43,8 +43,8 @@ pub struct Content {
 
 /// A datatype containing media content.
 ///
-/// Exactly one field within a Part should be set, representing the specific type
-/// of content being conveyed. Using multiple fields within the same `Part`
+/// Exactly one field within a Part should be set, representing the specific
+/// type of content being conveyed. Using multiple fields within the same `Part`
 /// instance is considered invalid.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
@@ -58,14 +58,19 @@ pub struct Part {
     /// Optional. URI based data.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_data: Option<FileData>,
-    /// An opaque signature for the thought so it can be reused in subsequent requests.
-    /// @remarks Encoded as base64 string.
+    /// An opaque signature for the thought so it can be reused in subsequent
+    /// requests. @remarks Encoded as base64 string.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thought_signature: Option<String>,
-    /// Optional. A predicted [FunctionCall] returned from the model that contains a string representing the [FunctionDeclaration.name] with the parameters and their values.
+    /// Optional. A predicted [FunctionCall] returned from the model that
+    /// contains a string representing the [FunctionDeclaration.name] with the
+    /// parameters and their values.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_call: Option<FunctionCall>,
-    /// Optional. The result output of a [FunctionCall] that contains a string representing the [FunctionDeclaration.name] and a structured JSON object containing any output from the function call. It is used as context to the model.
+    /// Optional. The result output of a [FunctionCall] that contains a string
+    /// representing the [FunctionDeclaration.name] and a structured JSON object
+    /// containing any output from the function call. It is used as context to
+    /// the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_response: Option<FunctionResponse>,
     /// Optional. Text part (can be code).
@@ -77,7 +82,9 @@ pub struct Part {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Blob2 {
-    /// Optional. Display name of the blob. Used to provide a label or filename to distinguish blobs. This field is not currently used in the Gemini GenerateContent calls.
+    /// Optional. Display name of the blob. Used to provide a label or filename
+    /// to distinguish blobs. This field is not currently used in the Gemini
+    /// GenerateContent calls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     /// Required. Raw bytes.
@@ -93,7 +100,9 @@ pub struct Blob2 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileData {
-    /// Optional. Display name of the file data. Used to provide a label or filename to distinguish file datas. It is not currently used in the Gemini GenerateContent calls.
+    /// Optional. Display name of the file data. Used to provide a label or
+    /// filename to distinguish file datas. It is not currently used in the
+    /// Gemini GenerateContent calls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     /// Required. URI.
@@ -108,14 +117,16 @@ pub struct FileData {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionCall {
-    /// The unique id of the function call. If populated, the client to execute the
-    /// `function_call` and return the response with the matching `id`.
+    /// The unique id of the function call. If populated, the client to execute
+    /// the `function_call` and return the response with the matching `id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// Optional. The function parameters and values in JSON object format. See [FunctionDeclaration.parameters] for parameter details.
+    /// Optional. The function parameters and values in JSON object format. See
+    /// [FunctionDeclaration.parameters] for parameter details.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Value>,
-    /// Required. The name of the function to call. Matches [FunctionDeclaration.name].
+    /// Required. The name of the function to call. Matches
+    /// [FunctionDeclaration.name].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -124,13 +135,18 @@ pub struct FunctionCall {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionResponse {
-    /// Optional. The id of the function call this response is for. Populated by the client to match the corresponding function call `id`.
+    /// Optional. The id of the function call this response is for. Populated by
+    /// the client to match the corresponding function call `id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// Required. The name of the function to call. Matches [FunctionDeclaration.name] and [FunctionCall.name].
+    /// Required. The name of the function to call. Matches
+    /// [FunctionDeclaration.name] and [FunctionCall.name].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Required. The function response in JSON object format. Use "output" key to specify function output and "error" key to specify error details (if any). If "output" and "error" keys are not specified, then whole "response" is treated as function output.
+    /// Required. The function response in JSON object format. Use "output" key
+    /// to specify function output and "error" key to specify error details (if
+    /// any). If "output" and "error" keys are not specified, then whole
+    /// "response" is treated as function output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response: Option<HashMap<String, Value>>,
 }
@@ -143,9 +159,9 @@ pub struct FunctionResponse {
 #[serde(rename_all = "camelCase")]
 pub struct GenerateContentConfig {
     /// Value that controls the degree of randomness in token selection.
-    /// Lower temperatures are good for prompts that require a less open-ended or
-    /// creative response, while higher temperatures can lead to more diverse or
-    /// creative results.
+    /// Lower temperatures are good for prompts that require a less open-ended
+    /// or creative response, while higher temperatures can lead to more
+    /// diverse or creative results.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     /// Tokens are selected from the most to least probable until the sum
@@ -154,10 +170,10 @@ pub struct GenerateContentConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
     /// For each token selection step, the ``top_k`` tokens with the
-    /// highest probabilities are sampled. Then tokens are further filtered based
-    /// on ``top_p`` with the final token selected using temperature sampling. Use
-    /// a lower number for less random responses and a higher number for more
-    /// random responses.
+    /// highest probabilities are sampled. Then tokens are further filtered
+    /// based on ``top_p`` with the final token selected using temperature
+    /// sampling. Use a lower number for less random responses and a higher
+    /// number for more random responses.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<i32>,
     /// Number of response variations to return.
@@ -229,22 +245,43 @@ pub struct Tool {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionDeclaration {
-    /// Optional. Description and purpose of the function. Model uses it to decide how and whether to call the function.
+    /// Optional. Description and purpose of the function. Model uses it to
+    /// decide how and whether to call the function.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// Required. The name of the function to call. Must start with a letter or an underscore. Must be a-z, A-Z, 0-9, or contain underscores, dots and dashes, with a maximum length of 64.
+    /// Required. The name of the function to call. Must start with a letter or
+    /// an underscore. Must be a-z, A-Z, 0-9, or contain underscores, dots and
+    /// dashes, with a maximum length of 64.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// Optional. Describes the parameters to this function in JSON Schema Object format. Reflects the Open API 3.03 Parameter Object. string Key: the name of the parameter. Parameter names are case sensitive. Schema Value: the Schema defining the type used for the parameter. For function with no parameters, this can be left unset. Parameter names must start with a letter or an underscore and must only contain chars a-z, A-Z, 0-9, or underscores with a maximum length of 64. Example with 1 required and 1 optional parameter: type: OBJECT properties: param1: type: STRING param2: type: INTEGER required: - param1
+    /// Optional. Describes the parameters to this function in JSON Schema
+    /// Object format. Reflects the Open API 3.03 Parameter Object. string Key:
+    /// the name of the parameter. Parameter names are case sensitive. Schema
+    /// Value: the Schema defining the type used for the parameter. For function
+    /// with no parameters, this can be left unset. Parameter names must start
+    /// with a letter or an underscore and must only contain chars a-z, A-Z,
+    /// 0-9, or underscores with a maximum length of 64. Example with 1 required
+    /// and 1 optional parameter: type: OBJECT properties: param1: type: STRING
+    /// param2: type: INTEGER required: - param1
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parameters: Option<HashMap<String, Value>>,
-    /// Optional. Describes the parameters to the function in JSON Schema format. The schema must describe an object where the properties are the parameters to the function. For example: ``` { "type": "object", "properties": { "name": { "type": "string" }, "age": { "type": "integer" } }, "additionalProperties": false, "required": ["name", "age"], "propertyOrdering": ["name", "age"] } ``` This field is mutually exclusive with `parameters`.
+    /// Optional. Describes the parameters to the function in JSON Schema
+    /// format. The schema must describe an object where the properties are the
+    /// parameters to the function. For example: ``` { "type": "object",
+    /// "properties": { "name": { "type": "string" }, "age": { "type": "integer"
+    /// } }, "additionalProperties": false, "required": ["name", "age"],
+    /// "propertyOrdering": ["name", "age"] } ``` This field is mutually
+    /// exclusive with `parameters`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parameters_json_schema: Option<Value>,
-    /// Optional. Describes the output from this function in JSON Schema format. Reflects the Open API 3.03 Response Object. The Schema defines the type used for the response value of the function.
+    /// Optional. Describes the output from this function in JSON Schema format.
+    /// Reflects the Open API 3.03 Response Object. The Schema defines the type
+    /// used for the response value of the function.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response: Option<HashMap<String, Value>>,
-    /// Optional. Describes the output from this function in JSON Schema format. The value specified by the schema is the response value of the function. This field is mutually exclusive with `response`.
+    /// Optional. Describes the output from this function in JSON Schema format.
+    /// The value specified by the schema is the response value of the function.
+    /// This field is mutually exclusive with `response`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_json_schema: Option<Value>,
 }
@@ -267,7 +304,10 @@ pub struct FunctionCallingConfig {
     /// Optional. Function calling mode.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<FunctionCallingConfigMode>,
-    /// Optional. Function names to call. Only set when the Mode is ANY. Function names should match [FunctionDeclaration.name]. With mode set to ANY, model will predict a function call from the set of function names provided.
+    /// Optional. Function names to call. Only set when the Mode is ANY.
+    /// Function names should match [FunctionDeclaration.name]. With mode set to
+    /// ANY, model will predict a function call from the set of function names
+    /// provided.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_function_names: Option<Vec<String>>,
 }
@@ -278,16 +318,25 @@ pub enum FunctionCallingConfigMode {
     /// The function calling config mode is unspecified. Should not be used.
     #[serde(rename = "MODE_UNSPECIFIED")]
     ModeUnspecified,
-    /// Default model behavior, model decides to predict either function calls or natural language response.
+    /// Default model behavior, model decides to predict either function calls
+    /// or natural language response.
     #[serde(rename = "AUTO")]
     Auto,
-    /// Model is constrained to always predicting function calls only. If "allowed_function_names" are set, the predicted function calls will be limited to any one of "allowed_function_names", else the predicted function calls will be any one of the provided "function_declarations".
+    /// Model is constrained to always predicting function calls only. If
+    /// "allowed_function_names" are set, the predicted function calls will be
+    /// limited to any one of "allowed_function_names", else the predicted
+    /// function calls will be any one of the provided "function_declarations".
     #[serde(rename = "ANY")]
     Any,
-    /// Model will not predict any function calls. Model behavior is same as when not passing any function declarations.
+    /// Model will not predict any function calls. Model behavior is same as
+    /// when not passing any function declarations.
     #[serde(rename = "NONE")]
     None,
-    /// Model decides to predict either a function call or a natural language response, but will validate function calls with constrained decoding. If "allowed_function_names" are set, the predicted function call will be limited to any one of "allowed_function_names", else the predicted function call will be any one of the provided "function_declarations".
+    /// Model decides to predict either a function call or a natural language
+    /// response, but will validate function calls with constrained decoding. If
+    /// "allowed_function_names" are set, the predicted function call will be
+    /// limited to any one of "allowed_function_names", else the predicted
+    /// function call will be any one of the provided "function_declarations".
     #[serde(rename = "VALIDATED")]
     Validated,
 }
@@ -353,10 +402,13 @@ pub struct SpeakerVoiceConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ThinkingConfig {
-    /// Indicates whether to include thoughts in the response. If true, thoughts are returned only if the model supports thought and thoughts are available.
+    /// Indicates whether to include thoughts in the response. If true, thoughts
+    /// are returned only if the model supports thought and thoughts are
+    /// available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_thoughts: Option<bool>,
-    /// Indicates the thinking budget in tokens. 0 is DISABLED. -1 is AUTOMATIC. The default values and allowed ranges are model dependent.
+    /// Indicates the thinking budget in tokens. 0 is DISABLED. -1 is AUTOMATIC.
+    /// The default values and allowed ranges are model dependent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking_budget: Option<i32>,
 }
@@ -374,7 +426,8 @@ pub struct GenerateContentResponse {
     /// Output only. The model version used to generate the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_version: Option<String>,
-    /// Output only. response_id is used to identify each response. It is the encoding of the event_id.
+    /// Output only. response_id is used to identify each response. It is the
+    /// encoding of the event_id.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_id: Option<String>,
     /// Usage metadata about the response(s).
@@ -445,17 +498,28 @@ pub struct Citation {
     pub uri: Option<String>,
 }
 
-/// Represents a whole or partial calendar date, such as a birthday. The time of day and time zone are either specified elsewhere or are insignificant. The date is relative to the Gregorian Calendar. This can represent one of the following: * A full date, with non-zero year, month, and day values. * A month and day, with a zero year (for example, an anniversary). * A year on its own, with a zero month and a zero day. * A year and month, with a zero day (for example, a credit card expiration date). Related types: * google.type.TimeOfDay * google.type.DateTime * google.protobuf.Timestamp
+/// Represents a whole or partial calendar date, such as a birthday. The time of
+/// day and time zone are either specified elsewhere or are insignificant. The
+/// date is relative to the Gregorian Calendar. This can represent one of the
+/// following: * A full date, with non-zero year, month, and day values. * A
+/// month and day, with a zero year (for example, an anniversary). * A year on
+/// its own, with a zero month and a zero day. * A year and month, with a zero
+/// day (for example, a credit card expiration date). Related types: *
+/// google.type.TimeOfDay * google.type.DateTime * google.protobuf.Timestamp
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GoogleTypeDate {
-    /// Day of a month. Must be from 1 to 31 and valid for the year and month, or 0 to specify a year by itself or a year and month where the day isn't significant.
+    /// Day of a month. Must be from 1 to 31 and valid for the year and month,
+    /// or 0 to specify a year by itself or a year and month where the day isn't
+    /// significant.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub day: Option<i32>,
-    /// Month of a year. Must be from 1 to 12, or 0 to specify a year without a month and day.
+    /// Month of a year. Must be from 1 to 12, or 0 to specify a year without a
+    /// month and day.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub month: Option<i32>,
-    /// Year of the date. Must be from 1 to 9999, or 0 to specify a date without a year.
+    /// Year of the date. Must be from 1 to 9999, or 0 to specify a date without
+    /// a year.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub year: Option<i32>,
 }
@@ -468,13 +532,16 @@ pub enum FinishReason {
     /// The finish reason is unspecified.
     #[serde(rename = "FINISH_REASON_UNSPECIFIED")]
     FinishReasonUnspecified,
-    /// Token generation reached a natural stopping point or a configured stop sequence.
+    /// Token generation reached a natural stopping point or a configured stop
+    /// sequence.
     #[serde(rename = "STOP")]
     Stop,
     /// Token generation reached the configured maximum output tokens.
     #[serde(rename = "MAX_TOKENS")]
     MaxTokens,
-    /// Token generation stopped because the content potentially contains safety violations. NOTE: When streaming, [content][] is empty if content filters blocks the output.
+    /// Token generation stopped because the content potentially contains safety
+    /// violations. NOTE: When streaming, [content][] is empty if content
+    /// filters blocks the output.
     #[serde(rename = "SAFETY")]
     Safety,
     /// The token generation stopped because of potential recitation.
@@ -492,13 +559,15 @@ pub enum FinishReason {
     /// Token generation stopped for potentially containing prohibited content.
     #[serde(rename = "PROHIBITED_CONTENT")]
     ProhibitedContent,
-    /// Token generation stopped because the content potentially contains Sensitive Personally Identifiable Information (SPII).
+    /// Token generation stopped because the content potentially contains
+    /// Sensitive Personally Identifiable Information (SPII).
     #[serde(rename = "SPII")]
     Spii,
     /// The function call generated by the model is invalid.
     #[serde(rename = "MALFORMED_FUNCTION_CALL")]
     MalformedFunctionCall,
-    /// Token generation stopped because generated images have safety violations.
+    /// Token generation stopped because generated images have safety
+    /// violations.
     #[serde(rename = "IMAGE_SAFETY")]
     ImageSafety,
     /// The tool call generated by the model is invalid.
@@ -510,10 +579,12 @@ pub enum FinishReason {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateContentResponseUsageMetadata {
-    /// Output only. List of modalities of the cached content in the request input.
+    /// Output only. List of modalities of the cached content in the request
+    /// input.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_tokens_details: Option<Vec<ModalityTokenCount>>,
-    /// Output only. Number of tokens in the cached part in the input (the cached content).
+    /// Output only. Number of tokens in the cached part in the input (the
+    /// cached content).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_content_token_count: Option<i32>,
     /// Number of tokens in the response(s).
@@ -522,10 +593,13 @@ pub struct GenerateContentResponseUsageMetadata {
     /// Output only. List of modalities that were returned in the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub candidates_tokens_details: Option<Vec<ModalityTokenCount>>,
-    /// Number of tokens in the request. When `cached_content` is set, this is still the total effective prompt size meaning this includes the number of tokens in the cached content.
+    /// Number of tokens in the request. When `cached_content` is set, this is
+    /// still the total effective prompt size meaning this includes the number
+    /// of tokens in the cached content.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_token_count: Option<i32>,
-    /// Output only. List of modalities that were processed in the request input.
+    /// Output only. List of modalities that were processed in the request
+    /// input.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_tokens_details: Option<Vec<ModalityTokenCount>>,
     /// Output only. Number of tokens present in thoughts output.
@@ -534,10 +608,12 @@ pub struct GenerateContentResponseUsageMetadata {
     /// Output only. Number of tokens present in tool-use prompt(s).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_use_prompt_token_count: Option<i32>,
-    /// Output only. List of modalities that were processed for tool-use request inputs.
+    /// Output only. List of modalities that were processed for tool-use request
+    /// inputs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_use_prompt_tokens_details: Option<Vec<ModalityTokenCount>>,
-    /// Total token count for prompt, response candidates, and tool-use prompts (if present).
+    /// Total token count for prompt, response candidates, and tool-use prompts
+    /// (if present).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_token_count: Option<i32>,
 }

@@ -7,11 +7,7 @@ use llm_sdk::*;
 use regex::Regex;
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::error::Error;
-use std::fs;
-use std::path::PathBuf;
-use std::sync::LazyLock;
+use std::{collections::HashMap, error::Error, fs, path::PathBuf, sync::LazyLock};
 
 #[derive(Debug, Clone)]
 pub enum TestMethod {
@@ -191,16 +187,20 @@ pub async fn run_test_case(
         .clone();
 
     let mut input = test_case.input.clone();
+    let mut output = test_case.output.clone();
     if let Some(opts) = options {
         if let Some(f) = opts.additional_input {
             f(&mut input);
+        }
+        if let Some(f) = opts.custom_output_content {
+            output.content = f(&mut output.content);
         }
     }
 
     match test_case.method {
         TestMethod::Generate => {
             let result = model.generate(input).await?;
-            for part_assertion in test_case.output.content {
+            for part_assertion in output.content {
                 part_assertion.assert(&result.content)?;
             }
         }
@@ -215,7 +215,7 @@ pub async fn run_test_case(
             }
 
             let result = accumulator.compute_response()?;
-            for part_assertion in test_case.output.content {
+            for part_assertion in output.content {
                 part_assertion.assert(&result.content)?;
             }
         }
@@ -226,6 +226,7 @@ pub async fn run_test_case(
 #[derive(Clone, Default)]
 pub struct RunTestCaseOptions {
     pub additional_input: Option<fn(&mut LanguageModelInput)>,
+    pub custom_output_content: Option<fn(&mut Vec<PartAssertion>) -> Vec<PartAssertion>>,
 }
 
 pub async fn test_generate_text(

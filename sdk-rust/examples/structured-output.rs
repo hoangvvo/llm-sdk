@@ -105,13 +105,19 @@ Tags: breakfast, easy, kid-friendly"#;
 
     let response = model
         .generate(LanguageModelInput {
-            system_prompt: Some("You are a helpful assistant that extracts structured data from text according to a provided JSON schema.".into()),
-            messages: vec![
-                Message::user(vec![Part::text(text)]),
-            ],
+            system_prompt: Some(
+                "You are a helpful assistant that extracts structured data from text according to \
+                 a provided JSON schema."
+                    .into(),
+            ),
+            messages: vec![Message::user(vec![Part::text(text)])],
             response_format: Some(ResponseFormatOption::Json(ResponseFormatJson {
                 name: "recipe".to_string(),
-                description: Some("A structured recipe including title, description, ingredients, instructions, prep time, cook time, total time, and tags.".to_string()),
+                description: Some(
+                    "A structured recipe including title, description, ingredients, instructions, \
+                     prep time, cook time, total time, and tags."
+                        .to_string(),
+                ),
                 schema: Some(schema),
             })),
             ..Default::default()

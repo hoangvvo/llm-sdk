@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
+	"github.com/sanity-io/litter"
 )
 
 func main() {
@@ -39,8 +39,8 @@ func main() {
 	}
 
 	log.Println("Reasoning")
-	fmt.Println(examples.ToJSONString(reasoningParts))
+	litter.Dump(reasoningParts)
 
 	log.Println("\nAnswer")
-	fmt.Println(examples.ToJSONString(otherParts))
+	litter.Dump(otherParts)
 }

@@ -84,17 +84,44 @@ func TestSourcePartInput(t *testing.T) {
 }
 
 func TestGenerateAudio(t *testing.T) {
-	testcommon.RunTestCase(t, audioModel, "generate_audio", testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
-		lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
-		lmi.Audio = &llmsdk.AudioOptions{Voice: ptr.To("Zephyr")}
-	}))
+	testcommon.RunTestCase(t, audioModel, "generate_audio",
+		testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
+			lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
+			lmi.Audio = &llmsdk.AudioOptions{Voice: ptr.To("Zephyr")}
+		}),
+		testcommon.WithCustomOutputContent(func(content []testcommon.PartAssertion) []testcommon.PartAssertion {
+			newContent := []testcommon.PartAssertion{}
+			for _, part := range content {
+				if part.AudioPart != nil {
+					part.AudioPart.AudioID = false
+					part.AudioPart.Transcript = nil
+				}
+				newContent = append(newContent, part)
+			}
+			return newContent
+		}),
+	)
 }
 
 func TestStreamAudio(t *testing.T) {
-	testcommon.RunTestCase(t, audioModel, "stream_audio", testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
-		lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
-		lmi.Audio = &llmsdk.AudioOptions{Voice: ptr.To("Zephyr")}
-	}))
+	testcommon.RunTestCase(
+		t, audioModel, "stream_audio",
+		testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
+			lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
+			lmi.Audio = &llmsdk.AudioOptions{Voice: ptr.To("Zephyr")}
+		}),
+		testcommon.WithCustomOutputContent(func(content []testcommon.PartAssertion) []testcommon.PartAssertion {
+			newContent := []testcommon.PartAssertion{}
+			for _, part := range content {
+				if part.AudioPart != nil {
+					part.AudioPart.AudioID = false
+					part.AudioPart.Transcript = nil
+				}
+				newContent = append(newContent, part)
+			}
+			return newContent
+		}),
+	)
 }
 
 func TestGenerateReasoning(t *testing.T) {

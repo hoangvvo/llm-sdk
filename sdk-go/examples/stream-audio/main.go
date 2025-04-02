@@ -12,6 +12,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
+	"github.com/sanity-io/litter"
 )
 
 func main() {
@@ -45,7 +46,7 @@ func main() {
 
 	for response.Next() {
 		current := response.Current()
-		fmt.Println(examples.ToJSONString(current))
+		litter.Dump(current)
 
 		if current.Delta != nil && current.Delta.Part.AudioPartDelta != nil {
 			audioDelta := current.Delta.Part.AudioPartDelta
@@ -127,5 +128,5 @@ func main() {
 		log.Fatalf("Failed to compute response: %v", err)
 	}
 
-	fmt.Printf("Final response: %s\n", examples.ToJSONString(finalResponse))
+	litter.Dump(finalResponse)
 }

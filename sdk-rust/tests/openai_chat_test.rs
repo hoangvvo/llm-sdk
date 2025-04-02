@@ -67,6 +67,7 @@ test_set!(
                 ..Default::default()
             });
         }),
+        ..Default::default()
     })
 );
 
@@ -81,6 +82,7 @@ test_set!(
                 ..Default::default()
             });
         }),
+        ..Default::default()
     })
 );
 

@@ -21,7 +21,7 @@ Two libraries are provided:
 
 The specification serves as the foundation for implementing the unified LLM SDK in various programming languages. It is expressed using TypeScript in [schemas/sdk.ts](./schema/sdk.ts).
 
-Implementations in different programming languages must strictly adhere to this specification. Specifically, the properties in data structures should retain the same names and types, even if this conflicts with the conventions of the target language, such as camelCase vs snake_case (we follow the latter).
+Implementations in different programming languages must strictly adhere to this specification. Specifically, the properties in data structures should retain the same names and types when being serialized to JSON (either by naming of the fields or through serialization attributes).
 
 Each implementation may provide additional features.
 
@@ -70,16 +70,14 @@ A language model instance satisfies the `LanguageModel` interface, which include
 - Sampling parameters: `max_tokens`, `temperature`, `top_p`, `top_k`, `presence_penalty`, `frequency_penalty`, and `seed`.
 - Tool definitions and tool selection.
 - The response format to enforce the model to return structured objects instead of plain text.
-
-See [LanguageModelInput](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L366).
+- `modalities` for the model to generate, such as text, images, or audio.
+- Specific part output options like `audio`, `reasoning`.
 
 ### Message
 
 `Message`s are primitives that make up the conversation history, and `Part`s are the building blocks of each message. The library converts them into a format suitable for the underlying LLM provider and maps those from different providers to the unified format.
 
 Three message types are defined in the SDK: `UserMessage`, `AssistantMessage`, and `ToolMessage`.
-
-See [Message](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L29).
 
 ### Part
 
@@ -91,9 +89,7 @@ See [Message](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L29).
 
 The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `SourcePart` (for citation), `ToolCallPart`, `ToolResultPart`, and `ReasoningPart`.
 
-See [`Part`](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L16).
-
-For streaming calls, there are also corresponding [`PartDelta`](https://github.com/hoangvvo/llm-sdk/blob/main/schema/sdk.ts#L25) types.
+For streaming calls, there are also corresponding `PartDelta` types.
 
 ### Model Response
 

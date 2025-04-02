@@ -14,7 +14,12 @@ impl TryFrom<u32> for ReasoningEffort {
             OPENAI_REASONING_EFFORT_LOW => Ok(ReasoningEffort::Low),
             OPENAI_REASONING_EFFORT_MEDIUM => Ok(ReasoningEffort::Medium),
             OPENAI_REASONING_EFFORT_HIGH => Ok(ReasoningEffort::High),
-            _ => Err(LanguageModelError::Unsupported("openai", "Budget tokens property is not supported for OpenAI reasoning. You may use OPENAI_REASONING_EFFORT_* constants to map it to OpenAI reasoning effort levels.".to_string())),
+            _ => Err(LanguageModelError::Unsupported(
+                "openai",
+                "Budget tokens property is not supported for OpenAI reasoning. You may use \
+                 OPENAI_REASONING_EFFORT_* constants to map it to OpenAI reasoning effort levels."
+                    .to_string(),
+            )),
         }
     }
 }

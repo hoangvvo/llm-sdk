@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"fmt"
 	"log"
 
 	"github.com/ebitengine/oto/v3"
@@ -12,6 +11,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
+	"github.com/sanity-io/litter"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 		log.Fatalf("Generation failed: %v", err)
 	}
 
-	fmt.Println(examples.ToJSONString(response))
+	litter.Dump(response)
 
 	// Find and play audio part
 	for _, part := range response.Content {
@@ -67,8 +67,6 @@ func main() {
 			<-ready
 
 			audioPlayer := otoContext.NewPlayer(decoder)
-			fmt.Printf("Playing MP3 audio (sample rate: %d, channels: %d)\n",
-				decoder.SampleRate(), 2)
 
 			audioPlayer.Play()
 
@@ -77,7 +75,6 @@ func main() {
 			}
 
 			audioPlayer.Close()
-			fmt.Println("Audio playback finished")
 		}
 	}
 }

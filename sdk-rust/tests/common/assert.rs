@@ -68,7 +68,8 @@ impl ToolCallPartAssertion {
 
         if found_part.is_none() {
             return Err(format!(
-                "Expected matching tool call part:\nExpected tool {} with args {:#?}\nReceived:\n{}",
+                "Expected matching tool call part:\nExpected tool {} with args \
+                 {:#?}\nReceived:\n{}",
                 self.tool_name,
                 self.args,
                 serde_json::to_string_pretty(content).unwrap()

@@ -13,6 +13,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
+	"github.com/sanity-io/litter"
 )
 
 // Define the context interface that can be accessed in the instructions and
@@ -213,10 +214,6 @@ func main() {
 		// Append items with the output items
 		items = append(items, response.Output...)
 
-		prettyJSON, err := json.MarshalIndent(response.Content, "", "  ")
-		if err != nil {
-			log.Fatalf("Failed to format JSON: %v", err)
-		}
-		fmt.Printf("%s\n", string(prettyJSON))
+		litter.Dump(response)
 	}
 }

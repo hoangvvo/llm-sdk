@@ -87,6 +87,13 @@ suite("GoogleModel", () => {
           voice: "Zephyr",
         },
       }),
+      customOutputContent: (content) =>
+        content.map((part) => {
+          if (part.type === "audio") {
+            return { ...part, audio_id: false, transcript: undefined };
+          }
+          return part;
+        }),
     });
   });
 
@@ -99,6 +106,13 @@ suite("GoogleModel", () => {
           voice: "Zephyr",
         },
       }),
+      customOutputContent: (content) =>
+        content.map((part) => {
+          if (part.type === "audio") {
+            return { ...part, audio_id: false, transcript: undefined };
+          }
+          return part;
+        }),
     });
   });
 

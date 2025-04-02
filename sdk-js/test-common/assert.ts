@@ -26,7 +26,7 @@ export interface ToolCallPartAssertion {
 export interface AudioPartAssertion {
   type: "audio";
   audio_id?: boolean;
-  transcript?: RegExp;
+  transcript?: RegExp | undefined;
 }
 
 export interface ReasoningPartAssertion {

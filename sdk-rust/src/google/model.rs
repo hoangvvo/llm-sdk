@@ -429,8 +429,8 @@ fn convert_to_google_function_response(
         .map(|text| serde_json::from_str(&text).unwrap_or_else(|_| json!({ "data": text })))
         .collect();
 
-    // Use "output" key to specify function output and "error" key to specify error details,
-    // as per Google API specification
+    // Use "output" key to specify function output and "error" key to specify error
+    // details, as per Google API specification
     let mut result = HashMap::new();
     let key = if is_error { "error" } else { "output" };
     let value = if responses.len() == 1 {

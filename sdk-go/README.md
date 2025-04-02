@@ -63,11 +63,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
+	"github.com/sanity-io/litter"
 )
 
 func main() {
@@ -91,7 +91,7 @@ func main() {
 		log.Fatalf("Generation failed: %v", err)
 	}
 
-	fmt.Println(examples.ToJSONString(response))
+	litter.Dump(response)
 }
 ```
 

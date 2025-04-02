@@ -1,5 +1,5 @@
 mod common;
-use crate::common::cases::RunTestCaseOptions;
+use crate::common::{assert::PartAssertion, cases::RunTestCaseOptions};
 use llm_sdk::{google::*, *};
 use std::{env, error::Error, sync::LazyLock};
 use tokio::test;
@@ -81,6 +81,20 @@ test_set!(
                 ..Default::default()
             });
         }),
+        custom_output_content: Some(|content| {
+            content
+                .iter_mut()
+                .map(|part| {
+                    if let PartAssertion::Audio(part) = part {
+                        part.audio_id = false;
+                        part.transcript = None;
+                        PartAssertion::Audio(part.clone())
+                    } else {
+                        part.clone()
+                    }
+                })
+                .collect()
+        })
     })
 );
 
@@ -95,6 +109,20 @@ test_set!(
                 ..Default::default()
             });
         }),
+        custom_output_content: Some(|content| {
+            content
+                .iter_mut()
+                .map(|part| {
+                    if let PartAssertion::Audio(part) = part {
+                        part.audio_id = false;
+                        part.transcript = None;
+                        PartAssertion::Audio(part.clone())
+                    } else {
+                        part.clone()
+                    }
+                })
+                .collect()
+        })
     })
 );
 
