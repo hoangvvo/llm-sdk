@@ -110,13 +110,13 @@ async fn test_agent_run_creates_session_runs_and_finishes() {
     }
     assert_eq!(response.output.len(), 1);
 
-    if let AgentItem::Message(Message::Assistant(assistant_msg)) = &response.output[0] {
-        assert_eq!(assistant_msg.content.len(), 1);
-        if let Part::Text(text_part) = &assistant_msg.content[0] {
+    if let AgentItem::Model(model_response) = &response.output[0] {
+        assert_eq!(model_response.content.len(), 1);
+        if let Part::Text(text_part) = &model_response.content[0] {
             assert_eq!(text_part.text, "Mock response");
         }
     } else {
-        panic!("Expected assistant message");
+        panic!("Expected model response item");
     }
 }
 

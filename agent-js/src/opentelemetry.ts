@@ -23,13 +23,20 @@ export class AgentSpan {
   }
 
   onResponse(response: AgentResponse) {
-    for (const modelCall of response.model_calls) {
-      if (modelCall.usage) {
-        this.usage = this.usage ?? { input_tokens: 0, output_tokens: 0 };
-        this.usage.input_tokens += modelCall.usage.input_tokens;
-        this.usage.output_tokens += modelCall.usage.output_tokens;
+    // Aggregate usage and cost from model items within output
+    for (const item of response.output) {
+      if (item.type === "model") {
+        const usage = item.usage;
+        const cost = item.cost;
+        if (usage) {
+          this.usage = this.usage ?? { input_tokens: 0, output_tokens: 0 };
+          this.usage.input_tokens += usage.input_tokens;
+          this.usage.output_tokens += usage.output_tokens;
+        }
+        if (typeof cost === "number") {
+          this.cost = (this.cost ?? 0) + cost;
+        }
       }
-      this.cost = (this.cost ?? 0) + (modelCall.cost ?? 0);
     }
   }
 

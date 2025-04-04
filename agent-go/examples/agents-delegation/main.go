@@ -69,7 +69,7 @@ func (t *AgentTransferTool[C]) Execute(ctx context.Context, paramsJSON json.RawM
 
 	result, err := t.agent.Run(ctx, llmagent.AgentRequest[C]{
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(
+			llmagent.NewAgentItemMessage(
 				llmsdk.NewUserMessage(
 					llmsdk.NewTextPart(params.Task),
 				)),
@@ -370,7 +370,7 @@ You should also poll the order status in every turn to send them for delivery on
 	for {
 		fmt.Println("\n--- New iteration ---")
 
-		items = append(items, llmagent.NewMessageAgentItem(llmsdk.NewUserMessage(
+		items = append(items, llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(
 			llmsdk.NewTextPart("Next"),
 		)))
 

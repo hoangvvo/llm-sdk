@@ -1,12 +1,12 @@
 use crate::{
     instruction,
-    types::{AgentStream, AgentStreamEvent},
-    AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse, ModelCallInfo,
+    types::{AgentItemTool, AgentStream, AgentStreamEvent},
+    AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse,
 };
 use futures::{lock::Mutex, stream::StreamExt};
 use llm_sdk::{
-    AssistantMessage, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
-    ToolCallPart, ToolMessage, ToolResultPart,
+    LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator, ToolCallPart, ToolMessage,
+    ToolResultPart,
 };
 use std::sync::Arc;
 
@@ -54,10 +54,8 @@ where
             return Ok(ProcessResult::Response(parts));
         }
 
-        let mut next_messages: Vec<Message> = vec![];
-
-        // Process all tool calls
-        let mut tool_message = ToolMessage { content: vec![] };
+        // Build AgentItems for all tool results
+        let mut items: Vec<AgentItem> = vec![];
 
         for tool_call_part in tool_call_parts {
             let ToolCallPart {
@@ -76,22 +74,22 @@ where
                     AgentError::Invariant(format!("Tool {tool_name} not found for tool call"))
                 })?;
 
+            let input_args = args.clone();
             let tool_res = agent_tool
                 .execute(args, &context, run_state)
                 .await
                 .map_err(AgentError::ToolExecution)?;
 
-            tool_message.content.push(Part::ToolResult(ToolResultPart {
+            items.push(AgentItem::Tool(AgentItemTool {
                 tool_call_id,
                 tool_name,
-                content: tool_res.content,
-                is_error: Some(tool_res.is_error),
+                input: input_args,
+                output: tool_res.content,
+                is_error: tool_res.is_error,
             }));
         }
 
-        next_messages.push(Message::Tool(tool_message));
-
-        Ok(ProcessResult::Next(next_messages))
+        Ok(ProcessResult::Items(items))
     }
 
     /// Run a non-streaming execution of the agent.
@@ -104,31 +102,17 @@ where
             let mut input = input.clone();
 
             input.messages = state.get_turn_messages().await;
-            let ModelResponse {
-                content,
-                usage,
-                cost,
-            } = self.params.model.generate(input).await?;
+            let model_response = self.params.model.generate(input).await?;
+            let content = model_response.content.clone();
 
-            state
-                .append_messages(vec![Message::assistant(content.clone())])
-                .await;
-
-            state
-                .append_model_call(ModelCallInfo {
-                    usage,
-                    cost,
-                    model_id: self.params.model.model_id(),
-                    provider: self.params.model.provider().to_string(),
-                })
-                .await;
+            state.append_model_response(model_response).await;
 
             match self.process(context.clone(), &state, content).await? {
                 ProcessResult::Response(final_content) => {
                     return Ok(state.create_response(final_content).await);
                 }
-                ProcessResult::Next(next_messages) => {
-                    state.append_messages(next_messages).await;
+                ProcessResult::Items(items) => {
+                    state.append_items(items).await;
                 }
             }
 
@@ -166,22 +150,12 @@ where
                     yield AgentStreamEvent::Partial(partial);
                 }
 
-                let ModelResponse { content, usage, cost } = accumulator.compute_response()?;
+                let model_response = accumulator.compute_response()?;
 
-                let assistant_message = Message::Assistant(AssistantMessage {
-                    content: content.clone(),
-                });
+                let content = model_response.content.clone();
 
-                state.append_messages(vec![assistant_message.clone()]).await;
-
-                state.append_model_call(ModelCallInfo {
-                    usage,
-                    cost,
-                    model_id: session.params.model.model_id(),
-                    provider: session.params.model.provider().to_string(),
-                }).await;
-
-                yield AgentStreamEvent::Message(assistant_message);
+                let item = state.append_model_response(model_response).await;
+                yield AgentStreamEvent::Item(item);
 
                 match session.process(context.clone(), &state, content).await? {
                     ProcessResult::Response(final_content) => {
@@ -189,8 +163,11 @@ where
                         yield AgentStreamEvent::Response(response);
                         break;
                     }
-                    ProcessResult::Next(next_messages) => {
-                        state.append_messages(next_messages).await;
+                    ProcessResult::Items(items) => {
+                        state.append_items(items.clone()).await;
+                        for item in items {
+                            yield AgentStreamEvent::Item(item);
+                        }
                     }
                 }
 
@@ -243,8 +220,8 @@ where
 
 enum ProcessResult {
     Response(Vec<Part>),
-    // Return when new messages need to be added to the input and continue processing
-    Next(Vec<Message>),
+    // Return when new items need to be added to the output and continue processing
+    Items(Vec<AgentItem>),
 }
 
 pub struct RunState {
@@ -253,11 +230,8 @@ pub struct RunState {
 
     /// The current turn number in the run.
     pub current_turn: Arc<Mutex<usize>>,
-    /// All items generated during the run, such as new `ToolMessage` and
-    /// `AssistantMessage`
+    /// All items generated during the run, such as new tool and model items
     output: Arc<Mutex<Vec<AgentItem>>>,
-    /// Information about the LLM calls made during the run
-    model_calls: Arc<Mutex<Vec<ModelCallInfo>>>,
 }
 
 impl RunState {
@@ -268,7 +242,6 @@ impl RunState {
             input,
             current_turn: Arc::new(Mutex::new(0)),
             output: Arc::new(Mutex::new(vec![])),
-            model_calls: Arc::new(Mutex::new(vec![])),
         }
     }
 
@@ -283,52 +256,76 @@ impl RunState {
         Ok(())
     }
 
-    /// Add a message to the run state.
+    /// Add message items to the run state.
     pub async fn append_messages(&self, messages: Vec<Message>) {
+        if messages.is_empty() {
+            return;
+        }
         let mut output = self.output.lock().await;
-        output.append(&mut messages.into_iter().map(AgentItem::Message).collect());
+        output.extend(messages.into_iter().map(AgentItem::Message));
     }
 
-    /// Add a model call to the run state.
-    pub async fn append_model_call(&self, info: ModelCallInfo) {
-        let mut model_calls = self.model_calls.lock().await;
-        model_calls.push(info);
+    /// Add AgentItems to the run state.
+    pub async fn append_items(&self, items: Vec<AgentItem>) {
+        if items.is_empty() {
+            return;
+        }
+        let mut output = self.output.lock().await;
+        output.extend(items);
     }
 
-    pub async fn append_outputs(&self, mut outputs: Vec<AgentItem>) {
+    /// Append a model response to the run state and return the created item.
+    pub async fn append_model_response(&self, response: ModelResponse) -> AgentItem {
         let mut output = self.output.lock().await;
-        output.append(&mut outputs);
+        let item = AgentItem::Model(response);
+        output.push(item.clone());
+        item
     }
 
     /// Get LLM messages to use in the `LanguageModelInput` for the turn
     #[must_use]
     pub async fn get_turn_messages(&self) -> Vec<Message> {
         let output = self.output.lock().await;
-        [
-            self.input
-                .iter()
-                .map(|item| match item {
-                    AgentItem::Message(msg) => msg.clone(),
-                })
-                .collect::<Vec<_>>(),
-            output
-                .iter()
-                .map(|item| match item {
-                    AgentItem::Message(msg) => msg.clone(),
-                })
-                .collect(),
-        ]
-        .concat()
+        let mut messages: Vec<Message> = Vec::new();
+        let iter = self.input.iter().cloned().chain(output.iter().cloned());
+
+        for item in iter {
+            match item {
+                AgentItem::Message(msg) => messages.push(msg),
+                AgentItem::Model(model_response) => {
+                    messages.push(Message::assistant(model_response.content));
+                }
+                AgentItem::Tool(tool) => {
+                    let tool_part = Part::ToolResult(ToolResultPart {
+                        tool_call_id: tool.tool_call_id,
+                        tool_name: tool.tool_name,
+                        content: tool.output,
+                        is_error: Some(tool.is_error),
+                    });
+
+                    match messages.last_mut() {
+                        Some(Message::Tool(last_tool_message)) => {
+                            last_tool_message.content.push(tool_part);
+                        }
+                        _ => {
+                            messages.push(Message::Tool(ToolMessage {
+                                content: vec![tool_part],
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+
+        messages
     }
 
     #[must_use]
     pub async fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
         let output = self.output.lock().await;
-        let model_calls = self.model_calls.lock().await;
         AgentResponse {
             content: final_content,
             output: output.clone(),
-            model_calls: model_calls.clone(),
         }
     }
 }

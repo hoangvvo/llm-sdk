@@ -42,17 +42,8 @@ suite("Agent#run", () => {
       content: [{ type: "text", text: "Mock response" }],
       output: [
         {
-          type: "message",
-          role: "assistant",
+          type: "model",
           content: [{ type: "text", text: "Mock response" }],
-        },
-      ],
-      model_calls: [
-        {
-          cost: null,
-          model_id: "mock-model",
-          provider: "mock",
-          usage: null,
         },
       ],
     });
@@ -91,26 +82,19 @@ suite("Agent#runStream", () => {
         delta: { index: 0, part: { type: "text", text: "Mock" } },
       },
       {
-        type: "message",
-        role: "assistant",
-        content: [{ type: "text", text: "Mock" }],
+        type: "item",
+        item: {
+          type: "model",
+          content: [{ type: "text", text: "Mock" }],
+        },
       },
       {
         type: "response",
         content: [{ type: "text", text: "Mock" }],
         output: [
           {
-            type: "message",
-            role: "assistant",
+            type: "model",
             content: [{ type: "text", text: "Mock" }],
-          },
-        ],
-        model_calls: [
-          {
-            cost: null,
-            model_id: "mock-model",
-            provider: "mock",
-            usage: null,
           },
         ],
       },
@@ -119,17 +103,8 @@ suite("Agent#runStream", () => {
       content: [{ type: "text", text: "Mock" }],
       output: [
         {
-          type: "message",
-          role: "assistant",
+          type: "model",
           content: [{ type: "text", text: "Mock" }],
-        },
-      ],
-      model_calls: [
-        {
-          cost: null,
-          model_id: "mock-model",
-          provider: "mock",
-          usage: null,
         },
       ],
     });

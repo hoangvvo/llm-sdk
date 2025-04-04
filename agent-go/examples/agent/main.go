@@ -197,7 +197,7 @@ func main() {
 		}
 
 		// Add user message as the input
-		items = append(items, llmagent.NewMessageAgentItem(llmsdk.NewUserMessage(
+		items = append(items, llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(
 			llmsdk.NewTextPart(userInput),
 		)))
 

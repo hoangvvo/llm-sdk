@@ -187,7 +187,7 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Hello!"}},
@@ -206,21 +206,11 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 			{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
 		},
 		Output: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
-				AssistantMessage: &llmsdk.AssistantMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
-					},
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+				Content: []llmsdk.Part{
+					{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
 				},
 			}),
-		},
-		ModelCalls: []llmagent.ModelCallInfo{
-			{
-				Cost:     nil,
-				Usage:    nil,
-				ModelID:  model.ModelID(),
-				Provider: model.Provider(),
-			},
 		},
 	}
 
@@ -274,7 +264,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{"testContext": true},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
@@ -308,9 +298,9 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 			{TextPart: &llmsdk.TextPart{Text: "Final response"}},
 		},
 		Output: []llmagent.AgentItem{
-			// Assistant tool call message
-			llmagent.NewMessageAgentItem(llmsdk.Message{
-				AssistantMessage: &llmsdk.AssistantMessage{
+			// Assistant tool call model item
+			llmagent.NewAgentItemModelResponse(
+				llmsdk.ModelResponse{
 					Content: []llmsdk.Part{
 						{ToolCallPart: &llmsdk.ToolCallPart{
 							ToolName:   "test_tool",
@@ -318,46 +308,28 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 							Args:       json.RawMessage(`{"param": "value"}`),
 						}},
 					},
+					Usage: &llmsdk.ModelUsage{InputTokens: 1000, OutputTokens: 50},
+					Cost:  ptr.To(0.0015),
 				},
-			}),
-			// Tool result message
-			llmagent.NewMessageAgentItem(llmsdk.Message{
-				ToolMessage: &llmsdk.ToolMessage{
-					Content: []llmsdk.Part{
-						{ToolResultPart: &llmsdk.ToolResultPart{
-							ToolCallID: "call_1",
-							ToolName:   "test_tool",
-							Content: []llmsdk.Part{
-								{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
-							},
-							IsError: false,
-						}},
-					},
-				},
-			}),
-			// Final assistant response message
-			llmagent.NewMessageAgentItem(llmsdk.Message{
-				AssistantMessage: &llmsdk.AssistantMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Final response"}},
-					},
-				},
-			}),
-		},
-		ModelCalls: []llmagent.ModelCallInfo{
+			),
+			// Tool result item
 			{
-				Usage: &llmsdk.ModelUsage{
-					InputTokens:  1000,
-					OutputTokens: 50,
+				Tool: &llmagent.AgentItemTool{
+					ToolCallID: "call_1",
+					ToolName:   "test_tool",
+					Input:      json.RawMessage(`{"param": "value"}`),
+					Output: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+					},
+					IsError: false,
 				},
-				Cost:     ptr.To(0.0015),
-				ModelID:  model.ModelID(),
-				Provider: model.Provider(),
 			},
-			{
-				ModelID:  model.ModelID(),
-				Provider: model.Provider(),
-			},
+			// Final model item
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+				Content: []llmsdk.Part{
+					{TextPart: &llmsdk.TextPart{Text: "Final response"}},
+				},
+			}),
 		},
 	}
 
@@ -420,7 +392,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Use both tools"}},
@@ -455,46 +427,39 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 	expectedResponse := &llmagent.AgentResponse{
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Processed both tools")},
 		Output: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(
-				llmsdk.NewAssistantMessage(
+			// model with tool calls
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+				Content: []llmsdk.Part{
 					llmsdk.NewToolCallPart("call_1", "tool_1", map[string]any{"param": "value1"}),
 					llmsdk.NewToolCallPart("call_2", "tool_2", map[string]any{"param": "value2"}),
-				),
-			),
-			llmagent.NewMessageAgentItem(
-				llmsdk.NewToolMessage(
-					llmsdk.NewToolResultPart("call_1", "tool_1", []llmsdk.Part{
-						llmsdk.NewTextPart("Tool 1 result"),
-					}, false),
-					llmsdk.NewToolResultPart("call_2", "tool_2", []llmsdk.Part{
-						llmsdk.NewTextPart("Tool 2 result"),
-					}, false),
-				),
-			),
-			llmagent.NewMessageAgentItem(
-				llmsdk.NewAssistantMessage(
-					llmsdk.NewTextPart("Processed both tools"),
-				),
-			),
-		},
-		ModelCalls: []llmagent.ModelCallInfo{
-			{
-				Usage: &llmsdk.ModelUsage{
-					InputTokens:  2000,
-					OutputTokens: 100,
 				},
-				ModelID:  model.ModelID(),
-				Provider: model.Provider(),
-			},
-			{
-				Usage: &llmsdk.ModelUsage{
-					InputTokens:  50,
-					OutputTokens: 10,
+				Usage: &llmsdk.ModelUsage{InputTokens: 2000, OutputTokens: 100},
+			}),
+			{ // tool result 1
+				Tool: &llmagent.AgentItemTool{
+					ToolCallID: "call_1",
+					ToolName:   "tool_1",
+					Input:      json.RawMessage(`{"param":"value1"}`),
+					Output:     []llmsdk.Part{llmsdk.NewTextPart("Tool 1 result")},
+					IsError:    false,
 				},
-				Cost:     ptr.To(0.0003),
-				ModelID:  model.ModelID(),
-				Provider: model.Provider(),
 			},
+			{ // tool result 2
+				Tool: &llmagent.AgentItemTool{
+					ToolCallID: "call_2",
+					ToolName:   "tool_2",
+					Input:      json.RawMessage(`{"param":"value2"}`),
+					Output:     []llmsdk.Part{llmsdk.NewTextPart("Tool 2 result")},
+					IsError:    false,
+				},
+			},
+			llmagent.NewAgentItemModelResponse(
+				llmsdk.ModelResponse{
+					Content: []llmsdk.Part{llmsdk.NewTextPart("Processed both tools")},
+					Usage:   &llmsdk.ModelUsage{InputTokens: 50, OutputTokens: 10},
+					Cost:    ptr.To(0.0003),
+				},
+			),
 		},
 	}
 
@@ -552,7 +517,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Calculate some numbers"}},
@@ -645,7 +610,7 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Keep using tools"}},
@@ -694,7 +659,7 @@ func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Use a tool"}},
@@ -747,7 +712,7 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
@@ -811,7 +776,7 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 	response, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
@@ -825,26 +790,16 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Check that the tool result was marked as an error
+	// Check that the tool result was marked as an error (as a tool item)
 	if len(response.Output) < 2 {
-		t.Fatalf("expected at least 2 output messages, got %d", len(response.Output))
+		t.Fatalf("expected at least 2 output items, got %d", len(response.Output))
 	}
 
-	toolMessage := response.Output[1]
-	if toolMessage.Message == nil || toolMessage.Message.ToolMessage == nil {
-		t.Fatal("expected tool message")
+	toolItem := response.Output[1]
+	if toolItem.Tool == nil {
+		t.Fatal("expected tool item")
 	}
-
-	if len(toolMessage.Message.ToolMessage.Content) == 0 {
-		t.Fatal("expected tool message content")
-	}
-
-	toolResultPart := toolMessage.Message.ToolMessage.Content[0].ToolResultPart
-	if toolResultPart == nil {
-		t.Fatal("expected tool result part")
-	}
-
-	if !toolResultPart.IsError {
+	if !toolItem.Tool.IsError {
 		t.Error("expected tool result to be marked as error")
 	}
 
@@ -885,7 +840,7 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Hello"}},
@@ -953,7 +908,7 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{"userRole": "developer"},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Hello"}},
@@ -1002,7 +957,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Hi"}},
@@ -1024,7 +979,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Should have partial events, a message event, and a response event
+	// Should have partial events, an item event, and a response event
 	if len(events) < 4 {
 		t.Errorf("expected at least 4 events, got %d", len(events))
 	}
@@ -1090,7 +1045,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Use tool"}},
@@ -1114,14 +1069,14 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 
 	// Count event types
 	partialCount := 0
-	messageCount := 0
+	itemCount := 0
 	responseCount := 0
 
 	for _, event := range events {
 		if event.Partial != nil {
 			partialCount++
-		} else if event.Message != nil {
-			messageCount++
+		} else if event.Item != nil {
+			itemCount++
 		} else if event.Response != nil {
 			responseCount++
 		}
@@ -1130,8 +1085,8 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 	if partialCount < 2 {
 		t.Errorf("expected at least 2 partial events, got %d", partialCount)
 	}
-	if messageCount != 3 {
-		t.Errorf("expected 3 message events, got %d", messageCount)
+	if itemCount != 3 {
+		t.Errorf("expected 3 item events, got %d", itemCount)
 	}
 	if responseCount != 1 {
 		t.Errorf("expected 1 response event, got %d", responseCount)
@@ -1209,7 +1164,7 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 	stream, err := session.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Keep using tools"}},
@@ -1265,7 +1220,7 @@ func TestRun_FinishCleansUpSessionResources(t *testing.T) {
 	_, err := session.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 		Context: map[string]interface{}{},
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(llmsdk.Message{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Hello"}},

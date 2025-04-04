@@ -1,12 +1,12 @@
 use futures::StreamExt;
 use llm_agent::{
-    AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse, AgentStreamEvent, AgentTool,
-    AgentToolResult, InstructionParam, ModelCallInfo, RunSession, RunState,
+    AgentError, AgentItem, AgentItemTool, AgentParams, AgentRequest, AgentResponse,
+    AgentStreamEvent, AgentTool, AgentToolResult, InstructionParam, RunSession, RunState,
 };
 use llm_sdk::{
-    AssistantMessage, ContentDelta, JSONSchema, LanguageModel, LanguageModelError,
-    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
-    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, TextPartDelta, ToolCallPart,
+    ContentDelta, JSONSchema, LanguageModel, LanguageModelError, LanguageModelInput,
+    LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
+    ModelUsage, Part, PartDelta, PartialModelResponse, TextPartDelta, ToolCallPart,
     ToolCallPartDelta, UserMessage,
 };
 use serde_json::Value;
@@ -211,14 +211,10 @@ async fn test_run_session_returns_response_when_no_tool_call() {
 
     let expected_response = AgentResponse {
         content: vec![create_text_part("Hi!")],
-        output: vec![AgentItem::Message(Message::Assistant(AssistantMessage {
+        output: vec![AgentItem::Model(ModelResponse {
             content: vec![create_text_part("Hi!")],
-        }))],
-        model_calls: vec![ModelCallInfo {
-            model_id: "mock-model".to_string(),
-            provider: "mock".to_string(),
             ..Default::default()
-        }],
+        })],
     };
 
     assert_eq!(
@@ -269,41 +265,30 @@ async fn test_run_session_executes_single_tool_call_and_returns_response() {
     let expected_response = AgentResponse {
         content: vec![create_text_part("Final response")],
         output: vec![
-            AgentItem::Message(Message::Assistant(AssistantMessage {
+            AgentItem::Model(ModelResponse {
                 content: vec![Part::ToolCall(ToolCallPart {
                     tool_name: "test_tool".to_string(),
                     tool_call_id: "call_1".to_string(),
                     args: serde_json::json!({"param": "value"}),
                 })],
-            })),
-            AgentItem::Message(Message::Tool(llm_sdk::ToolMessage {
-                content: vec![Part::ToolResult(llm_sdk::ToolResultPart {
-                    tool_call_id: "call_1".to_string(),
-                    tool_name: "test_tool".to_string(),
-                    content: vec![create_text_part("Tool result")],
-                    is_error: Some(false),
-                })],
-            })),
-            AgentItem::Message(Message::Assistant(AssistantMessage {
-                content: vec![create_text_part("Final response")],
-            })),
-        ],
-        model_calls: vec![
-            ModelCallInfo {
                 usage: Some(ModelUsage {
                     input_tokens: 100,
                     output_tokens: 50,
                     ..Default::default()
                 }),
                 cost: Some(0.0015),
-                model_id: "mock-model".to_string(),
-                provider: "mock".to_string(),
-            },
-            ModelCallInfo {
-                model_id: "mock-model".to_string(),
-                provider: "mock".to_string(),
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_1".to_string(),
+                tool_name: "test_tool".to_string(),
+                input: serde_json::json!({"param": "value"}),
+                output: vec![create_text_part("Tool result")],
+                is_error: false,
+            }),
+            AgentItem::Model(ModelResponse {
+                content: vec![create_text_part("Final response")],
                 ..Default::default()
-            },
+            }),
         ],
     };
 
@@ -586,7 +571,7 @@ async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
     let expected_response = AgentResponse {
         content: vec![create_text_part("Processed both tools")],
         output: vec![
-            AgentItem::Message(Message::Assistant(AssistantMessage {
+            AgentItem::Model(ModelResponse {
                 content: vec![
                     Part::ToolCall(ToolCallPart {
                         tool_name: "tool_1".to_string(),
@@ -599,48 +584,36 @@ async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
                         args: serde_json::json!({"param": "value2"}),
                     }),
                 ],
-            })),
-            AgentItem::Message(Message::Tool(llm_sdk::ToolMessage {
-                content: vec![
-                    Part::ToolResult(llm_sdk::ToolResultPart {
-                        tool_call_id: "call_1".to_string(),
-                        tool_name: "tool_1".to_string(),
-                        content: vec![create_text_part("Tool 1 result")],
-                        is_error: Some(false),
-                    }),
-                    Part::ToolResult(llm_sdk::ToolResultPart {
-                        tool_call_id: "call_2".to_string(),
-                        tool_name: "tool_2".to_string(),
-                        content: vec![create_text_part("Tool 2 result")],
-                        is_error: Some(false),
-                    }),
-                ],
-            })),
-            AgentItem::Message(Message::Assistant(AssistantMessage {
-                content: vec![create_text_part("Processed both tools")],
-            })),
-        ],
-        model_calls: vec![
-            ModelCallInfo {
                 usage: Some(ModelUsage {
                     input_tokens: 2000,
                     output_tokens: 100,
                     ..Default::default()
                 }),
-                model_id: "mock-model".to_string(),
-                provider: "mock".to_string(),
-                ..Default::default()
-            },
-            ModelCallInfo {
+                cost: None,
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_1".to_string(),
+                tool_name: "tool_1".to_string(),
+                input: serde_json::json!({"param": "value1"}),
+                output: vec![create_text_part("Tool 1 result")],
+                is_error: false,
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_2".to_string(),
+                tool_name: "tool_2".to_string(),
+                input: serde_json::json!({"param": "value2"}),
+                output: vec![create_text_part("Tool 2 result")],
+                is_error: false,
+            }),
+            AgentItem::Model(ModelResponse {
+                content: vec![create_text_part("Processed both tools")],
                 usage: Some(ModelUsage {
                     input_tokens: 50,
                     output_tokens: 10,
                     ..Default::default()
                 }),
                 cost: Some(0.0003),
-                model_id: "mock-model".to_string(),
-                provider: "mock".to_string(),
-            },
+            }),
         ],
     };
 
@@ -1002,13 +975,13 @@ async fn test_run_session_streaming_multiple_turns() {
     // Should have multiple events for multiple turns
     assert!(!events.is_empty());
 
-    let message_events: Vec<_> = events
+    let item_events: Vec<_> = events
         .iter()
-        .filter(|event| matches!(event, Ok(AgentStreamEvent::Message(_))))
+        .filter(|event| matches!(event, Ok(AgentStreamEvent::Item(_))))
         .collect();
 
-    // Should have multiple message events
-    assert!(message_events.len() >= 1);
+    // Should have multiple item events
+    assert!(item_events.len() >= 1);
 }
 
 #[tokio::test]

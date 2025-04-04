@@ -254,7 +254,7 @@ func main() {
 
 	response, err := travelAgent.Run(context.Background(), llmagent.AgentRequest[struct{}]{
 		Input: []llmagent.AgentItem{
-			llmagent.NewMessageAgentItem(
+			llmagent.NewAgentItemMessage(
 				llmsdk.NewUserMessage(
 					llmsdk.NewTextPart(prompt),
 				),

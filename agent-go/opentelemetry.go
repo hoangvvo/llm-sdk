@@ -39,18 +39,20 @@ func NewAgentSpan(ctx context.Context, agentName string, method string) (*AgentS
 
 // OnResponse updates the span with response information
 func (s *AgentSpan) OnResponse(response *AgentResponse) {
-	for _, modelCall := range response.ModelCalls {
-		if modelCall.Usage != nil {
-			if s.usage == nil {
-				s.usage = &llmsdk.ModelUsage{}
-			}
-			s.usage.InputTokens += modelCall.Usage.InputTokens
-			s.usage.OutputTokens += modelCall.Usage.OutputTokens
-		}
-		if modelCall.Cost != nil {
-			s.cost += *modelCall.Cost
-		}
-	}
+    for _, item := range response.Output {
+        if item.Model != nil {
+            if item.Model.Usage != nil {
+                if s.usage == nil {
+                    s.usage = &llmsdk.ModelUsage{}
+                }
+                s.usage.InputTokens += item.Model.Usage.InputTokens
+                s.usage.OutputTokens += item.Model.Usage.OutputTokens
+            }
+            if item.Model.Cost != nil {
+                s.cost += *item.Model.Cost
+            }
+        }
+    }
 }
 
 // OnEnd ends the span and sets the final attributes

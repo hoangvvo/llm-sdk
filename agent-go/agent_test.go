@@ -36,7 +36,7 @@ func TestAgent_Run(t *testing.T) {
 		response, err := agent.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 			Context: map[string]interface{}{},
 			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
+				llmagent.NewAgentItemMessage(llmsdk.Message{
 					UserMessage: &llmsdk.UserMessage{
 						Content: []llmsdk.Part{
 							{TextPart: &llmsdk.TextPart{Text: "Hello"}},
@@ -55,19 +55,11 @@ func TestAgent_Run(t *testing.T) {
 				{TextPart: &llmsdk.TextPart{Text: "Mock response"}},
 			},
 			Output: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
-					AssistantMessage: &llmsdk.AssistantMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Mock response"}},
-						},
+				llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Mock response"}},
 					},
 				}),
-			},
-			ModelCalls: []llmagent.ModelCallInfo{
-				{
-					ModelID:  model.ModelID(),
-					Provider: model.Provider(),
-				},
 			},
 		}
 
@@ -85,7 +77,7 @@ func TestAgent_RunStream(t *testing.T) {
 		stream, err := agent.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 			Context: map[string]interface{}{},
 			Input: []llmagent.AgentItem{
-				llmagent.NewMessageAgentItem(llmsdk.Message{
+				llmagent.NewAgentItemMessage(llmsdk.Message{
 					UserMessage: &llmsdk.UserMessage{
 						Content: []llmsdk.Part{
 							{TextPart: &llmsdk.TextPart{Text: "Hello"}},
@@ -110,7 +102,7 @@ func TestAgent_RunStream(t *testing.T) {
 
 		// Check for partial event
 		var foundPartial bool
-		var foundMessage bool
+		var foundItem bool
 		var foundResponse bool
 
 		for _, event := range events {
@@ -131,11 +123,10 @@ func TestAgent_RunStream(t *testing.T) {
 				}
 			}
 
-			if event.Message != nil {
-				foundMessage = true
-				// Verify message event structure
-				if event.Message.AssistantMessage.Content[0].TextPart.Text != "Mock" {
-					t.Errorf("expected message text 'Mock', got %q", event.Message.AssistantMessage.Content[0].TextPart.Text)
+			if event.Item != nil {
+				foundItem = true
+				if event.Item.Model == nil || len(event.Item.Model.Content) == 0 || event.Item.Model.Content[0].TextPart.Text != "Mock" {
+					t.Errorf("expected item model text 'Mock', got %+v", event.Item)
 				}
 			}
 
@@ -145,10 +136,9 @@ func TestAgent_RunStream(t *testing.T) {
 				if event.Response.Content[0].TextPart.Text != "Mock" {
 					t.Errorf("expected response text 'Mock', got %q", event.Response.Content[0].TextPart.Text)
 				}
-
-				outputMessage := event.Response.Output[0].Message
-				if outputMessage.AssistantMessage.Content[0].TextPart.Text != "Mock" {
-					t.Errorf("expected output message text 'Mock', got %q", outputMessage.AssistantMessage.Content[0].TextPart.Text)
+				first := event.Response.Output[0]
+				if first.Model == nil || len(first.Model.Content) == 0 || first.Model.Content[0].TextPart.Text != "Mock" {
+					t.Errorf("expected first output model text 'Mock', got %+v", first)
 				}
 			}
 		}
@@ -156,8 +146,8 @@ func TestAgent_RunStream(t *testing.T) {
 		if !foundPartial {
 			t.Error("expected to find partial event")
 		}
-		if !foundMessage {
-			t.Error("expected to find message event")
+		if !foundItem {
+			t.Error("expected to find item event")
 		}
 		if !foundResponse {
 			t.Error("expected to find response event")

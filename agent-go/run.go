@@ -3,6 +3,7 @@ package llmagent
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
@@ -48,12 +49,8 @@ func (s *RunSession[C]) process(
 		}, nil
 	}
 
-	var nextMessages []llmsdk.Message
-
-	// Process all tool calls
-	toolMessage := llmsdk.ToolMessage{
-		Content: []llmsdk.Part{},
-	}
+	// Build AgentItem tool results for each tool call
+	var items []AgentItem
 
 	for _, toolCallPart := range toolCallParts {
 		var agentTool AgentTool[C]
@@ -87,22 +84,16 @@ func (s *RunSession[C]) process(
 			return ProcessResult{}, err
 		}
 
-		toolMessage.Content = append(toolMessage.Content, llmsdk.Part{
-			ToolResultPart: &llmsdk.ToolResultPart{
-				ToolCallID: toolCallPart.ToolCallID,
-				ToolName:   toolCallPart.ToolName,
-				Content:    toolRes.Content,
-				IsError:    toolRes.IsError,
-			},
-		})
+		items = append(items, NewAgentItemTool(
+			toolCallPart.ToolCallID,
+			toolCallPart.ToolName,
+			toolCallPart.Args,
+			toolRes.Content,
+			toolRes.IsError,
+		))
 	}
-
-	nextMessages = append(nextMessages, llmsdk.Message{
-		ToolMessage: &toolMessage,
-	})
-
 	return ProcessResult{
-		Next: &nextMessages,
+		Items: &items,
 	}, nil
 }
 
@@ -136,14 +127,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 		content := modelResponse.Content
 
-		state.AppendMessages([]llmsdk.Message{llmsdk.NewAssistantMessage(content...)})
-
-		state.AppendModelCall(ModelCallInfo{
-			Usage:    modelResponse.Usage,
-			Cost:     modelResponse.Cost,
-			ModelID:  s.params.Model.ModelID(),
-			Provider: s.params.Model.Provider(),
-		})
+		state.AppendModelResponse(*modelResponse)
 
 		var result ProcessResult
 		result, err = s.process(ctx, contextVal, state, content)
@@ -157,8 +141,8 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 			return response, nil
 		}
 
-		if result.Next != nil {
-			state.AppendMessages(*result.Next)
+		if result.Items != nil {
+			state.AppendItems(*result.Items)
 		}
 
 		if err = state.Turn(); err != nil {
@@ -235,23 +219,10 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 
 			content := modelResponse.Content
 
-			assistantMessage := llmsdk.Message{
-				AssistantMessage: &llmsdk.AssistantMessage{
-					Content: content,
-				},
-			}
-
-			state.AppendMessages([]llmsdk.Message{assistantMessage})
-
-			state.AppendModelCall(ModelCallInfo{
-				Usage:    modelResponse.Usage,
-				Cost:     modelResponse.Cost,
-				ModelID:  s.params.Model.ModelID(),
-				Provider: s.params.Model.Provider(),
-			})
+			item := state.AppendModelResponse(modelResponse)
 
 			eventChan <- &AgentStreamEvent{
-				Message: &assistantMessage,
+				Item: &item,
 			}
 
 			var result ProcessResult
@@ -270,11 +241,12 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 				return
 			}
 
-			if result.Next != nil {
-				state.AppendMessages(*result.Next)
-				for _, message := range *result.Next {
+			if result.Items != nil {
+				state.AppendItems(*result.Items)
+				for _, item := range *result.Items {
+					it := item
 					eventChan <- &AgentStreamEvent{
-						Message: &message,
+						Item: &it,
 					}
 				}
 			}
@@ -331,8 +303,8 @@ func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]
 // Only one of Response or Next should be set.
 type ProcessResult struct {
 	Response *[]llmsdk.Part
-	// Return when new messages need to be added to the input and continue processing
-	Next *[]llmsdk.Message
+	// Return when new items need to be added to the output and continue processing
+	Items *[]AgentItem
 }
 
 type RunState struct {
@@ -341,12 +313,8 @@ type RunState struct {
 
 	// CurrentTurn is the current turn number in the run.
 	CurrentTurn uint
-	// output contains all items generated during the run, such as new `ToolMessage` and
-	// `AssistantMessage`
+	// output contains all items generated during the run, such as new `Tool` and `Model` items
 	output []AgentItem
-
-	// modelCalls contain information about the LLM calls made during the run
-	modelCalls []ModelCallInfo
 
 	mu sync.RWMutex
 }
@@ -357,7 +325,6 @@ func NewRunState(input []AgentItem, maxTurns uint) *RunState {
 		input:       input,
 		CurrentTurn: 0,
 		output:      []AgentItem{},
-		modelCalls:  []ModelCallInfo{},
 	}
 }
 
@@ -386,12 +353,24 @@ func (s *RunState) AppendMessages(messages []llmsdk.Message) {
 	}
 }
 
-// AppendModelCall adds a model call to the run state.
-func (s *RunState) AppendModelCall(call ModelCallInfo) {
+// AppendItems adds AgentItems to the run state.
+func (s *RunState) AppendItems(items []AgentItem) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.output = append(s.output, items...)
+}
 
-	s.modelCalls = append(s.modelCalls, call)
+// AppendModelResponse appends a model response as a model AgentItem and returns it.
+func (s *RunState) AppendModelResponse(resp llmsdk.ModelResponse) AgentItem {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item := NewAgentItemModelResponse(resp)
+	s.output = append(s.output, item)
+	return item
+}
+
+func (s *RunState) GetItems() []AgentItem {
+	return slices.Concat(s.input, s.output)
 }
 
 // GetTurnMessages gets LLM messages to use in the `LanguageModelInput` for the turn
@@ -399,16 +378,31 @@ func (s *RunState) GetTurnMessages() []llmsdk.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	messages := make([]llmsdk.Message, 0, len(s.input)+len(s.output))
-	for _, item := range s.input {
-		if item.Message != nil {
-			messages = append(messages, *item.Message)
-		}
-	}
+	messages := []llmsdk.Message{}
+	items := s.GetItems()
 
-	for _, item := range s.output {
-		if item.Message != nil {
-			messages = append(messages, *item.Message)
+	for _, it := range items {
+		if msg := it.Message; msg != nil {
+			messages = append(messages, *msg)
+		}
+		if modelResponse := it.Model; modelResponse != nil {
+			messages = append(messages, llmsdk.NewAssistantMessage(modelResponse.Content...))
+		}
+		if tool := it.Tool; tool != nil {
+			toolResultPart := llmsdk.NewToolResultPart(
+				tool.ToolCallID,
+				tool.ToolName,
+				tool.Output,
+				tool.IsError,
+			)
+
+			if len(messages) == 0 || messages[len(messages)-1].ToolMessage == nil {
+				messages = append(messages, llmsdk.NewToolMessage(toolResultPart))
+			} else {
+				lastMessage := messages[len(messages)-1]
+				lastMessage.ToolMessage.Content = append(lastMessage.ToolMessage.Content, toolResultPart)
+				messages[len(messages)-1] = lastMessage
+			}
 		}
 	}
 
@@ -420,8 +414,7 @@ func (s *RunState) CreateResponse(finalContent []llmsdk.Part) *AgentResponse {
 	defer s.mu.RUnlock()
 
 	return &AgentResponse{
-		Content:    finalContent,
-		Output:     s.output,
-		ModelCalls: s.modelCalls,
+		Content: finalContent,
+		Output:  s.output,
 	}
 }

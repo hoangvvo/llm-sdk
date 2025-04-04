@@ -125,22 +125,13 @@ suite("RunSession#run", () => {
       content: [{ type: "text", text: "Hi!" }],
       output: [
         {
-          type: "message",
-          role: "assistant",
+          type: "model",
           content: [
             {
               type: "text",
               text: "Hi!",
             },
           ],
-        },
-      ],
-      model_calls: [
-        {
-          cost: null,
-          model_id: "mock-model",
-          provider: "mock",
-          usage: null,
         },
       ],
     });
@@ -210,8 +201,7 @@ suite("RunSession#run", () => {
       content: [{ type: "text", text: "Final response" }],
       output: [
         {
-          type: "message",
-          role: "assistant",
+          type: "model",
           content: [
             {
               type: "tool-call",
@@ -220,41 +210,23 @@ suite("RunSession#run", () => {
               args: { param: "value" },
             },
           ],
-        },
-        {
-          type: "message",
-          role: "tool",
-          content: [
-            {
-              type: "tool-result",
-              tool_name: "test_tool",
-              tool_call_id: "call_1",
-              content: [{ type: "text", text: "Tool result" }],
-              is_error: false,
-            },
-          ],
-        },
-        {
-          type: "message",
-          role: "assistant",
-          content: [{ type: "text", text: "Final response" }],
-        },
-      ],
-      model_calls: [
-        {
           usage: {
             input_tokens: 1000,
             output_tokens: 50,
           },
           cost: 0.0015,
-          model_id: model.modelId,
-          provider: model.provider,
         },
         {
-          usage: null,
-          cost: null,
-          model_id: model.modelId,
-          provider: model.provider,
+          type: "tool",
+          tool_name: "test_tool",
+          tool_call_id: "call_1",
+          input: { param: "value" },
+          output: [{ type: "text", text: "Tool result" }],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [{ type: "text", text: "Final response" }],
         },
       ],
     });
@@ -337,8 +309,7 @@ suite("RunSession#run", () => {
       content: [{ type: "text", text: "Processed both tools" }],
       output: [
         {
-          type: "message",
-          role: "assistant",
+          type: "model",
           content: [
             {
               type: "tool-call",
@@ -353,66 +324,50 @@ suite("RunSession#run", () => {
               args: { param: "value2" },
             },
           ],
+          usage: {
+            input_tokens: 2000,
+            output_tokens: 100,
+          },
         },
         {
-          type: "message",
-          role: "tool",
-          content: [
+          type: "tool",
+          tool_call_id: "call_1",
+          tool_name: "tool_1",
+          input: { param: "value1" },
+          output: [
             {
-              type: "tool-result",
-              tool_call_id: "call_1",
-              tool_name: "tool_1",
-              content: [
-                {
-                  type: "text",
-                  text: "Tool 1 result",
-                },
-              ],
-              is_error: false,
-            },
-            {
-              type: "tool-result",
-              tool_call_id: "call_2",
-              tool_name: "tool_2",
-              content: [
-                {
-                  type: "text",
-                  text: "Tool 2 result",
-                },
-              ],
-              is_error: false,
+              type: "text",
+              text: "Tool 1 result",
             },
           ],
+          is_error: false,
         },
         {
-          type: "message",
-          role: "assistant",
+          type: "tool",
+          tool_call_id: "call_2",
+          tool_name: "tool_2",
+          input: { param: "value2" },
+          output: [
+            {
+              type: "text",
+              text: "Tool 2 result",
+            },
+          ],
+          is_error: false,
+        },
+        {
+          type: "model",
           content: [
             {
               type: "text",
               text: "Processed both tools",
             },
           ],
-        },
-      ],
-      model_calls: [
-        {
-          usage: {
-            input_tokens: 2000,
-            output_tokens: 100,
-          },
-          cost: null,
-          model_id: model.modelId,
-          provider: model.provider,
-        },
-        {
           usage: {
             input_tokens: 50,
             output_tokens: 10,
           },
           cost: 0.0003,
-          model_id: model.modelId,
-          provider: model.provider,
         },
       ],
     };
@@ -422,7 +377,7 @@ suite("RunSession#run", () => {
     t.assert.deepStrictEqual(response.content, [
       { type: "text", text: "Processed both tools" },
     ]);
-    t.assert.strictEqual(response.output.length, 3);
+    t.assert.strictEqual(response.output.length, 4);
   });
 
   test("handles multiple turns with tool calls", async (t: TestContext) => {
@@ -696,13 +651,13 @@ suite("RunSession#run", () => {
       ],
     });
 
-    const toolMessage = response.output[1];
-    t.assert.ok(toolMessage);
-    t.assert.strictEqual(toolMessage.type, "message");
-    const toolResult = toolMessage.content[0];
-    t.assert.ok(toolResult);
-    t.assert.strictEqual(toolResult.type, "tool-result");
-    t.assert.strictEqual(toolResult.is_error, true);
+    const toolItem = response.output[1];
+    t.assert.ok(toolItem);
+    t.assert.strictEqual(toolItem.type, "tool");
+    t.assert.strictEqual(toolItem.is_error, true);
+    t.assert.deepStrictEqual(toolItem.output, [
+      { type: "text", text: "Error: Invalid parameters" },
+    ]);
     t.assert.deepStrictEqual(response.content, [
       { type: "text", text: "Handled the error" },
     ]);
@@ -911,10 +866,10 @@ suite("RunSession#runStream", () => {
       ],
     );
 
-    const messageEvent = events[3];
-    t.assert.ok(messageEvent);
-    t.assert.strictEqual(messageEvent.type, "message");
-    t.assert.strictEqual(messageEvent.role, "assistant");
+    const itemEvent = events[3];
+    t.assert.ok(itemEvent);
+    t.assert.strictEqual(itemEvent.type, "item");
+    t.assert.strictEqual(itemEvent.item.type, "model");
 
     const responseEvent = events[4];
     t.assert.ok(responseEvent);
@@ -973,20 +928,16 @@ suite("RunSession#runStream", () => {
     }
 
     const partialEvents = events.filter((e) => e.type === "partial");
-    const messageEvents = events.filter((e) => e.type === "message");
+    const itemEvents = events.filter((e) => e.type === "item");
     const responseEvents = events.filter((e) => e.type === "response");
 
     t.assert.strictEqual(partialEvents.length, 3);
-    t.assert.strictEqual(messageEvents.length, 3);
+    t.assert.strictEqual(itemEvents.length, 3);
     t.assert.strictEqual(responseEvents.length, 1);
 
     t.assert.deepStrictEqual(
-      messageEvents.map((e) => ({ type: e.type, role: e.role })),
-      [
-        { type: "message", role: "assistant" },
-        { type: "message", role: "tool" },
-        { type: "message", role: "assistant" },
-      ],
+      itemEvents.map((e) => e.item.type),
+      ["model", "tool", "model"],
     );
 
     t.assert.deepStrictEqual(toolExecute.mock.calls[0]?.arguments[0], {
@@ -1050,8 +1001,8 @@ suite("RunSession#runStream", () => {
       events.push(event);
     }
 
-    const messageEvents = events.filter((e) => e.type === "message");
-    t.assert.strictEqual(messageEvents.length, 5);
+    const itemEvents = events.filter((e) => e.type === "item");
+    t.assert.strictEqual(itemEvents.length, 5);
     t.assert.strictEqual(toolExecute.mock.calls.length, 2);
 
     const responseEvent = events.find((e) => e.type === "response");
