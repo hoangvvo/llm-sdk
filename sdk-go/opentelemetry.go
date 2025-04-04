@@ -24,7 +24,7 @@ type LMSpan struct {
 	MaxTokens        *uint32  `json:"max_tokens,omitempty"`
 	Temperature      *float64 `json:"temperature,omitempty"`
 	TopP             *float64 `json:"top_p,omitempty"`
-	TopK             *float64 `json:"top_k,omitempty"`
+	TopK             *int32 `json:"top_k,omitempty"`
 	PresencePenalty  *float64 `json:"presence_penalty,omitempty"`
 	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
 	Seed             *int64   `json:"seed,omitempty"`
@@ -100,7 +100,7 @@ func (s *LMSpan) OnEnd() {
 		s.span.SetAttributes(attribute.Float64("gen_ai.request.top_p", *s.TopP))
 	}
 	if s.TopK != nil {
-		s.span.SetAttributes(attribute.Float64("gen_ai.request.top_k", *s.TopK))
+		s.span.SetAttributes(attribute.Int64("gen_ai.request.top_k", int64(*s.TopK)))
 	}
 	if s.PresencePenalty != nil {
 		s.span.SetAttributes(attribute.Float64("gen_ai.request.presence_penalty", *s.PresencePenalty))

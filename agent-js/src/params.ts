@@ -64,6 +64,7 @@ export interface AgentParams<TContext> {
   /**
    * Only sample from the top K options for each subsequent token.
    * Used to remove 'long tail' low probability responses.
+   * Must be a non-negative integer.
    * @default undefined
    */
   top_k?: number;

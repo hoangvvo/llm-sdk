@@ -173,7 +173,7 @@ pub struct GenerateContentConfig {
     /// highest probabilities are sampled. Then tokens are further filtered
     /// based on ``top_p`` with the final token selected using temperature
     /// sampling. Use a lower number for less random responses and a higher
-    /// number for more random responses.
+    /// number for more random responses. Must be a non-negative integer.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<i32>,
     /// Number of response variations to return.

@@ -119,7 +119,7 @@ export declare interface GenerateContentConfig {
      highest probabilities are sampled. Then tokens are further filtered based
      on ``top_p`` with the final token selected using temperature sampling. Use
      a lower number for less random responses and a higher number for more
-     random responses.
+     random responses. Must be a non-negative integer.
      */
   topK?: number;
   /** Number of response variations to return.

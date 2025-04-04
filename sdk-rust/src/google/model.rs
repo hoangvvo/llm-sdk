@@ -228,7 +228,7 @@ fn convert_to_generate_content_parameters(
         config.top_p = Some(top_p);
     }
     if let Some(top_k) = input.top_k {
-        config.top_k = Some(top_k as i32);
+        config.top_k = Some(top_k);
     }
     if let Some(presence_penalty) = input.presence_penalty {
         config.presence_penalty = Some(presence_penalty);

@@ -25,7 +25,8 @@ type AgentParams[C any] struct {
 	TopP *float64
 	// Only sample from the top K options for each subsequent token.
 	// Used to remove 'long tail' low probability responses.
-	TopK *float64
+	// Must be a non-negative integer.
+	TopK *int32
 	// Positive values penalize new tokens based on whether they appear in the
 	// text so far, increasing the model's likelihood to talk about new
 	// topics.
@@ -94,7 +95,8 @@ func WithTopP[C any](topP float64) AgentParamsOption[C] {
 // WithTopK sets the top-k sampling parameter for the model.
 // Only sample from the top K options for each subsequent token.
 // Used to remove 'long tail' low probability responses.
-func WithTopK[C any](topK float64) AgentParamsOption[C] {
+// Must be a non-negative integer.
+func WithTopK[C any](topK int32) AgentParamsOption[C] {
 	return func(p *AgentParams[C]) {
 		p.TopK = &topK
 	}

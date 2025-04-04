@@ -496,7 +496,7 @@ export interface LanguageModelInput {
    */
   top_p?: number;
   /**
-   * Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Ranges from 0.0 to 1.0
+   * Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Must be a non-negative integer.
    */
   top_k?: number;
   /**

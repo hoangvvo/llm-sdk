@@ -38,7 +38,8 @@ pub struct AgentParams<TCtx> {
     pub top_p: Option<f64>,
     /// Only sample from the top K options for each subsequent token.
     /// Used to remove 'long tail' low probability responses.
-    pub top_k: Option<f64>,
+    /// Must be a non-negative integer.
+    pub top_k: Option<i32>,
     /// Positive values penalize new tokens based on whether they appear in the
     /// text so far, increasing the model's likelihood to talk about new
     /// topics.
@@ -134,8 +135,9 @@ where
     /// Set the `top_k` for sampling
     /// Only sample from the top K options for each subsequent token.
     /// Used to remove 'long tail' low probability responses.
+    /// Must be a non-negative integer.
     #[must_use]
-    pub fn top_k(mut self, top_k: f64) -> Self {
+    pub fn top_k(mut self, top_k: i32) -> Self {
         self.top_k = Some(top_k);
         self
     }

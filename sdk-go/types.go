@@ -747,8 +747,8 @@ type LanguageModelInput struct {
 	Temperature *float64 `json:"temperature,omitempty"`
 	// An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. Ranges from 0.0 to 1.0
 	TopP *float64 `json:"top_p,omitempty"`
-	// Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Ranges from 0.0 to 1.0
-	TopK *float64 `json:"top_k,omitempty"`
+	// Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Must be a non-negative integer.
+	TopK *int32 `json:"top_k,omitempty"`
 	// Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.
 	PresencePenalty *float64 `json:"presence_penalty,omitempty"`
 	// Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.

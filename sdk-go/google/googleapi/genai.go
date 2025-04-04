@@ -115,7 +115,7 @@ type GenerateContentConfig struct {
 	// on ``top_p`` with the final token selected using temperature sampling. Use
 	// a lower number for less random responses and a higher number for more
 	// random responses.
-	TopK *float64 `json:"topK,omitempty"`
+	TopK *int32 `json:"topK,omitempty"`
 	// Number of response variations to return.
 	CandidateCount *int `json:"candidateCount,omitempty"`
 	// Maximum number of tokens that can be generated in the response.

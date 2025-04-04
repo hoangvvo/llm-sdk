@@ -173,10 +173,10 @@ function convertToGenerateContentParameters(
   if (temperature) {
     config.temperature = temperature;
   }
-  if (top_p) {
+  if (typeof top_p === "number") {
     config.topP = top_p;
   }
-  if (top_k) {
+  if (typeof top_k === "number") {
     config.topK = top_k;
   }
   if (presence_penalty) {

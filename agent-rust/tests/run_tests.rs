@@ -485,7 +485,7 @@ async fn test_run_session_passes_sampling_parameters_to_model() {
         AgentParams::new("test_agent", model.clone())
             .temperature(0.7)
             .top_p(0.9)
-            .top_k(40.0)
+            .top_k(40)
             .presence_penalty(0.1)
             .frequency_penalty(0.2)
             .into(),
@@ -507,7 +507,7 @@ async fn test_run_session_passes_sampling_parameters_to_model() {
     let generate_call = &generate_calls[0];
     assert_eq!(generate_call.temperature, Some(0.7));
     assert_eq!(generate_call.top_p, Some(0.9));
-    assert_eq!(generate_call.top_k, Some(40.0));
+    assert_eq!(generate_call.top_k, Some(40));
     assert_eq!(generate_call.presence_penalty, Some(0.1));
     assert_eq!(generate_call.frequency_penalty, Some(0.2));
 }

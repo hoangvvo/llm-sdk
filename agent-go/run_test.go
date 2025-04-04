@@ -817,7 +817,7 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 
 	temp := 0.7
 	topP := 0.9
-	topK := 40.0
+	topK := int32(40)
 	presencePenalty := 0.1
 	frequencyPenalty := 0.2
 
@@ -866,7 +866,7 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 		t.Errorf("expected topP %f, got %v", topP, call.TopP)
 	}
 	if call.TopK == nil || *call.TopK != topK {
-		t.Errorf("expected topK %f, got %v", topK, call.TopK)
+		t.Errorf("expected topK %d, got %v", topK, call.TopK)
 	}
 	if call.PresencePenalty == nil || *call.PresencePenalty != presencePenalty {
 		t.Errorf("expected presencePenalty %f, got %v", presencePenalty, call.PresencePenalty)

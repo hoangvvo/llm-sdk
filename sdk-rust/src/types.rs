@@ -460,9 +460,10 @@ pub struct LanguageModelInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
     /// Only sample from the top K options for each subsequent token. Used to
-    /// remove 'long tail' low probability responses. Ranges from 0.0 to 1.0
+    /// remove 'long tail' low probability responses. Must be a non-negative
+    /// integer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub top_k: Option<f64>,
+    pub top_k: Option<i32>,
     /// Positive values penalize new tokens based on whether they appear in the
     /// text so far, increasing the model's likelihood to talk about new topics.
     #[serde(skip_serializing_if = "Option::is_none")]

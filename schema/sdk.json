@@ -594,8 +594,8 @@
           "description": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. Ranges from 0.0 to 1.0"
         },
         "top_k": {
-          "type": "number",
-          "description": "Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Ranges from 0.0 to 1.0"
+          "type": "integer",
+          "description": "Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Must be a non-negative integer."
         },
         "presence_penalty": {
           "type": "number",
