@@ -14,6 +14,7 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/randutil"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
 // OpenAIModel implements the LanguageModel interface for OpenAI using Responses API
@@ -222,7 +223,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 		}
 	}()
 
-	return llmsdk.NewLanguageModelStream(responseCh, errCh), nil
+	return stream.New(responseCh, errCh), nil
 }
 
 // MARK: - Convert To OpenAI API Types

@@ -135,10 +135,8 @@ impl LMSpan {
                 .set_attribute(KeyValue::new("gen_ai.request.top_p", top_p));
         }
         if let Some(top_k) = self.top_k {
-            self.span.set_attribute(KeyValue::new(
-                "gen_ai.request.top_k",
-                i64::from(top_k),
-            ));
+            self.span
+                .set_attribute(KeyValue::new("gen_ai.request.top_k", i64::from(top_k)));
         }
         if let Some(presence_penalty) = self.presence_penalty {
             self.span.set_attribute(KeyValue::new(

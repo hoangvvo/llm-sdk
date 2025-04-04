@@ -13,6 +13,7 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/randutil"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
 const Provider llmsdk.ProviderName = "google"
@@ -207,7 +208,7 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 		}
 	}()
 
-	return llmsdk.NewLanguageModelStream(responseCh, errCh), nil
+	return stream.New(responseCh, errCh), nil
 }
 
 func convertToGenerateContentParameters(input *llmsdk.LanguageModelInput, modelID string) (*googleapi.GenerateContentParameters, error) {

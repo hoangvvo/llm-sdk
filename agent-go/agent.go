@@ -4,6 +4,7 @@ import (
 	"context"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
 type Agent[C any] struct {
@@ -56,7 +57,7 @@ func (a *Agent[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResp
 // A session is created for the run and cleaned up afterwards.
 func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*AgentStream, error) {
 	session := a.CreateSession()
-	stream, err := session.RunStream(ctx, request)
+	agentStream, err := session.RunStream(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -69,26 +70,16 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 		defer close(errChan)
 		defer session.Finish()
 
-		for {
-			select {
-			case event, ok := <-stream.C:
-				if !ok {
-					return
-				}
-				eventChan <- event
-			case err, ok := <-stream.errC:
-				if !ok {
-					return
-				}
-				errChan <- err
-				return
-			case <-ctx.Done():
-				errChan <- ctx.Err()
-				return
-			}
+		for agentStream.Next() {
+			event := agentStream.Current()
+			eventChan <- event
+		}
+		if err = agentStream.Err(); err != nil {
+			errChan <- err
+			return
 		}
 	}()
-	return NewAgentStream(eventChan, errChan), nil
+	return stream.New(eventChan, errChan), nil
 }
 
 func (a *Agent[C]) CreateSession() *RunSession[C] {

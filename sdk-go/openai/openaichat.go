@@ -12,6 +12,7 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
 // OpenAIChatModel implements the LanguageModel interface for OpenAI
@@ -220,7 +221,7 @@ func (m *OpenAIChatModel) Stream(ctx context.Context, input *llmsdk.LanguageMode
 		}
 	}()
 
-	return llmsdk.NewLanguageModelStream(responseCh, errCh), nil
+	return stream.New(responseCh, errCh), nil
 }
 
 // MARK: - Convert To OpenAI API Types

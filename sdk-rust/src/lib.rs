@@ -1,5 +1,6 @@
 mod accumulator;
 mod audio_utils;
+pub mod boxed_stream;
 mod client_utils;
 mod errors;
 pub mod google;

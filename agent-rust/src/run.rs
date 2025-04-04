@@ -3,10 +3,11 @@ use crate::{
     types::{AgentItemTool, AgentStream, AgentStreamEvent},
     AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse,
 };
+use async_stream::try_stream;
 use futures::{lock::Mutex, stream::StreamExt};
 use llm_sdk::{
-    LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator, ToolCallPart, ToolMessage,
-    ToolResultPart,
+    boxed_stream::BoxedStream, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
+    ToolCallPart, ToolMessage, ToolResultPart,
 };
 use std::sync::Arc;
 
@@ -32,64 +33,68 @@ where
 
     /// Process the model response and decide whether to continue the loop or
     /// return the response
-    async fn process(
-        &self,
+    async fn process<'a>(
+        &'a self,
         context: Arc<TCtx>,
-        run_state: &RunState,
+        run_state: &'a RunState,
         parts: Vec<Part>,
-    ) -> Result<ProcessResult, AgentError> {
-        let tool_call_parts: Vec<ToolCallPart> = parts
-            .iter()
-            .filter_map(|part| {
-                if let Part::ToolCall(tool_call) = part {
-                    Some(tool_call.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        // If no tool calls were found, return the model response as is
-        if tool_call_parts.is_empty() {
-            return Ok(ProcessResult::Response(parts));
-        }
-
-        // Build AgentItems for all tool results
-        let mut items: Vec<AgentItem> = vec![];
-
-        for tool_call_part in tool_call_parts {
-            let ToolCallPart {
-                tool_call_id,
-                tool_name,
-                args,
-                ..
-            } = tool_call_part;
-
-            let agent_tool = self
-                .params
-                .tools
+    ) -> BoxedStream<'a, Result<ProcessEvents, AgentError>> {
+        let stream = try_stream! {
+            let tool_call_parts: Vec<ToolCallPart> = parts
                 .iter()
-                .find(|tool| tool.name() == tool_name)
-                .ok_or_else(|| {
-                    AgentError::Invariant(format!("Tool {tool_name} not found for tool call"))
-                })?;
+                .filter_map(|part| {
+                    if let Part::ToolCall(tool_call) = part {
+                        Some(tool_call.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
 
-            let input_args = args.clone();
-            let tool_res = agent_tool
-                .execute(args, &context, run_state)
-                .await
-                .map_err(AgentError::ToolExecution)?;
+            // If no tool calls were found, return the model response as is
+            if tool_call_parts.is_empty() {
+                yield ProcessEvents::Response(parts);
+                return;
+            }
 
-            items.push(AgentItem::Tool(AgentItemTool {
-                tool_call_id,
-                tool_name,
-                input: input_args,
-                output: tool_res.content,
-                is_error: tool_res.is_error,
-            }));
-        }
+            for tool_call_part in tool_call_parts {
+                let ToolCallPart {
+                    tool_call_id,
+                    tool_name,
+                    args,
+                    ..
+                } = tool_call_part;
 
-        Ok(ProcessResult::Items(items))
+                let agent_tool = self
+                    .params
+                    .tools
+                    .iter()
+                    .find(|tool| tool.name() == tool_name)
+                    .ok_or_else(|| {
+                        AgentError::Invariant(format!("Tool {tool_name} not found for tool call"))
+                    })?;
+
+                let input_args = args.clone();
+                let tool_res = agent_tool
+                    .execute(args, &context, run_state)
+                    .await
+                    .map_err(AgentError::ToolExecution)?;
+
+                let item = AgentItemTool {
+                    tool_call_id,
+                    tool_name,
+                    input: input_args,
+                    output: tool_res.content,
+                    is_error: tool_res.is_error,
+                };
+
+                yield ProcessEvents::Item(AgentItem::Tool(item));
+            }
+
+            yield ProcessEvents::Next;
+        };
+
+        BoxedStream::from_stream(stream)
     }
 
     /// Run a non-streaming execution of the agent.
@@ -107,12 +112,21 @@ where
 
             state.append_model_response(model_response).await;
 
-            match self.process(context.clone(), &state, content).await? {
-                ProcessResult::Response(final_content) => {
-                    return Ok(state.create_response(final_content).await);
-                }
-                ProcessResult::Items(items) => {
-                    state.append_items(items).await;
+            let mut process_stream = self.process(context.clone(), &state, content).await;
+
+            while let Some(event) = process_stream.next().await {
+                let event = event?;
+                match event {
+                    ProcessEvents::Item(items) => {
+                        state.append_item(items).await;
+                    }
+                    ProcessEvents::Response(final_content) => {
+                        return Ok(state.create_response(final_content).await);
+                    }
+                    ProcessEvents::Next => {
+                        /* continue the loop */
+                        break;
+                    }
                 }
             }
 
@@ -157,16 +171,22 @@ where
                 let item = state.append_model_response(model_response).await;
                 yield AgentStreamEvent::Item(item);
 
-                match session.process(context.clone(), &state, content).await? {
-                    ProcessResult::Response(final_content) => {
-                        let response = state.create_response(final_content).await;
-                        yield AgentStreamEvent::Response(response);
-                        break;
-                    }
-                    ProcessResult::Items(items) => {
-                        state.append_items(items.clone()).await;
-                        for item in items {
+                let mut process_stream = session.process(context.clone(), &state, content).await;
+
+                while let Some(event) = process_stream.next().await {
+                    let event = event?;
+                    match event {
+                        ProcessEvents::Item(item) => {
+                            state.append_item(item.clone()).await;
                             yield AgentStreamEvent::Item(item);
+                        }
+                        ProcessEvents::Response(final_content) => {
+                            let response = state.create_response(final_content).await;
+                            yield AgentStreamEvent::Response(response);
+                            return;
+                        }
+                        ProcessEvents::Next => {
+                            /* continue the loop */
                         }
                     }
                 }
@@ -218,10 +238,13 @@ where
     }
 }
 
-enum ProcessResult {
+enum ProcessEvents {
+    // Emit when a new item is generated
+    Item(AgentItem),
+    //  Emit when the final response is ready
     Response(Vec<Part>),
-    // Return when new items need to be added to the output and continue processing
-    Items(Vec<AgentItem>),
+    // Emit when the loop should continue to the next iteration
+    Next,
 }
 
 pub struct RunState {
@@ -266,12 +289,9 @@ impl RunState {
     }
 
     /// Add AgentItems to the run state.
-    pub async fn append_items(&self, items: Vec<AgentItem>) {
-        if items.is_empty() {
-            return;
-        }
-        let mut output = self.output.lock().await;
-        output.extend(items);
+    pub async fn append_item(&self, item: AgentItem) {
+        let mut output: futures::lock::MutexGuard<'_, Vec<AgentItem>> = self.output.lock().await;
+        output.push(item);
     }
 
     /// Append a model response to the run state and return the created item.

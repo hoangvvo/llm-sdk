@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
 // RunSession manages the run session for an agent.
@@ -34,7 +35,7 @@ func (s *RunSession[C]) process(
 	contextVal C,
 	runState *RunState,
 	content []llmsdk.Part,
-) (ProcessResult, error) {
+) *stream.Stream[ProcessEvents] {
 	var toolCallParts []*llmsdk.ToolCallPart
 	for _, part := range content {
 		if part.ToolCallPart != nil {
@@ -42,59 +43,71 @@ func (s *RunSession[C]) process(
 		}
 	}
 
-	// If no tool calls were found, return the model response as is
-	if len(toolCallParts) == 0 {
-		return ProcessResult{
-			Response: &content,
-		}, nil
-	}
+	currCh := make(chan ProcessEvents)
+	errCh := make(chan error, 1)
 
-	// Build AgentItem tool results for each tool call
-	var items []AgentItem
+	go func() {
+		defer close(currCh)
+		defer close(errCh)
 
-	for _, toolCallPart := range toolCallParts {
-		var agentTool AgentTool[C]
-		for _, tool := range s.params.Tools {
-			if tool.Name() == toolCallPart.ToolName {
-				agentTool = tool
-				break
+		// If no tool calls were found, return the model response as is
+		if len(toolCallParts) == 0 {
+			currCh <- ProcessEvents{
+				Response: &content,
+			}
+			return
+		}
+
+		// Build AgentItem tool results for each tool call
+
+		for _, toolCallPart := range toolCallParts {
+			var agentTool AgentTool[C]
+			for _, tool := range s.params.Tools {
+				if tool.Name() == toolCallPart.ToolName {
+					agentTool = tool
+					break
+				}
+			}
+
+			if agentTool == nil {
+				errCh <- NewInvariantError(
+					fmt.Sprintf("tool %s not found for tool call", toolCallPart.ToolName),
+				)
+				return
+			}
+
+			toolRes, err := startActiveToolSpan(
+				ctx,
+				toolCallPart.ToolCallID,
+				toolCallPart.ToolName,
+				agentTool.Description(),
+				func(ctx context.Context) (AgentToolResult, error) {
+					res, err := agentTool.Execute(ctx, toolCallPart.Args, contextVal, runState)
+					if err != nil {
+						return AgentToolResult{}, NewToolExecutionError(err)
+					}
+					return res, nil
+				},
+			)
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			item := NewAgentItemTool(
+				toolCallPart.ToolCallID,
+				toolCallPart.ToolName,
+				toolCallPart.Args,
+				toolRes.Content,
+				toolRes.IsError,
+			)
+			currCh <- ProcessEvents{
+				Item: &item,
 			}
 		}
+	}()
 
-		if agentTool == nil {
-			return ProcessResult{}, NewInvariantError(
-				fmt.Sprintf("tool %s not found for tool call", toolCallPart.ToolName),
-			)
-		}
-
-		toolRes, err := startActiveToolSpan(
-			ctx,
-			toolCallPart.ToolCallID,
-			toolCallPart.ToolName,
-			agentTool.Description(),
-			func(ctx context.Context) (AgentToolResult, error) {
-				res, err := agentTool.Execute(ctx, toolCallPart.Args, contextVal, runState)
-				if err != nil {
-					return AgentToolResult{}, NewToolExecutionError(err)
-				}
-				return res, nil
-			},
-		)
-		if err != nil {
-			return ProcessResult{}, err
-		}
-
-		items = append(items, NewAgentItemTool(
-			toolCallPart.ToolCallID,
-			toolCallPart.ToolName,
-			toolCallPart.Args,
-			toolRes.Content,
-			toolRes.IsError,
-		))
-	}
-	return ProcessResult{
-		Items: &items,
-	}, nil
+	return stream.New(currCh, errCh)
 }
 
 // Run runs a non-streaming execution of the agent.
@@ -129,20 +142,24 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 		state.AppendModelResponse(*modelResponse)
 
-		var result ProcessResult
-		result, err = s.process(ctx, contextVal, state, content)
-		if err != nil {
+		processStream := s.process(ctx, contextVal, state, content)
+		for processStream.Next() {
+			event := processStream.Current()
+			if event.Response != nil {
+				response := state.CreateResponse(*event.Response)
+				span.OnResponse(response)
+				return response, nil
+			}
+			if event.Item != nil {
+				state.AppendItems(*event.Item)
+			}
+			if event.Next != nil {
+				// continue to next iteration
+				break
+			}
+		}
+		if err = processStream.Err(); err != nil {
 			return nil, err
-		}
-
-		if result.Response != nil {
-			response := state.CreateResponse(*result.Response)
-			span.OnResponse(response)
-			return response, nil
-		}
-
-		if result.Items != nil {
-			state.AppendItems(*result.Items)
 		}
 
 		if err = state.Turn(); err != nil {
@@ -225,30 +242,31 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 				Item: &item,
 			}
 
-			var result ProcessResult
-			result, err = s.process(ctx, contextVal, state, content)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			if result.Response != nil {
-				response := state.CreateResponse(*result.Response)
-				span.OnResponse(response)
-				eventChan <- &AgentStreamEvent{
-					Response: response,
-				}
-				return
-			}
-
-			if result.Items != nil {
-				state.AppendItems(*result.Items)
-				for _, item := range *result.Items {
-					it := item
+			processStream := s.process(ctx, contextVal, state, content)
+			for processStream.Next() {
+				event := processStream.Current()
+				if event.Response != nil {
+					response := state.CreateResponse(*event.Response)
+					span.OnResponse(response)
 					eventChan <- &AgentStreamEvent{
-						Item: &it,
+						Response: response,
+					}
+					return
+				}
+				if event.Item != nil {
+					state.AppendItems(*event.Item)
+					eventChan <- &AgentStreamEvent{
+						Item: event.Item,
 					}
 				}
+				if event.Next != nil {
+					// continue to next iteration
+					break
+				}
+			}
+			if err = processStream.Err(); err != nil {
+				errChan <- err
+				return
 			}
 
 			if err = state.Turn(); err != nil {
@@ -258,7 +276,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 		}
 	}()
 
-	return NewAgentStream(eventChan, errChan), nil
+	return stream.New(eventChan, errChan), nil
 }
 
 func (s *RunSession[C]) Finish() {
@@ -298,13 +316,14 @@ func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]
 	}, nil
 }
 
-// ProcessResult represents the result of processing a model response
-// to decide whether to continue the loop or return the response.
-// Only one of Response or Next should be set.
-type ProcessResult struct {
+// ProcessEvents represents the sum type of events returned by the process function.
+type ProcessEvents struct {
+	// Emit when a new item is generated
+	Item *AgentItem
+	// Emit when the final response is ready
 	Response *[]llmsdk.Part
-	// Return when new items need to be added to the output and continue processing
-	Items *[]AgentItem
+	// Emit when the loop should continue to the next iteration
+	Next *struct{}
 }
 
 type RunState struct {
@@ -354,7 +373,7 @@ func (s *RunState) AppendMessages(messages []llmsdk.Message) {
 }
 
 // AppendItems adds AgentItems to the run state.
-func (s *RunState) AppendItems(items []AgentItem) {
+func (s *RunState) AppendItems(items ...AgentItem) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.output = append(s.output, items...)

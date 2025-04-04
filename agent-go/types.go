@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
 type AgentRequest[C any] struct {
@@ -229,51 +230,4 @@ const (
 	AgentStreamEventTypeResponse AgentStreamEventType = "response"
 )
 
-type AgentStream struct {
-	C    <-chan *AgentStreamEvent
-	errC <-chan error
-
-	curr *AgentStreamEvent
-	err  error
-}
-
-func NewAgentStream(c <-chan *AgentStreamEvent, errC <-chan error) *AgentStream {
-	return &AgentStream{
-		C:    c,
-		errC: errC,
-		curr: nil,
-		err:  nil,
-	}
-}
-
-// Next advances the stream and returns true if there is a next item.
-func (s *AgentStream) Next() bool {
-	select {
-	case event, ok := <-s.C:
-		if !ok {
-			// Channel closed, check for error (non-blocking)
-			select {
-			case err := <-s.errC:
-				s.err = err
-			default:
-				// No error available
-			}
-			return false
-		}
-		s.curr = event
-		return true
-	case err := <-s.errC:
-		s.err = err
-		return false
-	}
-}
-
-// Current gets the most recent item after Next() returns true.
-func (s *AgentStream) Current() *AgentStreamEvent {
-	return s.curr
-}
-
-// Err returns the error encountered during streaming, if any.
-func (s *AgentStream) Err() error {
-	return s.err
-}
+type AgentStream = stream.Stream[*AgentStreamEvent]

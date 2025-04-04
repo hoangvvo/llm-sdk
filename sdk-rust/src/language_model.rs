@@ -1,11 +1,6 @@
 use crate::{
-    LanguageModelCapability, LanguageModelInput, LanguageModelPricing, LanguageModelResult,
-    ModelResponse, PartialModelResponse,
-};
-use futures::{stream::BoxStream, Stream};
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
+    boxed_stream::BoxedStream, LanguageModelCapability, LanguageModelInput, LanguageModelPricing,
+    LanguageModelResult, ModelResponse, PartialModelResponse,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -23,21 +18,4 @@ pub trait LanguageModel: Send + Sync {
     async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream>;
 }
 
-pub struct LanguageModelStream(BoxStream<'static, LanguageModelResult<PartialModelResponse>>);
-
-impl LanguageModelStream {
-    pub fn from_stream<S>(stream: S) -> Self
-    where
-        S: Stream<Item = LanguageModelResult<PartialModelResponse>> + Send + 'static,
-    {
-        Self(Box::pin(stream))
-    }
-}
-
-impl Stream for LanguageModelStream {
-    type Item = LanguageModelResult<PartialModelResponse>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.0.as_mut().poll_next(cx)
-    }
-}
+pub type LanguageModelStream = BoxedStream<'static, LanguageModelResult<PartialModelResponse>>;

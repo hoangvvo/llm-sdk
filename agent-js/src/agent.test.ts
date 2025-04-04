@@ -78,18 +78,16 @@ suite("Agent#runStream", () => {
 
     t.assert.deepStrictEqual(events, [
       {
-        type: "partial",
+        event: "partial",
         delta: { index: 0, part: { type: "text", text: "Mock" } },
       },
       {
-        type: "item",
-        item: {
-          type: "model",
-          content: [{ type: "text", text: "Mock" }],
-        },
+        event: "item",
+        type: "model",
+        content: [{ type: "text", text: "Mock" }],
       },
       {
-        type: "response",
+        event: "response",
         content: [{ type: "text", text: "Mock" }],
         output: [
           {

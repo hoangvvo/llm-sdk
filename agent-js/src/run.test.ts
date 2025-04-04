@@ -845,7 +845,7 @@ suite("RunSession#runStream", () => {
     }
 
     t.assert.strictEqual(events.length, 5);
-    const partialEvents = events.filter((e) => e.type === "partial");
+    const partialEvents = events.filter((e) => e.event === "partial");
     t.assert.strictEqual(partialEvents.length, 3);
 
     t.assert.deepStrictEqual(
@@ -868,12 +868,12 @@ suite("RunSession#runStream", () => {
 
     const itemEvent = events[3];
     t.assert.ok(itemEvent);
-    t.assert.strictEqual(itemEvent.type, "item");
-    t.assert.strictEqual(itemEvent.item.type, "model");
+    t.assert.strictEqual(itemEvent.event, "item");
+    t.assert.strictEqual(itemEvent.type, "model");
 
     const responseEvent = events[4];
     t.assert.ok(responseEvent);
-    t.assert.strictEqual(responseEvent.type, "response");
+    t.assert.strictEqual(responseEvent.event, "response");
     t.assert.deepStrictEqual(responseEvent.content, [
       { type: "text", text: "Hello!" },
     ]);
@@ -927,16 +927,16 @@ suite("RunSession#runStream", () => {
       events.push(event);
     }
 
-    const partialEvents = events.filter((e) => e.type === "partial");
-    const itemEvents = events.filter((e) => e.type === "item");
-    const responseEvents = events.filter((e) => e.type === "response");
+    const partialEvents = events.filter((e) => e.event === "partial");
+    const itemEvents = events.filter((e) => e.event === "item");
+    const responseEvents = events.filter((e) => e.event === "response");
 
     t.assert.strictEqual(partialEvents.length, 3);
     t.assert.strictEqual(itemEvents.length, 3);
     t.assert.strictEqual(responseEvents.length, 1);
 
     t.assert.deepStrictEqual(
-      itemEvents.map((e) => e.item.type),
+      itemEvents.map((e) => e.type),
       ["model", "tool", "model"],
     );
 
@@ -1001,11 +1001,11 @@ suite("RunSession#runStream", () => {
       events.push(event);
     }
 
-    const itemEvents = events.filter((e) => e.type === "item");
+    const itemEvents = events.filter((e) => e.event === "item");
     t.assert.strictEqual(itemEvents.length, 5);
     t.assert.strictEqual(toolExecute.mock.calls.length, 2);
 
-    const responseEvent = events.find((e) => e.type === "response");
+    const responseEvent = events.find((e) => e.event === "response");
     t.assert.ok(responseEvent);
     t.assert.deepStrictEqual(responseEvent.content, [
       { type: "text", text: "All done" },

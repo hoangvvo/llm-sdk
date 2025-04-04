@@ -66,21 +66,20 @@ export class RunSession<TContext> {
    * Process the model response and decide whether to continue the loop or
    * return the response
    */
-  async #process(
+  async *#process(
     context: TContext,
     state: RunState,
     content: Part[],
-  ): Promise<ProcessResult> {
+  ): AsyncGenerator<ProcessEvents> {
     const toolCallParts = content.filter((part) => part.type === "tool-call");
 
     if (!toolCallParts.length) {
-      return {
+      yield {
         type: "response",
         content,
       };
+      return;
     }
-
-    const agentItemTools: AgentItemTool[] = [];
 
     for (const toolCallPart of toolCallParts) {
       const agentTool = this.#params.tools.find(
@@ -106,19 +105,23 @@ export class RunSession<TContext> {
         },
       );
 
-      agentItemTools.push({
+      const agentItemTool: AgentItemTool = {
         type: "tool",
         tool_name: toolCallPart.tool_name,
         tool_call_id: toolCallPart.tool_call_id,
         input: toolCallPart.args,
         output: toolRes.content,
         is_error: toolRes.is_error,
-      });
+      };
+
+      yield {
+        type: "item",
+        item: agentItemTool,
+      };
     }
 
-    return {
+    yield {
       type: "next",
-      items: agentItemTools,
     };
   }
 
@@ -160,18 +163,28 @@ export class RunSession<TContext> {
 
         state.appendModelResponse(modelResponse);
 
-        const processResult = await span.withContext(() =>
-          this.#process(context, state, content),
-        );
-        if (processResult.type === "response") {
-          const response = state.createResponse(processResult.content);
-          span.onResponse(response);
-          return response;
-        } else {
-          state.appendItems(processResult.items);
-        }
+        const processStream = this.#process(context, state, content);
+        // Patch next to propogate tracing context
+        // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
+        const originalNext = processStream.next.bind(processStream);
+        processStream.next = (...args) =>
+          span.withContext(() => originalNext(...args));
 
-        state.turn();
+        for await (const event of processStream) {
+          if (event.type === "item") {
+            state.appendItem(event.item);
+          }
+          if (event.type === "response") {
+            const response = state.createResponse(event.content);
+            span.onResponse(response);
+            return response;
+          }
+          if (event.type === "next") {
+            // continue the loop
+            state.turn();
+            break;
+          }
+        }
       }
     } catch (err) {
       span.onError(err);
@@ -237,25 +250,35 @@ export class RunSession<TContext> {
 
         const { content } = response;
 
-        const processResult = await span.withContext(() =>
-          this.#process(context, state, content),
-        );
+        const processStream = this.#process(context, state, content);
+        // Patch next to propogate tracing context
+        // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
+        const originalProcessStreamNext =
+          processStream.next.bind(processStream);
+        processStream.next = (...args) =>
+          span.withContext(() => originalProcessStreamNext(...args));
 
-        if (processResult.type === "response") {
-          const response = state.createResponse(processResult.content);
-          yield {
-            event: "response",
-            ...response,
-          };
-          span.onResponse(response);
-          return response;
-        } else {
-          state.appendItems(processResult.items);
-          for (const item of processResult.items) {
+        for await (const event of processStream) {
+          if (event.type === "item") {
+            state.appendItem(event.item);
             yield {
               event: "item",
-              ...item,
+              ...event.item,
             };
+          }
+          if (event.type === "response") {
+            const response = state.createResponse(event.content);
+            span.onResponse(response);
+            yield {
+              event: "response",
+              ...response,
+            };
+            return response;
+          }
+          if (event.type === "next") {
+            // continue the loop
+            state.turn();
+            break;
           }
         }
 
@@ -330,19 +353,32 @@ export class RunSession<TContext> {
   }
 }
 
-type ProcessResult = ProcessResultResponse | ProcessResultNext;
+/**
+ * ProcessEvents represents the sum type of events returned by the process function.
+ */
+type ProcessEvents = ProcessEventResponse | ProcessEventNext | ProcessEventItem;
 
-interface ProcessResultResponse {
+/**
+ * Emit when a new item is generated
+ */
+interface ProcessEventItem {
+  type: "item";
+  item: AgentItem;
+}
+
+/**
+ * Emit when the final response is ready
+ */
+interface ProcessEventResponse {
   type: "response";
   content: Part[];
 }
 
-interface ProcessResultNext {
+/**
+ * Emit when the loop should continue to the next iteration
+ */
+interface ProcessEventNext {
   type: "next";
-  /**
-   * Agent items generated by the process() calls
-   */
-  items: AgentItem[];
 }
 
 export class RunState {
@@ -385,8 +421,8 @@ export class RunState {
   /**
    * Add AgentItems to the run state
    */
-  appendItems(items: AgentItem[]): void {
-    this.#output.push(...items);
+  appendItem(item: AgentItem): void {
+    this.#output.push(item);
   }
 
   // Append a model response to the run state as an AgentItemModelResponse

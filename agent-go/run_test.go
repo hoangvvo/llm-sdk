@@ -10,6 +10,7 @@ import (
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
 // MockLanguageModel implements llmsdk.LanguageModel for testing
@@ -114,7 +115,7 @@ func NewMockLanguageModelStream(partials []llmsdk.PartialModelResponse) *llmsdk.
 		}
 	}()
 
-	return llmsdk.NewLanguageModelStream(eventChan, errChan)
+	return stream.New(eventChan, errChan)
 }
 
 // MockAgentTool implements llmagent.AgentTool for testing
