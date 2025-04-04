@@ -5,7 +5,7 @@ use std::collections::HashMap;
 /// Loosely describe audio format. Some values (e.g., 'wav') denote containers;
 /// others (e.g., 'linear16') specify encoding only; cannot describe containers
 /// that can contain different audio encodings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum AudioFormat {

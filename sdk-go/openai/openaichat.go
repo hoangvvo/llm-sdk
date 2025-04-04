@@ -692,8 +692,10 @@ func (m *OpenAIChatModel) mapOpenAIDelta(delta openaiapi.ChatCompletionChunkChoi
 				format := mapOpenAIAudioFormat(createParams.Audio.Format)
 				audioDelta.Format = &format
 			}
-			audioDelta.SampleRate = ptr.To(OpenAIAudioSampleRate)
-			audioDelta.Channels = ptr.To(OpenAIAudioChannels)
+			if audioDelta.Format != nil && *audioDelta.Format == llmsdk.AudioFormatLinear16 {
+				audioDelta.SampleRate = ptr.To(OpenAIAudioSampleRate)
+				audioDelta.Channels = ptr.To(OpenAIAudioChannels)
+			}
 		}
 		if delta.Audio.Transcript != nil {
 			audioDelta.Transcript = delta.Audio.Transcript

@@ -694,8 +694,10 @@ fn map_openai_delta(
                 .as_ref()
                 .map(|audio_param| &audio_param.format)
                 .map(AudioFormat::from);
-            audio_part.sample_rate = Some(OPENAI_AUDIO_SAMPLE_RATE);
-            audio_part.channels = Some(OPENAI_AUDIO_CHANNELS);
+            if audio_part.format == Some(AudioFormat::Linear16) {
+                audio_part.sample_rate = Some(OPENAI_AUDIO_SAMPLE_RATE);
+                audio_part.channels = Some(OPENAI_AUDIO_CHANNELS);
+            }
         }
         if let Some(transcript) = audio.transcript {
             audio_part.transcript = Some(transcript);

@@ -3,7 +3,7 @@ import type {
   ModelResponse,
   Part,
   PartialModelResponse,
-} from "@hoangvvo/llm-sdk";
+} from "./sdk.ts";
 
 export interface AgentRequest<TContext> {
   /**

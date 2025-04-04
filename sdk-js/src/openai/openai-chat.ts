@@ -682,6 +682,10 @@ function mapOpenAIDelta(
       if (createParams.audio?.format) {
         part.format = mapOpenAIAudioFormat(createParams.audio.format);
       }
+      if (part.format == "linear16") {
+        part.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;
+        part.channels = OPENAI_AUDIO_CHANNELS;
+      }
     }
     if (delta.audio.transcript) {
       part.transcript = delta.audio.transcript;
