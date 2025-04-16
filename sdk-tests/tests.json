@@ -574,7 +574,7 @@
         "content": [
           {
             "type": "audio",
-            "audio_id": true,
+            "id": true,
             "transcript": "Hello"
           }
         ]
@@ -601,7 +601,7 @@
         "content": [
           {
             "type": "audio",
-            "audio_id": true,
+            "id": true,
             "transcript": "Hello"
           }
         ]

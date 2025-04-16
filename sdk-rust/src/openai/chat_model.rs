@@ -443,7 +443,7 @@ impl TryFrom<AudioPart> for openai_api::ChatCompletionAssistantMessageParamAudio
     type Error = LanguageModelError;
 
     fn try_from(part: AudioPart) -> Result<Self, Self::Error> {
-        let id = part.audio_id.ok_or_else(|| {
+        let id = part.id.ok_or_else(|| {
             LanguageModelError::Unsupported(
                 PROVIDER,
                 "Cannot convert audio part to OpenAI assistant message without an ID".to_string(),
@@ -600,7 +600,7 @@ fn map_openai_message(
 
     if let Some(audio) = message.audio {
         let mut audio_part = AudioPart {
-            audio_id: Some(audio.id),
+            id: Some(audio.id),
             format: AudioFormat::from(
                 &create_params
                     .audio
@@ -659,6 +659,7 @@ impl TryFrom<openai_api::ChatCompletionMessageFunctionToolCall> for ToolCallPart
             tool_call_id: value.id,
             tool_name: value.function.name,
             args: args_value,
+            id: None,
         })
     }
 }
@@ -688,7 +689,7 @@ fn map_openai_delta(
     if let Some(audio) = delta.audio {
         let mut audio_part = AudioPartDelta::default();
         if let Some(id) = audio.id {
-            audio_part.audio_id = Some(id);
+            audio_part.id = Some(id);
         }
         if let Some(data) = audio.data {
             audio_part.audio_data = Some(data);

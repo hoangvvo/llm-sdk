@@ -30,6 +30,7 @@ impl ImagePart {
             image_data: image_data.into(),
             width: None,
             height: None,
+            id: None,
         }
     }
 
@@ -44,6 +45,12 @@ impl ImagePart {
         self.height = Some(h);
         self
     }
+
+    #[must_use]
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
 }
 
 impl AudioPart {
@@ -54,7 +61,7 @@ impl AudioPart {
             sample_rate: None,
             channels: None,
             transcript: None,
-            audio_id: None,
+            id: None,
         }
     }
 
@@ -78,7 +85,7 @@ impl AudioPart {
 
     #[must_use]
     pub fn with_audio_id(mut self, audio_id: impl Into<String>) -> Self {
-        self.audio_id = Some(audio_id.into());
+        self.id = Some(audio_id.into());
         self
     }
 }
@@ -93,7 +100,14 @@ impl ToolCallPart {
             tool_call_id: tool_call_id.into(),
             tool_name: tool_name.into(),
             args,
+            id: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 }
 

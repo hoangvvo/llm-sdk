@@ -17,8 +17,8 @@ use crate::{
     LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
     LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta,
     PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
-    ResponseFormatOption, TextPartDelta, Tool, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
-    ToolResultPart, UserMessage,
+    ResponseFormatOption, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
+    ToolMessage, ToolResultPart, UserMessage,
 };
 use async_stream::try_stream;
 use futures::StreamExt;
@@ -358,9 +358,7 @@ fn convert_assistant_message_to_response_input_items(
                 }
                 Part::Reasoning(reasoning_part) => {
                     ResponseInputItem::Reasoning(ResponseReasoningItem {
-                        // Similar to assistant message parts, we generate a unique ID for each
-                        // reasoning part.
-                        id: format!("rs_{}", id_utils::generate_string(15)),
+                        id: reasoning_part.id.unwrap_or_default(),
                         summary: vec![ResponseReasoningItemSummaryUnion::SummaryText(
                             ResponseReasoningItemSummary {
                                 text: reasoning_part.text,
@@ -374,7 +372,7 @@ fn convert_assistant_message_to_response_input_items(
                 }
                 Part::Image(image_part) => {
                     ResponseInputItem::ImageGenerationCall(ResponseOutputItemImageGenerationCall {
-                        id: format!("ig_{}", id_utils::generate_string(15)),
+                        id: image_part.id.unwrap_or_default(),
                         status: "completed".to_string(),
                         result: Some(format!(
                             "data:{};base64,{}",
@@ -399,7 +397,7 @@ fn convert_assistant_message_to_response_input_items(
                         arguments: tool_call_part.args.to_string(),
                         call_id: tool_call_part.tool_call_id,
                         name: tool_call_part.tool_name,
-                        id: None,
+                        id: tool_call_part.id,
                         status: None,
                     })
                 }
@@ -562,16 +560,19 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                 Ok(acc)
             }
             ResponseOutputItem::FunctionCall(function_tool_call) => {
-                let part = Part::tool_call(
-                    function_tool_call.call_id,
-                    function_tool_call.name,
-                    serde_json::from_str(&function_tool_call.arguments).map_err(|e| {
-                        LanguageModelError::Invariant(
-                            PROVIDER,
-                            format!("Failed to parse function tool call arguments: {e}"),
-                        )
-                    })?,
-                );
+                let args = serde_json::from_str(&function_tool_call.arguments).map_err(|e| {
+                    LanguageModelError::Invariant(
+                        PROVIDER,
+                        format!("Failed to parse function tool call arguments: {e}"),
+                    )
+                })?;
+                let mut tool_call_part =
+                    ToolCallPart::new(function_tool_call.call_id, function_tool_call.name, args);
+
+                if let Some(id) = function_tool_call.id {
+                    tool_call_part.id = Some(id);
+                }
+                let part = Part::ToolCall(tool_call_part);
 
                 acc.push(part);
                 Ok(acc)
@@ -593,6 +594,7 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                     width,
                     height,
                     mime_type: format!("image/{}", image_gen_call.output_format),
+                    id: Some(image_gen_call.id),
                 });
 
                 acc.push(part);
@@ -613,6 +615,7 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                 let part = Part::Reasoning(ReasoningPart {
                     text: summary_text,
                     signature: reasoning_item.encrypted_content,
+                    id: Some(reasoning_item.id),
                 });
 
                 acc.push(part);
@@ -637,6 +640,7 @@ fn map_openai_stream_event(
                         args: Some(function_tool_call.arguments),
                         tool_name: Some(function_tool_call.name),
                         tool_call_id: Some(function_tool_call.call_id),
+                        id: function_tool_call.id,
                     });
                     Ok(Some(ContentDelta {
                         index: output_item_added_event.output_index,
@@ -647,7 +651,8 @@ fn map_openai_stream_event(
                     if let Some(encrypted_content) = reasoning_item.encrypted_content {
                         let reasoning_part = PartDelta::Reasoning(ReasoningPartDelta {
                             signature: Some(encrypted_content),
-                            ..Default::default()
+                            text: None,
+                            id: Some(reasoning_item.id),
                         });
                         Ok(Some(ContentDelta {
                             index: output_item_added_event.output_index,
@@ -692,6 +697,7 @@ fn map_openai_stream_event(
                 height,
                 mime_type: Some(format!("image/{}", partial_image_event.output_format)),
                 image_data: Some(partial_image_event.partial_image_b64),
+                id: Some(partial_image_event.item_id),
             });
 
             Ok(Some(ContentDelta {

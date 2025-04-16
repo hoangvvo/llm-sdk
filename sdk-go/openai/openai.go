@@ -376,10 +376,14 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 			})
 
 		case part.ReasoningPart != nil:
+			id := ""
+			if part.ReasoningPart.ID != nil {
+				id = *part.ReasoningPart.ID
+			}
 			inputItems = append(inputItems, openaiapi.ResponseInputItem{
 				ResponseReasoningItem: &openaiapi.ResponseReasoningItem{
 					// Similar to assistant message parts, we generate a unique ID for each reasoning part.
-					ID: fmt.Sprintf("rs_%s", randutil.String(15)),
+					ID: id,
 					Summary: []openaiapi.ResponseReasoningItemSummaryUnion{
 						{
 							ResponseReasoningItemSummary: &openaiapi.ResponseReasoningItemSummary{
@@ -387,16 +391,18 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 							},
 						},
 					},
-					// ReasoningInputItem can not have content
-					Content:          []openaiapi.ResponseReasoningItemContentUnion{},
 					EncryptedContent: part.ReasoningPart.Signature,
 				},
 			})
 
 		case part.ImagePart != nil:
+			id := ""
+			if part.ImagePart.ID != nil {
+				id = *part.ImagePart.ID
+			}
 			inputItems = append(inputItems, openaiapi.ResponseInputItem{
 				ResponseOutputItemImageGenerationCall: &openaiapi.ResponseOutputItemImageGenerationCall{
-					ID:     fmt.Sprintf("ig_%s", randutil.String(15)),
+					ID:     id,
 					Status: "completed",
 					Result: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.ImageData)),
 				},
@@ -409,6 +415,7 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 					Arguments: string(args),
 					CallID:    part.ToolCallPart.ToolCallID,
 					Name:      part.ToolCallPart.ToolName,
+					ID:        part.ToolCallPart.ID,
 				},
 			})
 
@@ -586,11 +593,13 @@ func mapOpenAIOutputItems(items []openaiapi.ResponseOutputItem) ([]llmsdk.Part, 
 				return nil, fmt.Errorf("failed to parse tool arguments: %w", err)
 			}
 
-			parts = append(parts, llmsdk.NewToolCallPart(
+			toolCallPart := llmsdk.NewToolCallPart(
 				item.ResponseFunctionToolCall.CallID,
 				item.ResponseFunctionToolCall.Name,
 				args,
-			))
+			)
+			toolCallPart.ToolCallPart.ID = item.ResponseFunctionToolCall.ID
+			parts = append(parts, toolCallPart)
 
 		case item.ResponseOutputItemImageGenerationCall != nil:
 			responseOutputItemImageGenerationCall := item.ResponseOutputItemImageGenerationCall
@@ -609,6 +618,7 @@ func mapOpenAIOutputItems(items []openaiapi.ResponseOutputItem) ([]llmsdk.Part, 
 					MimeType:  fmt.Sprintf("image/%s", responseOutputItemImageGenerationCall.OutputFormat),
 					Width:     width,
 					Height:    height,
+					ID:        &responseOutputItemImageGenerationCall.ID,
 				},
 			})
 
@@ -624,6 +634,7 @@ func mapOpenAIOutputItems(items []openaiapi.ResponseOutputItem) ([]llmsdk.Part, 
 				ReasoningPart: &llmsdk.ReasoningPart{
 					Text:      summary,
 					Signature: item.ResponseReasoningItem.EncryptedContent,
+					ID:        ptr.To(item.ResponseReasoningItem.ID),
 				},
 			})
 		}
@@ -651,6 +662,7 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 						Args:       ptr.To(item.ResponseFunctionToolCall.Arguments),
 						ToolName:   ptr.To(item.ResponseFunctionToolCall.Name),
 						ToolCallID: ptr.To(item.ResponseFunctionToolCall.CallID),
+						ID:         item.ResponseFunctionToolCall.ID,
 					},
 				},
 			}, nil
@@ -663,6 +675,7 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 					Part: llmsdk.PartDelta{
 						ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
 							Signature: item.ResponseReasoningItem.EncryptedContent,
+							ID:        ptr.To(item.ResponseReasoningItem.ID),
 						},
 					},
 				}, nil
@@ -695,23 +708,26 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 	case event.ResponseImageGenCallPartialImageEvent != nil:
 		var width, height *int
 
-		if event.ResponseImageGenCallPartialImageEvent.Size != "" {
-			width, height = parseOpenAIImageSize(event.ResponseImageGenCallPartialImageEvent.Size)
+		responseImageGenCallPartialImageEvent := event.ResponseImageGenCallPartialImageEvent
+
+		if responseImageGenCallPartialImageEvent.Size != "" {
+			width, height = parseOpenAIImageSize(responseImageGenCallPartialImageEvent.Size)
 		}
 
 		var mimeType *string
-		if event.ResponseImageGenCallPartialImageEvent.OutputFormat != "" {
-			mimeType = ptr.To(fmt.Sprintf("image/%s", event.ResponseImageGenCallPartialImageEvent.OutputFormat))
+		if responseImageGenCallPartialImageEvent.OutputFormat != "" {
+			mimeType = ptr.To(fmt.Sprintf("image/%s", responseImageGenCallPartialImageEvent.OutputFormat))
 		}
 
 		return &llmsdk.ContentDelta{
-			Index: event.ResponseImageGenCallPartialImageEvent.OutputIndex,
+			Index: responseImageGenCallPartialImageEvent.OutputIndex,
 			Part: llmsdk.PartDelta{
 				ImagePartDelta: &llmsdk.ImagePartDelta{
-					ImageData: ptr.To(event.ResponseImageGenCallPartialImageEvent.PartialImageB64),
+					ImageData: ptr.To(responseImageGenCallPartialImageEvent.PartialImageB64),
 					MimeType:  mimeType,
 					Width:     width,
 					Height:    height,
+					ID:        &responseImageGenCallPartialImageEvent.ItemID,
 				},
 			},
 		}, nil

@@ -93,7 +93,7 @@ impl AudioPartAssertion {
                 if audio_part.audio_data.is_empty() {
                     return false; // Audio data must be present
                 }
-                if self.audio_id && audio_part.audio_id.is_none() {
+                if self.audio_id && audio_part.id.is_none() {
                     return false; // Audio ID must be present if required
                 }
                 if let Some(transcript) = &self.transcript {

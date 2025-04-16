@@ -103,23 +103,26 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             mime_type: Some(image_part.mime_type),
             width: image_part.width,
             height: image_part.height,
+            id: image_part.id,
         }),
         Part::Audio(audio_part) => PartDelta::Audio(AudioPartDelta {
             audio_data: Some(audio_part.audio_data),
             format: Some(audio_part.format),
             sample_rate: audio_part.sample_rate,
             channels: audio_part.channels,
-            audio_id: audio_part.audio_id,
+            id: audio_part.id,
             transcript: audio_part.transcript,
         }),
         Part::ToolCall(tool_call_part) => PartDelta::ToolCall(ToolCallPartDelta {
             tool_name: Some(tool_call_part.tool_name),
             args: Some(tool_call_part.args.to_string()),
             tool_call_id: Some(tool_call_part.tool_call_id),
+            id: tool_call_part.id,
         }),
         Part::Reasoning(reasoning_part) => PartDelta::Reasoning(ReasoningPartDelta {
             text: Some(reasoning_part.text),
             signature: reasoning_part.signature,
+            id: reasoning_part.id,
         }),
         _ => Err(LanguageModelError::Invariant(
             "",

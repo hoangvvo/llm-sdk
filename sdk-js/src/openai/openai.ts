@@ -288,8 +288,7 @@ function convertAssistantMessageToResponseInputItems(
       case "reasoning":
         return {
           type: "reasoning",
-          // Similar to assistant message parts, we generate a unique ID for each reasoning part.
-          id: `rs_${genidForMessageId()}`,
+          id: part.id ?? "",
           summary: [
             {
               type: "summary_text",
@@ -304,7 +303,7 @@ function convertAssistantMessageToResponseInputItems(
         };
       case "image":
         return {
-          id: `ig_${genidForMessageId()}`,
+          id: part.id ?? "",
           type: "image_generation_call",
           status: "completed",
           result: `data:${part.mime_type};base64,${part.image_data}`,
@@ -315,6 +314,7 @@ function convertAssistantMessageToResponseInputItems(
           call_id: part.tool_call_id,
           name: part.tool_name,
           arguments: JSON.stringify(part.args),
+          ...(part.id && { id: part.id }),
         };
       default:
         throw new UnsupportedError(
@@ -491,6 +491,7 @@ function mapOpenAIOutputItems(
               args: JSON.parse(item.arguments) as Record<string, unknown>,
               tool_call_id: item.call_id,
               tool_name: item.name,
+              ...(item.id && { id: item.id }),
             },
           ];
         }
@@ -517,6 +518,7 @@ function mapOpenAIOutputItems(
               mime_type: `image/${patchedItem.output_format}`,
               ...(width && { width }),
               ...(height && { height }),
+              ...(item.id && { id: item.id }),
             },
           ];
         }
@@ -526,6 +528,7 @@ function mapOpenAIOutputItems(
             {
               type: "reasoning",
               text: summary,
+              id: item.id,
               ...(item.encrypted_content && {
                 signature: item.encrypted_content,
               }),
@@ -567,6 +570,7 @@ function mapOpenAIStreamEvent(
           args: event.item.arguments,
           tool_name: event.item.name,
           tool_call_id: event.item.call_id,
+          ...(event.item.id && { id: event.item.id }),
         };
         const index = event.output_index;
         return {
@@ -580,6 +584,7 @@ function mapOpenAIStreamEvent(
           const part: ReasoningPartDelta = {
             type: "reasoning",
             text: "",
+            id: event.item.id,
             signature: event.item.encrypted_content,
           };
 
@@ -636,6 +641,7 @@ function mapOpenAIStreamEvent(
         }),
         ...(width && { width }),
         ...(height && { height }),
+        ...(patchedEvent.item_id && { id: patchedEvent.item_id }),
       };
 
       const index = event.output_index;

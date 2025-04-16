@@ -25,7 +25,7 @@ export interface ToolCallPartAssertion {
 
 export interface AudioPartAssertion {
   type: "audio";
-  audio_id?: boolean;
+  id?: boolean;
   transcript?: RegExp | undefined;
 }
 
@@ -110,7 +110,7 @@ export function assertAudioPart(
     if (!part.audio_data) {
       return false;
     }
-    if (assertion.audio_id && !part.audio_id) {
+    if (assertion.id && !part.id) {
       return false;
     }
     if (assertion.transcript && !assertion.transcript.test(part.transcript!)) {

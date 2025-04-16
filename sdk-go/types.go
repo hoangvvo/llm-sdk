@@ -78,6 +78,8 @@ type ImagePart struct {
 	Width *int `json:"width,omitempty"`
 	// The height of the image in pixels.
 	Height *int `json:"height,omitempty"`
+	// ID of the image part, if applicable
+	ID *string `json:"id,omitempty"`
 }
 
 // AudioPart represents a part of the message that contains an audio.
@@ -92,7 +94,7 @@ type AudioPart struct {
 	// The transcript of the audio.
 	Transcript *string `json:"transcript,omitempty"`
 	// The ID of the part, if applicable.
-	AudioID *string `json:"audio_id,omitempty"`
+	ID *string `json:"id,omitempty"`
 }
 
 // SourcePart represents a part of the message that contains a source with structured content.
@@ -112,6 +114,9 @@ type ToolCallPart struct {
 	ToolName string `json:"tool_name"`
 	// The arguments to pass to the tool.
 	Args json.RawMessage `json:"args"`
+	// The ID of the part, if applicable.
+	// This is different from ToolCallID which is used to match tool results.
+	ID *string `json:"id,omitempty"`
 }
 
 // ToolResultPart represents a part of the message that represents the result of a tool call.
@@ -132,6 +137,8 @@ type ReasoningPart struct {
 	Text string `json:"text"`
 	//  The reasoning internal signature
 	Signature *string `json:"signature,omitempty"`
+	// The ID of the reasoning part, if applicable.
+	ID *string `json:"id,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Part
@@ -280,6 +287,7 @@ type ToolCallPartDelta struct {
 	ToolCallID *string `json:"tool_call_id,omitempty"`
 	ToolName   *string `json:"tool_name,omitempty"`
 	Args       *string `json:"args,omitempty"`
+	ID         *string `json:"id,omitempty"`
 }
 
 // ImagePartDelta represents a delta update for an image part, used in streaming of an image message.
@@ -292,6 +300,8 @@ type ImagePartDelta struct {
 	Width *int `json:"width,omitempty"`
 	// Height is the height of the image in pixels.
 	Height *int `json:"height,omitempty"`
+	// ID of the image part, if applicable
+	ID *string `json:"id,omitempty"`
 }
 
 // AudioPartDelta represents a delta update for an audio part, used in streaming of an audio message.
@@ -301,13 +311,14 @@ type AudioPartDelta struct {
 	SampleRate *int         `json:"sample_rate,omitempty"`
 	Channels   *int         `json:"channels,omitempty"`
 	Transcript *string      `json:"transcript,omitempty"`
-	AudioID    *string      `json:"audio_id,omitempty"`
+	ID         *string      `json:"id,omitempty"`
 }
 
 // ReasoningPartDelta represents a delta update for a reasoning part, used in streaming of reasoning messages.
 type ReasoningPartDelta struct {
 	Text      string  `json:"text,omitempty"`
 	Signature *string `json:"signature,omitempty"`
+	ID        *string `json:"id,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for PartDelta

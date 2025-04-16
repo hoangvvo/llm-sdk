@@ -14,7 +14,8 @@
         { "$ref": "#/definitions/AudioPart" },
         { "$ref": "#/definitions/SourcePart" },
         { "$ref": "#/definitions/ToolCallPart" },
-        { "$ref": "#/definitions/ToolResultPart" }
+        { "$ref": "#/definitions/ToolResultPart" },
+        { "$ref": "#/definitions/ReasoningPart" }
       ]
     },
     "PartDelta": {
@@ -23,7 +24,8 @@
         { "$ref": "#/definitions/TextPartDelta" },
         { "$ref": "#/definitions/ToolCallPartDelta" },
         { "$ref": "#/definitions/ImagePartDelta" },
-        { "$ref": "#/definitions/AudioPartDelta" }
+        { "$ref": "#/definitions/AudioPartDelta" },
+        { "$ref": "#/definitions/ReasoningPartDelta" }
       ]
     },
     "Message": {
@@ -133,9 +135,9 @@
           "type": "string",
           "description": "The transcript of the audio."
         },
-        "audio_id": {
+        "id": {
           "type": "string",
-          "description": "Audio ID, if applicable."
+          "description": "ID of the audio part, if applicable"
         }
       },
       "required": ["type", "audio_data", "format"],
@@ -176,6 +178,10 @@
           "type": "object",
           "description": "The arguments to pass to the tool.",
           "additionalProperties": true
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the tool call part, if applicable. This is different from tool_call_id which is used to match tool results."
         }
       },
       "required": ["type", "tool_call_id", "tool_name", "args"],
@@ -205,6 +211,27 @@
         }
       },
       "required": ["type", "tool_call_id", "tool_name", "content"],
+      "additionalProperties": false
+    },
+    "ReasoningPart": {
+      "type": "object",
+      "description": "A part of the message that represents the model reasoning.",
+      "properties": {
+        "type": { "const": "reasoning" },
+        "text": {
+          "type": "string",
+          "description": "The reasoning text content"
+        },
+        "signature": {
+          "type": "string",
+          "description": "The reasoning internal signature"
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the reasoning part, if applicable"
+        }
+      },
+      "required": ["type", "text"],
       "additionalProperties": false
     },
     "Citation": {
@@ -264,7 +291,7 @@
         "role": { "const": "tool" },
         "content": {
           "type": "array",
-          "items": { "$ref": "#/definitions/ToolResultPart" }
+          "items": { "$ref": "#/definitions/Part" }
         }
       },
       "required": ["role", "content"],
@@ -296,6 +323,10 @@
         "args": {
           "type": "string",
           "description": "The partial JSON string of the arguments to pass to the tool."
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the tool call part, if applicable. This is different from tool_call_id which is used to match tool results."
         }
       },
       "required": ["type"],
@@ -351,12 +382,33 @@
           "type": "string",
           "description": "The transcript of the audio."
         },
-        "audio_id": {
+        "id": {
           "type": "string",
-          "description": "The audio ID, if applicable."
+          "description": "The ID of the audio part, if applicable"
         }
       },
       "required": ["type"],
+      "additionalProperties": false
+    },
+    "ReasoningPartDelta": {
+      "type": "object",
+      "description": "A delta update for a reasoning part, used in streaming of reasoning messages.",
+      "properties": {
+        "type": { "const": "reasoning" },
+        "text": {
+          "type": "string",
+          "description": "The reasoning text content"
+        },
+        "signature": {
+          "type": "string",
+          "description": "The reasoning internal signature"
+        },
+        "id": {
+          "type": "string",
+          "description": "The ID of the reasoning part, if applicable"
+        }
+      },
+      "required": ["type", "text"],
       "additionalProperties": false
     },
     "ContentDelta": {
@@ -399,19 +451,6 @@
         }
       },
       "required": ["name", "description", "parameters"],
-      "additionalProperties": false
-    },
-    "ToolMessageOnlyResult": {
-      "type": "object",
-      "description": "Represents tool result in the message history.\nOnly ToolResultPart should be included in the content.",
-      "properties": {
-        "role": { "const": "tool" },
-        "content": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/ToolResultPart" }
-        }
-      },
-      "required": ["role", "content"],
       "additionalProperties": false
     },
     "ModelTokensDetails": {
@@ -537,7 +576,7 @@
       "properties": {
         "format": {
           "$ref": "#/definitions/AudioFormat",
-          "description": "The desired audio format for generation."
+          "description": "The desired audio format."
         },
         "voice": {
           "type": "string",
@@ -556,11 +595,11 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Whether to enable reasoning generation."
+          "description": "Whether to enable reasoning output."
         },
         "budget_tokens": {
           "type": "number",
-          "description": "The maximum number of tokens to use for reasoning."
+          "description": "Specify the budget tokens for reasoning generation."
         }
       },
       "required": ["enabled"],

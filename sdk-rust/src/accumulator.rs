@@ -18,6 +18,7 @@ struct AccumulatedToolCallData {
     tool_name: String,
     tool_call_id: Option<String>,
     args: String,
+    id: Option<String>,
 }
 
 /// Internal representation of accumulated image data
@@ -27,6 +28,7 @@ struct AccumulatedImageData {
     mime_type: Option<String>,
     width: Option<u32>,
     height: Option<u32>,
+    id: Option<String>,
 }
 
 /// Internal representation of accumulated audio data
@@ -37,7 +39,7 @@ struct AccumulatedAudioData {
     sample_rate: Option<u32>,
     channels: Option<u32>,
     transcript: String,
-    audio_id: Option<String>,
+    id: Option<String>,
 }
 
 /// Internal representation of accumulated reasoning data
@@ -45,6 +47,7 @@ struct AccumulatedAudioData {
 struct AccumulatedReasoningData {
     text: String,
     signature: Option<String>,
+    id: Option<String>,
 }
 
 /// Represents accumulated data for different part types
@@ -67,12 +70,14 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             tool_name: tool_delta.tool_name.unwrap_or_default(),
             tool_call_id: tool_delta.tool_call_id,
             args: tool_delta.args.unwrap_or_default(),
+            id: tool_delta.id,
         }),
         PartDelta::Image(image_delta) => AccumulatedData::Image(AccumulatedImageData {
             image_data: image_delta.image_data.unwrap_or_default(),
             mime_type: image_delta.mime_type,
             width: image_delta.width,
             height: image_delta.height,
+            id: image_delta.id,
         }),
         PartDelta::Audio(audio_delta) => AccumulatedData::Audio(AccumulatedAudioData {
             audio_data_chunks: audio_delta
@@ -83,12 +88,13 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             sample_rate: audio_delta.sample_rate,
             channels: audio_delta.channels,
             transcript: audio_delta.transcript.unwrap_or_default(),
-            audio_id: audio_delta.audio_id,
+            id: audio_delta.id,
         }),
         PartDelta::Reasoning(reasoning_delta) => {
             AccumulatedData::Reasoning(AccumulatedReasoningData {
                 text: reasoning_delta.text.unwrap_or_default(),
                 signature: reasoning_delta.signature,
+                id: reasoning_delta.id,
             })
         }
     }
@@ -110,6 +116,9 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             if let Some(args) = tool_delta.args {
                 existing_tool.args.push_str(&args);
             }
+            if tool_delta.id.is_some() {
+                existing_tool.id = tool_delta.id;
+            }
         }
         (AccumulatedData::Image(ref mut existing_image), PartDelta::Image(image_delta)) => {
             if let Some(image_data) = image_delta.image_data {
@@ -123,6 +132,9 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             }
             if image_delta.height.is_some() {
                 existing_image.height = image_delta.height;
+            }
+            if image_delta.id.is_some() {
+                existing_image.id = image_delta.id;
             }
         }
         (AccumulatedData::Audio(ref mut existing_audio), PartDelta::Audio(audio_delta)) => {
@@ -141,8 +153,8 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             if let Some(transcript) = audio_delta.transcript {
                 existing_audio.transcript.push_str(&transcript);
             }
-            if audio_delta.audio_id.is_some() {
-                existing_audio.audio_id = audio_delta.audio_id;
+            if audio_delta.id.is_some() {
+                existing_audio.id = audio_delta.id;
             }
         }
         (
@@ -154,6 +166,9 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             }
             if reasoning_delta.signature.is_some() {
                 existing_reasoning.signature = reasoning_delta.signature;
+            }
+            if reasoning_delta.id.is_some() {
+                existing_reasoning.id = reasoning_delta.id;
             }
         }
         _ => Err(format!(
@@ -201,6 +216,7 @@ fn create_tool_call_part(data: AccumulatedToolCallData, index: usize) -> Languag
         tool_call_id,
         tool_name: data.tool_name,
         args: parse_tool_call_args(&data.args)?,
+        id: data.id,
     }))
 }
 
@@ -225,6 +241,7 @@ fn create_image_part(data: AccumulatedImageData, index: usize) -> LanguageModelR
         mime_type,
         width: data.width,
         height: data.height,
+        id: data.id,
     }))
 }
 
@@ -258,7 +275,7 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
         } else {
             Some(data.transcript)
         },
-        audio_id: data.audio_id,
+        id: data.id,
     }))
 }
 
@@ -266,6 +283,7 @@ fn create_reasoning_part(data: AccumulatedReasoningData) -> Part {
     Part::Reasoning(ReasoningPart {
         text: data.text,
         signature: data.signature,
+        id: data.id,
     })
 }
 

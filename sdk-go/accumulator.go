@@ -16,6 +16,7 @@ type AccumulatedToolCallData struct {
 	ToolName   string
 	ToolCallID *string
 	Args       string
+	ID         *string
 }
 
 // AccumulatedImageData represents accumulated image data
@@ -24,6 +25,7 @@ type AccumulatedImageData struct {
 	ImageData string
 	Width     *int
 	Height    *int
+	ID        *string
 }
 
 // AccumulatedAudioData represents accumulated audio data
@@ -33,12 +35,13 @@ type AccumulatedAudioData struct {
 	SampleRate      *int
 	Channels        *int
 	Transcript      string
-	AudioID         *string
+	ID              *string
 }
 
 type AccumulatedReasoningData struct {
 	Text      string
 	Signature *string
+	ID        *string
 }
 
 // AccumulatedData represents accumulated data for different part types
@@ -86,6 +89,7 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 			ToolName:   toolName,
 			ToolCallID: delta.Part.ToolCallPartDelta.ToolCallID,
 			Args:       args,
+			ID:         delta.Part.ToolCallPartDelta.ID,
 		}
 	case delta.Part.ImagePartDelta != nil:
 		imageData := ""
@@ -97,6 +101,7 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 			Width:     delta.Part.ImagePartDelta.Width,
 			Height:    delta.Part.ImagePartDelta.Height,
 			MimeType:  delta.Part.ImagePartDelta.MimeType,
+			ID:        delta.Part.ImagePartDelta.ID,
 		}
 	case delta.Part.AudioPartDelta != nil:
 		var audioDataChunks []string
@@ -113,12 +118,13 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 			SampleRate:      delta.Part.AudioPartDelta.SampleRate,
 			Channels:        delta.Part.AudioPartDelta.Channels,
 			Transcript:      transcript,
-			AudioID:         delta.Part.AudioPartDelta.AudioID,
+			ID:              delta.Part.AudioPartDelta.ID,
 		}
 	case delta.Part.ReasoningPartDelta != nil:
 		return &AccumulatedReasoningData{
 			Text:      delta.Part.ReasoningPartDelta.Text,
 			Signature: delta.Part.ReasoningPartDelta.Signature,
+			ID:        delta.Part.ReasoningPartDelta.ID,
 		}
 	default:
 		return nil
@@ -148,6 +154,9 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 		if toolCallPartDelta.Args != nil {
 			existingData.Args += *toolCallPartDelta.Args
 		}
+		if toolCallPartDelta.ID != nil {
+			existingData.ID = toolCallPartDelta.ID
+		}
 	case *AccumulatedImageData:
 		imagePartDelta := delta.Part.ImagePartDelta
 		if imagePartDelta == nil {
@@ -164,6 +173,9 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 		}
 		if imagePartDelta.MimeType != nil {
 			existingData.MimeType = imagePartDelta.MimeType
+		}
+		if imagePartDelta.ID != nil {
+			existingData.ID = imagePartDelta.ID
 		}
 
 	case *AccumulatedAudioData:
@@ -186,8 +198,8 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 		if audioPartDelta.Transcript != nil {
 			existingData.Transcript += *audioPartDelta.Transcript
 		}
-		if audioPartDelta.AudioID != nil {
-			existingData.AudioID = audioPartDelta.AudioID
+		if audioPartDelta.ID != nil {
+			existingData.ID = audioPartDelta.ID
 		}
 
 	case *AccumulatedReasoningData:
@@ -198,6 +210,9 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 		existingData.Text += reasoningPartDelta.Text
 		if reasoningPartDelta.Signature != nil {
 			existingData.Signature = reasoningPartDelta.Signature
+		}
+		if reasoningPartDelta.ID != nil {
+			existingData.ID = reasoningPartDelta.ID
 		}
 	default:
 		return fmt.Errorf("unknown accumulated data type at index %d", delta.Index)
@@ -237,7 +252,9 @@ func createToolCallPart(data *AccumulatedToolCallData, index int) (Part, error) 
 		return Part{}, err
 	}
 
-	return NewToolCallPart(*data.ToolCallID, data.ToolName, args), nil
+	toolCallPart := NewToolCallPart(*data.ToolCallID, data.ToolName, args)
+	toolCallPart.ToolCallPart.ID = data.ID
+	return toolCallPart, nil
 }
 
 // createImagePart creates an image part from accumulated image data
@@ -252,6 +269,7 @@ func createImagePart(data *AccumulatedImageData, index int) (Part, error) {
 			Width:     data.Width,
 			Height:    data.Height,
 			MimeType:  *data.MimeType,
+			ID:        data.ID,
 		},
 	}, nil
 }
@@ -283,7 +301,7 @@ func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 			SampleRate: data.SampleRate,
 			Channels:   data.Channels,
 			Transcript: transcript,
-			AudioID:    data.AudioID,
+			ID:         data.ID,
 		},
 	}, nil
 }
@@ -294,6 +312,7 @@ func createReasoningPart(data *AccumulatedReasoningData) Part {
 		ReasoningPart: &ReasoningPart{
 			Text:      data.Text,
 			Signature: data.Signature,
+			ID:        data.ID,
 		},
 	}
 }

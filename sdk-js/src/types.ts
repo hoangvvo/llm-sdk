@@ -98,6 +98,10 @@ export interface ImagePart {
    * The height of the image in pixels.
    */
   height?: number;
+  /**
+   * ID of the image part, if applicable
+   */
+  id?: string;
 }
 /**
  * A part of the message that contains an audio.
@@ -122,9 +126,9 @@ export interface AudioPart {
    */
   transcript?: string;
   /**
-   * Audio ID, if applicable.
+   * ID of the audio part, if applicable
    */
-  audio_id?: string;
+  id?: string;
 }
 /**
  * A part of the message that contains a source with structured content.
@@ -158,6 +162,11 @@ export interface ToolCallPart {
    * The arguments to pass to the tool.
    */
   args: Record<string, unknown>;
+  /**
+   * The ID of the tool call part, if applicable.
+   * This is different from tool_call_id which is used to match tool results.
+   */
+  id?: string;
 }
 /**
  * A part of the message that represents the result of a tool call.
@@ -194,6 +203,10 @@ export interface ReasoningPart {
    * The reasoning internal signature
    */
   signature?: string;
+  /**
+   * The ID of the reasoning part, if applicable
+   */
+  id?: string;
 }
 
 /**
@@ -252,6 +265,11 @@ export interface ToolCallPartDelta {
    * The partial JSON string of the arguments to pass to the tool.
    */
   args?: string;
+  /**
+   * The ID of the tool call part, if applicable.
+   * This is different from tool_call_id which is used to match tool results.
+   */
+  id?: string;
 }
 /**
  * A delta update for an image part, used in streaming of an image message.
@@ -274,6 +292,10 @@ export interface ImagePartDelta {
    * The height of the image in pixels.
    */
   height?: number;
+  /**
+   * ID of the image part, if applicable
+   */
+  id?: string;
 }
 /**
  * A delta update for an audio part, used in streaming of an audio message.
@@ -298,9 +320,9 @@ export interface AudioPartDelta {
    */
   transcript?: string;
   /**
-   * The audio ID, if applicable.
+   * The ID of the audio part, if applicable
    */
-  audio_id?: string;
+  id?: string;
 }
 /**
  * A delta update for a reasoning part, used in streaming of reasoning messages.
@@ -315,6 +337,10 @@ export interface ReasoningPartDelta {
    * The reasoning internal signature
    */
   signature?: string;
+  /**
+   * The ID of the reasoning part, if applicable
+   */
+  id?: string;
 }
 /**
  * Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.

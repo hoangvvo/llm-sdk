@@ -28,7 +28,7 @@ interface AccumulatedAudioData {
   sampleRate?: number;
   channels?: number;
   transcript?: string;
-  audio_id?: string;
+  id?: string;
 }
 
 type AccumulatedData =
@@ -57,6 +57,7 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
           tool_call_id: delta.part.tool_call_id,
         }),
         args: delta.part.args ?? "",
+        ...(delta.part.id && { id: delta.part.id }),
       };
 
     case "image":
@@ -70,6 +71,7 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
         ...(typeof delta.part.height === "number" && {
           height: delta.part.height,
         }),
+        ...(delta.part.id && { id: delta.part.id }),
       };
 
     case "audio":
@@ -86,7 +88,7 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
         ...(delta.part.transcript && {
           transcript: delta.part.transcript,
         }),
-        ...(delta.part.audio_id && { audio_id: delta.part.audio_id }),
+        ...(delta.part.id && { id: delta.part.id }),
       };
 
     case "reasoning":
@@ -126,6 +128,9 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
       if (delta.part.args) {
         existingPart.args = (existingPart.args ?? "") + delta.part.args;
       }
+      if (delta.part.id) {
+        existingPart.id = delta.part.id;
+      }
       break;
     }
 
@@ -143,6 +148,9 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
       }
       if (typeof delta.part.height === "number") {
         existingPart.height = delta.part.height;
+      }
+      if (delta.part.id) {
+        existingPart.id = delta.part.id;
       }
       break;
     }
@@ -165,8 +173,8 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
         existingPart.transcript = existingPart.transcript ?? "";
         existingPart.transcript += delta.part.transcript;
       }
-      if (delta.part.audio_id) {
-        existingPart.audio_id = delta.part.audio_id;
+      if (delta.part.id) {
+        existingPart.id = delta.part.id;
       }
       break;
     }
@@ -178,6 +186,10 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
       if (delta.part.signature) {
         existingPart.signature = delta.part.signature;
       }
+      if (delta.part.id) {
+        existingPart.id = delta.part.id;
+      }
+      break;
     }
   }
 }
@@ -209,6 +221,7 @@ function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
       tool_call_id: data.tool_call_id,
       tool_name: data.tool_name,
       args: JSON.parse(data.args ?? "{}") as Record<string, unknown>,
+      ...(data.id && { id: data.id }),
     };
   } catch (e) {
     throw new InvariantError(
@@ -232,6 +245,7 @@ function createImagePart(data: ImagePartDelta, index: number): Part {
     mime_type: data.mime_type,
     ...(data.width && { width: data.width }),
     ...(data.height && { height: data.height }),
+    ...(data.id && { id: data.id }),
   };
 }
 
@@ -257,7 +271,7 @@ function createAudioPart(data: AccumulatedAudioData): Part {
     ...(data.sampleRate && { sample_rate: data.sampleRate }),
     ...(data.channels && { channels: data.channels }),
     ...(data.transcript && { transcript: data.transcript }),
-    ...(data.audio_id && { audio_id: data.audio_id }),
+    ...(data.id && { id: data.id }),
   };
 }
 
@@ -269,6 +283,7 @@ function createReasoningPart(data: ReasoningPartDelta): Part {
     type: "reasoning",
     text: data.text,
     ...(data.signature && { signature: data.signature }),
+    ...(data.id && { id: data.id }),
   };
 }
 

@@ -490,6 +490,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                     Some(Ok(Part::Reasoning(ReasoningPart {
                         text,
                         signature: part.thought_signature,
+                        id: None,
                     })))
                 } else {
                     Some(Ok(Part::Text(crate::TextPart { text })))
@@ -502,6 +503,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                             mime_type,
                             width: None,
                             height: None,
+                            id: None,
                         })))
                     } else if mime_type.starts_with("audio/") {
                         if let Ok(format) = audio_utils::map_mime_type_to_audio_format(&mime_type) {
@@ -510,7 +512,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                                 format,
                                 sample_rate: None,
                                 channels: None,
-                                audio_id: None,
+                                id: None,
                                 transcript: None,
                             })))
                         } else {
@@ -537,6 +539,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                             .unwrap_or_else(|| id_utils::generate_string(10)),
                         tool_name: name.clone(),
                         args: json!(function_call.args.unwrap_or_default()),
+                        id: None,
                     })))
                 } else {
                     Some(Err(LanguageModelError::Invariant(

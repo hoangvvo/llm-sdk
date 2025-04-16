@@ -105,6 +105,7 @@ func LooselyConvertPartToPartDelta(part Part) PartDelta {
 				ToolCallID: &part.ToolCallPart.ToolCallID,
 				ToolName:   &part.ToolCallPart.ToolName,
 				Args:       &argsStr,
+				ID:         part.ToolCallPart.ID,
 			},
 		}
 	case part.ReasoningPart != nil:
@@ -112,6 +113,7 @@ func LooselyConvertPartToPartDelta(part Part) PartDelta {
 			ReasoningPartDelta: &ReasoningPartDelta{
 				Text:      part.ReasoningPart.Text,
 				Signature: part.ReasoningPart.Signature,
+				ID:        part.ReasoningPart.ID,
 			},
 		}
 	case part.ImagePart != nil:
@@ -121,6 +123,7 @@ func LooselyConvertPartToPartDelta(part Part) PartDelta {
 				ImageData: &part.ImagePart.ImageData,
 				Width:     part.ImagePart.Width,
 				Height:    part.ImagePart.Height,
+				ID:        part.ImagePart.ID,
 			},
 		}
 	case part.AudioPart != nil:
@@ -131,7 +134,7 @@ func LooselyConvertPartToPartDelta(part Part) PartDelta {
 				SampleRate: part.AudioPart.SampleRate,
 				Channels:   part.AudioPart.Channels,
 				Transcript: part.AudioPart.Transcript,
-				AudioID:    part.AudioPart.AudioID,
+				ID:         part.AudioPart.ID,
 			},
 		}
 	default:

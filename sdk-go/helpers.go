@@ -81,7 +81,7 @@ func WithAudioTranscript(transcript string) AudioPartOption {
 
 func WithAudioID(audioID string) AudioPartOption {
 	return func(p *AudioPart) {
-		p.AudioID = &audioID
+		p.ID = &audioID
 	}
 }
 
@@ -107,6 +107,12 @@ func WithReasoningSignature(signature string) ReasoingPartOption {
 	}
 }
 
+func WithReasoningID(id string) ReasoingPartOption {
+	return func(p *ReasoningPart) {
+		p.ID = &id
+	}
+}
+
 // NewSourcePart creates a new source part
 func NewSourcePart(title string, content []Part) Part {
 	return Part{
@@ -118,16 +124,30 @@ func NewSourcePart(title string, content []Part) Part {
 }
 
 // NewToolCallPart creates a new tool call part
-func NewToolCallPart(toolCallID, toolName string, args any) Part {
+func NewToolCallPart(toolCallID, toolName string, args any, opts ...ToolCallPartOption) Part {
 	// TODO: handle error
 	argsJSON, _ := json.Marshal(args)
 
-	return Part{
+	toolCallPart := Part{
 		ToolCallPart: &ToolCallPart{
 			ToolCallID: toolCallID,
 			ToolName:   toolName,
 			Args:       argsJSON,
 		},
+	}
+
+	for _, opt := range opts {
+		opt(toolCallPart.ToolCallPart)
+	}
+
+	return toolCallPart
+}
+
+type ToolCallPartOption func(*ToolCallPart)
+
+func WithToolCallPartID(id string) ToolCallPartOption {
+	return func(p *ToolCallPart) {
+		p.ID = &id
 	}
 }
 

@@ -85,12 +85,14 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
         ...(typeof part.args === "object" && {
           args: JSON.stringify(part.args),
         }),
+        ...(part.id && { id: part.id }),
       };
     case "reasoning":
       return {
         type: "reasoning",
         text: part.text,
         ...(part.signature && { signature: part.signature }),
+        ...(part.id && { id: part.id }),
       };
     case "image":
       return part;

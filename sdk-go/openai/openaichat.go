@@ -393,9 +393,9 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 					assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, toolCall)
 
 				case part.AudioPart != nil:
-					if part.AudioPart.AudioID != nil {
+					if part.AudioPart.ID != nil {
 						assistantMsg.Audio = &openaiapi.ChatCompletionAssistantMessageParamAudio{
-							ID: *part.AudioPart.AudioID,
+							ID: *part.AudioPart.ID,
 						}
 					}
 				}
@@ -691,7 +691,7 @@ func (m *OpenAIChatModel) mapOpenAIDelta(delta openaiapi.ChatCompletionChunkChoi
 		audioDelta := llmsdk.AudioPartDelta{}
 
 		if delta.Audio.ID != nil {
-			audioDelta.AudioID = delta.Audio.ID
+			audioDelta.ID = delta.Audio.ID
 		}
 		if delta.Audio.Data != nil {
 			audioDelta.AudioData = delta.Audio.Data

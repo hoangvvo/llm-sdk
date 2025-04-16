@@ -86,7 +86,7 @@ func (a AudioPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 				t.Errorf("Audio data must be present")
 				return
 			}
-			if a.AudioID && (part.AudioPart.AudioID == nil || *part.AudioPart.AudioID == "") {
+			if a.AudioID && (part.AudioPart.ID == nil || *part.AudioPart.ID == "") {
 				t.Errorf("Expected audio ID to be present")
 				return
 			}

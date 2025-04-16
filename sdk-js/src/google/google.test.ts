@@ -90,7 +90,7 @@ suite("GoogleModel", () => {
       customOutputContent: (content) =>
         content.map((part) => {
           if (part.type === "audio") {
-            return { ...part, audio_id: false, transcript: undefined };
+            return { ...part, id: false, transcript: undefined };
           }
           return part;
         }),
@@ -109,7 +109,7 @@ suite("GoogleModel", () => {
       customOutputContent: (content) =>
         content.map((part) => {
           if (part.type === "audio") {
-            return { ...part, audio_id: false, transcript: undefined };
+            return { ...part, id: false, transcript: undefined };
           }
           return part;
         }),

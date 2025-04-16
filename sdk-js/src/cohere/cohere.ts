@@ -507,7 +507,7 @@ function mapCohereResponseContentItem(
     case "thinking": {
       return {
         type: "reasoning",
-        text: (content as unknown as { thinking: string }).thinking,
+        text: content.thinking,
       };
     }
   }

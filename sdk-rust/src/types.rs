@@ -135,6 +135,9 @@ pub struct ImagePart {
     /// The height of the image in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// The ID of the image part, if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 /// A part of the message that contains an audio.
@@ -154,9 +157,9 @@ pub struct AudioPart {
     /// The transcript of the audio.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript: Option<String>,
-    /// The Audio ID, if applicable.
+    /// The ID of the audio part, if applicable
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audio_id: Option<String>,
+    pub id: Option<String>,
 }
 
 /// A part of the message that contains a source with structured content.
@@ -182,6 +185,10 @@ pub struct ToolCallPart {
     pub tool_name: String,
     /// The arguments to pass to the tool.
     pub args: Value,
+    /// The ID of the tool call, if applicable
+    /// This is different from `tool_call_id`, which is the ID used to match the tool result with the tool call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 /// A part of the message that represents the result of a tool call.
@@ -208,6 +215,9 @@ pub struct ReasoningPart {
     /// The reasoning internal signature
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,
+    /// The ID of the reasoning part, if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 /// Represents a message sent by the user.
@@ -246,6 +256,10 @@ pub struct ToolCallPartDelta {
     /// The partial JSON string of the arguments to pass to the tool.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
+    /// The ID of the tool call, if applicable
+    /// This is different from `tool_call_id`, which is the ID used to match the tool result with the tool call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 /// A delta update for an image part, used in streaming of an image message.
@@ -264,6 +278,9 @@ pub struct ImagePartDelta {
     /// The height of the image in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// The ID of the image part, if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 /// A delta update for an audio part, used in streaming of an audio message.
@@ -284,9 +301,9 @@ pub struct AudioPartDelta {
     /// The transcript of the audio.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript: Option<String>,
-    /// The audio ID, if applicable.
+    /// The ID of the audio part, if applicable
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audio_id: Option<String>,
+    pub id: Option<String>,
 }
 
 // A delta update for a reasoning part, used in streaming of reasoning messages.
@@ -299,6 +316,9 @@ pub struct ReasoningPartDelta {
     /// The reasoning internal signature
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,
+    /// The ID of the reasoning part, if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 /// Represents a delta update in a message's content, enabling partial streaming
