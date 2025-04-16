@@ -110,6 +110,8 @@ pub enum LanguageModelCapability {
     AudioOutput,
     FunctionCalling,
     StructuredOutput,
+    Citation,
+    Reasoning,
 }
 
 /// A part of the message that contains text.

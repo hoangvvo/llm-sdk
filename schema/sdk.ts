@@ -66,7 +66,8 @@ export type LanguageModelCapability =
   | "audio-output"
   | "function-calling"
   | "structured-output"
-  | "citation";
+  | "citation"
+  | "reasoning";
 
 /**
  * A part of the message that contains text.
@@ -388,6 +389,10 @@ export interface ModelResponse {
 export interface PartialModelResponse {
   delta?: ContentDelta;
   usage?: ModelUsage;
+  /**
+   * The cost of the response.
+   */
+  cost?: number;
 }
 /**
  * The model will automatically choose the tool to use or not use any tools.

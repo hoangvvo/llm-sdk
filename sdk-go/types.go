@@ -678,6 +678,7 @@ const (
 	CapabilityFunctionCalling  LanguageModelCapability = "function-calling"
 	CapabilityStructuredOutput LanguageModelCapability = "structured-output"
 	CapabilityCitation         LanguageModelCapability = "citation"
+	CapabilityReasoning        LanguageModelCapability = "reasoning"
 )
 
 // ContentDelta represents a delta update in a message's content, enabling partial streaming updates in LLM responses.

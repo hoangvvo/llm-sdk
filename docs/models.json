@@ -26,7 +26,8 @@
         "text-output",
         "image-input",
         "function-calling",
-        "structured-output"
+        "structured-output",
+        "reasoning"
       ],
       "pricing": {
         "input_cost_per_text_token": 15.0e-6,
@@ -72,7 +73,8 @@
         "image-input",
         "function-calling",
         "structured-output",
-        "citation"
+        "citation",
+        "reasoning"
       ],
       "pricing": {
         "input_cost_per_text_token": 3.0e-6,
@@ -104,6 +106,29 @@
         "input_cost_per_audio_token": 1e-6
       }
     }
+  },
+  {
+    "provider": "google",
+    "model_id": "gemini-2.0-flash-exp-image-generation",
+    "metadata": {
+      "capabilities": [
+        "text-input",
+        "text-output",
+        "image-input",
+        "image-output",
+        "audio-input",
+        "function-calling",
+        "structured-output"
+      ],
+      "pricing": {
+        "input_cost_per_text_token": 0.1e-6,
+        "output_cost_per_text_token": 0.4e-6,
+        "input_cost_per_image_token": 0.1e-6,
+        "output_cost_per_image_token": 30e-6,
+        "input_cost_per_audio_token": 0.7e-6
+      }
+    },
+    "modalities": ["text", "image"]
   },
   {
     "provider": "cohere",

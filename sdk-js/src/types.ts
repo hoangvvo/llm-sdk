@@ -66,7 +66,8 @@ export type LanguageModelCapability =
   | "audio-output"
   | "function-calling"
   | "structured-output"
-  | "citation";
+  | "citation"
+  | "reasoning";
 
 /**
  * A part of the message that contains text.

@@ -67,7 +67,8 @@
         "image-output",
         "function-calling",
         "structured-output",
-        "citation"
+        "citation",
+        "reasoning"
       ]
     },
 
@@ -460,7 +461,11 @@
       "description": "Represents a partial response from the language model, useful for streaming output via async generator.",
       "properties": {
         "delta": { "$ref": "#/definitions/ContentDelta" },
-        "usage": { "$ref": "#/definitions/ModelUsage" }
+        "usage": { "$ref": "#/definitions/ModelUsage" },
+        "cost": {
+          "type": "number",
+          "description": "The cost of the response."
+        }
       },
       "additionalProperties": false
     },
