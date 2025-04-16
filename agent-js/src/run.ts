@@ -313,13 +313,16 @@ export class RunSession<TContext> {
         // messages will be computed from getTurnMessages
         messages: [],
         system_prompt: systemPrompt,
-        tools: this.#params.tools.map((tool) => ({
+        response_format: this.#params.response_format,
+      };
+
+      if (this.#params.tools.length > 0) {
+        input.tools = this.#params.tools.map((tool) => ({
           name: tool.name,
           description: tool.description,
           parameters: tool.parameters,
-        })),
-        response_format: this.#params.response_format,
-      };
+        }));
+      }
 
       if (this.#params.temperature !== undefined) {
         input.temperature = this.#params.temperature;

@@ -215,13 +215,17 @@ where
                 // messages will be computed from getTurnMessages
                 messages: vec![],
                 system_prompt: Some(system_prompt),
-                tools: Some(
-                    self.params
-                        .tools
-                        .iter()
-                        .map(|tool| tool.as_ref().into())
-                        .collect(),
-                ),
+                tools: if !self.params.tools.is_empty() {
+                    Some(
+                        self.params
+                            .tools
+                            .iter()
+                            .map(|tool| tool.as_ref().into())
+                            .collect(),
+                    )
+                } else {
+                    None
+                },
                 response_format: Some(self.params.response_format.clone()),
                 temperature: self.params.temperature,
                 top_p: self.params.top_p,
