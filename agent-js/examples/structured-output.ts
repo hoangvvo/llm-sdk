@@ -1,14 +1,9 @@
 import { Agent, getTextFromResponse, tool } from "@hoangvvo/llm-agent";
 import type { ResponseFormatOption } from "@hoangvvo/llm-sdk";
-import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
-import assert from "node:assert";
+import { getModel } from "./get-model.ts";
 
 // Define the model to use for the Agent
-assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
-const model = new OpenAIModel({
-  apiKey: process.env["OPENAI_API_KEY"],
-  modelId: "gpt-4o",
-});
+const model = getModel("openai", "gpt-4o");
 
 const searchFlightsTool = tool({
   name: "search_flights",

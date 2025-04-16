@@ -65,7 +65,7 @@ const getWeatherTool = typeboxTool({
     {
       city: Type.String({ description: "The name of the city" }),
     },
-    { additionalProperties: false }
+    { additionalProperties: false },
   ),
   execute(params) {
     // inferred as { city: string }
@@ -186,7 +186,7 @@ Find examples in the [examples](./examples/) folder:
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.ts)
 
 ```bash
-node --env-file=../.env examples/agent.ts
+node examples/agent.ts
 ```
 
 ## License

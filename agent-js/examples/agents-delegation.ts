@@ -1,8 +1,7 @@
 import { Agent, tool, type AgentItem } from "@hoangvvo/llm-agent";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
-import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
-import assert from "node:assert";
 import { z } from "zod";
+import { getModel } from "./get-model.ts";
 
 // Implement the agent delegation pattern, where a main agent delegates tasks
 // to sub-agents. The main agent uses the results from the sub-agents'
@@ -45,11 +44,7 @@ ${description}`,
   });
 }
 
-assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
-const model = new OpenAIModel({
-  apiKey: process.env["OPENAI_API_KEY"],
-  modelId: "gpt-4o",
-});
+const model = getModel("openai", "gpt-4o");
 
 interface Order {
   customer_name: string;

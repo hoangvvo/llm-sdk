@@ -1,7 +1,12 @@
 import type { LanguageModelMetadata } from "@hoangvvo/llm-sdk";
-import type { Dispatch, SetStateAction } from "react";
+import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
-import type { ApiKeys, MyContext } from "../types";
+import type {
+  AgentBehaviorSettings,
+  ApiKeys,
+  MyContext,
+  ToolInfo,
+} from "../types";
 
 export interface ModelSelection {
   provider: string;
@@ -22,6 +27,15 @@ interface SidebarProps {
   onSaveApiKey: (provider: string, apiKey: string) => void;
   context: MyContext;
   onContextChange: Dispatch<SetStateAction<MyContext>>;
+  behavior: AgentBehaviorSettings;
+  onBehaviorChange: Dispatch<SetStateAction<AgentBehaviorSettings>>;
+  tools: ToolInfo[];
+  enabledTools: string[];
+  onEnabledToolsChange: (tools: string[]) => void;
+  toolErrorMessage?: string | null;
+  disabledInstructions: boolean;
+  onDisabledInstructionsChange: (value: boolean) => void;
+  toolsInitialized: boolean;
 }
 
 export function Sidebar({
@@ -33,21 +47,41 @@ export function Sidebar({
   onSaveApiKey,
   context,
   onContextChange,
+  behavior,
+  onBehaviorChange,
+  tools,
+  enabledTools,
+  onEnabledToolsChange,
+  toolErrorMessage,
+  disabledInstructions,
+  onDisabledInstructionsChange,
+  toolsInitialized,
 }: SidebarProps) {
   return (
     <aside className="flex h-full w-96 shrink-0 flex-col overflow-auto border-l border-slate-200/70 bg-white/60 px-6 py-6 backdrop-blur-sm">
-      <div className="flex min-h-0 flex-1 flex-col gap-6">
-        <div className="space-y-6">
-          <ModelSelectionSection
-            models={models}
-            selection={selection}
-            onChange={onModelSelectionChange}
-            errorMessage={modelSelectionErrorMessage}
-            apiKeys={apiKeys}
-            onSaveApiKey={onSaveApiKey}
-          />
-          <ContextSection context={context} onChange={onContextChange} />
-        </div>
+      <div className="space-y-6">
+        <ModelSelectionSection
+          models={models}
+          selection={selection}
+          onChange={onModelSelectionChange}
+          errorMessage={modelSelectionErrorMessage}
+          apiKeys={apiKeys}
+          onSaveApiKey={onSaveApiKey}
+        />
+        <AgentBehaviorSection
+          behavior={behavior}
+          onChange={onBehaviorChange}
+          disabledInstructions={disabledInstructions}
+          onDisabledInstructionsChange={onDisabledInstructionsChange}
+        />
+        <ToolSection
+          tools={tools}
+          enabledTools={enabledTools}
+          onEnabledToolsChange={onEnabledToolsChange}
+          errorMessage={toolErrorMessage}
+          initialized={toolsInitialized}
+        />
+        <ContextSection context={context} onChange={onContextChange} />
       </div>
     </aside>
   );
@@ -234,6 +268,226 @@ function ModelSelectionSection({
   );
 }
 
+interface AgentBehaviorSectionProps {
+  behavior: AgentBehaviorSettings;
+  onChange: Dispatch<SetStateAction<AgentBehaviorSettings>>;
+  disabledInstructions: boolean;
+  onDisabledInstructionsChange: (value: boolean) => void;
+}
+
+function AgentBehaviorSection({
+  behavior,
+  onChange,
+  disabledInstructions,
+  onDisabledInstructionsChange,
+}: AgentBehaviorSectionProps) {
+  const handleNumberChange =
+    (key: keyof AgentBehaviorSettings, parser: (value: string) => number) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const { value } = event.target;
+      onChange((prev) => {
+        if (value.trim() === "") {
+          const { [key]: _omit, ...rest } = prev;
+          void _omit;
+          return rest;
+        }
+        const parsed = parser(value);
+        if (Number.isNaN(parsed)) {
+          return prev;
+        }
+        return { ...prev, [key]: parsed };
+      });
+    };
+
+  return (
+    <div className="console-surface space-y-3">
+      <h2 className="console-section-title">Agent Behavior</h2>
+      <p className="text-xs text-slate-500">
+        Tune sampling parameters for the agent.
+      </p>
+      <div className="grid grid-cols-1 gap-3">
+        <NumberField
+          label="Temperature"
+          placeholder="e.g. 0.7"
+          value={behavior.temperature}
+          step="0.1"
+          min="0"
+          max="2"
+          onChange={handleNumberChange("temperature", (value) =>
+            parseFloat(value),
+          )}
+        />
+        <NumberField
+          label="Top P"
+          placeholder="e.g. 0.9"
+          value={behavior.top_p}
+          step="0.05"
+          min="0"
+          max="1"
+          onChange={handleNumberChange("top_p", (value) => parseFloat(value))}
+        />
+        <NumberField
+          label="Top K"
+          placeholder="e.g. 40"
+          value={behavior.top_k}
+          step="1"
+          min="0"
+          onChange={handleNumberChange("top_k", (value) =>
+            Math.max(0, Math.floor(Number(value))),
+          )}
+        />
+        <NumberField
+          label="Presence penalty"
+          placeholder="e.g. 0.5"
+          value={behavior.presence_penalty}
+          step="0.1"
+          onChange={handleNumberChange("presence_penalty", (value) =>
+            parseFloat(value),
+          )}
+        />
+        <NumberField
+          label="Frequency penalty"
+          placeholder="e.g. 0.5"
+          value={behavior.frequency_penalty}
+          step="0.1"
+          onChange={handleNumberChange("frequency_penalty", (value) =>
+            parseFloat(value),
+          )}
+        />
+      </div>
+      <div className="border-t border-slate-200/70 pt-3">
+        <label className="flex items-start gap-3 text-xs text-slate-600">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+            checked={disabledInstructions}
+            onChange={(event) => {
+              onDisabledInstructionsChange(event.target.checked);
+            }}
+          />
+          <span>
+            <span className="font-semibold text-slate-700">
+              Disable system instructions
+            </span>
+            <p className="text-[11px] leading-snug text-slate-500">
+              Prevents default instructions from being sent to the model
+              (workaround for some legacy models)
+            </p>
+          </span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+interface ToolSectionProps {
+  tools: ToolInfo[];
+  enabledTools: string[];
+  onEnabledToolsChange: (tools: string[]) => void;
+  errorMessage?: string | null;
+  initialized: boolean;
+}
+
+function ToolSection({
+  tools,
+  enabledTools,
+  onEnabledToolsChange,
+  errorMessage,
+  initialized,
+}: ToolSectionProps) {
+  const orderedToolNames = useMemo(
+    () => tools.map((tool) => tool.name),
+    [tools],
+  );
+
+  const handleToggleTool = (toolName: string, isChecked: boolean) => {
+    if (isChecked) {
+      const nextSet = new Set([...enabledTools, toolName]);
+      const normalized = orderedToolNames.filter((name) => nextSet.has(name));
+      onEnabledToolsChange(normalized);
+    } else {
+      onEnabledToolsChange(enabledTools.filter((name) => name !== toolName));
+    }
+  };
+
+  return (
+    <div className="console-surface space-y-3">
+      <h2 className="console-section-title">Tools</h2>
+      <p className="text-xs text-slate-500">
+        Toggle which tools the agent can invoke during a run.
+      </p>
+      {tools.length > 0 ? (
+        <ul className="mt-2 space-y-2 text-xs text-slate-600">
+          {tools.map((tool) => {
+            const checked = enabledTools.includes(tool.name);
+            return (
+              <li key={tool.name} className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+                  checked={checked}
+                  onChange={(event) => {
+                    handleToggleTool(tool.name, event.target.checked);
+                  }}
+                />
+                <div>
+                  <p className="font-semibold text-slate-700">{tool.name}</p>
+                  {tool.description ? (
+                    <p className="text-[11px] leading-snug text-slate-500">
+                      {tool.description}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-slate-500">
+          {errorMessage ??
+            (initialized ? "No tools available." : "Loading tools…")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+interface NumberFieldProps {
+  label: string;
+  value?: number;
+  placeholder?: string;
+  step?: string;
+  min?: string;
+  max?: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}
+
+function NumberField({
+  label,
+  value,
+  placeholder,
+  step,
+  min,
+  max,
+  onChange,
+}: NumberFieldProps) {
+  return (
+    <label className="console-label">
+      {label}
+      <input
+        type="number"
+        className="console-field mt-2 w-full"
+        value={value ?? ""}
+        placeholder={placeholder}
+        step={step}
+        min={min}
+        max={max}
+        onChange={onChange}
+      />
+    </label>
+  );
+}
+
 interface ContextSectionProps {
   context: MyContext;
   onChange: Dispatch<SetStateAction<MyContext>>;
@@ -264,11 +518,24 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
     });
   };
 
+  const handleUnitsChange = (value: string) => {
+    onChange((prev) => {
+      const next = { ...prev };
+      if (value.trim().length === 0) {
+        delete next.units;
+      } else {
+        next.units = value;
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="console-surface space-y-3">
       <h2 className="console-section-title">Context</h2>
       <p className="text-xs text-slate-500">
-        Provide optional details the agent can use while personalizing the run.
+        Provide optional details the agent can use for its instructions and
+        tools.
       </p>
       <label className="console-label">
         Name
@@ -291,6 +558,18 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
           value={context.location ?? ""}
           onChange={(event) => {
             handleLocationChange(event.target.value);
+          }}
+        />
+      </label>
+      <label className="console-label">
+        Preferred units
+        <input
+          type="text"
+          className="console-field mt-2 w-full"
+          placeholder="e.g. metric, imperial"
+          value={context.units ?? ""}
+          onChange={(event) => {
+            handleUnitsChange(event.target.value);
           }}
         />
       </label>

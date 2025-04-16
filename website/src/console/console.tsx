@@ -24,16 +24,30 @@ import {
   type ModelOption,
   type ModelSelection,
 } from "./components/sidebar.tsx";
+import { useAudio } from "./lib/use-audio.ts";
+import { useFetchInitialData } from "./lib/use-fetch-initial-data.ts";
+import { useLocalStorageState } from "./lib/use-local-storage-state.ts";
 import { base64ToArrayBuffer, createId } from "./lib/utils.ts";
-import { WavStreamPlayer } from "./lib/wavtools/wav_stream_player.ts";
-import type { ApiKeys, LoggedEvent, ModelInfo, MyContext } from "./types.ts";
+import type {
+  AgentBehaviorSettings,
+  ApiKeys,
+  LoggedEvent,
+  ModelInfo,
+  MyContext,
+  ToolInfo,
+} from "./types.ts";
 
 const API_BASE_URL = "http://localhost:4000";
 const RUN_STREAM_URL = `${API_BASE_URL}/run-stream`;
 const MODELS_URL = `${API_BASE_URL}/models`;
+const TOOLS_URL = `${API_BASE_URL}/tools`;
 
 const STORAGE_KEY_MODEL = "console-selected-model";
 const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
+const STORAGE_KEY_CONTEXT = "console-user-context";
+const STORAGE_KEY_ENABLED_TOOLS = "console-enabled-tools";
+const STORAGE_KEY_DISABLED_INSTRUCTIONS = "console-disabled-instructions";
+const STORAGE_KEY_AGENT_BEHAVIOR = "console-agent-behavior";
 
 type ServerToClientEvent = AgentStreamEvent | { event: "error"; error: string };
 
@@ -46,114 +60,144 @@ export function ConsoleApp() {
   const [eventLog, setEventLog] = useState<LoggedEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
-  const [modelSelection, setModelSelection] = useState<ModelSelection | null>(
-    null,
+  const [modelSelection, setModelSelection] =
+    useLocalStorageState<ModelSelection | null>(STORAGE_KEY_MODEL, null);
+  const [toolOptions, setToolOptions] = useState<ToolInfo[]>([]);
+  const [enabledTools, setEnabledTools] = useLocalStorageState<string[]>(
+    STORAGE_KEY_ENABLED_TOOLS,
+    () => [],
   );
-  const [modelFetchError, setModelFetchError] = useState<string | null>(null);
+  const [disabledInstructions, setDisabledInstructions] =
+    useLocalStorageState<boolean>(STORAGE_KEY_DISABLED_INSTRUCTIONS, false);
+  const [agentBehavior, setAgentBehavior] =
+    useLocalStorageState<AgentBehaviorSettings>(
+      STORAGE_KEY_AGENT_BEHAVIOR,
+      () => ({}),
+    );
   const [providerApiKeys, setProviderApiKeys] = useState<ApiKeys>({});
-  const [userContext, setUserContext] = useState<MyContext>({});
+  const [userContext, setUserContext] = useLocalStorageState<MyContext>(
+    STORAGE_KEY_CONTEXT,
+    (() => ({})) as () => MyContext,
+  );
+  const [toolsInitialized, setToolsInitialized] = useState(false);
 
   const allItems = useMemo(() => [...items, ...nextItems], [items, nextItems]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const streamPlayerRef = useRef<WavStreamPlayer | null>(null);
-  const streamPlayerSampleRateRef = useRef<number | null>(null);
-  const streamPlayerConnectedRef = useRef(false);
-
   useEffect(() => {
-    return () => {
-      const controller = abortControllerRef.current;
-      if (controller) {
-        controller.abort();
-      }
-      const context = streamPlayerRef.current?.context;
-      if (context && context.state !== "closed") {
-        context.close().catch(() => {
-          /* ignore */
-        });
-      }
-    };
+    const controller = abortControllerRef.current;
+    if (controller) {
+      controller.abort();
+    }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchModels = useCallback(async (signal: AbortSignal) => {
+    const response = await fetch(MODELS_URL, { signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch models (${String(response.status)})`);
+    }
+    return (await response.json()) as ModelInfo[];
+  }, []);
 
-    async function loadModels() {
-      try {
-        const response = await fetch(MODELS_URL);
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch models (${String(response.status)})`,
-          );
-        }
-        const data = (await response.json()) as ModelInfo[];
-        if (cancelled) return;
-        const options = data.map(mapModelInfo);
-        setModelOptions(options);
-        setModelFetchError(null);
-        setProviderApiKeys((prev) => {
-          const next = { ...prev };
-          for (const option of options) {
-            const storageKey = getProviderApiKeyStorageKey(option.provider);
-            const storedValue = localStorage.getItem(storageKey);
-            if (storedValue) {
-              next[option.provider] = storedValue;
-            } else {
-              next[option.provider] = undefined;
-            }
-          }
-          return next;
-        });
-        if (options.length > 0) {
-          const stored = localStorage.getItem(STORAGE_KEY_MODEL);
-          if (stored) {
-            try {
-              const parsed = JSON.parse(stored) as ModelSelection;
-              const found = options.find(
-                (option) =>
-                  option.provider === parsed.provider &&
-                  option.modelId === parsed.modelId,
-              );
-              if (found) {
-                setModelSelection(found);
-                return;
-              }
-            } catch (err) {
-              console.error("Failed to parse stored model selection", err);
-            }
-          } else {
-            setModelSelection((current) => {
-              if (current) {
-                const stillValid = options.some(
-                  (option) =>
-                    option.provider === current.provider &&
-                    option.modelId === current.modelId,
-                );
-                if (stillValid) {
-                  return current;
-                }
-              }
-              return options[0];
-            });
-          }
-        } else {
-          setModelSelection(null);
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setModelOptions([]);
-        setModelSelection(null);
-        setModelFetchError(
-          err instanceof Error ? err.message : "Failed to fetch models",
-        );
-      }
+  const { data: modelsData, error: modelsError } =
+    useFetchInitialData(fetchModels);
+
+  useEffect(() => {
+    if (!modelsData) {
+      return;
     }
 
-    void loadModels();
-    return () => {
-      cancelled = true;
-    };
+    const options = modelsData.map(mapModelInfo);
+    setModelOptions(options);
+    setProviderApiKeys((prev) => {
+      const next = { ...prev };
+      for (const option of options) {
+        const storageKey = getProviderApiKeyStorageKey(option.provider);
+        const storedValue = localStorage.getItem(storageKey);
+        if (storedValue) {
+          next[option.provider] = storedValue;
+        } else {
+          next[option.provider] = undefined;
+        }
+      }
+      return next;
+    });
+
+    if (options.length > 0) {
+      setModelSelection((current) => {
+        if (current) {
+          const stillValid = options.some(
+            (option) =>
+              option.provider === current.provider &&
+              option.modelId === current.modelId,
+          );
+          if (stillValid) {
+            return current;
+          }
+        }
+        return options[0];
+      });
+    } else {
+      setModelSelection(null);
+    }
+  }, [modelsData, setModelSelection]);
+
+  useEffect(() => {
+    if (!modelsError) {
+      return;
+    }
+    setModelOptions([]);
+    setModelSelection(null);
+  }, [modelsError, setModelSelection]);
+
+  const [hasStoredToolPreference] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLS) !== null;
+  });
+
+  const fetchTools = useCallback(async (signal: AbortSignal) => {
+    const response = await fetch(TOOLS_URL, { signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tools (${String(response.status)})`);
+    }
+    return (await response.json()) as ToolInfo[];
   }, []);
+
+  const { data: toolsData, error: toolsError } =
+    useFetchInitialData(fetchTools);
+
+  useEffect(() => {
+    if (!toolsData) {
+      return;
+    }
+
+    setToolOptions(toolsData);
+
+    const toolNames = toolsData.map((tool) => tool.name);
+
+    setEnabledTools((previous) => {
+      const baseSelection =
+        previous.length > 0 || hasStoredToolPreference ? previous : toolNames;
+      const baseSet = new Set(baseSelection);
+      const normalized = toolNames.filter((name) => baseSet.has(name));
+      if (arraysEqual(previous, normalized)) {
+        return previous;
+      }
+      return normalized;
+    });
+
+    setToolsInitialized(true);
+  }, [hasStoredToolPreference, setEnabledTools, toolsData]);
+
+  useEffect(() => {
+    if (!toolsError) {
+      return;
+    }
+    setToolOptions([]);
+    setToolsInitialized(true);
+  }, [toolsError]);
 
   const handleSaveProviderApiKey = useCallback(
     (provider: string, apiKey: string) => {
@@ -174,30 +218,6 @@ export function ConsoleApp() {
     [],
   );
 
-  const handleUpdateModelSelection = useCallback<
-    React.Dispatch<React.SetStateAction<ModelSelection | null>>
-  >((selection) => {
-    setModelSelection(selection);
-    if (typeof selection === "function") {
-      setModelSelection((current) => {
-        const next = selection(current);
-        if (next) {
-          localStorage.setItem(STORAGE_KEY_MODEL, JSON.stringify(next));
-        } else {
-          localStorage.removeItem(STORAGE_KEY_MODEL);
-        }
-        return next;
-      });
-    } else {
-      if (selection) {
-        localStorage.setItem(STORAGE_KEY_MODEL, JSON.stringify(selection));
-      } else {
-        localStorage.removeItem(STORAGE_KEY_MODEL);
-      }
-      setModelSelection(selection);
-    }
-  }, []);
-
   const logEvent = useCallback(
     (direction: "client" | "server", name: string, payload: unknown) => {
       setEventLog((prev) => [
@@ -214,43 +234,7 @@ export function ConsoleApp() {
     [],
   );
 
-  const ensureStreamPlayer = useCallback(
-    async (sampleRate?: number): Promise<WavStreamPlayer> => {
-      const desiredRate =
-        sampleRate ?? streamPlayerSampleRateRef.current ?? 44100;
-
-      if (
-        streamPlayerRef.current &&
-        streamPlayerSampleRateRef.current !== null &&
-        streamPlayerSampleRateRef.current !== desiredRate
-      ) {
-        const context = streamPlayerRef.current.context;
-        if (context && context.state !== "closed") {
-          await context.close().catch(() => {
-            /* ignore */
-          });
-        }
-        streamPlayerRef.current = null;
-        streamPlayerConnectedRef.current = false;
-      }
-
-      if (!streamPlayerRef.current) {
-        streamPlayerRef.current = new WavStreamPlayer({
-          sampleRate: desiredRate,
-        });
-        streamPlayerSampleRateRef.current = desiredRate;
-        streamPlayerConnectedRef.current = false;
-      }
-
-      if (!streamPlayerConnectedRef.current) {
-        await streamPlayerRef.current.connect();
-        streamPlayerConnectedRef.current = true;
-      }
-
-      return streamPlayerRef.current;
-    },
-    [],
-  );
+  const { ensureStreamPlayer } = useAudio();
 
   const handleAudioDelta = useCallback(
     async (delta: AudioPartDelta) => {
@@ -284,23 +268,20 @@ export function ConsoleApp() {
       setStreamingParts([]);
 
       try {
-        const requestContext: MyContext = {};
-        const name = userContext.name?.trim();
-        if (name) {
-          requestContext.name = name;
-        }
-        const location = userContext.location?.trim();
-        if (location) {
-          requestContext.location = location;
-        }
-
         const inputPayload = {
           provider: modelSelection.provider,
           model_id: modelSelection.modelId,
           input: {
             input: conversation,
-            context: requestContext,
+            context: userContext,
           } satisfies AgentRequest<MyContext>,
+          enabled_tools: toolsInitialized ? enabledTools : undefined,
+          disabled_instructions: disabledInstructions,
+          temperature: agentBehavior.temperature,
+          top_p: agentBehavior.top_p,
+          top_k: agentBehavior.top_k,
+          frequency_penalty: agentBehavior.frequency_penalty,
+          presence_penalty: agentBehavior.presence_penalty,
         };
 
         logEvent("client", "request", inputPayload);
@@ -379,7 +360,17 @@ export function ConsoleApp() {
         setIsStreaming(false);
       }
     },
-    [handleAudioDelta, logEvent, modelSelection, providerApiKeys, userContext],
+    [
+      agentBehavior,
+      disabledInstructions,
+      enabledTools,
+      handleAudioDelta,
+      logEvent,
+      modelSelection,
+      providerApiKeys,
+      toolsInitialized,
+      userContext,
+    ],
   );
 
   const handleAbort = useCallback(() => {
@@ -403,6 +394,21 @@ export function ConsoleApp() {
       await runAgent(nextConversation, [userItem]);
     },
     [items, modelSelection, runAgent],
+  );
+
+  const handleEnabledToolsChange = useCallback(
+    (next: string[]) => {
+      const toolNames = toolOptions.map((tool) => tool.name);
+      const toolNameSet = new Set(toolNames);
+      const allowed = new Set(next.filter((name) => toolNameSet.has(name)));
+      const normalized = toolNames.filter((name) => allowed.has(name));
+      setEnabledTools(normalized);
+      localStorage.setItem(
+        STORAGE_KEY_ENABLED_TOOLS,
+        JSON.stringify(normalized),
+      );
+    },
+    [toolOptions],
   );
 
   return (
@@ -467,12 +473,21 @@ export function ConsoleApp() {
         <Sidebar
           models={modelOptions}
           selection={modelSelection}
-          onModelSelectionChange={handleUpdateModelSelection}
-          modelSelectionErrorMessage={modelFetchError}
+          onModelSelectionChange={setModelSelection}
+          modelSelectionErrorMessage={modelsError}
           apiKeys={providerApiKeys}
           onSaveApiKey={handleSaveProviderApiKey}
           context={userContext}
           onContextChange={setUserContext}
+          behavior={agentBehavior}
+          onBehaviorChange={setAgentBehavior}
+          tools={toolOptions}
+          enabledTools={enabledTools}
+          onEnabledToolsChange={handleEnabledToolsChange}
+          toolErrorMessage={toolsError}
+          disabledInstructions={disabledInstructions}
+          onDisabledInstructionsChange={setDisabledInstructions}
+          toolsInitialized={toolsInitialized}
         />
       </div>
     </div>
@@ -486,6 +501,21 @@ function mapModelInfo(info: ModelInfo): ModelOption {
     label: `${formatProviderName(info.provider)} – ${info.model_id}`,
     metadata: info.metadata,
   };
+}
+
+function arraysEqual<T>(left: T[], right: T[]): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function reduceContentDelta(
