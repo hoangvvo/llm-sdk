@@ -39,20 +39,19 @@ func NewAgentSpan(ctx context.Context, agentName string, method string) (*AgentS
 
 // OnResponse updates the span with response information
 func (s *AgentSpan) OnResponse(response *AgentResponse) {
-    for _, item := range response.Output {
-        if item.Model != nil {
-            if item.Model.Usage != nil {
-                if s.usage == nil {
-                    s.usage = &llmsdk.ModelUsage{}
-                }
-                s.usage.InputTokens += item.Model.Usage.InputTokens
-                s.usage.OutputTokens += item.Model.Usage.OutputTokens
-            }
-            if item.Model.Cost != nil {
-                s.cost += *item.Model.Cost
-            }
-        }
-    }
+	for _, item := range response.Output {
+		if item.Model != nil {
+			if item.Model.Usage != nil {
+				if s.usage == nil {
+					s.usage = &llmsdk.ModelUsage{}
+				}
+				s.usage.Add(item.Model.Usage)
+			}
+			if item.Model.Cost != nil {
+				s.cost += *item.Model.Cost
+			}
+		}
+	}
 }
 
 // OnEnd ends the span and sets the final attributes
@@ -65,6 +64,10 @@ func (s *AgentSpan) OnEnd() {
 	if s.usage != nil {
 		attrs = append(attrs, attribute.Int64("gen_ai.model.input_tokens", int64(s.usage.InputTokens)))
 		attrs = append(attrs, attribute.Int64("gen_ai.model.output_tokens", int64(s.usage.OutputTokens)))
+	}
+
+	if s.cost > 0 {
+		attrs = append(attrs, attribute.Float64("llm_agent.cost", s.cost))
 	}
 
 	s.span.SetAttributes(attrs...)

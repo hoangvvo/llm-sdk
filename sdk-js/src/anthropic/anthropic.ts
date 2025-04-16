@@ -90,12 +90,18 @@ export class AnthropicModel implements LanguageModel {
         case "message_start": {
           const usage = mapAnthropicUsage(chunk.message.usage);
           const event: PartialModelResponse = { usage };
+          if (this.metadata?.pricing) {
+            event.cost = calculateCost(usage, this.metadata.pricing);
+          }
           yield event;
           break;
         }
         case "message_delta": {
           const usage = mapAnthropicMessageDeltaUsage(chunk.usage);
           const event: PartialModelResponse = { usage };
+          if (this.metadata?.pricing) {
+            event.cost = calculateCost(usage, this.metadata.pricing);
+          }
           yield event;
           break;
         }

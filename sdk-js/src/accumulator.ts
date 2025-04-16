@@ -16,6 +16,7 @@ import type {
   TextPartDelta,
   ToolCallPartDelta,
 } from "./types.ts";
+import { sumModelUsage } from "./usage.utils.ts";
 
 /**
  * Internal representation of accumulated audio data with chunks stored separately
@@ -172,7 +173,7 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
     case "reasoning": {
       const existingPart = existing as ReasoningPartDelta;
       if (delta.part.text) {
-        existingPart.text = (existingPart.text ?? "") + delta.part.text;
+        existingPart.text = existingPart.text + delta.part.text;
       }
       if (delta.part.signature) {
         existingPart.signature = delta.part.signature;
@@ -266,7 +267,7 @@ function createAudioPart(data: AccumulatedAudioData): Part {
 function createReasoningPart(data: ReasoningPartDelta): Part {
   return {
     type: "reasoning",
-    text: data.text ?? "",
+    text: data.text,
     ...(data.signature && { signature: data.signature }),
   };
 }
@@ -299,6 +300,7 @@ function createPart(data: AccumulatedData, index: number): Part {
 export class StreamAccumulator {
   readonly #accumulatedParts = new Map<number, AccumulatedData>();
   #accumulatedUsage?: ModelUsage;
+  #accumulatedCost?: number;
 
   /**
    * Adds a chunk of content deltas to the accumulator
@@ -308,7 +310,7 @@ export class StreamAccumulator {
       this.#processDelta(partial.delta);
     }
     if (partial.usage) {
-      this.#processUsage(partial.usage);
+      this.#processUsage(partial.usage, partial.cost);
     }
   }
 
@@ -323,6 +325,9 @@ export class StreamAccumulator {
     return {
       content,
       ...(this.#accumulatedUsage && { usage: this.#accumulatedUsage }),
+      ...(this.#accumulatedCost !== undefined && {
+        cost: this.#accumulatedCost,
+      }),
     };
   }
 
@@ -353,10 +358,16 @@ export class StreamAccumulator {
     }
   }
 
-  #processUsage(usage: ModelUsage): void {
-    this.#accumulatedUsage = this.#accumulatedUsage ?? { ...usage };
+  #processUsage(usage: ModelUsage, cost?: number): void {
+    this.#accumulatedUsage = this.#accumulatedUsage ?? {
+      input_tokens: 0,
+      output_tokens: 0,
+    };
+    this.#accumulatedUsage = sumModelUsage([this.#accumulatedUsage, usage]);
 
-    this.#accumulatedUsage.input_tokens += usage.input_tokens;
-    this.#accumulatedUsage.output_tokens += usage.output_tokens;
+    if (cost) {
+      this.#accumulatedCost = this.#accumulatedCost ?? 0;
+      this.#accumulatedCost += cost;
+    }
   }
 }

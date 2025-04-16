@@ -10,7 +10,7 @@ async fn main() {
 
     let model = common::get_model("openai", "gpt-4o");
 
-    let text = r#"Grandma's Classic Pancakes
+    let text = r"Grandma's Classic Pancakes
 
 These fluffy pancakes are quick to make and perfect for breakfast!
 
@@ -42,7 +42,7 @@ Prep time: 10 minutes
 Cook time: 15 minutes
 Total time: 25 minutes
 
-Tags: breakfast, easy, kid-friendly"#;
+Tags: breakfast, easy, kid-friendly";
 
     let schema = serde_json::json!({
       "title": "Recipe",

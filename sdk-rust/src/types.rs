@@ -333,7 +333,7 @@ pub struct ToolMessage {
 }
 
 /// Represents the token usage of the model.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ModelTokensDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -381,6 +381,7 @@ pub struct ModelResponse {
 pub struct PartialModelResponse {
     pub delta: Option<ContentDelta>,
     pub usage: Option<ModelUsage>,
+    pub cost: Option<f64>,
 }
 
 /// The model will use the specified tool.

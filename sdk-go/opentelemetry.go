@@ -24,7 +24,7 @@ type LMSpan struct {
 	MaxTokens        *uint32  `json:"max_tokens,omitempty"`
 	Temperature      *float64 `json:"temperature,omitempty"`
 	TopP             *float64 `json:"top_p,omitempty"`
-	TopK             *int32 `json:"top_k,omitempty"`
+	TopK             *int32   `json:"top_k,omitempty"`
 	PresencePenalty  *float64 `json:"presence_penalty,omitempty"`
 	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
 	Seed             *int64   `json:"seed,omitempty"`
@@ -55,8 +55,7 @@ func (s *LMSpan) OnStreamPartial(partial *PartialModelResponse) {
 		if s.Usage == nil {
 			s.Usage = &ModelUsage{}
 		}
-		s.Usage.InputTokens += partial.Usage.InputTokens
-		s.Usage.OutputTokens += partial.Usage.OutputTokens
+		s.Usage.Add(partial.Usage)
 	}
 	if partial.Delta != nil && s.TimeToFirstToken == nil {
 		s.TimeToFirstToken = ptr.To(time.Since(s.StartTime).Seconds())
@@ -86,6 +85,9 @@ func (s *LMSpan) OnEnd() {
 			attribute.Int("gen_ai.usage.input_tokens", s.Usage.InputTokens),
 			attribute.Int("gen_ai.usage.output_tokens", s.Usage.OutputTokens),
 		)
+	}
+	if s.Cost != nil {
+		s.span.SetAttributes(attribute.Float64("llm_sdk.cost", *s.Cost))
 	}
 	if s.TimeToFirstToken != nil {
 		s.span.SetAttributes(attribute.Float64("gen_ai.server.time_to_first_token", *s.TimeToFirstToken))

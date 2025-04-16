@@ -6,6 +6,7 @@ import type {
   ModelUsage,
   PartialModelResponse,
 } from "./types.ts";
+import { sumModelUsage } from "./usage.utils.ts";
 
 const tracer = trace.getTracer("@hoangvvo/llm-sdk");
 
@@ -58,8 +59,10 @@ export class LMSpan {
   onStreamPartial(partial: PartialModelResponse): void {
     if (partial.usage) {
       this.usage = this.usage ?? { input_tokens: 0, output_tokens: 0 };
-      this.usage.input_tokens += partial.usage.input_tokens;
-      this.usage.output_tokens += partial.usage.output_tokens;
+      this.usage = sumModelUsage([this.usage, partial.usage]);
+    }
+    if (partial.cost !== undefined) {
+      this.cost = (this.cost ?? 0) + partial.cost;
     }
     if (partial.delta && !this.time_to_first_token) {
       this.time_to_first_token =
@@ -89,6 +92,7 @@ export class LMSpan {
       "gen_ai.request.presence_penalty": this.presence_penalty,
       "gen_ai.request.frequency_penalty": this.frequency_penalty,
       "gen_ai.request.seed": this.seed,
+      "llm_sdk.cost": this.cost ?? undefined,
     });
     this.#span.end();
   }

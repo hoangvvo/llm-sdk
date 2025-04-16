@@ -183,7 +183,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // Append items with the output items
         items.extend(response.output.clone());
 
-        println!("{:#?}", response);
+        println!("{response:#?}");
     }
 
     Ok(())

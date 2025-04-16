@@ -118,7 +118,7 @@ func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 	}
 
 	if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-		cost := llmsdk.CalculateCost(*usage, *m.metadata.Pricing)
+		cost := usage.CalculateCost(m.metadata.Pricing)
 		result.Cost = &cost
 	}
 
@@ -197,6 +197,9 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 			if streamEvent.UsageMetadata != nil {
 				usage := mapGoogleUsageMetadata(*streamEvent.UsageMetadata)
 				partial := &llmsdk.PartialModelResponse{Usage: usage}
+				if m.metadata != nil && m.metadata.Pricing != nil {
+					partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
+				}
 				span.OnStreamPartial(partial)
 				responseCh <- partial
 			}

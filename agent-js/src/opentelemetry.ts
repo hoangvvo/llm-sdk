@@ -1,4 +1,4 @@
-import type { ModelUsage } from "@hoangvvo/llm-sdk";
+import { sumModelUsage, type ModelUsage } from "@hoangvvo/llm-sdk";
 import { context, SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { AgentToolResult } from "./tool.ts";
 import type { AgentResponse } from "./types.ts";
@@ -30,8 +30,7 @@ export class AgentSpan {
         const cost = item.cost;
         if (usage) {
           this.usage = this.usage ?? { input_tokens: 0, output_tokens: 0 };
-          this.usage.input_tokens += usage.input_tokens;
-          this.usage.output_tokens += usage.output_tokens;
+          this.usage = sumModelUsage([this.usage, usage]);
         }
         if (typeof cost === "number") {
           this.cost = (this.cost ?? 0) + cost;
@@ -46,6 +45,7 @@ export class AgentSpan {
       "gen_ai.agent.name": this.agent_name,
       "gen_ai.model.input_tokens": this.usage?.input_tokens ?? undefined,
       "gen_ai.model.output_tokens": this.usage?.output_tokens ?? undefined,
+      "llm_agent.cost": this.cost ?? undefined,
     });
     this.#span.end();
   }

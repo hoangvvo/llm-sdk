@@ -117,6 +117,9 @@ export class MistralModel implements LanguageModel {
       if (chunk.data.usage) {
         const usage = mapMistralUsageInfo(chunk.data.usage);
         const event: PartialModelResponse = { usage };
+        if (this.metadata?.pricing) {
+          event.cost = calculateCost(usage, this.metadata.pricing);
+        }
         yield event;
       }
     }

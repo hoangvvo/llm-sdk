@@ -11,8 +11,8 @@ mod opentelemetry;
 mod source_part_utils;
 mod stream_utils;
 mod types;
-mod types_ext;
-mod usage_utils;
+pub mod types_ext;
+pub mod usage_ext;
 
 pub use accumulator::StreamAccumulator;
 pub use errors::*;

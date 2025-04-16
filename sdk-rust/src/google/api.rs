@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-/// Config for models.generate_content parameters.
+/// Config for `models.generate_content` parameters.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateContentParameters {
@@ -62,12 +62,12 @@ pub struct Part {
     /// requests. @remarks Encoded as base64 string.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thought_signature: Option<String>,
-    /// Optional. A predicted [FunctionCall] returned from the model that
+    /// Optional. A predicted [`FunctionCall`] returned from the model that
     /// contains a string representing the [FunctionDeclaration.name] with the
     /// parameters and their values.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_call: Option<FunctionCall>,
-    /// Optional. The result output of a [FunctionCall] that contains a string
+    /// Optional. The result output of a [`FunctionCall`] that contains a string
     /// representing the [FunctionDeclaration.name] and a structured JSON object
     /// containing any output from the function call. It is used as context to
     /// the model.
@@ -84,7 +84,7 @@ pub struct Part {
 pub struct Blob2 {
     /// Optional. Display name of the blob. Used to provide a label or filename
     /// to distinguish blobs. This field is not currently used in the Gemini
-    /// GenerateContent calls.
+    /// `GenerateContent` calls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     /// Required. Raw bytes.
@@ -102,7 +102,7 @@ pub struct Blob2 {
 pub struct FileData {
     /// Optional. Display name of the file data. Used to provide a label or
     /// filename to distinguish file datas. It is not currently used in the
-    /// Gemini GenerateContent calls.
+    /// Gemini `GenerateContent` calls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     /// Required. URI.
@@ -181,7 +181,7 @@ pub struct GenerateContentConfig {
     pub candidate_count: Option<i32>,
     /// Maximum number of tokens that can be generated in the response.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_output_tokens: Option<i32>,
+    pub max_output_tokens: Option<u32>,
     /// List of strings that tells the model to stop generating text if one
     /// of the strings is encountered in the response.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -323,9 +323,9 @@ pub enum FunctionCallingConfigMode {
     #[serde(rename = "AUTO")]
     Auto,
     /// Model is constrained to always predicting function calls only. If
-    /// "allowed_function_names" are set, the predicted function calls will be
-    /// limited to any one of "allowed_function_names", else the predicted
-    /// function calls will be any one of the provided "function_declarations".
+    /// "`allowed_function_names`" are set, the predicted function calls will be
+    /// limited to any one of "`allowed_function_names`", else the predicted
+    /// function calls will be any one of the provided "`function_declarations`".
     #[serde(rename = "ANY")]
     Any,
     /// Model will not predict any function calls. Model behavior is same as
@@ -334,9 +334,9 @@ pub enum FunctionCallingConfigMode {
     None,
     /// Model decides to predict either a function call or a natural language
     /// response, but will validate function calls with constrained decoding. If
-    /// "allowed_function_names" are set, the predicted function call will be
-    /// limited to any one of "allowed_function_names", else the predicted
-    /// function call will be any one of the provided "function_declarations".
+    /// "`allowed_function_names`" are set, the predicted function call will be
+    /// limited to any one of "`allowed_function_names`", else the predicted
+    /// function call will be any one of the provided "`function_declarations`".
     #[serde(rename = "VALIDATED")]
     Validated,
 }
@@ -349,7 +349,7 @@ pub struct SpeechConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub voice_config: Option<VoiceConfig>,
     /// The configuration for the multi-speaker setup.
-    /// It is mutually exclusive with the voice_config field.
+    /// It is mutually exclusive with the `voice_config` field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub multi_speaker_voice_config: Option<MultiSpeakerVoiceConfig>,
     /// Language code (ISO 639. e.g. en-US) for the speech synthesization.
@@ -426,8 +426,8 @@ pub struct GenerateContentResponse {
     /// Output only. The model version used to generate the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_version: Option<String>,
-    /// Output only. response_id is used to identify each response. It is the
-    /// encoding of the event_id.
+    /// Output only. `response_id` is used to identify each response. It is the
+    /// encoding of the `event_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_id: Option<String>,
     /// Usage metadata about the response(s).
@@ -586,10 +586,10 @@ pub struct GenerateContentResponseUsageMetadata {
     /// Output only. Number of tokens in the cached part in the input (the
     /// cached content).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cached_content_token_count: Option<i32>,
+    pub cached_content_token_count: Option<u32>,
     /// Number of tokens in the response(s).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub candidates_token_count: Option<i32>,
+    pub candidates_token_count: Option<u32>,
     /// Output only. List of modalities that were returned in the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub candidates_tokens_details: Option<Vec<ModalityTokenCount>>,
@@ -597,17 +597,17 @@ pub struct GenerateContentResponseUsageMetadata {
     /// still the total effective prompt size meaning this includes the number
     /// of tokens in the cached content.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt_token_count: Option<i32>,
+    pub prompt_token_count: Option<u32>,
     /// Output only. List of modalities that were processed in the request
     /// input.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_tokens_details: Option<Vec<ModalityTokenCount>>,
     /// Output only. Number of tokens present in thoughts output.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub thoughts_token_count: Option<i32>,
+    pub thoughts_token_count: Option<u32>,
     /// Output only. Number of tokens present in tool-use prompt(s).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_use_prompt_token_count: Option<i32>,
+    pub tool_use_prompt_token_count: Option<u32>,
     /// Output only. List of modalities that were processed for tool-use request
     /// inputs.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -627,7 +627,7 @@ pub struct ModalityTokenCount {
     pub modality: Option<MediaModality>,
     /// Number of tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub token_count: Option<i32>,
+    pub token_count: Option<u32>,
 }
 
 /// Server content modalities.

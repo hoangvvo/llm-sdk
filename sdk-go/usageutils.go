@@ -2,8 +2,61 @@ package llmsdk
 
 import "github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 
-// CalculateCost calculates the total cost based on usage statistics and pricing information
-func CalculateCost(usage ModelUsage, pricing LanguageModelPricing) float64 {
+// SumModelTokensDetails sums multiple ModelTokensDetails into one
+func SumModelTokensDetails(detailsList []ModelTokensDetails) *ModelTokensDetails {
+	if len(detailsList) == 0 {
+		return nil
+	}
+
+	result := &ModelTokensDetails{}
+
+	for _, details := range detailsList {
+		if details.TextTokens != nil {
+			if result.TextTokens == nil {
+				result.TextTokens = ptr.To(0)
+			}
+			*result.TextTokens += *details.TextTokens
+		}
+		if details.CachedTextTokens != nil {
+			if result.CachedTextTokens == nil {
+				result.CachedTextTokens = ptr.To(0)
+			}
+			*result.CachedTextTokens += *details.CachedTextTokens
+		}
+		if details.AudioTokens != nil {
+			if result.AudioTokens == nil {
+				result.AudioTokens = ptr.To(0)
+			}
+			*result.AudioTokens += *details.AudioTokens
+		}
+		if details.CachedAudioTokens != nil {
+			if result.CachedAudioTokens == nil {
+				result.CachedAudioTokens = ptr.To(0)
+			}
+			*result.CachedAudioTokens += *details.CachedAudioTokens
+		}
+		if details.ImageTokens != nil {
+			if result.ImageTokens == nil {
+				result.ImageTokens = ptr.To(0)
+			}
+			*result.ImageTokens += *details.ImageTokens
+		}
+		if details.CachedImageTokens != nil {
+			if result.CachedImageTokens == nil {
+				result.CachedImageTokens = ptr.To(0)
+			}
+			*result.CachedImageTokens += *details.CachedImageTokens
+		}
+	}
+
+	return result
+}
+
+func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing) float64 {
+	if pricing == nil {
+		return 0
+	}
+
 	// Extract input token counts with fallbacks
 	inputTextTokens := usage.InputTokens
 	if usage.InputTokensDetails != nil && usage.InputTokensDetails.TextTokens != nil {
@@ -109,52 +162,36 @@ func CalculateCost(usage ModelUsage, pricing LanguageModelPricing) float64 {
 		outputImageCost
 }
 
-// sumModelTokensDetails sums multiple ModelTokensDetails into one
-func SumModelTokensDetails(detailsList []ModelTokensDetails) *ModelTokensDetails {
-	if len(detailsList) == 0 {
-		return nil
+func (u *ModelUsage) Add(other *ModelUsage) *ModelUsage {
+	if u == nil {
+		return other
+	}
+	if other == nil {
+		return u
 	}
 
-	result := &ModelTokensDetails{}
-
-	for _, details := range detailsList {
-		if details.TextTokens != nil {
-			if result.TextTokens == nil {
-				result.TextTokens = ptr.To(0)
-			}
-			*result.TextTokens += *details.TextTokens
-		}
-		if details.CachedTextTokens != nil {
-			if result.CachedTextTokens == nil {
-				result.CachedTextTokens = ptr.To(0)
-			}
-			*result.CachedTextTokens += *details.CachedTextTokens
-		}
-		if details.AudioTokens != nil {
-			if result.AudioTokens == nil {
-				result.AudioTokens = ptr.To(0)
-			}
-			*result.AudioTokens += *details.AudioTokens
-		}
-		if details.CachedAudioTokens != nil {
-			if result.CachedAudioTokens == nil {
-				result.CachedAudioTokens = ptr.To(0)
-			}
-			*result.CachedAudioTokens += *details.CachedAudioTokens
-		}
-		if details.ImageTokens != nil {
-			if result.ImageTokens == nil {
-				result.ImageTokens = ptr.To(0)
-			}
-			*result.ImageTokens += *details.ImageTokens
-		}
-		if details.CachedImageTokens != nil {
-			if result.CachedImageTokens == nil {
-				result.CachedImageTokens = ptr.To(0)
-			}
-			*result.CachedImageTokens += *details.CachedImageTokens
-		}
+	result := &ModelUsage{
+		InputTokens:  u.InputTokens + other.InputTokens,
+		OutputTokens: u.OutputTokens + other.OutputTokens,
 	}
+
+	tokenDetails := []ModelTokensDetails{}
+	if u.InputTokensDetails != nil {
+		tokenDetails = append(tokenDetails, *u.InputTokensDetails)
+	}
+	if other.InputTokensDetails != nil {
+		tokenDetails = append(tokenDetails, *other.InputTokensDetails)
+	}
+	result.InputTokensDetails = SumModelTokensDetails(tokenDetails)
+
+	tokenDetails = []ModelTokensDetails{}
+	if u.OutputTokensDetails != nil {
+		tokenDetails = append(tokenDetails, *u.OutputTokensDetails)
+	}
+	if other.OutputTokensDetails != nil {
+		tokenDetails = append(tokenDetails, *other.OutputTokensDetails)
+	}
+	result.OutputTokensDetails = SumModelTokensDetails(tokenDetails)
 
 	return result
 }

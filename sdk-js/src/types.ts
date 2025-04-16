@@ -388,6 +388,7 @@ export interface ModelResponse {
 export interface PartialModelResponse {
   delta?: ContentDelta;
   usage?: ModelUsage;
+  cost?: number;
 }
 /**
  * The model will automatically choose the tool to use or not use any tools.

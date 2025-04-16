@@ -320,6 +320,7 @@ func createPart(data AccumulatedData, index int) (Part, error) {
 type StreamAccumulator struct {
 	accumulatedParts map[int]AccumulatedData
 	accumulatedUsage *ModelUsage
+	cost             float64
 }
 
 // NewStreamAccumulator creates a new StreamAccumulator
@@ -337,8 +338,8 @@ func (s *StreamAccumulator) AddPartial(partial PartialModelResponse) error {
 			return err
 		}
 	}
-	if partial.Usage != nil {
-		s.processUsage(*partial.Usage)
+	if partial.Usage != nil || partial.Cost != nil {
+		s.processUsage(partial.Usage, partial.Cost)
 	}
 	return nil
 }
@@ -362,11 +363,15 @@ func (s *StreamAccumulator) ComputeResponse() (ModelResponse, error) {
 		content = append(content, part)
 	}
 
-	return ModelResponse{
+	r := ModelResponse{
 		Content: content,
 		Usage:   s.accumulatedUsage,
 		Cost:    nil,
-	}, nil
+	}
+	if s.cost > 0 {
+		r.Cost = &s.cost
+	}
+	return r, nil
 }
 
 // Size gets the number of accumulated parts
@@ -401,17 +406,15 @@ func (s *StreamAccumulator) processDelta(delta ContentDelta) error {
 }
 
 // processUsage processes usage statistics
-func (s *StreamAccumulator) processUsage(usage ModelUsage) {
-	if s.accumulatedUsage == nil {
-		// Create a copy of the usage
-		s.accumulatedUsage = &ModelUsage{
-			InputTokens:         usage.InputTokens,
-			OutputTokens:        usage.OutputTokens,
-			InputTokensDetails:  usage.InputTokensDetails,
-			OutputTokensDetails: usage.OutputTokensDetails,
+func (s *StreamAccumulator) processUsage(usage *ModelUsage, cost *float64) {
+	if usage != nil {
+		if s.accumulatedUsage == nil {
+			// Create a copy of the usage
+			s.accumulatedUsage = &ModelUsage{}
 		}
-	} else {
-		s.accumulatedUsage.InputTokens += usage.InputTokens
-		s.accumulatedUsage.OutputTokens += usage.OutputTokens
+		s.accumulatedUsage.Add(usage)
+	}
+	if cost != nil {
+		s.cost += *cost
 	}
 }

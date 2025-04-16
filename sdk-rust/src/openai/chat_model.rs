@@ -1,14 +1,14 @@
+use std::sync::Arc;
+
 use crate::{
     client_utils,
     language_model::{LanguageModelMetadata, LanguageModelStream},
     openai::chat_api as openai_api,
-    source_part_utils, stream_utils,
-    usage_utils::calculate_cost,
-    AssistantMessage, AudioFormat, AudioOptions, AudioPart, AudioPartDelta, ContentDelta,
-    ImagePart, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult, Message,
-    Modality, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
-    ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
-    ToolChoiceOption, ToolMessage, UserMessage,
+    source_part_utils, stream_utils, AssistantMessage, AudioFormat, AudioOptions, AudioPart,
+    AudioPartDelta, ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
+    LanguageModelResult, Message, Modality, ModelResponse, ModelUsage, Part, PartDelta,
+    PartialModelResponse, ResponseFormatJson, ResponseFormatOption, TextPart, TextPartDelta, Tool,
+    ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, UserMessage,
 };
 use async_stream::try_stream;
 use futures::stream::StreamExt;
@@ -24,7 +24,7 @@ pub struct OpenAIChatModel {
     api_key: String,
     base_url: String,
     client: Client,
-    metadata: Option<LanguageModelMetadata>,
+    metadata: Option<Arc<LanguageModelMetadata>>,
 }
 
 #[derive(Clone, Default)]
@@ -55,7 +55,7 @@ impl OpenAIChatModel {
 
     #[must_use]
     pub fn with_metadata(mut self, metadata: LanguageModelMetadata) -> Self {
-        self.metadata = Some(metadata);
+        self.metadata = Some(Arc::new(metadata));
         self
     }
 }
@@ -71,7 +71,7 @@ impl LanguageModel for OpenAIChatModel {
     }
 
     fn metadata(&self) -> Option<&LanguageModelMetadata> {
-        self.metadata.as_ref()
+        self.metadata.as_deref()
     }
 
     async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
@@ -117,7 +117,7 @@ impl LanguageModel for OpenAIChatModel {
                     usage.as_ref(),
                     self.metadata.as_ref().and_then(|m| m.pricing.as_ref()),
                 ) {
-                    Some(calculate_cost(usage, pricing))
+                    Some(usage.calculate_cost(pricing))
                 } else {
                     None
                 };
@@ -138,6 +138,7 @@ impl LanguageModel for OpenAIChatModel {
             &self.model_id(),
             input,
             |input| async move {
+                let metadata = self.metadata.clone();
                 let mut params = into_openai_create_params(input, self.model_id.clone())?;
                 params.stream = Some(true);
 
@@ -186,8 +187,10 @@ impl LanguageModel for OpenAIChatModel {
                         }
 
                         if let Some(usage) = chunk.usage {
+                            let usage = ModelUsage::from(usage.clone());
                             yield PartialModelResponse {
-                                usage: Some(usage.into()),
+                                cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing)),
+                                usage: Some(usage),
                                 ..Default::default()
                             };
                         }
@@ -254,7 +257,7 @@ fn into_openai_create_params(
         audio: audio.map(TryInto::try_into).transpose()?,
         reasoning_effort: reasoning
             .and_then(|r| r.budget_tokens)
-            .map(|b| b.try_into())
+            .map(std::convert::TryInto::try_into)
             .transpose()?,
         extra,
         ..Default::default()

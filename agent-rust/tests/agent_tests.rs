@@ -137,6 +137,7 @@ async fn test_agent_run_stream_creates_session_streams_and_finishes() {
                     input_tokens_details: None,
                     output_tokens_details: None,
                 }),
+                ..Default::default()
             }]),
         );
 
@@ -156,12 +157,8 @@ async fn test_agent_run_stream_creates_session_streams_and_finishes() {
     assert!(!events.is_empty());
 
     // Check that we get at least one partial event
-    let has_partial = events.iter().any(|event| {
-        if let Ok(AgentStreamEvent::Partial(_)) = event {
-            true
-        } else {
-            false
-        }
-    });
+    let has_partial = events
+        .iter()
+        .any(|event| matches!(event, Ok(AgentStreamEvent::Partial(_))));
     assert!(has_partial);
 }

@@ -101,7 +101,7 @@ where
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
         let state = RunState::new(request.input.clone(), self.params.max_turns);
 
-        let (input, context) = self.get_llm_input(request).await?;
+        let (input, ctx) = self.get_llm_input(request).await?;
 
         loop {
             let mut input = input.clone();
@@ -112,7 +112,7 @@ where
 
             state.append_model_response(model_response).await;
 
-            let mut process_stream = self.process(context.clone(), &state, content).await;
+            let mut process_stream = self.process(ctx.clone(), &state, content).await;
 
             while let Some(event) = process_stream.next().await {
                 let event = event?;
@@ -138,7 +138,7 @@ where
     pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
         let state = Arc::new(RunState::new(request.input.clone(), self.params.max_turns));
 
-        let (input, context) = self.get_llm_input(request).await?;
+        let (input, ctx) = self.get_llm_input(request).await?;
 
         let session = Arc::new(Self {
             params: self.params.clone(),
@@ -171,7 +171,7 @@ where
                 let item = state.append_model_response(model_response).await;
                 yield AgentStreamEvent::Item(item);
 
-                let mut process_stream = session.process(context.clone(), &state, content).await;
+                let mut process_stream = session.process(ctx.clone(), &state, content).await;
 
                 while let Some(event) = process_stream.next().await {
                     let event = event?;
@@ -288,7 +288,7 @@ impl RunState {
         output.extend(messages.into_iter().map(AgentItem::Message));
     }
 
-    /// Add AgentItems to the run state.
+    /// Add `AgentItems` to the run state.
     pub async fn append_item(&self, item: AgentItem) {
         let mut output: futures::lock::MutexGuard<'_, Vec<AgentItem>> = self.output.lock().await;
         output.push(item);

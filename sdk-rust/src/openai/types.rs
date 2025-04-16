@@ -10,10 +10,10 @@ impl TryFrom<u32> for ReasoningEffort {
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
-            OPENAI_REASONING_EFFORT_MINIMAL => Ok(ReasoningEffort::Minimal),
-            OPENAI_REASONING_EFFORT_LOW => Ok(ReasoningEffort::Low),
-            OPENAI_REASONING_EFFORT_MEDIUM => Ok(ReasoningEffort::Medium),
-            OPENAI_REASONING_EFFORT_HIGH => Ok(ReasoningEffort::High),
+            OPENAI_REASONING_EFFORT_MINIMAL => Ok(Self::Minimal),
+            OPENAI_REASONING_EFFORT_LOW => Ok(Self::Low),
+            OPENAI_REASONING_EFFORT_MEDIUM => Ok(Self::Medium),
+            OPENAI_REASONING_EFFORT_HIGH => Ok(Self::High),
             _ => Err(LanguageModelError::Unsupported(
                 "openai",
                 "Budget tokens property is not supported for OpenAI reasoning. You may use \

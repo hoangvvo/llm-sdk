@@ -127,6 +127,9 @@ export class GoogleModel implements LanguageModel {
       if (chunk.usageMetadata) {
         const usage = mapGoogleUsageMetadata(chunk.usageMetadata);
         const partial: PartialModelResponse = { usage };
+        if (this.metadata?.pricing) {
+          partial.cost = calculateCost(usage, this.metadata.pricing);
+        }
         yield partial;
       }
     }

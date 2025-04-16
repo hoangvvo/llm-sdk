@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     client_utils, id_utils,
     openai::responses_api::{
@@ -11,14 +13,12 @@ use crate::{
         ResponseStreamEvent, ResponseTextConfig, ResponseUsage, ToolChoiceFunction,
         ToolImageGeneration,
     },
-    source_part_utils,
-    usage_utils::calculate_cost,
-    AssistantMessage, AudioFormat, ContentDelta, ImagePart, ImagePartDelta, LanguageModel,
-    LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
-    LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption,
-    TextPartDelta, Tool, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart,
-    UserMessage,
+    source_part_utils, AssistantMessage, AudioFormat, ContentDelta, ImagePart, ImagePartDelta,
+    LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
+    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta,
+    PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
+    ResponseFormatOption, TextPartDelta, Tool, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
+    ToolResultPart, UserMessage,
 };
 use async_stream::try_stream;
 use futures::StreamExt;
@@ -31,7 +31,7 @@ pub struct OpenAIModel {
     api_key: String,
     base_url: String,
     client: Client,
-    metadata: Option<LanguageModelMetadata>,
+    metadata: Option<Arc<LanguageModelMetadata>>,
 }
 
 #[derive(Clone, Default)]
@@ -61,7 +61,7 @@ impl OpenAIModel {
 
     #[must_use]
     pub fn with_metadata(mut self, metadata: LanguageModelMetadata) -> Self {
-        self.metadata = Some(metadata);
+        self.metadata = Some(Arc::new(metadata));
         self
     }
 }
@@ -77,7 +77,7 @@ impl LanguageModel for OpenAIModel {
     }
 
     fn metadata(&self) -> Option<&LanguageModelMetadata> {
-        self.metadata.as_ref()
+        self.metadata.as_deref()
     }
 
     async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
@@ -106,13 +106,13 @@ impl LanguageModel for OpenAIModel {
                 let responses_api::Response { output, usage, .. } = json;
 
                 let content = map_openai_output_items(output)?;
-                let usage = usage.map(Into::into);
+                let usage = usage.map(ModelUsage::from);
 
                 let cost = if let (Some(usage), Some(pricing)) = (
                     usage.as_ref(),
                     self.metadata().and_then(|m| m.pricing.as_ref()),
                 ) {
-                    Some(calculate_cost(usage, pricing))
+                    Some(usage.calculate_cost(pricing))
                 } else {
                     None
                 };
@@ -133,6 +133,7 @@ impl LanguageModel for OpenAIModel {
             &self.model_id(),
             input,
             |input| async move {
+                let metadata = self.metadata.clone();
                 let mut params = convert_to_response_create_params(input, &self.model_id())?;
                 params.stream = Some(true);
 
@@ -163,6 +164,7 @@ impl LanguageModel for OpenAIModel {
                                 let usage = ModelUsage::from(usage.clone());
                                 yield PartialModelResponse {
                                     delta: None,
+                                    cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing)),
                                     usage: Some(usage),
                                 }
                             }

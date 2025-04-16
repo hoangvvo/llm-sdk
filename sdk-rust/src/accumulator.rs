@@ -287,6 +287,8 @@ pub struct StreamAccumulator {
     accumulated_parts: BTreeMap<usize, AccumulatedData>,
     /// Accumulated usage statistics
     accumulated_usage: Option<ModelUsage>,
+    /// Accumulated cost
+    cost: Option<f64>,
 }
 
 impl StreamAccumulator {
@@ -296,6 +298,7 @@ impl StreamAccumulator {
         Self {
             accumulated_parts: BTreeMap::new(),
             accumulated_usage: None,
+            cost: None,
         }
     }
 
@@ -308,7 +311,7 @@ impl StreamAccumulator {
             self.process_delta(delta.clone())?;
         }
         if let Some(usage) = partial.usage {
-            self.process_usage(&usage);
+            self.process_usage(&usage, partial.cost);
         }
         Ok(())
     }
@@ -361,13 +364,14 @@ impl StreamAccumulator {
         }
     }
 
-    fn process_usage(&mut self, usage: &ModelUsage) {
+    fn process_usage(&mut self, usage: &ModelUsage, cost: Option<f64>) {
         let accumulated_usage = self
             .accumulated_usage
             .get_or_insert_with(ModelUsage::default);
-
-        accumulated_usage.input_tokens += usage.input_tokens;
-        accumulated_usage.output_tokens += usage.output_tokens;
+        accumulated_usage.add(usage);
+        if let Some(cost) = cost {
+            self.cost = Some(self.cost.unwrap_or(0.0) + cost);
+        }
     }
 }
 

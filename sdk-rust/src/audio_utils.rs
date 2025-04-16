@@ -58,8 +58,7 @@ pub fn map_audio_format_to_mime_type(format: &AudioFormat) -> String {
         AudioFormat::Mp3 => "audio/mp3",
         AudioFormat::Linear16 => "audio/l16",
         AudioFormat::Flac => "audio/flac",
-        AudioFormat::Mulaw => "audio/basic",
-        AudioFormat::Alaw => "audio/basic",
+        AudioFormat::Mulaw | AudioFormat::Alaw => "audio/basic",
         AudioFormat::Aac => "audio/aac",
         AudioFormat::Opus => "audio/opus",
     }

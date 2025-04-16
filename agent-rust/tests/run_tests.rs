@@ -683,7 +683,7 @@ async fn test_run_session_handles_multiple_turns_with_tool_calls() {
         assert_eq!(text_part.text, "All calculations done");
     }
     // Should have multiple outputs for multiple turns
-    assert!(response.output.len() >= 1);
+    assert!(!response.output.is_empty());
 }
 
 #[tokio::test]
@@ -724,6 +724,7 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
                 }),
             }),
             usage: Some(create_model_usage()),
+            ..Default::default()
         },
         PartialModelResponse {
             delta: Some(ContentDelta {
@@ -733,6 +734,7 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
                 }),
             }),
             usage: Some(create_model_usage()),
+            ..Default::default()
         },
         PartialModelResponse {
             delta: Some(ContentDelta {
@@ -742,6 +744,7 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
                 }),
             }),
             usage: Some(create_model_usage()),
+            ..Default::default()
         },
     ]));
 
@@ -763,13 +766,9 @@ async fn test_run_session_streaming_response_when_no_tool_call() {
     assert!(!events.is_empty());
 
     // Check that we get at least one partial event
-    let has_partial = events.iter().any(|event| {
-        if let Ok(AgentStreamEvent::Partial(_)) = event {
-            true
-        } else {
-            false
-        }
-    });
+    let has_partial = events
+        .iter()
+        .any(|event| matches!(event, Ok(AgentStreamEvent::Partial(_))));
     assert!(has_partial);
 }
 
@@ -829,9 +828,7 @@ async fn test_run_session_includes_string_and_dynamic_function_instructions() {
     ];
 
     let session: RunSession<TestContext> = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model.clone())
-            .instructions(instructions)
-            .into(),
+        AgentParams::new("test_agent", model.clone()).instructions(instructions),
     ))
     .await;
 
@@ -874,6 +871,7 @@ async fn test_run_session_streaming_tool_call_execution() {
                     }),
                 }),
                 usage: Some(create_model_usage()),
+                ..Default::default()
             }]),
         );
 
@@ -900,13 +898,9 @@ async fn test_run_session_streaming_tool_call_execution() {
     assert!(!events.is_empty());
 
     // Check that we get at least one partial event
-    let has_partial = events.iter().any(|event| {
-        if let Ok(AgentStreamEvent::Partial(_)) = event {
-            true
-        } else {
-            false
-        }
-    });
+    let has_partial = events
+        .iter()
+        .any(|event| matches!(event, Ok(AgentStreamEvent::Partial(_))));
     assert!(has_partial);
 }
 
@@ -930,6 +924,7 @@ async fn test_run_session_streaming_multiple_turns() {
                     }),
                 }),
                 usage: Some(create_model_usage()),
+                ..Default::default()
             }])
             .add_partial_responses(vec![PartialModelResponse {
                 delta: Some(ContentDelta {
@@ -941,6 +936,7 @@ async fn test_run_session_streaming_multiple_turns() {
                     }),
                 }),
                 usage: Some(create_model_usage()),
+                cost: None,
             }])
             .add_partial_responses(vec![PartialModelResponse {
                 delta: Some(ContentDelta {
@@ -950,6 +946,7 @@ async fn test_run_session_streaming_multiple_turns() {
                     }),
                 }),
                 usage: Some(create_model_usage()),
+                cost: None,
             }]),
     );
 
@@ -981,7 +978,7 @@ async fn test_run_session_streaming_multiple_turns() {
         .collect();
 
     // Should have multiple item events
-    assert!(item_events.len() >= 1);
+    assert!(!item_events.is_empty());
 }
 
 #[tokio::test]
@@ -1000,6 +997,7 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
                     }),
                 }),
                 usage: Some(create_model_usage()),
+                cost: None,
             }])
             .add_partial_responses(vec![PartialModelResponse {
                 delta: Some(ContentDelta {
@@ -1011,6 +1009,7 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
                     }),
                 }),
                 usage: Some(create_model_usage()),
+                cost: None,
             }])
             .add_partial_responses(vec![PartialModelResponse {
                 delta: Some(ContentDelta {
@@ -1022,6 +1021,7 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
                     }),
                 }),
                 usage: Some(create_model_usage()),
+                cost: None,
             }]),
     );
 
@@ -1056,7 +1056,7 @@ async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
                         break;
                     }
                     Err(_) => break,
-                    Ok(_) => continue,
+                    Ok(_) => { /* continue consuming */ }
                 }
             }
             assert!(

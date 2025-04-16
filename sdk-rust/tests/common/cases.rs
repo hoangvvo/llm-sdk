@@ -147,7 +147,7 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
                 "audio" => {
                     let audio_id = part_obj
                         .get("audio_id")
-                        .and_then(|v| v.as_bool())
+                        .and_then(serde_json::Value::as_bool)
                         .unwrap_or(false);
                     let transcript = part_obj
                         .get("transcript")
@@ -183,7 +183,7 @@ pub async fn run_test_case(
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TEST_CASES
         .get(test_case_name)
-        .ok_or_else(|| format!("Test case '{}' not found", test_case_name))?
+        .ok_or_else(|| format!("Test case '{test_case_name}' not found"))?
         .clone();
 
     let mut input = test_case.input.clone();

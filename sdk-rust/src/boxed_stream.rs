@@ -16,7 +16,7 @@ impl<'a, T> BoxedStream<'a, T> {
     }
 }
 
-impl<'a, T> Stream for BoxedStream<'a, T> {
+impl<T> Stream for BoxedStream<'_, T> {
     type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

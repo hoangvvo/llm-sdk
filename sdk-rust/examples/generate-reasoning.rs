@@ -13,9 +13,9 @@ async fn main() {
         .generate(LanguageModelInput {
             messages: vec![
                 Message::user(
-                  vec![Part::text(r#"A car starts from rest and accelerates at a constant rate of 4 m/s^2 for 10 seconds.
+                  vec![Part::text(r"A car starts from rest and accelerates at a constant rate of 4 m/s^2 for 10 seconds.
 1. What is the final velocity of the car after 10 seconds?
-2. How far does the car travel in those 10 seconds?"#)]
+2. How far does the car travel in those 10 seconds?")]
                 )
             ],
             ..Default::default()

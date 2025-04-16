@@ -5,17 +5,16 @@ use super::api::{
     ThinkingConfig, Tool, ToolConfig, VoiceConfig,
 };
 use crate::{
-    audio_utils, client_utils, id_utils, source_part_utils, stream_utils,
-    usage_utils::calculate_cost, AudioPart, ContentDelta, ImagePart, LanguageModel,
-    LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
-    LanguageModelStream, Message, ModelResponse, ModelTokensDetails, ModelUsage, Part,
-    PartialModelResponse, ReasoningPart, ResponseFormatOption, ToolChoiceOption,
+    audio_utils, client_utils, id_utils, source_part_utils, stream_utils, AudioPart, ContentDelta,
+    ImagePart, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
+    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelTokensDetails,
+    ModelUsage, Part, PartialModelResponse, ReasoningPart, ResponseFormatOption, ToolChoiceOption,
 };
 use async_stream::try_stream;
 use futures::StreamExt;
 use reqwest::Client;
 use serde_json::json;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 const PROVIDER: &str = "google";
 
@@ -24,7 +23,7 @@ pub struct GoogleModel {
     api_key: String,
     base_url: String,
     client: Client,
-    metadata: Option<LanguageModelMetadata>,
+    metadata: Option<Arc<LanguageModelMetadata>>,
 }
 
 #[derive(Clone, Default)]
@@ -52,7 +51,7 @@ impl GoogleModel {
 
     #[must_use]
     pub fn with_metadata(mut self, metadata: LanguageModelMetadata) -> Self {
-        self.metadata = Some(metadata);
+        self.metadata = Some(Arc::new(metadata));
         self
     }
 }
@@ -68,7 +67,7 @@ impl LanguageModel for GoogleModel {
     }
 
     fn metadata(&self) -> Option<&LanguageModelMetadata> {
-        self.metadata.as_ref()
+        self.metadata.as_deref()
     }
 
     async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
@@ -114,7 +113,7 @@ impl LanguageModel for GoogleModel {
                     usage.as_ref(),
                     self.metadata().and_then(|m| m.pricing.as_ref()),
                 ) {
-                    Some(calculate_cost(usage, pricing))
+                    Some(usage.calculate_cost(pricing))
                 } else {
                     None
                 };
@@ -136,6 +135,7 @@ impl LanguageModel for GoogleModel {
             input,
             |input| async move {
                 let params = convert_to_generate_content_parameters(input, &self.model_id)?;
+                let metadata = self.metadata.clone();
 
                 let url = format!(
                     "{}/models/{}:streamGenerateContent?key={}&alt=sse",
@@ -175,6 +175,7 @@ impl LanguageModel for GoogleModel {
                                         yield PartialModelResponse {
                                             delta: Some(delta),
                                             usage: None,
+                                            cost: None,
                                         };
                                     }
                                 }
@@ -185,6 +186,10 @@ impl LanguageModel for GoogleModel {
                             let usage = map_google_usage_metadata(&usage_metadata);
                             yield PartialModelResponse {
                                 delta: None,
+                                cost: metadata
+                                    .as_ref()
+                                    .and_then(|m| m.pricing.as_ref())
+                                    .map(|pricing| usage.calculate_cost(pricing)),
                                 usage: Some(usage),
                             };
                         }
@@ -240,7 +245,7 @@ fn convert_to_generate_content_parameters(
         config.seed = Some(seed);
     }
     if let Some(max_tokens) = input.max_tokens {
-        config.max_output_tokens = Some(max_tokens as i32);
+        config.max_output_tokens = Some(max_tokens);
     }
 
     if let Some(tools) = input.tools {
@@ -554,7 +559,7 @@ fn map_google_content_to_delta(
 
     let parts = map_google_content(parts)?;
 
-    for part in parts.into_iter() {
+    for part in parts {
         let part_delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
         let guessed_index = stream_utils::guess_delta_index(&part_delta, existing_deltas, None);
         deltas.push(ContentDelta {
@@ -569,8 +574,8 @@ fn map_google_content_to_delta(
 fn map_google_usage_metadata(
     usage: &super::api::GenerateContentResponseUsageMetadata,
 ) -> ModelUsage {
-    let input_tokens = usage.prompt_token_count.unwrap_or(0) as u32;
-    let output_tokens = usage.candidates_token_count.unwrap_or(0) as u32;
+    let input_tokens = usage.prompt_token_count.unwrap_or(0);
+    let output_tokens = usage.candidates_token_count.unwrap_or(0);
 
     let input_tokens_details = map_modality_token_counts(
         usage.prompt_tokens_details.as_ref(),
@@ -608,16 +613,15 @@ fn map_modality_token_counts(
     if let Some(details) = details {
         for detail in details {
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
-                let count = count as u32;
                 match modality {
                     MediaModality::Text => {
-                        *tokens_details.text_tokens.get_or_insert_default() += count
+                        *tokens_details.text_tokens.get_or_insert_default() += count;
                     }
                     MediaModality::Audio => {
-                        *tokens_details.audio_tokens.get_or_insert_default() += count
+                        *tokens_details.audio_tokens.get_or_insert_default() += count;
                     }
                     MediaModality::Image => {
-                        *tokens_details.image_tokens.get_or_insert_default() += count
+                        *tokens_details.image_tokens.get_or_insert_default() += count;
                     }
                     _ => {}
                 }
@@ -628,16 +632,15 @@ fn map_modality_token_counts(
     if let Some(cached) = cached_details {
         for detail in cached {
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
-                let count = count as u32;
                 match modality {
                     MediaModality::Text => {
-                        *tokens_details.cached_text_tokens.get_or_insert_default() += count
+                        *tokens_details.cached_text_tokens.get_or_insert_default() += count;
                     }
                     MediaModality::Audio => {
-                        *tokens_details.cached_audio_tokens.get_or_insert_default() += count
+                        *tokens_details.cached_audio_tokens.get_or_insert_default() += count;
                     }
                     MediaModality::Image => {
-                        *tokens_details.cached_image_tokens.get_or_insert_default() += count
+                        *tokens_details.cached_image_tokens.get_or_insert_default() += count;
                     }
                     _ => {}
                 }

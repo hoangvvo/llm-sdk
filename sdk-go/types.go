@@ -729,6 +729,7 @@ type ModelResponse struct {
 type PartialModelResponse struct {
 	Delta *ContentDelta `json:"delta,omitempty"`
 	Usage *ModelUsage   `json:"usage,omitempty"`
+	Cost  *float64      `json:"cost,omitempty"`
 }
 
 // LanguageModelInput defines the input parameters for the language model completion.

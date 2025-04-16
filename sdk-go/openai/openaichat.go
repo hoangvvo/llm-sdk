@@ -121,6 +121,10 @@ func (m *OpenAIChatModel) Generate(ctx context.Context, input *llmsdk.LanguageMo
 		Content: content,
 		Usage:   usage,
 	}
+	if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
+		cost := usage.CalculateCost(m.metadata.Pricing)
+		result.Cost = &cost
+	}
 
 	span.OnResponse(result)
 
@@ -209,6 +213,9 @@ func (m *OpenAIChatModel) Stream(ctx context.Context, input *llmsdk.LanguageMode
 				}
 				partial := &llmsdk.PartialModelResponse{
 					Usage: usage,
+				}
+				if m.metadata != nil && m.metadata.Pricing != nil {
+					partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
 				}
 				span.OnStreamPartial(partial)
 

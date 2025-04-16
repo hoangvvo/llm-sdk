@@ -71,16 +71,17 @@ impl LMSpan {
         if let Some(usage) = &response.usage {
             self.usage = Some(usage.clone());
         }
+        if let Some(cost) = response.cost {
+            self.cost = Some(cost);
+        }
     }
 
     pub fn on_stream_partial(&mut self, partial: &PartialModelResponse) {
         if let Some(usage) = &partial.usage {
-            if let Some(ref mut usage) = self.usage {
-                usage.input_tokens += usage.input_tokens;
-                usage.output_tokens += usage.output_tokens;
-            } else {
-                self.usage = Some(usage.clone());
-            }
+            self.usage.get_or_insert_with(Default::default).add(usage);
+        }
+        if let Some(cost) = partial.cost {
+            *self.cost.get_or_insert(0.0) += cost;
         }
         if partial.delta.is_some() && self.time_to_first_token.is_none() {
             self.time_to_first_token = Some(
@@ -113,6 +114,9 @@ impl LMSpan {
                 "gen_ai.usage.output_tokens",
                 i64::from(usage.output_tokens),
             ));
+        }
+        if let Some(cost) = self.cost {
+            self.span.set_attribute(KeyValue::new("llm_sdk.cost", cost));
         }
         if let Some(time_to_first_token) = self.time_to_first_token {
             self.span.set_attribute(KeyValue::new(

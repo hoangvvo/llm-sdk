@@ -142,6 +142,9 @@ export class OpenAIChatModel implements LanguageModel {
       if (chunk.usage) {
         const usage = mapOpenAIUsage(chunk.usage, input);
         const event: PartialModelResponse = { usage };
+        if (this.metadata?.pricing) {
+          event.cost = calculateCost(usage, this.metadata.pricing);
+        }
         yield event;
       }
     }

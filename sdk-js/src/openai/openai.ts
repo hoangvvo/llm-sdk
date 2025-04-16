@@ -120,6 +120,9 @@ export class OpenAIModel implements LanguageModel {
         if (event.response.usage) {
           const usage = mapOpenAIUsage(event.response.usage);
           const partial: PartialModelResponse = { usage };
+          if (this.metadata?.pricing) {
+            partial.cost = calculateCost(usage, this.metadata.pricing);
+          }
           yield partial;
         }
       }
