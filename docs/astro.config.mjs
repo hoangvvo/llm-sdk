@@ -1,5 +1,7 @@
 // @ts-check
+import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 
 // https://astro.build/config
@@ -42,7 +44,20 @@ export default defineConfig({
             { slug: "agent/agents-delegation" },
           ],
         },
+        {
+          label: "Demo",
+          items: [
+            {
+              label: "Chat",
+              link: "/console",
+            },
+          ],
+        },
       ],
     }),
+    react(),
   ],
+  vite: {
+    plugins: [tailwindcss()],
+  },
 });

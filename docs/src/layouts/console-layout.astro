@@ -1,0 +1,49 @@
+---
+import { Icon } from "@astrojs/starlight/components";
+import "../styles/global.css";
+export interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const { pathname } = Astro.url;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>llm-sdk | {title}</title>
+    <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="flex">
+    <!-- Sidebar -->
+    <aside class="w-24 h-screen border-r border-gray-200 p-2">
+      <nav>
+        <ul>
+          <li class="mb-2">
+            <a
+              href="/agent/"
+              class="flex gap-0.5 flex-col items-center text-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-2"
+            >
+              <Icon name="open-book" size="1.5rem" />
+              <span class="text-sm font-mono">Docs</span>
+            </a>
+          </li>
+          <li class="mb-2">
+            <a
+              href="/console"
+              class="flex gap-0.5 flex-col items-center text-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-2"
+            >
+              <Icon name="comment" size="1.5rem" />
+              <span class="text-sm font-mono">Chat</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+    <div class="flex-1 min-w-0">
+      <slot />
+    </div>
+  </body>
+</html>

@@ -1,5 +1,7 @@
 import pluginJs from "@eslint/js";
 import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
 import { globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
@@ -16,6 +18,14 @@ export default [
   pluginJs.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
+  {
+    files: ["./app/**/*.{ts,tsx}"],
+    ...reactHooks.configs["recommended-latest"],
+  },
+  {
+    files: ["./app/**/*.{ts,tsx}"],
+    ...reactRefresh.configs.vite,
+  },
   {
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },

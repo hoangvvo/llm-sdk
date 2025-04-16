@@ -48,6 +48,20 @@ This may enabled by default for supported models, but can be configured using `r
       title="types.ts"
     />
   </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["ReasoningOptions"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["ReasoningOptions"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
 </Tabs>
 
 Once enabled, the model will output `ReasoningPart`s in addition to other parts.
