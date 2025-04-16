@@ -12,6 +12,7 @@ import type {
   Part,
   ReasoningPart,
   TextPart,
+  ToolCallPart,
 } from "@hoangvvo/llm-sdk";
 import { stream as eventStream } from "fetch-event-stream";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -259,7 +260,7 @@ export function ConsoleApp() {
       try {
         const player = await ensureStreamPlayer(delta.sample_rate ?? undefined);
         const buffer = base64ToArrayBuffer(delta.audio_data);
-        player.add16BitPCM(buffer, delta.audio_id ?? "default");
+        player.add16BitPCM(buffer, delta.id ?? "default");
       } catch (err) {
         console.error("Failed to play streaming audio", err);
       }
@@ -521,6 +522,7 @@ function reduceContentDelta(
         image_data: previousImage.image_data + (part.image_data ?? ""),
         width: part.width ?? previousImage.width,
         height: part.height ?? previousImage.height,
+        id: part.id ?? previousImage.id,
       } satisfies ImagePart;
       break;
     }
@@ -540,7 +542,7 @@ function reduceContentDelta(
         sample_rate: part.sample_rate ?? previousAudio.sample_rate,
         channels: part.channels ?? previousAudio.channels,
         transcript: `${previousAudio.transcript ?? ""}${part.transcript ?? ""}`,
-        audio_id: part.audio_id ?? previousAudio.audio_id,
+        id: part.id ?? previousAudio.id,
       } satisfies AudioPart;
       break;
     }
@@ -554,22 +556,27 @@ function reduceContentDelta(
         ...previousReasoning,
         text: `${previousReasoning.text}${separator}${part.text}`,
         signature: part.signature ?? previousReasoning.signature,
+        id: part.id ?? previousReasoning.id,
       } satisfies ReasoningPart;
       break;
     }
     case "tool-call": {
-      const previousText = next[index]?.type === "text" ? next[index].text : "";
-      const segments = [previousText];
-      if (part.tool_name) {
-        segments.push(`Tool: ${part.tool_name}\n`);
-      }
-      if (part.args) {
-        segments.push(part.args);
-      }
+      const previousToolCall: ToolCallPart =
+        next[index]?.type === "tool-call"
+          ? next[index]
+          : {
+              type: "tool-call",
+              tool_name: part.tool_name ?? "unknown",
+              args: {},
+              tool_call_id: part.tool_call_id ?? "",
+            };
       next[index] = {
-        type: "text",
-        text: segments.join(""),
-      } satisfies TextPart;
+        ...previousToolCall,
+        tool_name: part.tool_name ?? previousToolCall.tool_name,
+        args: {},
+        tool_call_id: part.tool_call_id ?? previousToolCall.tool_call_id,
+        id: part.id ?? previousToolCall.id,
+      } satisfies ToolCallPart;
       break;
     }
   }

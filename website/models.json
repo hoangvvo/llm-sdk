@@ -128,7 +128,8 @@
         "input_cost_per_audio_token": 0.7e-6
       }
     },
-    "modalities": ["text", "image"]
+    "modalities": ["text", "image"],
+    "no_system_prompt": true
   },
   {
     "provider": "cohere",

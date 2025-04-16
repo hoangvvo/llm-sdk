@@ -55,12 +55,16 @@ function ConversationItem({ item }: { item: AgentItem }) {
       <div className="console-card-assistant">
         <div className="console-section-title mb-3 text-sky-600">Assistant</div>
         <PartsList parts={item.content} />
-        {item.usage ? (
-          <div className="console-subheading mt-4">
-            usage · in {item.usage.input_tokens} · out{" "}
-            {item.usage.output_tokens}
-          </div>
-        ) : null}
+        <div className="console-subheading mt-4 tracking-normal!">
+          {item.usage ? (
+            <span>
+              usage: in {item.usage.input_tokens} · out{" "}
+              {item.usage.output_tokens}
+            </span>
+          ) : null}
+          {"  |  "}
+          {item.cost ? <span>cost: ${item.cost.toFixed(6)}</span> : null}
+        </div>
       </div>
     );
   }
@@ -94,7 +98,6 @@ function ConversationItem({ item }: { item: AgentItem }) {
 }
 
 function PartsList({ parts }: { parts: Part[] }) {
-  console.log("Rendering PartsList with parts:", parts);
   return (
     <div className="flex flex-col items-start gap-4 text-sm leading-relaxed text-slate-700">
       {parts.map((part, index) => (
