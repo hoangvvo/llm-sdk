@@ -1,3 +1,97 @@
-@layer base, starlight, theme, components, utilities;
+@layer base, starlight, theme, utilities;
 
 @import "tailwindcss";
+
+@layer components {
+  .console-section-title {
+    @apply text-xs tracking-[0.3em] text-slate-500 uppercase;
+  }
+
+  .console-subheading {
+    @apply text-[11px] tracking-[0.25em] text-slate-500 uppercase;
+  }
+
+  .console-microcaps {
+    @apply text-[11px] tracking-[0.2em] text-slate-500 uppercase;
+  }
+
+  .console-label {
+    @apply block text-[11px] tracking-[0.2em] text-slate-500 uppercase;
+  }
+
+  .console-field {
+    @apply rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:ring-2 focus:ring-slate-300 focus:outline-none;
+  }
+
+  .console-textarea {
+    @apply min-h-[96px] w-full resize-y rounded border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 focus:outline-none;
+  }
+
+  .console-button {
+    @apply inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-1.5 text-[11px] tracking-[0.2em] text-slate-600 uppercase transition hover:border-slate-400 hover:bg-white hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .console-button-primary {
+    @apply border-slate-900 bg-slate-900 text-white hover:border-slate-700 hover:bg-slate-700;
+  }
+
+  .console-button-danger {
+    @apply border-rose-200 bg-rose-50 text-rose-600 hover:border-rose-300 hover:bg-rose-100;
+  }
+
+  .console-button-success {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100;
+  }
+
+  .console-button-quiet {
+    @apply border-transparent bg-transparent text-rose-500 hover:text-rose-600;
+  }
+
+  .console-surface {
+    @apply rounded-xl border border-slate-200 bg-white/80 p-4;
+  }
+
+  .console-card-user {
+    @apply rounded-xl border border-rose-100 bg-rose-50/80 p-5;
+  }
+
+  .console-card-assistant {
+    @apply rounded-xl border border-sky-100 bg-sky-50/70 p-5;
+  }
+
+  .console-card-tool {
+    @apply rounded-xl border border-indigo-100 bg-indigo-50/60 p-5;
+  }
+
+  .console-card-stream {
+    @apply rounded-xl border border-sky-100 bg-sky-50/70 p-5;
+  }
+
+  .console-card-source {
+    @apply rounded-xl border border-slate-200 bg-white p-3;
+  }
+
+  .console-card-tool-call {
+    @apply rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700;
+  }
+
+  .console-card-tool-result {
+    @apply rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700;
+  }
+
+  .console-card-reasoning {
+    @apply rounded-xl border border-slate-200 bg-slate-100 p-3 text-sm text-slate-700;
+  }
+
+  .console-chip {
+    @apply inline-flex items-center rounded-full border border-slate-300 px-2 py-0.5 text-[11px] tracking-wide text-slate-500 uppercase;
+  }
+
+  .console-preview {
+    @apply relative flex w-40 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white;
+  }
+
+  .console-placeholder {
+    @apply rounded-xl border border-dashed border-slate-200 bg-white/80 p-4 text-center text-slate-500;
+  }
+}

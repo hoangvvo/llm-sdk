@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { base64ToArrayBuffer } from "../lib/utils.ts";
 import { WavPacker } from "../lib/wavtools/wav_packer.ts";
 import { Markdown } from "./markdown.tsx";
+import { SecurityBanner } from "./security-banner.tsx";
 
 interface ChatPaneProps {
   items: AgentItem[];
@@ -14,30 +15,19 @@ export function ChatPane({ items, streamingParts }: ChatPaneProps) {
   return (
     <main className="flex-1 space-y-6 overflow-y-auto px-8 py-6">
       {items.length === 0 && streamingParts.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-200/80 bg-white/70 p-10 text-slate-500">
-          <p className="text-md uppercase text-centeer tracking-[0.2em]">
+        <div className="console-placeholder p-10">
+          <p className="text-md text-centeer tracking-[0.2em] uppercase">
             Welcome to the Chat Console
           </p>
-          <p className="text-xs mt-4">
-            Make sure to start any of the example servers:
-          </p>
-          <div className="mt-4 rounded bg-slate-100 p-3 text-xs text-slate-700">
-            cd ../agent-js &amp;&amp; node --env-file ../.env examples/server.ts
-          </div>
-          <div className="mt-2 rounded bg-slate-100 p-3 text-xs text-slate-700">
-            cd ../agent-rust &amp;&amp; cargo run --example server
-          </div>
-          <div className="mt-2 rounded bg-slate-100 p-3 text-xs text-slate-700">
-            cd ../agent-go &amp;&amp; go run ./examples/server
-          </div>
+          <SecurityBanner />
         </div>
       ) : null}
       {items.map((item, index) => (
         <ConversationItem key={`${String(index)}-${item.type}`} item={item} />
       ))}
       {streamingParts.length > 0 ? (
-        <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-5">
-          <div className="mb-3 text-[11px] uppercase tracking-[0.35em] text-sky-600">
+        <div className="console-card-stream">
+          <div className="console-section-title mb-3 text-sky-600">
             Assistant · streaming
           </div>
           <PartsList parts={streamingParts} />
@@ -51,8 +41,8 @@ function ConversationItem({ item }: { item: AgentItem }) {
   if (item.type === "message") {
     const heading = item.role === "user" ? "You" : "Assistant";
     return (
-      <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-5">
-        <div className="mb-3 text-[11px] uppercase tracking-[0.3em] text-slate-500">
+      <div className="console-card-user">
+        <div className="console-section-title mb-3 text-slate-600">
           {heading}
         </div>
         <PartsList parts={item.content} />
@@ -62,13 +52,11 @@ function ConversationItem({ item }: { item: AgentItem }) {
 
   if (item.type === "model") {
     return (
-      <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-5">
-        <div className="mb-3 text-[11px] uppercase tracking-[0.3em] text-sky-600">
-          Assistant
-        </div>
+      <div className="console-card-assistant">
+        <div className="console-section-title mb-3 text-sky-600">Assistant</div>
         <PartsList parts={item.content} />
         {item.usage ? (
-          <div className="mt-4 text-[11px] uppercase tracking-[0.25em] text-slate-500">
+          <div className="console-subheading mt-4">
             usage · in {item.usage.input_tokens} · out{" "}
             {item.usage.output_tokens}
           </div>
@@ -78,8 +66,8 @@ function ConversationItem({ item }: { item: AgentItem }) {
   }
 
   return (
-    <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
-      <div className="mb-3 text-[11px] uppercase tracking-[0.3em] text-indigo-500">
+    <div className="console-card-tool">
+      <div className="console-section-title mb-3 text-indigo-500">
         Tool · {item.tool_name}
       </div>
       <div className="mb-3 text-[13px] text-slate-600">
@@ -87,21 +75,17 @@ function ConversationItem({ item }: { item: AgentItem }) {
         {item.tool_call_id}
       </div>
       <div className="mb-3">
-        <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
-          Input
-        </div>
-        <pre className="mt-1 whitespace-pre-wrap break-words rounded-md bg-slate-100 p-3 text-xs text-slate-800">
+        <div className="console-subheading">Input</div>
+        <pre className="mt-1 rounded-md bg-slate-100 p-3 text-xs break-words whitespace-pre-wrap text-slate-800">
           {JSON.stringify(item.input, null, 2)}
         </pre>
       </div>
       <div>
-        <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
-          Output
-        </div>
+        <div className="console-subheading">Output</div>
         <PartsList parts={item.output} />
       </div>
       {item.is_error ? (
-        <div className="mt-3 text-[11px] uppercase tracking-[0.25em] text-rose-500">
+        <div className="console-subheading mt-3 text-rose-500">
           Tool reported an error.
         </div>
       ) : null}
@@ -136,10 +120,8 @@ function PartView({ part }: { part: Part }) {
       return <AudioPartView part={part} />;
     case "source":
       return (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
-          <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
-            Source
-          </div>
+        <div className="console-card-source text-xs text-slate-600">
+          <div className="console-subheading">Source</div>
           <div className="mt-2 font-semibold text-slate-800">{part.title}</div>
           <div className="mt-2">
             <PartsList parts={part.content} />
@@ -148,22 +130,20 @@ function PartView({ part }: { part: Part }) {
       );
     case "tool-call":
       return (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-          <div className="text-[11px] uppercase tracking-[0.25em] text-amber-600">
+        <div className="console-card-tool-call">
+          <div className="console-subheading text-amber-600">
             Requested tool
           </div>
           <div className="mt-2 text-amber-700">{part.tool_name}</div>
-          <div className="mt-3 whitespace-pre-wrap break-words text-[11px] text-amber-800">
+          <div className="mt-3 text-[11px] break-words whitespace-pre-wrap text-amber-800">
             {JSON.stringify(part.args, null, 2)}
           </div>
         </div>
       );
     case "tool-result":
       return (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
-          <div className="text-[11px] uppercase tracking-[0.25em] text-emerald-600">
-            Tool result
-          </div>
+        <div className="console-card-tool-result">
+          <div className="console-subheading text-emerald-600">Tool result</div>
           <div className="mt-2">
             <PartsList parts={part.content} />
           </div>
@@ -174,16 +154,14 @@ function PartView({ part }: { part: Part }) {
       );
     case "reasoning":
       return (
-        <div className="rounded-xl border border-slate-200 bg-slate-100 p-3 text-sm text-slate-700">
-          <div className="mb-2 text-[11px] uppercase tracking-[0.25em] text-slate-500">
-            Reasoning
-          </div>
+        <div className="console-card-reasoning">
+          <div className="console-subheading mb-2">Reasoning</div>
           <Markdown>{part.text}</Markdown>
         </div>
       );
     default:
       return (
-        <pre className="whitespace-pre-wrap break-words rounded-md bg-slate-100 p-3 text-xs text-slate-800">
+        <pre className="console-surface text-xs break-words whitespace-pre-wrap text-slate-800">
           {JSON.stringify(part, null, 2)}
         </pre>
       );
@@ -195,11 +173,11 @@ function AudioPartView({ part }: { part: AudioPart }) {
   const transcript = part.transcript?.trim();
 
   return (
-    <div className="space-y-2 w-full">
+    <div className="w-full space-y-2">
       {src ? (
         <audio src={src} controls className="w-full" />
       ) : (
-        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs uppercase tracking-[0.25em] text-slate-400">
+        <div className="console-surface p-2 text-xs tracking-[0.2em] text-slate-500 uppercase">
           Audio loading…
         </div>
       )}

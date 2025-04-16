@@ -270,7 +270,7 @@ export function Composer({
     >
       <div className="flex flex-col gap-3">
         <textarea
-          className="min-h-[96px] w-full resize-y rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 text-sm tracking-[0.12em] text-slate-800 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          className="console-textarea"
           placeholder="Send a message..."
           value={inputText}
           onChange={(event) => {
@@ -300,11 +300,11 @@ export function Composer({
             ))}
           </div>
         ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.2em]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded-full border border-slate-200 bg-white/70 px-4 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white hover:text-slate-900"
+              className="console-button"
               onClick={() => imageInputRef.current?.click()}
               disabled={disabled || isStreaming || isRecording}
             >
@@ -312,7 +312,7 @@ export function Composer({
             </button>
             <button
               type="button"
-              className="rounded-full border border-slate-200 bg-white/70 px-4 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white hover:text-slate-900"
+              className="console-button"
               onClick={() => audioInputRef.current?.click()}
               disabled={disabled || isStreaming || isRecording}
             >
@@ -320,10 +320,8 @@ export function Composer({
             </button>
             <button
               type="button"
-              className={`rounded-full border px-4 py-1.5 text-[11px] font-semibold transition ${
-                isRecording
-                  ? "border-rose-200 bg-rose-50 text-rose-600 hover:border-rose-300 hover:bg-rose-100"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100"
+              className={`console-button ${
+                isRecording ? "console-button-danger" : "console-button-success"
               }`}
               onClick={() => {
                 if (isRecording) {
@@ -363,7 +361,7 @@ export function Composer({
             {isStreaming ? (
               <button
                 type="button"
-                className="rounded-full border border-rose-200 bg-rose-50 px-4 py-1.5 text-[11px] font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-100"
+                className="console-button console-button-danger"
                 onClick={onAbort}
               >
                 Stop
@@ -371,7 +369,7 @@ export function Composer({
             ) : null}
             <button
               type="submit"
-              className="rounded-full border border-slate-400/80 bg-white/80 px-6 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-white/80"
+              className="console-button console-button-primary"
               disabled={!canSubmit}
             >
               Send
@@ -379,9 +377,7 @@ export function Composer({
           </div>
         </div>
         {isRecording ? (
-          <p className="text-[11px] uppercase tracking-[0.25em] text-rose-500">
-            Recording…
-          </p>
+          <p className="console-subheading text-rose-500">Recording…</p>
         ) : null}
       </div>
     </form>
@@ -494,10 +490,10 @@ function AttachmentPreview({
   onRemove: () => void;
 }) {
   return (
-    <div className="relative flex w-40 flex-col overflow-hidden rounded-lg border border-slate-200/80 bg-white/80">
+    <div className="console-preview">
       <button
         type="button"
-        className="absolute right-1 top-1 z-10 rounded bg-white/90 px-2 text-[11px] text-slate-600 ring-1 ring-slate-200 transition hover:bg-white"
+        className="console-button absolute top-1 right-1 z-10 px-2 py-0 text-[11px]"
         onClick={onRemove}
       >
         ✕

@@ -23,9 +23,7 @@ export function EventsPane({ events }: EventsPaneProps) {
   if (events.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="rounded-xl border border-dashed border-slate-200/80 bg-white/70 p-10 text-center text-sm uppercase tracking-[0.2em] text-slate-500">
-          No events yet.
-        </div>
+        <div className="console-placeholder p-10">No events yet.</div>
       </div>
     );
   }
@@ -38,7 +36,7 @@ export function EventsPane({ events }: EventsPaneProps) {
           return (
             <div
               key={event.id}
-              className="overflow-hidden rounded-xl border border-slate-200 bg-white/80"
+              className="console-surface overflow-hidden p-0!"
             >
               <button
                 type="button"
@@ -68,7 +66,7 @@ export function EventsPane({ events }: EventsPaneProps) {
               {expanded ? (
                 <div className="border-t border-slate-200 bg-white px-4 py-3">
                   <div className="max-h-64 overflow-auto rounded-lg bg-slate-950/90 p-4 text-xs text-slate-100">
-                    <pre className="whitespace-pre overflow-x-auto">
+                    <pre className="overflow-x-auto whitespace-pre">
                       {JSON.stringify(event.payload, null, 2)}
                     </pre>
                   </div>

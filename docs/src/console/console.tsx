@@ -22,16 +22,17 @@ import {
   Sidebar,
   type ModelOption,
   type ModelSelection,
-} from "./components/model-sidebar.tsx";
+} from "./components/sidebar.tsx";
 import { base64ToArrayBuffer, createId } from "./lib/utils.ts";
 import { WavStreamPlayer } from "./lib/wavtools/wav_stream_player.ts";
-import type { LoggedEvent, ModelInfo } from "./types.ts";
+import type { ApiKeys, LoggedEvent, ModelInfo, MyContext } from "./types.ts";
 
 const API_BASE_URL = "http://localhost:4000";
 const RUN_STREAM_URL = `${API_BASE_URL}/run-stream`;
 const MODELS_URL = `${API_BASE_URL}/models`;
 
 const STORAGE_KEY_MODEL = "console-selected-model";
+const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
 
 type ServerToClientEvent = AgentStreamEvent | { event: "error"; error: string };
 
@@ -48,6 +49,8 @@ export function ConsoleApp() {
     null,
   );
   const [modelFetchError, setModelFetchError] = useState<string | null>(null);
+  const [providerApiKeys, setProviderApiKeys] = useState<ApiKeys>({});
+  const [userContext, setUserContext] = useState<MyContext>({});
 
   const allItems = useMemo(() => [...items, ...nextItems], [items, nextItems]);
 
@@ -87,6 +90,19 @@ export function ConsoleApp() {
         const options = data.map(mapModelInfo);
         setModelOptions(options);
         setModelFetchError(null);
+        setProviderApiKeys((prev) => {
+          const next = { ...prev };
+          for (const option of options) {
+            const storageKey = getProviderApiKeyStorageKey(option.provider);
+            const storedValue = localStorage.getItem(storageKey);
+            if (storedValue) {
+              next[option.provider] = storedValue;
+            } else {
+              next[option.provider] = undefined;
+            }
+          }
+          return next;
+        });
         if (options.length > 0) {
           const stored = localStorage.getItem(STORAGE_KEY_MODEL);
           if (stored) {
@@ -138,11 +154,48 @@ export function ConsoleApp() {
     };
   }, []);
 
-  useEffect(() => {
-    if (modelSelection) {
-      localStorage.setItem(STORAGE_KEY_MODEL, JSON.stringify(modelSelection));
+  const handleSaveProviderApiKey = useCallback(
+    (provider: string, apiKey: string) => {
+      const trimmed = apiKey.trim();
+      setProviderApiKeys((prev) => {
+        const next = { ...prev };
+        const storageKey = getProviderApiKeyStorageKey(provider);
+        if (trimmed) {
+          next[provider] = trimmed;
+          localStorage.setItem(storageKey, trimmed);
+        } else {
+          next[provider] = undefined;
+          localStorage.removeItem(storageKey);
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleUpdateModelSelection = useCallback<
+    React.Dispatch<React.SetStateAction<ModelSelection | null>>
+  >((selection) => {
+    setModelSelection(selection);
+    if (typeof selection === "function") {
+      setModelSelection((current) => {
+        const next = selection(current);
+        if (next) {
+          localStorage.setItem(STORAGE_KEY_MODEL, JSON.stringify(next));
+        } else {
+          localStorage.removeItem(STORAGE_KEY_MODEL);
+        }
+        return next;
+      });
+    } else {
+      if (selection) {
+        localStorage.setItem(STORAGE_KEY_MODEL, JSON.stringify(selection));
+      } else {
+        localStorage.removeItem(STORAGE_KEY_MODEL);
+      }
+      setModelSelection(selection);
     }
-  }, [modelSelection]);
+  }, []);
 
   const logEvent = useCallback(
     (direction: "client" | "server", name: string, payload: unknown) => {
@@ -230,13 +283,23 @@ export function ConsoleApp() {
       setStreamingParts([]);
 
       try {
+        const requestContext: MyContext = {};
+        const name = userContext.name?.trim();
+        if (name) {
+          requestContext.name = name;
+        }
+        const location = userContext.location?.trim();
+        if (location) {
+          requestContext.location = location;
+        }
+
         const inputPayload = {
           provider: modelSelection.provider,
           model_id: modelSelection.modelId,
           input: {
             input: conversation,
-            context: {},
-          } satisfies AgentRequest<Record<string, unknown>>,
+            context: requestContext,
+          } satisfies AgentRequest<MyContext>,
         };
 
         logEvent("client", "request", inputPayload);
@@ -245,6 +308,9 @@ export function ConsoleApp() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...(providerApiKeys[modelSelection.provider]
+              ? { Authorization: providerApiKeys[modelSelection.provider] }
+              : {}),
           },
           body: JSON.stringify(inputPayload),
           signal: controller.signal,
@@ -312,7 +378,7 @@ export function ConsoleApp() {
         setIsStreaming(false);
       }
     },
-    [handleAudioDelta, logEvent, modelSelection],
+    [handleAudioDelta, logEvent, modelSelection, providerApiKeys, userContext],
   );
 
   const handleAbort = useCallback(() => {
@@ -339,9 +405,9 @@ export function ConsoleApp() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-rose-50 text-slate-900 font-mono">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-rose-50 font-mono text-slate-900">
       <div className="flex h-screen">
-        <section className="flex flex-1 flex-col border-slate-200/70 bg-white/75 backdrop-blur-sm">
+        <section className="flex min-w-0 flex-1 flex-col border-slate-200/70 bg-white/75 backdrop-blur-sm">
           <header className="border-b border-slate-200/70 px-8 py-3">
             <div className="flex items-center justify-between">
               <div>
@@ -349,7 +415,7 @@ export function ConsoleApp() {
                   Chat Console
                 </h1>
               </div>
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em]">
+              <div className="flex items-center gap-2 text-xs tracking-[0.25em] uppercase">
                 <button
                   type="button"
                   className={`rounded-full border px-4 py-1.5 transition ${
@@ -385,7 +451,7 @@ export function ConsoleApp() {
             <EventsPane events={eventLog} />
           )}
           {error ? (
-            <div className="text-xs bg-rose-500 text-white text-center py-1">
+            <div className="bg-rose-500 py-1 text-center text-xs text-white">
               {error}
             </div>
           ) : null}
@@ -400,8 +466,12 @@ export function ConsoleApp() {
         <Sidebar
           models={modelOptions}
           selection={modelSelection}
-          onChange={setModelSelection}
-          errorMessage={modelFetchError}
+          onModelSelectionChange={handleUpdateModelSelection}
+          modelSelectionErrorMessage={modelFetchError}
+          apiKeys={providerApiKeys}
+          onSaveApiKey={handleSaveProviderApiKey}
+          context={userContext}
+          onContextChange={setUserContext}
         />
       </div>
     </div>
@@ -543,4 +613,8 @@ function formatProviderName(provider: string): string {
     return lookup[provider];
   }
   return provider.replace(/-/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function getProviderApiKeyStorageKey(provider: string): string {
+  return `${STORAGE_KEY_PROVIDER_PREFIX}${provider}`;
 }

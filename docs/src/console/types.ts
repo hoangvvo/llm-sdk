@@ -13,3 +13,10 @@ export interface ModelInfo {
   model_id: string;
   metadata?: LanguageModelMetadata;
 }
+
+export type ApiKeys = Record<string, string | undefined>;
+
+export interface MyContext {
+  name?: string;
+  location?: string;
+}
