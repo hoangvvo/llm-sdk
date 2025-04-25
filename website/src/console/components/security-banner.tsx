@@ -5,7 +5,7 @@ export const SecurityBanner = () => {
       servers after the request is completed. API keys and other preferences are
       stored in the browser's local storage for your convenience.{" "}
       <a
-        href="https://github.com/hoangvvo/llm-sdk/tree/main/docs/src/console"
+        href="https://github.com/hoangvvo/llm-sdk/tree/main/website"
         className="text-sky-600 underline"
         target="_blank"
         rel="noreferrer"

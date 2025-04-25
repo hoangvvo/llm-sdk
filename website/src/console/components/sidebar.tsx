@@ -165,7 +165,7 @@ function ModelSelectionSection({
       <div>
         <h2 className="console-section-title">Model</h2>
         <p className="mt-2 text-xs text-slate-500">
-          Choose which LLM model the agent should use.
+          Choose which model the agent should use.
         </p>
         {models.length > 0 ? (
           <div className="mt-3 flex gap-2">

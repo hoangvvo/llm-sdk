@@ -3,6 +3,7 @@ import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
 // https://astro.build/config
 export default defineConfig({
@@ -49,7 +50,11 @@ export default defineConfig({
           items: [
             {
               label: "Chat",
-              link: "/console",
+              link: "/console/chat",
+            },
+            {
+              label: "Realtime",
+              link: "/console/realtime",
             },
           ],
         },
@@ -58,6 +63,28 @@ export default defineConfig({
     react(),
   ],
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [
+      tailwindcss(),
+      viteStaticCopy({
+        targets: [
+          {
+            src: "../node_modules/onnxruntime-web/dist/*.wasm",
+            dest: "src/onnxruntime-web/",
+          },
+          {
+            src: "../node_modules/@ricky0123/vad-web/dist/vad.worklet.bundle.min.js",
+            dest: "src/vad-web/",
+          },
+          {
+            src: "../node_modules/@ricky0123/vad-web/dist/*.onnx",
+            dest: "src/vad-web/",
+          },
+          {
+            src: "../node_modules/onnxruntime-web/dist/*.mjs",
+            dest: "src/onnxruntime-web/",
+          },
+        ],
+      }),
+    ],
   },
 });

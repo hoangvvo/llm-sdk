@@ -13,6 +13,8 @@
   "dependencies": {
     "@astrojs/react": "^4.3.1",
     "@astrojs/starlight": "^0.35.2",
+    "@ricky0123/vad-react": "^0.0.33",
+    "@ricky0123/vad-web": "^0.0.27",
     "@tailwindcss/vite": "^4.1.1",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
@@ -22,7 +24,8 @@
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
     "sharp": "^0.34.2",
-    "tailwindcss": "^4.1.0"
+    "tailwindcss": "^4.1.0",
+    "vite-plugin-static-copy": "^3.1.2"
   },
   "devDependencies": {
     "tree-sitter": "^0.21.1",

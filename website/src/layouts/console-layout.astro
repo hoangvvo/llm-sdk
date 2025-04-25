@@ -6,7 +6,6 @@ export interface Props {
 }
 
 const { title } = Astro.props;
-const { pathname } = Astro.url;
 ---
 
 <html lang="en">
@@ -32,11 +31,20 @@ const { pathname } = Astro.url;
           </li>
           <li class="mb-2">
             <a
-              href="/console"
+              href="/console/chat"
               class="flex gap-0.5 flex-col items-center text-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-2"
             >
               <Icon name="comment" size="1.5rem" />
               <span class="text-sm font-mono">Chat</span>
+            </a>
+          </li>
+          <li class="mb-2">
+            <a
+              href="/console/realtime"
+              class="flex gap-0.5 flex-col items-center text-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-2"
+            >
+              <Icon name="rss" size="1.5rem" />
+              <span class="text-sm font-mono">Realtime</span>
             </a>
           </li>
         </ul>
