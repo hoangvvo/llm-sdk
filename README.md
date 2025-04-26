@@ -7,6 +7,8 @@ Two libraries are provided:
 - [LLM SDK](#llm-sdks): Unified SDKs to interact with various LLM providers.
 - [LLM Agent](#llm-agent): An abstraction to build agentic AI applications using the LLM SDK.
 
+Check out the [Console Application](./website) for a demo application that showcases the capabilities of the libraries.
+
 ## Features
 
 - Supports multiple LLM providers with a unified API.
