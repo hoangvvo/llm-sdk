@@ -207,6 +207,8 @@ fn read_line(prompt: &str) -> io::Result<String> {
 Find examples in the [examples](./examples/) folder:
 
 - [`agent`: Simple Example](./examples/agent.rs)
+- [`instructions`: Static and dynamic instructions](./examples/instructions.rs)
+- [`tools`: Executable tools](./examples/tools.rs)
 - [`structured-output`: Structured Output](./examples/structured-output.rs)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.rs)
 

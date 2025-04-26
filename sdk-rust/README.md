@@ -90,6 +90,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`tool-use`: Function calling](./examples/tool-use.rs)
 - [`structured-output`: Structured output](./examples/structured-output.rs)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning.rs)
+- [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.rs)
 
 ```bash
 cargo run --example generate-text

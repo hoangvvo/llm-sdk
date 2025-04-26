@@ -38,7 +38,7 @@
     "audio-decode": "^2.2.2",
     "audio-play": "^2.3.1",
     "cohere-ai": "^7.17.0",
-    "dotenv": "^17.0.0",
+    "dotenv": "^16.0.0",
     "open": "^10.1.0",
     "openai": "^5.0.0",
     "zod": "^3.24.2",

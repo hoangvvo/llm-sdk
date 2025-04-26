@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+use crate::LanguageModelInputExtra;
+
 /// Config for `models.generate_content` parameters.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +26,8 @@ pub struct GenerateContentParameters {
     pub system_instruction: Option<Content>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_config: Option<GenerateContentConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", flatten)]
+    pub extra: Option<LanguageModelInputExtra>,
 }
 
 /// Contains the multi-part content of a message.

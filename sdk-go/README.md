@@ -106,6 +106,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`tool-use`: Function calling](./examples/tool-use/main.go)
 - [`structured-output`: Structured output](./examples/structured-output/main.go)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning/main.go)
+- [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning/main.go)
 
 ```bash
 go run ./examples/generate-text

@@ -109,7 +109,8 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio.ts)
 - [`function-calling`: Function calling](./examples/tool-use.ts)
 - [`structured-output`: Structured output](./examples/structured-output.ts)
-- [`generate-reasoning`: Reasoning](./examples/generate-reasoning.ts)
+- [`generate-reasoning`: Generate reasoning](./examples/generate-reasoning.ts)
+- [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.ts)
 
 ```bash
 node --env-file=../.env examples/generate-text.ts

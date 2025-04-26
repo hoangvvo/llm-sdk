@@ -12,7 +12,7 @@ import (
 func main() {
 	model := examples.GetModel("openai", "o1")
 
-	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
+	stream, err := model.Stream(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
 				llmsdk.NewTextPart(`A car starts from rest and accelerates at a constant rate of 4 m/s^2 for 10 seconds.
@@ -29,18 +29,14 @@ func main() {
 		log.Fatalf("Generation failed: %v", err)
 	}
 
-	var reasoningParts, otherParts []llmsdk.Part
-	for _, part := range response.Content {
-		if part.Type() == llmsdk.PartTypeReasoning {
-			reasoningParts = append(reasoningParts, part)
+	for stream.Next() {
+		partial := stream.Current()
+		if partial.Delta.Part.ReasoningPartDelta != nil {
+			log.Println("Reasoning:")
+			litter.Dump(partial.Delta.Part)
 		} else {
-			otherParts = append(otherParts, part)
+			log.Println("Answer:")
+			litter.Dump(partial.Delta.Part)
 		}
 	}
-
-	log.Println("Reasoning")
-	litter.Dump(reasoningParts)
-
-	log.Println("\nAnswer")
-	litter.Dump(otherParts)
 }

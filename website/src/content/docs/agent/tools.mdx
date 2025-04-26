@@ -2,6 +2,9 @@
 title: Tools
 ---
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goToolsExample from "../../../../../agent-go/examples/tools/main.go?raw";
+import jsToolsExample from "../../../../../agent-js/examples/tools.ts?raw";
+import rustToolsExample from "../../../../../agent-rust/examples/tools.rs?raw";
 import {
   extractGoAgentToolTypes,
   extractRustAgentToolTypes,
@@ -65,5 +68,19 @@ The `execute` function must always return an `AgentToolResult`, which includes:
       lang="go"
       title="types.go"
     />
+  </TabItem>
+</Tabs>
+
+Below is an example of how to define tools in an agent:
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsToolsExample} lang="typescript" title="tools.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustToolsExample} lang="rust" title="tools.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goToolsExample} lang="go" title="main.go" />
   </TabItem>
 </Tabs>

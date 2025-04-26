@@ -229,6 +229,8 @@ func main() {
 Find examples in the [examples](./examples/) folder:
 
 - [`agent`: Simple Example](./examples/agent/main.go)
+- [`instructions`: Static and dynamic instructions](./examples/instructions/main.go)
+- [`tools`: Executable tools](./examples/tools/main.go)
 - [`structured-output`: Structured Output](./examples/structured-output/main.go)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation/main.go)
 

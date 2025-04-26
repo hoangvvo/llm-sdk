@@ -1,5 +1,6 @@
 use dotenvy::dotenv;
-use llm_sdk::{LanguageModelInput, Message, Part, ReasoningOptions};
+use futures::StreamExt;
+use llm_sdk::{LanguageModelInput, Message, Part, PartDelta, ReasoningOptions};
 
 mod common;
 
@@ -9,8 +10,8 @@ async fn main() {
 
     let model = common::get_model("openai", "o1");
 
-    let response = model
-        .generate(LanguageModelInput {
+    let mut stream = model
+        .stream(LanguageModelInput {
             messages: vec![
                 Message::user(
                   vec![Part::text(r"A car starts from rest and accelerates at a constant rate of 4 m/s^2 for 10 seconds.
@@ -18,7 +19,7 @@ async fn main() {
 2. How far does the car travel in those 10 seconds?")]
                 )
             ],
-            reasoning: Some(ReasoningOptions {
+                reasoning: Some(ReasoningOptions {
                 enabled: true,
                 ..Default::default()
             }),
@@ -27,16 +28,16 @@ async fn main() {
         .await
         .unwrap();
 
-    let (reasoning_parts, other_parts): (Vec<Part>, Vec<Part>) = response
-        .content
-        .into_iter()
-        .partition(|part| matches!(part, Part::Reasoning { .. }));
-    println!("Reasoning:");
-    for part in reasoning_parts {
-        println!("{part:#?}");
-    }
-    println!("\nAnswer:");
-    for part in other_parts {
-        println!("{part:#?}");
+    while let Some(partial) = stream.next().await {
+        let partial = partial.expect("stream error");
+        if let Some(delta) = partial.delta {
+            if let PartDelta::Reasoning { .. } = delta.part {
+                println!("Reasoning:");
+                println!("{delta:#?}");
+            } else {
+                println!("Answer:");
+                println!("{delta:#?}");
+            }
+        }
     }
 }

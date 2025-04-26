@@ -3,9 +3,12 @@ title: Reasoning
 ---
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
-import goGenerateTextCode from "../../../../../sdk-go/examples/generate-reasoning/main.go?raw";
-import jsGenerateTextCode from "../../../../../sdk-js/examples/generate-reasoning.ts?raw";
-import rustGenerateTextCode from "../../../../../sdk-rust/examples/generate-reasoning.rs?raw";
+import goGenerateReasoningCode from "../../../../../sdk-go/examples/generate-reasoning/main.go?raw";
+import goStreamReasoningCode from "../../../../../sdk-go/examples/stream-reasoning/main.go?raw";
+import jsGenerateReasoningCode from "../../../../../sdk-js/examples/generate-reasoning.ts?raw";
+import jsStreamReasoningCode from "../../../../../sdk-js/examples/stream-reasoning.ts?raw";
+import rustGenerateReasoningCode from "../../../../../sdk-rust/examples/generate-reasoning.rs?raw";
+import rustStreamReasoningCode from "../../../../../sdk-rust/examples/stream-reasoning.rs?raw";
 import {
   extractGoTypes,
   extractRustTypes,
@@ -69,15 +72,59 @@ Once enabled, the model will output `ReasoningPart`s in addition to other parts.
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={jsGenerateTextCode}
+      code={jsGenerateReasoningCode}
       lang="typescript"
       title="generate-reasoning.ts"
     />
   </TabItem>
   <TabItem label="Rust">
-    <Code code={rustGenerateTextCode} lang="rust" title="generate-reasoning.rs" />
+    <Code code={rustGenerateReasoningCode} lang="rust" title="generate-reasoning.rs" />
   </TabItem>
   <TabItem label="Go">
-    <Code code={goGenerateTextCode} lang="go" title="main.go" />
+    <Code code={goGenerateReasoningCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+Reasoning parts are also emitted in streaming mode in the form of `ReasoningPartDelta`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["ReasoningPartDelta"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["ReasoningPartDelta"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["ReasoningPartDelta"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
+Accessing reasoning parts in streaming mode like other parts:
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsStreamReasoningCode}
+      lang="typescript"
+      title="stream-reasoning.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustStreamReasoningCode} lang="rust" title="stream-reasoning.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goStreamReasoningCode} lang="go" title="main.go" />
   </TabItem>
 </Tabs>

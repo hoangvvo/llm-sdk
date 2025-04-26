@@ -315,6 +315,8 @@ fn convert_to_generate_content_parameters(
 
     params.generation_config = Some(config);
 
+    params.extra = input.extra;
+
     Ok(params)
 }
 

@@ -26,7 +26,13 @@ const accumulator = new StreamAccumulator();
 
 let current = await stream.next();
 while (!current.done) {
-  console.dir(current.value, { depth: null });
+  if (current.value.delta?.part.type === "reasoning") {
+    console.log("Reasoning:");
+    console.dir(current.value.delta.part, { depth: null });
+  } else if (current.value.delta) {
+    console.log("Answer:");
+    console.dir(current.value.delta.part, { depth: null });
+  }
   accumulator.addPartial(current.value);
   current = await stream.next();
 }
