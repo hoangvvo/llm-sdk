@@ -9,6 +9,8 @@ Two libraries are provided:
 
 Check out the [Console Application](./website) for a demo application that showcases the capabilities of the libraries.
 
+![Console Chat Application screenshot](./website/assets/console-chat.png)
+
 ## Features
 
 - Supports multiple LLM providers with a unified API.
