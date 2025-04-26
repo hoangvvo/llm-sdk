@@ -20,6 +20,8 @@ export interface MyContext {
   name?: string;
   location?: string;
   units?: string;
+  geo_api_key?: string;
+  tomorrow_api_key?: string;
 }
 
 export interface ToolInfo {

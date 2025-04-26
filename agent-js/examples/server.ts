@@ -13,10 +13,13 @@ interface MyContext {
   name?: string;
   location?: string;
   units?: string;
+  geo_api_key?: string;
+  tomorrow_api_key?: string;
 }
 
 const instructions: InstructionParam<MyContext>[] = [
-  "Answer in markdown format.",
+  `Answer in markdown format.
+To access certain tools, the user may have to provide corresponding API keys in the context fields on the UI.`,
   (context) =>
     `The user name is ${context.name ?? "<not provided>"}. The user location is ${context.location ?? "<not provided>"}. The user prefers ${context.units ?? "<not provided>"} units.`,
   () => `The current date is ${new Date().toDateString()}.`,
@@ -28,17 +31,17 @@ const getCoordinatesTool = zodTool({
   parameters: z.object({
     location: z.string().describe("The location name, e.g. Paris, France"),
   }),
-  execute: async (input) => {
+  execute: async (input, context: MyContext) => {
     const { location } = input;
 
-    const apiKey = process.env["GEO_API_KEY"];
+    const apiKey = context.geo_api_key ?? process.env["GEO_API_KEY"];
 
     if (apiKey === undefined) {
       return {
         content: [
           {
             type: "text",
-            text: "GEO_API_KEY is not set in the environment variables.",
+            text: "API Key not provided. You can also provide the value on the UI with the Context field 'geo_api_key'. Get a free API key at https://geocode.maps.co/",
           },
         ],
         is_error: true,
@@ -102,17 +105,17 @@ const getWeatherTool = zodTool({
     timesteps: z.enum(["current", "1h", "1d"]).describe("Timesteps"),
     startTime: z.string().describe("Start time in ISO format"),
   }),
-  execute: async (input) => {
+  execute: async (input, context: MyContext) => {
     const { latitude, longitude, units, timesteps, startTime } = input;
 
-    const apiKey = process.env["TOMORROW_API_KEY"];
+    const apiKey = context.tomorrow_api_key ?? process.env["TOMORROW_API_KEY"];
 
     if (apiKey === undefined) {
       return {
         content: [
           {
             type: "text",
-            text: "TOMORROW_API_KEY is not set in the environment variables.",
+            text: "API Key not provided. You can also provide the value on the UI with the Context field 'tomorrow_api_key'. Get a free API key at https://tomorrow.io/",
           },
         ],
         is_error: true,

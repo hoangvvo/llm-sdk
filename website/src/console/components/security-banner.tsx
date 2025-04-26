@@ -1,6 +1,6 @@
 export const SecurityBanner = () => {
   return (
-    <div className="mx-auto mt-4 max-w-lg text-[10px] leading-relaxed text-slate-600">
+    <div className="mx-auto max-w-lg text-[10px] leading-relaxed text-slate-600">
       Data, including the provided API keys, is not retained by the example
       servers after the request is completed. API keys and other preferences are
       stored in the browser's local storage for your convenience.{" "}

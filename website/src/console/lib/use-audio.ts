@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { WavStreamPlayer } from "./wavtools/wav_stream_player";
 
 export function useAudio() {
   const streamPlayerRef = useRef<WavStreamPlayer | null>(null);
   const streamPlayerSampleRateRef = useRef<number | null>(null);
-  const streamPlayerConnectedRef = useRef(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -20,40 +20,67 @@ export function useAudio() {
   const ensureStreamPlayer = useCallback(
     async (sampleRate?: number): Promise<WavStreamPlayer> => {
       const desiredRate =
-        sampleRate ?? streamPlayerSampleRateRef.current ?? 44100;
+        sampleRate ?? streamPlayerSampleRateRef.current ?? 22000;
 
-      if (
-        streamPlayerRef.current &&
-        streamPlayerSampleRateRef.current !== null &&
-        streamPlayerSampleRateRef.current !== desiredRate
-      ) {
-        const context = streamPlayerRef.current.context;
-        if (context && context.state !== "closed") {
-          await context.close().catch(() => {
-            /* ignore */
-          });
-        }
+      // Recreate the player if the sample rate is different
+      if (streamPlayerRef.current?.sampleRate !== desiredRate) {
+        // Close the existing context if any
+        void streamPlayerRef.current?.interrupt();
         streamPlayerRef.current = null;
-        streamPlayerConnectedRef.current = false;
       }
 
       if (!streamPlayerRef.current) {
         streamPlayerRef.current = new WavStreamPlayer({
           sampleRate: desiredRate,
         });
-        streamPlayerSampleRateRef.current = desiredRate;
-        streamPlayerConnectedRef.current = false;
+        await streamPlayerRef.current.connect();
       }
 
-      if (!streamPlayerConnectedRef.current) {
-        await streamPlayerRef.current.connect();
-        streamPlayerConnectedRef.current = true;
-      }
+      streamPlayerSampleRateRef.current = desiredRate;
 
       return streamPlayerRef.current;
     },
     [],
   );
 
-  return { ensureStreamPlayer };
+  const interruptPlayback = useCallback(async () => {
+    const player = streamPlayerRef.current;
+    if (!player) {
+      return;
+    }
+    try {
+      await player.interrupt();
+      streamPlayerRef.current = null;
+      setIsPlaying(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    const itv = setInterval(() => {
+      const player = streamPlayerRef.current;
+      if (!player) {
+        setIsPlaying(false);
+        return;
+      }
+      void player.getTrackSampleOffset().then((offset) => {
+        setIsPlaying(!!offset?.trackId);
+      });
+    }, 2000);
+    return () => {
+      clearInterval(itv);
+    };
+  }, []);
+
+  const add16BitPCM = useCallback(
+    async (arrayBuffer: ArrayBuffer | Int16Array, trackId?: string) => {
+      const player = await ensureStreamPlayer();
+      player.add16BitPCM(arrayBuffer, trackId);
+      setIsPlaying(true);
+    },
+    [ensureStreamPlayer],
+  );
+
+  return { add16BitPCM, interruptPlayback, isPlaying };
 }

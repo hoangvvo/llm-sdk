@@ -59,6 +59,16 @@ interface UseAgentReturn {
 
 type ServerToClientEvent = AgentStreamEvent | { event: "error"; error: string };
 
+function isAbortError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+  if (error instanceof Error) {
+    return error.name === "AbortError";
+  }
+  return false;
+}
+
 export function useAgent<Context>(
   config: UseAgentConfig<Context>,
   options: UseAgentOptions = {},
@@ -137,6 +147,8 @@ export function useAgent<Context>(
         ...pendingUserItems,
       ];
 
+      let streamingParts: Part[] = [];
+
       setNextItems(pendingUserItems);
       setError(null);
       setIsStreaming(true);
@@ -204,7 +216,8 @@ export function useAgent<Context>(
                 console.error("Failed to handle audio delta", err);
               }
             }
-            setStreamingParts((prev) => reduceContentDelta(prev, parsed));
+            streamingParts = reduceContentDelta(streamingParts, parsed);
+            setStreamingParts([...streamingParts]);
             continue;
           }
 
@@ -226,7 +239,25 @@ export function useAgent<Context>(
         });
         setNextItems([]);
       } catch (err) {
-        if (err instanceof Response) {
+        if (isAbortError(err)) {
+          setItems((prev) => {
+            const next = [...prev, ...pendingItems];
+
+            // If there are still streaming parts when aborting, attach them
+            // to the last message
+            if (streamingParts.length > 0) {
+              next.push({
+                type: "message",
+                role: "assistant",
+                content: streamingParts,
+              });
+            }
+
+            itemsRef.current = next;
+            return next;
+          });
+          setNextItems([]);
+        } else if (err instanceof Response) {
           const info = await err.text();
           setError(() =>
             info.trim().length > 0

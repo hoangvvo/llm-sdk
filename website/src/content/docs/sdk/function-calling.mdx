@@ -2,14 +2,14 @@
 title: Function calling
 ---
 
-import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goToolUseCode from "../../../../../sdk-go/examples/tool-use/main.go?raw";
 import jsToolUseCode from "../../../../../sdk-js/examples/tool-use.ts?raw";
 import rustToolUseCode from "../../../../../sdk-rust/examples/tool-use.rs?raw";
-import goToolUseCode from "../../../../../sdk-go/examples/tool-use/main.go?raw";
 import {
   extractGoTypes,
-  extractTypescriptTypes,
   extractRustTypes,
+  extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
 
 Functions can be provided to the model as `Tool`:
@@ -64,26 +64,26 @@ The model might returns one or many `ToolCallPart`s in its response to indicate 
   </TabItem>
 </Tabs>
 
-Execute the tools in your application and return the results to the model as `ToolResultPart`:
+Execute the tools in your application and return the results to the model as a single `ToolMessage`, which contain one or many `ToolResultPart`s in its `content` field:
 
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptTypes(["ToolResultPart"])}
+      code={extractTypescriptTypes(["ToolMessage", "ToolResultPart"])}
       lang="typescript"
       title="types.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustTypes(["ToolResultPart"])}
+      code={extractRustTypes(["ToolMessage", "ToolResultPart"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
     <Code
-      code={extractGoTypes(["ToolResultPart"])}
+      code={extractGoTypes(["ToolMessage", "ToolResultPart"])}
       lang="go"
       title="types.go"
     />

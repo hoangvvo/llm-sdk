@@ -494,42 +494,6 @@ interface ContextSectionProps {
 }
 
 function ContextSection({ context, onChange }: ContextSectionProps) {
-  const handleNameChange = (value: string) => {
-    onChange((prev) => {
-      const next = { ...prev };
-      if (value.trim().length === 0) {
-        delete next.name;
-      } else {
-        next.name = value;
-      }
-      return next;
-    });
-  };
-
-  const handleLocationChange = (value: string) => {
-    onChange((prev) => {
-      const next = { ...prev };
-      if (value.trim().length === 0) {
-        delete next.location;
-      } else {
-        next.location = value;
-      }
-      return next;
-    });
-  };
-
-  const handleUnitsChange = (value: string) => {
-    onChange((prev) => {
-      const next = { ...prev };
-      if (value.trim().length === 0) {
-        delete next.units;
-      } else {
-        next.units = value;
-      }
-      return next;
-    });
-  };
-
   return (
     <div className="console-surface space-y-3">
       <h2 className="console-section-title">Context</h2>
@@ -545,7 +509,7 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
           placeholder="e.g. Ada Lovelace"
           value={context.name ?? ""}
           onChange={(event) => {
-            handleNameChange(event.target.value);
+            onChange((prev) => ({ ...prev, name: event.target.value }));
           }}
         />
       </label>
@@ -557,7 +521,7 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
           placeholder="e.g. San Francisco, CA"
           value={context.location ?? ""}
           onChange={(event) => {
-            handleLocationChange(event.target.value);
+            onChange((prev) => ({ ...prev, location: event.target.value }));
           }}
         />
       </label>
@@ -569,7 +533,37 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
           placeholder="e.g. metric, imperial"
           value={context.units ?? ""}
           onChange={(event) => {
-            handleUnitsChange(event.target.value);
+            onChange((prev) => ({ ...prev, units: event.target.value }));
+          }}
+        />
+      </label>
+      <label className="console-label">
+        Tomorrow.io API key
+        <input
+          type="text"
+          className="console-field mt-2 w-full"
+          placeholder="API key for the Tomorrow.io weather tool"
+          value={context.tomorrow_api_key ?? ""}
+          onChange={(event) => {
+            onChange((prev) => ({
+              ...prev,
+              tomorrow_api_key: event.target.value,
+            }));
+          }}
+        />
+      </label>
+      <label className="console-label">
+        Geocode.maps.co API key
+        <input
+          type="text"
+          className="console-field mt-2 w-full"
+          placeholder="API key for the geocoding tool"
+          value={context.geo_api_key ?? ""}
+          onChange={(event) => {
+            onChange((prev) => ({
+              ...prev,
+              geo_api_key: event.target.value,
+            }));
           }}
         />
       </label>

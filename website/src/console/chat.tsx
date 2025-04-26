@@ -195,22 +195,17 @@ export function ChatApp() {
     [toolOptions],
   );
 
-  const { ensureStreamPlayer } = useAudio();
+  const { add16BitPCM } = useAudio();
 
   const handleAudioDelta = useCallback(
-    async (delta: AudioPartDelta) => {
+    (delta: AudioPartDelta) => {
       if (!delta.audio_data || delta.audio_data.length === 0) {
         return;
       }
-      try {
-        const player = await ensureStreamPlayer(delta.sample_rate ?? undefined);
-        const buffer = base64ToArrayBuffer(delta.audio_data);
-        player.add16BitPCM(buffer, delta.id ?? "default");
-      } catch (err) {
-        console.error("Failed to play streaming audio", err);
-      }
+      const buffer = base64ToArrayBuffer(delta.audio_data);
+      void add16BitPCM(buffer, delta.id ?? "default");
     },
-    [ensureStreamPlayer],
+    [add16BitPCM],
   );
 
   const {
