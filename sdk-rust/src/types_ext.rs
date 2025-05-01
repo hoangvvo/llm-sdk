@@ -84,8 +84,8 @@ impl AudioPart {
     }
 
     #[must_use]
-    pub fn with_audio_id(mut self, audio_id: impl Into<String>) -> Self {
-        self.id = Some(audio_id.into());
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
         self
     }
 }

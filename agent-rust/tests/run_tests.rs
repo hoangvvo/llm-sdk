@@ -6,7 +6,7 @@ use llm_agent::{
     AgentStreamEvent, AgentTool, AgentToolResult, InstructionParam, RunSession, RunState,
 };
 use llm_sdk::{
-    testing::{MockGenerateResult, MockLanguageModel, MockStreamResult},
+    llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
     PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta, UserMessage,
 };

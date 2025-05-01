@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import test, { suite, type TestContext } from "node:test";
-import { MockLanguageModel } from "./testing.ts";
-import type { ModelResponse } from "./types.ts";
-// import { MockLanguageModel, type ModelResponse } from "@hoangvvo/llm-sdk";
+import type { ModelResponse } from "../types.ts";
+import { MockLanguageModel } from "./test.ts";
+// import { MockLanguageModel, type ModelResponse } from "@hoangvvo/llm-sdk/test";
 
 suite("MockLanguageModel", () => {
   test("tracks generate inputs and returns mocked responses", async (t: TestContext) => {

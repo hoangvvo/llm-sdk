@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 
-import { MockLanguageModel } from "@hoangvvo/llm-sdk";
+import { MockLanguageModel } from "@hoangvvo/llm-sdk/test";
 import test, { suite, type TestContext } from "node:test";
 import { Agent } from "./agent.ts";
 

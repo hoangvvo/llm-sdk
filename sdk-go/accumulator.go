@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/audioutil"
 )
 
 // AccumulatedTextData represents accumulated text data
@@ -284,7 +286,7 @@ func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 		return Part{}, NewNotImplementedError("", fmt.Sprintf("Only linear16 format is supported for audio concatenation. Received: %s", *data.Format))
 	}
 
-	concatenatedAudio, err := concatenateB64AudioChunks(data.AudioDataChunks)
+	concatenatedAudio, err := audioutil.ConcatenateB64AudioChunks(data.AudioDataChunks)
 	if err != nil {
 		return Part{}, err
 	}

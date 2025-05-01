@@ -32,7 +32,7 @@ interface TestCaseJSON {
       text?: string;
       tool_name?: string;
       args?: Record<string, string>;
-      audio_id?: boolean;
+      id?: boolean;
       transcript?: string;
     }[];
   };
@@ -97,7 +97,7 @@ function jsonToTestCase(jsonCase: TestCaseJSON): TestCase {
       } else if (part.type === "audio") {
         return {
           type: "audio",
-          audio_id: part.audio_id,
+          id: part.id,
           transcript: part.transcript ? new RegExp(part.transcript) : undefined,
         } as PartAssertion;
       } else if (part.type === "reasoning" && part.text) {

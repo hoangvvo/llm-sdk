@@ -6,6 +6,7 @@ toolchain go1.24.5
 
 require (
 	github.com/ebitengine/oto/v3 v3.3.2
+	github.com/google/go-cmp v0.7.0
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/joho/godotenv v1.5.1
 	github.com/sanity-io/litter v1.5.8

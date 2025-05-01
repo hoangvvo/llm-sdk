@@ -3,9 +3,9 @@ title: Testing
 ---
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
-import goTestingTest from '../../../../../sdk-go/testing_test.go?raw';
-import jsTestingTest from '../../../../../sdk-js/src/testing.test.ts?raw';
-import rustTestingTest from '../../../../../sdk-rust/tests/testing_test.rs?raw';
+import goTestingTest from '../../../../../sdk-go/llmsdktest/testing_test.go?raw';
+import jsTestingTest from '../../../../../sdk-js/src/test/test.test.ts?raw';
+import rustTestingTest from '../../../../../sdk-rust/tests/llm_sdk_test_test.rs?raw';
 
 To test applications that interact with language models, we can use `MockLanguageModel` to simulate model responses.
 It can also be used to assert that the application is making the expected calls to the model.

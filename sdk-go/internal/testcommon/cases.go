@@ -139,7 +139,7 @@ func convertOutputAssertions(content []interface{}) []PartAssertion {
 				transcript = t
 			}
 			assertions = append(assertions, NewAudioAssertion(
-				partMap["audio_id"].(bool),
+				partMap["id"].(bool),
 				transcript,
 			))
 		case "reasoning":

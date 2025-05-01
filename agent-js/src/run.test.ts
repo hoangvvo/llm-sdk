@@ -6,10 +6,10 @@
 
 import {
   LanguageModelError,
-  MockLanguageModel,
   type PartDelta,
   type PartialModelResponse,
 } from "@hoangvvo/llm-sdk";
+import { MockLanguageModel } from "@hoangvvo/llm-sdk/test";
 import test, { suite, type TestContext } from "node:test";
 import {
   AgentInvariantError,

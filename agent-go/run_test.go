@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/llmsdktest"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
@@ -62,9 +63,9 @@ func (t *MockAgentTool[C]) Execute(ctx context.Context, params json.RawMessage, 
 // -------- Root-level tests (Run) --------
 
 func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
 			},
@@ -127,9 +128,9 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 
 	tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
 
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "test_tool",
@@ -145,7 +146,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 		}),
 	)
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "Final response"}},
 			},
@@ -258,9 +259,9 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 	tool1 := NewMockTool[map[string]interface{}]("tool_1", tool1Result, nil)
 	tool2 := NewMockTool[map[string]interface{}]("tool_2", tool2Result, nil)
 
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				llmsdk.NewToolCallPart("call_1", "tool_1", map[string]any{"param": "value1"}),
 				llmsdk.NewToolCallPart("call_2", "tool_2", map[string]any{"param": "value2"}),
@@ -272,7 +273,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 		}),
 	)
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "Processed both tools"}},
 			},
@@ -384,9 +385,9 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 
 	tool := NewMockTool[map[string]interface{}]("calculator", toolResult, nil)
 
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "calculator",
@@ -397,7 +398,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 		}),
 	)
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "calculator",
@@ -408,7 +409,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 		}),
 	)
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "All calculations done"}},
 			},
@@ -549,9 +550,9 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 
 	tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
 
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "test_tool",
@@ -562,7 +563,7 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 		}),
 	)
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "test_tool",
@@ -573,7 +574,7 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 		}),
 	)
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "test_tool",
@@ -623,9 +624,9 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 }
 
 func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "non_existent_tool",
@@ -679,9 +680,9 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 		return llmagent.AgentToolResult{}, errors.New("tool execution failed")
 	})
 
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "failing_tool",
@@ -740,9 +741,9 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 
 	tool := NewMockTool[map[string]interface{}]("test_tool", toolResult, nil)
 
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{ToolCallPart: &llmsdk.ToolCallPart{
 					ToolName:   "test_tool",
@@ -753,7 +754,7 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 		}),
 	)
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "Handled the error"}},
 			},
@@ -839,9 +840,9 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 }
 
 func TestRun_PassesSamplingParametersToModel(t *testing.T) {
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "Response"}},
 			},
@@ -910,9 +911,9 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 }
 
 func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testing.T) {
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "Response"}},
 			},
@@ -973,9 +974,9 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 // -------- Root-level tests (RunStream) --------
 
 func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueStreamResult(
-		llmsdk.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
 			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Hel"}}}},
 			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "lo"}}}},
 			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "!"}}}},
@@ -1088,9 +1089,9 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 	callId := "call_1"
 	args := `{"operation": "add", "a": 1, "b": 2}`
 
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueStreamResult(
-		llmsdk.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
 			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
 				ToolName:   &toolName,
 				ToolCallID: &callId,
@@ -1099,7 +1100,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 		}),
 	)
 	model.EnqueueStreamResult(
-		llmsdk.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
 			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Final response"}}}},
 		}),
 	)
@@ -1275,9 +1276,9 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 	callId3 := "call_3"
 	args := "{}"
 
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueStreamResult(
-		llmsdk.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
 			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
 				ToolName:   &toolName,
 				ToolCallID: &callId1,
@@ -1286,7 +1287,7 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 		}),
 	)
 	model.EnqueueStreamResult(
-		llmsdk.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
 			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
 				ToolName:   &toolName,
 				ToolCallID: &callId2,
@@ -1295,7 +1296,7 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 		}),
 	)
 	model.EnqueueStreamResult(
-		llmsdk.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
 			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
 				ToolName:   &toolName,
 				ToolCallID: &callId3,
@@ -1354,9 +1355,9 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 // -------- Root-level lifecycle test --------
 
 func TestRun_FinishCleansUpSessionResources(t *testing.T) {
-	model := llmsdk.NewMockLanguageModel()
+	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
-		llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
 				{TextPart: &llmsdk.TextPart{Text: "Response"}},
 			},

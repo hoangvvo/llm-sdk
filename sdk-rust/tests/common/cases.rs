@@ -145,8 +145,8 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
                     }));
                 }
                 "audio" => {
-                    let audio_id = part_obj
-                        .get("audio_id")
+                    let id = part_obj
+                        .get("id")
                         .and_then(serde_json::Value::as_bool)
                         .unwrap_or(false);
                     let transcript = part_obj
@@ -156,10 +156,7 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
                             // Always treat as regex
                             Regex::new(t).unwrap()
                         });
-                    assertions.push(PartAssertion::Audio(AudioPartAssertion {
-                        audio_id,
-                        transcript,
-                    }));
+                    assertions.push(PartAssertion::Audio(AudioPartAssertion { id, transcript }));
                 }
                 "reasoning" => {
                     if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {

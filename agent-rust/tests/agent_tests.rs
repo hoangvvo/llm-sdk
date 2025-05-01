@@ -1,7 +1,7 @@
 use futures::TryStreamExt;
 use llm_agent::{Agent, AgentItem, AgentParams, AgentRequest, AgentResponse, AgentStreamEvent};
 use llm_sdk::{
-    testing::{MockLanguageModel, MockStreamResult},
+    llm_sdk_test::{MockLanguageModel, MockStreamResult},
     ContentDelta, Message, ModelResponse, Part, PartDelta, PartialModelResponse, TextPartDelta,
     UserMessage,
 };

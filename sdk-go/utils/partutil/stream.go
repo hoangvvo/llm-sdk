@@ -1,6 +1,10 @@
-package llmsdk
+package partutil
 
-import "slices"
+import (
+	"slices"
+
+	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+)
 
 // GuessDeltaIndex tries to guess the appropriate index for a delta based on existing deltas.
 //
@@ -13,12 +17,12 @@ import "slices"
 // toolCallIndex does not always correspond to the index of the tool call in
 // the deltas because some providers keep tool call separate from other parts
 // (e.g openai). We can match this against the existing tool call deltas.
-func GuessDeltaIndex(part PartDelta, allContentDeltas []ContentDelta, toolCallIndex *int) int {
+func GuessDeltaIndex(part llmsdk.PartDelta, allContentDeltas []llmsdk.ContentDelta, toolCallIndex *int) int {
 	// contentDeltas may have the structure of
 	// [part0 partial, part0 partial, part1 partial].
 	// For the purpose of this matching, we want only
 	// [part0, part1]
-	uniqueContentDeltas := slices.CompactFunc(slices.Clone(allContentDeltas), func(a, b ContentDelta) bool {
+	uniqueContentDeltas := slices.CompactFunc(slices.Clone(allContentDeltas), func(a, b llmsdk.ContentDelta) bool {
 		return a.Index == b.Index
 	})
 
@@ -30,7 +34,7 @@ func GuessDeltaIndex(part PartDelta, allContentDeltas []ContentDelta, toolCallIn
 		// [LLM-SDK state]
 		// parts: [index 0 text] [index 1 tool] [index 2 text] [index 3 tool]
 		// In this case, we need to map the tool index 0 -> 1 and 1 -> 3
-		var toolPartDeltas []ContentDelta
+		var toolPartDeltas []llmsdk.ContentDelta
 		for _, contentDelta := range uniqueContentDeltas {
 			if contentDelta.Part.ToolCallPartDelta != nil {
 				toolPartDeltas = append(toolPartDeltas, contentDelta)
@@ -47,7 +51,7 @@ func GuessDeltaIndex(part PartDelta, allContentDeltas []ContentDelta, toolCallIn
 	}
 
 	// Attempt to find the LAST matching delta in uniqueContentDeltas
-	var matchingDelta *ContentDelta
+	var matchingDelta *llmsdk.ContentDelta
 	for i := len(uniqueContentDeltas) - 1; i >= 0; i-- {
 		contentDelta := &uniqueContentDeltas[i]
 		// Inline matching logic: For text and audio parts, they are the matching delta
@@ -90,18 +94,18 @@ func GuessDeltaIndex(part PartDelta, allContentDeltas []ContentDelta, toolCallIn
 	}
 }
 
-func LooselyConvertPartToPartDelta(part Part) PartDelta {
+func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 	switch {
 	case part.TextPart != nil:
-		return PartDelta{
-			TextPartDelta: &TextPartDelta{
+		return llmsdk.PartDelta{
+			TextPartDelta: &llmsdk.TextPartDelta{
 				Text: part.TextPart.Text,
 			},
 		}
 	case part.ToolCallPart != nil:
 		argsStr := string(part.ToolCallPart.Args)
-		return PartDelta{
-			ToolCallPartDelta: &ToolCallPartDelta{
+		return llmsdk.PartDelta{
+			ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
 				ToolCallID: &part.ToolCallPart.ToolCallID,
 				ToolName:   &part.ToolCallPart.ToolName,
 				Args:       &argsStr,
@@ -109,16 +113,16 @@ func LooselyConvertPartToPartDelta(part Part) PartDelta {
 			},
 		}
 	case part.ReasoningPart != nil:
-		return PartDelta{
-			ReasoningPartDelta: &ReasoningPartDelta{
+		return llmsdk.PartDelta{
+			ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
 				Text:      part.ReasoningPart.Text,
 				Signature: part.ReasoningPart.Signature,
 				ID:        part.ReasoningPart.ID,
 			},
 		}
 	case part.ImagePart != nil:
-		return PartDelta{
-			ImagePartDelta: &ImagePartDelta{
+		return llmsdk.PartDelta{
+			ImagePartDelta: &llmsdk.ImagePartDelta{
 				MimeType:  &part.ImagePart.MimeType,
 				ImageData: &part.ImagePart.ImageData,
 				Width:     part.ImagePart.Width,
@@ -127,8 +131,8 @@ func LooselyConvertPartToPartDelta(part Part) PartDelta {
 			},
 		}
 	case part.AudioPart != nil:
-		return PartDelta{
-			AudioPartDelta: &AudioPartDelta{
+		return llmsdk.PartDelta{
+			AudioPartDelta: &llmsdk.AudioPartDelta{
 				AudioData:  &part.AudioPart.AudioData,
 				Format:     &part.AudioPart.Format,
 				SampleRate: part.AudioPart.SampleRate,
@@ -138,6 +142,6 @@ func LooselyConvertPartToPartDelta(part Part) PartDelta {
 			},
 		}
 	default:
-		return PartDelta{}
+		return llmsdk.PartDelta{}
 	}
 }

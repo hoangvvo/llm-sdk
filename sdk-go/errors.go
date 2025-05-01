@@ -23,7 +23,7 @@ type LanguageModelError struct {
 	Message string
 	Err     error
 	// The provider name
-	Provider ProviderName
+	Provider string
 	// The status for the StatusCode error kind
 	Status int
 }
@@ -67,15 +67,15 @@ func NewStatusCodeError(status int, body string) *LanguageModelError {
 	return &LanguageModelError{Kind: StatusCode, Message: body, Status: status}
 }
 
-func NewUnsupportedError(provider ProviderName, msg string) *LanguageModelError {
+func NewUnsupportedError(provider string, msg string) *LanguageModelError {
 	return &LanguageModelError{Kind: Unsupported, Message: msg, Provider: provider}
 }
 
-func NewNotImplementedError(provider ProviderName, msg string) *LanguageModelError {
+func NewNotImplementedError(provider string, msg string) *LanguageModelError {
 	return &LanguageModelError{Kind: NotImplemented, Message: msg, Provider: provider}
 }
 
-func NewInvariantError(provider ProviderName, msg string) *LanguageModelError {
+func NewInvariantError(provider string, msg string) *LanguageModelError {
 	return &LanguageModelError{Kind: Invariant, Message: msg, Provider: provider}
 }
 

@@ -1,9 +1,9 @@
-import type { LanguageModel } from "./language-model.ts";
+import type { LanguageModel } from "../language-model.ts";
 import type {
   LanguageModelInput,
   ModelResponse,
   PartialModelResponse,
-} from "./types.ts";
+} from "../types.ts";
 
 /**
  * A result for a mocked `generate` call.

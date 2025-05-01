@@ -82,7 +82,7 @@ impl ToolCallPartAssertion {
 
 #[derive(Debug, Clone)]
 pub struct AudioPartAssertion {
-    pub audio_id: bool,            // Whether the audio ID is present
+    pub id: bool,                  // Whether the audio ID is present
     pub transcript: Option<Regex>, // Optional transcript to match
 }
 
@@ -93,7 +93,7 @@ impl AudioPartAssertion {
                 if audio_part.audio_data.is_empty() {
                     return false; // Audio data must be present
                 }
-                if self.audio_id && audio_part.id.is_none() {
+                if self.id && audio_part.id.is_none() {
                     return false; // Audio ID must be present if required
                 }
                 if let Some(transcript) = &self.transcript {
@@ -112,10 +112,10 @@ impl AudioPartAssertion {
         });
         if found_part.is_none() {
             return Err(format!(
-                "Expected matching audio part:\nExpected transcript: {:#?}, audio_id present: \
+                "Expected matching audio part:\nExpected transcript: {:#?}, id present: \
                  {}\nReceived:\n{}",
                 self.transcript,
-                self.audio_id,
+                self.id,
                 serde_json::to_string_pretty(content).unwrap()
             ));
         }

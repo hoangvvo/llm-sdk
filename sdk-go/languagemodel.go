@@ -6,15 +6,13 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
-type ProviderName string
-
 type LanguageModelMetadata struct {
 	Pricing      *LanguageModelPricing     `json:"pricing"`
 	Capabilities []LanguageModelCapability `json:"capabilities,omitempty"`
 }
 
 type LanguageModel interface {
-	Provider() ProviderName
+	Provider() string
 	ModelID() string
 	Metadata() *LanguageModelMetadata
 	Generate(ctx context.Context, input *LanguageModelInput) (*ModelResponse, error)

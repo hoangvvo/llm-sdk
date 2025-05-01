@@ -12,6 +12,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/randutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
@@ -61,7 +62,7 @@ func (m *OpenAIModel) WithMetadata(metadata *llmsdk.LanguageModelMetadata) *Open
 }
 
 // Provider returns the provider name
-func (m *OpenAIModel) Provider() llmsdk.ProviderName {
+func (m *OpenAIModel) Provider() string {
 	return Provider
 }
 
@@ -330,7 +331,7 @@ func convertToOpenAIInputs(messages []llmsdk.Message) ([]openaiapi.ResponseInput
 }
 
 func convertUserMessageToOpenAIInputItem(userMessage *llmsdk.UserMessage) (openaiapi.ResponseInputItem, error) {
-	messageParts := llmsdk.GetCompatiblePartsWithoutSourceParts(userMessage.Content)
+	messageParts := partutil.GetCompatiblePartsWithoutSourceParts(userMessage.Content)
 	var content []openaiapi.ResponseInputContent
 
 	for _, part := range messageParts {
@@ -350,7 +351,7 @@ func convertUserMessageToOpenAIInputItem(userMessage *llmsdk.UserMessage) (opena
 }
 
 func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.AssistantMessage) ([]openaiapi.ResponseInputItem, error) {
-	messageParts := llmsdk.GetCompatiblePartsWithoutSourceParts(assistantMessage.Content)
+	messageParts := partutil.GetCompatiblePartsWithoutSourceParts(assistantMessage.Content)
 	var inputItems []openaiapi.ResponseInputItem
 
 	for _, part := range messageParts {
@@ -434,7 +435,7 @@ func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]op
 			return nil, fmt.Errorf("tool messages must contain only tool result parts")
 		}
 
-		toolResultPartContent := llmsdk.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
+		toolResultPartContent := partutil.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
 		for _, toolResultPart := range toolResultPartContent {
 			switch {
 			case toolResultPart.TextPart != nil:

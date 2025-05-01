@@ -11,12 +11,13 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/google/googleapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/randutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
 
-const Provider llmsdk.ProviderName = "google"
+const Provider = "google"
 
 type GoogleModelOptions struct {
 	BaseURL    string
@@ -57,7 +58,7 @@ func (m *GoogleModel) WithMetadata(metadata llmsdk.LanguageModelMetadata) *Googl
 	return m
 }
 
-func (m *GoogleModel) Provider() llmsdk.ProviderName {
+func (m *GoogleModel) Provider() string {
 	return Provider
 }
 
@@ -329,7 +330,7 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 		return []googleapi.Part{{
 			InlineData: &googleapi.Blob2{
 				Data:     &part.AudioPart.AudioData,
-				MimeType: ptr.To(llmsdk.MapAudioFormatToMimeType(part.AudioPart.Format)),
+				MimeType: ptr.To(partutil.MapAudioFormatToMimeType(part.AudioPart.Format)),
 			},
 		}}, nil
 	case part.ReasoningPart != nil:
@@ -371,7 +372,7 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 }
 
 func convertToGoogleFunctionResponseResponse(parts []llmsdk.Part, isError bool) (map[string]any, error) {
-	compatibleParts := llmsdk.GetCompatiblePartsWithoutSourceParts(parts)
+	compatibleParts := partutil.GetCompatiblePartsWithoutSourceParts(parts)
 	textParts := []llmsdk.TextPart{}
 	for _, part := range compatibleParts {
 		if part.TextPart != nil {
@@ -526,7 +527,7 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 				}
 
 				if strings.HasPrefix(*part.InlineData.MimeType, "audio/") {
-					format, err := llmsdk.MapMimeTypeToAudioFormat(*part.InlineData.MimeType)
+					format, err := partutil.MapMimeTypeToAudioFormat(*part.InlineData.MimeType)
 					if err != nil {
 						return nil, llmsdk.NewInvariantError(Provider, fmt.Sprintf("unsupported audio mime type: %s", *part.InlineData.MimeType))
 					}
@@ -578,8 +579,8 @@ func mapGoogleContentToDelta(content googleapi.Content, existingContentDeltas []
 	}
 
 	for _, part := range parts {
-		partDelta := llmsdk.LooselyConvertPartToPartDelta(part)
-		index := llmsdk.GuessDeltaIndex(partDelta, append(existingContentDeltas, contentDeltas...), nil)
+		partDelta := partutil.LooselyConvertPartToPartDelta(part)
+		index := partutil.GuessDeltaIndex(partDelta, append(existingContentDeltas, contentDeltas...), nil)
 		contentDeltas = append(contentDeltas, llmsdk.ContentDelta{
 			Index: index,
 			Part:  partDelta,

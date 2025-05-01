@@ -7,13 +7,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/llmsdktest"
 )
 
 func TestAgent_Run(t *testing.T) {
 	t.Run("creates session, runs, and finishes", func(t *testing.T) {
-		model := llmsdk.NewMockLanguageModel()
+		model := llmsdktest.NewMockLanguageModel()
 		model.EnqueueGenerateResult(
-			llmsdk.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+			llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
 					{TextPart: &llmsdk.TextPart{Text: "Mock response"}},
 				},
@@ -59,9 +60,9 @@ func TestAgent_Run(t *testing.T) {
 
 func TestAgent_RunStream(t *testing.T) {
 	t.Run("creates session, streams, and finishes", func(t *testing.T) {
-		model := llmsdk.NewMockLanguageModel()
+		model := llmsdktest.NewMockLanguageModel()
 		model.EnqueueStreamResult(
-			llmsdk.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+			llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
 				{
 					Delta: &llmsdk.ContentDelta{
 						Index: 0,

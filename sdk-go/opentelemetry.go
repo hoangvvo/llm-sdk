@@ -13,7 +13,7 @@ import (
 
 var tracer = otel.Tracer("github.com/hoangvvo/llm-sdk/sdk-go")
 
-type LMSpan struct {
+type lmSpan struct {
 	Provider  string      `json:"provider"`
 	ModelID   string      `json:"model_id"`
 	Usage     *ModelUsage `json:"usage,omitempty"`
@@ -32,10 +32,10 @@ type LMSpan struct {
 	span trace.Span
 }
 
-func NewLMSpan(ctx context.Context, provider string, modelID string, method string, input *LanguageModelInput) (context.Context, *LMSpan) {
+func NewLMSpan(ctx context.Context, provider string, modelID string, method string, input *LanguageModelInput) (context.Context, *lmSpan) {
 	spanCtx, span := tracer.Start(ctx, "llm_sdk."+method)
 
-	return spanCtx, &LMSpan{
+	return spanCtx, &lmSpan{
 		Provider:         provider,
 		ModelID:          modelID,
 		StartTime:        time.Now(),
@@ -50,7 +50,7 @@ func NewLMSpan(ctx context.Context, provider string, modelID string, method stri
 	}
 }
 
-func (s *LMSpan) OnStreamPartial(partial *PartialModelResponse) {
+func (s *lmSpan) OnStreamPartial(partial *PartialModelResponse) {
 	if partial.Usage != nil {
 		if s.Usage == nil {
 			s.Usage = &ModelUsage{}
@@ -62,18 +62,18 @@ func (s *LMSpan) OnStreamPartial(partial *PartialModelResponse) {
 	}
 }
 
-func (s *LMSpan) OnResponse(response *ModelResponse) {
+func (s *lmSpan) OnResponse(response *ModelResponse) {
 	if response.Usage != nil {
 		s.Usage = response.Usage
 	}
 }
 
-func (s *LMSpan) OnError(err error) {
+func (s *lmSpan) OnError(err error) {
 	s.span.RecordError(err)
 	s.span.SetStatus(codes.Error, err.Error())
 }
 
-func (s *LMSpan) OnEnd() {
+func (s *lmSpan) OnEnd() {
 	// https://opentelemetry.io/docs/specs/semconv/gen-ai/
 	s.span.SetAttributes(
 		attribute.String("gen_ai.operation.name", "generate_content"),

@@ -11,6 +11,7 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
@@ -50,7 +51,7 @@ func (m *OpenAIChatModel) WithMetadata(metadata *llmsdk.LanguageModelMetadata) *
 }
 
 // Provider returns the provider name
-func (m *OpenAIChatModel) Provider() llmsdk.ProviderName {
+func (m *OpenAIChatModel) Provider() string {
 	return Provider
 }
 
@@ -342,7 +343,7 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 		case message.UserMessage != nil:
 			var content []openaiapi.ChatCompletionContentPart
 
-			messageParts := llmsdk.GetCompatiblePartsWithoutSourceParts(message.UserMessage.Content)
+			messageParts := partutil.GetCompatiblePartsWithoutSourceParts(message.UserMessage.Content)
 
 			for _, part := range messageParts {
 				openAIPart, err := convertToOpenAIContentPart(part)
@@ -361,7 +362,7 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 		case message.AssistantMessage != nil:
 			assistantMsg := &openaiapi.ChatCompletionAssistantMessageParam{}
 
-			messageParts := llmsdk.GetCompatiblePartsWithoutSourceParts(message.AssistantMessage.Content)
+			messageParts := partutil.GetCompatiblePartsWithoutSourceParts(message.AssistantMessage.Content)
 
 			for _, part := range messageParts {
 				switch {
@@ -411,7 +412,7 @@ func convertToOpenAIMessages(messages []llmsdk.Message, systemPrompt *string) ([
 					return nil, fmt.Errorf("tool message must only contain tool result parts")
 				}
 
-				toolResultPartContent := llmsdk.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
+				toolResultPartContent := partutil.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
 
 				var content []openaiapi.ChatCompletionToolMessageParamToolContentPart
 				for _, contentPart := range toolResultPartContent {
@@ -679,7 +680,7 @@ func (m *OpenAIChatModel) mapOpenAIDelta(delta openaiapi.ChatCompletionChunkChoi
 		}
 
 		// Find the appropriate index for text content
-		index := llmsdk.GuessDeltaIndex(llmsdk.PartDelta{TextPartDelta: &textDelta}, slices.Concat(existingDeltas, contentDeltas), nil)
+		index := partutil.GuessDeltaIndex(llmsdk.PartDelta{TextPartDelta: &textDelta}, slices.Concat(existingDeltas, contentDeltas), nil)
 
 		contentDeltas = append(contentDeltas, llmsdk.ContentDelta{
 			Index: index,
@@ -708,7 +709,7 @@ func (m *OpenAIChatModel) mapOpenAIDelta(delta openaiapi.ChatCompletionChunkChoi
 			audioDelta.Transcript = delta.Audio.Transcript
 		}
 
-		index := llmsdk.GuessDeltaIndex(llmsdk.PartDelta{AudioPartDelta: &audioDelta}, slices.Concat(existingDeltas, contentDeltas), nil)
+		index := partutil.GuessDeltaIndex(llmsdk.PartDelta{AudioPartDelta: &audioDelta}, slices.Concat(existingDeltas, contentDeltas), nil)
 
 		contentDeltas = append(contentDeltas, llmsdk.ContentDelta{
 			Index: index,
@@ -736,7 +737,7 @@ func (m *OpenAIChatModel) mapOpenAIDelta(delta openaiapi.ChatCompletionChunkChoi
 			indexHint = &toolCall.Index
 		}
 
-		index := llmsdk.GuessDeltaIndex(llmsdk.PartDelta{ToolCallPartDelta: &toolCallDelta}, slices.Concat(existingDeltas, contentDeltas), indexHint)
+		index := partutil.GuessDeltaIndex(llmsdk.PartDelta{ToolCallPartDelta: &toolCallDelta}, slices.Concat(existingDeltas, contentDeltas), indexHint)
 
 		contentDeltas = append(contentDeltas, llmsdk.ContentDelta{
 			Index: index,
