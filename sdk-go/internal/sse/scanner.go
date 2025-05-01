@@ -11,9 +11,13 @@ type Scanner struct {
 	scanner *bufio.Scanner
 }
 
+const MaxScanTokenSize = 256 * 1024 // 256KB
+
 // NewScanner creates a new SSE scanner from an io.Reader
 func NewScanner(reader io.Reader) *Scanner {
 	scanner := bufio.NewScanner(reader)
+	buf := make([]byte, MaxScanTokenSize)
+	scanner.Buffer(buf, MaxScanTokenSize)
 	return &Scanner{
 		scanner: scanner,
 	}
@@ -44,13 +48,13 @@ type Event struct {
 // ParseEvent parses a single SSE event from lines of text
 func ParseEvent(lines []string) *Event {
 	event := &Event{}
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, ":") {
 			continue
 		}
-		
+
 		if strings.HasPrefix(line, "event:") {
 			event.Type = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
 		} else if strings.HasPrefix(line, "data:") {
@@ -63,7 +67,7 @@ func ParseEvent(lines []string) *Event {
 			event.ID = strings.TrimSpace(strings.TrimPrefix(line, "id:"))
 		}
 	}
-	
+
 	return event
 }
 
