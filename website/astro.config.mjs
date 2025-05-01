@@ -3,6 +3,7 @@ import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
+import { ion } from "starlight-ion-theme";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
 // https://astro.build/config
@@ -10,6 +11,12 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "llm-sdk",
+      logo: {
+        light: "./src/assets/logo-light.svg",
+        dark: "./src/assets/logo-dark.svg",
+        alt: "llm-sdk",
+        replacesTitle: true,
+      },
       social: [
         {
           icon: "github",
@@ -61,6 +68,7 @@ export default defineConfig({
           ],
         },
       ],
+      plugins: [ion()],
     }),
     react(),
   ],
