@@ -888,11 +888,12 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(model.TrackedGenerateInputs) != 1 {
-		t.Fatalf("expected 1 generate call, got %d", len(model.TrackedGenerateInputs))
+	trackedGenerateInputs := model.TrackedGenerateInputs()
+	if len(trackedGenerateInputs) != 1 {
+		t.Fatalf("expected 1 generate call, got %d", len(trackedGenerateInputs))
 	}
 
-	call := *model.TrackedGenerateInputs[0]
+	call := trackedGenerateInputs[0]
 	if call.Temperature == nil || *call.Temperature != temp {
 		t.Errorf("expected temperature %f, got %v", temp, call.Temperature)
 	}
@@ -959,11 +960,12 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(model.TrackedGenerateInputs) != 1 {
-		t.Fatalf("expected 1 generate call, got %d", len(model.TrackedGenerateInputs))
+	trackedGenerateInputs := model.TrackedGenerateInputs()
+	if len(trackedGenerateInputs) != 1 {
+		t.Fatalf("expected 1 generate call, got %d", len(trackedGenerateInputs))
 	}
 
-	call := *model.TrackedGenerateInputs[0]
+	call := trackedGenerateInputs[0]
 	expectedSystemPrompt := "You are a helpful assistant.\nThe user is a developer.\nAlways be polite."
 
 	if call.SystemPrompt == nil || *call.SystemPrompt != expectedSystemPrompt {

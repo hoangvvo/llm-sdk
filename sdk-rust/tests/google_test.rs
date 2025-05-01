@@ -1,77 +1,74 @@
 mod common;
 use crate::common::{assert::PartAssertion, cases::RunTestCaseOptions};
 use llm_sdk::{google::*, *};
-use std::{env, error::Error, sync::LazyLock};
+use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
 
-static GOOGLE_MODEL: LazyLock<GoogleModel> = LazyLock::new(|| {
-    dotenvy::dotenv().ok();
+fn google_api_key() -> &'static String {
+    static KEY: OnceLock<String> = OnceLock::new();
 
+    KEY.get_or_init(|| {
+        dotenvy::dotenv().ok();
+        env::var("GOOGLE_API_KEY").expect("GOOGLE_API_KEY must be set")
+    })
+}
+
+fn google_model() -> GoogleModel {
     GoogleModel::new(
         "gemini-2.5-flash".to_string(),
         GoogleModelOptions {
-            api_key: env::var("GOOGLE_API_KEY")
-                .expect("GOOGLE_API_KEY must be set")
-                .to_string(),
+            api_key: google_api_key().clone(),
             ..Default::default()
         },
     )
-});
+}
 
-static GOOGLE_AUDIO_MODEL: LazyLock<GoogleModel> = LazyLock::new(|| {
-    dotenvy::dotenv().ok();
-
+fn google_audio_model() -> GoogleModel {
     GoogleModel::new(
         "gemini-2.5-flash-preview-tts".to_string(),
         GoogleModelOptions {
-            api_key: env::var("GOOGLE_API_KEY")
-                .expect("GOOGLE_API_KEY must be set")
-                .to_string(),
+            api_key: google_api_key().clone(),
             ..Default::default()
         },
     )
-});
+}
 
-static GOOGLE_REASONING_MODEL: LazyLock<GoogleModel> = LazyLock::new(|| {
-    dotenvy::dotenv().ok();
-
+fn google_reasoning_model() -> GoogleModel {
     GoogleModel::new(
         "gemini-2.0-flash-thinking-exp-01-21".to_string(),
         GoogleModelOptions {
-            api_key: env::var("GOOGLE_API_KEY")
-                .expect("GOOGLE_API_KEY must be set")
-                .to_string(),
+            api_key: google_api_key().clone(),
             ..Default::default()
         },
     )
-});
+}
 
-test_set!(GOOGLE_MODEL, generate_text);
+test_set!(google_model(), generate_text);
 
-test_set!(GOOGLE_MODEL, stream_text);
+test_set!(google_model(), stream_text);
 
-test_set!(GOOGLE_MODEL, generate_with_system_prompt);
+test_set!(google_model(), generate_with_system_prompt);
 
-test_set!(GOOGLE_MODEL, generate_tool_call);
+test_set!(google_model(), generate_tool_call);
 
-test_set!(GOOGLE_MODEL, stream_tool_call);
+test_set!(google_model(), stream_tool_call);
 
-test_set!(GOOGLE_MODEL, generate_text_from_tool_result);
+test_set!(google_model(), generate_text_from_tool_result);
 
-test_set!(GOOGLE_MODEL, stream_text_from_tool_result);
+test_set!(google_model(), stream_text_from_tool_result);
 
-test_set!(GOOGLE_MODEL, generate_parallel_tool_calls);
+test_set!(google_model(), generate_parallel_tool_calls);
 
-test_set!(GOOGLE_MODEL, stream_parallel_tool_calls);
+test_set!(google_model(), stream_parallel_tool_calls);
 
-test_set!(GOOGLE_MODEL, stream_parallel_tool_calls_same_name);
+test_set!(google_model(), stream_parallel_tool_calls_same_name);
 
-test_set!(GOOGLE_MODEL, structured_response_format);
+test_set!(google_model(), structured_response_format);
 
-test_set!(GOOGLE_MODEL, source_part_input);
+test_set!(google_model(), source_part_input);
 
 test_set!(
-    GOOGLE_AUDIO_MODEL,
+    google_audio_model(),
     generate_audio,
     Some(RunTestCaseOptions {
         additional_input: Some(|input| {
@@ -99,7 +96,7 @@ test_set!(
 );
 
 test_set!(
-    GOOGLE_AUDIO_MODEL,
+    google_audio_model(),
     stream_audio,
     Some(RunTestCaseOptions {
         additional_input: Some(|input| {
@@ -126,6 +123,6 @@ test_set!(
     })
 );
 
-test_set!(GOOGLE_REASONING_MODEL, generate_reasoning);
+test_set!(google_reasoning_model(), generate_reasoning);
 
-test_set!(GOOGLE_REASONING_MODEL, stream_reasoning);
+test_set!(google_reasoning_model(), stream_reasoning);

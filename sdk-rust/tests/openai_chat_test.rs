@@ -1,63 +1,64 @@
 mod common;
 use crate::common::cases::RunTestCaseOptions;
 use llm_sdk::{openai::*, *};
-use std::{env, error::Error, sync::LazyLock};
+use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
 
-static OPENAI_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
-    dotenvy::dotenv().ok();
+fn openai_api_key() -> &'static String {
+    static KEY: OnceLock<String> = OnceLock::new();
 
+    KEY.get_or_init(|| {
+        dotenvy::dotenv().ok();
+        env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
+    })
+}
+
+fn openai_model() -> OpenAIChatModel {
     OpenAIChatModel::new(
         "gpt-4o".to_string(),
         OpenAIChatModelOptions {
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY must be set")
-                .to_string(),
+            api_key: openai_api_key().clone(),
             ..Default::default()
         },
     )
-});
+}
 
-static OPENAI_AUDIO_MODEL: LazyLock<OpenAIChatModel> = LazyLock::new(|| {
-    dotenvy::dotenv().ok();
-
+fn openai_audio_model() -> OpenAIChatModel {
     OpenAIChatModel::new(
         "gpt-4o-audio-preview".to_string(),
         OpenAIChatModelOptions {
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY must be set")
-                .to_string(),
+            api_key: openai_api_key().clone(),
             ..Default::default()
         },
     )
-});
+}
 
-test_set!(OPENAI_MODEL, generate_text);
+test_set!(openai_model(), generate_text);
 
-test_set!(OPENAI_MODEL, stream_text);
+test_set!(openai_model(), stream_text);
 
-test_set!(OPENAI_MODEL, generate_with_system_prompt);
+test_set!(openai_model(), generate_with_system_prompt);
 
-test_set!(OPENAI_MODEL, generate_tool_call);
+test_set!(openai_model(), generate_tool_call);
 
-test_set!(OPENAI_MODEL, stream_tool_call);
+test_set!(openai_model(), stream_tool_call);
 
-test_set!(OPENAI_MODEL, generate_text_from_tool_result);
+test_set!(openai_model(), generate_text_from_tool_result);
 
-test_set!(OPENAI_MODEL, stream_text_from_tool_result);
+test_set!(openai_model(), stream_text_from_tool_result);
 
-test_set!(OPENAI_MODEL, generate_parallel_tool_calls);
+test_set!(openai_model(), generate_parallel_tool_calls);
 
-test_set!(OPENAI_MODEL, stream_parallel_tool_calls);
+test_set!(openai_model(), stream_parallel_tool_calls);
 
-test_set!(OPENAI_MODEL, stream_parallel_tool_calls_same_name);
+test_set!(openai_model(), stream_parallel_tool_calls_same_name);
 
-test_set!(OPENAI_MODEL, structured_response_format);
+test_set!(openai_model(), structured_response_format);
 
-test_set!(OPENAI_MODEL, source_part_input);
+test_set!(openai_model(), source_part_input);
 
 test_set!(
-    OPENAI_AUDIO_MODEL,
+    openai_audio_model(),
     generate_audio,
     Some(RunTestCaseOptions {
         additional_input: Some(|input| {
@@ -72,7 +73,7 @@ test_set!(
 );
 
 test_set!(
-    OPENAI_AUDIO_MODEL,
+    openai_audio_model(),
     stream_audio,
     Some(RunTestCaseOptions {
         additional_input: Some(|input| {
@@ -88,12 +89,12 @@ test_set!(
 
 test_set!(
     ignore = "reasoning is not supported in chat completion api",
-    OPENAI_MODEL,
+    openai_model(),
     generate_reasoning
 );
 
 test_set!(
     ignore = "reasoning is not supported in chat completion api",
-    OPENAI_MODEL,
+    openai_model(),
     stream_reasoning
 );

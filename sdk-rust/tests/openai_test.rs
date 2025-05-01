@@ -1,72 +1,73 @@
 mod common;
 use llm_sdk::{openai::*, *};
-use std::{env, error::Error, sync::LazyLock};
+use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
 
-static MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
-    dotenvy::dotenv().ok();
+fn openai_api_key() -> &'static String {
+    static KEY: OnceLock<String> = OnceLock::new();
 
+    KEY.get_or_init(|| {
+        dotenvy::dotenv().ok();
+        env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
+    })
+}
+
+fn openai_model() -> OpenAIModel {
     OpenAIModel::new(
         "gpt-4o".to_string(),
         OpenAIModelOptions {
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY must be set")
-                .to_string(),
+            api_key: openai_api_key().clone(),
             ..Default::default()
         },
     )
-});
+}
 
-static REASONING_MODEL: LazyLock<OpenAIModel> = LazyLock::new(|| {
-    dotenvy::dotenv().ok();
-
+fn openai_reasoning_model() -> OpenAIModel {
     OpenAIModel::new(
         "o1".to_string(),
         OpenAIModelOptions {
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY must be set")
-                .to_string(),
+            api_key: openai_api_key().clone(),
             ..Default::default()
         },
     )
-});
+}
 
-test_set!(MODEL, generate_text);
+test_set!(openai_model(), generate_text);
 
-test_set!(MODEL, stream_text);
+test_set!(openai_model(), stream_text);
 
-test_set!(MODEL, generate_with_system_prompt);
+test_set!(openai_model(), generate_with_system_prompt);
 
-test_set!(MODEL, generate_tool_call);
+test_set!(openai_model(), generate_tool_call);
 
-test_set!(MODEL, stream_tool_call);
+test_set!(openai_model(), stream_tool_call);
 
-test_set!(MODEL, generate_text_from_tool_result);
+test_set!(openai_model(), generate_text_from_tool_result);
 
-test_set!(MODEL, stream_text_from_tool_result);
+test_set!(openai_model(), stream_text_from_tool_result);
 
-test_set!(MODEL, generate_parallel_tool_calls);
+test_set!(openai_model(), generate_parallel_tool_calls);
 
-test_set!(MODEL, stream_parallel_tool_calls);
+test_set!(openai_model(), stream_parallel_tool_calls);
 
-test_set!(MODEL, stream_parallel_tool_calls_same_name);
+test_set!(openai_model(), stream_parallel_tool_calls_same_name);
 
-test_set!(MODEL, structured_response_format);
+test_set!(openai_model(), structured_response_format);
 
-test_set!(MODEL, source_part_input);
+test_set!(openai_model(), source_part_input);
 
 test_set!(
     ignore = "audio is not supported in responses api",
-    MODEL,
+    openai_model(),
     generate_audio
 );
 
 test_set!(
     ignore = "audio is not supported in responses api",
-    MODEL,
+    openai_model(),
     stream_audio
 );
 
-test_set!(REASONING_MODEL, generate_reasoning);
+test_set!(openai_reasoning_model(), generate_reasoning);
 
-test_set!(REASONING_MODEL, stream_reasoning);
+test_set!(openai_reasoning_model(), stream_reasoning);

@@ -565,8 +565,13 @@ fn map_google_content_to_delta(
     let parts = map_google_content(parts)?;
 
     for part in parts {
+        let all_content_deltas = existing_deltas
+            .iter()
+            .chain(deltas.iter())
+            .cloned()
+            .collect::<Vec<_>>();
         let part_delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
-        let guessed_index = stream_utils::guess_delta_index(&part_delta, existing_deltas, None);
+        let guessed_index = stream_utils::guess_delta_index(&part_delta, &all_content_deltas, None);
         deltas.push(ContentDelta {
             index: guessed_index,
             part: part_delta,

@@ -340,37 +340,41 @@ pub async fn test_stream_reasoning(
 
 #[macro_export]
 macro_rules! test_set {
-    ($model_name:ident, $test_name:ident) => {
+    ($model_expr:expr, $test_name:ident) => {
         #[test]
         async fn $test_name() -> Result<(), Box<dyn Error>> {
+            let model = $model_expr;
             paste::paste! {
-                $crate::common::cases::[<test_$test_name>](&*$model_name, None).await
+                $crate::common::cases::[<test_$test_name>](&model, None).await
             }
         }
     };
-    ($model_name:ident, $test_name:ident, $options:expr) => {
+    ($model_expr:expr, $test_name:ident, $options:expr) => {
         #[test]
         async fn $test_name() -> Result<(), Box<dyn Error>> {
+            let model = $model_expr;
             paste::paste! {
-                $crate::common::cases::[<test_$test_name>](&*$model_name, $options).await
+                $crate::common::cases::[<test_$test_name>](&model, $options).await
             }
         }
     };
-    (ignore = $reason:literal, $model_name:ident, $test_name:ident) => {
+    (ignore = $reason:literal, $model_expr:expr, $test_name:ident) => {
         #[test]
         #[ignore = $reason]
         async fn $test_name() -> Result<(), Box<dyn Error>> {
+            let model = $model_expr;
             paste::paste! {
-                $crate::common::cases::[<test_$test_name>](&*$model_name, None).await
+                $crate::common::cases::[<test_$test_name>](&model, None).await
             }
         }
     };
-    (ignore = $reason:literal, $model_name:ident, $test_name:ident, $options:expr) => {
+    (ignore = $reason:literal, $model_expr:expr, $test_name:ident, $options:expr) => {
         #[test]
         #[ignore = $reason]
         async fn $test_name() -> Result<(), Box<dyn Error>> {
+            let model = $model_expr;
             paste::paste! {
-                $crate::common::cases::[<test_$test_name>](&*$model_name, $options).await
+                $crate::common::cases::[<test_$test_name>](&model, $options).await
             }
         }
     };
