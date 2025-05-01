@@ -1,0 +1,22 @@
+---
+title: Testing
+---
+
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goAgentTestCode from "../../../../../agent-go/agent_test.go?raw";
+import jsAgentTestCode from "../../../../../agent-js/src/agent.test.ts?raw";
+import rustAgentTestCode from "../../../../../agent-rust/tests/agent_tests.rs?raw";
+
+The best way to test agents is to pass a `MockLanguageModel` to the agent instead of a real language model.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsAgentTestCode} lang="typescript" title="agent.test.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustAgentTestCode} lang="rust" title="agent_test.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goAgentTestCode} lang="go" title="agent_test.go" />
+  </TabItem>
+</Tabs>

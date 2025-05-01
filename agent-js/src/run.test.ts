@@ -6,12 +6,10 @@
 
 import {
   LanguageModelError,
-  type LanguageModelInput,
-  type ModelResponse,
+  MockLanguageModel,
   type PartDelta,
   type PartialModelResponse,
 } from "@hoangvvo/llm-sdk";
-import assert from "node:assert";
 import test, { suite, type TestContext } from "node:test";
 import {
   AgentInvariantError,
@@ -22,56 +20,6 @@ import {
 import { RunSession, type RunState } from "./run.ts";
 import type { AgentTool } from "./tool.ts";
 import type { AgentResponse, AgentStreamEvent } from "./types.ts";
-
-function createMockLanguageModel(t: TestContext) {
-  const responses: ModelResponse[] = [];
-  const partialModelResponseSets: PartialModelResponse[][] = [];
-  const errors: Error[] = [];
-  const streamErrors: Error[] = [];
-
-  return {
-    modelId: "mock-model",
-    provider: "mock",
-    addResponses(...value: ModelResponse[]) {
-      responses.push(...value);
-      return this;
-    },
-    addPartialModelResponses(...value: PartialModelResponse[][]) {
-      partialModelResponseSets.push(...value);
-      return this;
-    },
-    addError(error: Error) {
-      errors.push(error);
-      return this;
-    },
-    addStreamError(error: Error) {
-      streamErrors.push(error);
-      return this;
-    },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    generate: t.mock.fn((_input: LanguageModelInput) => {
-      const error = errors.shift();
-      if (error) {
-        return Promise.reject(error);
-      }
-      const response = responses.shift();
-      assert(response, "no mock response");
-      return Promise.resolve(response);
-    }),
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    stream: t.mock.fn(async function* (_input: LanguageModelInput) {
-      const error = streamErrors.shift();
-      if (error) {
-        throw error;
-      }
-      const partialResponses = partialModelResponseSets.shift();
-      assert(partialResponses, "no mock partial response");
-      for (const response of partialResponses) {
-        yield Promise.resolve(response);
-      }
-    }),
-  };
-}
 
 function createMockTool<TContext = any>(
   name: string,
@@ -95,10 +43,29 @@ function createPartialResponse(part: PartDelta): PartialModelResponse {
   };
 }
 
+function isPartialEvent(
+  event: AgentStreamEvent,
+): event is Extract<AgentStreamEvent, { event: "partial" }> {
+  return event.event === "partial";
+}
+
+function isItemEvent(
+  event: AgentStreamEvent,
+): event is Extract<AgentStreamEvent, { event: "item" }> {
+  return event.event === "item";
+}
+
+function isResponseEvent(
+  event: AgentStreamEvent,
+): event is Extract<AgentStreamEvent, { event: "response" }> {
+  return event.event === "response";
+}
+
 suite("RunSession#run", () => {
   test("returns a response when there is no tool call", async (t: TestContext) => {
-    const model = createMockLanguageModel(t).addResponses({
-      content: [{ type: "text", text: "Hi!" }],
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: { content: [{ type: "text", text: "Hi!" }] },
     });
 
     const session = await RunSession.create({
@@ -146,8 +113,9 @@ suite("RunSession#run", () => {
 
     const tool = createMockTool("test_tool", null, toolExecute);
 
-    const model = createMockLanguageModel(t).addResponses(
-      {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
         content: [
           {
             type: "tool-call",
@@ -162,10 +130,12 @@ suite("RunSession#run", () => {
         },
         cost: 0.0015,
       },
-      {
+    });
+    model.enqueueGenerateResult({
+      response: {
         content: [{ type: "text", text: "Final response" }],
       },
-    );
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -187,15 +157,12 @@ suite("RunSession#run", () => {
       ],
     });
 
-    t.assert.strictEqual(toolExecute.mock.calls.length, 1);
-    const firstCall = toolExecute.mock.calls[0];
-    t.assert.ok(firstCall);
-    t.assert.deepStrictEqual(firstCall.arguments[0], {
-      param: "value",
-    });
-    t.assert.deepStrictEqual(firstCall.arguments[1], {
-      testContext: true,
-    });
+    const toolCallArguments = toolExecute.mock.calls.map((call) =>
+      call.arguments.slice(0, 2),
+    );
+    t.assert.deepStrictEqual(toolCallArguments, [
+      [{ param: "value" }, { testContext: true }],
+    ]);
 
     t.assert.deepStrictEqual(response, {
       content: [{ type: "text", text: "Final response" }],
@@ -247,8 +214,9 @@ suite("RunSession#run", () => {
     const tool1 = createMockTool("tool_1", null, tool1Execute);
     const tool2 = createMockTool("tool_2", null, tool2Execute);
 
-    const model = createMockLanguageModel(t).addResponses(
-      {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
         content: [
           {
             type: "tool-call",
@@ -268,7 +236,9 @@ suite("RunSession#run", () => {
           output_tokens: 100,
         },
       },
-      {
+    });
+    model.enqueueGenerateResult({
+      response: {
         content: [{ type: "text", text: "Processed both tools" }],
         usage: {
           input_tokens: 50,
@@ -276,7 +246,7 @@ suite("RunSession#run", () => {
         },
         cost: 0.0003,
       },
-    );
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -298,12 +268,14 @@ suite("RunSession#run", () => {
       ],
     });
 
-    t.assert.deepStrictEqual(tool1Execute.mock.calls[0]?.arguments[0], {
-      param: "value1",
-    });
-    t.assert.deepStrictEqual(tool2Execute.mock.calls[0]?.arguments[0], {
-      param: "value2",
-    });
+    t.assert.deepStrictEqual(
+      tool1Execute.mock.calls.map((call) => call.arguments[0]),
+      [{ param: "value1" }],
+    );
+    t.assert.deepStrictEqual(
+      tool2Execute.mock.calls.map((call) => call.arguments[0]),
+      [{ param: "value2" }],
+    );
 
     const expectedResponse: AgentResponse = {
       content: [{ type: "text", text: "Processed both tools" }],
@@ -373,11 +345,6 @@ suite("RunSession#run", () => {
     };
 
     t.assert.deepStrictEqual(response, expectedResponse);
-
-    t.assert.deepStrictEqual(response.content, [
-      { type: "text", text: "Processed both tools" },
-    ]);
-    t.assert.strictEqual(response.output.length, 4);
   });
 
   test("handles multiple turns with tool calls", async (t: TestContext) => {
@@ -389,8 +356,9 @@ suite("RunSession#run", () => {
 
     const tool = createMockTool("calculator", null, toolExecute);
 
-    const model = createMockLanguageModel(t).addResponses(
-      {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
         content: [
           {
             type: "tool-call",
@@ -400,7 +368,9 @@ suite("RunSession#run", () => {
           },
         ],
       },
-      {
+    });
+    model.enqueueGenerateResult({
+      response: {
         content: [
           {
             type: "tool-call",
@@ -410,10 +380,12 @@ suite("RunSession#run", () => {
           },
         ],
       },
-      {
+    });
+    model.enqueueGenerateResult({
+      response: {
         content: [{ type: "text", text: "All calculations done" }],
       },
-    );
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -435,15 +407,63 @@ suite("RunSession#run", () => {
       ],
     });
 
-    t.assert.deepStrictEqual(toolExecute.mock.calls[0]?.arguments[0], {
-      operation: "add",
-      a: 1,
-      b: 2,
-    });
-    t.assert.deepStrictEqual(response.content, [
-      { type: "text", text: "All calculations done" },
-    ]);
-    t.assert.strictEqual(response.output.length, 5);
+    t.assert.deepStrictEqual(
+      toolExecute.mock.calls.map((call) => call.arguments[0]),
+      [
+        { operation: "add", a: 1, b: 2 },
+        { operation: "multiply", a: 3, b: 4 },
+      ],
+    );
+
+    const expectedResponse: AgentResponse = {
+      content: [{ type: "text", text: "All calculations done" }],
+      output: [
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "calculator",
+              tool_call_id: "call_1",
+              args: { operation: "add", a: 1, b: 2 },
+            },
+          ],
+        },
+        {
+          type: "tool",
+          tool_name: "calculator",
+          tool_call_id: "call_1",
+          input: { operation: "add", a: 1, b: 2 },
+          output: [{ type: "text", text: "Calculation result" }],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "calculator",
+              tool_call_id: "call_2",
+              args: { operation: "multiply", a: 3, b: 4 },
+            },
+          ],
+        },
+        {
+          type: "tool",
+          tool_name: "calculator",
+          tool_call_id: "call_2",
+          input: { operation: "multiply", a: 3, b: 4 },
+          output: [{ type: "text", text: "Calculation result" }],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [{ type: "text", text: "All calculations done" }],
+        },
+      ],
+    };
+
+    t.assert.deepStrictEqual(response, expectedResponse);
   });
 
   test("throws AgentMaxTurnsExceededError when max turns exceeded", async (t: TestContext) => {
@@ -454,8 +474,9 @@ suite("RunSession#run", () => {
 
     const tool = createMockTool("test_tool", null, toolExecute);
 
-    const model = createMockLanguageModel(t).addResponses(
-      {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
         content: [
           {
             type: "tool-call",
@@ -465,7 +486,9 @@ suite("RunSession#run", () => {
           },
         ],
       },
-      {
+    });
+    model.enqueueGenerateResult({
+      response: {
         content: [
           {
             type: "tool-call",
@@ -475,7 +498,9 @@ suite("RunSession#run", () => {
           },
         ],
       },
-      {
+    });
+    model.enqueueGenerateResult({
+      response: {
         content: [
           {
             type: "tool-call",
@@ -485,7 +510,7 @@ suite("RunSession#run", () => {
           },
         ],
       },
-    );
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -518,15 +543,18 @@ suite("RunSession#run", () => {
   });
 
   test("throws AgentInvariantError when tool not found", async (t: TestContext) => {
-    const model = createMockLanguageModel(t).addResponses({
-      content: [
-        {
-          type: "tool-call",
-          tool_name: "non_existent_tool",
-          tool_call_id: "call_1",
-          args: {},
-        },
-      ],
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
+        content: [
+          {
+            type: "tool-call",
+            tool_name: "non_existent_tool",
+            tool_call_id: "call_1",
+            args: {},
+          },
+        ],
+      },
     });
 
     const session = await RunSession.create({
@@ -566,15 +594,18 @@ suite("RunSession#run", () => {
 
     const tool = createMockTool("failing_tool", null, toolExecute);
 
-    const model = createMockLanguageModel(t).addResponses({
-      content: [
-        {
-          type: "tool-call",
-          tool_name: "failing_tool",
-          tool_call_id: "call_1",
-          args: {},
-        },
-      ],
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
+        content: [
+          {
+            type: "tool-call",
+            tool_name: "failing_tool",
+            tool_call_id: "call_1",
+            args: {},
+          },
+        ],
+      },
     });
 
     const session = await RunSession.create({
@@ -608,15 +639,16 @@ suite("RunSession#run", () => {
   });
 
   test("handles tool returning error result", async (t: TestContext) => {
-    const toolExecute = t.mock.fn(() => ({
+    const toolExecute = t.mock.fn<AgentTool<any>["execute"]>(() => ({
       content: [{ type: "text", text: "Error: Invalid parameters" }],
       is_error: true,
     }));
 
     const tool = createMockTool("test_tool", null, toolExecute);
 
-    const model = createMockLanguageModel(t).addResponses(
-      {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
         content: [
           {
             type: "tool-call",
@@ -626,10 +658,12 @@ suite("RunSession#run", () => {
           },
         ],
       },
-      {
+    });
+    model.enqueueGenerateResult({
+      response: {
         content: [{ type: "text", text: "Handled the error" }],
       },
-    );
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -651,20 +685,45 @@ suite("RunSession#run", () => {
       ],
     });
 
-    const toolItem = response.output[1];
-    t.assert.ok(toolItem);
-    t.assert.strictEqual(toolItem.type, "tool");
-    t.assert.strictEqual(toolItem.is_error, true);
-    t.assert.deepStrictEqual(toolItem.output, [
-      { type: "text", text: "Error: Invalid parameters" },
-    ]);
-    t.assert.deepStrictEqual(response.content, [
-      { type: "text", text: "Handled the error" },
-    ]);
+    t.assert.deepStrictEqual(
+      toolExecute.mock.calls.map((call) => call.arguments[0]),
+      [{ invalid: true }],
+    );
+
+    const expectedResponse: AgentResponse = {
+      content: [{ type: "text", text: "Handled the error" }],
+      output: [
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "test_tool",
+              tool_call_id: "call_1",
+              args: { invalid: true },
+            },
+          ],
+        },
+        {
+          type: "tool",
+          tool_name: "test_tool",
+          tool_call_id: "call_1",
+          input: { invalid: true },
+          output: [{ type: "text", text: "Error: Invalid parameters" }],
+          is_error: true,
+        },
+        {
+          type: "model",
+          content: [{ type: "text", text: "Handled the error" }],
+        },
+      ],
+    };
+
+    t.assert.deepStrictEqual(response, expectedResponse);
   });
 
   test("throws error when session not initialized", async (t: TestContext) => {
-    const model = createMockLanguageModel(t);
+    const model = new MockLanguageModel();
 
     const session = new RunSession({
       name: "test_agent",
@@ -696,8 +755,9 @@ suite("RunSession#run", () => {
   });
 
   test("passes sampling parameters to model", async (t: TestContext) => {
-    const model = createMockLanguageModel(t).addResponses({
-      content: [{ type: "text", text: "Response" }],
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: { content: [{ type: "text", text: "Response" }] },
     });
 
     const session = await RunSession.create({
@@ -725,21 +785,29 @@ suite("RunSession#run", () => {
       ],
     });
 
-    const generateCalls = model.generate.mock.calls;
-    t.assert.strictEqual(generateCalls.length, 1);
-    const generateCall = generateCalls[0];
-    t.assert.ok(generateCall);
-    t.assert.strictEqual(generateCall.arguments[0].temperature, 0.7);
-    t.assert.strictEqual(generateCall.arguments[0].top_p, 0.9);
-    t.assert.strictEqual(generateCall.arguments[0].top_k, 40);
-    t.assert.strictEqual(generateCall.arguments[0].presence_penalty, 0.1);
-    t.assert.strictEqual(generateCall.arguments[0].frequency_penalty, 0.2);
+    const samplingInputs = model.trackedGenerateInputs.map((input) => ({
+      temperature: input.temperature,
+      top_p: input.top_p,
+      top_k: input.top_k,
+      presence_penalty: input.presence_penalty,
+      frequency_penalty: input.frequency_penalty,
+    }));
+    t.assert.deepStrictEqual(samplingInputs, [
+      {
+        temperature: 0.7,
+        top_p: 0.9,
+        top_k: 40,
+        presence_penalty: 0.1,
+        frequency_penalty: 0.2,
+      },
+    ]);
   });
 
   test("throws LanguageModelError when non-streaming generation fails", async (t: TestContext) => {
-    const model = createMockLanguageModel(t).addError(
-      new LanguageModelError("API quota exceeded"),
-    );
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      error: new LanguageModelError("API quota exceeded"),
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -772,8 +840,9 @@ suite("RunSession#run", () => {
   });
 
   test("includes string and dynamic function instructions in system prompt", async (t: TestContext) => {
-    const model = createMockLanguageModel(t).addResponses({
-      content: [{ type: "text", text: "Response" }],
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: { content: [{ type: "text", text: "Response" }] },
     });
 
     const session = await RunSession.create({
@@ -800,24 +869,25 @@ suite("RunSession#run", () => {
       ],
     });
 
-    const generateCalls = model.generate.mock.calls;
-    t.assert.strictEqual(generateCalls.length, 1);
-    const generateCall = generateCalls[0];
-    t.assert.ok(generateCall);
-    t.assert.strictEqual(
-      generateCall.arguments[0].system_prompt,
-      "You are a helpful assistant.\nThe user is a developer.\nAlways be polite.",
+    const systemPrompts = model.trackedGenerateInputs.map(
+      (input) => input.system_prompt,
     );
+    t.assert.deepStrictEqual(systemPrompts, [
+      "You are a helpful assistant.\nThe user is a developer.\nAlways be polite.",
+    ]);
   });
 });
 
 suite("RunSession#runStream", () => {
   test("streams response when there is no tool call", async (t: TestContext) => {
-    const model = createMockLanguageModel(t).addPartialModelResponses([
-      createPartialResponse({ type: "text", text: "Hel" }),
-      createPartialResponse({ type: "text", text: "lo" }),
-      createPartialResponse({ type: "text", text: "!" }),
-    ]);
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [
+        createPartialResponse({ type: "text", text: "Hel" }),
+        createPartialResponse({ type: "text", text: "lo" }),
+        createPartialResponse({ type: "text", text: "!" }),
+      ],
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -844,39 +914,38 @@ suite("RunSession#runStream", () => {
       events.push(event);
     }
 
-    t.assert.strictEqual(events.length, 5);
-    const partialEvents = events.filter((e) => e.event === "partial");
-    t.assert.strictEqual(partialEvents.length, 3);
-
     t.assert.deepStrictEqual(
-      partialEvents.map((e) => e.delta),
+      events.map((event) => event.event),
+      ["partial", "partial", "partial", "item", "response"],
+    );
+
+    const partialEvents = events.filter(isPartialEvent);
+    t.assert.deepStrictEqual(
+      partialEvents.map((event) => event.delta),
       [
-        {
-          index: 0,
-          part: { type: "text", text: "Hel" },
-        },
-        {
-          index: 0,
-          part: { type: "text", text: "lo" },
-        },
-        {
-          index: 0,
-          part: { type: "text", text: "!" },
-        },
+        { index: 0, part: { type: "text", text: "Hel" } },
+        { index: 0, part: { type: "text", text: "lo" } },
+        { index: 0, part: { type: "text", text: "!" } },
       ],
     );
 
-    const itemEvent = events[3];
-    t.assert.ok(itemEvent);
-    t.assert.strictEqual(itemEvent.event, "item");
-    t.assert.strictEqual(itemEvent.type, "model");
-
-    const responseEvent = events[4];
-    t.assert.ok(responseEvent);
-    t.assert.strictEqual(responseEvent.event, "response");
-    t.assert.deepStrictEqual(responseEvent.content, [
-      { type: "text", text: "Hello!" },
+    t.assert.deepStrictEqual(events.filter(isItemEvent), [
+      {
+        event: "item",
+        type: "model",
+        content: [{ type: "text", text: "Hello!" }],
+      },
     ]);
+    t.assert.deepStrictEqual(events.find(isResponseEvent), {
+      event: "response",
+      content: [{ type: "text", text: "Hello!" }],
+      output: [
+        {
+          type: "model",
+          content: [{ type: "text", text: "Hello!" }],
+        },
+      ],
+    });
   });
 
   test("streams tool call execution and response", async (t: TestContext) => {
@@ -888,19 +957,23 @@ suite("RunSession#runStream", () => {
 
     const tool = createMockTool("test_tool", null, toolExecute);
 
-    const model = createMockLanguageModel(t)
-      .addPartialModelResponses([
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [
         createPartialResponse({
           type: "tool-call",
           tool_name: "test_tool",
           tool_call_id: "call_1",
           args: JSON.stringify({ a: 1, b: 2, operation: "add" }),
         }),
-      ])
-      .addPartialModelResponses([
+      ],
+    });
+    model.enqueueStreamResult({
+      partials: [
         createPartialResponse({ type: "text", text: "Final" }),
         createPartialResponse({ type: "text", text: "Final response" }),
-      ]);
+      ],
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -927,54 +1000,128 @@ suite("RunSession#runStream", () => {
       events.push(event);
     }
 
-    const partialEvents = events.filter((e) => e.event === "partial");
-    const itemEvents = events.filter((e) => e.event === "item");
-    const responseEvents = events.filter((e) => e.event === "response");
-
-    t.assert.strictEqual(partialEvents.length, 3);
-    t.assert.strictEqual(itemEvents.length, 3);
-    t.assert.strictEqual(responseEvents.length, 1);
-
     t.assert.deepStrictEqual(
-      itemEvents.map((e) => e.type),
-      ["model", "tool", "model"],
+      events.map((event) => event.event),
+      ["partial", "item", "item", "partial", "partial", "item", "response"],
     );
 
-    t.assert.deepStrictEqual(toolExecute.mock.calls[0]?.arguments[0], {
-      operation: "add",
-      a: 1,
-      b: 2,
+    const partialEvents = events.filter(isPartialEvent);
+    t.assert.deepStrictEqual(
+      partialEvents.map((event) => event.delta),
+      [
+        {
+          index: 0,
+          part: {
+            type: "tool-call",
+            tool_name: "test_tool",
+            tool_call_id: "call_1",
+            args: JSON.stringify({ a: 1, b: 2, operation: "add" }),
+          },
+        },
+        { index: 0, part: { type: "text", text: "Final" } },
+        { index: 0, part: { type: "text", text: "Final response" } },
+      ],
+    );
+
+    const expectedItemEvents = [
+      {
+        event: "item",
+        type: "model",
+        content: [
+          {
+            type: "tool-call",
+            tool_name: "test_tool",
+            tool_call_id: "call_1",
+            args: { a: 1, b: 2, operation: "add" },
+          },
+        ],
+      },
+      {
+        event: "item",
+        type: "tool",
+        tool_name: "test_tool",
+        tool_call_id: "call_1",
+        input: { a: 1, b: 2, operation: "add" },
+        output: [{ type: "text", text: "Tool result" }],
+        is_error: false,
+      },
+      {
+        event: "item",
+        type: "model",
+        content: [{ type: "text", text: "FinalFinal response" }],
+      },
+    ];
+    t.assert.deepStrictEqual(events.filter(isItemEvent), expectedItemEvents);
+
+    const responseEvent = events.find(isResponseEvent);
+    t.assert.deepStrictEqual(responseEvent, {
+      event: "response",
+      content: [{ type: "text", text: "FinalFinal response" }],
+      output: [
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "test_tool",
+              tool_call_id: "call_1",
+              args: { a: 1, b: 2, operation: "add" },
+            },
+          ],
+        },
+        {
+          type: "tool",
+          tool_name: "test_tool",
+          tool_call_id: "call_1",
+          input: { a: 1, b: 2, operation: "add" },
+          output: [{ type: "text", text: "Tool result" }],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [{ type: "text", text: "FinalFinal response" }],
+        },
+      ],
     });
+
+    t.assert.deepStrictEqual(
+      toolExecute.mock.calls.map((call) => call.arguments[0]),
+      [{ a: 1, b: 2, operation: "add" }],
+    );
   });
 
   test("handles multiple turns in streaming mode", async (t: TestContext) => {
-    const toolExecute = t.mock.fn(() => ({
+    const toolExecute = t.mock.fn<AgentTool<any>["execute"]>(() => ({
       content: [{ type: "text", text: "Calculation done" }],
       is_error: false,
     }));
 
     const tool = createMockTool("calculator", null, toolExecute);
 
-    const model = createMockLanguageModel(t)
-      .addPartialModelResponses([
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [
         createPartialResponse({
           type: "tool-call",
           tool_name: "calculator",
           tool_call_id: "call_1",
           args: JSON.stringify({ a: 1, b: 2 }),
         }),
-      ])
-      .addPartialModelResponses([
+      ],
+    });
+    model.enqueueStreamResult({
+      partials: [
         createPartialResponse({
           type: "tool-call",
           tool_name: "calculator",
           tool_call_id: "call_2",
           args: JSON.stringify({ a: 3, b: 4 }),
         }),
-      ])
-      .addPartialModelResponses([
-        createPartialResponse({ type: "text", text: "All done" }),
-      ]);
+      ],
+    });
+    model.enqueueStreamResult({
+      partials: [createPartialResponse({ type: "text", text: "All done" })],
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -1001,15 +1148,129 @@ suite("RunSession#runStream", () => {
       events.push(event);
     }
 
-    const itemEvents = events.filter((e) => e.event === "item");
-    t.assert.strictEqual(itemEvents.length, 5);
-    t.assert.strictEqual(toolExecute.mock.calls.length, 2);
+    t.assert.deepStrictEqual(
+      events.map((event) => event.event),
+      [
+        "partial",
+        "item",
+        "item",
+        "partial",
+        "item",
+        "item",
+        "partial",
+        "item",
+        "response",
+      ],
+    );
 
-    const responseEvent = events.find((e) => e.event === "response");
-    t.assert.ok(responseEvent);
-    t.assert.deepStrictEqual(responseEvent.content, [
-      { type: "text", text: "All done" },
-    ]);
+    const expectedItemEvents = [
+      {
+        event: "item",
+        type: "model",
+        content: [
+          {
+            type: "tool-call",
+            tool_name: "calculator",
+            tool_call_id: "call_1",
+            args: { a: 1, b: 2 },
+          },
+        ],
+      },
+      {
+        event: "item",
+        type: "tool",
+        tool_name: "calculator",
+        tool_call_id: "call_1",
+        input: { a: 1, b: 2 },
+        output: [{ type: "text", text: "Calculation done" }],
+        is_error: false,
+      },
+      {
+        event: "item",
+        type: "model",
+        content: [
+          {
+            type: "tool-call",
+            tool_name: "calculator",
+            tool_call_id: "call_2",
+            args: { a: 3, b: 4 },
+          },
+        ],
+      },
+      {
+        event: "item",
+        type: "tool",
+        tool_name: "calculator",
+        tool_call_id: "call_2",
+        input: { a: 3, b: 4 },
+        output: [{ type: "text", text: "Calculation done" }],
+        is_error: false,
+      },
+      {
+        event: "item",
+        type: "model",
+        content: [{ type: "text", text: "All done" }],
+      },
+    ];
+    t.assert.deepStrictEqual(events.filter(isItemEvent), expectedItemEvents);
+
+    t.assert.deepStrictEqual(
+      toolExecute.mock.calls.map((call) => call.arguments[0]),
+      [
+        { a: 1, b: 2 },
+        { a: 3, b: 4 },
+      ],
+    );
+
+    const responseEvent = events.at(-1);
+    t.assert.deepStrictEqual(responseEvent, {
+      event: "response",
+      content: [{ type: "text", text: "All done" }],
+      output: [
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "calculator",
+              tool_call_id: "call_1",
+              args: { a: 1, b: 2 },
+            },
+          ],
+        },
+        {
+          type: "tool",
+          tool_name: "calculator",
+          tool_call_id: "call_1",
+          input: { a: 1, b: 2 },
+          output: [{ type: "text", text: "Calculation done" }],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "calculator",
+              tool_call_id: "call_2",
+              args: { a: 3, b: 4 },
+            },
+          ],
+        },
+        {
+          type: "tool",
+          tool_name: "calculator",
+          tool_call_id: "call_2",
+          input: { a: 3, b: 4 },
+          output: [{ type: "text", text: "Calculation done" }],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [{ type: "text", text: "All done" }],
+        },
+      ],
+    });
   });
 
   test("throws AgentMaxTurnsExceededError in streaming mode", async (t: TestContext) => {
@@ -1020,31 +1281,37 @@ suite("RunSession#runStream", () => {
 
     const tool = createMockTool("test_tool", null, toolExecute);
 
-    const model = createMockLanguageModel(t)
-      .addPartialModelResponses([
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [
         createPartialResponse({
           type: "tool-call",
           tool_name: "test_tool",
           tool_call_id: "call_1",
           args: "{}",
         }),
-      ])
-      .addPartialModelResponses([
+      ],
+    });
+    model.enqueueStreamResult({
+      partials: [
         createPartialResponse({
           type: "tool-call",
           tool_name: "test_tool",
           tool_call_id: "call_2",
           args: "{}",
         }),
-      ])
-      .addPartialModelResponses([
+      ],
+    });
+    model.enqueueStreamResult({
+      partials: [
         createPartialResponse({
           type: "tool-call",
           tool_name: "test_tool",
           tool_call_id: "call_3",
           args: "{}",
         }),
-      ]);
+      ],
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -1081,9 +1348,10 @@ suite("RunSession#runStream", () => {
   });
 
   test("throws AgentLanguageModelError when streaming fails", async (t: TestContext) => {
-    const model = createMockLanguageModel(t).addStreamError(
-      new LanguageModelError("Rate limit exceeded"),
-    );
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      error: new LanguageModelError("Rate limit exceeded"),
+    });
 
     const session = await RunSession.create({
       name: "test_agent",
@@ -1124,7 +1392,7 @@ suite("RunSession#runStream", () => {
   });
 
   test("throws error when session not initialized in streaming", async (t: TestContext) => {
-    const model = createMockLanguageModel(t);
+    const model = new MockLanguageModel();
 
     const session = new RunSession({
       name: "test_agent",
@@ -1163,8 +1431,9 @@ suite("RunSession#runStream", () => {
 
 suite("RunSession lifecycle", () => {
   test("finish() cleans up session resources", async (t: TestContext) => {
-    const model = createMockLanguageModel(t).addResponses({
-      content: [{ type: "text", text: "Response" }],
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: { content: [{ type: "text", text: "Response" }] },
     });
 
     const session = await RunSession.create({

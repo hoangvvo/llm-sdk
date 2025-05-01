@@ -1,27 +1,15 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 
-import type { LanguageModel, PartialModelResponse } from "@hoangvvo/llm-sdk";
+import { MockLanguageModel } from "@hoangvvo/llm-sdk";
 import test, { suite, type TestContext } from "node:test";
 import { Agent } from "./agent.ts";
 
-function createMockLanguageModel(): LanguageModel {
-  return {
-    modelId: "mock-model",
-    provider: "mock",
-    generate: () =>
-      Promise.resolve({ content: [{ type: "text", text: "Mock response" }] }),
-    stream: async function* () {
-      const event: PartialModelResponse = {
-        delta: { index: 0, part: { type: "text", text: "Mock" } },
-      };
-      yield Promise.resolve(event);
-    },
-  };
-}
-
 suite("Agent#run", () => {
   test("creates session, runs, and finishes", async (t: TestContext) => {
-    const model = createMockLanguageModel();
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: { content: [{ type: "text", text: "Mock response" }] },
+    });
     const agent = new Agent({
       name: "test-agent",
       model,
@@ -52,7 +40,14 @@ suite("Agent#run", () => {
 
 suite("Agent#runStream", () => {
   test("creates session, streams, and finishes", async (t: TestContext) => {
-    const model = createMockLanguageModel();
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [
+        {
+          delta: { index: 0, part: { type: "text", text: "Mock" } },
+        },
+      ],
+    });
     const agent = new Agent({
       name: "test-agent",
       model,

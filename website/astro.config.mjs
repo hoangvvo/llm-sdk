@@ -31,6 +31,7 @@ export default defineConfig({
             { slug: "sdk/function-calling" },
             { slug: "sdk/structured-output" },
             { slug: "sdk/reasoning" },
+            { slug: "sdk/testing" },
           ],
         },
         {
@@ -43,6 +44,7 @@ export default defineConfig({
             { slug: "agent/execution" },
             { slug: "agent/structured-output" },
             { slug: "agent/agents-delegation" },
+            { slug: "agent/testing" },
           ],
         },
         {

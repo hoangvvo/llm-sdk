@@ -1,142 +1,68 @@
-use futures::StreamExt;
+use std::sync::Arc;
+
+use futures::{StreamExt, TryStreamExt};
 use llm_agent::{
     AgentError, AgentItem, AgentItemTool, AgentParams, AgentRequest, AgentResponse,
     AgentStreamEvent, AgentTool, AgentToolResult, InstructionParam, RunSession, RunState,
 };
 use llm_sdk::{
-    ContentDelta, JSONSchema, LanguageModel, LanguageModelError, LanguageModelInput,
-    LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelUsage, Part, PartDelta, PartialModelResponse, TextPartDelta, ToolCallPart,
-    ToolCallPartDelta, UserMessage,
+    testing::{MockGenerateResult, MockLanguageModel, MockStreamResult},
+    ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
+    PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta, UserMessage,
 };
-use serde_json::Value;
-use std::{collections::VecDeque, sync::Arc};
+use serde_json::{json, Value};
 
-#[derive(Clone)]
-struct MockLanguageModel {
-    responses: Arc<std::sync::Mutex<VecDeque<ModelResponse>>>,
-    partial_responses: Arc<std::sync::Mutex<VecDeque<Vec<PartialModelResponse>>>>,
-    errors: Arc<std::sync::Mutex<VecDeque<LanguageModelError>>>,
-    stream_errors: Arc<std::sync::Mutex<VecDeque<LanguageModelError>>>,
-    generate_calls: Arc<std::sync::Mutex<Vec<LanguageModelInput>>>,
-    stream_calls: Arc<std::sync::Mutex<Vec<LanguageModelInput>>>,
-}
-
-impl MockLanguageModel {
-    fn new() -> Self {
-        Self {
-            responses: Arc::new(std::sync::Mutex::new(VecDeque::new())),
-            partial_responses: Arc::new(std::sync::Mutex::new(VecDeque::new())),
-            errors: Arc::new(std::sync::Mutex::new(VecDeque::new())),
-            stream_errors: Arc::new(std::sync::Mutex::new(VecDeque::new())),
-            generate_calls: Arc::new(std::sync::Mutex::new(Vec::new())),
-            stream_calls: Arc::new(std::sync::Mutex::new(Vec::new())),
-        }
-    }
-
-    fn add_response(self, response: ModelResponse) -> Self {
-        self.responses.lock().unwrap().push_back(response);
-        self
-    }
-
-    fn add_responses(self, responses: Vec<ModelResponse>) -> Self {
-        self.responses.lock().unwrap().extend(responses);
-        self
-    }
-
-    fn add_partial_responses(self, responses: Vec<PartialModelResponse>) -> Self {
-        self.partial_responses.lock().unwrap().push_back(responses);
-        self
-    }
-
-    fn add_error(self, error: LanguageModelError) -> Self {
-        self.errors.lock().unwrap().push_back(error);
-        self
-    }
-
-    fn add_stream_error(self, error: LanguageModelError) -> Self {
-        self.stream_errors.lock().unwrap().push_back(error);
-        self
-    }
-
-    fn get_generate_calls(&self) -> Vec<LanguageModelInput> {
-        self.generate_calls.lock().unwrap().clone()
-    }
-}
-
-#[async_trait::async_trait]
-impl LanguageModel for MockLanguageModel {
-    fn model_id(&self) -> String {
-        "mock-model".to_string()
-    }
-
-    fn provider(&self) -> &'static str {
-        "mock"
-    }
-
-    fn metadata(&self) -> Option<&LanguageModelMetadata> {
-        None
-    }
-
-    async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
-        self.generate_calls.lock().unwrap().push(input.clone());
-
-        let mut errors = self.errors.lock().unwrap();
-        if let Some(error) = errors.pop_front() {
-            return Err(error);
-        }
-
-        let mut responses = self.responses.lock().unwrap();
-        if let Some(response) = responses.pop_front() {
-            Ok(response)
-        } else {
-            panic!("No mock response available");
-        }
-    }
-
-    async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream> {
-        self.stream_calls.lock().unwrap().push(input.clone());
-
-        let mut stream_errors = self.stream_errors.lock().unwrap();
-        if let Some(error) = stream_errors.pop_front() {
-            return Err(error);
-        }
-
-        let mut partial_responses = self.partial_responses.lock().unwrap();
-        if let Some(responses) = partial_responses.pop_front() {
-            let stream = futures::stream::iter(responses.into_iter().map(Ok));
-            Ok(LanguageModelStream::from_stream(stream))
-        } else {
-            // Return empty stream instead of panicking to be more flexible
-            let stream = futures::stream::iter(std::iter::empty().map(Ok));
-            Ok(LanguageModelStream::from_stream(stream))
-        }
-    }
-}
+type ExecuteFn = dyn for<'a> Fn(
+        Value,
+        &'a RunState,
+    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>
+    + Send
+    + Sync
+    + 'static;
 
 #[derive(Clone)]
 struct MockTool {
     name: String,
-    result: AgentToolResult,
-    execution_count: Arc<std::sync::Mutex<usize>>,
-    last_args: Arc<std::sync::Mutex<Option<Value>>>,
-    should_error: bool,
+    execute: Arc<ExecuteFn>,
+    all_calls: Arc<std::sync::Mutex<Vec<Value>>>,
 }
 
 impl MockTool {
-    fn new(name: &str, content: Vec<Part>, is_error: bool) -> Self {
+    fn new(name: &str, result: AgentToolResult) -> Self {
+        let execute: Arc<ExecuteFn> = Arc::new({
+            let result = Arc::new(result);
+            move |_, _| Ok((*result).clone())
+        });
+
         Self {
             name: name.to_string(),
-            result: AgentToolResult { content, is_error },
-            execution_count: Arc::new(std::sync::Mutex::new(0)),
-            last_args: Arc::new(std::sync::Mutex::new(None)),
-            should_error: false,
+            execute,
+            all_calls: Arc::new(std::sync::Mutex::new(Vec::new())),
         }
     }
 
-    fn with_error(mut self) -> Self {
-        self.should_error = true;
-        self
+    fn with_execute_fn<F>(name: &str, result: AgentToolResult, execute: F) -> Self
+    where
+        F: for<'a> Fn(
+                Value,
+                &'a RunState,
+            )
+                -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        let _ = result;
+
+        Self {
+            name: name.to_string(),
+            execute: Arc::new(execute),
+            all_calls: Arc::new(std::sync::Mutex::new(Vec::new())),
+        }
+    }
+
+    fn recorded_calls(&self) -> Vec<Value> {
+        self.all_calls.lock().unwrap().clone()
     }
 }
 
@@ -147,55 +73,31 @@ impl AgentTool<()> for MockTool {
     }
 
     fn description(&self) -> String {
-        "Mock tool".to_string()
+        format!("Mock tool {}", self.name)
     }
 
     fn parameters(&self) -> JSONSchema {
-        serde_json::json!({
-            "type": "object",
-            "properties": {}
-        })
+        json!({"type": "object", "properties": {}})
     }
 
     async fn execute(
         &self,
         args: Value,
         _context: &(),
-        _state: &RunState,
+        state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        *self.execution_count.lock().unwrap() += 1;
-        *self.last_args.lock().unwrap() = Some(args);
-
-        if self.should_error {
-            return Err("Tool execution failed".into());
-        }
-
-        Ok(AgentToolResult {
-            content: self.result.content.clone(),
-            is_error: self.result.is_error,
-        })
-    }
-}
-
-fn create_text_part(text: &str) -> Part {
-    Part::text(text)
-}
-
-fn create_model_usage() -> ModelUsage {
-    ModelUsage {
-        input_tokens: 10,
-        output_tokens: 5,
-        input_tokens_details: None,
-        output_tokens_details: None,
+        self.all_calls.lock().unwrap().push(args.clone());
+        (self.execute)(args, state)
     }
 }
 
 #[tokio::test]
-async fn test_run_session_returns_response_when_no_tool_call() {
-    let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
-        content: vec![create_text_part("Hi!")],
+async fn run_returns_response_when_no_tool_call() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Hi!")],
         ..Default::default()
-    }));
+    });
 
     let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model))).await;
 
@@ -203,53 +105,50 @@ async fn test_run_session_returns_response_when_no_tool_call() {
         .run(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Hello!")],
+                content: vec![Part::text("Hello!")],
             }))],
         })
         .await
-        .unwrap();
+        .expect("run succeeds");
 
-    let expected_response = AgentResponse {
-        content: vec![create_text_part("Hi!")],
+    let expected = AgentResponse {
+        content: vec![Part::text("Hi!")],
         output: vec![AgentItem::Model(ModelResponse {
-            content: vec![create_text_part("Hi!")],
+            content: vec![Part::text("Hi!")],
             ..Default::default()
         })],
     };
 
-    assert_eq!(
-        serde_json::to_string(&response).unwrap(),
-        serde_json::to_string(&expected_response).unwrap()
-    );
+    assert_eq!(response, expected);
 }
 
 #[tokio::test]
-async fn test_run_session_executes_single_tool_call_and_returns_response() {
-    let tool = MockTool::new("test_tool", vec![create_text_part("Tool result")], false);
+async fn run_executes_single_tool_call_and_returns_response() {
+    let tool = MockTool::new(
+        "test_tool",
+        AgentToolResult {
+            content: vec![Part::text("Tool result")],
+            is_error: false,
+        },
+    );
 
-    let model = Arc::new(MockLanguageModel::new().add_responses(vec![
-        ModelResponse {
-            content: vec![Part::ToolCall(ToolCallPart {
-                tool_name: "test_tool".to_string(),
-                tool_call_id: "call_1".to_string(),
-                args: serde_json::json!({"param": "value"}),
-                id: None,
-            })],
-            usage: Some(ModelUsage {
-                input_tokens: 100,
-                output_tokens: 50,
-                ..Default::default()
-            }),
-            cost: Some(0.0015),
-        },
-        ModelResponse {
-            content: vec![create_text_part("Final response")],
-            ..Default::default()
-        },
-    ]));
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call(
+            "call_1",
+            "test_tool",
+            json!({"param": "value"}),
+        )],
+        usage: Some(ModelUsage::default()),
+        cost: Some(0.0015),
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Final response")],
+        ..Default::default()
+    });
 
     let session = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model).add_tool(tool),
+        AgentParams::new("test_agent", model).add_tool(tool.clone()),
     ))
     .await;
 
@@ -257,85 +156,251 @@ async fn test_run_session_executes_single_tool_call_and_returns_response() {
         .run(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Use the tool")],
+                content: vec![Part::text("Use the tool")],
             }))],
         })
         .await
-        .unwrap();
+        .expect("run succeeds");
 
-    let expected_response = AgentResponse {
-        content: vec![create_text_part("Final response")],
+    let expected = AgentResponse {
+        content: vec![Part::text("Final response")],
         output: vec![
             AgentItem::Model(ModelResponse {
-                content: vec![Part::ToolCall(ToolCallPart {
-                    tool_name: "test_tool".to_string(),
-                    tool_call_id: "call_1".to_string(),
-                    args: serde_json::json!({"param": "value"}),
-                    id: None,
-                })],
-                usage: Some(ModelUsage {
-                    input_tokens: 100,
-                    output_tokens: 50,
-                    ..Default::default()
-                }),
+                content: vec![Part::tool_call(
+                    "call_1",
+                    "test_tool",
+                    json!({"param": "value"}),
+                )],
+                usage: Some(ModelUsage::default()),
                 cost: Some(0.0015),
             }),
             AgentItem::Tool(AgentItemTool {
                 tool_call_id: "call_1".to_string(),
                 tool_name: "test_tool".to_string(),
-                input: serde_json::json!({"param": "value"}),
-                output: vec![create_text_part("Tool result")],
+                input: json!({"param": "value"}),
+                output: vec![Part::text("Tool result")],
                 is_error: false,
             }),
             AgentItem::Model(ModelResponse {
-                content: vec![create_text_part("Final response")],
+                content: vec![Part::text("Final response")],
                 ..Default::default()
             }),
         ],
     };
 
+    assert_eq!(response, expected);
+
+    let calls = tool.recorded_calls();
+    assert_eq!(calls, vec![json!({"param": "value"})]);
+}
+
+#[tokio::test]
+async fn run_executes_multiple_tool_calls_in_parallel() {
+    let tool1 = MockTool::new(
+        "tool_1",
+        AgentToolResult {
+            content: vec![Part::text("Tool 1 result")],
+            is_error: false,
+        },
+    );
+    let tool2 = MockTool::new(
+        "tool_2",
+        AgentToolResult {
+            content: vec![Part::text("Tool 2 result")],
+            is_error: false,
+        },
+    );
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![
+            Part::tool_call("call_1", "tool_1", json!({"param": "value1"})),
+            Part::tool_call("call_2", "tool_2", json!({"param": "value2"})),
+        ],
+        usage: Some(ModelUsage::default()),
+        cost: None,
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Processed both tools")],
+        usage: Some(ModelUsage::default()),
+        cost: Some(0.0003),
+    });
+
+    let session = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model)
+            .add_tool(tool1.clone())
+            .add_tool(tool2.clone()),
+    ))
+    .await;
+
+    let response = session
+        .run(AgentRequest {
+            context: (),
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::text("Use both tools")],
+            }))],
+        })
+        .await
+        .expect("run succeeds");
+
+    let expected = AgentResponse {
+        content: vec![Part::text("Processed both tools")],
+        output: vec![
+            AgentItem::Model(ModelResponse {
+                content: vec![
+                    Part::tool_call("call_1", "tool_1", json!({"param": "value1"})),
+                    Part::tool_call("call_2", "tool_2", json!({"param": "value2"})),
+                ],
+                usage: Some(ModelUsage::default()),
+                cost: None,
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_1".to_string(),
+                tool_name: "tool_1".to_string(),
+                input: json!({"param": "value1"}),
+                output: vec![Part::text("Tool 1 result")],
+                is_error: false,
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_2".to_string(),
+                tool_name: "tool_2".to_string(),
+                input: json!({"param": "value2"}),
+                output: vec![Part::text("Tool 2 result")],
+                is_error: false,
+            }),
+            AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Processed both tools")],
+                usage: Some(ModelUsage::default()),
+                cost: Some(0.0003),
+            }),
+        ],
+    };
+
+    assert_eq!(response, expected);
+    assert_eq!(tool1.recorded_calls(), vec![json!({"param": "value1"})]);
+    assert_eq!(tool2.recorded_calls(), vec![json!({"param": "value2"})]);
+}
+
+#[tokio::test]
+async fn run_handles_multiple_turns_with_tool_calls() {
+    let tool = MockTool::new(
+        "calculator",
+        AgentToolResult {
+            content: vec![Part::text("Calculation result")],
+            is_error: false,
+        },
+    );
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call(
+            "call_1",
+            "calculator",
+            json!({"operation": "add", "a": 1, "b": 2}),
+        )],
+        ..Default::default()
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call(
+            "call_2",
+            "calculator",
+            json!({"operation": "multiply", "a": 3, "b": 4}),
+        )],
+        ..Default::default()
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("All calculations done")],
+        ..Default::default()
+    });
+
+    let session = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model).add_tool(tool.clone()),
+    ))
+    .await;
+
+    let response = session
+        .run(AgentRequest {
+            context: (),
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::text("Calculate some numbers")],
+            }))],
+        })
+        .await
+        .expect("run succeeds");
+
+    let expected = AgentResponse {
+        content: vec![Part::text("All calculations done")],
+        output: vec![
+            AgentItem::Model(ModelResponse {
+                content: vec![Part::tool_call(
+                    "call_1",
+                    "calculator",
+                    json!({"operation": "add", "a": 1, "b": 2}),
+                )],
+                ..Default::default()
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_1".to_string(),
+                tool_name: "calculator".to_string(),
+                input: json!({"operation": "add", "a": 1, "b": 2}),
+                output: vec![Part::text("Calculation result")],
+                is_error: false,
+            }),
+            AgentItem::Model(ModelResponse {
+                content: vec![Part::tool_call(
+                    "call_2",
+                    "calculator",
+                    json!({"operation": "multiply", "a": 3, "b": 4}),
+                )],
+                ..Default::default()
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_2".to_string(),
+                tool_name: "calculator".to_string(),
+                input: json!({"operation": "multiply", "a": 3, "b": 4}),
+                output: vec![Part::text("Calculation result")],
+                is_error: false,
+            }),
+            AgentItem::Model(ModelResponse {
+                content: vec![Part::text("All calculations done")],
+                ..Default::default()
+            }),
+        ],
+    };
+
+    assert_eq!(response, expected);
     assert_eq!(
-        serde_json::to_string(&response).unwrap(),
-        serde_json::to_string(&expected_response).unwrap()
+        tool.recorded_calls(),
+        vec![
+            json!({"operation": "add", "a": 1, "b": 2}),
+            json!({"operation": "multiply", "a": 3, "b": 4}),
+        ]
     );
 }
 
 #[tokio::test]
-async fn test_run_session_throws_max_turns_exceeded_error() {
-    let tool = MockTool::new("test_tool", vec![create_text_part("Tool result")], false);
+async fn run_throws_max_turns_exceeded_error() {
+    let tool = MockTool::new(
+        "test_tool",
+        AgentToolResult {
+            content: vec![Part::text("Tool result")],
+            is_error: false,
+        },
+    );
 
-    let model = Arc::new(MockLanguageModel::new().add_responses(vec![
-        ModelResponse {
-            content: vec![Part::ToolCall(ToolCallPart {
-                tool_name: "test_tool".to_string(),
-                tool_call_id: "call_1".to_string(),
-                args: serde_json::json!({}),
-                id: None,
-            })],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
-        },
-        ModelResponse {
-            content: vec![Part::ToolCall(ToolCallPart {
-                tool_name: "test_tool".to_string(),
-                tool_call_id: "call_2".to_string(),
-                args: serde_json::json!({}),
-                id: None,
-            })],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
-        },
-        ModelResponse {
-            content: vec![Part::ToolCall(ToolCallPart {
-                tool_name: "test_tool".to_string(),
-                tool_call_id: "call_3".to_string(),
-                args: serde_json::json!({}),
-                id: None,
-            })],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
-        },
-    ]));
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call("call_1", "test_tool", json!({}))],
+        ..Default::default()
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call("call_2", "test_tool", json!({}))],
+        ..Default::default()
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call("call_3", "test_tool", json!({}))],
+        ..Default::default()
+    });
 
     let session = RunSession::new(Arc::new(
         AgentParams::new("test_agent", model)
@@ -348,373 +413,198 @@ async fn test_run_session_throws_max_turns_exceeded_error() {
         .run(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Keep using tools")],
+                content: vec![Part::text("Keep using tools")],
             }))],
         })
         .await;
 
     match result {
-        Err(AgentError::MaxTurnsExceeded(turns)) => {
-            assert_eq!(turns, 2);
-        }
-        _ => panic!("Expected MaxTurnsExceeded error"),
+        Err(AgentError::MaxTurnsExceeded(turns)) => assert_eq!(turns, 2),
+        other => panic!("expected max turns exceeded error, got {other:?}"),
     }
 }
 
 #[tokio::test]
-async fn test_run_session_throws_invariant_error_when_tool_not_found() {
-    let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
-        content: vec![Part::ToolCall(ToolCallPart {
-            tool_name: "non_existent_tool".to_string(),
-            tool_call_id: "call_1".to_string(),
-            args: serde_json::json!({}),
-            id: None,
-        })],
-        usage: Some(create_model_usage()),
-        cost: Some(0.0),
-    }));
+async fn run_throws_invariant_error_when_tool_not_found() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call("call_1", "non_existent_tool", json!({}))],
+        ..Default::default()
+    });
 
-    let session = RunSession::new(AgentParams::new("test_agent", model).into()).await;
+    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model))).await;
 
     let result = session
         .run(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Use a tool")],
+                content: vec![Part::text("Use a tool")],
             }))],
         })
         .await;
 
     match result {
-        Err(AgentError::Invariant(msg)) => {
-            assert!(msg.contains("Tool non_existent_tool not found"));
+        Err(AgentError::Invariant(message)) => {
+            assert!(message.contains("Tool non_existent_tool not found"));
         }
-        _ => panic!("Expected Invariant error"),
+        other => panic!("expected invariant error, got {other:?}"),
     }
 }
 
 #[tokio::test]
-async fn test_run_session_throws_tool_execution_error_when_tool_execution_fails() {
-    let tool = MockTool::new("failing_tool", vec![create_text_part("")], false).with_error();
-
-    let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
-        content: vec![Part::ToolCall(ToolCallPart {
-            tool_name: "failing_tool".to_string(),
-            tool_call_id: "call_1".to_string(),
-            args: serde_json::json!({}),
-            id: None,
-        })],
-        usage: Some(create_model_usage()),
-        cost: Some(0.0),
-    }));
-
-    let session =
-        RunSession::new(AgentParams::new("test_agent", model).add_tool(tool).into()).await;
-
-    let result = session
-        .run(AgentRequest {
-            context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Use the tool")],
-            }))],
-        })
-        .await;
-
-    match result {
-        Err(AgentError::ToolExecution(_)) => {
-            // Expected
-        }
-        _ => panic!("Expected ToolExecution error"),
-    }
-}
-
-#[tokio::test]
-async fn test_run_session_handles_tool_returning_error_result() {
-    let tool = MockTool::new(
-        "test_tool",
-        vec![create_text_part("Error: Invalid parameters")],
-        true,
+async fn run_throws_tool_execution_error() {
+    let failing_tool = MockTool::with_execute_fn(
+        "failing_tool",
+        AgentToolResult {
+            content: vec![],
+            is_error: false,
+        },
+        |_args, _state| Err("Tool execution failed".into()),
     );
 
-    let model = Arc::new(MockLanguageModel::new().add_responses(vec![
-        ModelResponse {
-            content: vec![Part::ToolCall(ToolCallPart {
-                tool_name: "test_tool".to_string(),
-                tool_call_id: "call_1".to_string(),
-                args: serde_json::json!({"invalid": true}),
-                id: None,
-            })],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
-        },
-        ModelResponse {
-            content: vec![create_text_part("Handled the error")],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
-        },
-    ]));
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call("call_1", "failing_tool", json!({}))],
+        ..Default::default()
+    });
 
-    let session = RunSession::new(
-        AgentParams::new("test_agent", model.clone())
-            .add_tool(tool)
-            .into(),
-    )
+    let session = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model).add_tool(failing_tool),
+    ))
+    .await;
+
+    let result = session
+        .run(AgentRequest {
+            context: (),
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::text("Use the tool")],
+            }))],
+        })
+        .await;
+
+    assert!(matches!(result, Err(AgentError::ToolExecution(_))));
+}
+
+#[tokio::test]
+async fn run_handles_tool_returning_error_result() {
+    let tool = MockTool::new(
+        "test_tool",
+        AgentToolResult {
+            content: vec![Part::text("Error: Invalid parameters")],
+            is_error: true,
+        },
+    );
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call(
+            "call_1",
+            "test_tool",
+            json!({"invalid": true}),
+        )],
+        ..Default::default()
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Handled the error")],
+        ..Default::default()
+    });
+
+    let session = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model).add_tool(tool.clone()),
+    ))
     .await;
 
     let response = session
         .run(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Use the tool")],
+                content: vec![Part::text("Use the tool")],
             }))],
         })
         .await
-        .unwrap();
+        .expect("run succeeds");
 
-    // For now, just check that we got a response - tool handling details may be
-    // implementation specific
+    let expected = AgentResponse {
+        content: vec![Part::text("Handled the error")],
+        output: vec![
+            AgentItem::Model(ModelResponse {
+                content: vec![Part::tool_call(
+                    "call_1",
+                    "test_tool",
+                    json!({"invalid": true}),
+                )],
+                ..Default::default()
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_1".to_string(),
+                tool_name: "test_tool".to_string(),
+                input: json!({"invalid": true}),
+                output: vec![Part::text("Error: Invalid parameters")],
+                is_error: true,
+            }),
+            AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Handled the error")],
+                ..Default::default()
+            }),
+        ],
+    };
 
-    // Check final response
-    assert_eq!(response.content.len(), 1);
-    if let Part::Text(text_part) = &response.content[0] {
-        assert_eq!(text_part.text, "Handled the error");
-    }
+    assert_eq!(response, expected);
+    assert_eq!(tool.recorded_calls(), vec![json!({"invalid": true})]);
 }
 
 #[tokio::test]
-async fn test_run_session_passes_sampling_parameters_to_model() {
-    let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
-        content: vec![create_text_part("Response")],
-        usage: Some(create_model_usage()),
-        cost: Some(0.0),
-    }));
+async fn run_passes_sampling_parameters_to_model() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Response")],
+        ..Default::default()
+    });
 
-    let session = RunSession::new(
+    let session = RunSession::new(Arc::new(
         AgentParams::new("test_agent", model.clone())
             .temperature(0.7)
             .top_p(0.9)
             .top_k(40)
             .presence_penalty(0.1)
-            .frequency_penalty(0.2)
-            .into(),
-    )
+            .frequency_penalty(0.2),
+    ))
     .await;
 
     session
         .run(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Hello")],
+                content: vec![Part::text("Hello")],
             }))],
         })
         .await
-        .unwrap();
+        .expect("run succeeds");
 
-    let generate_calls = model.get_generate_calls();
-    assert_eq!(generate_calls.len(), 1);
-    let generate_call = &generate_calls[0];
-    assert_eq!(generate_call.temperature, Some(0.7));
-    assert_eq!(generate_call.top_p, Some(0.9));
-    assert_eq!(generate_call.top_k, Some(40));
-    assert_eq!(generate_call.presence_penalty, Some(0.1));
-    assert_eq!(generate_call.frequency_penalty, Some(0.2));
+    let inputs = model.tracked_generate_inputs();
+    assert_eq!(inputs.len(), 1);
+    let input = &inputs[0];
+    assert_eq!(input.temperature, Some(0.7));
+    assert_eq!(input.top_p, Some(0.9));
+    assert_eq!(input.top_k, Some(40));
+    assert_eq!(input.presence_penalty, Some(0.1));
+    assert_eq!(input.frequency_penalty, Some(0.2));
 }
 
 #[tokio::test]
-async fn test_run_session_executes_multiple_tool_calls_in_parallel() {
-    let tool1 = MockTool::new("tool_1", vec![create_text_part("Tool 1 result")], false);
+async fn run_throws_language_model_error_when_generation_fails() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(MockGenerateResult::error(LanguageModelError::InvalidInput(
+        "API quota exceeded".to_string(),
+    )));
 
-    let tool2 = MockTool::new("tool_2", vec![create_text_part("Tool 2 result")], false);
-
-    let model = Arc::new(MockLanguageModel::new().add_responses(vec![
-        ModelResponse {
-            content: vec![
-                Part::ToolCall(ToolCallPart {
-                    tool_name: "tool_1".to_string(),
-                    tool_call_id: "call_1".to_string(),
-                    args: serde_json::json!({"param": "value1"}),
-                    id: None,
-                }),
-                Part::ToolCall(ToolCallPart {
-                    tool_name: "tool_2".to_string(),
-                    tool_call_id: "call_2".to_string(),
-                    args: serde_json::json!({"param": "value2"}),
-                    id: None,
-                }),
-            ],
-            usage: Some(ModelUsage {
-                input_tokens: 2000,
-                output_tokens: 100,
-                ..Default::default()
-            }),
-            cost: None,
-        },
-        ModelResponse {
-            content: vec![create_text_part("Processed both tools")],
-            usage: Some(ModelUsage {
-                input_tokens: 50,
-                output_tokens: 10,
-                ..Default::default()
-            }),
-            cost: Some(0.0003),
-        },
-    ]));
-
-    let session = RunSession::new(
-        AgentParams::new("test_agent", model.clone())
-            .add_tool(tool1.clone())
-            .add_tool(tool2.clone())
-            .into(),
-    )
-    .await;
-
-    let response = session
-        .run(AgentRequest {
-            context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Use both tools")],
-            }))],
-        })
-        .await
-        .unwrap();
-
-    let expected_response = AgentResponse {
-        content: vec![create_text_part("Processed both tools")],
-        output: vec![
-            AgentItem::Model(ModelResponse {
-                content: vec![
-                    Part::ToolCall(ToolCallPart {
-                        tool_name: "tool_1".to_string(),
-                        tool_call_id: "call_1".to_string(),
-                        args: serde_json::json!({"param": "value1"}),
-                        id: None,
-                    }),
-                    Part::ToolCall(ToolCallPart {
-                        tool_name: "tool_2".to_string(),
-                        tool_call_id: "call_2".to_string(),
-                        args: serde_json::json!({"param": "value2"}),
-                        id: None,
-                    }),
-                ],
-                usage: Some(ModelUsage {
-                    input_tokens: 2000,
-                    output_tokens: 100,
-                    ..Default::default()
-                }),
-                cost: None,
-            }),
-            AgentItem::Tool(AgentItemTool {
-                tool_call_id: "call_1".to_string(),
-                tool_name: "tool_1".to_string(),
-                input: serde_json::json!({"param": "value1"}),
-                output: vec![create_text_part("Tool 1 result")],
-                is_error: false,
-            }),
-            AgentItem::Tool(AgentItemTool {
-                tool_call_id: "call_2".to_string(),
-                tool_name: "tool_2".to_string(),
-                input: serde_json::json!({"param": "value2"}),
-                output: vec![create_text_part("Tool 2 result")],
-                is_error: false,
-            }),
-            AgentItem::Model(ModelResponse {
-                content: vec![create_text_part("Processed both tools")],
-                usage: Some(ModelUsage {
-                    input_tokens: 50,
-                    output_tokens: 10,
-                    ..Default::default()
-                }),
-                cost: Some(0.0003),
-            }),
-        ],
-    };
-
-    assert_eq!(
-        serde_json::to_string(&response).unwrap(),
-        serde_json::to_string(&expected_response).unwrap()
-    );
-}
-
-#[tokio::test]
-async fn test_run_session_handles_multiple_turns_with_tool_calls() {
-    let tool = MockTool::new(
-        "calculator",
-        vec![create_text_part("Calculation result")],
-        false,
-    );
-
-    let model = Arc::new(MockLanguageModel::new().add_responses(vec![
-        ModelResponse {
-            content: vec![Part::ToolCall(ToolCallPart {
-                tool_name: "calculator".to_string(),
-                tool_call_id: "call_1".to_string(),
-                args: serde_json::json!({
-                    "operation": "add",
-                    "a": 1,
-                    "b": 2
-                }),
-                id: None,
-            })],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
-        },
-        ModelResponse {
-            content: vec![Part::ToolCall(ToolCallPart {
-                tool_name: "calculator".to_string(),
-                tool_call_id: "call_2".to_string(),
-                args: serde_json::json!({
-                    "operation": "multiply",
-                    "a": 3,
-                    "b": 4
-                }),
-                id: None,
-            })],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
-        },
-        ModelResponse {
-            content: vec![create_text_part("All calculations done")],
-            usage: Some(create_model_usage()),
-            cost: Some(0.0),
-        },
-    ]));
-
-    let session =
-        RunSession::new(AgentParams::new("test_agent", model).add_tool(tool).into()).await;
-
-    let response = session
-        .run(AgentRequest {
-            context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Calculate some numbers")],
-            }))],
-        })
-        .await
-        .unwrap();
-
-    assert_eq!(response.content.len(), 1);
-    if let Part::Text(text_part) = &response.content[0] {
-        assert_eq!(text_part.text, "All calculations done");
-    }
-    // Should have multiple outputs for multiple turns
-    assert!(!response.output.is_empty());
-}
-
-#[tokio::test]
-async fn test_run_session_throws_language_model_error_when_generation_fails() {
-    let model = Arc::new(
-        MockLanguageModel::new().add_error(LanguageModelError::InvalidInput(
-            "API quota exceeded".to_string(),
-        )),
-    );
-
-    let session = RunSession::new(AgentParams::new("test_agent", model.clone()).into()).await;
+    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model))).await;
 
     let result = session
         .run(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Hello")],
+                content: vec![Part::text("Hello")],
             }))],
         })
         .await;
@@ -723,126 +613,31 @@ async fn test_run_session_throws_language_model_error_when_generation_fails() {
         Err(AgentError::LanguageModel(err)) => {
             assert!(err.to_string().contains("API quota exceeded"));
         }
-        _ => panic!("Expected LanguageModel error"),
+        other => panic!("expected language model error, got {other:?}"),
     }
 }
 
 #[tokio::test]
-async fn test_run_session_streaming_response_when_no_tool_call() {
-    let model = Arc::new(MockLanguageModel::new().add_partial_responses(vec![
-        PartialModelResponse {
-            delta: Some(ContentDelta {
-                index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "Hel".to_string(),
-                }),
-            }),
-            usage: Some(create_model_usage()),
-            ..Default::default()
-        },
-        PartialModelResponse {
-            delta: Some(ContentDelta {
-                index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "lo".to_string(),
-                }),
-            }),
-            usage: Some(create_model_usage()),
-            ..Default::default()
-        },
-        PartialModelResponse {
-            delta: Some(ContentDelta {
-                index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "!".to_string(),
-                }),
-            }),
-            usage: Some(create_model_usage()),
-            ..Default::default()
-        },
-    ]));
-
-    let session = RunSession::new(AgentParams::new("test_agent", model.clone()).into()).await;
-
-    let stream = session
-        .run_stream(AgentRequest {
-            context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Hi")],
-            }))],
-        })
-        .await
-        .unwrap();
-
-    let events: Vec<_> = stream.collect().await;
-
-    // Should have partial events and final events
-    assert!(!events.is_empty());
-
-    // Check that we get at least one partial event
-    let has_partial = events
-        .iter()
-        .any(|event| matches!(event, Ok(AgentStreamEvent::Partial(_))));
-    assert!(has_partial);
-}
-
-#[tokio::test]
-async fn test_run_session_streaming_throws_language_model_error() {
-    let model = Arc::new(MockLanguageModel::new().add_stream_error(
-        LanguageModelError::InvalidInput("Rate limit exceeded".to_string()),
-    ));
-
-    let session = RunSession::new(AgentParams::new("test_agent", model).into()).await;
-
-    let result = session
-        .run_stream(AgentRequest {
-            context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Hello")],
-            }))],
-        })
-        .await;
-
-    match result {
-        Err(AgentError::LanguageModel(err)) => {
-            assert!(err.to_string().contains("Rate limit exceeded"));
-        }
-        Ok(mut stream) => {
-            // If the stream was created, it should error on consumption
-            match stream.next().await {
-                Some(Err(AgentError::LanguageModel(err))) => {
-                    assert!(err.to_string().contains("Rate limit exceeded"));
-                }
-                _ => panic!("Expected LanguageModel error on stream consumption"),
-            }
-        }
-        _ => panic!("Expected LanguageModel error"),
-    }
-}
-
-#[tokio::test]
-async fn test_run_session_includes_string_and_dynamic_function_instructions() {
-    let model = Arc::new(MockLanguageModel::new().add_response(ModelResponse {
-        content: vec![create_text_part("Response")],
-        usage: Some(create_model_usage()),
-        cost: Some(0.0),
-    }));
-
+async fn run_includes_string_and_dynamic_function_instructions() {
     #[derive(Clone)]
     struct TestContext {
         user_role: String,
     }
 
-    let instructions: Vec<InstructionParam<TestContext>> = vec![
-        InstructionParam::String("You are a helpful assistant.".to_string()),
-        InstructionParam::Func(Box::new(|ctx: &TestContext| {
-            Ok(format!("The user is a {}.", ctx.user_role))
-        })),
-        InstructionParam::String("Always be polite.".to_string()),
-    ];
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Response")],
+        ..Default::default()
+    });
 
     let session: RunSession<TestContext> = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model.clone()).instructions(instructions),
+        AgentParams::new("test_agent", model.clone()).instructions(vec![
+            InstructionParam::String("You are a helpful assistant.".to_string()),
+            InstructionParam::Func(Box::new(|ctx: &TestContext| {
+                Ok(format!("The user is a {}.", ctx.user_role))
+            })),
+            InstructionParam::String("Always be polite.".to_string()),
+        ]),
     ))
     .await;
 
@@ -852,238 +647,534 @@ async fn test_run_session_includes_string_and_dynamic_function_instructions() {
                 user_role: "developer".to_string(),
             },
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Hello")],
+                content: vec![Part::text("Hello")],
             }))],
         })
         .await
-        .unwrap();
+        .expect("run succeeds");
 
-    let generate_calls = model.get_generate_calls();
-    assert_eq!(generate_calls.len(), 1);
-    let generate_call = &generate_calls[0];
+    let inputs = model.tracked_generate_inputs();
+    assert_eq!(inputs.len(), 1);
     assert_eq!(
-        generate_call.system_prompt,
-        Some(
-            "You are a helpful assistant.\nThe user is a developer.\nAlways be polite.".to_string()
-        )
+        inputs[0].system_prompt.as_deref(),
+        Some("You are a helpful assistant.\nThe user is a developer.\nAlways be polite."),
     );
 }
 
 #[tokio::test]
-async fn test_run_session_streaming_tool_call_execution() {
-    let tool = MockTool::new("test_tool", vec![create_text_part("Tool result")], false);
-
-    let model =
-        Arc::new(
-            MockLanguageModel::new().add_partial_responses(vec![PartialModelResponse {
-                delta: Some(ContentDelta {
-                    index: 0,
-                    part: PartDelta::ToolCall(ToolCallPartDelta {
-                        tool_name: Some("test_tool".to_string()),
-                        tool_call_id: Some("call_1".to_string()),
-                        args: Some("{}".to_string()),
-                        id: None,
-                    }),
+async fn run_stream_streams_response_when_no_tool_call() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(vec![
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "Hel".to_string(),
                 }),
-                usage: Some(create_model_usage()),
-                ..Default::default()
-            }]),
-        );
+            }),
+            ..Default::default()
+        },
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "lo".to_string(),
+                }),
+            }),
+            ..Default::default()
+        },
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "!".to_string(),
+                }),
+            }),
+            ..Default::default()
+        },
+    ]);
 
-    let session = RunSession::new(
-        AgentParams::new("test_agent", model.clone())
-            .add_tool(tool)
-            .into(),
-    )
-    .await;
+    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model.clone()))).await;
 
-    let stream = session
+    let events = session
         .run_stream(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Use tool")],
+                content: vec![Part::text("Hi")],
             }))],
         })
         .await
-        .unwrap();
+        .expect("run_stream succeeds")
+        .map_err(|err| err.to_string())
+        .try_collect::<Vec<_>>()
+        .await
+        .expect("collect stream");
 
-    let events: Vec<_> = stream.collect().await;
+    let expected = vec![
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "Hel".to_string(),
+                }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "lo".to_string(),
+                }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "!".to_string(),
+                }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
+            content: vec![Part::text("Hello!")],
+            ..Default::default()
+        })),
+        AgentStreamEvent::Response(AgentResponse {
+            content: vec![Part::text("Hello!")],
+            output: vec![AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Hello!")],
+                ..Default::default()
+            })],
+        }),
+    ];
 
-    // Should have tool call events
-    assert!(!events.is_empty());
-
-    // Check that we get at least one partial event
-    let has_partial = events
-        .iter()
-        .any(|event| matches!(event, Ok(AgentStreamEvent::Partial(_))));
-    assert!(has_partial);
+    assert_eq!(events, expected);
 }
 
 #[tokio::test]
-async fn test_run_session_streaming_multiple_turns() {
+async fn run_stream_streams_tool_call_execution_and_response() {
+    let tool = MockTool::new(
+        "test_tool",
+        AgentToolResult {
+            content: vec![Part::text("Tool result")],
+            is_error: false,
+        },
+    );
+
+    let tool_args = json!({"a": 1, "b": 2, "operation": "add"});
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: Some("call_1".to_string()),
+                tool_name: Some("test_tool".to_string()),
+                args: Some(tool_args.to_string()),
+                id: None,
+            }),
+        }),
+        ..Default::default()
+    }]);
+    model.enqueue_stream(vec![
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "Final".to_string(),
+                }),
+            }),
+            ..Default::default()
+        },
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: " response".to_string(),
+                }),
+            }),
+            ..Default::default()
+        },
+    ]);
+
+    let events = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model).add_tool(tool.clone()),
+    ))
+    .await
+    .run_stream(AgentRequest {
+        context: (),
+        input: vec![AgentItem::Message(Message::User(UserMessage {
+            content: vec![Part::text("Use tool")],
+        }))],
+    })
+    .await
+    .expect("run_stream succeeds")
+    .map_err(|err| err.to_string())
+    .try_collect::<Vec<_>>()
+    .await
+    .expect("collect stream");
+
+    let expected = vec![
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::ToolCall(ToolCallPartDelta {
+                    tool_call_id: Some("call_1".to_string()),
+                    tool_name: Some("test_tool".to_string()),
+                    args: Some(tool_args.to_string()),
+                    id: None,
+                }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
+            content: vec![Part::tool_call("call_1", "test_tool", tool_args.clone())],
+            ..Default::default()
+        })),
+        AgentStreamEvent::Item(AgentItem::Tool(AgentItemTool {
+            tool_call_id: "call_1".to_string(),
+            tool_name: "test_tool".to_string(),
+            input: tool_args.clone(),
+            output: vec![Part::text("Tool result")],
+            is_error: false,
+        })),
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "Final".to_string(),
+                }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: " response".to_string(),
+                }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
+            content: vec![Part::text("Final response")],
+            ..Default::default()
+        })),
+        AgentStreamEvent::Response(AgentResponse {
+            content: vec![Part::text("Final response")],
+            output: vec![
+                AgentItem::Model(ModelResponse {
+                    content: vec![Part::tool_call("call_1", "test_tool", tool_args.clone())],
+                    ..Default::default()
+                }),
+                AgentItem::Tool(AgentItemTool {
+                    tool_call_id: "call_1".to_string(),
+                    tool_name: "test_tool".to_string(),
+                    input: tool_args.clone(),
+                    output: vec![Part::text("Tool result")],
+                    is_error: false,
+                }),
+                AgentItem::Model(ModelResponse {
+                    content: vec![Part::text("Final response")],
+                    ..Default::default()
+                }),
+            ],
+        }),
+    ];
+
+    assert_eq!(events, expected);
+    assert_eq!(tool.recorded_calls(), vec![tool_args]);
+}
+
+#[tokio::test]
+async fn run_stream_handles_multiple_turns() {
     let tool = MockTool::new(
         "calculator",
-        vec![create_text_part("Calculation done")],
-        false,
+        AgentToolResult {
+            content: vec![Part::text("Calculation done")],
+            is_error: false,
+        },
     );
 
-    let model = Arc::new(
-        MockLanguageModel::new()
-            .add_partial_responses(vec![PartialModelResponse {
-                delta: Some(ContentDelta {
-                    index: 0,
-                    part: PartDelta::ToolCall(ToolCallPartDelta {
-                        tool_name: Some("calculator".to_string()),
-                        tool_call_id: Some("call_1".to_string()),
-                        args: Some("{\"a\": 1, \"b\": 2}".to_string()),
-                        id: None,
-                    }),
+    let first_args = json!({"a": 1, "b": 2});
+    let second_args = json!({"a": 3, "b": 4});
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: Some("call_1".to_string()),
+                tool_name: Some("calculator".to_string()),
+                args: Some(first_args.to_string()),
+                id: None,
+            }),
+        }),
+        ..Default::default()
+    }]);
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: Some("call_2".to_string()),
+                tool_name: Some("calculator".to_string()),
+                args: Some(second_args.to_string()),
+                id: None,
+            }),
+        }),
+        ..Default::default()
+    }]);
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::Text(TextPartDelta {
+                text: "All done".to_string(),
+            }),
+        }),
+        ..Default::default()
+    }]);
+
+    let events = RunSession::new(Arc::new(
+        AgentParams::new("test_agent", model).add_tool(tool.clone()),
+    ))
+    .await
+    .run_stream(AgentRequest {
+        context: (),
+        input: vec![AgentItem::Message(Message::User(UserMessage {
+            content: vec![Part::text("Calculate")],
+        }))],
+    })
+    .await
+    .expect("run_stream succeeds")
+    .map_err(|err| err.to_string())
+    .try_collect::<Vec<_>>()
+    .await
+    .expect("collect stream");
+
+    let expected = vec![
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::ToolCall(ToolCallPartDelta {
+                    tool_call_id: Some("call_1".to_string()),
+                    tool_name: Some("calculator".to_string()),
+                    args: Some(first_args.to_string()),
+                    id: None,
                 }),
-                usage: Some(create_model_usage()),
-                ..Default::default()
-            }])
-            .add_partial_responses(vec![PartialModelResponse {
-                delta: Some(ContentDelta {
-                    index: 0,
-                    part: PartDelta::ToolCall(ToolCallPartDelta {
-                        tool_name: Some("calculator".to_string()),
-                        tool_call_id: Some("call_2".to_string()),
-                        args: Some("{\"a\": 3, \"b\": 4}".to_string()),
-                        id: None,
-                    }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
+            content: vec![Part::tool_call("call_1", "calculator", first_args.clone())],
+            ..Default::default()
+        })),
+        AgentStreamEvent::Item(AgentItem::Tool(AgentItemTool {
+            tool_call_id: "call_1".to_string(),
+            tool_name: "calculator".to_string(),
+            input: first_args.clone(),
+            output: vec![Part::text("Calculation done")],
+            is_error: false,
+        })),
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::ToolCall(ToolCallPartDelta {
+                    tool_call_id: Some("call_2".to_string()),
+                    tool_name: Some("calculator".to_string()),
+                    args: Some(second_args.to_string()),
+                    id: None,
                 }),
-                usage: Some(create_model_usage()),
-                cost: None,
-            }])
-            .add_partial_responses(vec![PartialModelResponse {
-                delta: Some(ContentDelta {
-                    index: 0,
-                    part: PartDelta::Text(TextPartDelta {
-                        text: "All done".to_string(),
-                    }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
+            content: vec![Part::tool_call("call_2", "calculator", second_args.clone())],
+            ..Default::default()
+        })),
+        AgentStreamEvent::Item(AgentItem::Tool(AgentItemTool {
+            tool_call_id: "call_2".to_string(),
+            tool_name: "calculator".to_string(),
+            input: second_args.clone(),
+            output: vec![Part::text("Calculation done")],
+            is_error: false,
+        })),
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "All done".to_string(),
                 }),
-                usage: Some(create_model_usage()),
-                cost: None,
-            }]),
-    );
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
+            content: vec![Part::text("All done")],
+            ..Default::default()
+        })),
+        AgentStreamEvent::Response(AgentResponse {
+            content: vec![Part::text("All done")],
+            output: vec![
+                AgentItem::Model(ModelResponse {
+                    content: vec![Part::tool_call("call_1", "calculator", first_args.clone())],
+                    ..Default::default()
+                }),
+                AgentItem::Tool(AgentItemTool {
+                    tool_call_id: "call_1".to_string(),
+                    tool_name: "calculator".to_string(),
+                    input: first_args.clone(),
+                    output: vec![Part::text("Calculation done")],
+                    is_error: false,
+                }),
+                AgentItem::Model(ModelResponse {
+                    content: vec![Part::tool_call("call_2", "calculator", second_args.clone())],
+                    ..Default::default()
+                }),
+                AgentItem::Tool(AgentItemTool {
+                    tool_call_id: "call_2".to_string(),
+                    tool_name: "calculator".to_string(),
+                    input: second_args.clone(),
+                    output: vec![Part::text("Calculation done")],
+                    is_error: false,
+                }),
+                AgentItem::Model(ModelResponse {
+                    content: vec![Part::text("All done")],
+                    ..Default::default()
+                }),
+            ],
+        }),
+    ];
 
-    let session = RunSession::new(
-        AgentParams::new("test_agent", model.clone())
-            .add_tool(tool)
-            .into(),
-    )
-    .await;
-
-    let stream = session
-        .run_stream(AgentRequest {
-            context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Calculate")],
-            }))],
-        })
-        .await
-        .unwrap();
-
-    let events: Vec<_> = stream.collect().await;
-
-    // Should have multiple events for multiple turns
-    assert!(!events.is_empty());
-
-    let item_events: Vec<_> = events
-        .iter()
-        .filter(|event| matches!(event, Ok(AgentStreamEvent::Item(_))))
-        .collect();
-
-    // Should have multiple item events
-    assert!(!item_events.is_empty());
+    assert_eq!(events, expected);
 }
 
 #[tokio::test]
-async fn test_run_session_streaming_throws_max_turns_exceeded_error() {
-    let tool = MockTool::new("test_tool", vec![create_text_part("Tool result")], false);
-
-    let model = Arc::new(
-        MockLanguageModel::new()
-            .add_partial_responses(vec![PartialModelResponse {
-                delta: Some(ContentDelta {
-                    index: 0,
-                    part: PartDelta::ToolCall(ToolCallPartDelta {
-                        tool_name: Some("test_tool".to_string()),
-                        tool_call_id: Some("call_1".to_string()),
-                        args: Some("{}".to_string()),
-                        id: None,
-                    }),
-                }),
-                usage: Some(create_model_usage()),
-                cost: None,
-            }])
-            .add_partial_responses(vec![PartialModelResponse {
-                delta: Some(ContentDelta {
-                    index: 0,
-                    part: PartDelta::ToolCall(ToolCallPartDelta {
-                        tool_name: Some("test_tool".to_string()),
-                        tool_call_id: Some("call_2".to_string()),
-                        args: Some("{}".to_string()),
-                        id: None,
-                    }),
-                }),
-                usage: Some(create_model_usage()),
-                cost: None,
-            }])
-            .add_partial_responses(vec![PartialModelResponse {
-                delta: Some(ContentDelta {
-                    index: 0,
-                    part: PartDelta::ToolCall(ToolCallPartDelta {
-                        tool_name: Some("test_tool".to_string()),
-                        tool_call_id: Some("call_3".to_string()),
-                        args: Some("{}".to_string()),
-                        id: None,
-                    }),
-                }),
-                usage: Some(create_model_usage()),
-                cost: None,
-            }]),
+async fn run_stream_throws_max_turns_exceeded_error() {
+    let tool = MockTool::new(
+        "test_tool",
+        AgentToolResult {
+            content: vec![Part::text("Tool result")],
+            is_error: false,
+        },
     );
 
-    let session = RunSession::new(Arc::new(
+    let args = json!({});
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: Some("call_1".to_string()),
+                tool_name: Some("test_tool".to_string()),
+                args: Some(args.to_string()),
+                id: None,
+            }),
+        }),
+        ..Default::default()
+    }]);
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: Some("call_2".to_string()),
+                tool_name: Some("test_tool".to_string()),
+                args: Some(args.to_string()),
+                id: None,
+            }),
+        }),
+        ..Default::default()
+    }]);
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: Some("call_3".to_string()),
+                tool_name: Some("test_tool".to_string()),
+                args: Some(args.to_string()),
+                id: None,
+            }),
+        }),
+        ..Default::default()
+    }]);
+
+    let result = RunSession::new(Arc::new(
         AgentParams::new("test_agent", model)
             .add_tool(tool)
             .max_turns(2),
     ))
+    .await
+    .run_stream(AgentRequest {
+        context: (),
+        input: vec![AgentItem::Message(Message::User(UserMessage {
+            content: vec![Part::text("Keep using tools")],
+        }))],
+    })
     .await;
 
-    let stream = session
+    match result {
+        Err(AgentError::MaxTurnsExceeded(_)) => {}
+        Ok(mut stream) => {
+            let mut seen = false;
+            while let Some(event) = stream.next().await {
+                if matches!(event, Err(AgentError::MaxTurnsExceeded(_))) {
+                    seen = true;
+                    break;
+                }
+            }
+            assert!(seen, "expected MaxTurnsExceeded error during streaming");
+        }
+        other => {
+            drop(other);
+            panic!("expected MaxTurnsExceeded error")
+        }
+    }
+}
+
+#[tokio::test]
+async fn run_stream_throws_language_model_error() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(MockStreamResult::error(LanguageModelError::InvalidInput(
+        "Rate limit exceeded".to_string(),
+    )));
+
+    let result = RunSession::new(Arc::new(AgentParams::new("test_agent", model)))
+        .await
         .run_stream(AgentRequest {
             context: (),
             input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![create_text_part("Keep using tools")],
+                content: vec![Part::text("Hello")],
             }))],
         })
         .await;
 
-    // The stream should either fail immediately or fail during consumption
-    match stream {
-        Err(AgentError::MaxTurnsExceeded(_)) => {
-            // Expected immediate failure
+    match result {
+        Err(AgentError::LanguageModel(err)) => {
+            assert!(err.to_string().contains("Rate limit exceeded"));
         }
-        Ok(mut event_stream) => {
-            // Should fail during consumption
-            let mut found_max_turns_error = false;
-            while let Some(event) = event_stream.next().await {
+        Ok(mut stream) => {
+            let mut seen = false;
+            while let Some(event) = stream.next().await {
                 match event {
-                    Err(AgentError::MaxTurnsExceeded(_)) => {
-                        found_max_turns_error = true;
+                    Err(AgentError::LanguageModel(err)) => {
+                        assert!(err.to_string().contains("Rate limit exceeded"));
+                        seen = true;
                         break;
                     }
                     Err(_) => break,
-                    Ok(_) => { /* continue consuming */ }
+                    Ok(_) => {}
                 }
             }
             assert!(
-                found_max_turns_error,
-                "Expected MaxTurnsExceeded error during streaming"
+                seen,
+                "expected language model error during stream consumption"
             );
         }
-        _ => panic!("Expected MaxTurnsExceeded error or successful stream"),
+        other => {
+            drop(other);
+            panic!("expected language model error")
+        }
     }
 }

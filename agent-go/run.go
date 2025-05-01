@@ -360,18 +360,6 @@ func (s *RunState) Turn() error {
 	return nil
 }
 
-// AppendMessages adds messages to the run state.
-func (s *RunState) AppendMessages(messages []llmsdk.Message) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for _, message := range messages {
-		s.output = append(s.output, AgentItem{
-			Message: &message,
-		})
-	}
-}
-
 // AppendItems adds AgentItems to the run state.
 func (s *RunState) AppendItems(items ...AgentItem) {
 	s.mu.Lock()

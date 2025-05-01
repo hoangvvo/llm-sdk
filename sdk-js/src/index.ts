@@ -4,6 +4,11 @@ export {
   type LanguageModel,
   type LanguageModelMetadata,
 } from "./language-model.ts";
+export {
+  MockLanguageModel,
+  type MockGenerateResult,
+  type MockStreamResult,
+} from "./testing.ts";
 export * from "./types.ts";
 export {
   calculateCost,

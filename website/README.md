@@ -32,13 +32,13 @@ Visit `http://localhost:4321/console/chat` in your web browser to access the con
 
 ![Real-time Console Application screenshot](./assets/console-realtime.png)
 
-In addition to the chat console, there is also a real-time interactive application available at `http://localhost:4321/realtime-console`. This application allows for real-time voice interactions using the device's microphone. The real-time logic is implemented in the frontend with [a VAD model](https://github.com/snakers4/silero-vad), but it can be implemented in the backend in a similar manner. It uses the same `Agent` class to power the interactions.
+In addition to the chat console, there is also a real-time interactive application available at http://localhost:4321/console/realtime. This application allows for real-time voice interactions using the device's microphone. The real-time logic is implemented in the frontend with [a VAD model](https://github.com/snakers4/silero-vad), but it can be implemented in the backend in a similar manner. It uses the same `Agent` class to power the interactions.
 
-This is similar to [OpenAI Realtime API](https://platform.openai.com/docs/guides/realtime), except it uses a regular multi-modal LLM (e.g., `gpt-4o-audio-preview`) instead of a specialized model like `gpt-4o-realtime` and implements without lock-in to any specific vendor.
+This is similar to [OpenAI Realtime API](https://platform.openai.com/docs/guides/realtime), except it uses a regular multi-modal LLM (e.g., `gpt-4o-audio-preview`) instead of a specialized real-time model like `gpt-4o-realtime` and implements without lock-in to any specific vendor.
 
-It is also possible to create a custom `LanguageModel` class that combines a text LLM (e.g., `gpt-4o`) with a speech-to-text model (e.g., `whisper`) to achieve similar functionality while also enable other modalities such as image.
+It is also possible to create a custom `LanguageModel` class that combines a text LLM (e.g., `gpt-4o`) with a speech-to-text model (e.g., `whisper`) to achieve similar functionality while saving costs.
 
-Visit `http://localhost:4321/console/realtime` in your web browser to access the real-time console application.
+Visit http://localhost:4321/console/realtime in your web browser to access the real-time console application.
 
 ## Model list
 
