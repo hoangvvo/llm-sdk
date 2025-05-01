@@ -538,7 +538,16 @@
               }
             ]
           }
-        ]
+        ],
+        "tools": [{
+          "name": "get_first_secret_number",
+          "description": "Get the first secret number",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        }]
       },
       "output": {
         "content": [

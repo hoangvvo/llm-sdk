@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { JSONSchema } from "../src/types.ts";
+import type { JSONSchema, LanguageModelInput } from "../src/types.ts";
 
 /**
  * If the schema has a type of [T, "null"], it means that the property is optional
@@ -38,4 +38,27 @@ export function transformCompatibleSchema(schema: any): JSONSchema {
     };
   }
   return schema;
+}
+
+export function transformInputForCompatibleSchema(
+  input: LanguageModelInput,
+): LanguageModelInput {
+  const newInput = { ...input };
+  if (
+    newInput.response_format?.type === "json" &&
+    newInput.response_format.schema
+  ) {
+    newInput.response_format.schema = transformCompatibleSchema(
+      newInput.response_format.schema,
+    );
+  }
+  if (newInput.tools) {
+    newInput.tools = newInput.tools.map((tool) => {
+      return {
+        ...tool,
+        parameters: transformCompatibleSchema(tool.parameters),
+      };
+    });
+  }
+  return newInput;
 }

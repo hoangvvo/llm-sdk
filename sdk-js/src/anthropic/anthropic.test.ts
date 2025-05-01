@@ -13,7 +13,7 @@ suite("AnthropicModel", () => {
   assert(process.env["ANTHROPIC_API_KEY"], "ANTHROPIC_API_KEY must be set");
   const model = new AnthropicModel({
     apiKey: process.env["ANTHROPIC_API_KEY"],
-    modelId: "claude-3-7-sonnet-20250219",
+    modelId: "claude-sonnet-4-20250514",
   });
 
   const reasoningOptions: RunTestCaseOptions = {

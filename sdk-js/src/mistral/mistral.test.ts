@@ -3,6 +3,7 @@
 import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
+import { transformInputForCompatibleSchema } from "../../test-common/utils.ts";
 import { MistralModel } from "./mistral.ts";
 
 suite("MistralModel", () => {
@@ -30,11 +31,15 @@ suite("MistralModel", () => {
   });
 
   test(TEST_CASE_NAMES.GENERATE_TOOL_CALL, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TOOL_CALL);
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TOOL_CALL, {
+      additionalInputs: transformInputForCompatibleSchema,
+    });
   });
 
   test(TEST_CASE_NAMES.STREAM_TOOL_CALL, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TOOL_CALL);
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TOOL_CALL, {
+      additionalInputs: transformInputForCompatibleSchema,
+    });
   });
 
   test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT, (t) => {
@@ -42,19 +47,26 @@ suite("MistralModel", () => {
       t,
       model,
       TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT,
+      { additionalInputs: transformInputForCompatibleSchema },
     );
   });
 
   test(TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT);
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT, {
+      additionalInputs: transformInputForCompatibleSchema,
+    });
   });
 
   test(TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS);
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, {
+      additionalInputs: transformInputForCompatibleSchema,
+    });
   });
 
   test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS);
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS, {
+      additionalInputs: transformInputForCompatibleSchema,
+    });
   });
 
   test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME, (t) => {
@@ -62,6 +74,7 @@ suite("MistralModel", () => {
       t,
       model,
       TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+      { additionalInputs: transformInputForCompatibleSchema },
     );
   });
 

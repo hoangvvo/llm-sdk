@@ -14,7 +14,7 @@ suite("CohereModel", () => {
 
   const reasoningModel = new CohereModel({
     apiKey: process.env["CO_API_KEY"],
-    modelId: "command-a",
+    modelId: "command-a-03-2025",
   });
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {

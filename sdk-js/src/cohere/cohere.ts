@@ -141,7 +141,7 @@ function convertToCohereChatRequest(
   const request: Cohere.V2ChatRequest = {
     model: modelId,
     messages: cohereMessages,
-    documents: cohereDocuments,
+    ...(cohereDocuments.length > 0 && { documents: cohereDocuments }),
     ...extra,
   };
 
@@ -168,7 +168,8 @@ function convertToCohereChatRequest(
   }
   if (tools) {
     request.tools = tools.map(convertToCohereTool);
-    request.strictTools = true;
+    // TODO: Strict tools usually hangs the request so should be disabled for now
+    // request.strictTools = true;
   }
   if (tool_choice) {
     const toolChoice = convertToCohereToolChoice(tool_choice);
