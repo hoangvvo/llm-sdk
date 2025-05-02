@@ -8,6 +8,10 @@ import {
   type ModelOption,
   type ModelSelection,
 } from "./components/sidebar.tsx";
+import {
+  normalizeBaseUrl,
+  parseExampleServerUrls,
+} from "./lib/example-server.ts";
 import { useAgent } from "./lib/use-agent.ts";
 import { useAudio } from "./lib/use-audio.ts";
 import { useFetchInitialData } from "./lib/use-fetch-initial-data.ts";
@@ -21,10 +25,13 @@ import type {
   ToolInfo,
 } from "./types.ts";
 
-const API_BASE_URL = "http://localhost:4000";
-const RUN_STREAM_URL = `${API_BASE_URL}/run-stream`;
-const MODELS_URL = `${API_BASE_URL}/models`;
-const TOOLS_URL = `${API_BASE_URL}/tools`;
+const env = import.meta.env as Record<string, string | undefined>;
+
+const DEFAULT_API_BASE_URL = normalizeBaseUrl("http://localhost:4000");
+const STORAGE_KEY_SERVER_URL = "console-example-server-url";
+const EXAMPLE_SERVER_URL_OPTIONS = parseExampleServerUrls(
+  env.EXAMPLE_SERVER_URLS ?? env.PUBLIC_EXAMPLE_SERVER_URLS,
+);
 
 const STORAGE_KEY_MODEL = "console-selected-model";
 const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
@@ -57,6 +64,39 @@ export function ChatApp() {
   );
   const [toolsInitialized, setToolsInitialized] = useState(false);
 
+  const hasExampleServerOptions = EXAMPLE_SERVER_URL_OPTIONS.length > 0;
+  const [apiBaseUrl, setApiBaseUrl] = useLocalStorageState<string>(
+    STORAGE_KEY_SERVER_URL,
+    () => EXAMPLE_SERVER_URL_OPTIONS[0] ?? DEFAULT_API_BASE_URL,
+  );
+  const normalizedApiBaseUrl = useMemo(
+    () => normalizeBaseUrl(apiBaseUrl),
+    [apiBaseUrl],
+  );
+  const effectiveApiBaseUrl = hasExampleServerOptions
+    ? normalizedApiBaseUrl
+    : DEFAULT_API_BASE_URL;
+
+  useEffect(() => {
+    if (!hasExampleServerOptions) {
+      return;
+    }
+    if (!EXAMPLE_SERVER_URL_OPTIONS.includes(normalizedApiBaseUrl)) {
+      setApiBaseUrl(EXAMPLE_SERVER_URL_OPTIONS[0]);
+    }
+  }, [hasExampleServerOptions, normalizedApiBaseUrl, setApiBaseUrl]);
+
+  const runStreamUrl = `${effectiveApiBaseUrl}/run-stream`;
+  const modelsUrl = `${effectiveApiBaseUrl}/models`;
+  const toolsUrl = `${effectiveApiBaseUrl}/tools`;
+
+  const handleServerUrlChange = useCallback(
+    (value: string) => {
+      setApiBaseUrl(normalizeBaseUrl(value));
+    },
+    [setApiBaseUrl],
+  );
+
   const [hasStoredToolPreference] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -64,16 +104,25 @@ export function ChatApp() {
     return window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLS) !== null;
   });
 
-  const fetchModels = useCallback(async (signal: AbortSignal) => {
-    const response = await fetch(MODELS_URL, { signal });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models (${String(response.status)})`);
-    }
-    return (await response.json()) as ModelInfo[];
-  }, []);
+  const fetchModels = useCallback(
+    async (signal: AbortSignal) => {
+      const response = await fetch(modelsUrl, { signal });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch models (${String(response.status)})`);
+      }
+      return (await response.json()) as ModelInfo[];
+    },
+    [modelsUrl],
+  );
 
-  const { data: modelsData, error: modelsError } =
-    useFetchInitialData(fetchModels);
+  const {
+    data: modelsData,
+    error: modelsError,
+    refetch: refetchModels,
+  } = useFetchInitialData(fetchModels);
+  useEffect(() => {
+    refetchModels();
+  }, [modelsUrl, refetchModels]);
 
   useEffect(() => {
     if (!modelsData) {
@@ -119,16 +168,25 @@ export function ChatApp() {
     setModelSelection(null);
   }, [modelsError, setModelSelection]);
 
-  const fetchTools = useCallback(async (signal: AbortSignal) => {
-    const response = await fetch(TOOLS_URL, { signal });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tools (${String(response.status)})`);
-    }
-    return (await response.json()) as ToolInfo[];
-  }, []);
+  const fetchTools = useCallback(
+    async (signal: AbortSignal) => {
+      const response = await fetch(toolsUrl, { signal });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tools (${String(response.status)})`);
+      }
+      return (await response.json()) as ToolInfo[];
+    },
+    [toolsUrl],
+  );
 
-  const { data: toolsData, error: toolsError } =
-    useFetchInitialData(fetchTools);
+  const {
+    data: toolsData,
+    error: toolsError,
+    refetch: refetchTools,
+  } = useFetchInitialData(fetchTools);
+  useEffect(() => {
+    refetchTools();
+  }, [refetchTools, toolsUrl]);
 
   useEffect(() => {
     if (!toolsData) {
@@ -220,7 +278,7 @@ export function ChatApp() {
     abort,
   } = useAgent<MyContext>(
     {
-      runStreamUrl: RUN_STREAM_URL,
+      runStreamUrl,
       modelSelection,
       providerApiKeys,
       userContext,
@@ -301,6 +359,13 @@ export function ChatApp() {
           />
         </section>
         <Sidebar
+          serverOptions={
+            hasExampleServerOptions ? EXAMPLE_SERVER_URL_OPTIONS : []
+          }
+          serverUrl={hasExampleServerOptions ? normalizedApiBaseUrl : undefined}
+          onServerUrlChange={
+            hasExampleServerOptions ? handleServerUrlChange : undefined
+          }
           models={modelOptions}
           selection={modelSelection}
           onModelSelectionChange={setModelSelection}

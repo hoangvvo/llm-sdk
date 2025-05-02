@@ -19,6 +19,9 @@ export interface ModelOption extends ModelSelection {
 }
 
 interface SidebarProps {
+  serverOptions?: string[];
+  serverUrl?: string;
+  onServerUrlChange?: (value: string) => void;
   models: ModelOption[];
   selection: ModelSelection | null;
   onModelSelectionChange: Dispatch<SetStateAction<ModelSelection | null>>;
@@ -39,6 +42,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({
+  serverOptions,
+  serverUrl,
+  onServerUrlChange,
   models,
   selection,
   onModelSelectionChange,
@@ -60,6 +66,11 @@ export function Sidebar({
   return (
     <aside className="flex h-full w-96 shrink-0 flex-col overflow-auto border-l border-slate-200/70 bg-white/60 px-6 py-6 backdrop-blur-sm">
       <div className="space-y-6">
+        <ServerSelectionSection
+          options={serverOptions}
+          value={serverUrl}
+          onChange={onServerUrlChange}
+        />
         <ModelSelectionSection
           models={models}
           selection={selection}
@@ -84,6 +95,43 @@ export function Sidebar({
         <ContextSection context={context} onChange={onContextChange} />
       </div>
     </aside>
+  );
+}
+
+interface ServerSelectionSectionProps {
+  options?: string[];
+  value?: string;
+  onChange?: (value: string) => void;
+}
+
+function ServerSelectionSection({
+  options,
+  value,
+  onChange,
+}: ServerSelectionSectionProps) {
+  if (!options || options.length === 0 || !value || !onChange) {
+    return null;
+  }
+  return (
+    <div>
+      <h2 className="console-section-title">Example Server</h2>
+      <p className="mt-2 text-xs text-slate-500">
+        Select which example server to use when running the console.
+      </p>
+      <select
+        className="console-field mt-3 w-full"
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 

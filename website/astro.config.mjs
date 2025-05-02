@@ -8,6 +8,7 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 
 // https://astro.build/config
 export default defineConfig({
+  site: "https://llm-sdk.hoangvvo.workers.dev",
   integrations: [
     starlight({
       title: "llm-sdk",

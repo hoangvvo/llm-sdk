@@ -1,0 +1,9 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "llm-sdk",
+  "compatibility_date": "2025-05-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page", // If you have a custom `src/pages/404.astro` page
+  },
+}
