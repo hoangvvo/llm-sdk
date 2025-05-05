@@ -304,17 +304,19 @@ export class RunSession<TContext> {
     request: AgentRequest<TContext>,
   ): Promise<LanguageModelInput> {
     try {
-      const systemPrompt = await getPromptForInstructionParams(
-        this.#params.instructions,
-        request.context,
-      );
-
       const input: LanguageModelInput = {
         // messages will be computed from getTurnMessages
         messages: [],
-        system_prompt: systemPrompt,
         response_format: this.#params.response_format,
       };
+
+      if (this.#params.instructions.length > 0) {
+        const systemPrompt = await getPromptForInstructionParams(
+          this.#params.instructions,
+          request.context,
+        );
+        input.system_prompt = systemPrompt;
+      }
 
       if (this.#params.tools.length > 0) {
         input.tools = this.#params.tools.map((tool) => ({

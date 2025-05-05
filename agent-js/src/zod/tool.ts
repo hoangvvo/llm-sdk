@@ -28,6 +28,8 @@ export function zodTool<TContext, TZodSchema extends ZodType>(params: {
 }) {
   return {
     ...params,
-    parameters: zodToJsonSchema(params.parameters),
+    parameters: zodToJsonSchema(params.parameters, {
+      target: "openAi",
+    }),
   };
 }

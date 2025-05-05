@@ -574,14 +574,14 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
         />
       </label>
       <label className="console-label">
-        Preferred units
+        Language
         <input
           type="text"
           className="console-field mt-2 w-full"
-          placeholder="e.g. metric, imperial"
-          value={context.units ?? ""}
+          placeholder="e.g. English, Spanish, French"
+          value={context.language ?? ""}
           onChange={(event) => {
-            onChange((prev) => ({ ...prev, units: event.target.value }));
+            onChange((prev) => ({ ...prev, language: event.target.value }));
           }}
         />
       </label>
@@ -611,6 +611,21 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
             onChange((prev) => ({
               ...prev,
               geo_api_key: event.target.value,
+            }));
+          }}
+        />
+      </label>
+      <label className="console-label">
+        newsapi.org API key
+        <input
+          type="text"
+          className="console-field mt-2 w-full"
+          placeholder="API key for the news tool"
+          value={context.news_api_key ?? ""}
+          onChange={(event) => {
+            onChange((prev) => ({
+              ...prev,
+              news_api_key: event.target.value,
             }));
           }}
         />

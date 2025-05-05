@@ -79,6 +79,8 @@ async fn main() {
 }
 ```
 
+## Examples
+
 Find examples in the [examples](./examples/) folder to learn how to:
 
 - [`generate-text`: Generate text](./examples/generate-text.rs)

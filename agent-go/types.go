@@ -48,6 +48,19 @@ type AgentItem struct {
 	Tool *AgentItemTool `json:"-"`
 }
 
+func (r AgentItem) Type() AgentItemType {
+	if r.Message != nil {
+		return AgentItemTypeMessage
+	}
+	if r.Model != nil {
+		return AgentItemTypeModel
+	}
+	if r.Tool != nil {
+		return AgentItemTypeTool
+	}
+	return ""
+}
+
 // AgentItemTool represents a tool call item in the run output.
 type AgentItemTool struct {
 	ToolCallID string          `json:"tool_call_id"`
@@ -170,13 +183,32 @@ func (e AgentStreamEvent) MarshalJSON() ([]byte, error) {
 		})
 	}
 	if e.Item != nil {
-		return json.Marshal(struct {
-			Event AgentStreamEventType `json:"event"`
-			*AgentItem
-		}{
-			Event:     AgentStreamEventTypeItem,
-			AgentItem: e.Item,
-		})
+		// we cannot marshal r.Item directly because AgentItem
+		// also implements MarshalJSON, which would lead to overriding
+		// Create a type alias that doesn't have MarshalJSON
+		// Let AgentItem marshal itself
+		itemJSON, err := json.Marshal(e.Item)
+		if err != nil {
+			return nil, err
+		}
+
+		// Marshal just the event field
+		eventJSON, err := json.Marshal(AgentStreamEventTypeItem)
+		if err != nil {
+			return nil, err
+		}
+
+		// Manually construct the JSON by inserting the event field
+		// itemJSON looks like: {"type":"...", ...}
+		// We want: {"event":"item","type":"...", ...}
+
+		// Convert to string for manipulation
+		itemStr := string(itemJSON)
+
+		// Build the final JSON string
+		result := fmt.Sprintf(`{"event":%s,%s`, eventJSON, itemStr[1:])
+
+		return []byte(result), nil
 	}
 	if e.Response != nil {
 		return json.Marshal(struct {

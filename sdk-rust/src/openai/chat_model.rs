@@ -35,7 +35,7 @@ pub struct OpenAIChatModelOptions {
 
 impl OpenAIChatModel {
     #[must_use]
-    pub fn new(model_id: String, options: OpenAIChatModelOptions) -> Self {
+    pub fn new(model_id: impl ToString, options: OpenAIChatModelOptions) -> Self {
         let client = Client::new();
 
         let api_key = options.api_key;
@@ -45,7 +45,7 @@ impl OpenAIChatModel {
             .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
 
         Self {
-            model_id,
+            model_id: model_id.to_string(),
             api_key,
             base_url,
             client,

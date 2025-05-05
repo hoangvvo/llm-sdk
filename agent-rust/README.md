@@ -204,6 +204,8 @@ fn read_line(prompt: &str) -> io::Result<String> {
 }
 ```
 
+## Examples
+
 Find examples in the [examples](./examples/) folder:
 
 - [`agent`: Simple Example](./examples/agent.rs)
@@ -215,6 +217,8 @@ Find examples in the [examples](./examples/) folder:
 ```bash
 cargo run --example agent
 ```
+
+An example server that exposes an API to interact with the agent can be found in [examples/server](./examples/server). This can be used to test the agent with the [console application](../website).
 
 ## License
 

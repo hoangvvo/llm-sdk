@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { type TestContext } from "node:test";
 import type { Part } from "../src/types.ts";
 
@@ -160,7 +159,6 @@ function matchToolCallArgs(
       if (
         !(
           typeof actualValue !== "object" &&
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string
           expectedValue.test(String(actualValue))
         )
       ) {

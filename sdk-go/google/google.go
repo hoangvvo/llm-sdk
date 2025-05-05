@@ -53,8 +53,8 @@ func NewGoogleModel(modelID string, options GoogleModelOptions) *GoogleModel {
 	}
 }
 
-func (m *GoogleModel) WithMetadata(metadata llmsdk.LanguageModelMetadata) *GoogleModel {
-	m.metadata = &metadata
+func (m *GoogleModel) WithMetadata(metadata *llmsdk.LanguageModelMetadata) *GoogleModel {
+	m.metadata = metadata
 	return m
 }
 

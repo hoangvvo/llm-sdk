@@ -170,10 +170,8 @@ func (u *ModelUsage) Add(other *ModelUsage) *ModelUsage {
 		return u
 	}
 
-	result := &ModelUsage{
-		InputTokens:  u.InputTokens + other.InputTokens,
-		OutputTokens: u.OutputTokens + other.OutputTokens,
-	}
+	u.InputTokens += other.InputTokens
+	u.OutputTokens += other.OutputTokens
 
 	tokenDetails := []ModelTokensDetails{}
 	if u.InputTokensDetails != nil {
@@ -182,7 +180,7 @@ func (u *ModelUsage) Add(other *ModelUsage) *ModelUsage {
 	if other.InputTokensDetails != nil {
 		tokenDetails = append(tokenDetails, *other.InputTokensDetails)
 	}
-	result.InputTokensDetails = SumModelTokensDetails(tokenDetails)
+	u.InputTokensDetails = SumModelTokensDetails(tokenDetails)
 
 	tokenDetails = []ModelTokensDetails{}
 	if u.OutputTokensDetails != nil {
@@ -191,7 +189,7 @@ func (u *ModelUsage) Add(other *ModelUsage) *ModelUsage {
 	if other.OutputTokensDetails != nil {
 		tokenDetails = append(tokenDetails, *other.OutputTokensDetails)
 	}
-	result.OutputTokensDetails = SumModelTokensDetails(tokenDetails)
+	u.OutputTokensDetails = SumModelTokensDetails(tokenDetails)
 
-	return result
+	return u
 }

@@ -69,7 +69,9 @@ impl AgentTool<DungeonRunContext> for AttackEnemyTool {
         "attack_enemy".to_string()
     }
     fn description(&self) -> String {
-        "Resolve a martial attack from a party member against an active enemy and update its hit points.".to_string()
+        "Resolve a martial attack from a party member against an active enemy and update its hit \
+         points."
+            .to_string()
     }
     fn parameters(&self) -> llm_sdk::JSONSchema {
         serde_json::json!({
@@ -112,7 +114,8 @@ impl AgentTool<DungeonRunContext> for AttackEnemyTool {
         if remaining_actions <= 0 {
             return Ok(AgentToolResult {
                 content: vec![Part::text(format!(
-                    "{} is out of actions this round. Ask another hero to step in or advance the scene.",
+                    "{} is out of actions this round. Ask another hero to step in or advance the \
+                     scene.",
                     params.attacker
                 ))],
                 is_error: true,
@@ -138,11 +141,7 @@ impl AgentTool<DungeonRunContext> for AttackEnemyTool {
 
         let weapon_lower = params.weapon.to_lowercase();
         let base_damage = if weapon_lower.contains("axe") { 7 } else { 5 };
-        let finesse_bonus = if weapon_lower.contains("dagger") {
-            1
-        } else {
-            0
-        };
+        let finesse_bonus = i32::from(weapon_lower.contains("dagger"));
         let computed_damage = base_damage + (params.attacker.len() % 3) as i32 + finesse_bonus;
 
         enemy_state.hp = (enemy_state.hp - computed_damage).max(0);
@@ -217,7 +216,8 @@ impl AgentTool<DungeonRunContext> for StabilizeAllyTool {
         if !downed.remove(&hero_key) {
             return Ok(AgentToolResult {
                 content: vec![Part::text(format!(
-                    "{} is already on their feet. Consider taking another tactical action instead of stabilising.",
+                    "{} is already on their feet. Consider taking another tactical action instead \
+                     of stabilising.",
                     params.hero
                 ))],
                 is_error: true,
@@ -271,10 +271,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let dungeon_coach = Agent::<DungeonRunContext>::builder("Torch", model)
         .add_instruction(
-            "You are Torch, a steady co-Dungeon Master. Keep answers short and, when combat actions come up, lean on the provided tools to resolve them.",
+            "You are Torch, a steady co-Dungeon Master. Keep answers short and, when combat \
+             actions come up, lean on the provided tools to resolve them.",
         )
         .add_instruction(
-            "If a requested action involves striking an enemy, call attack_enemy. If the party wants to help someone back up, call stabilize_ally before answering.",
+            "If a requested action involves striking an enemy, call attack_enemy. If the party \
+             wants to help someone back up, call stabilize_ally before answering.",
         )
         .add_tool(AttackEnemyTool)
         .add_tool(StabilizeAllyTool)
@@ -284,13 +286,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let success_response = dungeon_coach
         .run(AgentRequest {
             context: success_context.clone(),
-            input: vec![llm_agent::AgentItem::Message(Message::user(vec![Part::text(
-                "Thorne will strike the ghoul with a battleaxe while Mira uses her turn to stabilise Finley. Help me resolve it.",
-            )]))],
+            input: vec![llm_agent::AgentItem::Message(Message::user(vec![
+                Part::text(
+                    "Thorne will strike the ghoul with a battleaxe while Mira uses her turn to \
+                     stabilise Finley. Help me resolve it.",
+                ),
+            ]))],
         })
         .await?;
 
-    println!("Success response:\n{:#?}", success_response);
+    println!("Success response:\n{success_response:#?}");
     println!("{}", success_response.text());
     println!(
         "Remaining enemy HP: {:?}",
@@ -321,13 +326,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let failure_response = dungeon_coach
         .run(AgentRequest {
             context: failure_context,
-            input: vec![llm_agent::AgentItem::Message(Message::user(vec![Part::text(
-                "Thorne wants to swing again at the marauder, and Mira tries to stabilise Finley anyway.",
-            )]))],
+            input: vec![llm_agent::AgentItem::Message(Message::user(vec![
+                Part::text(
+                    "Thorne wants to swing again at the marauder, and Mira tries to stabilise \
+                     Finley anyway.",
+                ),
+            ]))],
         })
         .await?;
 
-    println!("Failure response:\n{:#?}", failure_response);
+    println!("Failure response:\n{failure_response:#?}");
 
     Ok(())
 }

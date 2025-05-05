@@ -179,6 +179,8 @@ while (userInput !== "exit") {
 }
 ```
 
+## Examples
+
 Find examples in the [examples](./examples/) folder:
 
 - [`agent`: Simple Example](./examples/agent.ts)
@@ -190,6 +192,8 @@ Find examples in the [examples](./examples/) folder:
 ```bash
 node examples/agent.ts
 ```
+
+An example server that exposes an API to interact with the agent can be found in [examples/server](./examples/server). This can be used to test the agent with the [console application](../website).
 
 ## License
 

@@ -127,15 +127,15 @@ func WithModalities[C any](modalities ...llmsdk.Modality) AgentParamsOption[C] {
 	}
 }
 
-// WithAudioOptions sets the options for audio generation.
-func WithAudioOptions[C any](audioOptions llmsdk.AudioOptions) AgentParamsOption[C] {
+// WithAudio sets the options for audio generation.
+func WithAudio[C any](audioOptions llmsdk.AudioOptions) AgentParamsOption[C] {
 	return func(p *AgentParams[C]) {
 		p.Audio = &audioOptions
 	}
 }
 
-// WithReasoningOptions sets the options for reasoning generation.
-func WithReasoningOptions[C any](reasoningOptions llmsdk.ReasoningOptions) AgentParamsOption[C] {
+// WithReasoning sets the options for reasoning generation.
+func WithReasoning[C any](reasoningOptions llmsdk.ReasoningOptions) AgentParamsOption[C] {
 	return func(p *AgentParams[C]) {
 		p.Reasoning = &reasoningOptions
 	}

@@ -294,15 +294,19 @@ func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]
 		})
 	}
 
-	systemPrompt, err := getPrompt(ctx, s.params.Instructions, request.Context)
-	if err != nil {
-		return nil, NewInitError(err)
+	var systemPrompt *string
+	if len(s.params.Instructions) > 0 {
+		prompt, err := getPrompt(ctx, s.params.Instructions, request.Context)
+		if err != nil {
+			return nil, NewInitError(err)
+		}
+		systemPrompt = &prompt
 	}
 
 	return &llmsdk.LanguageModelInput{
 		// messages will be computed from getTurnMessages
 		Messages:         nil,
-		SystemPrompt:     &systemPrompt,
+		SystemPrompt:     systemPrompt,
 		Tools:            tools,
 		ResponseFormat:   s.params.ResponseFormat,
 		Temperature:      s.params.Temperature,

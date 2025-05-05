@@ -19,9 +19,10 @@ export type ApiKeys = Record<string, string | undefined>;
 export interface MyContext {
   name?: string;
   location?: string;
-  units?: string;
+  language?: string;
   geo_api_key?: string;
   tomorrow_api_key?: string;
+  news_api_key?: string;
 }
 
 export interface ToolInfo {

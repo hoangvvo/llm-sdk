@@ -95,6 +95,8 @@ func main() {
 }
 ```
 
+## Examples
+
 Find examples in the [examples](./examples/) folder to learn how to:
 
 - [`generate-text`: Generate text](./examples/generate-text/main.go)
@@ -111,3 +113,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 ```bash
 go run ./examples/generate-text
 ```
+
+## License
+
+[MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)

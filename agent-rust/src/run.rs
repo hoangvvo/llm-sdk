@@ -206,16 +206,22 @@ where
         &self,
         request: AgentRequest<TCtx>,
     ) -> Result<(LanguageModelInput, Arc<TCtx>), AgentError> {
-        let system_prompt = instruction::get_prompt(&self.params.instructions, &request.context)
-            .await
-            .map_err(AgentError::Init)?;
-
         Ok((
             LanguageModelInput {
                 // messages will be computed from getTurnMessages
                 messages: vec![],
-                system_prompt: Some(system_prompt),
-                tools: if !self.params.tools.is_empty() {
+                system_prompt: if self.params.instructions.is_empty() {
+                    None
+                } else {
+                    Some(
+                        instruction::get_prompt(&self.params.instructions, &request.context)
+                            .await
+                            .map_err(AgentError::Init)?,
+                    )
+                },
+                tools: if self.params.tools.is_empty() {
+                    None
+                } else {
                     Some(
                         self.params
                             .tools
@@ -223,8 +229,6 @@ where
                             .map(|tool| tool.as_ref().into())
                             .collect(),
                     )
-                } else {
-                    None
                 },
                 response_format: Some(self.params.response_format.clone()),
                 temperature: self.params.temperature,
@@ -281,15 +285,6 @@ impl RunState {
             return Err(AgentError::MaxTurnsExceeded(self.max_turns));
         }
         Ok(())
-    }
-
-    /// Add message items to the run state.
-    pub async fn append_messages(&self, messages: Vec<Message>) {
-        if messages.is_empty() {
-            return;
-        }
-        let mut output = self.output.lock().await;
-        output.extend(messages.into_iter().map(AgentItem::Message));
     }
 
     /// Add `AgentItems` to the run state.

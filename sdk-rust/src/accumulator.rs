@@ -347,7 +347,7 @@ impl StreamAccumulator {
 
         Ok(ModelResponse {
             content,
-            cost: None,
+            cost: self.cost,
             usage: self.accumulated_usage,
         })
     }

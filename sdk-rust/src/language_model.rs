@@ -1,9 +1,11 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     boxed_stream::BoxedStream, LanguageModelCapability, LanguageModelInput, LanguageModelPricing,
     LanguageModelResult, ModelResponse, PartialModelResponse,
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LanguageModelMetadata {
     pub pricing: Option<LanguageModelPricing>,
     pub capabilities: Option<Vec<LanguageModelCapability>>,
