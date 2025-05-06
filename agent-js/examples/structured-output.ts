@@ -1,4 +1,4 @@
-import { Agent, getTextFromResponse, tool } from "@hoangvvo/llm-agent";
+import { Agent, getResponseText, tool } from "@hoangvvo/llm-agent";
 import type { ResponseFormatOption } from "@hoangvvo/llm-sdk";
 import { getModel } from "./get-model.ts";
 
@@ -160,4 +160,4 @@ const response = await travelAgent.run({
   context: {},
 });
 
-console.dir(JSON.parse(getTextFromResponse(response)));
+console.dir(JSON.parse(getResponseText(response)));

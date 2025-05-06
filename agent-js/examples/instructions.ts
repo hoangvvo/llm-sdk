@@ -1,4 +1,4 @@
-import { Agent, getTextFromResponse } from "@hoangvvo/llm-agent";
+import { Agent, getResponseText } from "@hoangvvo/llm-agent";
 import { getModel } from "./get-model.ts";
 
 interface DungeonRunContext {
@@ -52,4 +52,4 @@ const response = await dungeonCoach.run({
   ],
 });
 
-console.log(getTextFromResponse(response));
+console.log(getResponseText(response));

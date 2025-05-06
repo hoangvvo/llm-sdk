@@ -1,4 +1,4 @@
-import { Agent, getTextFromResponse, tool } from "@hoangvvo/llm-agent";
+import { Agent, getResponseText, tool } from "@hoangvvo/llm-agent";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
 import z from "zod";
 import { getModel } from "./get-model.ts";
@@ -180,7 +180,7 @@ const successResponse = await dungeonCoach.run({
 });
 
 console.dir(successResponse, { depth: null });
-console.log(getTextFromResponse(successResponse));
+console.log(getResponseText(successResponse));
 console.log("Remaining enemy HP:", successContext.encounter.enemies);
 console.log(
   "Downed allies after success run:",
@@ -208,4 +208,4 @@ const failureResponse = await dungeonCoach.run({
 });
 
 console.dir(failureResponse, { depth: null });
-console.log(getTextFromResponse(failureResponse));
+console.log(getResponseText(failureResponse));

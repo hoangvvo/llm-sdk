@@ -13,8 +13,8 @@ export default defineConfig({
     starlight({
       title: "llm-sdk",
       logo: {
-        light: "./src/assets/logo-light.svg",
-        dark: "./src/assets/logo-dark.svg",
+        light: "./public/logo-light.svg",
+        dark: "./public/logo-dark.svg",
         alt: "llm-sdk",
         replacesTitle: true,
       },

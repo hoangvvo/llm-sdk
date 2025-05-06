@@ -22,7 +22,7 @@ impl AgentTool<MyContext> for GetCoordinatesTool {
     }
 
     fn description(&self) -> String {
-        "Get latitude and longitude coordinates for a location".to_string()
+        "Get coordinates (latitude and longitude) from a location name".to_string()
     }
 
     fn parameters(&self) -> JSONSchema {
@@ -31,7 +31,7 @@ impl AgentTool<MyContext> for GetCoordinatesTool {
             "properties": {
                 "location": {
                     "type": "string",
-                    "description": "Location name (city, state, country)"
+                    "description": "The location name, e.g. Paris, France"
                 }
             },
             "required": ["location"],
@@ -47,13 +47,15 @@ impl AgentTool<MyContext> for GetCoordinatesTool {
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: GetCoordinatesParams = serde_json::from_value(args)?;
 
+        let env_key = std::env::var("GEO_API_KEY").ok();
         let api_key = context
             .geo_api_key
             .as_ref()
-            .ok_or("Geo API key not provided")?;
+            .or(env_key.as_ref())
+            .ok_or("API Key not provided. You can also provide the value on the UI with the Context field 'geo_api_key'. Get a free API key at https://geocode.maps.co/")?;
 
         let url = format!(
-            "https://api.opencagedata.com/geocode/v1/json?q={}&key={}&limit=1",
+            "https://geocode.maps.co/search?q={}&api_key={}",
             urlencoding::encode(&params.location),
             api_key
         );
@@ -65,37 +67,38 @@ impl AgentTool<MyContext> for GetCoordinatesTool {
                 if !response.status().is_success() {
                     return Ok(AgentToolResult {
                         content: vec![Part::text(format!(
-                            "Failed to get coordinates for '{}'",
-                            params.location
+                            "Error fetching coordinates: {} {}",
+                            response.status().as_u16(),
+                            response.status().canonical_reason().unwrap_or("")
                         ))],
                         is_error: true,
                     });
                 }
 
-                match response.json::<Value>().await {
-                    Ok(data) => {
-                        if let Some(results) = data.get("results").and_then(|r| r.as_array()) {
-                            if let Some(first_result) = results.first() {
-                                if let Some(geometry) = first_result.get("geometry") {
-                                    let result = serde_json::json!({
-                                        "location": params.location,
-                                        "latitude": geometry.get("lat"),
-                                        "longitude": geometry.get("lng"),
-                                        "formatted": first_result.get("formatted")
-                                    });
+                match response.json::<Vec<Value>>().await {
+                    Ok(items) => {
+                        if let Some(first_item) = items.first() {
+                            if let (Some(lat), Some(lon)) = (
+                                first_item.get("lat").and_then(|v| v.as_str()),
+                                first_item.get("lon").and_then(|v| v.as_str()),
+                            ) {
+                                let result = serde_json::json!({
+                                    "latitude": lat,
+                                    "longitude": lon
+                                });
 
-                                    return Ok(AgentToolResult {
-                                        content: vec![Part::text(serde_json::to_string_pretty(
-                                            &result,
-                                        )?)],
-                                        is_error: false,
-                                    });
-                                }
+                                return Ok(AgentToolResult {
+                                    content: vec![Part::text(serde_json::to_string(&result)?)],
+                                    is_error: false,
+                                });
                             }
                         }
 
                         Ok(AgentToolResult {
-                            content: vec![Part::text("Location not found".to_string())],
+                            content: vec![Part::text(format!(
+                                "No coordinates found for location: {}",
+                                params.location
+                            ))],
                             is_error: true,
                         })
                     }
@@ -115,9 +118,12 @@ impl AgentTool<MyContext> for GetCoordinatesTool {
 
 #[derive(Deserialize)]
 struct GetWeatherParams {
-    latitude: f64,
-    longitude: f64,
-    include_forecast: Option<bool>,
+    latitude: String,
+    longitude: String,
+    units: String,
+    timesteps: String,
+    #[serde(rename = "startTime")]
+    start_time: String,
 }
 
 pub struct GetWeatherTool;
@@ -129,7 +135,7 @@ impl AgentTool<MyContext> for GetWeatherTool {
     }
 
     fn description(&self) -> String {
-        "Get current weather information for specific coordinates".to_string()
+        "Get current weather from latitude and longitude".to_string()
     }
 
     fn parameters(&self) -> JSONSchema {
@@ -137,19 +143,29 @@ impl AgentTool<MyContext> for GetWeatherTool {
             "type": "object",
             "properties": {
                 "latitude": {
-                    "type": "number",
-                    "description": "Latitude coordinate"
+                    "type": "string",
+                    "description": "The latitude"
                 },
                 "longitude": {
-                    "type": "number",
-                    "description": "Longitude coordinate"
+                    "type": "string",
+                    "description": "The longitude"
                 },
-                "include_forecast": {
-                    "type": ["boolean", "null"],
-                    "description": "Include weather forecast (default: false)"
+                "units": {
+                    "type": "string",
+                    "enum": ["metric", "imperial"],
+                    "description": "Units"
+                },
+                "timesteps": {
+                    "type": "string",
+                    "enum": ["current", "1h", "1d"],
+                    "description": "Timesteps"
+                },
+                "startTime": {
+                    "type": "string",
+                    "description": "Start time in ISO format"
                 }
             },
-            "required": ["latitude", "longitude", "include_forecast"],
+            "required": ["latitude", "longitude", "units", "timesteps", "startTime"],
             "additionalProperties": false
         })
     }
@@ -162,17 +178,18 @@ impl AgentTool<MyContext> for GetWeatherTool {
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: GetWeatherParams = serde_json::from_value(args)?;
 
+        let env_key = std::env::var("TOMORROW_API_KEY").ok();
         let api_key = context
             .tomorrow_api_key
             .as_ref()
-            .ok_or("Tomorrow API key not provided")?;
+            .or(env_key.as_ref())
+            .ok_or("API Key not provided. You can also provide the value on the UI with the Context field 'tomorrow_api_key'. Get a free API key at https://tomorrow.io/")?;
 
-        let include_forecast = params.include_forecast.unwrap_or(false);
-        let timeline = if include_forecast { "1d" } else { "realtime" };
+        let fields = "temperature,temperatureApparent,humidity";
 
         let url = format!(
-            "https://api.tomorrow.io/v4/weather/{}?location={},{}&apikey={}",
-            timeline, params.latitude, params.longitude, api_key
+            "https://api.tomorrow.io/v4/timelines?location={},{}&fields={}&timesteps={}&units={}&startTime={}&apikey={}",
+            params.latitude, params.longitude, fields, params.timesteps, params.units, params.start_time, api_key
         );
 
         let client = reqwest::Client::new();
@@ -181,40 +198,20 @@ impl AgentTool<MyContext> for GetWeatherTool {
             Ok(response) => {
                 if !response.status().is_success() {
                     return Ok(AgentToolResult {
-                        content: vec![Part::text("Failed to fetch weather data".to_string())],
+                        content: vec![Part::text(format!(
+                            "Error fetching weather: {} {}",
+                            response.status().as_u16(),
+                            response.status().canonical_reason().unwrap_or("")
+                        ))],
                         is_error: true,
                     });
                 }
 
                 match response.json::<Value>().await {
-                    Ok(data) => {
-                        let mut result = serde_json::Map::new();
-                        result.insert(
-                            "latitude".to_string(),
-                            Value::Number(serde_json::Number::from_f64(params.latitude).unwrap()),
-                        );
-                        result.insert(
-                            "longitude".to_string(),
-                            Value::Number(serde_json::Number::from_f64(params.longitude).unwrap()),
-                        );
-
-                        if let Some(data_obj) = data.get("data") {
-                            if timeline == "realtime" {
-                                if let Some(values) = data_obj.get("values") {
-                                    result.insert("current_weather".to_string(), values.clone());
-                                }
-                            } else if let Some(timelines) = data_obj.get("timelines") {
-                                result.insert("forecast".to_string(), timelines.clone());
-                            }
-                        }
-
-                        Ok(AgentToolResult {
-                            content: vec![Part::text(serde_json::to_string_pretty(
-                                &Value::Object(result),
-                            )?)],
-                            is_error: false,
-                        })
-                    }
+                    Ok(data) => Ok(AgentToolResult {
+                        content: vec![Part::text(serde_json::to_string(&data)?)],
+                        is_error: false,
+                    }),
                     Err(e) => Ok(AgentToolResult {
                         content: vec![Part::text(format!("Error: {e}"))],
                         is_error: true,
