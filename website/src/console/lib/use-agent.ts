@@ -222,9 +222,7 @@ export function useAgent<Context>(
           }
 
           if (parsed.event === "item") {
-            const { event: _ignoredEvent, ...itemWithoutEvent } = parsed;
-            void _ignoredEvent;
-            const newItem = itemWithoutEvent as AgentItem;
+            const { item: newItem } = parsed;
             setNextItems((prev) => [...prev, newItem]);
             pendingItems.push(newItem);
             setStreamingParts([]);

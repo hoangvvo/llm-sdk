@@ -1,5 +1,8 @@
 use futures::TryStreamExt;
-use llm_agent::{Agent, AgentItem, AgentParams, AgentRequest, AgentResponse, AgentStreamEvent};
+use llm_agent::{
+    Agent, AgentItem, AgentParams, AgentRequest, AgentResponse, AgentStreamEvent,
+    AgentStreamItemEvent,
+};
 use llm_sdk::{
     llm_sdk_test::{MockLanguageModel, MockStreamResult},
     ContentDelta, Message, ModelResponse, Part, PartDelta, PartialModelResponse, TextPartDelta,
@@ -79,10 +82,13 @@ async fn agent_run_stream_creates_session_streams_and_finishes() {
             }),
             ..Default::default()
         }),
-        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
-            content: vec![Part::text("Mock")],
-            ..Default::default()
-        })),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 0,
+            item: AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Mock")],
+                ..Default::default()
+            }),
+        }),
         AgentStreamEvent::Response(AgentResponse {
             content: vec![Part::text("Mock")],
             output: vec![AgentItem::Model(ModelResponse {

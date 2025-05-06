@@ -242,10 +242,11 @@ export class RunSession<TContext> {
 
         const response = accumulator.computeResponse();
 
-        const item = state.appendModelResponse(response);
+        const { item, index } = state.appendModelResponse(response);
         yield {
           event: "item",
-          ...item,
+          index,
+          item,
         };
 
         const { content } = response;
@@ -260,10 +261,11 @@ export class RunSession<TContext> {
 
         for await (const event of processStream) {
           if (event.type === "item") {
-            state.appendItem(event.item);
+            const index = state.appendItem(event.item);
             yield {
               event: "item",
-              ...event.item,
+              item: event.item,
+              index,
             };
           }
           if (event.type === "response") {
@@ -424,21 +426,29 @@ export class RunState {
   }
 
   /**
-   * Add AgentItems to the run state
+   * Add AgentItems to the run state.
+   * Returns the index of the added item in the output array.
    */
-  appendItem(item: AgentItem): void {
+  appendItem(item: AgentItem): number {
     this.#output.push(item);
+    return this.#output.length - 1;
   }
 
   // Append a model response to the run state as an AgentItemModelResponse
-  // and return such the item
-  appendModelResponse(response: ModelResponse): AgentItem {
+  // and return such the item and its index in the output array
+  appendModelResponse(response: ModelResponse): {
+    item: AgentItem;
+    index: number;
+  } {
     const item: AgentItemModelResponse = {
       type: "model",
       ...response,
     };
     this.#output.push(item);
-    return item;
+    return {
+      item,
+      index: this.#output.length - 1,
+    };
   }
 
   /**

@@ -932,8 +932,11 @@ suite("RunSession#runStream", () => {
     t.assert.deepStrictEqual(events.filter(isItemEvent), [
       {
         event: "item",
-        type: "model",
-        content: [{ type: "text", text: "Hello!" }],
+        index: 0,
+        item: {
+          type: "model",
+          content: [{ type: "text", text: "Hello!" }],
+        },
       },
     ]);
     t.assert.deepStrictEqual(events.find(isResponseEvent), {
@@ -1026,31 +1029,41 @@ suite("RunSession#runStream", () => {
     const expectedItemEvents = [
       {
         event: "item",
-        type: "model",
-        content: [
-          {
-            type: "tool-call",
-            tool_name: "test_tool",
-            tool_call_id: "call_1",
-            args: { a: 1, b: 2, operation: "add" },
-          },
-        ],
+        index: 0,
+        item: {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "test_tool",
+              tool_call_id: "call_1",
+              args: { a: 1, b: 2, operation: "add" },
+            },
+          ],
+        },
       },
       {
         event: "item",
-        type: "tool",
-        tool_name: "test_tool",
-        tool_call_id: "call_1",
-        input: { a: 1, b: 2, operation: "add" },
-        output: [{ type: "text", text: "Tool result" }],
-        is_error: false,
+        index: 1,
+        item: {
+          type: "tool",
+          tool_name: "test_tool",
+          tool_call_id: "call_1",
+          input: { a: 1, b: 2, operation: "add" },
+          output: [{ type: "text", text: "Tool result" }],
+          is_error: false,
+        },
       },
       {
         event: "item",
-        type: "model",
-        content: [{ type: "text", text: "FinalFinal response" }],
+        index: 2,
+        item: {
+          type: "model",
+          content: [{ type: "text", text: "FinalFinal response" }],
+        },
       },
     ];
+
     t.assert.deepStrictEqual(events.filter(isItemEvent), expectedItemEvents);
 
     const responseEvent = events.find(isResponseEvent);
@@ -1166,50 +1179,65 @@ suite("RunSession#runStream", () => {
     const expectedItemEvents = [
       {
         event: "item",
-        type: "model",
-        content: [
-          {
-            type: "tool-call",
-            tool_name: "calculator",
-            tool_call_id: "call_1",
-            args: { a: 1, b: 2 },
-          },
-        ],
+        index: 0,
+        item: {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "calculator",
+              tool_call_id: "call_1",
+              args: { a: 1, b: 2 },
+            },
+          ],
+        },
       },
       {
         event: "item",
-        type: "tool",
-        tool_name: "calculator",
-        tool_call_id: "call_1",
-        input: { a: 1, b: 2 },
-        output: [{ type: "text", text: "Calculation done" }],
-        is_error: false,
+        index: 1,
+        item: {
+          type: "tool",
+          tool_name: "calculator",
+          tool_call_id: "call_1",
+          input: { a: 1, b: 2 },
+          output: [{ type: "text", text: "Calculation done" }],
+          is_error: false,
+        },
       },
       {
         event: "item",
-        type: "model",
-        content: [
-          {
-            type: "tool-call",
-            tool_name: "calculator",
-            tool_call_id: "call_2",
-            args: { a: 3, b: 4 },
-          },
-        ],
+        index: 2,
+        item: {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "calculator",
+              tool_call_id: "call_2",
+              args: { a: 3, b: 4 },
+            },
+          ],
+        },
       },
       {
         event: "item",
-        type: "tool",
-        tool_name: "calculator",
-        tool_call_id: "call_2",
-        input: { a: 3, b: 4 },
-        output: [{ type: "text", text: "Calculation done" }],
-        is_error: false,
+        index: 3,
+        item: {
+          type: "tool",
+          tool_name: "calculator",
+          tool_call_id: "call_2",
+          input: { a: 3, b: 4 },
+          output: [{ type: "text", text: "Calculation done" }],
+          is_error: false,
+        },
       },
       {
         event: "item",
-        type: "model",
-        content: [{ type: "text", text: "All done" }],
+        index: 4,
+        item: {
+          type: "model",
+          content: [{ type: "text", text: "All done" }],
+        },
       },
     ];
     t.assert.deepStrictEqual(events.filter(isItemEvent), expectedItemEvents);

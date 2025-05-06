@@ -168,7 +168,7 @@ func (r *AgentItem) UnmarshalJSON(data []byte) error {
 // Only one of the fields will be non-nil.
 type AgentStreamEvent struct {
 	Partial  *llmsdk.PartialModelResponse `json:"-"`
-	Item     *AgentItem                   `json:"-"`
+	Item     *AgentStreamItemEvent        `json:"-"`
 	Response *AgentResponse               `json:"-"`
 }
 
@@ -183,32 +183,13 @@ func (e AgentStreamEvent) MarshalJSON() ([]byte, error) {
 		})
 	}
 	if e.Item != nil {
-		// we cannot marshal r.Item directly because AgentItem
-		// also implements MarshalJSON, which would lead to overriding
-		// Create a type alias that doesn't have MarshalJSON
-		// Let AgentItem marshal itself
-		itemJSON, err := json.Marshal(e.Item)
-		if err != nil {
-			return nil, err
-		}
-
-		// Marshal just the event field
-		eventJSON, err := json.Marshal(AgentStreamEventTypeItem)
-		if err != nil {
-			return nil, err
-		}
-
-		// Manually construct the JSON by inserting the event field
-		// itemJSON looks like: {"type":"...", ...}
-		// We want: {"event":"item","type":"...", ...}
-
-		// Convert to string for manipulation
-		itemStr := string(itemJSON)
-
-		// Build the final JSON string
-		result := fmt.Sprintf(`{"event":%s,%s`, eventJSON, itemStr[1:])
-
-		return []byte(result), nil
+		return json.Marshal(struct {
+			Event AgentStreamEventType `json:"event"`
+			*AgentStreamItemEvent
+		}{
+			Event:                AgentStreamEventTypeItem,
+			AgentStreamItemEvent: e.Item,
+		})
 	}
 	if e.Response != nil {
 		return json.Marshal(struct {
@@ -237,7 +218,7 @@ func (e *AgentStreamEvent) UnmarshalJSON(data []byte) error {
 		}
 		e.Partial = &partial
 	case AgentStreamEventTypeItem:
-		var item AgentItem
+		var item AgentStreamItemEvent
 		if err := json.Unmarshal(data, &item); err != nil {
 			return err
 		}
@@ -252,6 +233,18 @@ func (e *AgentStreamEvent) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("unknown AgentStreamEvent event: %s", aux.Event)
 	}
 	return nil
+}
+
+type AgentStreamItemEvent struct {
+	Index int       `json:"index"`
+	Item  AgentItem `json:"item"`
+}
+
+func NewAgentStreamItemEvent(index int, item AgentItem) *AgentStreamEvent {
+	return &AgentStreamEvent{Item: &AgentStreamItemEvent{
+		Index: index,
+		Item:  item,
+	}}
 }
 
 type AgentStreamEventType string

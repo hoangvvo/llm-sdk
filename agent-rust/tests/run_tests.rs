@@ -3,7 +3,8 @@ use std::sync::Arc;
 use futures::{StreamExt, TryStreamExt};
 use llm_agent::{
     AgentError, AgentItem, AgentItemTool, AgentParams, AgentRequest, AgentResponse,
-    AgentStreamEvent, AgentTool, AgentToolResult, InstructionParam, RunSession, RunState,
+    AgentStreamEvent, AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam,
+    RunSession, RunState,
 };
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
@@ -738,10 +739,13 @@ async fn run_stream_streams_response_when_no_tool_call() {
             }),
             ..Default::default()
         }),
-        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
-            content: vec![Part::text("Hello!")],
-            ..Default::default()
-        })),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 0,
+            item: AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Hello!")],
+                ..Default::default()
+            }),
+        }),
         AgentStreamEvent::Response(AgentResponse {
             content: vec![Part::text("Hello!")],
             output: vec![AgentItem::Model(ModelResponse {
@@ -830,17 +834,23 @@ async fn run_stream_streams_tool_call_execution_and_response() {
             }),
             ..Default::default()
         }),
-        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
-            content: vec![Part::tool_call("call_1", "test_tool", tool_args.clone())],
-            ..Default::default()
-        })),
-        AgentStreamEvent::Item(AgentItem::Tool(AgentItemTool {
-            tool_call_id: "call_1".to_string(),
-            tool_name: "test_tool".to_string(),
-            input: tool_args.clone(),
-            output: vec![Part::text("Tool result")],
-            is_error: false,
-        })),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 0,
+            item: AgentItem::Model(ModelResponse {
+                content: vec![Part::tool_call("call_1", "test_tool", tool_args.clone())],
+                ..Default::default()
+            }),
+        }),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 1,
+            item: AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_1".to_string(),
+                tool_name: "test_tool".to_string(),
+                input: tool_args.clone(),
+                output: vec![Part::text("Tool result")],
+                is_error: false,
+            }),
+        }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
@@ -859,10 +869,13 @@ async fn run_stream_streams_tool_call_execution_and_response() {
             }),
             ..Default::default()
         }),
-        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
-            content: vec![Part::text("Final response")],
-            ..Default::default()
-        })),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 2,
+            item: AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Final response")],
+                ..Default::default()
+            }),
+        }),
         AgentStreamEvent::Response(AgentResponse {
             content: vec![Part::text("Final response")],
             output: vec![
@@ -967,17 +980,23 @@ async fn run_stream_handles_multiple_turns() {
             }),
             ..Default::default()
         }),
-        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
-            content: vec![Part::tool_call("call_1", "calculator", first_args.clone())],
-            ..Default::default()
-        })),
-        AgentStreamEvent::Item(AgentItem::Tool(AgentItemTool {
-            tool_call_id: "call_1".to_string(),
-            tool_name: "calculator".to_string(),
-            input: first_args.clone(),
-            output: vec![Part::text("Calculation done")],
-            is_error: false,
-        })),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 0,
+            item: AgentItem::Model(ModelResponse {
+                content: vec![Part::tool_call("call_1", "calculator", first_args.clone())],
+                ..Default::default()
+            }),
+        }),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 1,
+            item: AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_1".to_string(),
+                tool_name: "calculator".to_string(),
+                input: first_args.clone(),
+                output: vec![Part::text("Calculation done")],
+                is_error: false,
+            }),
+        }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
@@ -990,17 +1009,23 @@ async fn run_stream_handles_multiple_turns() {
             }),
             ..Default::default()
         }),
-        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
-            content: vec![Part::tool_call("call_2", "calculator", second_args.clone())],
-            ..Default::default()
-        })),
-        AgentStreamEvent::Item(AgentItem::Tool(AgentItemTool {
-            tool_call_id: "call_2".to_string(),
-            tool_name: "calculator".to_string(),
-            input: second_args.clone(),
-            output: vec![Part::text("Calculation done")],
-            is_error: false,
-        })),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 2,
+            item: AgentItem::Model(ModelResponse {
+                content: vec![Part::tool_call("call_2", "calculator", second_args.clone())],
+                ..Default::default()
+            }),
+        }),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 3,
+            item: AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call_2".to_string(),
+                tool_name: "calculator".to_string(),
+                input: second_args.clone(),
+                output: vec![Part::text("Calculation done")],
+                is_error: false,
+            }),
+        }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
@@ -1010,10 +1035,13 @@ async fn run_stream_handles_multiple_turns() {
             }),
             ..Default::default()
         }),
-        AgentStreamEvent::Item(AgentItem::Model(ModelResponse {
-            content: vec![Part::text("All done")],
-            ..Default::default()
-        })),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 4,
+            item: AgentItem::Model(ModelResponse {
+                content: vec![Part::text("All done")],
+                ..Default::default()
+            }),
+        }),
         AgentStreamEvent::Response(AgentResponse {
             content: vec![Part::text("All done")],
             output: vec![

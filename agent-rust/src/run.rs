@@ -1,7 +1,7 @@
 use crate::{
     instruction,
     types::{AgentItemTool, AgentStream, AgentStreamEvent},
-    AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse,
+    AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse, AgentStreamItemEvent,
 };
 use async_stream::try_stream;
 use futures::{lock::Mutex, stream::StreamExt};
@@ -168,8 +168,10 @@ where
 
                 let content = model_response.content.clone();
 
-                let item = state.append_model_response(model_response).await;
-                yield AgentStreamEvent::Item(item);
+                let (item, index) = state.append_model_response(model_response).await;
+                yield AgentStreamEvent::Item(
+                    AgentStreamItemEvent { item, index }
+                );
 
                 let mut process_stream = session.process(ctx.clone(), &state, content).await;
 
@@ -177,8 +179,10 @@ where
                     let event = event?;
                     match event {
                         ProcessEvents::Item(item) => {
-                            state.append_item(item.clone()).await;
-                            yield AgentStreamEvent::Item(item);
+                            let index = state.append_item(item.clone()).await;
+                            yield AgentStreamEvent::Item(
+                                AgentStreamItemEvent { item, index }
+                            );
                         }
                         ProcessEvents::Response(final_content) => {
                             let response = state.create_response(final_content).await;
@@ -287,18 +291,19 @@ impl RunState {
         Ok(())
     }
 
-    /// Add `AgentItems` to the run state.
-    pub async fn append_item(&self, item: AgentItem) {
+    /// Add `AgentItems` to the run state and return the index of the added item.
+    pub async fn append_item(&self, item: AgentItem) -> usize {
         let mut output: futures::lock::MutexGuard<'_, Vec<AgentItem>> = self.output.lock().await;
         output.push(item);
+        output.len() - 1
     }
 
-    /// Append a model response to the run state and return the created item.
-    pub async fn append_model_response(&self, response: ModelResponse) -> AgentItem {
+    /// Append a model response to the run state and return the created item and its index.
+    pub async fn append_model_response(&self, response: ModelResponse) -> (AgentItem, usize) {
         let mut output = self.output.lock().await;
         let item = AgentItem::Model(response);
         output.push(item.clone());
-        item
+        (item, output.len() - 1)
     }
 
     /// Get LLM messages to use in the `LanguageModelInput` for the turn

@@ -112,16 +112,14 @@ func TestAgent_RunStream(t *testing.T) {
 					},
 				},
 			},
-			{
-				Item: func() *llmagent.AgentItem {
-					item := llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Mock"}},
-						},
-					})
-					return &item
-				}(),
-			},
+			llmagent.NewAgentStreamItemEvent(
+				0,
+				llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+					Content: []llmsdk.Part{
+						{TextPart: &llmsdk.TextPart{Text: "Mock"}},
+					},
+				}),
+			),
 			{
 				Response: &llmagent.AgentResponse{
 					Content: []llmsdk.Part{

@@ -68,8 +68,15 @@ pub struct AgentItemTool {
 #[serde(tag = "event", rename_all = "kebab-case")]
 pub enum AgentStreamEvent {
     Partial(PartialModelResponse),
-    Item(AgentItem),
+    Item(AgentStreamItemEvent),
     Response(AgentResponse),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct AgentStreamItemEvent {
+    pub index: usize,
+    pub item: AgentItem,
 }
 
 pub type AgentStream = BoxedStream<'static, Result<AgentStreamEvent, AgentError>>;

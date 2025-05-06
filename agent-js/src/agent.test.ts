@@ -78,8 +78,11 @@ suite("Agent#runStream", () => {
       },
       {
         event: "item",
-        type: "model",
-        content: [{ type: "text", text: "Mock" }],
+        index: 0,
+        item: {
+          type: "model",
+          content: [{ type: "text", text: "Mock" }],
+        },
       },
       {
         event: "response",

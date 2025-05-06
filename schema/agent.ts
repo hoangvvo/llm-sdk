@@ -78,17 +78,17 @@ export interface AgentItemTool {
  */
 export type AgentStreamEvent =
   | AgentStreamEventPartial
-  | AgentStreamEventItem
-  | AgentStreamEventResponse;
+  | AgentStreamItemEvent
+  | AgentStreamResponseEvent;
 
 export interface AgentStreamEventPartial extends PartialModelResponse {
   event: "partial";
 }
 
-export type AgentStreamEventItem = AgentItem & {
+export type AgentStreamItemEvent = AgentItem & {
   event: "item";
 };
 
-export interface AgentStreamEventResponse extends AgentResponse {
+export interface AgentStreamResponseEvent extends AgentResponse {
   event: "response";
 }

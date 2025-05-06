@@ -1047,14 +1047,13 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 			},
 		},
 		{
-			Item: func() *llmagent.AgentItem {
-				item := llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+			Item: &llmagent.AgentStreamItemEvent{
+				Item: llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 					Content: []llmsdk.Part{
 						{TextPart: &llmsdk.TextPart{Text: "Hello!"}},
 					},
-				})
-				return &item
-			}(),
+				}),
+			},
 		},
 		{
 			Response: &llmagent.AgentResponse{
@@ -1159,9 +1158,10 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 				summaries = append(summaries, "partial:other")
 			}
 		case event.Item != nil:
-			if event.Item.Model != nil {
-				if len(event.Item.Model.Content) > 0 {
-					part := event.Item.Model.Content[0]
+			itemEvent := event.Item
+			if itemEvent.Item.Model != nil {
+				if len(itemEvent.Item.Model.Content) > 0 {
+					part := itemEvent.Item.Model.Content[0]
 					if part.ToolCallPart != nil {
 						summaries = append(summaries, "item:model:tool-call:"+part.ToolCallPart.ToolName)
 					} else if part.TextPart != nil {
@@ -1172,12 +1172,12 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 				} else {
 					summaries = append(summaries, "item:model:empty")
 				}
-			} else if event.Item.Tool != nil {
+			} else if itemEvent.Item.Tool != nil {
 				suffix := ":false"
-				if event.Item.Tool.IsError {
+				if itemEvent.Item.Tool.IsError {
 					suffix = ":true"
 				}
-				summaries = append(summaries, "item:tool:"+event.Item.Tool.ToolName+suffix)
+				summaries = append(summaries, "item:tool:"+itemEvent.Item.Tool.ToolName+suffix)
 			} else {
 				summaries = append(summaries, "item:other")
 			}

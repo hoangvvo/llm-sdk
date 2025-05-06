@@ -95,8 +95,8 @@
       "description": "Stream events emitted by the agent during runStream call.",
       "oneOf": [
         { "$ref": "#/definitions/AgentStreamEventPartial" },
-        { "$ref": "#/definitions/AgentStreamEventItem" },
-        { "$ref": "#/definitions/AgentStreamEventResponse" }
+        { "$ref": "#/definitions/AgentStreamItemEvent" },
+        { "$ref": "#/definitions/AgentStreamResponseEvent" }
       ]
     },
     "AgentStreamEventPartial": {
@@ -111,19 +111,15 @@
         }
       ]
     },
-    "AgentStreamEventItem": {
-      "allOf": [
-        { "$ref": "#/definitions/AgentItem" },
-        {
-          "type": "object",
-          "properties": {
-            "event": { "const": "item" }
-          },
-          "required": ["event"]
-        }
-      ]
+    "AgentStreamItemEvent": {
+        "type": "object",
+        "properties": {
+          "event": { "const": "item" },
+          "item": { "$ref": "#/definitions/AgentItem" }
+        },
+        "required": ["event", "item"]
     },
-    "AgentStreamEventResponse": {
+    "AgentStreamResponseEvent": {
       "allOf": [
         { "$ref": "#/definitions/AgentResponse" },
         {

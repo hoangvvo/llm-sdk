@@ -151,7 +151,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 				return response, nil
 			}
 			if event.Item != nil {
-				state.AppendItems(*event.Item)
+				state.AppendItem(*event.Item)
 			}
 			if event.Next != nil {
 				// continue to next iteration
@@ -236,11 +236,9 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 
 			content := modelResponse.Content
 
-			item := state.AppendModelResponse(modelResponse)
+			item, index := state.AppendModelResponse(modelResponse)
 
-			eventChan <- &AgentStreamEvent{
-				Item: &item,
-			}
+			eventChan <- NewAgentStreamItemEvent(index, item)
 
 			processStream := s.process(ctx, contextVal, state, content)
 			for processStream.Next() {
@@ -254,10 +252,8 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 					return
 				}
 				if event.Item != nil {
-					state.AppendItems(*event.Item)
-					eventChan <- &AgentStreamEvent{
-						Item: event.Item,
-					}
+					index := state.AppendItem(*event.Item)
+					eventChan <- NewAgentStreamItemEvent(index, *event.Item)
 				}
 				if event.Next != nil {
 					// continue to next iteration
@@ -364,20 +360,21 @@ func (s *RunState) Turn() error {
 	return nil
 }
 
-// AppendItems adds AgentItems to the run state.
-func (s *RunState) AppendItems(items ...AgentItem) {
+// AppendItem adds an AgentItem to the run state and returns its index.
+func (s *RunState) AppendItem(item AgentItem) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.output = append(s.output, items...)
+	s.output = append(s.output, item)
+	return len(s.output) - 1
 }
 
-// AppendModelResponse appends a model response as a model AgentItem and returns it.
-func (s *RunState) AppendModelResponse(resp llmsdk.ModelResponse) AgentItem {
+// AppendModelResponse appends a model response as a model AgentItem and returns it and its index.
+func (s *RunState) AppendModelResponse(resp llmsdk.ModelResponse) (AgentItem, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	item := NewAgentItemModelResponse(resp)
 	s.output = append(s.output, item)
-	return item
+	return item, len(s.output) - 1
 }
 
 func (s *RunState) GetItems() []AgentItem {
