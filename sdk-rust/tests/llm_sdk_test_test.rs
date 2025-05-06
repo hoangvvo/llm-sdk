@@ -2,16 +2,14 @@ use futures::StreamExt;
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult,
-    LanguageModelStream, Message, ModelResponse, Part, PartDelta, PartialModelResponse, TextPart,
+    LanguageModelStream, Message, ModelResponse, Part, PartDelta, PartialModelResponse,
     TextPartDelta, UserMessage,
 };
 
 fn user_input(text: &str) -> LanguageModelInput {
     LanguageModelInput {
         messages: vec![Message::User(UserMessage {
-            content: vec![Part::Text(TextPart {
-                text: text.to_string(),
-            })],
+            content: vec![Part::text(text)],
         })],
         ..LanguageModelInput::default()
     }
@@ -34,15 +32,11 @@ async fn mock_language_model_tracks_generate_inputs_and_returns_results() {
     let model = MockLanguageModel::new();
 
     let response1 = ModelResponse {
-        content: vec![Part::Text(TextPart {
-            text: "Hello, world!".to_string(),
-        })],
+        content: vec![Part::text("Hello, world!")],
         ..ModelResponse::default()
     };
     let response3 = ModelResponse {
-        content: vec![Part::Text(TextPart {
-            text: "Goodbye, world!".to_string(),
-        })],
+        content: vec![Part::text("Goodbye, world!")],
         ..ModelResponse::default()
     };
 
@@ -92,9 +86,7 @@ async fn mock_language_model_tracks_generate_inputs_and_returns_results() {
     assert!(model.tracked_generate_inputs().is_empty());
 
     model.enqueue_generate(ModelResponse {
-        content: vec![Part::Text(TextPart {
-            text: "After reset".to_string(),
-        })],
+        content: vec![Part::text("After reset")],
         ..ModelResponse::default()
     });
 

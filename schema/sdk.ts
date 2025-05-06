@@ -293,7 +293,7 @@ export interface ImagePartDelta {
    */
   height?: number;
   /**
-   * The ID of the image part, if applicable
+   * ID of the image part, if applicable
    */
   id?: string;
 }
@@ -415,9 +415,6 @@ export interface ModelResponse {
 export interface PartialModelResponse {
   delta?: ContentDelta;
   usage?: ModelUsage;
-  /**
-   * The cost of the response.
-   */
   cost?: number;
 }
 /**

@@ -148,6 +148,10 @@
       "description": "A part of the message that contains a source with structured content.\nIt will be used for citation for supported models.",
       "properties": {
         "type": { "const": "source" },
+        "source": {
+          "type": "string",
+          "description": "The source URL or identifier of the document."
+        },
         "title": {
           "type": "string",
           "description": "The title of the document."

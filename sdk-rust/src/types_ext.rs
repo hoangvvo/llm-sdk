@@ -1,11 +1,20 @@
 use crate::{
-    AssistantMessage, AudioPart, ImagePart, Message, Part, TextPart, ToolCallPart, ToolMessage,
-    ToolResultPart, UserMessage,
+    AssistantMessage, AudioPart, ImagePart, Message, Part, SourcePart, TextPart, ToolCallPart,
+    ToolMessage, ToolResultPart, UserMessage,
 };
 
 impl TextPart {
     pub fn new(text: impl Into<String>) -> Self {
-        Self { text: text.into() }
+        Self {
+            text: text.into(),
+            citations: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_citation(mut self, citation: Vec<crate::Citation>) -> Self {
+        self.citations = Some(citation);
+        self
     }
 }
 
@@ -13,13 +22,17 @@ impl From<&str> for TextPart {
     fn from(value: &str) -> Self {
         Self {
             text: value.to_string(),
+            citations: None,
         }
     }
 }
 
 impl From<String> for TextPart {
     fn from(value: String) -> Self {
-        Self { text: value }
+        Self {
+            text: value,
+            citations: None,
+        }
     }
 }
 
@@ -132,6 +145,16 @@ impl ToolResultPart {
     }
 }
 
+impl SourcePart {
+    pub fn new(source: impl Into<String>, title: impl Into<String>, content: Vec<Part>) -> Self {
+        Self {
+            source: source.into(),
+            title: title.into(),
+            content,
+        }
+    }
+}
+
 impl From<TextPart> for Part {
     fn from(value: TextPart) -> Self {
         Self::Text(value)
@@ -162,6 +185,12 @@ impl From<ToolResultPart> for Part {
     }
 }
 
+impl From<SourcePart> for Part {
+    fn from(value: SourcePart) -> Self {
+        Self::Source(value)
+    }
+}
+
 impl Part {
     pub fn text(text: impl Into<String>) -> Self {
         Self::Text(TextPart::new(text))
@@ -189,6 +218,10 @@ impl Part {
         content: Vec<Self>,
     ) -> Self {
         Self::ToolResult(ToolResultPart::new(tool_call_id, tool_name, content))
+    }
+
+    pub fn source(source: impl Into<String>, title: impl Into<String>, content: Vec<Self>) -> Self {
+        Self::Source(SourcePart::new(source, title, content))
     }
 }
 

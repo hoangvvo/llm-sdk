@@ -114,9 +114,10 @@ func WithReasoningID(id string) ReasoingPartOption {
 }
 
 // NewSourcePart creates a new source part
-func NewSourcePart(title string, content []Part) Part {
+func NewSourcePart(source string, title string, content []Part) Part {
 	return Part{
 		SourcePart: &SourcePart{
+			Source:  source,
 			Title:   title,
 			Content: content,
 		},

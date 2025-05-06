@@ -65,7 +65,8 @@ func (p Part) Type() PartType {
 
 // TextPart represents a part of the message that contains text.
 type TextPart struct {
-	Text string `json:"text"`
+	Text      string     `json:"text"`
+	Citations []Citation `json:"citations,omitempty"`
 }
 
 // ImagePart represents a part of the message that contains an image.
@@ -100,6 +101,8 @@ type AudioPart struct {
 // SourcePart represents a part of the message that contains a source with structured content.
 // It will be used for citation for supported models.
 type SourcePart struct {
+	// The source URL or identifier of the document.
+	Source string `json:"source"`
 	// The title of the document.
 	Title string `json:"title"`
 	// The content of the document.
@@ -139,6 +142,16 @@ type ReasoningPart struct {
 	Signature *string `json:"signature,omitempty"`
 	// The ID of the reasoning part, if applicable.
 	ID *string `json:"id,omitempty"`
+}
+
+// Citation represents a citation to a source document.
+type Citation struct {
+	// The URL or identifier of the document being cited.
+	Source string `json:"source"`
+	// The start index of the document content part being cited.
+	StartIndex int `json:"start_index"`
+	// The end index of the document content part being cited.
+	EndIndex int `json:"end_index"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Part

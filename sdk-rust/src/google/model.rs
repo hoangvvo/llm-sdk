@@ -495,7 +495,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                         id: None,
                     })))
                 } else {
-                    Some(Ok(Part::Text(crate::TextPart { text })))
+                    Some(Ok(Part::text(text)))
                 }
             } else if let Some(inline_data) = part.inline_data {
                 if let (Some(data), Some(mime_type)) = (inline_data.data, inline_data.mime_type) {

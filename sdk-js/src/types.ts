@@ -137,6 +137,10 @@ export interface AudioPart {
 export interface SourcePart {
   type: "source";
   /**
+   * The source URL or identifier of the document.
+   */
+  source: string;
+  /**
    * The title of the document.
    */
   title: string;
@@ -214,18 +218,18 @@ export interface ReasoningPart {
  */
 export interface Citation {
   /**
-   * The ID of the document being cited.
+   * The URL or identifier of the document being cited.
    */
-  source_id: string;
+  source: string;
 
   /**
    * The start index of the document content part being cited.
    */
-  start_source_part_index: number;
+  start_index: number;
   /**
    * The end index of the document content part being cited.
    */
-  end_source_part_index: number;
+  end_index: number;
 }
 /**
  * Represents a message sent by the user.

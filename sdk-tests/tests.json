@@ -498,6 +498,7 @@
                 "content": [
                   {
                     "type": "source",
+                    "source": "doc1",
                     "title": "my secret number",
                     "content": [
                       {
@@ -524,6 +525,7 @@
             "content": [
               {
                 "type": "source",
+                "source": "doc2",
                 "title": "my secret number",
                 "content": [
                   {

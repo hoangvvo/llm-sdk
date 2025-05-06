@@ -1,7 +1,7 @@
 use crate::{
     audio_utils, AudioFormat, AudioPart, ContentDelta, ImagePart, LanguageModelError,
     LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    ReasoningPart, TextPart, ToolCallPart,
+    ReasoningPart, ToolCallPart,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -182,7 +182,7 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
 
 /// Creates a text part from accumulated text data
 fn create_text_part(data: AccumulatedTextData) -> Part {
-    Part::Text(TextPart { text: data.text })
+    Part::text(data.text)
 }
 
 /// Parses tool call arguments from JSON string

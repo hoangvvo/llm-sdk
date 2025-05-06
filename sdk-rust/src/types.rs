@@ -119,6 +119,8 @@ pub enum LanguageModelCapability {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct TextPart {
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub citations: Option<Vec<Citation>>,
 }
 
 /// A part of the message that contains an image.
@@ -167,6 +169,8 @@ pub struct AudioPart {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct SourcePart {
+    /// The source URL or identifier of the document.
+    pub source: String,
     /// The title of the document.
     pub title: String,
     /// The content of the document.
@@ -218,6 +222,23 @@ pub struct ReasoningPart {
     /// The ID of the reasoning part, if applicable
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct Citation {
+    /**
+     * The URL or identifier of the document being cited.
+     */
+    pub source: String,
+    /**
+     * The start index of the document content part being cited.
+     */
+    pub start_index: usize,
+    /**
+     * The end index of the document content part being cited.
+     */
+    pub end_index: usize,
 }
 
 /// Represents a message sent by the user.

@@ -585,7 +585,7 @@ fn map_openai_message(
     let mut parts = vec![];
 
     if let Some(content) = message.content {
-        parts.push(Part::Text(TextPart { text: content }));
+        parts.push(Part::text(content));
     }
 
     if let Some(tool_calls) = message.tool_calls {
