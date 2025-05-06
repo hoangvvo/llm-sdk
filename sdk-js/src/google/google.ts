@@ -4,6 +4,7 @@ import type {
   GenerateContentConfig,
   Part as GooglePart,
   ModalityTokenCount,
+  PrebuiltVoiceConfig,
   SpeechConfig,
   ThinkingConfig,
   UsageMetadata,
@@ -43,6 +44,7 @@ import type {
   Part,
   PartialModelResponse,
   ReasoningOptions,
+  ReasoningPart,
   ResponseFormatOption,
   TextPart,
   Tool,
@@ -163,9 +165,6 @@ function convertToGenerateContentParameters(
     contents: convertToGoogleContents(messages),
     model: modelId,
     ...extra,
-    config: {
-      ...(extra?.["config"] as object),
-    },
   };
   const config: GenerateContentConfig = {
     ...(extra?.["config"] as object),
@@ -273,14 +272,16 @@ function convertToGoogleParts(part: Part): GooglePart[] {
           },
         },
       ];
-    case "reasoning":
-      return [
-        {
-          text: part.text,
-          thought: true,
-          ...(part.signature && { thoughtSignature: part.signature }),
-        },
-      ];
+    case "reasoning": {
+      const googleReasoningPart: GooglePart = {
+        text: part.text,
+        thought: true,
+      };
+      if (part.signature) {
+        googleReasoningPart.thoughtSignature = part.signature;
+      }
+      return [googleReasoningPart];
+    }
     case "source":
       return part.content.map(convertToGoogleParts).flat();
     case "tool-call":
@@ -393,36 +394,43 @@ function convertToGoogleModality(modality: Modality): string {
 }
 
 function convertToGoogleSpeechConfig(audio: AudioOptions): SpeechConfig {
-  return {
-    voiceConfig: {
-      prebuiltVoiceConfig: {
-        ...(audio.voice && { voiceName: audio.voice }),
-      },
-    },
-    ...(audio.language && { languageCode: audio.language }),
+  const prebuiltVoiceConfig: PrebuiltVoiceConfig = {};
+  if (audio.voice) {
+    prebuiltVoiceConfig.voiceName = audio.voice;
+  }
+  const speechConfig: SpeechConfig = {
+    voiceConfig: { prebuiltVoiceConfig },
   };
+  if (audio.language) {
+    speechConfig.languageCode = audio.language;
+  }
+  return speechConfig;
 }
 
 function convertToGoogleThinkingConfig(
   reasoning: ReasoningOptions,
 ): ThinkingConfig {
-  return {
+  const thinkingConfig: ThinkingConfig = {
     includeThoughts: reasoning.enabled,
-    ...(reasoning.budget_tokens && { thinkingBudget: reasoning.budget_tokens }),
   };
+  if (typeof reasoning.budget_tokens === "number") {
+    thinkingConfig.thinkingBudget = reasoning.budget_tokens;
+  }
+  return thinkingConfig;
 }
 
 function mapGoogleContent(parts: GooglePart[]): Part[] {
   return parts
     .map((googlePart): Part | null => {
       if (googlePart.thought) {
-        return {
+        const reasoningPart: ReasoningPart = {
           type: "reasoning",
           text: googlePart.text ?? "",
-          ...(googlePart.thoughtSignature && {
-            signature: googlePart.thoughtSignature,
-          }),
         };
+        if (googlePart.thoughtSignature) {
+          reasoningPart.signature = googlePart.thoughtSignature;
+        }
+        return reasoningPart;
       }
       if (googlePart.text) {
         return {

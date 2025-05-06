@@ -141,10 +141,11 @@ function convertToCohereChatRequest(
   const request: Cohere.V2ChatRequest = {
     model: modelId,
     messages: cohereMessages,
-    ...(cohereDocuments.length > 0 && { documents: cohereDocuments }),
     ...extra,
   };
-
+  if (cohereDocuments.length > 0) {
+    request.documents = cohereDocuments;
+  }
   if (typeof max_tokens === "number") {
     request.maxTokens = max_tokens;
   }
@@ -453,12 +454,13 @@ function convertToCohereResponseFormat(
 ): Cohere.ResponseFormatV2 {
   switch (responseFormat.type) {
     case "json": {
-      return {
+      const jsonObjectFormat: Cohere.ResponseFormatV2.JsonObject = {
         type: "json_object",
-        ...(responseFormat.schema && {
-          jsonSchema: responseFormat.schema,
-        }),
       };
+      if (responseFormat.schema) {
+        jsonObjectFormat.jsonSchema = responseFormat.schema;
+      }
+      return jsonObjectFormat;
     }
     case "text": {
       return { type: "text" };
@@ -467,10 +469,13 @@ function convertToCohereResponseFormat(
 }
 
 function convertToCohereThinking(reasoning: ReasoningOptions): Cohere.Thinking {
-  return {
+  const cohereThinking: Cohere.Thinking = {
     type: reasoning.enabled ? "enabled" : "disabled",
-    ...(reasoning.budget_tokens && { tokenBudget: reasoning.budget_tokens }),
   };
+  if (typeof reasoning.budget_tokens === "number") {
+    cohereThinking.tokenBudget = reasoning.budget_tokens;
+  }
+  return cohereThinking;
 }
 
 // MARK: To SDK Message

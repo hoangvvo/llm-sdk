@@ -54,19 +54,13 @@ export function createAgent(
     model,
     tools,
     max_turns: 5,
-    ...(options?.temperature !== undefined && {
-      temperature: options.temperature,
-    }),
-    ...(options?.top_p !== undefined && { top_p: options.top_p }),
-    ...(options?.top_k !== undefined && { top_k: options.top_k }),
-    ...(options?.frequency_penalty !== undefined && {
-      frequency_penalty: options.frequency_penalty,
-    }),
-    ...(options?.presence_penalty !== undefined && {
-      presence_penalty: options.presence_penalty,
-    }),
-    ...(modelInfo.modalities && { modalities: modelInfo.modalities }),
-    ...(modelInfo.audio && { audio: modelInfo.audio }),
-    ...(modelInfo.reasoning && { reasoning: modelInfo.reasoning }),
+    temperature: options?.temperature ?? null,
+    top_p: options?.top_p ?? null,
+    top_k: options?.top_k ?? null,
+    frequency_penalty: options?.frequency_penalty ?? null,
+    presence_penalty: options?.presence_penalty ?? null,
+    modalities: modelInfo.modalities ?? null,
+    audio: modelInfo.audio ?? null,
+    reasoning: modelInfo.reasoning ?? null,
   });
 }

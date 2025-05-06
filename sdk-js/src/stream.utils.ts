@@ -1,5 +1,11 @@
 import { InvariantError } from "./errors.ts";
-import type { ContentDelta, Part, PartDelta } from "./types.ts";
+import type {
+  ContentDelta,
+  Part,
+  PartDelta,
+  ReasoningPartDelta,
+  ToolCallPartDelta,
+} from "./types.ts";
 
 /**
  * Because of the difference in mapping, especially in `OpenAI` cases,
@@ -77,23 +83,35 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
       return part;
     case "audio":
       return part;
-    case "tool-call":
-      return {
-        type: "tool-call",
-        ...(part.tool_call_id && { tool_call_id: part.tool_call_id }),
-        ...(part.tool_name && { tool_name: part.tool_name }),
-        ...(typeof part.args === "object" && {
-          args: JSON.stringify(part.args),
-        }),
-        ...(part.id && { id: part.id }),
-      };
-    case "reasoning":
-      return {
+    case "tool-call": {
+      const toolCall: ToolCallPartDelta = { type: "tool-call" };
+      if (part.tool_call_id) {
+        toolCall.tool_call_id = part.tool_call_id;
+      }
+      if (part.tool_name) {
+        toolCall.tool_name = part.tool_name;
+      }
+      if (typeof part.args === "object") {
+        toolCall.args = JSON.stringify(part.args);
+      }
+      if (part.id) {
+        toolCall.id = part.id;
+      }
+      return toolCall;
+    }
+    case "reasoning": {
+      const reasoning: ReasoningPartDelta = {
         type: "reasoning",
         text: part.text,
-        ...(part.signature && { signature: part.signature }),
-        ...(part.id && { id: part.id }),
       };
+      if (part.signature) {
+        reasoning.signature = part.signature;
+      }
+      if (part.id) {
+        reasoning.id = part.id;
+      }
+      return reasoning;
+    }
     case "image":
       return part;
     default: {

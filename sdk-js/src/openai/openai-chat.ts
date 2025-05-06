@@ -485,17 +485,19 @@ function convertToOpenAIResponseFormat(
   switch (responseFormat.type) {
     case "json": {
       if (responseFormat.schema) {
-        return {
+        const responseFormatJsonSchema: OpenAI.ResponseFormatJSONSchema = {
           type: "json_schema",
           json_schema: {
             name: responseFormat.name,
-            ...(responseFormat.description && {
-              description: responseFormat.description,
-            }),
             schema: responseFormat.schema,
             strict: true,
           },
         };
+        if (responseFormat.description) {
+          responseFormatJsonSchema.json_schema.description =
+            responseFormat.description;
+        }
+        return responseFormatJsonSchema;
       }
       return {
         type: "json_object",

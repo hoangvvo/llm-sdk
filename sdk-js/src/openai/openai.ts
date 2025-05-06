@@ -14,6 +14,7 @@ import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import type {
   AssistantMessage,
   ContentDelta,
+  ImagePart,
   ImagePartDelta,
   LanguageModelInput,
   Message,
@@ -22,10 +23,12 @@ import type {
   Part,
   PartialModelResponse,
   ReasoningOptions,
+  ReasoningPart,
   ReasoningPartDelta,
   ResponseFormatOption,
   TextPartDelta,
   Tool,
+  ToolCallPart,
   ToolCallPartDelta,
   ToolChoiceOption,
   ToolMessage,
@@ -285,8 +288,8 @@ function convertAssistantMessageToResponseInputItems(
             },
           ],
         };
-      case "reasoning":
-        return {
+      case "reasoning": {
+        const responseInputItem: OpenAI.Responses.ResponseInputItem = {
           type: "reasoning",
           id: part.id ?? "",
           summary: [
@@ -295,12 +298,13 @@ function convertAssistantMessageToResponseInputItems(
               text: part.text,
             },
           ],
-          // ReasoningInputItem can not have content
           content: [],
-          ...(part.signature && {
-            encrypted_content: part.signature,
-          }),
         };
+        if (part.signature) {
+          responseInputItem.encrypted_content = part.signature;
+        }
+        return responseInputItem;
+      }
       case "image":
         return {
           id: part.id ?? "",
@@ -308,14 +312,18 @@ function convertAssistantMessageToResponseInputItems(
           status: "completed",
           result: `data:${part.mime_type};base64,${part.image_data}`,
         };
-      case "tool-call":
-        return {
+      case "tool-call": {
+        const responseInputItem: OpenAI.Responses.ResponseInputItem = {
           type: "function_call",
           call_id: part.tool_call_id,
           name: part.tool_name,
           arguments: JSON.stringify(part.args),
-          ...(part.id && { id: part.id }),
         };
+        if (part.id) {
+          responseInputItem.id = part.id;
+        }
+        return responseInputItem;
+      }
       default:
         throw new UnsupportedError(
           PROVIDER,
@@ -405,16 +413,17 @@ function convertToOpenAIResponseTextConfig(
   switch (responseFormat.type) {
     case "json": {
       if (responseFormat.schema) {
+        const format: OpenAI.Responses.ResponseFormatTextConfig = {
+          type: "json_schema",
+          name: responseFormat.name,
+          schema: responseFormat.schema,
+          strict: true,
+        };
+        if (responseFormat.description) {
+          format.description = responseFormat.description;
+        }
         return {
-          format: {
-            type: "json_schema",
-            name: responseFormat.name,
-            ...(responseFormat.description && {
-              description: responseFormat.description,
-            }),
-            schema: responseFormat.schema,
-            strict: true,
-          },
+          format,
         };
       }
       return {
@@ -485,15 +494,16 @@ function mapOpenAIOutputItems(
           });
         }
         case "function_call": {
-          return [
-            {
-              type: "tool-call",
-              args: JSON.parse(item.arguments) as Record<string, unknown>,
-              tool_call_id: item.call_id,
-              tool_name: item.name,
-              ...(item.id && { id: item.id }),
-            },
-          ];
+          const toolCallPart: ToolCallPart = {
+            type: "tool-call",
+            args: JSON.parse(item.arguments) as Record<string, unknown>,
+            tool_call_id: item.call_id,
+            tool_name: item.name,
+          };
+          if (item.id) {
+            toolCallPart.id = item.id;
+          }
+          return [toolCallPart];
         }
         case "image_generation_call": {
           const patchedItem = item as OpenAIPatchedResponsesImageGenerationCall;
@@ -511,29 +521,33 @@ function mapOpenAIOutputItems(
             [width, height] = patchedItem.size.split("x").map(Number);
           }
 
-          return [
-            {
-              type: "image",
-              image_data: patchedItem.result,
-              mime_type: `image/${patchedItem.output_format}`,
-              ...(width && { width }),
-              ...(height && { height }),
-              ...(item.id && { id: item.id }),
-            },
-          ];
+          const imagePart: ImagePart = {
+            type: "image",
+            image_data: patchedItem.result,
+            mime_type: `image/${patchedItem.output_format}`,
+          };
+          if (typeof width === "number") {
+            imagePart.width = width;
+          }
+          if (typeof height === "number") {
+            imagePart.height = height;
+          }
+          if (item.id) {
+            imagePart.id = item.id;
+          }
+          return [imagePart];
         }
         case "reasoning": {
           const summary = item.summary.map((s) => s.text).join("\n");
-          return [
-            {
-              type: "reasoning",
-              text: summary,
-              id: item.id,
-              ...(item.encrypted_content && {
-                signature: item.encrypted_content,
-              }),
-            },
-          ];
+          const reasoningPart: ReasoningPart = {
+            type: "reasoning",
+            text: summary,
+            id: item.id,
+          };
+          if (item.encrypted_content) {
+            reasoningPart.signature = item.encrypted_content;
+          }
+          return [reasoningPart];
         }
         default: {
           return [];
@@ -565,18 +579,21 @@ function mapOpenAIStreamEvent(
     }
     case "response.output_item.added": {
       if (event.item.type === "function_call") {
-        const part: ToolCallPartDelta = {
+        const toolCallPartDelta: ToolCallPartDelta = {
           type: "tool-call",
           args: event.item.arguments,
           tool_name: event.item.name,
           tool_call_id: event.item.call_id,
-          ...(event.item.id && { id: event.item.id }),
         };
+        if (event.item.id) {
+          toolCallPartDelta.id = event.item.id;
+        }
         const index = event.output_index;
-        return {
+        const contentDelta: ContentDelta = {
           index,
-          part,
+          part: toolCallPartDelta,
         };
+        return contentDelta;
       }
 
       if (event.item.type === "reasoning") {
@@ -633,22 +650,28 @@ function mapOpenAIStreamEvent(
         [width, height] = patchedEvent.size.split("x").map(Number);
       }
 
-      const part: ImagePartDelta = {
+      const imagePartDelta: ImagePartDelta = {
         type: "image",
         image_data: patchedEvent.partial_image_b64,
-        ...(patchedEvent.output_format && {
-          mime_type: `image/${patchedEvent.output_format}`,
-        }),
-        ...(width && { width }),
-        ...(height && { height }),
-        ...(patchedEvent.item_id && { id: patchedEvent.item_id }),
       };
-
+      if (patchedEvent.output_format) {
+        imagePartDelta.mime_type = `image/${patchedEvent.output_format}`;
+      }
+      if (typeof width === "number") {
+        imagePartDelta.width = width;
+      }
+      if (typeof height === "number") {
+        imagePartDelta.height = height;
+      }
+      if (patchedEvent.item_id) {
+        imagePartDelta.id = patchedEvent.item_id;
+      }
       const index = event.output_index;
-      return {
+      const contentDelta: ContentDelta = {
         index,
-        part,
+        part: imagePartDelta,
       };
+      return contentDelta;
     }
 
     case "response.reasoning_text.delta": {

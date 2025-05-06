@@ -6,14 +6,18 @@ import {
 import { InvariantError } from "./errors.ts";
 import type {
   AudioFormat,
+  AudioPart,
   ContentDelta,
+  ImagePart,
   ImagePartDelta,
   ModelResponse,
   ModelUsage,
   Part,
   PartialModelResponse,
+  ReasoningPart,
   ReasoningPartDelta,
   TextPartDelta,
+  ToolCallPart,
   ToolCallPartDelta,
 } from "./types.ts";
 import { sumModelUsage } from "./usage.utils.ts";
@@ -49,47 +53,63 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
         text: delta.part.text,
       };
 
-    case "tool-call":
-      return {
+    case "tool-call": {
+      const toolCallPartDelta: ToolCallPartDelta = {
         type: "tool-call",
         tool_name: delta.part.tool_name ?? "",
-        ...(delta.part.tool_call_id && {
-          tool_call_id: delta.part.tool_call_id,
-        }),
         args: delta.part.args ?? "",
-        ...(delta.part.id && { id: delta.part.id }),
       };
+      if (delta.part.tool_call_id) {
+        toolCallPartDelta.tool_call_id = delta.part.tool_call_id;
+      }
+      if (delta.part.id) {
+        toolCallPartDelta.id = delta.part.id;
+      }
+      return toolCallPartDelta;
+    }
 
-    case "image":
-      return {
+    case "image": {
+      const imagePartDelta: ImagePartDelta = {
         type: "image",
         image_data: delta.part.image_data ?? "",
-        ...(delta.part.mime_type && { mime_type: delta.part.mime_type }),
-        ...(typeof delta.part.width === "number" && {
-          width: delta.part.width,
-        }),
-        ...(typeof delta.part.height === "number" && {
-          height: delta.part.height,
-        }),
-        ...(delta.part.id && { id: delta.part.id }),
       };
+      if (delta.part.mime_type) {
+        imagePartDelta.mime_type = delta.part.mime_type;
+      }
+      if (typeof delta.part.width === "number") {
+        imagePartDelta.width = delta.part.width;
+      }
+      if (typeof delta.part.height === "number") {
+        imagePartDelta.height = delta.part.height;
+      }
+      if (delta.part.id) {
+        imagePartDelta.id = delta.part.id;
+      }
+      return imagePartDelta;
+    }
 
-    case "audio":
-      return {
+    case "audio": {
+      const audioData: AccumulatedAudioData = {
         type: "audio",
         audioDataChunks: delta.part.audio_data ? [delta.part.audio_data] : [],
-        ...(delta.part.format && { format: delta.part.format }),
-        ...(typeof delta.part.sample_rate === "number" && {
-          sampleRate: delta.part.sample_rate,
-        }),
-        ...(typeof delta.part.channels === "number" && {
-          channels: delta.part.channels,
-        }),
-        ...(delta.part.transcript && {
-          transcript: delta.part.transcript,
-        }),
-        ...(delta.part.id && { id: delta.part.id }),
       };
+      if (delta.part.format) {
+        audioData.format = delta.part.format;
+      }
+      if (typeof delta.part.sample_rate === "number") {
+        audioData.sampleRate = delta.part.sample_rate;
+      }
+      if (typeof delta.part.channels === "number") {
+        audioData.channels = delta.part.channels;
+      }
+      if (delta.part.transcript) {
+        audioData.transcript = delta.part.transcript;
+      }
+      if (delta.part.id) {
+        audioData.id = delta.part.id;
+      }
+      return audioData;
+    }
 
     case "reasoning":
       return {
@@ -216,13 +236,16 @@ function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
   }
 
   try {
-    return {
+    const toolCalPart: ToolCallPart = {
       type: "tool-call",
       tool_call_id: data.tool_call_id,
       tool_name: data.tool_name,
       args: JSON.parse(data.args ?? "{}") as Record<string, unknown>,
-      ...(data.id && { id: data.id }),
     };
+    if (data.id) {
+      toolCalPart.id = data.id;
+    }
+    return toolCalPart;
   } catch (e) {
     throw new InvariantError(
       "",
@@ -239,14 +262,21 @@ function createImagePart(data: ImagePartDelta, index: number): Part {
     );
   }
 
-  return {
+  const imagePart: ImagePart = {
     type: "image",
     image_data: data.image_data,
     mime_type: data.mime_type,
-    ...(data.width && { width: data.width }),
-    ...(data.height && { height: data.height }),
-    ...(data.id && { id: data.id }),
   };
+  if (typeof data.width === "number") {
+    imagePart.width = data.width;
+  }
+  if (typeof data.height === "number") {
+    imagePart.height = data.height;
+  }
+  if (data.id) {
+    imagePart.id = data.id;
+  }
+  return imagePart;
 }
 
 /**
@@ -264,27 +294,41 @@ function createAudioPart(data: AccumulatedAudioData): Part {
   const concatenated = mergeInt16Arrays(audioArrays);
   const audioData = arrayBufferToBase64(concatenated);
 
-  return {
+  const audioPart: AudioPart = {
     type: "audio",
     audio_data: audioData,
     format: data.format,
-    ...(data.sampleRate && { sample_rate: data.sampleRate }),
-    ...(data.channels && { channels: data.channels }),
-    ...(data.transcript && { transcript: data.transcript }),
-    ...(data.id && { id: data.id }),
   };
+  if (typeof data.sampleRate === "number") {
+    audioPart.sample_rate = data.sampleRate;
+  }
+  if (typeof data.channels === "number") {
+    audioPart.channels = data.channels;
+  }
+  if (data.transcript) {
+    audioPart.transcript = data.transcript;
+  }
+  if (data.id) {
+    audioPart.id = data.id;
+  }
+  return audioPart;
 }
 
 /**
  * Creates a reasoning part from accumulated reasoning data
  */
 function createReasoningPart(data: ReasoningPartDelta): Part {
-  return {
+  const reasoningPart: ReasoningPart = {
     type: "reasoning",
     text: data.text,
-    ...(data.signature && { signature: data.signature }),
-    ...(data.id && { id: data.id }),
   };
+  if (data.signature) {
+    reasoningPart.signature = data.signature;
+  }
+  if (data.id) {
+    reasoningPart.id = data.id;
+  }
+  return reasoningPart;
 }
 
 /**
@@ -336,14 +380,14 @@ export class StreamAccumulator {
     const content = Array.from(this.#accumulatedParts.entries())
       .sort(([a], [b]) => a - b)
       .map(([index, data]) => createPart(data, index));
-
-    return {
-      content,
-      ...(this.#accumulatedUsage && { usage: this.#accumulatedUsage }),
-      ...(this.#accumulatedCost !== undefined && {
-        cost: this.#accumulatedCost,
-      }),
-    };
+    const response: ModelResponse = { content };
+    if (this.#accumulatedUsage) {
+      response.usage = this.#accumulatedUsage;
+    }
+    if (this.#accumulatedCost !== undefined) {
+      response.cost = this.#accumulatedCost;
+    }
+    return response;
   }
 
   /**
