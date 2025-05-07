@@ -2,13 +2,15 @@
 title: Image generation
 ---
 
-import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goGenerateImageCode from "../../../../../sdk-go/examples/generate-image/main.go?raw";
+import jsGenerateImageCode from "../../../../../sdk-js/examples/generate-image.ts?raw";
+import rustGenerateImageCode from "../../../../../sdk-rust/examples/generate-image.rs?raw";
 import {
   extractGoTypes,
-  extractTypescriptTypes,
   extractRustTypes,
+  extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
-import jsGenerateImageCode from "../../../../../sdk-js/examples/generate-image.ts?raw";
 
 Image modality is represented as `ImagePart`s.
 
@@ -47,6 +49,20 @@ Depending on the provider, you may have to pass additional parameters to their A
       code={jsGenerateImageCode}
       lang="typescript"
       title="generate-image.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={rustGenerateImageCode}
+      lang="rust"
+      title="generate-image.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={goGenerateImageCode}
+      lang="go"
+      title="main.go"
     />
   </TabItem>
 </Tabs>

@@ -30,6 +30,7 @@ if (!imagePart) {
 const fileName = `sunset.${imagePart.mime_type.split("/")[1] ?? "png"}`;
 
 await writeFile(fileName, imagePart.image_data, { encoding: "base64" });
+console.log(`Saved image to ${fileName}`);
 
 await open(fileName);
 

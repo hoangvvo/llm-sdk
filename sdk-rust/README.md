@@ -87,6 +87,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`stream-text`: Stream text](./examples/stream-text.rs)
 - [`generate-audio`: Generate audio](./examples/generate-audio.rs)
 - [`stream-audio`: Stream audio](./examples/stream-audio.rs)
+- [`generate-image`: Generate image](./examples/generate-image.rs)
 - [`describe-image`: Describe image](./examples/describe-image.rs)
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio.rs)
 - [`tool-use`: Function calling](./examples/tool-use.rs)

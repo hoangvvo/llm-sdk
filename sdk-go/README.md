@@ -103,6 +103,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`stream-text`: Stream text](./examples/stream-text/main.go)
 - [`generate-audio`: Generate audio](./examples/generate-audio/main.go)
 - [`stream-audio`: Stream audio](./examples/stream-audio/main.go)
+- [`generate-image`: Generate image](./examples/generate-image/main.go)
 - [`describe-image`: Describe image](./examples/describe-image/main.go)
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio/main.go)
 - [`tool-use`: Function calling](./examples/tool-use/main.go)
