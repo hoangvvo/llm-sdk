@@ -31,6 +31,18 @@ Below is an example of how to implement an agent in each language:
 
 ## Agent Patterns
 
-Unlike other agent frameworks, this library does not hardcode any hidden prompt templates or parsing logic. This design choice avoids unnecessary constraints, reduces complexity, and prevents the loss of control that comes with excessive abstraction (see this [blog post](https://hamel.dev/blog/posts/prompt/) for a deeper discussion).
+This agent **library** (not *framework*) is designed for transparency and control.
+Unlike many “agentic” frameworks, it ships with no hidden prompt templates or secret parsing rules—and that’s on purpose:
 
-However, this prevents the library from implementing specific agent patterns, such as hand-off, memory, and others. The examples folder in each agent library contains implementations of various agent patterns to serve as references.
+- Nothing hidden – What you write is what runs. No secret prompts or “special sauce” behind the scenes, so your instructions aren’t quietly overridden.
+- Works in any language – Many frameworks bake in English-only prompts. Here, the model sees only your words, whether they’re in English or not.
+- Easy to tweak – Change prompts, parsing, or flow without fighting built-in defaults.
+- Less to debug – Fewer layers mean you can trace exactly where things break.
+
+LLM in the past was not as powerful as today, so frameworks had to do a lot of heavy lifting to get decent results.
+But with modern LLMs, much of that complexity is no longer necessary.
+
+Because we keep the core minimal (500 LOC!), the library doesn’t bundle heavy agent patterns like hand-off, memory, or planners.
+Instead, the `examples/` folder shows clean, working references you can copy or adapt to see that it can still be used to build complex use cases.
+
+Check out this [blog post](https://hamel.dev/blog/posts/prompt/) for more discussion on this design philosophy.

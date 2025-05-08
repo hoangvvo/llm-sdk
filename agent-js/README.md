@@ -188,6 +188,7 @@ Find examples in the [examples](./examples/) folder:
 - [`tools`: Executable tools](./examples/tools.ts)
 - [`structured-output`: Structured Output](./examples/structured-output.ts)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.ts)
+- [`memory`: Memory pattern (core + archival)](./examples/memory.ts)
 
 ```bash
 node examples/agent.ts

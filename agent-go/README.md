@@ -235,6 +235,7 @@ Find examples in the [examples](./examples/) folder:
 - [`tools`: Executable tools](./examples/tools/main.go)
 - [`structured-output`: Structured Output](./examples/structured-output/main.go)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation/main.go)
+- [`memory`: Memory pattern (core + archival)](./examples/memory/main.go)
 
 ```bash
 go run ./examples/agent

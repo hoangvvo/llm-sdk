@@ -1,0 +1,45 @@
+---
+title: Agent memory
+---
+
+import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goMemoryCode from "../../../../../agent-go/examples/memory/main.go?raw";
+import jsMemoryCode from "../../../../../agent-js/examples/memory.ts?raw";
+import rustMemoryCode from "../../../../../agent-rust/examples/memory.rs?raw";
+
+<Aside>
+  This is an agent pattern that requires custom implementation. [Why?](/agent/#agent-patterns)
+</Aside>
+
+The Memory pattern enables an agent to retain information learned from earlier interactions and use it later.
+It is inspired by the _MemGPT_ paper, which defines two memory types:
+
+- **Core memory**: Small, high‑value facts always included in the prompt (e.g., _user name_, _key preferences_). Updated via a tool; injected into the system context each turn.
+- **Archival memory**: Larger, long‑tail information stored externally and retrieved on demand (e.g., _detailed notes_, _historical results_). Not included by default; the agent searches it explicitly when needed.
+
+There are certain use cases where memory is beneficial:
+
+- **Personalization**: Persist user preferences or profile details.
+- **Long‑running tasks**: Track decisions or partial results across sessions.
+- **Knowledge recall**: Store and retrieve references, notes, or summaries.
+
+How archival memory works (vector search):
+
+1. **Chunking**: Split information into manageable text chunks.
+2. **Embedding**: Convert each chunk into a vector using an embedding model (e.g., _text-embedding-3-small_).
+3. **Storage**: Save vectors in a database optimized for similarity search.
+4. **Retrieval**: Embed the query and return the most similar stored chunks.
+
+The examples below demonstrate a basic in‑memory core store and a placeholder archival search (ready to replace with a vector DB).
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsMemoryCode} lang="typescript" title="memory.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustMemoryCode} lang="rust" title="memory.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goMemoryCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>

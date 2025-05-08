@@ -213,6 +213,7 @@ Find examples in the [examples](./examples/) folder:
 - [`tools`: Executable tools](./examples/tools.rs)
 - [`structured-output`: Structured Output](./examples/structured-output.rs)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.rs)
+- [`memory`: Memory pattern (core + archival)](./examples/memory.rs)
 
 ```bash
 cargo run --example agent

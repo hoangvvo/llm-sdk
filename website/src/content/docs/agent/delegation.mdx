@@ -1,0 +1,34 @@
+---
+title: Agents delegation
+---
+
+import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goAgentsDelegationCode from "../../../../../agent-go/examples/agents-delegation/main.go?raw";
+import jsAgentsDelegationCode from "../../../../../agent-js/examples/agents-delegation.ts?raw";
+import rustAgentsDelegationCode from "../../../../../agent-rust/examples/agents-delegation.rs?raw";
+
+<Aside>
+  This is an agent pattern that requires custom implementation. [Why?](/agent/#agent-patterns)
+</Aside>
+
+Agents delegation (also called the orchestration pattern) lets one agent hand off work to other, more specialized agents and aggregate their results. Splitting capability across focused agents keeps prompts smaller and instructions clearer, which generally makes responses faster and more accurate; by contrast, overloading a single agent with too many instructions and responsibilities can increase latency, cost, and the risk of inaccuracy or hallucination.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsAgentsDelegationCode}
+      lang="typescript"
+      title="agents-delegation.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={rustAgentsDelegationCode}
+      lang="rust"
+      title="agents-delegation.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goAgentsDelegationCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
