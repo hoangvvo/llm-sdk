@@ -1,4 +1,6 @@
-import { Agent, tool, type AgentItem } from "@hoangvvo/llm-agent";
+import { Agent, type AgentItem } from "@hoangvvo/llm-agent";
+import { zodTool } from "@hoangvvo/llm-agent/zod";
+import { z } from "zod";
 import { getModel } from "./get-model.ts";
 
 // Memory pattern example: provide tools + instructions for core/archival memory.
@@ -57,19 +59,11 @@ For less important or long-tail info, use archival_memory_search before answerin
     async () => coreMemoryPrompt(store.fetchCore()),
   ],
   tools: [
-    tool<void, { id: string; content: string }>({
+    zodTool({
       name: "core_memory_update",
       description:
         "Update or add a core memory block. Returns all core memories after the update.",
-      parameters: {
-        type: "object",
-        properties: {
-          id: { type: "string" },
-          content: { type: "string" },
-        },
-        required: ["id", "content"],
-        additionalProperties: false,
-      },
+      parameters: z.object({ id: z.string(), content: z.string() }),
       async execute({ id, content }) {
         console.log(
           `[memory.core_memory_update] id=${id} len=${content.length}`,
@@ -86,15 +80,10 @@ For less important or long-tail info, use archival_memory_search before answerin
         };
       },
     }),
-    tool<void, { query: string }>({
+    zodTool({
       name: "archival_memory_search",
       description: "Search for memories in the archival memory",
-      parameters: {
-        type: "object",
-        properties: { query: { type: "string" } },
-        required: ["query"],
-        additionalProperties: false,
-      },
+      parameters: z.object({ query: z.string() }),
       async execute({ query }) {
         console.log(`[memory.archival_memory_search] query="${query}"`);
         // TODO: Replace with semantic vector search using embeddings.
@@ -105,15 +94,10 @@ For less important or long-tail info, use archival_memory_search before answerin
         };
       },
     }),
-    tool<void, { id: string; content: string }>({
+    zodTool({
       name: "archival_memory_update",
       description: "Update or add a memory block in the archival memory",
-      parameters: {
-        type: "object",
-        properties: { id: { type: "string" }, content: { type: "string" } },
-        required: ["id", "content"],
-        additionalProperties: false,
-      },
+      parameters: z.object({ id: z.string(), content: z.string() }),
       async execute({ id, content }) {
         console.log(
           `[memory.archival_memory_update] id=${id} len=${content.length}`,

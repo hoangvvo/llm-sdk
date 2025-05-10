@@ -9,6 +9,7 @@ replace github.com/hoangvvo/llm-sdk/sdk-go => ../sdk-go
 require (
 	github.com/hoangvvo/llm-sdk/sdk-go v0.0.0-00010101000000-000000000000
 	github.com/joho/godotenv v1.5.1
+	github.com/sergi/go-diff v1.3.1
 )
 
 require (

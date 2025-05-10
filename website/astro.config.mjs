@@ -53,6 +53,7 @@ export default defineConfig({
             { slug: "agent/structured-output" },
             { slug: "agent/delegation" },
             { slug: "agent/memory" },
+            { slug: "agent/artifacts" },
             { slug: "agent/testing" },
           ],
         },
