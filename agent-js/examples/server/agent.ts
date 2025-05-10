@@ -1,6 +1,7 @@
 import { Agent, type InstructionParam } from "@hoangvvo/llm-agent";
 import type { LanguageModel } from "@hoangvvo/llm-sdk";
 import type { ModelInfo } from "../get-model.ts";
+import { getArtifactTools } from "./artifacts.tools.ts";
 import type { MyContext } from "./context.ts";
 import { getCryptoPriceTool, getStockPriceTool } from "./finance.tools.ts";
 import { getNewsTool, searchWikipediaTool } from "./information.tools.ts";
@@ -14,6 +15,8 @@ To access certain tools, the user may have to provide corresponding API keys in 
 The user location is ${context.location ?? "<not provided>"}.
 The user speaks ${context.language ?? "<not provided>"} language.`,
   () => `The current date is ${new Date().toDateString()}.`,
+  `For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).
+Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`,
 ];
 
 export const availableTools = [
@@ -23,6 +26,7 @@ export const availableTools = [
   getNewsTool,
   getCoordinatesTool,
   getWeatherTool,
+  ...getArtifactTools(),
 ];
 
 // Create a new instance of Agent for the request
@@ -33,20 +37,21 @@ export function createAgent(
   options?: {
     enabledTools?: string[] | undefined;
     disabledInstructions?: boolean | undefined;
-    temperature?: number | undefined;
-    top_p?: number | undefined;
-    top_k?: number | undefined;
-    frequency_penalty?: number | undefined;
-    presence_penalty?: number | undefined;
+    temperature?: number;
+    top_p?: number;
+    top_k?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
   },
 ): Agent<MyContext> {
-  const enabledTools = options?.enabledTools;
+  const { enabledTools, disabledInstructions, ...agentParams } = options ?? {};
+
   const toolNameSet = enabledTools ? new Set(enabledTools) : null;
   const tools =
     toolNameSet === null
       ? availableTools
       : availableTools.filter((tool) => toolNameSet.has(tool.name));
-  const agentInstructions = options?.disabledInstructions ? [] : instructions;
+  const agentInstructions = disabledInstructions ? [] : instructions;
 
   return new Agent<MyContext>({
     name: "MyAgent",
@@ -54,13 +59,9 @@ export function createAgent(
     model,
     tools,
     max_turns: 5,
-    temperature: options?.temperature ?? null,
-    top_p: options?.top_p ?? null,
-    top_k: options?.top_k ?? null,
-    frequency_penalty: options?.frequency_penalty ?? null,
-    presence_penalty: options?.presence_penalty ?? null,
-    modalities: modelInfo.modalities ?? null,
-    audio: modelInfo.audio ?? null,
-    reasoning: modelInfo.reasoning ?? null,
+    ...(modelInfo.audio && { audio: modelInfo.audio }),
+    ...(modelInfo.reasoning && { reasoning: modelInfo.reasoning }),
+    ...(modelInfo.modalities && { modalities: modelInfo.modalities }),
+    ...agentParams,
   });
 }

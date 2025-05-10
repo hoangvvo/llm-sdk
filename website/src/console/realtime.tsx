@@ -7,6 +7,7 @@ import {
   type ModelOption,
   type ModelSelection,
 } from "./components/sidebar.tsx";
+import { reduceArtifactsFromToolParts } from "./lib/artifacts.ts";
 import {
   normalizeBaseUrl,
   parseExampleServerUrls,
@@ -345,6 +346,9 @@ export function RealtimeApp() {
           console.error("Failed to play streaming audio", err);
         }
       },
+      onToolResult: (_toolName, parts) => {
+        setUserContext((prev) => reduceArtifactsFromToolParts(prev, parts));
+      },
     },
   );
 
@@ -550,7 +554,7 @@ export function RealtimeApp() {
           </div>
         </div>
       </section>
-      <section className="h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
         <ChatPane items={allItems} streamingParts={streamingParts} />
       </section>
       <Sidebar

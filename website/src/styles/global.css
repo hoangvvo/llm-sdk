@@ -2,6 +2,32 @@
 
 @import "tailwindcss";
 
+/* Global scrollbar styling to match console aesthetic */
+@layer base {
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(148 163 184 / 0.35) transparent; /* lighter slate-400 */
+  }
+
+  /* WebKit */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: rgb(148 163 184 / 0.35); /* lighter slate-400 */
+    border-radius: 0; /* squared to match aesthetic */
+    border: 0;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(148 163 184 / 0.55);
+  }
+}
+
 @layer components {
   .console-section-title {
     @apply text-xs tracking-[0.3em] text-slate-500 uppercase;

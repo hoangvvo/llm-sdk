@@ -13,7 +13,7 @@ interface ChatPaneProps {
 
 export function ChatPane({ items, streamingParts }: ChatPaneProps) {
   return (
-    <div className="flex-1 space-y-6 overflow-x-hidden overflow-y-auto px-8 py-6">
+    <div className="min-h-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto px-4 py-6">
       {items.length === 0 && streamingParts.length === 0 ? (
         <div className="console-placeholder p-10">
           <SecurityBanner />
@@ -117,7 +117,9 @@ function ConversationItem({ item }: { item: AgentItem }) {
           </div>
           <div>
             <div className="console-subheading">Output</div>
-            <PartsList parts={tool.output} />
+            <div className="max-h-[100px] overflow-y-auto">
+              <PartsList parts={tool.output} />
+            </div>
           </div>
           {tool.is_error ? (
             <div className="console-subheading mt-3 text-rose-500!">
@@ -171,7 +173,7 @@ function PartView({ part }: { part: Part }) {
             Requested tool
           </div>
           <div className="mt-2 text-amber-700">{part.tool_name}</div>
-          <div className="mt-3 text-[11px] break-words whitespace-pre-wrap text-amber-800">
+          <div className="mt-3 max-h-[100px] overflow-y-auto text-[11px] break-words whitespace-pre-wrap text-amber-800">
             {JSON.stringify(part.args, null, 2)}
           </div>
         </div>

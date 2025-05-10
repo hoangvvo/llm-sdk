@@ -79,18 +79,18 @@ export function Sidebar({
           apiKeys={apiKeys}
           onSaveApiKey={onSaveApiKey}
         />
-        <AgentBehaviorSection
-          behavior={behavior}
-          onChange={onBehaviorChange}
-          disabledInstructions={disabledInstructions}
-          onDisabledInstructionsChange={onDisabledInstructionsChange}
-        />
         <ToolSection
           tools={tools}
           enabledTools={enabledTools}
           onEnabledToolsChange={onEnabledToolsChange}
           errorMessage={toolErrorMessage}
           initialized={toolsInitialized}
+        />
+        <AgentBehaviorSection
+          behavior={behavior}
+          onChange={onBehaviorChange}
+          disabledInstructions={disabledInstructions}
+          onDisabledInstructionsChange={onDisabledInstructionsChange}
         />
         <ContextSection context={context} onChange={onContextChange} />
       </div>

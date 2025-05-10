@@ -1,5 +1,6 @@
 import type { AudioPartDelta, Part } from "@hoangvvo/llm-sdk";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArtifactsPane } from "./components/artifacts-pane.tsx";
 import { ChatPane } from "./components/chat-pane.tsx";
 import { Composer } from "./components/composer.tsx";
 import { EventsPane } from "./components/events-pane.tsx";
@@ -8,6 +9,7 @@ import {
   type ModelOption,
   type ModelSelection,
 } from "./components/sidebar.tsx";
+import { reduceArtifactsFromToolParts } from "./lib/artifacts.ts";
 import {
   normalizeBaseUrl,
   parseExampleServerUrls,
@@ -287,7 +289,12 @@ export function ChatApp() {
       agentBehavior,
       toolsInitialized,
     },
-    { onAudioDelta: handleAudioDelta },
+    {
+      onAudioDelta: handleAudioDelta,
+      onToolResult: (_toolName, parts) => {
+        setUserContext((prev) => reduceArtifactsFromToolParts(prev, parts));
+      },
+    },
   );
 
   const allItems = useMemo(() => [...items, ...nextItems], [items, nextItems]);
@@ -341,7 +348,24 @@ export function ChatApp() {
             </div>
           </header>
           {activeTab === "chat" ? (
-            <ChatPane items={allItems} streamingParts={streamingParts} />
+            <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-1 p-2">
+              <div className="col-span-2 flex h-full min-h-0 min-w-0">
+                <ChatPane items={allItems} streamingParts={streamingParts} />
+              </div>
+              <div className="col-span-1 flex h-full min-w-0 flex-col">
+                <ArtifactsPane
+                  artifacts={userContext.artifacts}
+                  onDelete={(id) => {
+                    setUserContext((prev) => ({
+                      ...prev,
+                      artifacts: (prev.artifacts ?? []).filter(
+                        (a) => a.id !== id,
+                      ),
+                    }));
+                  }}
+                />
+              </div>
+            </div>
           ) : (
             <EventsPane events={eventLog} />
           )}

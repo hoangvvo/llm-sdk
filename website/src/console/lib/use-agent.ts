@@ -33,6 +33,11 @@ interface UseAgentConfig<Context> {
 
 interface UseAgentOptions {
   onAudioDelta?: (delta: AudioPartDelta) => void | Promise<void>;
+  onToolResult?: (
+    toolName: string,
+    output: Part[],
+    input: Record<string, unknown>,
+  ) => void | Promise<void>;
 }
 
 interface ConversationSendOptions {
@@ -226,6 +231,23 @@ export function useAgent<Context>(
             setNextItems((prev) => [...prev, newItem]);
             pendingItems.push(newItem);
             setStreamingParts([]);
+            // Notify tool results so client can update local context
+            if (newItem.type === "tool") {
+              const toolItem = newItem as unknown as {
+                tool_name: string;
+                output: Part[];
+                input: Record<string, unknown>;
+              };
+              try {
+                await options.onToolResult?.(
+                  toolItem.tool_name,
+                  toolItem.output,
+                  toolItem.input,
+                );
+              } catch (err) {
+                console.error("onToolResult handler failed", err);
+              }
+            }
             continue;
           }
         }
