@@ -49,7 +49,7 @@ export default defineConfig({
             { slug: "agent/agent" },
             { slug: "agent/instructions" },
             { slug: "agent/tools" },
-            { slug: "agent/execution" },
+            { slug: "agent/run" },
             { slug: "agent/structured-output" },
             { slug: "agent/delegation" },
             { slug: "agent/memory" },

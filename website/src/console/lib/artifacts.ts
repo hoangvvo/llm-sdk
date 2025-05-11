@@ -2,6 +2,7 @@ import type { Part } from "@hoangvvo/llm-sdk";
 import type { Artifact, MyContext } from "../types.ts";
 
 // Reduce tool output parts into updated context.artifacts
+// In an actual implementation, you may want to persist changes to a database
 export function reduceArtifactsFromToolParts(
   prev: MyContext,
   parts: Part[],
