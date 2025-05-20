@@ -1,5 +1,10 @@
-import { Agent, type AgentItem } from "@hoangvvo/llm-agent";
+import {
+  Agent,
+  type AgentItem,
+  type AgentItemMessage,
+} from "@hoangvvo/llm-agent";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
+import type { TextPart } from "@hoangvvo/llm-sdk";
 import { z } from "zod";
 import { getModel } from "./get-model.ts";
 
@@ -26,7 +31,10 @@ class InMemoryStore {
   searchArchival(query: string): MemoryBlock[] {
     const q = query.toLowerCase();
     return [...this.archival.entries()]
-      .filter(([, c]) => c.toLowerCase().includes(q))
+      .filter(
+        ([id, c]) =>
+          id.toLowerCase().includes(q) || c.toLowerCase().includes(q),
+      )
       .map(([id, content]) => ({ id, content }));
   }
   updateArchival(block: MemoryBlock): void {
@@ -124,8 +132,8 @@ For less important or long-tail info, use archival_memory_search before answerin
   ],
 });
 
-// Demo: two separate sessions (second cannot see the first turn)
-// Turn 1 session
+// Demo: four independent turns to show core + archival memory
+// Turn 1 — store a core memory
 const items1: AgentItem[] = [
   {
     type: "message",
@@ -135,9 +143,13 @@ const items1: AgentItem[] = [
     ],
   },
 ];
+console.log(
+  `[user] ${((items1[0] as AgentItemMessage).content[0] as TextPart).text}`,
+);
 const res1 = await memoryAgent.run({ context: undefined, input: items1 });
 console.dir(res1.content, { depth: null });
-// Turn 2 session — only the question, no prior messages
+
+// Turn 2 — recall using core memory (no prior messages)
 const items2: AgentItem[] = [
   {
     type: "message",
@@ -145,5 +157,49 @@ const items2: AgentItem[] = [
     content: [{ type: "text", text: "What's my favorite color?" }],
   },
 ];
+console.log(
+  `[user] ${((items2[0] as AgentItemMessage).content[0] as TextPart).text}`,
+);
 const res2 = await memoryAgent.run({ context: undefined, input: items2 });
 console.dir(res2.content, { depth: null });
+
+// Turn 3 — store less-important info in archival memory
+const items3: AgentItem[] = [
+  {
+    type: "message",
+    role: "user",
+    content: [
+      {
+        type: "text",
+        text:
+          "I captured some background notes titled 'q3-report-research' for future reference: " +
+          "Key data sources for the Q3 report include Salesforce pipeline exports, Google Analytics weekly sessions, and the paid ads spend spreadsheet. " +
+          "Please tuck this away so you can look it up later.",
+      },
+    ],
+  },
+];
+console.log(
+  `[user] ${((items3[0] as AgentItemMessage).content[0] as TextPart).text}`,
+);
+const res3 = await memoryAgent.run({ context: undefined, input: items3 });
+console.dir(res3.content, { depth: null });
+
+// Turn 4 — recall via archival search (no prior messages)
+const items4: AgentItem[] = [
+  {
+    type: "message",
+    role: "user",
+    content: [
+      {
+        type: "text",
+        text: "Can you pull up what we have under 'q3-report-research'?",
+      },
+    ],
+  },
+];
+console.log(
+  `[user] ${((items4[0] as AgentItemMessage).content[0] as TextPart).text}`,
+);
+const res4 = await memoryAgent.run({ context: undefined, input: items4 });
+console.dir(res4.content, { depth: null });

@@ -51,7 +51,7 @@ impl Store {
             .lock()
             .unwrap()
             .iter()
-            .filter(|(_, c)| c.to_lowercase().contains(&q))
+            .filter(|(id, c)| id.to_lowercase().contains(&q) || c.to_lowercase().contains(&q))
             .map(|(id, content)| MemoryBlock {
                 id: id.clone(),
                 content: content.clone(),
@@ -275,10 +275,12 @@ For less important or long-tail info, use archival_memory_search before answerin
             }),
     );
 
-    // Two separate sessions (second cannot see first turn)
+    // Four independent sessions (agent cannot see prior turns except via memory)
+    // Turn 1 — store a core memory
     let items1: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
         "Remember that my favorite color is blue.",
     )]))];
+    println!("[user] Remember that my favorite color is blue.");
     let res1 = agent
         .run(AgentRequest {
             context: (),
@@ -287,10 +289,12 @@ For less important or long-tail info, use archival_memory_search before answerin
         .await
         .expect("run failed");
     println!("res1: {:#?}", res1.content);
-    // Turn 2: recall with only the question
+
+    // Turn 2 — recall using core memory (no prior messages)
     let items2: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
         "What's my favorite color?",
     )]))];
+    println!("[user] What's my favorite color?");
     let res2 = agent
         .run(AgentRequest {
             context: (),
@@ -299,4 +303,36 @@ For less important or long-tail info, use archival_memory_search before answerin
         .await
         .expect("run failed");
     println!("res2: {:#?}", res2.content);
+
+    // Turn 3 — capture background notes for later lookup
+    let turn3 = "I captured some background notes titled 'q3-report-research' for future reference: ".to_string()
+        + "Key data sources for the Q3 report include Salesforce pipeline exports, Google Analytics weekly sessions, and the paid ads spend spreadsheet. "
+        + "Please tuck this away so you can look it up later.";
+    let items3: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
+        &turn3,
+    )]))];
+    println!("[user] {}", turn3);
+    let res3 = agent
+        .run(AgentRequest {
+            context: (),
+            input: items3,
+        })
+        .await
+        .expect("run failed");
+    println!("res3: {:#?}", res3.content);
+
+    // Turn 4 — fetch the saved background notes
+    let turn4 = "Can you pull up what we have under 'q3-report-research'?";
+    let items4: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
+        turn4,
+    )]))];
+    println!("[user] {}", turn4);
+    let res4 = agent
+        .run(AgentRequest {
+            context: (),
+            input: items4,
+        })
+        .await
+        .expect("run failed");
+    println!("res4: {:#?}", res4.content);
 }

@@ -51,7 +51,9 @@ func (s *Store) SearchArchival(query string) []MemoryBlock {
 	q := strings.ToLower(query)
 	res := []MemoryBlock{}
 	for id, content := range s.Archival {
-		if strings.Contains(strings.ToLower(content), q) {
+		idLower := strings.ToLower(id)
+		contentLower := strings.ToLower(content)
+		if strings.Contains(idLower, q) || strings.Contains(contentLower, q) {
 			res = append(res, MemoryBlock{ID: id, Content: content})
 		}
 	}
@@ -177,13 +179,13 @@ func main() {
 	store := NewStore()
 
 	// Instructions: static memory guide + dynamic core memories snapshot
-    memPrompt := `You can remember information learned from interactions with the user in two types of memory called core memory and archival memory.
+	memPrompt := `You can remember information learned from interactions with the user in two types of memory called core memory and archival memory.
 Core memory is always available in your conversation context, providing essential, foundational context for keeping track of key details about the user.
 As core memory is limited in size, it is important to only store the most important information. For other less important details, use archival memory.
 Archival memory is infinite size, but is held outside of your immediate context, so you must explicitly run a search operation to see data inside it.
 Archival memory is used to remember less significant details about the user or information found during the conversation. When the user mentions a name, topic, or details you don't know, search your archival memory to see if you have any information about it.`
 
-    rulesPrompt := `You cannot see prior conversation turns beyond what is provided in the current input.
+	rulesPrompt := `You cannot see prior conversation turns beyond what is provided in the current input.
 When a user shares a durable preference or profile detail, call core_memory_update to store it.
 When asked to recall such facts and it's not present in the current input, rely on the core memories in this prompt.
 For less important or long-tail info, use archival_memory_search before answering.`
@@ -194,11 +196,11 @@ For less important or long-tail info, use archival_memory_search before answerin
 	}
 
 	agent := llmagent.NewAgent("memory", model,
-        llmagent.WithInstructions(
-            llmagent.InstructionParam[Ctx]{String: &memPrompt},
-            llmagent.InstructionParam[Ctx]{String: &rulesPrompt},
-            llmagent.InstructionParam[Ctx]{Func: coreInstr},
-        ),
+		llmagent.WithInstructions(
+			llmagent.InstructionParam[Ctx]{String: &memPrompt},
+			llmagent.InstructionParam[Ctx]{String: &rulesPrompt},
+			llmagent.InstructionParam[Ctx]{Func: coreInstr},
+		),
 		llmagent.WithTools(
 			&CoreMemoryUpdateTool{S: store},
 			&ArchivalSearchTool{S: store},
@@ -206,24 +208,56 @@ For less important or long-tail info, use archival_memory_search before answerin
 		),
 	)
 
-	// Demo: two separate sessions (second cannot see first turn)
+	// Demo: four independent sessions (agent cannot see prior turns except via memory)
 	ctx := context.Background()
+
+	// Turn 1 — store a core memory
 	items1 := []llmagent.AgentItem{
 		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Remember that my favorite color is blue."))),
 	}
+	fmt.Println("[user] Remember that my favorite color is blue.")
 	res1, err := agent.Run(ctx, llmagent.AgentRequest[Ctx]{Context: Ctx{}, Input: items1})
 	if err != nil {
 		log.Fatal(err)
 	}
 	litter.Dump(res1.Content)
+
+	// Turn 2 — recall using core memory
 	items2 := []llmagent.AgentItem{
 		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("What's my favorite color?"))),
 	}
+	fmt.Println("[user] What's my favorite color?")
 	res2, err := agent.Run(ctx, llmagent.AgentRequest[Ctx]{Context: Ctx{}, Input: items2})
 	if err != nil {
 		log.Fatal(err)
 	}
 	litter.Dump(res2.Content)
+
+	// Turn 3 — capture background notes for later lookup (archival)
+	turn3 := "I captured some background notes titled 'q3-report-research' for future reference: " +
+		"Key data sources for the Q3 report include Salesforce pipeline exports, Google Analytics weekly sessions, and the paid ads spend spreadsheet. " +
+		"Please tuck this away so you can look it up later."
+	items3 := []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart(turn3))),
+	}
+	fmt.Println("[user] " + turn3)
+	res3, err := agent.Run(ctx, llmagent.AgentRequest[Ctx]{Context: Ctx{}, Input: items3})
+	if err != nil {
+		log.Fatal(err)
+	}
+	litter.Dump(res3.Content)
+
+	// Turn 4 — fetch the saved background notes via search
+	turn4 := "Can you pull up what we have under 'q3-report-research'?"
+	items4 := []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart(turn4))),
+	}
+	fmt.Println("[user] " + turn4)
+	res4, err := agent.Run(ctx, llmagent.AgentRequest[Ctx]{Context: Ctx{}, Input: items4})
+	if err != nil {
+		log.Fatal(err)
+	}
+	litter.Dump(res4.Content)
 }
 
 func randID() string {
