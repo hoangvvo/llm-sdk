@@ -67,6 +67,8 @@ func (t *AgentTransferTool[C]) Execute(ctx context.Context, paramsJSON json.RawM
 		return llmagent.AgentToolResult{}, err
 	}
 
+	fmt.Printf("[-> %s agent]: %s\n", t.agent.Name, params.Task)
+
 	result, err := t.agent.Run(ctx, llmagent.AgentRequest[C]{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(

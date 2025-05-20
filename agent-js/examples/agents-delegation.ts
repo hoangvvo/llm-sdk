@@ -26,6 +26,8 @@ ${description}`,
       additionalProperties: false,
     },
     async execute(args: { task: string }, context: TContext) {
+      console.log(`[-> ${agent.name} agent]:`, args.task);
+
       const result = await agent.run({
         context,
         input: [
@@ -36,6 +38,7 @@ ${description}`,
           },
         ],
       });
+
       return {
         content: result.content,
         is_error: false,

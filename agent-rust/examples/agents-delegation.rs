@@ -64,6 +64,9 @@ where
         _state: &RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
         let params: DelegateParams = serde_json::from_value(params)?;
+
+        println!("[-> {} agent]: {}", self.agent.name, params.task);
+
         let result = self
             .agent
             .run(AgentRequest {
