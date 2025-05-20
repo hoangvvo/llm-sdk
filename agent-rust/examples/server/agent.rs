@@ -54,8 +54,8 @@ pub fn create_agent(
                 let location = context.location.as_deref().unwrap_or("<not provided>");
                 let language = context.language.as_deref().unwrap_or("<not provided>");
                 Ok(format!(
-                    "The user name is {name}.\\nThe user location is {location}.\\nThe user speaks {language} \
-                     language."
+                    "The user name is {name}.\\nThe user location is {location}.\\nThe user \
+                     speaks {language} language."
                 ))
             })
             .add_instruction(|_context: &MyContext| {

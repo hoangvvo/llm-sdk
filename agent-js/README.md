@@ -190,6 +190,7 @@ Find examples in the [examples](./examples/) folder:
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.ts)
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts.ts)
 - [`memory`: Memory pattern (core + archival)](./examples/memory.ts)
+- [`planner-executor`: Plan TODOs and execute](./examples/planner-executor.ts)
 
 ```bash
 node examples/agent.ts

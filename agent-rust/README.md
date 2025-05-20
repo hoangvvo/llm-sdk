@@ -215,6 +215,7 @@ Find examples in the [examples](./examples/) folder:
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.rs)
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts.rs)
 - [`memory`: Memory pattern (core + archival)](./examples/memory.rs)
+- [`planner-executor`: Plan TODOs and execute](./examples/planner-executor.rs)
 
 ```bash
 cargo run --example agent

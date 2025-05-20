@@ -47,7 +47,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 Box::pin(async move {
                     sleep(Duration::from_millis(25)).await;
                     Ok(format!(
-                        "Weave in the oracle whisper: \"{hint}\" so it feels like an in-world hint."
+                        "Weave in the oracle whisper: \"{hint}\" so it feels like an in-world \
+                         hint."
                     ))
                 })
             },

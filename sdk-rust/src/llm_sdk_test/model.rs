@@ -112,7 +112,8 @@ impl MockLanguageModelState {
     }
 }
 
-/// A mock language model for testing that tracks inputs and yields predefined outputs.
+/// A mock language model for testing that tracks inputs and yields predefined
+/// outputs.
 pub struct MockLanguageModel {
     provider: &'static str,
     model_id: String,

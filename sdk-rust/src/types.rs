@@ -190,7 +190,8 @@ pub struct ToolCallPart {
     /// The arguments to pass to the tool.
     pub args: Value,
     /// The ID of the tool call, if applicable
-    /// This is different from `tool_call_id`, which is the ID used to match the tool result with the tool call.
+    /// This is different from `tool_call_id`, which is the ID used to match the
+    /// tool result with the tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
 }
@@ -278,7 +279,8 @@ pub struct ToolCallPartDelta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
     /// The ID of the tool call, if applicable
-    /// This is different from `tool_call_id`, which is the ID used to match the tool result with the tool call.
+    /// This is different from `tool_call_id`, which is the ID used to match the
+    /// tool result with the tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
 }

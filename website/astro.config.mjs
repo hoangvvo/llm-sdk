@@ -54,6 +54,7 @@ export default defineConfig({
             { slug: "agent/delegation" },
             { slug: "agent/memory" },
             { slug: "agent/artifacts" },
+            { slug: "agent/planner-executor" },
             { slug: "agent/testing" },
           ],
         },

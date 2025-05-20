@@ -294,8 +294,14 @@ async fn main() {
     ));
 
     let store = Store::default();
-    let overview = "Use documents (artifacts/canvases) for substantive deliverables like documents, plans, specs, or code. Keep chat replies brief and status-oriented; put the full content into a document via the tools. Always reference documents by id.";
-    let rules = "- Prefer creating/updating documents instead of pasting large content into chat\n- When asked to revise or extend prior work, read/update the relevant document\n- Keep the chat response short: what changed, where it lives (document id), and next steps\n";
+    let overview = "Use documents (artifacts/canvases) for substantive deliverables like \
+                    documents, plans, specs, or code. Keep chat replies brief and \
+                    status-oriented; put the full content into a document via the tools. Always \
+                    reference documents by id.";
+    let rules = "- Prefer creating/updating documents instead of pasting large content into \
+                 chat\n- When asked to revise or extend prior work, read/update the relevant \
+                 document\n- Keep the chat response short: what changed, where it lives (document \
+                 id), and next steps\n";
 
     let agent = Agent::new(
         llm_agent::AgentParams::new("artifacts", model)
@@ -319,7 +325,9 @@ async fn main() {
     );
 
     let items1: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
-        "We need a product requirements document for a new Todo app. Please draft it in markdown with sections: Overview, Goals, Non-Goals, Requirements. Keep your chat reply short and save the full document to a separate document we can keep iterating on.",
+        "We need a product requirements document for a new Todo app. Please draft it in markdown \
+         with sections: Overview, Goals, Non-Goals, Requirements. Keep your chat reply short and \
+         save the full document to a separate document we can keep iterating on.",
     )]))];
     let res1 = agent
         .run(AgentRequest {
@@ -332,7 +340,8 @@ async fn main() {
     println!("Documents after creation:\n{:?}", store.list());
 
     let items2: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
-        "Please revise the document: expand the Goals section with 3 concrete goals and add a Milestones section. Keep your chat reply brief.",
+        "Please revise the document: expand the Goals section with 3 concrete goals and add a \
+         Milestones section. Keep your chat reply brief.",
     )]))];
     let res2 = agent
         .run(AgentRequest {

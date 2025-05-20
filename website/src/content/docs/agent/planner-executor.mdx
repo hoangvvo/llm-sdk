@@ -1,0 +1,36 @@
+---
+title: Planner–Executor
+---
+
+import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goPlannerCode from "../../../../../agent-go/examples/planner-executor/main.go?raw";
+import jsPlannerCode from "../../../../../agent-js/examples/planner-executor.ts?raw";
+import rustPlannerCode from "../../../../../agent-rust/examples/planner-executor.rs?raw";
+
+<Aside>
+  This is an agent pattern that requires custom implementation. [Why?](/agent/#agent-patterns)
+</Aside>
+
+The Planner–Executor pattern breaks a user’s goal into actionable steps and iteratively updates an internal plan while executing at a high level.
+The plan is strictly for the agent’s reasoning and do not have to be revealed to the user.
+
+Implement this pattern may allows the agent to produce better results for complex tasks.
+
+Internally, we implement a tool `update_plan` that accepts the following parameters:
+
+- `explanation`: string
+- `plan`: Array of `{ status, step }` where:
+  - `status`: one of `pending` | `in_progress` | `complete`
+  - `step`: string
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsPlannerCode} lang="typescript" title="planner-executor.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustPlannerCode} lang="rust" title="planner-executor.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goPlannerCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>

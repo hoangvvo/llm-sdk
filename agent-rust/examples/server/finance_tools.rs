@@ -216,8 +216,7 @@ impl AgentTool<MyContext> for GetCryptoPriceTool {
                                 {
                                     result.insert("market_cap".to_string(), market_cap.clone());
                                 }
-                                if let Some(volume) =
-                                    crypto_data.get(format!("{currency}_24h_vol"))
+                                if let Some(volume) = crypto_data.get(format!("{currency}_24h_vol"))
                                 {
                                     result.insert("24h_volume".to_string(), volume.clone());
                                 }

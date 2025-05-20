@@ -237,6 +237,7 @@ Find examples in the [examples](./examples/) folder:
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation/main.go)
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts/main.go)
 - [`memory`: Memory pattern (core + archival)](./examples/memory/main.go)
+- [`planner-executor`: Plan TODOs and execute](./examples/planner-executor/main.go)
 
 ```bash
 go run ./examples/agent

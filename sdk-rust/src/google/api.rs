@@ -329,7 +329,8 @@ pub enum FunctionCallingConfigMode {
     /// Model is constrained to always predicting function calls only. If
     /// "`allowed_function_names`" are set, the predicted function calls will be
     /// limited to any one of "`allowed_function_names`", else the predicted
-    /// function calls will be any one of the provided "`function_declarations`".
+    /// function calls will be any one of the provided
+    /// "`function_declarations`".
     #[serde(rename = "ANY")]
     Any,
     /// Model will not predict any function calls. Model behavior is same as

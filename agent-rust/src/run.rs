@@ -291,14 +291,16 @@ impl RunState {
         Ok(())
     }
 
-    /// Add `AgentItems` to the run state and return the index of the added item.
+    /// Add `AgentItems` to the run state and return the index of the added
+    /// item.
     pub async fn append_item(&self, item: AgentItem) -> usize {
         let mut output: futures::lock::MutexGuard<'_, Vec<AgentItem>> = self.output.lock().await;
         output.push(item);
         output.len() - 1
     }
 
-    /// Append a model response to the run state and return the created item and its index.
+    /// Append a model response to the run state and return the created item and
+    /// its index.
     pub async fn append_model_response(&self, response: ModelResponse) -> (AgentItem, usize) {
         let mut output = self.output.lock().await;
         let item = AgentItem::Model(response);

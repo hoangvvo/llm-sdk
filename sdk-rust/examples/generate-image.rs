@@ -45,7 +45,9 @@ async fn main() {
         } else if cfg!(target_os = "linux") {
             Command::new("xdg-open").arg(&file_name).status()
         } else if cfg!(target_os = "windows") {
-            Command::new("cmd").args(["/C", "start", "", &file_name]).status()
+            Command::new("cmd")
+                .args(["/C", "start", "", &file_name])
+                .status()
         } else {
             Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
