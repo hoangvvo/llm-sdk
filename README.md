@@ -20,7 +20,7 @@ Check out the [Console Application](./website) for a demo application that showc
 - Support streaming, including for image and audio.
 - Supports citations and reasoning for supported models.
 - Reports token usage and calculates the cost of a request when provided with the model's pricing information.
-- Offers consistent serialization for data storage across different programming languages.
+- Unified serialization across programming languages (systems in different languages can work together).
 - Integrates OpenTelemetry for tracing.
 
 ## Specification
@@ -182,9 +182,10 @@ This agent **library** (not _framework_) is designed for transparency and contro
 Unlike many “agentic” frameworks, it ships with no hidden prompt templates or secret parsing rules—and that’s on purpose:
 
 - Nothing hidden – What you write is what runs. No secret prompts or “special sauce” behind the scenes, so your instructions aren’t quietly overridden.
-- Works in any language – Many frameworks bake in English-only prompts. Here, the model sees only your words, whether they’re in English or not.
+- Works in any settings – Many frameworks bake in English-only prompts. Here, the model sees only your words, in whichever language or format.
 - Easy to tweak – Change prompts, parsing, or flow without fighting built-in defaults.
 - Less to debug – Fewer layers mean you can trace exactly where things break.
+- No complex abstraction – Don't waste time learning new concepts or APIs (e.g., “chains”, “graphs”, syntax with special meanings, etc.). Just plain functions and data structures.
 
 LLM in the past was not as powerful as today, so frameworks had to do a lot of heavy lifting to get decent results.
 But with modern LLMs, much of that complexity is no longer necessary.

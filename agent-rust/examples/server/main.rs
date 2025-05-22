@@ -18,8 +18,8 @@ use std::{env, time::Duration};
 use tower_http::cors::{Any, CorsLayer};
 
 mod agent;
-mod context;
 mod artifacts_tools;
+mod context;
 mod finance_tools;
 mod get_model;
 mod information_tools;
@@ -188,9 +188,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/tools", get(list_tools_handler))
         .layer(
             CorsLayer::new()
-                .allow_origin(Any)
+                .allow_origin(["http://localhost:4321".parse().unwrap()])
                 .allow_methods(Any)
-                .allow_headers(Any),
+                .allow_headers(Any)
+                .allow_credentials(true),
         )
         .with_state(state);
 
