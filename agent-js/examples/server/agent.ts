@@ -20,13 +20,13 @@ Keep chat replies brief and put the full document content into artifacts via the
 ];
 
 export const availableTools = [
+  ...getArtifactTools(),
   getStockPriceTool,
   getCryptoPriceTool,
   searchWikipediaTool,
   getNewsTool,
   getCoordinatesTool,
   getWeatherTool,
-  ...getArtifactTools(),
 ];
 
 // Create a new instance of Agent for the request

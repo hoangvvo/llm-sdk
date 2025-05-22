@@ -1,22 +1,9 @@
 import type { Agent } from "@hoangvvo/llm-agent";
-import { type AgentRequest } from "@hoangvvo/llm-agent";
 import http from "node:http";
 import { getModel, getModelList } from "../get-model.ts";
 import { availableTools, createAgent } from "./agent.ts";
 import type { MyContext } from "./context.ts";
-
-interface RunStreamBody {
-  provider: string;
-  model_id: string;
-  input: AgentRequest<MyContext>;
-  enabled_tools?: string[];
-  disabled_instructions?: boolean;
-  temperature?: number;
-  top_p?: number;
-  top_k?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
-}
+import type { RunStreamBody } from "./types.ts";
 
 async function runStreamHandler(
   req: http.IncomingMessage,
@@ -106,17 +93,12 @@ function listToolsHandler(
   _req: http.IncomingMessage,
   res: http.ServerResponse,
 ) {
-  try {
-    const tools = availableTools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-    }));
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(tools));
-  } catch (err) {
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: (err as Error).message }));
-  }
+  const tools = availableTools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+  }));
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(tools));
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {

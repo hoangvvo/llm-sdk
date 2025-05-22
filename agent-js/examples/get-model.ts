@@ -12,8 +12,8 @@ import { MistralModel } from "@hoangvvo/llm-sdk/mistral";
 import { OpenAIChatModel, OpenAIModel } from "@hoangvvo/llm-sdk/openai";
 import dotenv from "dotenv";
 import assert from "node:assert";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import modelList from "../../website/models.json" with { type: "json" };
 
 dotenv.config({
   path: join(import.meta.dirname, "..", "..", ".env"),
@@ -98,12 +98,7 @@ export function getModel(
 }
 
 export async function getModelList() {
-  const modelList = await readFile(
-    join(import.meta.dirname, "..", "..", "website", "models.json"),
-    "utf-8",
-  ).then((text) => JSON.parse(text) as ModelInfo[]);
-
-  return modelList;
+  return modelList as ModelInfo[];
 }
 
 export interface ModelInfo {

@@ -4,10 +4,11 @@ use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions};
 use std::sync::Arc;
 
 use crate::{
-    context::MyContext,
     artifacts_tools::{
-        ArtifactCreateTool, ArtifactDeleteTool, ArtifactGetTool, ArtifactListTool, ArtifactUpdateTool,
+        ArtifactCreateTool, ArtifactDeleteTool, ArtifactGetTool, ArtifactListTool,
+        ArtifactUpdateTool,
     },
+    context::MyContext,
     finance_tools::{GetCryptoPriceTool, GetStockPriceTool},
     get_model::ModelInfo,
     information_tools::{GetNewsTool, SearchWikipediaTool},
@@ -30,17 +31,17 @@ pub struct AgentOptions {
 
 pub fn get_available_tools() -> Vec<Box<dyn AgentTool<MyContext> + Send + Sync>> {
     vec![
+        Box::new(ArtifactCreateTool),
+        Box::new(ArtifactUpdateTool),
+        Box::new(ArtifactGetTool),
+        Box::new(ArtifactListTool),
+        Box::new(ArtifactDeleteTool),
         Box::new(GetStockPriceTool),
         Box::new(GetCryptoPriceTool),
         Box::new(SearchWikipediaTool),
         Box::new(GetNewsTool),
         Box::new(GetCoordinatesTool),
         Box::new(GetWeatherTool),
-        Box::new(ArtifactCreateTool),
-        Box::new(ArtifactUpdateTool),
-        Box::new(ArtifactGetTool),
-        Box::new(ArtifactListTool),
-        Box::new(ArtifactDeleteTool),
     ]
 }
 
@@ -114,19 +115,35 @@ pub fn create_agent(
     if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"get_weather".to_string()) {
         builder = builder.add_tool(GetWeatherTool);
     }
-    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_create".to_string()) {
+    if enabled_tools.is_none()
+        || enabled_tools
+            .unwrap()
+            .contains(&"artifact_create".to_string())
+    {
         builder = builder.add_tool(ArtifactCreateTool);
     }
-    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_update".to_string()) {
+    if enabled_tools.is_none()
+        || enabled_tools
+            .unwrap()
+            .contains(&"artifact_update".to_string())
+    {
         builder = builder.add_tool(ArtifactUpdateTool);
     }
     if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_get".to_string()) {
         builder = builder.add_tool(ArtifactGetTool);
     }
-    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_list".to_string()) {
+    if enabled_tools.is_none()
+        || enabled_tools
+            .unwrap()
+            .contains(&"artifact_list".to_string())
+    {
         builder = builder.add_tool(ArtifactListTool);
     }
-    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_delete".to_string()) {
+    if enabled_tools.is_none()
+        || enabled_tools
+            .unwrap()
+            .contains(&"artifact_delete".to_string())
+    {
         builder = builder.add_tool(ArtifactDeleteTool);
     }
 

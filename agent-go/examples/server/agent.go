@@ -10,7 +10,7 @@ import (
 )
 
 var instructions = []llmagent.InstructionParam[*MyContext]{
-    {String: ptr(`Answer in markdown format.
+	{String: ptr(`Answer in markdown format.
 To access certain tools, the user may have to provide corresponding API keys in the context fields on the UI.`)},
 	{Func: func(ctx context.Context, context *MyContext) (string, error) {
 		name := "<not provided>"
@@ -29,25 +29,25 @@ To access certain tools, the user may have to provide corresponding API keys in 
 The user location is %s.
 The user speaks %s language.`, name, location, language), nil
 	}},
-    {Func: func(ctx context.Context, context *MyContext) (string, error) {
-        return fmt.Sprintf("The current date is %s.", time.Now().Format("Mon Jan 2 2006")), nil
-    }},
-    {String: ptr(`For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).
+	{Func: func(ctx context.Context, context *MyContext) (string, error) {
+		return fmt.Sprintf("The current date is %s.", time.Now().Format("Mon Jan 2 2006")), nil
+	}},
+	{String: ptr(`For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).
 Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`)},
 }
 
 var availableTools = []llmagent.AgentTool[*MyContext]{
-    &GetStockPriceTool{},
-    &GetCryptoPriceTool{},
-    &SearchWikipediaTool{},
-    &GetNewsTool{},
-    &GetCoordinatesTool{},
-    &GetWeatherTool{},
-    &ArtifactCreateTool{},
-    &ArtifactUpdateTool{},
-    &ArtifactGetTool{},
-    &ArtifactListTool{},
-    &ArtifactDeleteTool{},
+	&ArtifactCreateTool{},
+	&ArtifactUpdateTool{},
+	&ArtifactGetTool{},
+	&ArtifactListTool{},
+	&ArtifactDeleteTool{},
+	&GetStockPriceTool{},
+	&GetCryptoPriceTool{},
+	&SearchWikipediaTool{},
+	&GetNewsTool{},
+	&GetCoordinatesTool{},
+	&GetWeatherTool{},
 }
 
 type AgentOptions struct {

@@ -11,6 +11,8 @@ Check out the [Console Application](./website) for a demo application that showc
 
 ![Console Chat Application screenshot](./website/assets/console-chat.png)
 
+**Note**: This `Agent` library is v0, and the API may change in a future version. `SDK` library is also v0 but the API is more stable. Please open an issue or a PR if you have a suggestion on the API ergonomics or features.
+
 ## Features
 
 - Supports multiple LLM providers with a unified API.
