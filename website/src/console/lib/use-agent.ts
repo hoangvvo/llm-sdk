@@ -188,6 +188,7 @@ export function useAgent<Context>(
           },
           body: JSON.stringify(inputPayload),
           signal: controller.signal,
+          credentials: "include",
         });
 
         for await (const message of iterator) {

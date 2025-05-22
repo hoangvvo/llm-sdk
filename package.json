@@ -3,7 +3,8 @@
   "workspaces": [
     "sdk-js",
     "agent-js",
-    "website"
+    "website",
+    "website-server"
   ],
   "scripts": {
     "format": "prettier --write .",

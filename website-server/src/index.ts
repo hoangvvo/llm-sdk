@@ -1,14 +1,35 @@
 import type { Agent } from "@hoangvvo/llm-agent";
-import type { APIRoute } from "astro";
+import { getModel, getModelList } from "../../agent-js/examples/get-model.ts";
 import {
-  getModel,
-  getModelList,
-} from "../../../../../agent-js/examples/get-model.ts";
-import { createAgent } from "../../../../../agent-js/examples/server/agent.ts";
-import type { MyContext } from "../../../../../agent-js/examples/server/context.ts";
-import type { RunStreamBody } from "../../../../../agent-js/examples/server/types.ts";
+  availableTools,
+  createAgent,
+} from "../../agent-js/examples/server/agent.ts";
+import type { MyContext } from "../../agent-js/examples/server/context.ts";
+import type { RunStreamBody } from "../../agent-js/examples/server/types.ts";
 
-export const POST: APIRoute = async ({ request }) => {
+const corHeaders = {
+  "Access-Control-Allow-Origin": "https://llm-sdk.hoangvvo.com",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Credentials": "true",
+};
+
+async function handleGetModels(): Promise<Response> {
+  const modelList = await getModelList();
+
+  return Response.json(modelList, { headers: corHeaders });
+}
+
+function handleGetTools(): Response {
+  const tools = availableTools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+  }));
+
+  return Response.json(tools, { headers: corHeaders });
+}
+
+async function handleRunStream(request: Request): Promise<Response> {
   let json: RunStreamBody;
   let agent: Agent<MyContext>;
 
@@ -27,7 +48,10 @@ export const POST: APIRoute = async ({ request }) => {
     if (!modelInfo) {
       return Response.json(
         { error: `Model not found: ${provider} - ${model_id}` },
-        { status: 500, headers: { "Content-Type": "application/json" } },
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...corHeaders },
+        },
       );
     }
 
@@ -55,7 +79,7 @@ export const POST: APIRoute = async ({ request }) => {
       { error: (err as Error).message },
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...corHeaders },
       },
     );
   }
@@ -101,8 +125,39 @@ export const POST: APIRoute = async ({ request }) => {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      ...corHeaders,
     },
   });
-};
+}
 
-export const prerender = false;
+export default {
+  async fetch(request, env): Promise<Response> {
+    // @ts-expect-error: shimming process.env
+    globalThis.process = {
+      env: env,
+    };
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corHeaders,
+      });
+    }
+
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/api/models") {
+      return handleGetModels();
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/tools") {
+      return handleGetTools();
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/run-stream") {
+      return handleRunStream(request);
+    }
+
+    return new Response("Not Found", { status: 404 });
+  },
+} satisfies ExportedHandler<Env>;

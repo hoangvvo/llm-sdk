@@ -1,4 +1,8 @@
-import { Agent, type InstructionParam } from "@hoangvvo/llm-agent";
+import {
+  Agent,
+  type AgentTool,
+  type InstructionParam,
+} from "@hoangvvo/llm-agent";
 import type { LanguageModel } from "@hoangvvo/llm-sdk";
 import type { ModelInfo } from "../get-model.ts";
 import { getArtifactTools } from "./artifacts.tools.ts";
@@ -19,7 +23,7 @@ The user speaks ${context.language ?? "<not provided>"} language.`,
 Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`,
 ];
 
-export const availableTools = [
+export const availableTools: AgentTool<MyContext>[] = [
   ...getArtifactTools(),
   getStockPriceTool,
   getCryptoPriceTool,
