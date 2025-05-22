@@ -46,6 +46,7 @@ impl Store {
         self.fetch_core()
     }
     fn search_archival(&self, query: &str) -> Vec<MemoryBlock> {
+        // TODO: Replace with semantic vector search using embeddings.
         let q = query.to_lowercase();
         self.archival
             .lock()
@@ -308,9 +309,7 @@ For less important or long-tail info, use archival_memory_search before answerin
     let turn3 = "I captured some background notes titled 'q3-report-research' for future reference: ".to_string()
         + "Key data sources for the Q3 report include Salesforce pipeline exports, Google Analytics weekly sessions, and the paid ads spend spreadsheet. "
         + "Please tuck this away so you can look it up later.";
-    let items3: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
-        &turn3,
-    )]))];
+    let items3: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(&turn3)]))];
     println!("[user] {}", turn3);
     let res3 = agent
         .run(AgentRequest {
@@ -323,9 +322,7 @@ For less important or long-tail info, use archival_memory_search before answerin
 
     // Turn 4 — fetch the saved background notes
     let turn4 = "Can you pull up what we have under 'q3-report-research'?";
-    let items4: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
-        turn4,
-    )]))];
+    let items4: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(turn4)]))];
     println!("[user] {}", turn4);
     let res4 = agent
         .run(AgentRequest {

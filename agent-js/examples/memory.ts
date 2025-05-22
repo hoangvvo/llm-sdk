@@ -29,6 +29,7 @@ class InMemoryStore {
     return this.fetchCore();
   }
   searchArchival(query: string): MemoryBlock[] {
+    // TODO: Replace with semantic vector search using embeddings.
     const q = query.toLowerCase();
     return [...this.archival.entries()]
       .filter(

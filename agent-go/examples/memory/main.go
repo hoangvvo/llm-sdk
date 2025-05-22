@@ -48,6 +48,7 @@ func (s *Store) UpdateCore(b MemoryBlock) []MemoryBlock {
 	return s.FetchCore()
 }
 func (s *Store) SearchArchival(query string) []MemoryBlock {
+	// TODO: Replace with semantic vector search using embeddings.
 	q := strings.ToLower(query)
 	res := []MemoryBlock{}
 	for id, content := range s.Archival {
