@@ -26,5 +26,7 @@ export function typeboxTool<TContext, TSchema extends TTypeboxSchema>(params: {
     context: TContext,
   ): AgentToolResult | Promise<AgentToolResult>;
 }) {
+  // Strip away all the TypeBox-specific properties
+  params.parameters = JSON.parse(JSON.stringify(params.parameters)) as TSchema;
   return params;
 }
