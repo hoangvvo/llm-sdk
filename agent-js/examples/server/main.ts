@@ -43,31 +43,21 @@ async function runStreamHandler(
 
     const model = getModel(provider, model_id, modelInfo.metadata, apiKey);
 
-    const enabledToolsParam = Array.isArray(json.enabled_tools)
+    const { enabled_tools, ...params } = json;
+
+    const enabledToolsParam = Array.isArray(enabled_tools)
       ? Array.from(
           new Set(
-            json.enabled_tools.filter(
+            enabled_tools.filter(
               (toolName): toolName is string => typeof toolName === "string",
             ),
           ),
         )
       : undefined;
 
-    const disabledInstructions = json.disabled_instructions === true;
-    const temperature = sanitizeNumber(json.temperature);
-    const topP = sanitizeNumber(json.top_p);
-    const topK = sanitizeInteger(json.top_k);
-    const frequencyPenalty = sanitizeNumber(json.frequency_penalty);
-    const presencePenalty = sanitizeNumber(json.presence_penalty);
-
     agent = createAgent(model, modelInfo, {
       enabledTools: enabledToolsParam,
-      disabledInstructions,
-      temperature,
-      top_p: topP,
-      top_k: topK,
-      frequency_penalty: frequencyPenalty,
-      presence_penalty: presencePenalty,
+      ...params,
     });
   } catch (err) {
     res.writeHead(500, { "Content-Type": "application/json" });
@@ -127,30 +117,6 @@ function listToolsHandler(
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: (err as Error).message }));
   }
-}
-
-function sanitizeNumber(value: unknown): number | undefined {
-  if (typeof value !== "number") {
-    return undefined;
-  }
-  if (!Number.isFinite(value)) {
-    return undefined;
-  }
-  return value;
-}
-
-function sanitizeInteger(value: unknown): number | undefined {
-  if (typeof value !== "number") {
-    return undefined;
-  }
-  if (!Number.isFinite(value)) {
-    return undefined;
-  }
-  const int = Math.trunc(value);
-  if (int < 0) {
-    return undefined;
-  }
-  return int;
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {

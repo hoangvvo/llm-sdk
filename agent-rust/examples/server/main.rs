@@ -19,6 +19,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 mod agent;
 mod context;
+mod artifacts_tools;
 mod finance_tools;
 mod get_model;
 mod information_tools;

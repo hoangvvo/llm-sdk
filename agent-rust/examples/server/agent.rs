@@ -5,6 +5,9 @@ use std::sync::Arc;
 
 use crate::{
     context::MyContext,
+    artifacts_tools::{
+        ArtifactCreateTool, ArtifactDeleteTool, ArtifactGetTool, ArtifactListTool, ArtifactUpdateTool,
+    },
     finance_tools::{GetCryptoPriceTool, GetStockPriceTool},
     get_model::ModelInfo,
     information_tools::{GetNewsTool, SearchWikipediaTool},
@@ -33,6 +36,11 @@ pub fn get_available_tools() -> Vec<Box<dyn AgentTool<MyContext> + Send + Sync>>
         Box::new(GetNewsTool),
         Box::new(GetCoordinatesTool),
         Box::new(GetWeatherTool),
+        Box::new(ArtifactCreateTool),
+        Box::new(ArtifactUpdateTool),
+        Box::new(ArtifactGetTool),
+        Box::new(ArtifactListTool),
+        Box::new(ArtifactDeleteTool),
     ]
 }
 
@@ -63,7 +71,10 @@ pub fn create_agent(
                     "The current date is {}.",
                     Utc::now().format("%a %b %d %Y")
                 ))
-            });
+            })
+            .add_instruction(
+                "For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).\\nKeep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.",
+            );
     }
 
     // Add tools based on enabled_tools filter
@@ -102,6 +113,21 @@ pub fn create_agent(
     }
     if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"get_weather".to_string()) {
         builder = builder.add_tool(GetWeatherTool);
+    }
+    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_create".to_string()) {
+        builder = builder.add_tool(ArtifactCreateTool);
+    }
+    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_update".to_string()) {
+        builder = builder.add_tool(ArtifactUpdateTool);
+    }
+    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_get".to_string()) {
+        builder = builder.add_tool(ArtifactGetTool);
+    }
+    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_list".to_string()) {
+        builder = builder.add_tool(ArtifactListTool);
+    }
+    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_delete".to_string()) {
+        builder = builder.add_tool(ArtifactDeleteTool);
     }
 
     builder = builder.max_turns(5);
