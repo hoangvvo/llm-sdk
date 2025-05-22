@@ -306,8 +306,11 @@ For less important or long-tail info, use archival_memory_search before answerin
     println!("res2: {:#?}", res2.content);
 
     // Turn 3 — capture background notes for later lookup
-    let turn3 = "I captured some background notes titled 'q3-report-research' for future reference: ".to_string()
-        + "Key data sources for the Q3 report include Salesforce pipeline exports, Google Analytics weekly sessions, and the paid ads spend spreadsheet. "
+    let turn3 = "I captured some background notes titled 'q3-report-research' for future \
+                 reference: "
+        .to_string()
+        + "Key data sources for the Q3 report include Salesforce pipeline exports, Google \
+           Analytics weekly sessions, and the paid ads spend spreadsheet. "
         + "Please tuck this away so you can look it up later.";
     let items3: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(&turn3)]))];
     println!("[user] {}", turn3);

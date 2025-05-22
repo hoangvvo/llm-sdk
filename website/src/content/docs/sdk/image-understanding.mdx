@@ -2,16 +2,16 @@
 title: Image understanding
 ---
 
-import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
-import { extractCombined } from "../../../utils/treesitter-extract.ts";
-import jsDescribeImageCode from "../../../../../sdk-js/examples/describe-image.ts?raw";
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
 import goDescribeImageCode from "../../../../../sdk-go/examples/describe-image/main.go?raw";
+import jsDescribeImageCode from "../../../../../sdk-js/examples/describe-image.ts?raw";
 import rustDescribeImageCode from "../../../../../sdk-rust/examples/describe-image.rs?raw";
 import {
   extractGoTypes,
-  extractTypescriptTypes,
   extractRustTypes,
+  extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
+import { extractCombined } from "../../../utils/treesitter-extract.ts";
 
 Image modality is represented as `ImagePart`s.
 
@@ -40,6 +40,8 @@ Image modality is represented as `ImagePart`s.
 </Tabs>
 
 Images can be sent to the model as `ImagePart` objects.
+
+![describe-image](../../../../assets/examples/describe-image.gif)
 
 <Tabs>
   <TabItem label="TypeScript">

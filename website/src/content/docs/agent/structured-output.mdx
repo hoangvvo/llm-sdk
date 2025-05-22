@@ -2,13 +2,15 @@
 title: Structured output
 ---
 
-import { Tabs, TabItem, Code } from "@astrojs/starlight/components";
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goStructuredOutputCode from "../../../../../agent-go/examples/structured-output/main.go?raw";
 import jsStructuredOutputCode from "../../../../../agent-js/examples/structured-output.ts?raw";
 import rustStructuredOutputCode from "../../../../../agent-rust/examples/structured-output.rs?raw";
-import goStructuredOutputCode from "../../../../../agent-go/examples/structured-output/main.go?raw";
 
 Agents can combine tools to generate a structured output.
 The structured output will come as a `TextPart` and require parsing into an object.
+
+![structured-output](../../../../assets/examples/structured-output.gif)
 
 <Tabs>
   <TabItem label="TypeScript">

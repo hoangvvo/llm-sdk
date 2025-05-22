@@ -1,9 +1,11 @@
+import asciify from "asciify-image";
 import { unlink, writeFile } from "node:fs/promises";
 import open from "open";
 import { getModel } from "./get-model.ts";
 
 const model = getModel("google", "gemini-2.0-flash-exp-image-generation");
 
+console.log("Requesting image generation...");
 const response = await model.generate({
   modalities: ["text", "image"],
   messages: [
@@ -12,29 +14,42 @@ const response = await model.generate({
       content: [
         {
           type: "text",
-          text: "Generate an image of a sunset over the ocean",
+          text:
+            "A bright, sunlit green hill with a single large, leafy tree, " +
+            "fluffy clouds drifting across a deep blue sky, painted in the warm, " +
+            "detailed, hand-painted style of a Studio Ghibli landscape—soft colors, " +
+            "gentle light, and a sense of quiet wonder.",
         },
       ],
     },
   ],
 });
 
-console.dir(response, { depth: null });
-
 const imagePart = response.content.find((msg) => msg.type === "image");
 
 if (!imagePart) {
-  throw new Error("Image part not found");
+  throw new Error("Image part not found in response");
 }
 
-const fileName = `sunset.${imagePart.mime_type.split("/")[1] ?? "png"}`;
+const fileName = `image.${imagePart.mime_type.split("/")[1] ?? "png"}`;
 
 await writeFile(fileName, imagePart.image_data, { encoding: "base64" });
 console.log(`Saved image to ${fileName}`);
 
-await open(fileName);
+console.log("Rendering image to terminal...");
+const ascii = await asciify(fileName, {
+  fit: "box",
+  width: 80,
+  color: true,
+});
+console.log(ascii);
 
-setTimeout(() => {
-  // Cleanup
-  void unlink(fileName);
-}, 5000);
+console.log("---");
+
+open(fileName);
+
+await new Promise((resolve) => setTimeout(resolve, 5000));
+
+void unlink(fileName);
+
+console.log("Done.");

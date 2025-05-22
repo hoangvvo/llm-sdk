@@ -13,17 +13,24 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
-	"github.com/sanity-io/litter"
+
+	"github.com/qeesung/image2ascii/convert"
 )
 
 func main() {
 	model := examples.GetModel("google", "gemini-2.0-flash-exp-image-generation")
 
+	log.Println("Requesting image generation...")
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityImage},
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
-				llmsdk.NewTextPart("Generate an image of a sunset over the ocean"),
+				llmsdk.NewTextPart(
+					"A bright, sunlit green hill with a single large, leafy tree, " +
+						"fluffy clouds drifting across a deep blue sky, painted in the warm, " +
+						"detailed, hand-painted style of a Studio Ghibli landscape—soft colors, " +
+						"gentle light, and a sense of quiet wonder.",
+				),
 			),
 		},
 	})
@@ -31,7 +38,7 @@ func main() {
 		log.Fatalf("Generation failed: %v", err)
 	}
 
-	litter.Dump(response)
+	// Generation response is intentionally not printed to keep output concise
 
 	for _, part := range response.Content {
 		if part.ImagePart != nil {
@@ -42,7 +49,7 @@ func main() {
 					ext = sp[1]
 				}
 			}
-			fileName := fmt.Sprintf("sunset.%s", ext)
+			fileName := fmt.Sprintf("image.%s", ext)
 
 			data, err := base64.StdEncoding.DecodeString(part.ImagePart.ImageData)
 			if err != nil {
@@ -52,14 +59,23 @@ func main() {
 			if err := os.WriteFile(fileName, data, 0o644); err != nil {
 				log.Fatalf("Failed to write image file: %v", err)
 			}
-			fmt.Println("Saved image to", fileName)
-			// Try to open with default image viewer
-			if err := openFile(fileName); err != nil {
-				log.Printf("Failed to open image: %v", err)
-			}
-			// Cleanup after a short delay similar to JS example
+			log.Println("Saved image to", fileName)
+
+			log.Println("Rendering image to terminal...")
+			converter := convert.NewImageConverter()
+			// Basic defaults; tune as needed
+			opts := convert.DefaultOptions
+			opts.FixedWidth = 80
+			opts.Colored = true
+			ascii := converter.ImageFile2ASCIIString(fileName, &opts)
+			fmt.Println(ascii)
+
+			fmt.Println("---")
+			_ = openFile(fileName)
+
 			time.Sleep(5 * time.Second)
 			_ = os.Remove(fileName)
+			log.Println("Done.")
 			return
 		}
 	}

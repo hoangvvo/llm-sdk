@@ -34,6 +34,7 @@
     "@google/genai": "^1.0.0",
     "@mistralai/mistralai": "^1.6.0",
     "@sinclair/typebox": "^0.34.16",
+    "asciify-image": "^0.1.10",
     "audio-context": "^1.0.3",
     "audio-decode": "^2.2.2",
     "audio-play": "^2.3.1",
