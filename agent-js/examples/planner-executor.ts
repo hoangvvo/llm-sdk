@@ -107,7 +107,7 @@ When the work is complete, respond with the final deliverable and a brief one-pa
         .map((p, i) => `${i + 1}. [${p.status}] ${p.step}`)
         .join("\n");
       const expl = planStore.explanation();
-      return `INTERNAL PLAN (do not reveal to user):\n${rows}\nExplanation: ${expl}`;
+      return `INTERNAL PLAN:\n${rows}\nExplanation: ${expl}`;
     },
   ],
   tools: [updatePlanTool],

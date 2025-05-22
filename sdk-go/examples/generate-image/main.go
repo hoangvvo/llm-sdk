@@ -1,15 +1,15 @@
 package main
 
 import (
-    "context"
-    "encoding/base64"
-    "fmt"
-    "log"
-    "os"
-    "strings"
-    "time"
-    "runtime"
-    "os/exec"
+	"context"
+	"encoding/base64"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+	"time"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
@@ -49,33 +49,33 @@ func main() {
 				log.Fatalf("Failed to decode image data: %v", err)
 			}
 
-            if err := os.WriteFile(fileName, data, 0o644); err != nil {
-                log.Fatalf("Failed to write image file: %v", err)
-            }
-            fmt.Println("Saved image to", fileName)
-            // Try to open with default image viewer
-            if err := openFile(fileName); err != nil {
-                log.Printf("Failed to open image: %v", err)
-            }
-            // Cleanup after a short delay similar to JS example
-            time.Sleep(5 * time.Second)
-            _ = os.Remove(fileName)
-            return
-        }
-    }
+			if err := os.WriteFile(fileName, data, 0o644); err != nil {
+				log.Fatalf("Failed to write image file: %v", err)
+			}
+			fmt.Println("Saved image to", fileName)
+			// Try to open with default image viewer
+			if err := openFile(fileName); err != nil {
+				log.Printf("Failed to open image: %v", err)
+			}
+			// Cleanup after a short delay similar to JS example
+			time.Sleep(5 * time.Second)
+			_ = os.Remove(fileName)
+			return
+		}
+	}
 
 	log.Println("Image part not found in response")
 }
 
 func openFile(path string) error {
-    switch runtime.GOOS {
-    case "darwin":
-        return exec.Command("open", path).Start()
-    case "linux":
-        return exec.Command("xdg-open", path).Start()
-    case "windows":
-        return exec.Command("cmd", "/C", "start", "", path).Start()
-    default:
-        return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
-    }
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", path).Start()
+	case "linux":
+		return exec.Command("xdg-open", path).Start()
+	case "windows":
+		return exec.Command("cmd", "/C", "start", "", path).Start()
+	default:
+		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+	}
 }

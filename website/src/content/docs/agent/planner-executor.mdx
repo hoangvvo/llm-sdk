@@ -14,7 +14,7 @@ import rustPlannerCode from "../../../../../agent-rust/examples/planner-executor
 The Planner–Executor pattern breaks a user’s goal into actionable steps and iteratively updates an internal plan while executing at a high level.
 The plan is to guide the agent’s reasoning and do not have to be revealed to the user.
 
-Implementing this pattern may allow the agent to produce better results for complex tasks.
+Implementing this pattern may allow the agent to produce better results for complex tasks, such as those done by a **coding agent**.
 
 Internally, we implement a tool `update_plan` that accepts the following parameters:
 

@@ -19,7 +19,10 @@ type Todo struct {
 	Step   string `json:"step"`
 }
 
-type Store struct{ m map[string]*Todo; explanation string }
+type Store struct {
+	m           map[string]*Todo
+	explanation string
+}
 
 func NewStore() *Store { return &Store{m: map[string]*Todo{}, explanation: ""} }
 func (s *Store) List() []*Todo {
@@ -31,25 +34,27 @@ func (s *Store) List() []*Todo {
 }
 func (s *Store) Explanation() string { return s.explanation }
 func (s *Store) ResetWith(plan []Todo, explanation string) {
-    s.m = map[string]*Todo{}
-    for i := range plan {
-        it := plan[i]
-        key := fmt.Sprintf("%d", i)
-        itCopy := it
-        s.m[key] = &itCopy
-    }
-    s.explanation = explanation
+	s.m = map[string]*Todo{}
+	for i := range plan {
+		it := plan[i]
+		key := fmt.Sprintf("%d", i)
+		itCopy := it
+		s.m[key] = &itCopy
+	}
+	s.explanation = explanation
 }
 
 func formatTodos(s *Store) string {
-    list := s.List()
-    var b strings.Builder
-    fmt.Fprintf(&b, "\n─ PLAN (internal) · %d items\n", len(list))
-    if s.Explanation() != "" { fmt.Fprintf(&b, "Explanation: %s\n", s.Explanation()) }
-    if len(list) == 0 {
-        b.WriteString("(empty)\n")
-        return b.String()
-    }
+	list := s.List()
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n─ PLAN (internal) · %d items\n", len(list))
+	if s.Explanation() != "" {
+		fmt.Fprintf(&b, "Explanation: %s\n", s.Explanation())
+	}
+	if len(list) == 0 {
+		b.WriteString("(empty)\n")
+		return b.String()
+	}
 	for _, t := range list {
 		sym := "○"
 		if strings.EqualFold(strings.TrimSpace(t.Status), "in_progress") {
@@ -113,9 +118,9 @@ func (t *UpdatePlanTool) Execute(_ context.Context, params json.RawMessage, _ Ct
 	if err := json.Unmarshal(params, &p); err != nil {
 		return llmagent.AgentToolResult{}, err
 	}
-    t.S.ResetWith(p.Plan, p.Explanation)
-    body, _ := json.Marshal(map[string]any{"ok": true, "explanation": p.Explanation, "plan": t.S.List()})
-    return llmagent.AgentToolResult{Content: []llmsdk.Part{llmsdk.NewTextPart(string(body))}, IsError: false}, nil
+	t.S.ResetWith(p.Plan, p.Explanation)
+	body, _ := json.Marshal(map[string]any{"ok": true, "explanation": p.Explanation, "plan": t.S.List()})
+	return llmagent.AgentToolResult{Content: []llmsdk.Part{llmsdk.NewTextPart(string(body))}, IsError: false}, nil
 }
 
 func main() {
@@ -130,25 +135,29 @@ func main() {
 	store := NewStore()
 
 	// Build agent
-overview := `You are a planner–executor assistant.
+	overview := `You are a planner–executor assistant.
 Break the user's goal into clear, actionable steps using the tool update_plan (explanation, plan: [{status, step}]).
 Use the plan strictly as your internal plan: NEVER reveal or enumerate plan items to the user. Do not mention the words TODO, task list, or the names of tools.
 Keep user-visible replies concise and focused on results and next-step confirmations.
 Work iteratively: plan an initial set of high-level steps, then refine/execute one major step per turn, marking completed items along the way via tools.
 When the work is complete, respond with the final deliverable and a brief one-paragraph summary of what you did.`
 
-	agent := llmagent.NewAgent[Ctx]("planner-executor", model,
+	agent := llmagent.NewAgent("planner-executor", model,
 		llmagent.WithInstructions(
 			llmagent.InstructionParam[Ctx]{String: &overview},
-			// Dynamic instruction: inject internal plan (do not reveal to user)
+			// Dynamic instruction: inject internal plan
 			llmagent.InstructionParam[Ctx]{Func: func(_ context.Context, _ Ctx) (string, error) {
 				var b strings.Builder
-				b.WriteString("INTERNAL PLAN (do not reveal to user):\n")
-                list := store.List()
-                for i, it := range list { fmt.Fprintf(&b, "%d. [%s] %s\n", i+1, it.Status, it.Step) }
-                if store.Explanation() != "" { fmt.Fprintf(&b, "Explanation: %s\n", store.Explanation()) }
-                return b.String(), nil
-            }},
+				b.WriteString("INTERNAL PLAN:\n")
+				list := store.List()
+				for i, it := range list {
+					fmt.Fprintf(&b, "%d. [%s] %s\n", i+1, it.Status, it.Step)
+				}
+				if store.Explanation() != "" {
+					fmt.Fprintf(&b, "Explanation: %s\n", store.Explanation())
+				}
+				return b.String(), nil
+			}},
 		),
 		llmagent.WithTools(&UpdatePlanTool{S: store}),
 		llmagent.WithMaxTurns[Ctx](20),
