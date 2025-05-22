@@ -30,6 +30,7 @@ export default defineConfig({
           label: "SDK",
           items: [
             { slug: "sdk" },
+            { slug: "sdk/providers" },
             { slug: "sdk/language-model" },
             { slug: "sdk/text-generation" },
             { slug: "sdk/image-generation" },

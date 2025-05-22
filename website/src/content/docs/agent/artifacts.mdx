@@ -3,9 +3,11 @@ title: Artifacts (Canvas)
 ---
 
 import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import { Image } from 'astro:assets';
 import goArtifactsCode from "../../../../../agent-go/examples/artifacts/main.go?raw";
 import jsArtifactsCode from "../../../../../agent-js/examples/artifacts.ts?raw";
 import rustArtifactsCode from "../../../../../agent-rust/examples/artifacts.rs?raw";
+import imageConsoleChat from "../../../../assets/console-chat.png";
 
 <Aside>
   This is an agent pattern that requires custom implementation. [Why?](/agent/#agent-patterns)
@@ -15,7 +17,7 @@ import rustArtifactsCode from "../../../../../agent-rust/examples/artifacts.rs?r
 
 You can also check out the [Console App](/console/chat) to see how artifacts are integrated into a chat interface.
 
-<img src="https://raw.githubusercontent.com/hoangvvo/llm-sdk/refs/heads/main/website/assets/console-chat.png" alt="drawing" width="700"/>
+<Image src={imageConsoleChat} alt="Console Chat UI" width="700"/>
 
 The examples below implement a simple artifacts workflow using tools:
 
