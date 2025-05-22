@@ -1,7 +1,7 @@
 use crate::{
     instruction,
     types::{AgentItemTool, AgentStream, AgentStreamEvent},
-    AgentError, AgentItem, AgentParams, AgentRequest, AgentResponse, AgentStreamItemEvent,
+    AgentError, AgentItem, AgentParams, AgentResponse, AgentStreamItemEvent,
 };
 use async_stream::try_stream;
 use futures::{lock::Mutex, stream::StreamExt};
@@ -14,10 +14,15 @@ use std::sync::Arc;
 /// Manages the run session for an agent.
 /// It initializes all necessary components for the agent to run
 /// and handles the execution of the agent's tasks.
-/// Once finish, the session cleans up any resources used during the run.
-/// The session can be reused in multiple runs.
+/// Once finished, the session cleans up any resources used during the run.
+/// The session can be reused in multiple runs. RunSession binds to a specific
+///
+/// context value that is used to resolve instructions and invoke tools, while
+/// input items remain per run and are supplied to each invocation.
 pub struct RunSession<TCtx> {
     params: Arc<AgentParams<TCtx>>,
+    context: Arc<TCtx>,
+    system_prompt: Option<String>,
 }
 
 impl<TCtx> RunSession<TCtx>
@@ -27,18 +32,32 @@ where
     /// Creates a new run session and initializes dependencies
     #[allow(clippy::unused_async)]
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(params: Arc<AgentParams<TCtx>>) -> Self {
-        Self { params }
+    pub async fn new(params: Arc<AgentParams<TCtx>>, context: TCtx) -> Result<Self, AgentError> {
+        let system_prompt = if params.instructions.is_empty() {
+            None
+        } else {
+            Some(
+                instruction::get_prompt(&params.instructions, &context)
+                    .await
+                    .map_err(AgentError::Init)?,
+            )
+        };
+
+        Ok(Self {
+            params,
+            context: Arc::new(context),
+            system_prompt,
+        })
     }
 
     /// Process the model response and decide whether to continue the loop or
     /// return the response
     async fn process<'a>(
         &'a self,
-        context: Arc<TCtx>,
         run_state: &'a RunState,
         parts: Vec<Part>,
     ) -> BoxedStream<'a, Result<ProcessEvents, AgentError>> {
+        let context = self.context.clone();
         let stream = try_stream! {
             let tool_call_parts: Vec<ToolCallPart> = parts
                 .iter()
@@ -98,13 +117,14 @@ where
     }
 
     /// Run a non-streaming execution of the agent.
-    pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
-        let state = RunState::new(request.input.clone(), self.params.max_turns);
+    pub async fn run(&self, request: RunSessionRequest) -> Result<AgentResponse, AgentError> {
+        let RunSessionRequest { input } = request;
+        let state = RunState::new(input, self.params.max_turns);
 
-        let (input, ctx) = self.get_llm_input(request).await?;
+        let base_input = self.get_llm_input();
 
         loop {
-            let mut input = input.clone();
+            let mut input = base_input.clone();
 
             input.messages = state.get_turn_messages().await;
             let model_response = self.params.model.generate(input).await?;
@@ -112,7 +132,7 @@ where
 
             state.append_model_response(model_response).await;
 
-            let mut process_stream = self.process(ctx.clone(), &state, content).await;
+            let mut process_stream = self.process(&state, content).await;
 
             while let Some(event) = process_stream.next().await {
                 let event = event?;
@@ -135,18 +155,21 @@ where
     }
 
     /// Run a streaming execution of the agent.
-    pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
-        let state = Arc::new(RunState::new(request.input.clone(), self.params.max_turns));
+    pub async fn run_stream(&self, request: RunSessionRequest) -> Result<AgentStream, AgentError> {
+        let RunSessionRequest { input } = request;
+        let state = Arc::new(RunState::new(input, self.params.max_turns));
 
-        let (input, ctx) = self.get_llm_input(request).await?;
+        let base_input = self.get_llm_input();
 
         let session = Arc::new(Self {
+            context: self.context.clone(),
             params: self.params.clone(),
+            system_prompt: self.system_prompt.clone(),
         });
 
         let stream = async_stream::try_stream! {
             loop {
-                let mut input = input.clone();
+                let mut input = base_input.clone();
 
                 input.messages = state.get_turn_messages().await;
 
@@ -173,7 +196,7 @@ where
                     AgentStreamItemEvent { item, index }
                 );
 
-                let mut process_stream = session.process(ctx.clone(), &state, content).await;
+                let mut process_stream = session.process(&state, content).await;
 
                 while let Some(event) = process_stream.next().await {
                     let event = event?;
@@ -206,48 +229,40 @@ where
         // Cleanup dependencies if needed
     }
 
-    async fn get_llm_input(
-        &self,
-        request: AgentRequest<TCtx>,
-    ) -> Result<(LanguageModelInput, Arc<TCtx>), AgentError> {
-        Ok((
-            LanguageModelInput {
-                // messages will be computed from getTurnMessages
-                messages: vec![],
-                system_prompt: if self.params.instructions.is_empty() {
-                    None
-                } else {
-                    Some(
-                        instruction::get_prompt(&self.params.instructions, &request.context)
-                            .await
-                            .map_err(AgentError::Init)?,
-                    )
-                },
-                tools: if self.params.tools.is_empty() {
-                    None
-                } else {
-                    Some(
-                        self.params
-                            .tools
-                            .iter()
-                            .map(|tool| tool.as_ref().into())
-                            .collect(),
-                    )
-                },
-                response_format: Some(self.params.response_format.clone()),
-                temperature: self.params.temperature,
-                top_p: self.params.top_p,
-                top_k: self.params.top_k,
-                presence_penalty: self.params.presence_penalty,
-                frequency_penalty: self.params.frequency_penalty,
-                modalities: self.params.modalities.clone(),
-                reasoning: self.params.reasoning.clone(),
-                audio: self.params.audio.clone(),
-                ..Default::default()
+    fn get_llm_input(&self) -> LanguageModelInput {
+        LanguageModelInput {
+            // messages will be computed from getTurnMessages
+            messages: vec![],
+            system_prompt: self.system_prompt.clone(),
+            tools: if self.params.tools.is_empty() {
+                None
+            } else {
+                Some(
+                    self.params
+                        .tools
+                        .iter()
+                        .map(|tool| tool.as_ref().into())
+                        .collect(),
+                )
             },
-            Arc::new(request.context),
-        ))
+            response_format: Some(self.params.response_format.clone()),
+            temperature: self.params.temperature,
+            top_p: self.params.top_p,
+            top_k: self.params.top_k,
+            presence_penalty: self.params.presence_penalty,
+            frequency_penalty: self.params.frequency_penalty,
+            modalities: self.params.modalities.clone(),
+            reasoning: self.params.reasoning.clone(),
+            audio: self.params.audio.clone(),
+            ..Default::default()
+        }
     }
+}
+
+/// RunSessionRequest contains the input items used for a run.
+pub struct RunSessionRequest {
+    /// Input holds the items for this run, such as LLM messages.
+    pub input: Vec<AgentItem>,
 }
 
 enum ProcessEvents {

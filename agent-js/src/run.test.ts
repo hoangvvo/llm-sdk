@@ -75,10 +75,10 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: {},
     });
 
     const response = await session.run({
-      context: {},
       input: [
         {
           type: "message",
@@ -111,7 +111,11 @@ suite("RunSession#run", () => {
       is_error: false,
     }));
 
-    const tool = createMockTool("test_tool", null, toolExecute);
+    const tool = createMockTool<{ testContext: boolean }>(
+      "test_tool",
+      null,
+      toolExecute,
+    );
 
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -144,10 +148,10 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [tool],
+      context: { testContext: true },
     });
 
     const response = await session.run({
-      context: { testContext: true },
       input: [
         {
           type: "message",
@@ -157,6 +161,7 @@ suite("RunSession#run", () => {
       ],
     });
 
+    // The bound context should reach tool executions even though input items are supplied per run.
     const toolCallArguments = toolExecute.mock.calls.map((call) =>
       call.arguments.slice(0, 2),
     );
@@ -211,8 +216,8 @@ suite("RunSession#run", () => {
       is_error: false,
     }));
 
-    const tool1 = createMockTool("tool_1", null, tool1Execute);
-    const tool2 = createMockTool("tool_2", null, tool2Execute);
+    const tool1 = createMockTool<object>("tool_1", null, tool1Execute);
+    const tool2 = createMockTool<object>("tool_2", null, tool2Execute);
 
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -255,10 +260,10 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [tool1, tool2],
+      context: {},
     });
 
     const response = await session.run({
-      context: {},
       input: [
         {
           type: "message",
@@ -354,7 +359,7 @@ suite("RunSession#run", () => {
       is_error: false,
     }));
 
-    const tool = createMockTool("calculator", null, toolExecute);
+    const tool = createMockTool<object>("calculator", null, toolExecute);
 
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -394,10 +399,10 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [tool],
+      context: {},
     });
 
     const response = await session.run({
-      context: {},
       input: [
         {
           type: "message",
@@ -472,7 +477,7 @@ suite("RunSession#run", () => {
       is_error: false,
     }));
 
-    const tool = createMockTool("test_tool", null, toolExecute);
+    const tool = createMockTool<object>("test_tool", null, toolExecute);
 
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -519,12 +524,12 @@ suite("RunSession#run", () => {
       max_turns: 2,
       response_format: { type: "text" },
       tools: [tool],
+      context: {},
     });
 
     await t.assert.rejects(
       async () => {
         await session.run({
-          context: {},
           input: [
             {
               type: "message",
@@ -564,12 +569,12 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: {},
     });
 
     await t.assert.rejects(
       async () => {
         await session.run({
-          context: {},
           input: [
             {
               type: "message",
@@ -592,7 +597,7 @@ suite("RunSession#run", () => {
       throw new Error("Tool execution failed");
     });
 
-    const tool = createMockTool("failing_tool", null, toolExecute);
+    const tool = createMockTool<object>("failing_tool", null, toolExecute);
 
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -615,12 +620,12 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [tool],
+      context: {},
     });
 
     await t.assert.rejects(
       async () => {
         await session.run({
-          context: {},
           input: [
             {
               type: "message",
@@ -644,7 +649,7 @@ suite("RunSession#run", () => {
       is_error: true,
     }));
 
-    const tool = createMockTool("test_tool", null, toolExecute);
+    const tool = createMockTool<object>("test_tool", null, toolExecute);
 
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -672,10 +677,10 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [tool],
+      context: {},
     });
 
     const response = await session.run({
-      context: {},
       input: [
         {
           type: "message",
@@ -732,12 +737,12 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: {},
     });
 
     await t.assert.rejects(
       async () => {
         await session.run({
-          context: {},
           input: [
             {
               type: "message",
@@ -772,10 +777,10 @@ suite("RunSession#run", () => {
       top_k: 40,
       presence_penalty: 0.1,
       frequency_penalty: 0.2,
+      context: {},
     });
 
     await session.run({
-      context: {},
       input: [
         {
           type: "message",
@@ -816,12 +821,12 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: {},
     });
 
     await t.assert.rejects(
       async () => {
         await session.run({
-          context: {},
           input: [
             {
               type: "message",
@@ -856,10 +861,10 @@ suite("RunSession#run", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: { userRole: "developer" },
     });
 
     await session.run({
-      context: { userRole: "developer" },
       input: [
         {
           type: "message",
@@ -896,11 +901,11 @@ suite("RunSession#runStream", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: {},
     });
 
     const events: AgentStreamEvent[] = [];
     const generator = session.runStream({
-      context: {},
       input: [
         {
           type: "message",
@@ -958,7 +963,7 @@ suite("RunSession#runStream", () => {
       is_error: false,
     }));
 
-    const tool = createMockTool("test_tool", null, toolExecute);
+    const tool = createMockTool<object>("test_tool", null, toolExecute);
 
     const model = new MockLanguageModel();
     model.enqueueStreamResult({
@@ -985,11 +990,11 @@ suite("RunSession#runStream", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [tool],
+      context: {},
     });
 
     const events = [];
     const generator = session.runStream({
-      context: {},
       input: [
         {
           type: "message",
@@ -1109,7 +1114,7 @@ suite("RunSession#runStream", () => {
       is_error: false,
     }));
 
-    const tool = createMockTool("calculator", null, toolExecute);
+    const tool = createMockTool<object>("calculator", null, toolExecute);
 
     const model = new MockLanguageModel();
     model.enqueueStreamResult({
@@ -1143,11 +1148,11 @@ suite("RunSession#runStream", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [tool],
+      context: {},
     });
 
     const events = [];
     const generator = session.runStream({
-      context: {},
       input: [
         {
           type: "message",
@@ -1307,7 +1312,7 @@ suite("RunSession#runStream", () => {
       is_error: false,
     }));
 
-    const tool = createMockTool("test_tool", null, toolExecute);
+    const tool = createMockTool<object>("test_tool", null, toolExecute);
 
     const model = new MockLanguageModel();
     model.enqueueStreamResult({
@@ -1348,10 +1353,10 @@ suite("RunSession#runStream", () => {
       max_turns: 2,
       response_format: { type: "text" },
       tools: [tool],
+      context: {},
     });
 
     const generator = session.runStream({
-      context: {},
       input: [
         {
           type: "message",
@@ -1388,10 +1393,10 @@ suite("RunSession#runStream", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: {},
     });
 
     const generator = session.runStream({
-      context: {},
       input: [
         {
           type: "message",
@@ -1429,10 +1434,10 @@ suite("RunSession#runStream", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: {},
     });
 
     const generator = session.runStream({
-      context: {},
       input: [
         {
           type: "message",
@@ -1471,10 +1476,10 @@ suite("RunSession lifecycle", () => {
       max_turns: 10,
       response_format: { type: "text" },
       tools: [],
+      context: {},
     });
 
     await session.run({
-      context: {},
       input: [
         {
           type: "message",
@@ -1489,7 +1494,6 @@ suite("RunSession lifecycle", () => {
     await t.assert.rejects(
       async () => {
         await session.run({
-          context: {},
           input: [
             {
               type: "message",

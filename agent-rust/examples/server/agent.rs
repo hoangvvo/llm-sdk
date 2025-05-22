@@ -74,7 +74,11 @@ pub fn create_agent(
                 ))
             })
             .add_instruction(
-                "For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).\\nKeep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.",
+                "For substantive deliverables (documents/specs/code), use the artifact tools \
+                 (artifact_create, artifact_update, artifact_get, artifact_list, \
+                 artifact_delete).\\nKeep chat replies brief and put the full document content \
+                 into artifacts via these tools, rather than pasting large content into chat. \
+                 Reference documents by their id.",
             );
     }
 

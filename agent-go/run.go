@@ -13,26 +13,53 @@ import (
 // RunSession manages the run session for an agent.
 // It initializes all necessary components for the agent to run
 // and handles the execution of the agent's tasks.
-// Once finish, the session cleans up any resources used during the run.
-// The session can be reused in multiple runs.
+// Once finished, the session cleans up any resources used during the run.
+//
+// The session can be reused in multiple runs. RunSession binds to a specific
+// context value that is used when resolving instructions and invoking tools,
+// while input items remain per run and are supplied to each invocation.
 type RunSession[C any] struct {
-	params *AgentParams[C]
+	params       *AgentParams[C] // RunSession params stores the agent configuration used during the run.
+	contextVal   C               // RunSession contextVal is the bound context value used for instructions and tool executions.
+	systemPrompt *string         // RunSession systemPrompt caches the resolved instructions as a system prompt.
+	initialized  bool            // RunSession initialized ensures the session is ready before running.
 }
 
-// NewRunSession creates a new run session and initializes dependencies
+// NewRunSession creates a new run session, resolves instructions, and initializes dependencies.
 func NewRunSession[C any](
+	ctx context.Context,
 	params *AgentParams[C],
-) *RunSession[C] {
-	return &RunSession[C]{
-		params: params,
+	contextVal C,
+) (*RunSession[C], error) {
+	session := &RunSession[C]{
+		params:     params,
+		contextVal: contextVal,
 	}
+
+	if err := session.initialize(ctx); err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+func (s *RunSession[C]) initialize(ctx context.Context) error {
+	if len(s.params.Instructions) > 0 {
+		prompt, err := getPrompt(ctx, s.params.Instructions, s.contextVal)
+		if err != nil {
+			return NewInitError(err)
+		}
+		s.systemPrompt = &prompt
+	}
+
+	s.initialized = true
+	return nil
 }
 
 // process processes the model response and decide whether to continue the loop or
 // return the response
 func (s *RunSession[C]) process(
 	ctx context.Context,
-	contextVal C,
 	runState *RunState,
 	content []llmsdk.Part,
 ) *stream.Stream[ProcessEvents] {
@@ -82,7 +109,7 @@ func (s *RunSession[C]) process(
 				toolCallPart.ToolName,
 				agentTool.Description(),
 				func(ctx context.Context) (AgentToolResult, error) {
-					res, err := agentTool.Execute(ctx, toolCallPart.Args, contextVal, runState)
+					res, err := agentTool.Execute(ctx, toolCallPart.Args, s.contextVal, runState)
 					if err != nil {
 						return AgentToolResult{}, NewToolExecutionError(err)
 					}
@@ -111,7 +138,11 @@ func (s *RunSession[C]) process(
 }
 
 // Run runs a non-streaming execution of the agent.
-func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResponse, error) {
+func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*AgentResponse, error) {
+	if !s.initialized {
+		return nil, NewInvariantError("run session not initialized")
+	}
+
 	span, ctx := NewAgentSpan(ctx, s.params.Name, "run")
 	var err error
 	defer func() {
@@ -123,11 +154,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 	state := NewRunState(request.Input, s.params.MaxTurns)
 
-	input, err := s.getLLMInput(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-	contextVal := request.Context
+	input := s.getLLMInput()
 
 	for {
 		input.Messages = state.GetTurnMessages()
@@ -142,7 +169,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 
 		state.AppendModelResponse(*modelResponse)
 
-		processStream := s.process(ctx, contextVal, state, content)
+		processStream := s.process(ctx, state, content)
 		for processStream.Next() {
 			event := processStream.Current()
 			if event.Response != nil {
@@ -168,17 +195,17 @@ func (s *RunSession[C]) Run(ctx context.Context, request AgentRequest[C]) (*Agen
 	}
 }
 
-// Run a streaming execution of the agent.
-func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*AgentStream, error) {
+// RunStream runs a streaming execution of the agent.
+func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest) (*AgentStream, error) {
+	if !s.initialized {
+		return nil, NewInvariantError("run session not initialized")
+	}
+
 	span, ctx := NewAgentSpan(ctx, s.params.Name, "run_stream")
 
 	state := NewRunState(request.Input, s.params.MaxTurns)
 
-	input, err := s.getLLMInput(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-	contextVal := request.Context
+	input := s.getLLMInput()
 
 	eventChan := make(chan *AgentStreamEvent)
 	errChan := make(chan error, 1)
@@ -240,7 +267,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 
 			eventChan <- NewAgentStreamItemEvent(index, item)
 
-			processStream := s.process(ctx, contextVal, state, content)
+			processStream := s.process(ctx, state, content)
 			for processStream.Next() {
 				event := processStream.Current()
 				if event.Response != nil {
@@ -276,10 +303,11 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request AgentRequest[C]) 
 }
 
 func (s *RunSession[C]) Finish() {
-	// Cleanup dependencies if needed
+	s.initialized = false
+	s.systemPrompt = nil
 }
 
-func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]) (*llmsdk.LanguageModelInput, error) {
+func (s *RunSession[C]) getLLMInput() *llmsdk.LanguageModelInput {
 	// Convert AgentTool to SDK Tool
 	var tools []llmsdk.Tool
 	for _, tool := range s.params.Tools {
@@ -290,19 +318,10 @@ func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]
 		})
 	}
 
-	var systemPrompt *string
-	if len(s.params.Instructions) > 0 {
-		prompt, err := getPrompt(ctx, s.params.Instructions, request.Context)
-		if err != nil {
-			return nil, NewInitError(err)
-		}
-		systemPrompt = &prompt
-	}
-
 	return &llmsdk.LanguageModelInput{
 		// messages will be computed from getTurnMessages
 		Messages:         nil,
-		SystemPrompt:     systemPrompt,
+		SystemPrompt:     s.systemPrompt,
 		Tools:            tools,
 		ResponseFormat:   s.params.ResponseFormat,
 		Temperature:      s.params.Temperature,
@@ -313,7 +332,13 @@ func (s *RunSession[C]) getLLMInput(ctx context.Context, request AgentRequest[C]
 		Modalities:       s.params.Modalities,
 		Audio:            s.params.Audio,
 		Reasoning:        s.params.Reasoning,
-	}, nil
+	}
+}
+
+// RunSessionRequest contains the input used for a run.
+type RunSessionRequest struct {
+	// Input holds the items to seed the run, such as LLM messages.
+	Input []AgentItem
 }
 
 // ProcessEvents represents the sum type of events returned by the process function.

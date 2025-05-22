@@ -18,9 +18,12 @@ export class Agent<TContext> {
    * Create a one-time run of the agent and generate a response.
    * A session is created for the run and cleaned up afterwards.
    */
-  async run(request: AgentRequest<TContext>): Promise<AgentResponse> {
-    const runSession = await this.createSession();
-    const result = runSession.run(request);
+  async run({
+    input,
+    context,
+  }: AgentRequest<TContext>): Promise<AgentResponse> {
+    const runSession = await this.createSession(context);
+    const result = runSession.run({ input });
     await runSession.finish();
     return result;
   }
@@ -29,11 +32,12 @@ export class Agent<TContext> {
    * Create a one-time streaming run of the agent and generate a response.
    * A session is created for the run and cleaned up afterwards.
    */
-  async *runStream(
-    request: AgentRequest<TContext>,
-  ): AsyncGenerator<AgentStreamEvent, AgentResponse> {
-    const runSession = await this.createSession();
-    const stream = runSession.runStream(request);
+  async *runStream({
+    input,
+    context,
+  }: AgentRequest<TContext>): AsyncGenerator<AgentStreamEvent, AgentResponse> {
+    const runSession = await this.createSession(context);
+    const stream = runSession.runStream({ input });
 
     let current = await stream.next();
     while (!current.done) {
@@ -49,7 +53,7 @@ export class Agent<TContext> {
   /**
    * Create a session for stateful multiple runs of the agent
    */
-  async createSession(): Promise<RunSession<TContext>> {
-    return RunSession.create(this.#params);
+  async createSession(context: TContext): Promise<RunSession<TContext>> {
+    return RunSession.create({ context, ...this.#params });
   }
 }

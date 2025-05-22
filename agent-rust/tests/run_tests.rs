@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
 use llm_agent::{
-    AgentError, AgentItem, AgentItemTool, AgentParams, AgentRequest, AgentResponse,
-    AgentStreamEvent, AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam,
-    RunSession, RunState,
+    AgentError, AgentItem, AgentItemTool, AgentParams, AgentResponse, AgentStreamEvent,
+    AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam, RunSession,
+    RunSessionRequest, RunState,
 };
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
@@ -92,6 +92,15 @@ impl AgentTool<()> for MockTool {
     }
 }
 
+async fn new_run_session<TCtx>(params: Arc<AgentParams<TCtx>>, context: TCtx) -> RunSession<TCtx>
+where
+    TCtx: Send + Sync + 'static,
+{
+    RunSession::new(params, context)
+        .await
+        .expect("failed to create run session")
+}
+
 #[tokio::test]
 async fn run_returns_response_when_no_tool_call() {
     let model = Arc::new(MockLanguageModel::new());
@@ -100,11 +109,10 @@ async fn run_returns_response_when_no_tool_call() {
         ..Default::default()
     });
 
-    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model))).await;
+    let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
     let response = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Hello!")],
             }))],
@@ -148,14 +156,14 @@ async fn run_executes_single_tool_call_and_returns_response() {
         ..Default::default()
     });
 
-    let session = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model).add_tool(tool.clone()),
-    ))
+    let session = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model).add_tool(tool.clone())),
+        (),
+    )
     .await;
 
     let response = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Use the tool")],
             }))],
@@ -227,16 +235,18 @@ async fn run_executes_multiple_tool_calls_in_parallel() {
         cost: Some(0.0003),
     });
 
-    let session = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model)
-            .add_tool(tool1.clone())
-            .add_tool(tool2.clone()),
-    ))
+    let session = new_run_session(
+        Arc::new(
+            AgentParams::new("test_agent", model)
+                .add_tool(tool1.clone())
+                .add_tool(tool2.clone()),
+        ),
+        (),
+    )
     .await;
 
     let response = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Use both tools")],
             }))],
@@ -314,14 +324,14 @@ async fn run_handles_multiple_turns_with_tool_calls() {
         ..Default::default()
     });
 
-    let session = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model).add_tool(tool.clone()),
-    ))
+    let session = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model).add_tool(tool.clone())),
+        (),
+    )
     .await;
 
     let response = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Calculate some numbers")],
             }))],
@@ -403,16 +413,18 @@ async fn run_throws_max_turns_exceeded_error() {
         ..Default::default()
     });
 
-    let session = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model)
-            .add_tool(tool)
-            .max_turns(2),
-    ))
+    let session = new_run_session(
+        Arc::new(
+            AgentParams::new("test_agent", model)
+                .add_tool(tool)
+                .max_turns(2),
+        ),
+        (),
+    )
     .await;
 
     let result = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Keep using tools")],
             }))],
@@ -433,11 +445,10 @@ async fn run_throws_invariant_error_when_tool_not_found() {
         ..Default::default()
     });
 
-    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model))).await;
+    let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
     let result = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Use a tool")],
             }))],
@@ -469,14 +480,14 @@ async fn run_throws_tool_execution_error() {
         ..Default::default()
     });
 
-    let session = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model).add_tool(failing_tool),
-    ))
+    let session = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model).add_tool(failing_tool)),
+        (),
+    )
     .await;
 
     let result = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Use the tool")],
             }))],
@@ -510,14 +521,14 @@ async fn run_handles_tool_returning_error_result() {
         ..Default::default()
     });
 
-    let session = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model).add_tool(tool.clone()),
-    ))
+    let session = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model).add_tool(tool.clone())),
+        (),
+    )
     .await;
 
     let response = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Use the tool")],
             }))],
@@ -562,19 +573,21 @@ async fn run_passes_sampling_parameters_to_model() {
         ..Default::default()
     });
 
-    let session = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model.clone())
-            .temperature(0.7)
-            .top_p(0.9)
-            .top_k(40)
-            .presence_penalty(0.1)
-            .frequency_penalty(0.2),
-    ))
+    let session = new_run_session(
+        Arc::new(
+            AgentParams::new("test_agent", model.clone())
+                .temperature(0.7)
+                .top_p(0.9)
+                .top_k(40)
+                .presence_penalty(0.1)
+                .frequency_penalty(0.2),
+        ),
+        (),
+    )
     .await;
 
     session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Hello")],
             }))],
@@ -599,11 +612,10 @@ async fn run_throws_language_model_error_when_generation_fails() {
         "API quota exceeded".to_string(),
     )));
 
-    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model))).await;
+    let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
     let result = session
-        .run(AgentRequest {
-            context: (),
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Hello")],
             }))],
@@ -631,7 +643,7 @@ async fn run_includes_string_and_dynamic_function_instructions() {
         ..Default::default()
     });
 
-    let session: RunSession<TestContext> = RunSession::new(Arc::new(
+    let params = Arc::new(
         AgentParams::new("test_agent", model.clone()).instructions(vec![
             InstructionParam::String("You are a helpful assistant.".to_string()),
             InstructionParam::Func(Box::new(|ctx: &TestContext| {
@@ -639,14 +651,18 @@ async fn run_includes_string_and_dynamic_function_instructions() {
             })),
             InstructionParam::String("Always be polite.".to_string()),
         ]),
-    ))
+    );
+
+    let session: RunSession<TestContext> = new_run_session(
+        params,
+        TestContext {
+            user_role: "developer".to_string(),
+        },
+    )
     .await;
 
     session
-        .run(AgentRequest {
-            context: TestContext {
-                user_role: "developer".to_string(),
-            },
+        .run(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Hello")],
             }))],
@@ -695,11 +711,11 @@ async fn run_stream_streams_response_when_no_tool_call() {
         },
     ]);
 
-    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model.clone()))).await;
+    let session =
+        new_run_session(Arc::new(AgentParams::new("test_agent", model.clone())), ()).await;
 
     let events = session
-        .run_stream(AgentRequest {
-            context: (),
+        .run_stream(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Hi")],
             }))],
@@ -804,12 +820,12 @@ async fn run_stream_streams_tool_call_execution_and_response() {
         },
     ]);
 
-    let events = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model).add_tool(tool.clone()),
-    ))
+    let events = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model).add_tool(tool.clone())),
+        (),
+    )
     .await
-    .run_stream(AgentRequest {
-        context: (),
+    .run_stream(RunSessionRequest {
         input: vec![AgentItem::Message(Message::User(UserMessage {
             content: vec![Part::text("Use tool")],
         }))],
@@ -950,12 +966,12 @@ async fn run_stream_handles_multiple_turns() {
         ..Default::default()
     }]);
 
-    let events = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model).add_tool(tool.clone()),
-    ))
+    let events = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model).add_tool(tool.clone())),
+        (),
+    )
     .await
-    .run_stream(AgentRequest {
-        context: (),
+    .run_stream(RunSessionRequest {
         input: vec![AgentItem::Message(Message::User(UserMessage {
             content: vec![Part::text("Calculate")],
         }))],
@@ -1128,14 +1144,16 @@ async fn run_stream_throws_max_turns_exceeded_error() {
         ..Default::default()
     }]);
 
-    let result = RunSession::new(Arc::new(
-        AgentParams::new("test_agent", model)
-            .add_tool(tool)
-            .max_turns(2),
-    ))
+    let result = new_run_session(
+        Arc::new(
+            AgentParams::new("test_agent", model)
+                .add_tool(tool)
+                .max_turns(2),
+        ),
+        (),
+    )
     .await
-    .run_stream(AgentRequest {
-        context: (),
+    .run_stream(RunSessionRequest {
         input: vec![AgentItem::Message(Message::User(UserMessage {
             content: vec![Part::text("Keep using tools")],
         }))],
@@ -1168,10 +1186,9 @@ async fn run_stream_throws_language_model_error() {
         "Rate limit exceeded".to_string(),
     )));
 
-    let result = RunSession::new(Arc::new(AgentParams::new("test_agent", model)))
+    let result = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ())
         .await
-        .run_stream(AgentRequest {
-            context: (),
+        .run_stream(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Hello")],
             }))],

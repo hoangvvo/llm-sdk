@@ -7,18 +7,18 @@ import type {
 
 export interface AgentRequest<TContext> {
   /**
-   * The input items to the agent, such as LLM messages.
+   * The input items for this run, such as LLM messages.
    */
   input: AgentItem[];
   /**
-   * The context to be used during tool calling and building system instructions
+   * The context used to resolve instructions and passed to tool executions.
    */
   context: TContext;
 }
 
 export interface AgentResponse {
   /**
-   * The items generated during the agent's execution, such as new ToolMessage and AssistantMessage
+   * The items generated during the run, such as new tool and assistant messages.
    */
   output: AgentItem[];
 

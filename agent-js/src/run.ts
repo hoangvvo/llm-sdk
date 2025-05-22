@@ -24,7 +24,6 @@ import type {
   AgentItem,
   AgentItemModelResponse,
   AgentItemTool,
-  AgentRequest,
   AgentResponse,
   AgentStreamEvent,
 } from "./types.ts";
@@ -35,29 +34,45 @@ import type {
  * and handles the execution of the agent's tasks.
  * Once finished, the session cleans up any resources used during the run.
  * The session can be reused in multiple runs.
+ *
+ * A RunSession binds to a specific context value, which is used to resolve
+ * instructions and passed to tool executions. Input items remain per run and are
+ * supplied when invoking `run` or `runStream`.
  */
 export class RunSession<TContext> {
   #initialized: boolean;
   #params: AgentParamsWithDefaults<TContext>;
+  #context: TContext;
+  #system_prompt?: string;
 
-  constructor(inputParams: AgentParams<TContext>) {
+  constructor({ context, ...agentParams }: RunSessionParams<TContext>) {
     this.#initialized = false;
-    this.#params = agentParamsWithDefaults(inputParams);
+    this.#params = agentParamsWithDefaults(agentParams);
+    this.#context = context;
   }
 
   /**
    * Create a new run session and initializes dependencies
    */
   static async create<TContext>(
-    params: AgentParams<TContext>,
+    params: RunSessionParams<TContext>,
   ): Promise<RunSession<TContext>> {
     const session = new RunSession(params);
     await session.#initialize();
     return session;
   }
 
+  // Initialize any resources needed for the run session
   async #initialize() {
-    // Initialize any resources needed for the run session
+    // Resolve the instructions using the provided context
+    if (this.#params.instructions.length > 0) {
+      const systemPrompt = await getPromptForInstructionParams(
+        this.#params.instructions,
+        this.#context,
+      );
+      this.#system_prompt = systemPrompt;
+    }
+
     this.#initialized = true;
     return Promise.resolve();
   }
@@ -67,7 +82,6 @@ export class RunSession<TContext> {
    * return the response
    */
   async *#process(
-    context: TContext,
     state: RunState,
     content: Part[],
   ): AsyncGenerator<ProcessEvents> {
@@ -98,7 +112,11 @@ export class RunSession<TContext> {
         agentTool.description,
         async () => {
           try {
-            return await agentTool.execute(toolCallPart.args, context, state);
+            return await agentTool.execute(
+              toolCallPart.args,
+              this.#context,
+              state,
+            );
           } catch (e) {
             throw new AgentToolExecutionError(e);
           }
@@ -128,9 +146,9 @@ export class RunSession<TContext> {
   /**
    * Run a non-streaming execution of the agent.
    */
-  async run(request: AgentRequest<TContext>): Promise<AgentResponse> {
+  async run(request: RunSessionRequest): Promise<AgentResponse> {
     if (!this.#initialized) {
-      throw new Error("RunSession not initialized.");
+      throw new AgentInvariantError("RunSession not initialized.");
     }
 
     const span = new AgentSpan(this.#params.name, "run");
@@ -138,8 +156,7 @@ export class RunSession<TContext> {
     try {
       const state = new RunState(request.input, this.#params.max_turns);
 
-      const input = await span.withContext(() => this.#getLlmInput(request));
-      const context = request.context;
+      const input = this.#getLlmInput();
 
       for (;;) {
         const modelResponse: ModelResponse = await span.withContext(
@@ -163,7 +180,7 @@ export class RunSession<TContext> {
 
         state.appendModelResponse(modelResponse);
 
-        const processStream = this.#process(context, state, content);
+        const processStream = this.#process(state, content);
         // Patch next to propogate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalNext = processStream.next.bind(processStream);
@@ -198,10 +215,10 @@ export class RunSession<TContext> {
    * Run a streaming execution of the agent.
    */
   async *runStream(
-    request: AgentRequest<TContext>,
+    request: RunSessionRequest,
   ): AsyncGenerator<AgentStreamEvent, AgentResponse> {
     if (!this.#initialized) {
-      throw new Error("RunSession not initialized.");
+      throw new AgentInvariantError("RunSession not initialized.");
     }
 
     const span = new AgentSpan(this.#params.name, "run_stream");
@@ -209,8 +226,7 @@ export class RunSession<TContext> {
     try {
       const state = new RunState(request.input, this.#params.max_turns);
 
-      const input = await span.withContext(() => this.#getLlmInput(request));
-      const context = request.context;
+      const input = this.#getLlmInput();
 
       for (;;) {
         const modelStream = this.#params.model.stream({
@@ -251,7 +267,7 @@ export class RunSession<TContext> {
 
         const { content } = response;
 
-        const processStream = this.#process(context, state, content);
+        const processStream = this.#process(state, content);
         // Patch next to propogate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalProcessStreamNext =
@@ -302,9 +318,7 @@ export class RunSession<TContext> {
     return Promise.resolve();
   }
 
-  async #getLlmInput(
-    request: AgentRequest<TContext>,
-  ): Promise<LanguageModelInput> {
+  #getLlmInput(): LanguageModelInput {
     try {
       const input: LanguageModelInput = {
         // messages will be computed from getTurnMessages
@@ -312,12 +326,8 @@ export class RunSession<TContext> {
         response_format: this.#params.response_format,
       };
 
-      if (this.#params.instructions.length > 0) {
-        const systemPrompt = await getPromptForInstructionParams(
-          this.#params.instructions,
-          request.context,
-        );
-        input.system_prompt = systemPrompt;
+      if (this.#system_prompt) {
+        input.system_prompt = this.#system_prompt;
       }
 
       if (this.#params.tools.length > 0) {
@@ -358,6 +368,24 @@ export class RunSession<TContext> {
       throw new AgentInitError(err);
     }
   }
+}
+
+/**
+ * RunSessionParams represents the parameters needed to create a RunSession.
+ * It extends AgentParams to also include context for the agent.
+ */
+export interface RunSessionParams<TContext> extends AgentParams<TContext> {
+  /**
+   * The context to be used during tool calling and building system instructions
+   */
+  context: TContext;
+}
+
+/**
+ * RunSessionRequest contains the input used for a run.
+ */
+export interface RunSessionRequest {
+  input: AgentItem[];
 }
 
 /**

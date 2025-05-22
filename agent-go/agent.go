@@ -44,9 +44,12 @@ func NewAgent[C any](name string, model llmsdk.LanguageModel, options ...AgentPa
 // Run creates a one-time run of the agent and generates a response.
 // A session is created for the run and cleaned up afterwards.
 func (a *Agent[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResponse, error) {
-	session := a.CreateSession()
+	session, err := a.CreateSession(ctx, request.Context)
+	if err != nil {
+		return nil, err
+	}
 	defer session.Finish()
-	result, err := session.Run(ctx, request)
+	result, err := session.Run(ctx, RunSessionRequest{Input: request.Input})
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +59,11 @@ func (a *Agent[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResp
 // RunStream creates a one-time streaming run of the agent and generates a response.
 // A session is created for the run and cleaned up afterwards.
 func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*AgentStream, error) {
-	session := a.CreateSession()
-	agentStream, err := session.RunStream(ctx, request)
+	session, err := a.CreateSession(ctx, request.Context)
+	if err != nil {
+		return nil, err
+	}
+	agentStream, err := session.RunStream(ctx, RunSessionRequest{Input: request.Input})
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +88,7 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 	return stream.New(eventChan, errChan), nil
 }
 
-func (a *Agent[C]) CreateSession() *RunSession[C] {
-	return NewRunSession(a.params)
+// CreateSession creates an initialized session for stateful multiple runs of the agent using the provided context value.
+func (a *Agent[C]) CreateSession(ctx context.Context, contextVal C) (*RunSession[C], error) {
+	return NewRunSession(ctx, a.params, contextVal)
 }
