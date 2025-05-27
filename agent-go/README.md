@@ -233,6 +233,7 @@ Find examples in the [examples](./examples/) folder:
 - [`agent`: Simple Example](./examples/agent/main.go)
 - [`instructions`: Static and dynamic instructions](./examples/instructions/main.go)
 - [`tools`: Executable tools](./examples/tools/main.go)
+- [`toolkits`: Dynamic, stateful tools and instructions](./examples/toolkit/main.go)
 - [`structured-output`: Structured Output](./examples/structured-output/main.go)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation/main.go)
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts/main.go)

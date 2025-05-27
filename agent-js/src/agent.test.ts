@@ -5,7 +5,7 @@ import test, { suite, type TestContext } from "node:test";
 import { Agent } from "./agent.ts";
 
 suite("Agent#run", () => {
-  test("creates session, runs, and finishes", async (t: TestContext) => {
+  test("creates session, runs, and closes", async (t: TestContext) => {
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
       response: { content: [{ type: "text", text: "Mock response" }] },
@@ -39,7 +39,7 @@ suite("Agent#run", () => {
 });
 
 suite("Agent#runStream", () => {
-  test("creates session, streams, and finishes", async (t: TestContext) => {
+  test("creates session, streams, and closes", async (t: TestContext) => {
     const model = new MockLanguageModel();
     model.enqueueStreamResult({
       partials: [

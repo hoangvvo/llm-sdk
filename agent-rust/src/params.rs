@@ -1,4 +1,4 @@
-use crate::{Agent, AgentTool, InstructionParam};
+use crate::{Agent, AgentTool, InstructionParam, Toolkit};
 use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions, ResponseFormatOption};
 use std::sync::Arc;
 
@@ -25,7 +25,9 @@ pub struct AgentParams<TCtx> {
     /// agent.
     pub instructions: Vec<InstructionParam<TCtx>>,
     /// The tools that the agent can use to perform tasks.
-    pub tools: Vec<Box<dyn AgentTool<TCtx>>>,
+    pub tools: Vec<Arc<dyn AgentTool<TCtx>>>,
+    /// Optional toolkits that can provide dynamic tools and system prompts for each session.
+    pub toolkits: Vec<Arc<dyn Toolkit<TCtx>>>,
     /// The expected format of the response. Either text or structured output.
     pub response_format: ResponseFormatOption,
     /// Max number of turns for agent to run to protect against infinite loops.
@@ -66,6 +68,7 @@ where
             model,
             instructions: Vec::new(),
             tools: Vec::new(),
+            toolkits: Vec::new(),
             response_format: ResponseFormatOption::Text,
             max_turns: 10,
             temperature: None,
@@ -96,7 +99,21 @@ where
     /// Add a tool
     #[must_use]
     pub fn add_tool(mut self, tool: impl AgentTool<TCtx> + 'static) -> Self {
-        self.tools.push(Box::new(tool));
+        self.tools.push(Arc::new(tool));
+        self
+    }
+
+    /// Add a toolkit
+    #[must_use]
+    pub fn add_toolkit(mut self, toolkit: impl Toolkit<TCtx> + 'static) -> Self {
+        self.toolkits.push(Arc::new(toolkit));
+        self
+    }
+
+    /// Set the toolkits
+    #[must_use]
+    pub fn toolkits(mut self, toolkits: Vec<Arc<dyn Toolkit<TCtx>>>) -> Self {
+        self.toolkits = toolkits;
         self
     }
 

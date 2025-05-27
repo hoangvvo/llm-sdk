@@ -16,6 +16,7 @@ export default [
     },
   },
   pluginJs.configs.recommended,
+  ...tseslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked.map((config) => ({
     ...config,
     files: ["**/src/**/*.{ts,tsx}"],

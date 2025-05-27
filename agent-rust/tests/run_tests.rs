@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+type DynError = Box<dyn std::error::Error + Send + Sync>;
+
 use futures::{StreamExt, TryStreamExt};
 use llm_agent::{
     AgentError, AgentItem, AgentItemTool, AgentParams, AgentResponse, AgentStreamEvent,
     AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam, RunSession,
-    RunSessionRequest, RunState,
+    RunSessionRequest, RunState, Toolkit, ToolkitSession,
 };
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
@@ -13,10 +15,7 @@ use llm_sdk::{
 };
 use serde_json::{json, Value};
 
-type ExecuteFn = dyn for<'a> Fn(
-        Value,
-        &'a RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>
+type ExecuteFn = dyn for<'a> Fn(Value, &'a RunState) -> Result<AgentToolResult, DynError>
     + Send
     + Sync
     + 'static;
@@ -44,11 +43,7 @@ impl MockTool {
 
     fn with_execute_fn<F>(name: &str, result: AgentToolResult, execute: F) -> Self
     where
-        F: for<'a> Fn(
-                Value,
-                &'a RunState,
-            )
-                -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>
+        F: for<'a> Fn(Value, &'a RunState) -> Result<AgentToolResult, DynError>
             + Send
             + Sync
             + 'static,
@@ -64,6 +59,174 @@ impl MockTool {
 
     fn recorded_calls(&self) -> Vec<Value> {
         self.all_calls.lock().unwrap().clone()
+    }
+}
+
+struct MockToolkitSessionState<TCtx> {
+    system_prompt: Option<String>,
+    tools: Vec<Arc<dyn AgentTool<TCtx>>>,
+    system_prompt_calls: std::sync::Mutex<usize>,
+    tools_calls: std::sync::Mutex<usize>,
+    close_calls: std::sync::Mutex<usize>,
+}
+
+impl<TCtx> MockToolkitSessionState<TCtx> {
+    fn new(system_prompt: Option<String>, tools: Vec<Arc<dyn AgentTool<TCtx>>>) -> Arc<Self> {
+        Arc::new(Self {
+            system_prompt,
+            tools,
+            system_prompt_calls: std::sync::Mutex::new(0),
+            tools_calls: std::sync::Mutex::new(0),
+            close_calls: std::sync::Mutex::new(0),
+        })
+    }
+
+    fn system_prompt_calls(&self) -> usize {
+        *self.system_prompt_calls.lock().unwrap()
+    }
+
+    fn tools_calls(&self) -> usize {
+        *self.tools_calls.lock().unwrap()
+    }
+
+    fn close_calls(&self) -> usize {
+        *self.close_calls.lock().unwrap()
+    }
+}
+
+struct MockToolkitSession<TCtx> {
+    state: Arc<MockToolkitSessionState<TCtx>>,
+}
+
+#[async_trait::async_trait]
+impl<TCtx> ToolkitSession<TCtx> for MockToolkitSession<TCtx>
+where
+    TCtx: Send + Sync + 'static,
+{
+    fn system_prompt(&self) -> Option<String> {
+        let mut calls = self.state.system_prompt_calls.lock().unwrap();
+        *calls += 1;
+        self.state.system_prompt.clone()
+    }
+
+    fn tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
+        let mut calls = self.state.tools_calls.lock().unwrap();
+        *calls += 1;
+        self.state.tools.clone()
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DynError> {
+        let mut calls = self.state.close_calls.lock().unwrap();
+        *calls += 1;
+        Ok(())
+    }
+}
+
+struct MockToolkit<TCtx> {
+    state: Arc<MockToolkitSessionState<TCtx>>,
+    created_contexts: Arc<std::sync::Mutex<Vec<TCtx>>>,
+}
+
+impl<TCtx> MockToolkit<TCtx>
+where
+    TCtx: Clone,
+{
+    fn new(state: Arc<MockToolkitSessionState<TCtx>>) -> Self {
+        Self {
+            state,
+            created_contexts: Arc::new(std::sync::Mutex::new(Vec::new())),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<TCtx> Toolkit<TCtx> for MockToolkit<TCtx>
+where
+    TCtx: Send + Sync + Clone + 'static,
+{
+    async fn create_session(
+        &self,
+        context: &TCtx,
+    ) -> Result<Box<dyn ToolkitSession<TCtx> + Send + Sync>, DynError> {
+        self.created_contexts.lock().unwrap().push(context.clone());
+        Ok(Box::new(MockToolkitSession {
+            state: self.state.clone(),
+        }))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct CustomerContext {
+    customer: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct OrderExecution {
+    context: CustomerContext,
+    args: Value,
+    turn: usize,
+}
+
+#[derive(Clone, Default)]
+struct LookupOrderTool {
+    executions: Arc<std::sync::Mutex<Vec<OrderExecution>>>,
+}
+
+impl LookupOrderTool {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn executions(&self) -> Vec<OrderExecution> {
+        self.executions.lock().unwrap().clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl AgentTool<CustomerContext> for LookupOrderTool {
+    fn name(&self) -> String {
+        "lookup-order".to_string()
+    }
+
+    fn description(&self) -> String {
+        "Lookup an order by ID".to_string()
+    }
+
+    fn parameters(&self) -> JSONSchema {
+        json!({
+            "type": "object",
+            "properties": {
+                "orderId": { "type": "string" }
+            },
+            "required": ["orderId"],
+            "additionalProperties": false
+        })
+    }
+
+    async fn execute(
+        &self,
+        args: Value,
+        context: &CustomerContext,
+        state: &RunState,
+    ) -> Result<AgentToolResult, DynError> {
+        let order_id = args
+            .get("orderId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "missing orderId".to_string())?
+            .to_string();
+
+        let turn = *state.current_turn.lock().await;
+        self.executions.lock().unwrap().push(OrderExecution {
+            context: context.clone(),
+            args: args.clone(),
+            turn,
+        });
+
+        let text = format!("Order {order_id} ready for {}", context.customer);
+        Ok(AgentToolResult {
+            content: vec![Part::text(text)],
+            is_error: false,
+        })
     }
 }
 
@@ -92,13 +255,30 @@ impl AgentTool<()> for MockTool {
     }
 }
 
-async fn new_run_session<TCtx>(params: Arc<AgentParams<TCtx>>, context: TCtx) -> RunSession<TCtx>
+async fn new_run_session<TCtx>(
+    params: Arc<AgentParams<TCtx>>,
+    context: TCtx,
+) -> Arc<RunSession<TCtx>>
 where
     TCtx: Send + Sync + 'static,
 {
-    RunSession::new(params, context)
-        .await
-        .expect("failed to create run session")
+    Arc::new(
+        RunSession::new(params, context)
+            .await
+            .expect("failed to create run session"),
+    )
+}
+
+async fn close_run_session<TCtx>(session: Arc<RunSession<TCtx>>)
+where
+    TCtx: Send + Sync + 'static,
+{
+    match Arc::try_unwrap(session) {
+        Ok(run_session) => {
+            run_session.close().await.expect("close session succeeds");
+        }
+        Err(_) => panic!("session should not be shared at close"),
+    }
 }
 
 #[tokio::test]
@@ -129,6 +309,8 @@ async fn run_returns_response_when_no_tool_call() {
     };
 
     assert_eq!(response, expected);
+
+    close_run_session(session).await;
 }
 
 #[tokio::test]
@@ -653,7 +835,7 @@ async fn run_includes_string_and_dynamic_function_instructions() {
         ]),
     );
 
-    let session: RunSession<TestContext> = new_run_session(
+    let session = new_run_session(
         params,
         TestContext {
             user_role: "developer".to_string(),
@@ -676,6 +858,105 @@ async fn run_includes_string_and_dynamic_function_instructions() {
         inputs[0].system_prompt.as_deref(),
         Some("You are a helpful assistant.\nThe user is a developer.\nAlways be polite."),
     );
+
+    close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_merges_toolkit_prompts_and_tools() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call(
+            "call-1",
+            "lookup-order",
+            json!({"orderId": "123"}),
+        )],
+        ..Default::default()
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Order ready")],
+        ..Default::default()
+    });
+
+    let lookup_tool = Arc::new(LookupOrderTool::new());
+    let toolkit_session_state = MockToolkitSessionState::new(
+        Some("Toolkit prompt".to_string()),
+        vec![lookup_tool.clone()],
+    );
+    let toolkit = MockToolkit::new(toolkit_session_state.clone());
+    let contexts_handle = toolkit.created_contexts.clone();
+
+    let context = CustomerContext {
+        customer: "Ada".to_string(),
+    };
+
+    let session = new_run_session(
+        Arc::new(AgentParams::new("toolkit-agent", model.clone()).add_toolkit(toolkit)),
+        context.clone(),
+    )
+    .await;
+
+    let response = session
+        .run(RunSessionRequest {
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::text("Status?")],
+            }))],
+        })
+        .await
+        .expect("run succeeds");
+
+    assert_eq!(
+        contexts_handle.lock().unwrap().clone(),
+        vec![context.clone()]
+    );
+    assert_eq!(toolkit_session_state.system_prompt_calls(), 2);
+    assert_eq!(toolkit_session_state.tools_calls(), 2);
+
+    let executions = lookup_tool.executions();
+    assert_eq!(executions.len(), 1);
+    assert_eq!(executions[0].context, context);
+    assert_eq!(executions[0].args, json!({"orderId": "123"}));
+    assert_eq!(executions[0].turn, 0);
+
+    let inputs = model.tracked_generate_inputs();
+    assert_eq!(inputs.len(), 2);
+    for input in inputs {
+        assert_eq!(input.system_prompt, Some("Toolkit prompt".to_string()));
+        let tools = input.tools.expect("tools present");
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0].name, "lookup-order");
+    }
+
+    let expected = AgentResponse {
+        content: vec![Part::text("Order ready")],
+        output: vec![
+            AgentItem::Model(ModelResponse {
+                content: vec![Part::tool_call(
+                    "call-1",
+                    "lookup-order",
+                    json!({"orderId": "123"}),
+                )],
+                ..Default::default()
+            }),
+            AgentItem::Tool(AgentItemTool {
+                tool_call_id: "call-1".to_string(),
+                tool_name: "lookup-order".to_string(),
+                input: json!({"orderId": "123"}),
+                output: vec![Part::text("Order 123 ready for Ada")],
+                is_error: false,
+            }),
+            AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Order ready")],
+                ..Default::default()
+            }),
+        ],
+    };
+
+    assert_eq!(response, expected);
+
+    close_run_session(session).await;
+
+    assert_eq!(toolkit_session_state.close_calls(), 1);
 }
 
 #[tokio::test]
@@ -714,14 +995,17 @@ async fn run_stream_streams_response_when_no_tool_call() {
     let session =
         new_run_session(Arc::new(AgentParams::new("test_agent", model.clone())), ()).await;
 
-    let events = session
+    let stream = session
+        .clone()
         .run_stream(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Hi")],
             }))],
         })
         .await
-        .expect("run_stream succeeds")
+        .expect("run_stream succeeds");
+
+    let events = stream
         .map_err(|err| err.to_string())
         .try_collect::<Vec<_>>()
         .await
@@ -772,6 +1056,103 @@ async fn run_stream_streams_response_when_no_tool_call() {
     ];
 
     assert_eq!(events, expected);
+
+    close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_stream_merges_toolkit_prompts_and_tools() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::Text(TextPartDelta {
+                text: "Done".to_string(),
+            }),
+        }),
+        ..Default::default()
+    }]);
+
+    let lookup_tool = Arc::new(LookupOrderTool::new());
+    let toolkit_session_state = MockToolkitSessionState::new(
+        Some("Streaming toolkit prompt".to_string()),
+        vec![lookup_tool.clone()],
+    );
+    let toolkit = MockToolkit::new(toolkit_session_state.clone());
+    let contexts_handle = toolkit.created_contexts.clone();
+
+    let context = CustomerContext {
+        customer: "Ben".to_string(),
+    };
+
+    let session = new_run_session(
+        Arc::new(AgentParams::new("toolkit-stream-agent", model.clone()).add_toolkit(toolkit)),
+        context.clone(),
+    )
+    .await;
+
+    let stream = session
+        .clone()
+        .run_stream(RunSessionRequest {
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::text("Hello")],
+            }))],
+        })
+        .await
+        .expect("run_stream succeeds");
+
+    let events = stream
+        .map_err(|err| err.to_string())
+        .try_collect::<Vec<_>>()
+        .await
+        .expect("collect stream");
+
+    let expected = vec![
+        AgentStreamEvent::Partial(PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta {
+                    text: "Done".to_string(),
+                }),
+            }),
+            ..Default::default()
+        }),
+        AgentStreamEvent::Item(AgentStreamItemEvent {
+            index: 0,
+            item: AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Done")],
+                ..Default::default()
+            }),
+        }),
+        AgentStreamEvent::Response(AgentResponse {
+            content: vec![Part::text("Done")],
+            output: vec![AgentItem::Model(ModelResponse {
+                content: vec![Part::text("Done")],
+                ..Default::default()
+            })],
+        }),
+    ];
+
+    assert_eq!(events, expected);
+    assert_eq!(contexts_handle.lock().unwrap().clone(), vec![context]);
+    assert_eq!(toolkit_session_state.system_prompt_calls(), 1);
+    assert_eq!(toolkit_session_state.tools_calls(), 1);
+    assert!(lookup_tool.executions().is_empty());
+
+    let inputs = model.tracked_stream_inputs();
+    assert_eq!(inputs.len(), 1);
+    let input = &inputs[0];
+    assert_eq!(
+        input.system_prompt,
+        Some("Streaming toolkit prompt".to_string())
+    );
+    let tools = input.tools.clone().expect("tools present");
+    assert_eq!(tools.len(), 1);
+    assert_eq!(tools[0].name, "lookup-order");
+
+    close_run_session(session).await;
+
+    assert_eq!(toolkit_session_state.close_calls(), 1);
 }
 
 #[tokio::test]
@@ -820,22 +1201,27 @@ async fn run_stream_streams_tool_call_execution_and_response() {
         },
     ]);
 
-    let events = new_run_session(
+    let session = new_run_session(
         Arc::new(AgentParams::new("test_agent", model).add_tool(tool.clone())),
         (),
     )
-    .await
-    .run_stream(RunSessionRequest {
-        input: vec![AgentItem::Message(Message::User(UserMessage {
-            content: vec![Part::text("Use tool")],
-        }))],
-    })
-    .await
-    .expect("run_stream succeeds")
-    .map_err(|err| err.to_string())
-    .try_collect::<Vec<_>>()
-    .await
-    .expect("collect stream");
+    .await;
+
+    let stream = session
+        .clone()
+        .run_stream(RunSessionRequest {
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::text("Use tool")],
+            }))],
+        })
+        .await
+        .expect("run_stream succeeds");
+
+    let events = stream
+        .map_err(|err| err.to_string())
+        .try_collect::<Vec<_>>()
+        .await
+        .expect("collect stream");
 
     let expected = vec![
         AgentStreamEvent::Partial(PartialModelResponse {
@@ -915,6 +1301,8 @@ async fn run_stream_streams_tool_call_execution_and_response() {
     ];
 
     assert_eq!(events, expected);
+
+    close_run_session(session).await;
     assert_eq!(tool.recorded_calls(), vec![tool_args]);
 }
 
@@ -966,22 +1354,27 @@ async fn run_stream_handles_multiple_turns() {
         ..Default::default()
     }]);
 
-    let events = new_run_session(
+    let session = new_run_session(
         Arc::new(AgentParams::new("test_agent", model).add_tool(tool.clone())),
         (),
     )
-    .await
-    .run_stream(RunSessionRequest {
-        input: vec![AgentItem::Message(Message::User(UserMessage {
-            content: vec![Part::text("Calculate")],
-        }))],
-    })
-    .await
-    .expect("run_stream succeeds")
-    .map_err(|err| err.to_string())
-    .try_collect::<Vec<_>>()
-    .await
-    .expect("collect stream");
+    .await;
+
+    let stream = session
+        .clone()
+        .run_stream(RunSessionRequest {
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::text("Calculate")],
+            }))],
+        })
+        .await
+        .expect("run_stream succeeds");
+
+    let events = stream
+        .map_err(|err| err.to_string())
+        .try_collect::<Vec<_>>()
+        .await
+        .expect("collect stream");
 
     let expected = vec![
         AgentStreamEvent::Partial(PartialModelResponse {
@@ -1092,6 +1485,8 @@ async fn run_stream_handles_multiple_turns() {
     ];
 
     assert_eq!(events, expected);
+
+    close_run_session(session).await;
 }
 
 #[tokio::test]
@@ -1144,7 +1539,7 @@ async fn run_stream_throws_max_turns_exceeded_error() {
         ..Default::default()
     }]);
 
-    let result = new_run_session(
+    let session = new_run_session(
         Arc::new(
             AgentParams::new("test_agent", model)
                 .add_tool(tool)
@@ -1152,13 +1547,16 @@ async fn run_stream_throws_max_turns_exceeded_error() {
         ),
         (),
     )
-    .await
-    .run_stream(RunSessionRequest {
-        input: vec![AgentItem::Message(Message::User(UserMessage {
-            content: vec![Part::text("Keep using tools")],
-        }))],
-    })
     .await;
+
+    let result = session
+        .clone()
+        .run_stream(RunSessionRequest {
+            input: vec![AgentItem::Message(Message::User(UserMessage {
+                content: vec![Part::text("Keep using tools")],
+            }))],
+        })
+        .await;
 
     match result {
         Err(AgentError::MaxTurnsExceeded(_)) => {}
@@ -1177,6 +1575,8 @@ async fn run_stream_throws_max_turns_exceeded_error() {
             panic!("expected MaxTurnsExceeded error")
         }
     }
+
+    close_run_session(session).await;
 }
 
 #[tokio::test]
@@ -1186,8 +1586,10 @@ async fn run_stream_throws_language_model_error() {
         "Rate limit exceeded".to_string(),
     )));
 
-    let result = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ())
-        .await
+    let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
+
+    let result = session
+        .clone()
         .run_stream(RunSessionRequest {
             input: vec![AgentItem::Message(Message::User(UserMessage {
                 content: vec![Part::text("Hello")],
@@ -1222,4 +1624,6 @@ async fn run_stream_throws_language_model_error() {
             panic!("expected language model error")
         }
     }
+
+    close_run_session(session).await;
 }

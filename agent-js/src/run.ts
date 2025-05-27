@@ -20,6 +20,8 @@ import {
   type AgentParams,
   type AgentParamsWithDefaults,
 } from "./params.ts";
+import { type AgentTool } from "./tool.ts";
+import type { ToolkitSession } from "./toolkit.ts";
 import type {
   AgentItem,
   AgentItemModelResponse,
@@ -32,7 +34,7 @@ import type {
  * Manages the run session for an agent run.
  * It initializes all necessary components for the agent to run
  * and handles the execution of the agent's tasks.
- * Once finished, the session cleans up any resources used during the run.
+ * Once closed, the session cleans up any resources used during the run.
  * The session can be reused in multiple runs.
  *
  * A RunSession binds to a specific context value, which is used to resolve
@@ -43,12 +45,25 @@ export class RunSession<TContext> {
   #initialized: boolean;
   #params: AgentParamsWithDefaults<TContext>;
   #context: TContext;
-  #system_prompt?: string;
+  /**
+   * The system prompt generated from the params instructions.
+   */
+  #static_system_prompt?: string;
+  /**
+   * The tools provided from params.
+   */
+  #static_tools: AgentTool<TContext>[];
+  /**
+   * The toolkit sessions created for the run session.
+   */
+  #toolkit_sessions: ToolkitSession<TContext>[];
 
   constructor({ context, ...agentParams }: RunSessionParams<TContext>) {
     this.#initialized = false;
     this.#params = agentParamsWithDefaults(agentParams);
     this.#context = context;
+    this.#static_tools = [...this.#params.tools];
+    this.#toolkit_sessions = [];
   }
 
   /**
@@ -70,11 +85,22 @@ export class RunSession<TContext> {
         this.#params.instructions,
         this.#context,
       );
-      this.#system_prompt = systemPrompt;
+      this.#static_system_prompt = systemPrompt;
+    }
+
+    if (this.#params.toolkits.length > 0) {
+      try {
+        this.#toolkit_sessions = await Promise.all(
+          this.#params.toolkits.map((toolkit) =>
+            toolkit.createSession(this.#context),
+          ),
+        );
+      } catch (error) {
+        throw new AgentInitError(error);
+      }
     }
 
     this.#initialized = true;
-    return Promise.resolve();
   }
 
   /**
@@ -84,6 +110,7 @@ export class RunSession<TContext> {
   async *#process(
     state: RunState,
     content: Part[],
+    tools: AgentTool<TContext>[],
   ): AsyncGenerator<ProcessEvents> {
     const toolCallParts = content.filter((part) => part.type === "tool-call");
 
@@ -96,7 +123,7 @@ export class RunSession<TContext> {
     }
 
     for (const toolCallPart of toolCallParts) {
-      const agentTool = this.#params.tools.find(
+      const agentTool = tools.find(
         (tool) => tool.name === toolCallPart.tool_name,
       );
 
@@ -156,16 +183,14 @@ export class RunSession<TContext> {
     try {
       const state = new RunState(request.input, this.#params.max_turns);
 
-      const input = this.#getLlmInput();
-
       for (;;) {
+        const { input: languageModelInput, tools } = this.#getTurnParams(state);
+
         const modelResponse: ModelResponse = await span.withContext(
           async () => {
             try {
-              const response = await this.#params.model.generate({
-                ...input,
-                messages: state.getTurnMessages(),
-              });
+              const response =
+                await this.#params.model.generate(languageModelInput);
               return response;
             } catch (err) {
               if (err instanceof LanguageModelError) {
@@ -180,7 +205,7 @@ export class RunSession<TContext> {
 
         state.appendModelResponse(modelResponse);
 
-        const processStream = this.#process(state, content);
+        const processStream = this.#process(state, content, tools);
         // Patch next to propogate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalNext = processStream.next.bind(processStream);
@@ -226,13 +251,10 @@ export class RunSession<TContext> {
     try {
       const state = new RunState(request.input, this.#params.max_turns);
 
-      const input = this.#getLlmInput();
-
       for (;;) {
-        const modelStream = this.#params.model.stream({
-          ...input,
-          messages: state.getTurnMessages(),
-        });
+        const { input: languageModelInput, tools } = this.#getTurnParams(state);
+
+        const modelStream = this.#params.model.stream(languageModelInput);
         // Patch next to propogate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalNext = modelStream.next.bind(modelStream);
@@ -267,7 +289,7 @@ export class RunSession<TContext> {
 
         const { content } = response;
 
-        const processStream = this.#process(state, content);
+        const processStream = this.#process(state, content, tools);
         // Patch next to propogate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalProcessStreamNext =
@@ -313,31 +335,71 @@ export class RunSession<TContext> {
   /**
    * Finalize any resources or state for the run session
    */
-  async finish(): Promise<void> {
+  async close(): Promise<void> {
+    if (!this.#initialized) {
+      return;
+    }
+    this.#static_system_prompt = "";
+    this.#static_tools = [];
+
+    await Promise.all(this.#toolkit_sessions.map((session) => session.close()));
+    this.#toolkit_sessions = [];
+
     this.#initialized = false;
-    return Promise.resolve();
   }
 
-  #getLlmInput(): LanguageModelInput {
+  /**
+   * Compute the current snapshot of system prompt and tools from all toolkits
+   * as well as the base LanguageModelInput to be passed to the model.
+   */
+  #getTurnParams(state: RunState): {
+    /**
+     * The system prompt to use for the model input.
+     */
+    input: LanguageModelInput;
+    /**
+     * The tools to use for the model input.
+     */
+    tools: AgentTool<TContext>[];
+  } {
     try {
       const input: LanguageModelInput = {
-        // messages will be computed from getTurnMessages
-        messages: [],
+        messages: state.getTurnMessages(),
         response_format: this.#params.response_format,
       };
 
-      if (this.#system_prompt) {
-        input.system_prompt = this.#system_prompt;
+      // Add static system prompt and tools
+      const systemPrompts: string[] = [];
+      if (this.#static_system_prompt && this.#static_system_prompt.length > 0) {
+        systemPrompts.push(this.#static_system_prompt);
+      }
+      const tools = [...this.#static_tools];
+
+      // Add toolkit prompts and tools
+      for (const toolkitSession of this.#toolkit_sessions) {
+        const toolkitPrompt = toolkitSession.getSystemPrompt();
+        if (toolkitPrompt?.length) {
+          systemPrompts.push(toolkitPrompt);
+        }
+        const toolkitTools = toolkitSession.getTools();
+        if (toolkitTools.length > 0) {
+          tools.push(...toolkitTools);
+        }
       }
 
-      if (this.#params.tools.length > 0) {
-        input.tools = this.#params.tools.map((tool) => ({
+      // Add system prompt and tools to language model input if available
+      if (systemPrompts.length > 0) {
+        input.system_prompt = systemPrompts.join("\n");
+      }
+      if (tools.length > 0) {
+        input.tools = tools.map((tool) => ({
           name: tool.name,
           description: tool.description,
           parameters: tool.parameters,
         }));
       }
 
+      // Add other model params
       if (this.#params.temperature !== undefined) {
         input.temperature = this.#params.temperature;
       }
@@ -363,7 +425,7 @@ export class RunSession<TContext> {
         input.reasoning = this.#params.reasoning;
       }
 
-      return input;
+      return { input, tools };
     } catch (err) {
       throw new AgentInitError(err);
     }
@@ -376,7 +438,7 @@ export class RunSession<TContext> {
  */
 export interface RunSessionParams<TContext> extends AgentParams<TContext> {
   /**
-   * The context to be used during tool calling and building system instructions
+   * The context used to resolve instructions and passed to tool executions.
    */
   context: TContext;
 }

@@ -1,10 +1,15 @@
 use crate::{
     instruction,
+    toolkit::ToolkitSession,
     types::{AgentItemTool, AgentStream, AgentStreamEvent},
-    AgentError, AgentItem, AgentParams, AgentResponse, AgentStreamItemEvent,
+    AgentError, AgentItem, AgentParams, AgentResponse, AgentStreamItemEvent, AgentTool,
 };
 use async_stream::try_stream;
-use futures::{lock::Mutex, stream::StreamExt};
+use futures::{
+    future::{join_all, try_join_all},
+    lock::Mutex,
+    stream::StreamExt,
+};
 use llm_sdk::{
     boxed_stream::BoxedStream, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
     ToolCallPart, ToolMessage, ToolResultPart,
@@ -20,9 +25,14 @@ use std::sync::Arc;
 /// context value that is used to resolve instructions and invoke tools, while
 /// input items remain per run and are supplied to each invocation.
 pub struct RunSession<TCtx> {
+    /// Agent configuration used during the run session.
     params: Arc<AgentParams<TCtx>>,
+    /// The bound context value passed to instruction resolvers and tools.
     context: Arc<TCtx>,
+    /// System prompt generated from the static instruction params.
     system_prompt: Option<String>,
+    /// Toolkit sessions created for this run session.
+    toolkit_sessions: Arc<Vec<Box<dyn ToolkitSession<TCtx> + Send + Sync>>>,
 }
 
 impl<TCtx> RunSession<TCtx>
@@ -43,10 +53,13 @@ where
             )
         };
 
+        let toolkit_sessions = Self::initialize(&params, &context).await?;
+
         Ok(Self {
             params,
             context: Arc::new(context),
             system_prompt,
+            toolkit_sessions: Arc::new(toolkit_sessions),
         })
     }
 
@@ -56,6 +69,7 @@ where
         &'a self,
         run_state: &'a RunState,
         parts: Vec<Part>,
+        tools: Vec<Arc<dyn AgentTool<TCtx>>>,
     ) -> BoxedStream<'a, Result<ProcessEvents, AgentError>> {
         let context = self.context.clone();
         let stream = try_stream! {
@@ -84,9 +98,7 @@ where
                     ..
                 } = tool_call_part;
 
-                let agent_tool = self
-                    .params
-                    .tools
+                let agent_tool = tools
                     .iter()
                     .find(|tool| tool.name() == tool_name)
                     .ok_or_else(|| {
@@ -121,18 +133,14 @@ where
         let RunSessionRequest { input } = request;
         let state = RunState::new(input, self.params.max_turns);
 
-        let base_input = self.get_llm_input();
-
         loop {
-            let mut input = base_input.clone();
-
-            input.messages = state.get_turn_messages().await;
+            let (input, tools) = self.get_turn_params(&state).await?;
             let model_response = self.params.model.generate(input).await?;
             let content = model_response.content.clone();
 
             state.append_model_response(model_response).await;
 
-            let mut process_stream = self.process(&state, content).await;
+            let mut process_stream = self.process(&state, content, tools).await;
 
             while let Some(event) = process_stream.next().await {
                 let event = event?;
@@ -159,19 +167,15 @@ where
         let RunSessionRequest { input } = request;
         let state = Arc::new(RunState::new(input, self.params.max_turns));
 
-        let base_input = self.get_llm_input();
-
         let session = Arc::new(Self {
-            context: self.context.clone(),
             params: self.params.clone(),
+            context: self.context.clone(),
             system_prompt: self.system_prompt.clone(),
+            toolkit_sessions: self.toolkit_sessions.clone(),
         });
-
         let stream = async_stream::try_stream! {
             loop {
-                let mut input = base_input.clone();
-
-                input.messages = state.get_turn_messages().await;
+                let (input, tools) = session.get_turn_params(&state).await?;
 
                 let mut model_stream = session.params.model.stream(input).await?;
 
@@ -196,7 +200,7 @@ where
                     AgentStreamItemEvent { item, index }
                 );
 
-                let mut process_stream = session.process(&state, content).await;
+                let mut process_stream = session.process(&state, content, tools).await;
 
                 while let Some(event) = process_stream.next().await {
                     let event = event?;
@@ -225,26 +229,64 @@ where
         Ok(AgentStream::from_stream(stream))
     }
 
-    pub fn finish(self) {
-        // Cleanup dependencies if needed
+    pub async fn close(self) -> Result<(), AgentError> {
+        if let Ok(toolkit_sessions) = Arc::try_unwrap(self.toolkit_sessions) {
+            let _ = join_all(
+                toolkit_sessions
+                    .into_iter()
+                    .map(|toolkit_session| toolkit_session.close()),
+            )
+            .await;
+        }
+
+        Ok(())
     }
 
-    fn get_llm_input(&self) -> LanguageModelInput {
-        LanguageModelInput {
-            // messages will be computed from getTurnMessages
-            messages: vec![],
-            system_prompt: self.system_prompt.clone(),
-            tools: if self.params.tools.is_empty() {
-                None
-            } else {
-                Some(
-                    self.params
-                        .tools
-                        .iter()
-                        .map(|tool| tool.as_ref().into())
-                        .collect(),
-                )
-            },
+    async fn initialize(
+        params: &AgentParams<TCtx>,
+        context: &TCtx,
+    ) -> Result<Vec<Box<dyn ToolkitSession<TCtx> + Send + Sync>>, AgentError> {
+        let toolkit_sessions = if params.toolkits.is_empty() {
+            Vec::new()
+        } else {
+            let futures = params.toolkits.iter().map(|toolkit| async move {
+                toolkit
+                    .create_session(context)
+                    .await
+                    .map_err(AgentError::Init)
+            });
+
+            try_join_all(futures).await?
+        };
+        Ok(toolkit_sessions)
+    }
+
+    async fn get_turn_params(
+        &self,
+        state: &RunState,
+    ) -> Result<(LanguageModelInput, Vec<Arc<dyn AgentTool<TCtx>>>), AgentError> {
+        let mut system_prompts = Vec::new();
+        if let Some(prompt) = &self.system_prompt {
+            if !prompt.is_empty() {
+                system_prompts.push(prompt.clone());
+            }
+        }
+
+        let mut tools: Vec<Arc<dyn AgentTool<TCtx>>> = self.params.tools.iter().cloned().collect();
+
+        for session in self.toolkit_sessions.iter() {
+            if let Some(prompt) = session.system_prompt() {
+                if !prompt.is_empty() {
+                    system_prompts.push(prompt);
+                }
+            }
+
+            let toolkit_tools = session.tools();
+            tools.extend(toolkit_tools);
+        }
+
+        let mut input = LanguageModelInput {
+            messages: state.get_turn_messages().await,
             response_format: Some(self.params.response_format.clone()),
             temperature: self.params.temperature,
             top_p: self.params.top_p,
@@ -255,7 +297,18 @@ where
             reasoning: self.params.reasoning.clone(),
             audio: self.params.audio.clone(),
             ..Default::default()
+        };
+
+        if !system_prompts.is_empty() {
+            input.system_prompt = Some(system_prompts.join("\n"));
         }
+
+        if !tools.is_empty() {
+            let sdk_tools = tools.iter().map(|tool| tool.as_ref().into()).collect();
+            input.tools = Some(sdk_tools);
+        }
+
+        Ok((input, tools))
     }
 }
 

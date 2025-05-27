@@ -211,6 +211,7 @@ Find examples in the [examples](./examples/) folder:
 - [`agent`: Simple Example](./examples/agent.rs)
 - [`instructions`: Static and dynamic instructions](./examples/instructions.rs)
 - [`tools`: Executable tools](./examples/tools.rs)
+- [`toolkits`: Dynamic, stateful tools and instructions](./examples/toolkits.rs)
 - [`structured-output`: Structured Output](./examples/structured-output.rs)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.rs)
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts.rs)

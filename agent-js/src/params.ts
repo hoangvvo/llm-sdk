@@ -7,6 +7,7 @@ import type {
 } from "@hoangvvo/llm-sdk";
 import type { InstructionParam } from "./instruction.ts";
 import type { AgentTool } from "./tool.ts";
+import type { Toolkit } from "./toolkit.ts";
 
 /**
  * Parameters required to create a new agent.
@@ -101,13 +102,19 @@ export interface AgentParams<TContext> {
    * @default undefined
    */
   reasoning?: ReasoningOptions;
+
+  /**
+   * Optional toolkits that can provide dynamic tools and system prompts for each session.
+   * @default undefined
+   */
+  toolkits?: Toolkit<TContext>[];
 }
 
 export type AgentParamsWithDefaults<TContext> = AgentParams<TContext> &
   Required<
     Pick<
       AgentParams<TContext>,
-      "max_turns" | "tools" | "instructions" | "response_format"
+      "max_turns" | "tools" | "instructions" | "response_format" | "toolkits"
     >
   >;
 
@@ -117,6 +124,7 @@ export function agentParamsWithDefaults<TContext>(
   return {
     instructions: [],
     tools: [],
+    toolkits: [],
     response_format: {
       type: "text",
     },

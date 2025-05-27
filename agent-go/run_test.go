@@ -41,6 +41,38 @@ func NewMockTool[C any](name string, result llmagent.AgentToolResult, executeFun
 	}
 }
 
+type mockToolkit[C any] struct {
+	createFn func(ctx context.Context, contextVal C) (llmagent.ToolkitSession[C], error)
+}
+
+func (m *mockToolkit[C]) CreateSession(ctx context.Context, contextVal C) (llmagent.ToolkitSession[C], error) {
+	return m.createFn(ctx, contextVal)
+}
+
+type mockToolkitSession[C any] struct {
+	systemPrompt      *string
+	tools             []llmagent.AgentTool[C]
+	systemPromptCalls int
+	toolsCalls        int
+	closeCalls        int
+	closeErr          error
+}
+
+func (m *mockToolkitSession[C]) SystemPrompt() *string {
+	m.systemPromptCalls++
+	return m.systemPrompt
+}
+
+func (m *mockToolkitSession[C]) Tools() []llmagent.AgentTool[C] {
+	m.toolsCalls++
+	return m.tools
+}
+
+func (m *mockToolkitSession[C]) Close(context.Context) error {
+	m.closeCalls++
+	return m.closeErr
+}
+
 func (t *MockAgentTool[C]) Name() string {
 	return t.name
 }
@@ -992,6 +1024,181 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 	}
 }
 
+func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
+	type customerContext struct {
+		Customer string
+	}
+
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueGenerateResult(
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+			Content: []llmsdk.Part{{
+				ToolCallPart: &llmsdk.ToolCallPart{
+					ToolName:   "lookup-order",
+					ToolCallID: "call-1",
+					Args:       json.RawMessage(`{"orderId":"123"}`),
+				},
+			}},
+		}),
+	)
+	model.EnqueueGenerateResult(
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+			Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Order ready"}}},
+		}),
+	)
+
+	executed := []struct {
+		Context customerContext
+		Args    map[string]string
+		Turn    uint
+	}{}
+
+	dynamicTool := NewMockTool[customerContext](
+		"lookup-order",
+		llmagent.AgentToolResult{},
+		func(ctx context.Context, params json.RawMessage, contextVal customerContext, runState *llmagent.RunState) (llmagent.AgentToolResult, error) {
+			var args map[string]string
+			if err := json.Unmarshal(params, &args); err != nil {
+				return llmagent.AgentToolResult{}, err
+			}
+			executed = append(executed, struct {
+				Context customerContext
+				Args    map[string]string
+				Turn    uint
+			}{
+				Context: contextVal,
+				Args:    args,
+				Turn:    runState.CurrentTurn,
+			})
+
+			orderID := args["orderId"]
+			text := "Order " + orderID + " ready for " + contextVal.Customer
+			return llmagent.AgentToolResult{
+				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: text}}},
+				IsError: false,
+			}, nil
+		},
+	)
+
+	toolkitPrompt := "Toolkit prompt"
+	toolkitSession := &mockToolkitSession[customerContext]{
+		systemPrompt: &toolkitPrompt,
+		tools:        []llmagent.AgentTool[customerContext]{dynamicTool},
+	}
+
+	var createdContexts []customerContext
+	toolkit := &mockToolkit[customerContext]{
+		createFn: func(ctx context.Context, contextVal customerContext) (llmagent.ToolkitSession[customerContext], error) {
+			createdContexts = append(createdContexts, contextVal)
+			return toolkitSession, nil
+		},
+	}
+
+	ctxVal := customerContext{Customer: "Ada"}
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[customerContext]{
+			Name:           "toolkit-agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[customerContext]{},
+			Tools:          []llmagent.AgentTool[customerContext]{},
+			Toolkits:       []llmagent.Toolkit[customerContext]{toolkit},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
+		ctxVal,
+	)
+
+	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Status?"}}},
+				},
+			}),
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if diff := cmp.Diff([]customerContext{ctxVal}, createdContexts); diff != "" {
+		t.Fatalf("unexpected contexts (-want +got):\n%s", diff)
+	}
+
+	if toolkitSession.systemPromptCalls != 2 {
+		t.Fatalf("expected 2 system prompt calls, got %d", toolkitSession.systemPromptCalls)
+	}
+	if toolkitSession.toolsCalls != 2 {
+		t.Fatalf("expected 2 tools calls, got %d", toolkitSession.toolsCalls)
+	}
+
+	if len(executed) != 1 {
+		t.Fatalf("expected 1 tool execution, got %d", len(executed))
+	}
+	if executed[0].Context != ctxVal {
+		t.Fatalf("unexpected tool context: %v", executed[0].Context)
+	}
+	if executed[0].Args["orderId"] != "123" {
+		t.Fatalf("expected orderId 123, got %s", executed[0].Args["orderId"])
+	}
+	if executed[0].Turn != 0 {
+		t.Fatalf("expected execution on turn 0, got %d", executed[0].Turn)
+	}
+
+	inputs := model.TrackedGenerateInputs()
+	if len(inputs) != 2 {
+		t.Fatalf("expected 2 tracked generate inputs, got %d", len(inputs))
+	}
+	for _, input := range inputs {
+		if input.SystemPrompt == nil || *input.SystemPrompt != toolkitPrompt {
+			t.Fatalf("unexpected system prompt: %v", input.SystemPrompt)
+		}
+		if len(input.Tools) != 1 {
+			t.Fatalf("expected 1 tool, got %d", len(input.Tools))
+		}
+		if input.Tools[0].Name != "lookup-order" {
+			t.Fatalf("unexpected tool name: %s", input.Tools[0].Name)
+		}
+	}
+
+	expectedResponse := &llmagent.AgentResponse{
+		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Order ready"}}},
+		Output: []llmagent.AgentItem{
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+				Content: []llmsdk.Part{{
+					ToolCallPart: &llmsdk.ToolCallPart{
+						ToolName:   "lookup-order",
+						ToolCallID: "call-1",
+						Args:       json.RawMessage(`{"orderId":"123"}`),
+					},
+				}},
+			}),
+			llmagent.NewAgentItemTool(
+				"call-1",
+				"lookup-order",
+				json.RawMessage(`{"orderId":"123"}`),
+				[]llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Order 123 ready for Ada"}}},
+				false,
+			),
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Order ready"}}},
+			}),
+		},
+	}
+
+	if diff := cmp.Diff(expectedResponse, response); diff != "" {
+		t.Fatalf("response mismatch (-want +got):\n%s", diff)
+	}
+
+	if err := session.Close(context.Background()); err != nil {
+		t.Fatalf("expected no close error, got %v", err)
+	}
+	if toolkitSession.closeCalls != 1 {
+		t.Fatalf("expected toolkit close once, got %d", toolkitSession.closeCalls)
+	}
+}
+
 // -------- Root-level tests (RunStream) --------
 
 func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
@@ -1376,9 +1583,135 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 	}
 }
 
+func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
+	type customerContext struct {
+		Customer string
+	}
+
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueStreamResult(
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Done"}}}},
+		}),
+	)
+
+	dynamicTool := NewMockTool[customerContext](
+		"noop",
+		llmagent.AgentToolResult{Content: []llmsdk.Part{}, IsError: false},
+		nil,
+	)
+
+	toolkitPrompt := "Streaming toolkit prompt"
+	toolkitSession := &mockToolkitSession[customerContext]{
+		systemPrompt: &toolkitPrompt,
+		tools:        []llmagent.AgentTool[customerContext]{dynamicTool},
+	}
+
+	var createdContexts []customerContext
+	toolkit := &mockToolkit[customerContext]{
+		createFn: func(ctx context.Context, contextVal customerContext) (llmagent.ToolkitSession[customerContext], error) {
+			createdContexts = append(createdContexts, contextVal)
+			return toolkitSession, nil
+		},
+	}
+
+	ctxVal := customerContext{Customer: "Ben"}
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[customerContext]{
+			Name:           "toolkit-stream-agent",
+			Model:          model,
+			Instructions:   []llmagent.InstructionParam[customerContext]{},
+			Tools:          []llmagent.AgentTool[customerContext]{},
+			Toolkits:       []llmagent.Toolkit[customerContext]{toolkit},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
+		ctxVal,
+	)
+
+	stream, err := session.RunStream(context.Background(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Hello"}}},
+				},
+			}),
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	events := []*llmagent.AgentStreamEvent{}
+	for stream.Next() {
+		events = append(events, stream.Current())
+	}
+
+	if err := stream.Err(); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	expectedEvents := []*llmagent.AgentStreamEvent{
+		{
+			Partial: &llmsdk.PartialModelResponse{
+				Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Done"}}},
+			},
+		},
+		llmagent.NewAgentStreamItemEvent(
+			0,
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Done"}}},
+			}),
+		),
+		{
+			Response: &llmagent.AgentResponse{
+				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Done"}}},
+				Output: []llmagent.AgentItem{
+					llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+						Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Done"}}},
+					}),
+				},
+			},
+		},
+	}
+
+	if diff := cmp.Diff(expectedEvents, events); diff != "" {
+		t.Fatalf("stream events mismatch (-want +got):\n%s", diff)
+	}
+
+	if diff := cmp.Diff([]customerContext{ctxVal}, createdContexts); diff != "" {
+		t.Fatalf("unexpected contexts (-want +got):\n%s", diff)
+	}
+	if toolkitSession.systemPromptCalls != 1 {
+		t.Fatalf("expected 1 system prompt call, got %d", toolkitSession.systemPromptCalls)
+	}
+	if toolkitSession.toolsCalls != 1 {
+		t.Fatalf("expected 1 tools call, got %d", toolkitSession.toolsCalls)
+	}
+
+	inputs := model.TrackedStreamInputs()
+	if len(inputs) != 1 {
+		t.Fatalf("expected 1 tracked stream input, got %d", len(inputs))
+	}
+	if inputs[0].SystemPrompt == nil || *inputs[0].SystemPrompt != toolkitPrompt {
+		t.Fatalf("unexpected system prompt: %v", inputs[0].SystemPrompt)
+	}
+	if len(inputs[0].Tools) != 1 || inputs[0].Tools[0].Name != "noop" {
+		t.Fatalf("unexpected tools: %v", inputs[0].Tools)
+	}
+
+	if err := session.Close(context.Background()); err != nil {
+		t.Fatalf("expected no close error, got %v", err)
+	}
+	if toolkitSession.closeCalls != 1 {
+		t.Fatalf("expected toolkit close once, got %d", toolkitSession.closeCalls)
+	}
+}
+
 // -------- Root-level lifecycle test --------
 
-func TestRun_FinishCleansUpSessionResources(t *testing.T) {
+func TestRun_CloseCleansUpSessionResources(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
@@ -1417,9 +1750,26 @@ func TestRun_FinishCleansUpSessionResources(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Call finish (currently no-op but tests the interface)
-	session.Finish()
+	if err := session.Close(context.Background()); err != nil {
+		t.Fatalf("expected no close error, got %v", err)
+	}
 
-	// In this implementation, we don't prevent reuse after finish,
-	// but the test shows the expected lifecycle
+	_, err = session.Run(context.Background(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{
+					Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Hello again"}}},
+				},
+			}),
+		},
+	})
+
+	if err == nil {
+		t.Fatal("expected error when running after close, got nil")
+	}
+
+	var invariantErr *llmagent.AgentError
+	if !errors.As(err, &invariantErr) || invariantErr.Kind != llmagent.InvariantErrorKind {
+		t.Fatalf("expected invariant error after close, got %v", err)
+	}
 }

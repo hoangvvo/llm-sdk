@@ -100,7 +100,6 @@ Use the TODO tools strictly as your internal plan: NEVER reveal or enumerate TOD
 Keep user-visible replies concise and focused on results and next-step confirmations.
 Work iteratively: plan an initial set of high-level steps, then refine/execute one major step per turn, marking completed items along the way via tools.
 When the work is complete, respond with the final deliverable and a brief one-paragraph summary of what you did.`,
-    // Dynamic instruction to inject current internal plan (not for user disclosure)
     () => {
       const rows = planStore
         .list()

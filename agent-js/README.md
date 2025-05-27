@@ -186,6 +186,7 @@ Find examples in the [examples](./examples/) folder:
 - [`agent`: Simple Example](./examples/agent.ts)
 - [`instructions`: Static and dynamic instructions](./examples/instructions.ts)
 - [`tools`: Executable tools](./examples/tools.ts)
+- [`toolkits`: Dynamic, stateful tools and instructions](./examples/toolkits.ts)
 - [`structured-output`: Structured Output](./examples/structured-output.ts)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation.ts)
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts.ts)

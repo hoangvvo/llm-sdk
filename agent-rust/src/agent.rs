@@ -30,9 +30,20 @@ where
     pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
         let AgentRequest { input, context } = request;
         let run_session = self.create_session(context).await?;
-        let res = run_session.run(RunSessionRequest { input }).await?;
-        run_session.finish();
-        Ok(res)
+        let result = run_session.run(RunSessionRequest { input }).await;
+        match result {
+            Ok(response) => {
+                if let Err(close_err) = run_session.close().await {
+                    Err(close_err)
+                } else {
+                    Ok(response)
+                }
+            }
+            Err(err) => {
+                let _ = run_session.close().await;
+                Err(err)
+            }
+        }
     }
 
     /// Create a one-time streaming run of the agent and generate a response.
@@ -40,19 +51,29 @@ where
     pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
         let AgentRequest { input, context } = request;
         let run_session = Arc::new(self.create_session(context).await?);
-        let mut stream = run_session
+        let mut stream = match run_session
             .clone()
             .run_stream(RunSessionRequest { input })
-            .await?;
+            .await
+        {
+            Ok(stream) => stream,
+            Err(err) => {
+                if let Ok(session) = Arc::try_unwrap(run_session) {
+                    let _ = session.close().await;
+                }
+                return Err(err);
+            }
+        };
 
         let wrapped_stream = async_stream::stream! {
             let run_session = run_session;
             while let Some(item) = stream.next().await {
                 yield item;
             }
-
             if let Ok(session) = Arc::try_unwrap(run_session) {
-                session.finish();
+                if let Err(close_err) = session.close().await {
+                    yield Err(close_err);
+                }
             }
         };
 

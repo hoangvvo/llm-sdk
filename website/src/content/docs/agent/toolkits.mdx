@@ -1,0 +1,64 @@
+---
+title: Toolkits
+---
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goToolkitsExample from "../../../../../agent-go/examples/toolkits/main.go?raw";
+import jsToolkitsExample from "../../../../../agent-js/examples/toolkits.ts?raw";
+import rustToolkitsExample from "../../../../../agent-rust/examples/toolkits.rs?raw";
+import {
+  extractGoAgentToolkitTypes,
+  extractRustAgentToolkitTypes,
+  extractTypescriptAgentToolkitTypes,
+} from "../../../utils/extract-types.ts";
+
+Toolkits let an agent assemble dynamic instructions and tools for each run session. Unlike static
+instructions or tool lists, a toolkit can perform asynchronous work inside
+`Toolkit.createSession`—for example fetching user-specific data—and then expose a synchronous
+`ToolkitSession` that the agent loop can call to get the current instructions and tools for each
+turn.
+
+In addition, a `ToolkitSession` can hold state that persists across multiple calls to the run session,
+as well as swapping out tools or instructions based on the current state.
+
+## Interfaces
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptAgentToolkitTypes(["Toolkit", "ToolkitSession"])}
+      lang="typescript"
+      title="toolkit.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustAgentToolkitTypes(["Toolkit", "ToolkitSession"])}
+      lang="rust"
+      title="toolkit.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoAgentToolkitTypes(["Toolkit", "ToolkitSession"])}
+      lang="go"
+      title="toolkit.go"
+    />
+  </TabItem>
+</Tabs>
+
+## Example
+
+The following example demonstrates a Pokémon battle coach that adapts to the current match. Harsh
+Sunlight unlocks `solar_beam`, while sleeping opponents enable `dream_eater` and `nightmare`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsToolkitsExample} lang="typescript" title="examples/toolkit.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustToolkitsExample} lang="rust" title="examples/toolkit.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goToolkitsExample} lang="go" title="examples/toolkit/main.go" />
+  </TabItem>
+</Tabs>

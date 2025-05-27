@@ -11,7 +11,7 @@ import (
 )
 
 func TestAgent_Run(t *testing.T) {
-	t.Run("creates session, runs, and finishes", func(t *testing.T) {
+	t.Run("creates session, runs, and closes", func(t *testing.T) {
 		model := llmsdktest.NewMockLanguageModel()
 		model.EnqueueGenerateResult(
 			llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
@@ -59,7 +59,7 @@ func TestAgent_Run(t *testing.T) {
 }
 
 func TestAgent_RunStream(t *testing.T) {
-	t.Run("creates session, streams, and finishes", func(t *testing.T) {
+	t.Run("creates session, streams, and closes", func(t *testing.T) {
 		model := llmsdktest.NewMockLanguageModel()
 		model.EnqueueStreamResult(
 			llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{

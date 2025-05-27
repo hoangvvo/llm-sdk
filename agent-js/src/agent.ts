@@ -23,9 +23,12 @@ export class Agent<TContext> {
     context,
   }: AgentRequest<TContext>): Promise<AgentResponse> {
     const runSession = await this.createSession(context);
-    const result = runSession.run({ input });
-    await runSession.finish();
-    return result;
+    try {
+      const res = await runSession.run({ input });
+      return res;
+    } finally {
+      await runSession.close();
+    }
   }
 
   /**
@@ -37,17 +40,19 @@ export class Agent<TContext> {
     context,
   }: AgentRequest<TContext>): AsyncGenerator<AgentStreamEvent, AgentResponse> {
     const runSession = await this.createSession(context);
-    const stream = runSession.runStream({ input });
+    try {
+      const stream = runSession.runStream({ input });
 
-    let current = await stream.next();
-    while (!current.done) {
-      yield current.value;
-      current = await stream.next();
+      let current = await stream.next();
+      while (!current.done) {
+        yield current.value;
+        current = await stream.next();
+      }
+
+      return current.value;
+    } finally {
+      await runSession.close();
     }
-
-    await runSession.finish();
-
-    return current.value;
   }
 
   /**

@@ -19,6 +19,7 @@ import {
 } from "./errors.ts";
 import { RunSession, type RunState } from "./run.ts";
 import type { AgentTool } from "./tool.ts";
+import type { Toolkit, ToolkitSession } from "./toolkit.ts";
 import type { AgentResponse, AgentStreamEvent } from "./types.ts";
 
 function createMockTool<TContext = any>(
@@ -881,6 +882,172 @@ suite("RunSession#run", () => {
       "You are a helpful assistant.\nThe user is a developer.\nAlways be polite.",
     ]);
   });
+
+  test("merges toolkit prompts and tools with run context", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult(
+      {
+        response: {
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "lookup-order",
+              tool_call_id: "call-1",
+              args: { orderId: "123" },
+            },
+          ],
+        },
+      },
+      {
+        response: {
+          content: [{ type: "text", text: "Order ready" }],
+        },
+      },
+    );
+
+    interface Context {
+      customer: string;
+    }
+    const context: Context = { customer: "Ada" };
+    const createdContexts: Context[] = [];
+    let systemPromptCalls = 0;
+    let toolsCalls = 0;
+    let closeCalls = 0;
+    const executed: {
+      ctx: Context;
+      args: Record<string, unknown>;
+      turn: number;
+    }[] = [];
+
+    const dynamicTool: AgentTool<Context, { orderId: string }> = {
+      name: "lookup-order",
+      description: "Lookup an order by ID",
+      parameters: {
+        type: "object",
+        properties: {
+          orderId: { type: "string" },
+        },
+        required: ["orderId"],
+        additionalProperties: false,
+      },
+      execute(args, ctx, state) {
+        executed.push({ ctx, args, turn: state.currentTurn });
+        return Promise.resolve({
+          content: [
+            {
+              type: "text",
+              text: `Order ${args.orderId} ready for ${ctx.customer}`,
+            },
+          ],
+          is_error: false,
+        });
+      },
+    };
+
+    const toolkitSession: ToolkitSession<Context> = {
+      getSystemPrompt() {
+        systemPromptCalls += 1;
+        return "Toolkit prompt";
+      },
+      getTools() {
+        toolsCalls += 1;
+        return [dynamicTool];
+      },
+      close() {
+        closeCalls += 1;
+        return Promise.resolve();
+      },
+    };
+
+    const toolkit: Toolkit<Context> = {
+      createSession(ctx) {
+        createdContexts.push(ctx);
+        return Promise.resolve(toolkitSession);
+      },
+    };
+
+    const session = await RunSession.create({
+      name: "toolkit-agent",
+      model,
+      instructions: [],
+      max_turns: 10,
+      response_format: { type: "text" },
+      tools: [],
+      toolkits: [toolkit],
+      context,
+    });
+
+    const response = await session.run({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Status?" }],
+        },
+      ],
+    });
+
+    t.assert.deepStrictEqual(createdContexts, [context]);
+    t.assert.strictEqual(systemPromptCalls, 2);
+    t.assert.strictEqual(toolsCalls, 2);
+
+    t.assert.deepStrictEqual(executed, [
+      {
+        ctx: context,
+        args: { orderId: "123" },
+        turn: 0,
+      },
+    ]);
+
+    t.assert.deepStrictEqual(
+      model.trackedGenerateInputs.map((input) => input.system_prompt),
+      ["Toolkit prompt", "Toolkit prompt"],
+    );
+    t.assert.deepStrictEqual(model.trackedGenerateInputs[0]?.tools, [
+      {
+        name: "lookup-order",
+        description: "Lookup an order by ID",
+        parameters: dynamicTool.parameters,
+      },
+    ]);
+
+    t.assert.deepStrictEqual(response, {
+      content: [{ type: "text", text: "Order ready" }],
+      output: [
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "lookup-order",
+              tool_call_id: "call-1",
+              args: { orderId: "123" },
+            },
+          ],
+        },
+        {
+          type: "tool",
+          tool_name: "lookup-order",
+          tool_call_id: "call-1",
+          input: { orderId: "123" },
+          output: [
+            {
+              type: "text",
+              text: "Order 123 ready for Ada",
+            },
+          ],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [{ type: "text", text: "Order ready" }],
+        },
+      ],
+    });
+
+    await session.close();
+    t.assert.strictEqual(closeCalls, 1);
+  });
 });
 
 suite("RunSession#runStream", () => {
@@ -1460,10 +1627,149 @@ suite("RunSession#runStream", () => {
       },
     );
   });
+
+  test("merges toolkit prompts and tools in streaming runs", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [
+        {
+          delta: { index: 0, part: { type: "text", text: "Done" } },
+        },
+      ],
+    });
+
+    interface Context {
+      customer: string;
+    }
+    const context: Context = { customer: "Ben" };
+    const createdContexts: Context[] = [];
+    let systemPromptCalls = 0;
+    let toolsCalls = 0;
+    let closeCalls = 0;
+
+    const dynamicTool: AgentTool<Context> = {
+      name: "noop",
+      description: "No operation",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+      execute() {
+        return Promise.resolve({
+          content: [],
+          is_error: false,
+        });
+      },
+    };
+
+    const toolkitSession: ToolkitSession<Context> = {
+      getSystemPrompt() {
+        systemPromptCalls += 1;
+        return "Streaming toolkit prompt";
+      },
+      getTools() {
+        toolsCalls += 1;
+        return [dynamicTool];
+      },
+      close() {
+        closeCalls += 1;
+        return Promise.resolve();
+      },
+    };
+
+    const toolkit: Toolkit<Context> = {
+      createSession(ctx) {
+        createdContexts.push(ctx);
+        return Promise.resolve(toolkitSession);
+      },
+    };
+
+    const session = await RunSession.create({
+      name: "toolkit-stream-agent",
+      model,
+      instructions: [],
+      max_turns: 10,
+      response_format: { type: "text" },
+      tools: [],
+      toolkits: [toolkit],
+      context,
+    });
+
+    const events: AgentStreamEvent[] = [];
+    const generator = session.runStream({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      ],
+    });
+
+    let result = await generator.next();
+    while (!result.done) {
+      events.push(result.value);
+      result = await generator.next();
+    }
+
+    t.assert.deepStrictEqual(events, [
+      {
+        event: "partial",
+        delta: { index: 0, part: { type: "text", text: "Done" } },
+      },
+      {
+        event: "item",
+        index: 0,
+        item: {
+          type: "model",
+          content: [{ type: "text", text: "Done" }],
+        },
+      },
+      {
+        event: "response",
+        content: [{ type: "text", text: "Done" }],
+        output: [
+          {
+            type: "model",
+            content: [{ type: "text", text: "Done" }],
+          },
+        ],
+      },
+    ]);
+    t.assert.deepStrictEqual(result.value, {
+      content: [{ type: "text", text: "Done" }],
+      output: [
+        {
+          type: "model",
+          content: [{ type: "text", text: "Done" }],
+        },
+      ],
+    });
+
+    t.assert.deepStrictEqual(createdContexts, [context]);
+    t.assert.strictEqual(systemPromptCalls, 1);
+    t.assert.strictEqual(toolsCalls, 1);
+
+    t.assert.deepStrictEqual(
+      model.trackedStreamInputs.map((input) => input.system_prompt),
+      ["Streaming toolkit prompt"],
+    );
+    t.assert.deepStrictEqual(model.trackedStreamInputs[0]?.tools, [
+      {
+        name: "noop",
+        description: "No operation",
+        parameters: dynamicTool.parameters,
+      },
+    ]);
+
+    await session.close();
+    t.assert.strictEqual(closeCalls, 1);
+  });
 });
 
 suite("RunSession lifecycle", () => {
-  test("finish() cleans up session resources", async (t: TestContext) => {
+  test("close() cleans up session resources", async (t: TestContext) => {
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
       response: { content: [{ type: "text", text: "Response" }] },
@@ -1489,7 +1795,7 @@ suite("RunSession lifecycle", () => {
       ],
     });
 
-    await session.finish();
+    await session.close();
 
     await t.assert.rejects(
       async () => {

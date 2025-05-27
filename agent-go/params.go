@@ -13,6 +13,8 @@ type AgentParams[C any] struct {
 	Instructions []InstructionParam[C]
 	// The tools that the agent can use to perform tasks.
 	Tools []AgentTool[C]
+	// Optional toolkits that can provide dynamic tools and system prompts for each session.
+	Toolkits []Toolkit[C]
 	// The expected format of the response. Either text or structured output.
 	ResponseFormat *llmsdk.ResponseFormatOption
 	// Max number of turns for agent to run to protect against infinite loops.
@@ -57,6 +59,13 @@ func WithInstructions[C any](instructions ...InstructionParam[C]) AgentParamsOpt
 func WithTools[C any](tools ...AgentTool[C]) AgentParamsOption[C] {
 	return func(p *AgentParams[C]) {
 		p.Tools = tools
+	}
+}
+
+// WithToolkits sets the toolkits that can provide dynamic tools and prompts per session.
+func WithToolkits[C any](toolkits ...Toolkit[C]) AgentParamsOption[C] {
+	return func(p *AgentParams[C]) {
+		p.Toolkits = toolkits
 	}
 }
 

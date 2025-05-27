@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
+	"golang.org/x/sync/errgroup"
 )
 
 // RunSession manages the run session for an agent.
@@ -19,10 +22,12 @@ import (
 // context value that is used when resolving instructions and invoking tools,
 // while input items remain per run and are supplied to each invocation.
 type RunSession[C any] struct {
-	params       *AgentParams[C] // RunSession params stores the agent configuration used during the run.
-	contextVal   C               // RunSession contextVal is the bound context value used for instructions and tool executions.
-	systemPrompt *string         // RunSession systemPrompt caches the resolved instructions as a system prompt.
-	initialized  bool            // RunSession initialized ensures the session is ready before running.
+	params             *AgentParams[C]     // params stores the agent configuration used during the run.
+	contextVal         C                   // contextVal is the bound context value used for instructions and tool executions.
+	staticSystemPrompt *string             // systemPrompt caches the resolved instructions as a system prompt.
+	staticTools        []AgentTool[C]      // staticTools holds the tools provided directly in the agent params.
+	toolkitSessions    []ToolkitSession[C] // toolkitSessions keeps the toolkit-provided sessions for this run session.
+	initialized        bool                // initialized ensures the session is ready before running.
 }
 
 // NewRunSession creates a new run session, resolves instructions, and initializes dependencies.
@@ -32,8 +37,9 @@ func NewRunSession[C any](
 	contextVal C,
 ) (*RunSession[C], error) {
 	session := &RunSession[C]{
-		params:     params,
-		contextVal: contextVal,
+		params:      params,
+		contextVal:  contextVal,
+		staticTools: append([]AgentTool[C]{}, params.Tools...),
 	}
 
 	if err := session.initialize(ctx); err != nil {
@@ -49,7 +55,26 @@ func (s *RunSession[C]) initialize(ctx context.Context) error {
 		if err != nil {
 			return NewInitError(err)
 		}
-		s.systemPrompt = &prompt
+		s.staticSystemPrompt = &prompt
+	}
+
+	if len(s.params.Toolkits) > 0 {
+		sessions := make([]ToolkitSession[C], len(s.params.Toolkits))
+		g, ctx := errgroup.WithContext(ctx)
+		for i, toolkit := range s.params.Toolkits {
+			g.Go(func() error {
+				toolkitSession, err := toolkit.CreateSession(ctx, s.contextVal)
+				if err != nil {
+					return fmt.Errorf("toolkit[%d].CreateSession: %w", i, err)
+				}
+				sessions[i] = toolkitSession
+				return nil
+			})
+		}
+		if err := g.Wait(); err != nil {
+			return NewInitError(err)
+		}
+		s.toolkitSessions = sessions
 	}
 
 	s.initialized = true
@@ -62,6 +87,7 @@ func (s *RunSession[C]) process(
 	ctx context.Context,
 	runState *RunState,
 	content []llmsdk.Part,
+	tools []AgentTool[C],
 ) *stream.Stream[ProcessEvents] {
 	var toolCallParts []*llmsdk.ToolCallPart
 	for _, part := range content {
@@ -89,7 +115,7 @@ func (s *RunSession[C]) process(
 
 		for _, toolCallPart := range toolCallParts {
 			var agentTool AgentTool[C]
-			for _, tool := range s.params.Tools {
+			for _, tool := range tools {
 				if tool.Name() == toolCallPart.ToolName {
 					agentTool = tool
 					break
@@ -154,10 +180,8 @@ func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*Ag
 
 	state := NewRunState(request.Input, s.params.MaxTurns)
 
-	input := s.getLLMInput()
-
 	for {
-		input.Messages = state.GetTurnMessages()
+		input, tools := s.getTurnParams(state)
 		var modelResponse *llmsdk.ModelResponse
 		modelResponse, err = s.params.Model.Generate(ctx, input)
 		if err != nil {
@@ -169,7 +193,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*Ag
 
 		state.AppendModelResponse(*modelResponse)
 
-		processStream := s.process(ctx, state, content)
+		processStream := s.process(ctx, state, content, tools)
 		for processStream.Next() {
 			event := processStream.Current()
 			if event.Response != nil {
@@ -205,8 +229,6 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 
 	state := NewRunState(request.Input, s.params.MaxTurns)
 
-	input := s.getLLMInput()
-
 	eventChan := make(chan *AgentStreamEvent)
 	errChan := make(chan error, 1)
 
@@ -222,7 +244,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 		}()
 
 		for {
-			input.Messages = state.GetTurnMessages()
+			input, tools := s.getTurnParams(state)
 
 			var modelStream *llmsdk.LanguageModelStream
 			modelStream, err = s.params.Model.Stream(ctx, input)
@@ -267,7 +289,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 
 			eventChan <- NewAgentStreamItemEvent(index, item)
 
-			processStream := s.process(ctx, state, content)
+			processStream := s.process(ctx, state, content, tools)
 			for processStream.Next() {
 				event := processStream.Current()
 				if event.Response != nil {
@@ -302,27 +324,35 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 	return stream.New(eventChan, errChan), nil
 }
 
-func (s *RunSession[C]) Finish() {
-	s.initialized = false
-	s.systemPrompt = nil
-}
+func (s *RunSession[C]) Close(ctx context.Context) error {
+	if !s.initialized {
+		return nil
+	}
+	s.staticSystemPrompt = nil
+	s.staticTools = nil
 
-func (s *RunSession[C]) getLLMInput() *llmsdk.LanguageModelInput {
-	// Convert AgentTool to SDK Tool
-	var tools []llmsdk.Tool
-	for _, tool := range s.params.Tools {
-		tools = append(tools, llmsdk.Tool{
-			Name:        tool.Name(),
-			Description: tool.Description(),
-			Parameters:  tool.Parameters(),
+	g, ctx := errgroup.WithContext(ctx)
+	for _, toolkitSession := range s.toolkitSessions {
+		if toolkitSession == nil {
+			continue
+		}
+		g.Go(func() error {
+			return toolkitSession.Close(ctx)
 		})
 	}
+	if err := g.Wait(); err != nil {
+		return err
+	}
 
-	return &llmsdk.LanguageModelInput{
-		// messages will be computed from getTurnMessages
-		Messages:         nil,
-		SystemPrompt:     s.systemPrompt,
-		Tools:            tools,
+	s.toolkitSessions = nil
+	s.initialized = false
+
+	return nil
+}
+
+func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInput, []AgentTool[C]) {
+	input := &llmsdk.LanguageModelInput{
+		Messages:         state.GetTurnMessages(),
 		ResponseFormat:   s.params.ResponseFormat,
 		Temperature:      s.params.Temperature,
 		TopP:             s.params.TopP,
@@ -333,6 +363,45 @@ func (s *RunSession[C]) getLLMInput() *llmsdk.LanguageModelInput {
 		Audio:            s.params.Audio,
 		Reasoning:        s.params.Reasoning,
 	}
+
+	systemPrompts := []string{}
+	if s.staticSystemPrompt != nil && *s.staticSystemPrompt != "" {
+		systemPrompts = append(systemPrompts, *s.staticSystemPrompt)
+	}
+
+	tools := make([]AgentTool[C], len(s.staticTools))
+	copy(tools, s.staticTools)
+
+	for _, toolkitSession := range s.toolkitSessions {
+		if toolkitSession == nil {
+			continue
+		}
+		if prompt := toolkitSession.SystemPrompt(); prompt != nil && *prompt != "" {
+			systemPrompts = append(systemPrompts, *prompt)
+		}
+		if toolkitTools := toolkitSession.Tools(); len(toolkitTools) > 0 {
+			tools = append(tools, toolkitTools...)
+		}
+	}
+
+	if len(systemPrompts) > 0 {
+		joined := strings.Join(systemPrompts, "\n")
+		input.SystemPrompt = ptr.To(joined)
+	}
+
+	if len(tools) > 0 {
+		sdkTools := make([]llmsdk.Tool, 0, len(tools))
+		for _, tool := range tools {
+			sdkTools = append(sdkTools, llmsdk.Tool{
+				Name:        tool.Name(),
+				Description: tool.Description(),
+				Parameters:  tool.Parameters(),
+			})
+		}
+		input.Tools = sdkTools
+	}
+
+	return input, tools
 }
 
 // RunSessionRequest contains the input used for a run.

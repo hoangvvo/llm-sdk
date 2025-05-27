@@ -1,14 +1,17 @@
 import goAgentInstructionTypes from "../../../agent-go/instruction.go?raw";
 import goAgentParamsTypes from "../../../agent-go/params.go?raw";
 import goAgentToolTypes from "../../../agent-go/tool.go?raw";
+import goAgentToolkitTypes from "../../../agent-go/toolkit.go?raw";
 import goAgentTypes from "../../../agent-go/types.go?raw";
 import jsAgentInstructionTypes from "../../../agent-js/src/instruction.ts?raw";
 import jsAgentParamsTypes from "../../../agent-js/src/params.ts?raw";
 import jsAgentToolTypes from "../../../agent-js/src/tool.ts?raw";
+import jsAgentToolkitTypes from "../../../agent-js/src/toolkit.ts?raw";
 import jsAgentTypes from "../../../agent-js/src/types.ts?raw";
 import rustAgentInstructionTypes from "../../../agent-rust/src/instruction.rs?raw";
 import rustAgentParamsTypes from "../../../agent-rust/src/params.rs?raw";
 import rustAgentToolTypes from "../../../agent-rust/src/tool.rs?raw";
+import rustAgentToolkitTypes from "../../../agent-rust/src/toolkit.rs?raw";
 import rustAgentTypes from "../../../agent-rust/src/types.rs?raw";
 import goTypes from "../../../sdk-go/types.go?raw";
 import jsTypes from "../../../sdk-js/src/types.ts?raw";
@@ -50,6 +53,15 @@ export const extractRustAgentToolTypes = (typeNames: string[]) =>
 
 export const extractTypescriptAgentToolTypes = (typeNames: string[]) =>
   extractCombined(jsAgentToolTypes, typeNames, "ts");
+
+export const extractGoAgentToolkitTypes = (typeNames: string[]) =>
+  extractCombined(goAgentToolkitTypes, typeNames, "go");
+
+export const extractRustAgentToolkitTypes = (typeNames: string[]) =>
+  extractCombined(rustAgentToolkitTypes, typeNames, "rust");
+
+export const extractTypescriptAgentToolkitTypes = (typeNames: string[]) =>
+  extractCombined(jsAgentToolkitTypes, typeNames, "ts");
 
 export const extractTypescriptAgentInstructionTypes = (typeNames: string[]) =>
   extractCombined(jsAgentInstructionTypes, typeNames, "ts");

@@ -30,6 +30,7 @@ func NewAgent[C any](name string, model llmsdk.LanguageModel, options ...AgentPa
 		Model:          model,
 		Instructions:   []InstructionParam[C]{},
 		Tools:          []AgentTool[C]{},
+		Toolkits:       []Toolkit[C]{},
 		ResponseFormat: llmsdk.NewResponseFormatText(),
 		MaxTurns:       10,
 	}
@@ -48,10 +49,13 @@ func (a *Agent[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResp
 	if err != nil {
 		return nil, err
 	}
-	defer session.Finish()
-	result, err := session.Run(ctx, RunSessionRequest{Input: request.Input})
-	if err != nil {
-		return nil, err
+	result, runErr := session.Run(ctx, RunSessionRequest{Input: request.Input})
+	closeErr := session.Close(ctx)
+	if runErr != nil {
+		return nil, runErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
 	}
 	return result, nil
 }
@@ -65,6 +69,7 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 	}
 	agentStream, err := session.RunStream(ctx, RunSessionRequest{Input: request.Input})
 	if err != nil {
+		_ = session.Close(ctx)
 		return nil, err
 	}
 
@@ -74,14 +79,20 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 	go func() {
 		defer close(eventChan)
 		defer close(errChan)
-		defer session.Finish()
+
+		var streamErr error
+		defer func() {
+			if closeErr := session.Close(ctx); closeErr != nil && streamErr == nil {
+				errChan <- closeErr
+			}
+		}()
 
 		for agentStream.Next() {
 			event := agentStream.Current()
 			eventChan <- event
 		}
-		if err = agentStream.Err(); err != nil {
-			errChan <- err
+		if streamErr = agentStream.Err(); streamErr != nil {
+			errChan <- streamErr
 			return
 		}
 	}()
