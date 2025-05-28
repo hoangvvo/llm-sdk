@@ -2,6 +2,7 @@
 import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
 import tailwindcss from "@tailwindcss/vite";
+import mermaid from "astro-mermaid";
 import { defineConfig } from "astro/config";
 import { ion } from "starlight-ion-theme";
 import { viteStaticCopy } from "vite-plugin-static-copy";
@@ -50,7 +51,9 @@ export default defineConfig({
             { slug: "agent/agent" },
             { slug: "agent/instructions" },
             { slug: "agent/tools" },
+            { slug: "agent/toolkits" },
             { slug: "agent/run" },
+            { slug: "agent/agent-vs-run-session" },
             { slug: "agent/structured-output" },
             { slug: "agent/delegation" },
             { slug: "agent/memory" },
@@ -76,6 +79,10 @@ export default defineConfig({
       plugins: [ion()],
     }),
     react(),
+    mermaid({
+      theme: "forest",
+      autoTheme: true,
+    }),
   ],
   vite: {
     plugins: [

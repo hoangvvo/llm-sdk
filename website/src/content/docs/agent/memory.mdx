@@ -11,16 +11,15 @@ import rustMemoryCode from "../../../../../agent-rust/examples/memory.rs?raw";
   This is an agent pattern that requires custom implementation. [Why?](/agent/#agent-patterns)
 </Aside>
 
-The Memory pattern enables an agent to retain information learned from earlier interactions and use it later.
-It is inspired by the [_MemGPT_](https://research.memgpt.ai/) paper, which defines two memory types:
+The Memory pattern enables an agent to retain information learned from earlier interactions and use it later. It is inspired by the [_MemGPT_](https://research.memgpt.ai/) paper, which defines two memory types:
 
-- **Core memory**: Small, high‑value facts always included in the prompt (e.g., _user name_, _key preferences_). Updated via a tool; injected into the system context each turn.
-- **Archival memory**: Larger, long‑tail information stored externally and retrieved on demand (e.g., _detailed notes_, _historical results_). Not included by default; the agent searches it explicitly when needed.
+- **Core memory**: Small, high-value facts always included in the prompt (e.g., _user name_, _key preferences_). Updated via a tool; injected into the system context each turn.
+- **Archival memory**: Larger, long-tail information stored externally and retrieved on demand (e.g., _detailed notes_, _historical results_). Not included by default; the agent searches it explicitly when needed.
 
 There are certain use cases where memory is beneficial:
 
 - **Personalization**: Persist user preferences or profile details.
-- **Long‑running tasks**: Track decisions or partial results across sessions.
+- **Long-running tasks**: Track decisions or partial results across sessions.
 - **Knowledge recall**: Store and retrieve references, notes, or summaries.
 
 How archival memory works (vector search):
@@ -30,7 +29,9 @@ How archival memory works (vector search):
 3. **Storage**: Save vectors in a database optimized for similarity search.
 4. **Retrieval**: Embed the query and return the most similar stored chunks.
 
-The examples below demonstrate a basic in‑memory core store and a placeholder archival search.
+## Implementation
+
+The examples below demonstrate a basic in-memory core store and a placeholder archival search.
 
 ![Agent memory example](../../../../assets/examples/memory.gif)
 

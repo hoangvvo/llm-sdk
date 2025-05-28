@@ -26,7 +26,8 @@ pub struct AgentParams<TCtx> {
     pub instructions: Vec<InstructionParam<TCtx>>,
     /// The tools that the agent can use to perform tasks.
     pub tools: Vec<Arc<dyn AgentTool<TCtx>>>,
-    /// Optional toolkits that can provide dynamic tools and system prompts for each session.
+    /// Optional toolkits that can provide dynamic tools and system prompts for
+    /// each session.
     pub toolkits: Vec<Arc<dyn Toolkit<TCtx>>>,
     /// The expected format of the response. Either text or structured output.
     pub response_format: ResponseFormatOption,

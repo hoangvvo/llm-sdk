@@ -1,111 +1,101 @@
 import { Agent, getResponseText, tool } from "@hoangvvo/llm-agent";
+import { typeboxTool } from "@hoangvvo/llm-agent/typebox";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
+import { Type } from "@sinclair/typebox";
 import z from "zod";
 import { getModel } from "./get-model.ts";
 
-interface DungeonRunContext {
-  dungeonMaster: string;
-  partyName: string;
-  encounter: {
-    scene: string;
-    enemies: Record<string, { hp: number }>;
-    downedAllies: Set<string>;
-  };
-  actionBudget: Record<string, number>;
+/**
+ * Shared context used by every tool invocation. Tools mutate this object so the agent can
+ * keep track of the case without needing per-turn toolkits.
+ */
+interface LostAndFoundContext {
+  manifestId: string;
+  archivistOnDuty: string;
+  // Items waiting for confirmation before we issue a receipt.
+  intakeLedger: Map<
+    string,
+    { description: string; priority: "standard" | "rush" }
+  >;
+  // Items that must be escalated for contraband review.
+  flaggedContraband: Set<string>;
+  // Notes that should appear on the final receipt.
+  receiptNotes: string[];
 }
 
-function createDungeonContext(): DungeonRunContext {
+function createContext(): LostAndFoundContext {
   return {
-    dungeonMaster: "Rowan",
-    partyName: "Lanternbearers",
-    encounter: {
-      scene: "The Echo Bridge over the Sunken Keep",
-      enemies: {
-        ghoul: { hp: 12 },
-        marauder: { hp: 9 },
-      },
-      downedAllies: new Set(["finley"]),
-    },
-    actionBudget: {
-      thorne: 1,
-      mira: 2,
-    },
+    manifestId: "aurora-shift",
+    archivistOnDuty: "Quill",
+    intakeLedger: new Map(),
+    flaggedContraband: new Set(),
+    receiptNotes: [],
   };
 }
 
-const attackEnemyTool = tool({
-  name: "attack_enemy",
+/**
+ * Basic `tool` helper which provides convenient type completion for args and context.
+ */
+const intakeItemTool = tool<
+  LostAndFoundContext,
+  {
+    item_id: string;
+    description: string;
+    priority?: "standard" | "rush";
+  }
+>({
+  name: "intake_item",
   description:
-    "Resolve a martial attack from a party member against an active enemy and update its hit points.",
+    "Register an item reported by the traveller. Records a note for later receipt generation.",
   parameters: {
     type: "object",
     properties: {
-      attacker: {
+      item_id: {
         type: "string",
-        description: "Name of the party member making the attack.",
+        description: "Identifier used on the manifest ledger.",
       },
-      target: {
+      description: {
         type: "string",
-        description: "Enemy to strike.",
+        description: "What the traveller says it looks like.",
       },
-      weapon: {
+      priority: {
         type: "string",
-        description: "Weapon or maneuver used for flavour and damage bias.",
+        description: "Optional rush flag. Defaults to standard intake.",
+        enum: ["standard", "rush"],
       },
     },
-    required: ["attacker", "target", "weapon"],
+    required: ["item_id", "description", "priority"],
     additionalProperties: false,
   },
-  execute(
-    args: { attacker: string; target: string; weapon: string },
-    context: DungeonRunContext,
-  ) {
-    const attackerKey = args.attacker.trim().toLowerCase();
-    const targetKey = args.target.trim().toLowerCase();
-
-    const remainingActions = context.actionBudget[attackerKey] ?? 0;
-
-    if (remainingActions <= 0) {
+  execute(args, ctx) {
+    const normalizedId = args.item_id.trim().toLowerCase();
+    if (ctx.intakeLedger.has(normalizedId)) {
       return {
         content: [
           {
             type: "text",
-            text: `${args.attacker} is out of actions this round. Ask another hero to step in or advance the scene.`,
+            text: `Item ${args.item_id} is already on the ledger—confirm the manifest number before adding duplicates.`,
           },
         ],
         is_error: true,
       };
     }
 
-    const enemy = context.encounter.enemies[targetKey];
-
-    if (!enemy) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `No enemy named ${args.target} remains at ${context.encounter.scene}. Double-check the initiative order.`,
-          },
-        ],
-        is_error: true,
-      };
-    }
-
-    const baseDamage = args.weapon.toLowerCase().includes("axe") ? 7 : 5;
-    const finesseBonus = args.weapon.toLowerCase().includes("dagger") ? 1 : 0;
-    const computedDamage =
-      baseDamage + (args.attacker.length % 3) + finesseBonus;
-
-    enemy.hp = Math.max(0, enemy.hp - computedDamage);
-    context.actionBudget[attackerKey] = remainingActions - 1;
-
-    const defeatedText = enemy.hp === 0 ? ` ${args.target} is defeated!` : ``;
+    const priority =
+      args.priority?.trim() === "" ? "standard" : (args.priority ?? "standard");
+    ctx.intakeLedger.set(normalizedId, {
+      description: args.description,
+      priority,
+    });
+    ctx.receiptNotes.push(
+      `${args.item_id}: ${args.description}${priority === "rush" ? " (rush intake)" : ""}`,
+    );
 
     return {
       content: [
         {
           type: "text",
-          text: `${args.attacker} hits ${args.target} for ${String(computedDamage)} damage with the ${args.weapon}. ${args.target} now has ${String(enemy.hp)} HP.${defeatedText}`,
+          text: `Logged ${args.description} as ${args.item_id}. Intake queue now holds ${ctx.intakeLedger.size} item(s).`,
         },
       ],
       is_error: false,
@@ -113,36 +103,111 @@ const attackEnemyTool = tool({
   },
 });
 
-const stabilizeAllyTool = zodTool({
-  name: "stabilize_ally",
+/**
+ * zodTool helper to demonstrate schema definitions using Zod.
+ * Requires:
+ *
+ * npm install zod zod-to-json-schema
+ */
+const flagContrabandTool = zodTool({
+  name: "flag_contraband",
   description:
-    "Spend the round stabilising a downed ally. Removes them from the downed list if available.",
+    "Escalate a manifest item for contraband review. Prevents it from appearing on the standard receipt.",
   parameters: z.object({
-    hero: z.string().describe("Name of the ally to stabilise."),
+    item_id: z.string().describe("Item identifier within the manifest."),
+    reason: z
+      .string()
+      .min(3)
+      .describe("Why the item requires additional screening."),
   }),
-  execute(args, context: DungeonRunContext) {
-    const heroKey = args.hero.trim().toLowerCase();
-    const wasDowned = context.encounter.downedAllies.has(heroKey);
-
-    if (!wasDowned) {
+  execute(args, ctx: LostAndFoundContext) {
+    const key = args.item_id.trim().toLowerCase();
+    if (!ctx.intakeLedger.has(key)) {
       return {
         content: [
           {
             type: "text",
-            text: `${args.hero} is already on their feet. Consider taking another tactical action instead of stabilising.`,
+            text: `Cannot flag ${args.item_id}; it has not been logged yet. Intake the item first.`,
           },
         ],
         is_error: true,
       };
     }
 
-    context.encounter.downedAllies.delete(heroKey);
+    ctx.flaggedContraband.add(key);
+    ctx.receiptNotes.push(`⚠️ ${args.item_id} held for review: ${args.reason}`);
 
     return {
       content: [
         {
           type: "text",
-          text: `${args.hero} is stabilised and ready to rejoin when the next round begins.`,
+          text: `${args.item_id} marked for contraband inspection. Inform security before release.`,
+        },
+      ],
+      is_error: false,
+    };
+  },
+});
+
+/**
+ * Another standard tool using TypeBox that demonstrates returning a final summary and clearing state.
+ * Requires:
+ *
+ * npm install @sinclair/typebox
+ */
+const issueReceiptTool = typeboxTool({
+  name: "issue_receipt",
+  description:
+    "Publish a receipt for the traveller: lists cleared items, highlights contraband reminders, and clears the ledger.",
+  parameters: Type.Object(
+    {
+      traveller: Type.String({ description: "Name to print on the receipt." }),
+    },
+    { additionalProperties: false },
+  ),
+  execute(args, ctx: LostAndFoundContext) {
+    if (ctx.intakeLedger.size === 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `No items pending on manifest ${ctx.manifestId}. Intake something before issuing a receipt.`,
+          },
+        ],
+        is_error: true,
+      };
+    }
+
+    const cleared = Array.from(ctx.intakeLedger.entries())
+      .filter(([id]) => !ctx.flaggedContraband.has(id))
+      .map(([id, entry]) => `${id} (${entry.description})`);
+
+    const contraband = ctx.flaggedContraband.size;
+    const summaryLines: string[] = [
+      `Receipt for ${args.traveller} on manifest ${ctx.manifestId}:`,
+      cleared.length > 0
+        ? `Cleared items: ${cleared.join(", ")}`
+        : "No items cleared—everything is held for review.",
+    ];
+    if (ctx.receiptNotes.length > 0) {
+      summaryLines.push("Notes:");
+      summaryLines.push(...ctx.receiptNotes);
+    }
+    summaryLines.push(
+      contraband > 0
+        ? `${contraband} item(s) require contraband follow-up.`
+        : "No contraband flags recorded.",
+    );
+
+    ctx.intakeLedger.clear();
+    ctx.flaggedContraband.clear();
+    ctx.receiptNotes.length = 0;
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: summaryLines.join("\n"),
         },
       ],
       is_error: false,
@@ -152,18 +217,20 @@ const stabilizeAllyTool = zodTool({
 
 const model = getModel("openai", "gpt-4o");
 
-const dungeonCoach = new Agent<DungeonRunContext>({
-  name: "Torch",
+const lostAndFoundAgent = new Agent<LostAndFoundContext>({
+  name: "WaypointClerk",
   instructions: [
-    "You are Torch, a steady co-Dungeon Master. Keep answers short and, when combat actions come up, lean on the provided tools to resolve them.",
-    "If a requested action involves striking an enemy, call attack_enemy. If the party wants to help someone back up, call stabilize_ally before answering.",
+    "You are the archivist completing intake for Waypoint Seven's Interdimensional Lost & Found desk.",
+    "When travellers report belongings, call the available tools to mutate the manifest and then summarise your actions.",
+    "If a tool reports an error, acknowledge the issue and guide the traveller appropriately.",
   ],
   model,
-  tools: [attackEnemyTool, stabilizeAllyTool],
+  tools: [intakeItemTool, flagContrabandTool, issueReceiptTool],
 });
 
-const successContext = createDungeonContext();
-const successResponse = await dungeonCoach.run({
+// Successful run: exercise multiple tools and show evolving context state.
+const successContext = createContext();
+const successResponse = await lostAndFoundAgent.run({
   context: successContext,
   input: [
     {
@@ -172,26 +239,20 @@ const successResponse = await dungeonCoach.run({
       content: [
         {
           type: "text",
-          text: "Thorne will strike the ghoul with a battleaxe while Mira uses her turn to stabilise Finley. Help me resolve it.",
+          text: `Log the Chrono Locket as rush, mark the "Folded star chart" for contraband, then issue a receipt for Captain Lyra Moreno.`,
         },
       ],
     },
   ],
 });
 
+console.log("\n=== SUCCESS RUN ===");
 console.dir(successResponse, { depth: null });
 console.log(getResponseText(successResponse));
-console.log("Remaining enemy HP:", successContext.encounter.enemies);
-console.log(
-  "Downed allies after success run:",
-  Array.from(successContext.encounter.downedAllies),
-);
 
-const failureContext = createDungeonContext();
-failureContext.actionBudget["thorne"] = 0;
-failureContext.encounter.downedAllies.clear();
-
-const failureResponse = await dungeonCoach.run({
+// Failure case: demonstrate tool error handling in the same scenario.
+const failureContext = createContext();
+const failureResponse = await lostAndFoundAgent.run({
   context: failureContext,
   input: [
     {
@@ -200,12 +261,13 @@ const failureResponse = await dungeonCoach.run({
       content: [
         {
           type: "text",
-          text: "Thorne wants to swing again at the marauder, and Mira tries to stabilise Finley anyway.",
+          text: `Issue a receipt immediately without logging anything.`,
         },
       ],
     },
   ],
 });
 
+console.log("\n=== FAILURE RUN ===");
 console.dir(failureResponse, { depth: null });
 console.log(getResponseText(failureResponse));

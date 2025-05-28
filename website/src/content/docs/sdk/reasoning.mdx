@@ -15,7 +15,7 @@ import {
   extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
 
-For reasoning models, the SDK also outputs `ReasoningPart`:
+For reasoning models, the SDK also outputs [`ReasoningPart`](../language-model#reasoning-part):
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -67,6 +67,8 @@ This may enabled by default for supported models, but can be configured using `r
   </TabItem>
 </Tabs>
 
+## Generate reasoning
+
 Once enabled, the model will output `ReasoningPart`s in addition to other parts.
 
 ![generate-reasoning](../../../../assets/examples/generate-reasoning.gif)
@@ -114,6 +116,8 @@ Reasoning parts are also emitted in streaming mode in the form of `ReasoningPart
     />
   </TabItem>
 </Tabs>
+
+## Stream reasoning
 
 Accessing reasoning parts in streaming mode like other parts:
 

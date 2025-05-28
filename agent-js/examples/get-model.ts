@@ -10,12 +10,21 @@ import { CohereModel } from "@hoangvvo/llm-sdk/cohere";
 import { GoogleModel } from "@hoangvvo/llm-sdk/google";
 import { MistralModel } from "@hoangvvo/llm-sdk/mistral";
 import { OpenAIChatModel, OpenAIModel } from "@hoangvvo/llm-sdk/openai";
+import dotenv from "dotenv";
 import modelList from "../../website/models.json" with { type: "json" };
 
 function assert(condition: unknown, msg: string): asserts condition {
   if (!condition) {
     throw new Error(msg);
   }
+}
+
+try {
+  dotenv.config({
+    path: "../.env",
+  });
+} catch {
+  // ignore
 }
 
 export function getModel(

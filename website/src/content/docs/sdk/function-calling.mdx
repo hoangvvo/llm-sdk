@@ -12,7 +12,29 @@ import {
   extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
 
-Functions can be provided to the model as `Tool`:
+Function calling lets the model request work from your own code. You describe possible functions as tools, the model decides when to call them, and you send the results back so it can continue the conversation.
+
+## Request/response loop
+
+```mermaid
+sequenceDiagram
+  participant App
+  participant Model
+  participant Tool
+
+  App->>Model: messages + available tools
+  Model-->>App: assistant message with tool_call parts
+  App->>Tool: execute(args)
+  Tool-->>App: tool result payload
+  App->>Model: append tool message + retry
+  Model-->>App: final assistant content
+```
+
+The loop continues until the model returns regular assistant content (no tool call parts) or you stop the interaction. Each tool call is explicit, so you stay in control of side effects and error handling.
+
+## Describe the tools you expose
+
+Create one entry per callable function. The schema tells the model which arguments are expected.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -38,7 +60,11 @@ Functions can be provided to the model as `Tool`:
   </TabItem>
 </Tabs>
 
-The model might returns one or many `ToolCallPart`s in its response to indicate that it wants to call a function:
+Include these tools when you call the model. In the streaming APIs, pass them on every turn.
+
+## Detect tool calls from the model
+
+When the model wants to call something, the assistant message carries one or more [`ToolCallPart`](../language-model#tool-call-part)s. Each part includes the tool name and JSON arguments that you must parse before executing your own code.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -64,7 +90,11 @@ The model might returns one or many `ToolCallPart`s in its response to indicate 
   </TabItem>
 </Tabs>
 
-Execute the tools in your application and return the results to the model as a single `ToolMessage`, which contain one or many `ToolResultPart`s in its `content` field:
+Execute each requested function in your application. Handle failures yourself--if you return an error payload the model can choose a different strategy or ask for clarification.
+
+## Return the results as a tool message
+
+After execution, respond with a single `ToolMessage` that contains one or more [`ToolResultPart`](../language-model#tool-result-part)s for every call you serviced. The model uses these results to continue reasoning or to compose the final answer.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -90,10 +120,11 @@ Execute the tools in your application and return the results to the model as a s
   </TabItem>
 </Tabs>
 
-## Function tool example
+Append both the assistant message that requested the tool and your tool message to the conversation, then call the model again. Repeat until you get a regular assistant response.
 
-Below is an example to receive tool calls from the model and return tool results back to the model.
-For complex setup, it is recommended to use the [Agent library](/agent).
+## End-to-end example
+
+Below is a minimal loop that wires everything together. The logic is what drives the [Agent library](/agent) internally.
 
 <Tabs>
   <TabItem label="TypeScript">

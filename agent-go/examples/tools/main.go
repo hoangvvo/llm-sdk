@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -12,210 +13,222 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
-	"github.com/sanity-io/litter"
 )
 
-type EnemyState struct {
-	HP int `json:"hp"`
+// LostAndFoundContext mirrors the TypeScript example: agent tools mutate the manifest
+// directly so the RunSession sees the latest state without requiring a toolkit.
+type LostAndFoundContext struct {
+	ManifestID        string
+	Archivist         string
+	IntakeLedger      map[string]ItemRecord
+	FlaggedContraband map[string]struct{}
+	ReceiptNotes      []string
 }
 
-type EncounterState struct {
-	Scene        string
-	Enemies      map[string]EnemyState
-	DownedAllies map[string]struct{}
+type ItemRecord struct {
+	Description string
+	Priority    string
 }
 
-type DungeonRunContext struct {
-	DungeonMaster string
-	PartyName     string
-	Encounter     *EncounterState
-	ActionBudget  map[string]int
-}
-
-func createDungeonContext() *DungeonRunContext {
-	return &DungeonRunContext{
-		DungeonMaster: "Rowan",
-		PartyName:     "Lanternbearers",
-		Encounter: &EncounterState{
-			Scene: "The Echo Bridge over the Sunken Keep",
-			Enemies: map[string]EnemyState{
-				"ghoul":    {HP: 12},
-				"marauder": {HP: 9},
-			},
-			DownedAllies: map[string]struct{}{
-				"finley": {},
-			},
-		},
-		ActionBudget: map[string]int{
-			"thorne": 1,
-			"mira":   2,
-		},
+func newContext() *LostAndFoundContext {
+	return &LostAndFoundContext{
+		ManifestID:        "aurora-shift",
+		Archivist:         "Quill",
+		IntakeLedger:      map[string]ItemRecord{},
+		FlaggedContraband: map[string]struct{}{},
+		ReceiptNotes:      []string{},
 	}
 }
 
-type AttackEnemyParams struct {
-	Attacker string `json:"attacker"`
-	Target   string `json:"target"`
-	Weapon   string `json:"weapon"`
-}
+// intakeItemTool shows a standard AgentTool implementation that validates input,
+// mutates context, and returns structured output.
+type intakeItemTool struct{}
 
-type AttackEnemyTool struct{}
+func (intakeItemTool) Name() string        { return "intake_item" }
+func (intakeItemTool) Description() string { return "Register an item reported by the traveller." }
 
-func (t *AttackEnemyTool) Name() string {
-	return "attack_enemy"
-}
-
-func (t *AttackEnemyTool) Description() string {
-	return "Resolve a martial attack from a party member against an active enemy and update its hit points."
-}
-
-func (t *AttackEnemyTool) Parameters() llmsdk.JSONSchema {
+func (intakeItemTool) Parameters() llmsdk.JSONSchema {
 	return llmsdk.JSONSchema{
 		"type": "object",
 		"properties": map[string]any{
-			"attacker": map[string]any{
+			"item_id": map[string]any{
 				"type":        "string",
-				"description": "Name of the party member making the attack.",
+				"description": "Identifier used on the manifest ledger.",
 			},
-			"target": map[string]any{
+			"description": map[string]any{
 				"type":        "string",
-				"description": "Enemy to strike.",
+				"description": "What the traveller says it looks like.",
 			},
-			"weapon": map[string]any{
-				"type":        "string",
-				"description": "Weapon or maneuver used for flavour and damage bias.",
+			"priority": map[string]any{
+				"type": "string",
+				"enum": []string{"standard", "rush"},
 			},
 		},
-		"required":             []string{"attacker", "target", "weapon"},
+		"required":             []string{"item_id", "description"},
 		"additionalProperties": false,
 	}
 }
 
-func (t *AttackEnemyTool) Execute(_ context.Context, paramsJSON json.RawMessage, contextVal *DungeonRunContext, _ *llmagent.RunState) (llmagent.AgentToolResult, error) {
-	var params AttackEnemyParams
-	if err := json.Unmarshal(paramsJSON, &params); err != nil {
+func (intakeItemTool) Execute(_ context.Context, raw json.RawMessage, ctx *LostAndFoundContext, _ *llmagent.RunState) (llmagent.AgentToolResult, error) {
+	var params struct {
+		ItemID      string `json:"item_id"`
+		Description string `json:"description"`
+		Priority    string `json:"priority"`
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return llmagent.AgentToolResult{}, err
 	}
 
-	attackerKey := strings.ToLower(strings.TrimSpace(params.Attacker))
-	targetKey := strings.ToLower(strings.TrimSpace(params.Target))
-
-	remainingActions := contextVal.ActionBudget[attackerKey]
-	if remainingActions <= 0 {
+	normalized := strings.ToLower(strings.TrimSpace(params.ItemID))
+	if normalized == "" {
+		return llmagent.AgentToolResult{}, errors.New("item_id cannot be empty")
+	}
+	if _, exists := ctx.IntakeLedger[normalized]; exists {
 		return llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				llmsdk.NewTextPart(fmt.Sprintf("%s is out of actions this round. Ask another hero to step in or advance the scene.", params.Attacker)),
-			},
+			Content: []llmsdk.Part{llmsdk.NewTextPart(fmt.Sprintf("Item %s is already on the ledger—confirm the manifest number before adding duplicates.", params.ItemID))},
 			IsError: true,
 		}, nil
 	}
 
-	enemy, ok := contextVal.Encounter.Enemies[targetKey]
-	if !ok {
-		return llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				llmsdk.NewTextPart(fmt.Sprintf("No enemy named %s remains at %s. Double-check the initiative order.", params.Target, contextVal.Encounter.Scene)),
-			},
-			IsError: true,
-		}, nil
+	priority := params.Priority
+	if priority == "" {
+		priority = "standard"
 	}
 
-	weaponLower := strings.ToLower(params.Weapon)
-	baseDamage := 5
-	if strings.Contains(weaponLower, "axe") {
-		baseDamage = 7
-	}
-	finesseBonus := 0
-	if strings.Contains(weaponLower, "dagger") {
-		finesseBonus = 1
-	}
-	computedDamage := baseDamage + (len(params.Attacker) % 3) + finesseBonus
-
-	enemy.HP = enemy.HP - computedDamage
-	if enemy.HP < 0 {
-		enemy.HP = 0
-	}
-	contextVal.Encounter.Enemies[targetKey] = enemy
-	contextVal.ActionBudget[attackerKey] = remainingActions - 1
-
-	defeated := ""
-	if enemy.HP == 0 {
-		defeated = fmt.Sprintf(" %s is defeated!", params.Target)
-	}
+	ctx.IntakeLedger[normalized] = ItemRecord{Description: params.Description, Priority: priority}
+	ctx.ReceiptNotes = append(ctx.ReceiptNotes, fmt.Sprintf("%s: %s%s", params.ItemID, params.Description, ternary(priority == "rush", " (rush intake)", "")))
 
 	return llmagent.AgentToolResult{
-		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(fmt.Sprintf("%s hits %s for %d damage with the %s. %s now has %d HP.%s",
-				params.Attacker, params.Target, computedDamage, params.Weapon, params.Target, enemy.HP, defeated)),
-		},
+		Content: []llmsdk.Part{llmsdk.NewTextPart(fmt.Sprintf("Logged %s as %s. Intake queue now holds %d item(s).", params.Description, params.ItemID, len(ctx.IntakeLedger)))},
 		IsError: false,
 	}, nil
 }
 
-type StabilizeAllyParams struct {
-	Hero string `json:"hero"`
+// flagContrabandTool showcases additional validation and context mutation.
+type flagContrabandTool struct{}
+
+func (flagContrabandTool) Name() string { return "flag_contraband" }
+func (flagContrabandTool) Description() string {
+	return "Escalate a manifest item for contraband review."
 }
 
-type StabilizeAllyTool struct{}
-
-func (t *StabilizeAllyTool) Name() string {
-	return "stabilize_ally"
-}
-
-func (t *StabilizeAllyTool) Description() string {
-	return "Spend the round stabilising a downed ally. Removes them from the downed list if available."
-}
-
-func (t *StabilizeAllyTool) Parameters() llmsdk.JSONSchema {
+func (flagContrabandTool) Parameters() llmsdk.JSONSchema {
 	return llmsdk.JSONSchema{
 		"type": "object",
 		"properties": map[string]any{
-			"hero": map[string]any{
+			"item_id": map[string]any{
 				"type":        "string",
-				"description": "Name of the ally to stabilise.",
+				"description": "Identifier within the manifest.",
+			},
+			"reason": map[string]any{
+				"type":        "string",
+				"description": "Why the item needs review.",
 			},
 		},
-		"required":             []string{"hero"},
+		"required":             []string{"item_id", "reason"},
 		"additionalProperties": false,
 	}
 }
 
-func (t *StabilizeAllyTool) Execute(_ context.Context, paramsJSON json.RawMessage, contextVal *DungeonRunContext, _ *llmagent.RunState) (llmagent.AgentToolResult, error) {
-	var params StabilizeAllyParams
-	if err := json.Unmarshal(paramsJSON, &params); err != nil {
+func (flagContrabandTool) Execute(_ context.Context, raw json.RawMessage, ctx *LostAndFoundContext, _ *llmagent.RunState) (llmagent.AgentToolResult, error) {
+	var params struct {
+		ItemID string `json:"item_id"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
 		return llmagent.AgentToolResult{}, err
 	}
 
-	heroKey := strings.ToLower(strings.TrimSpace(params.Hero))
-	if _, ok := contextVal.Encounter.DownedAllies[heroKey]; !ok {
+	normalized := strings.ToLower(strings.TrimSpace(params.ItemID))
+	if _, exists := ctx.IntakeLedger[normalized]; !exists {
 		return llmagent.AgentToolResult{
-			Content: []llmsdk.Part{
-				llmsdk.NewTextPart(fmt.Sprintf("%s is already on their feet. Consider taking another tactical action instead of stabilising.", params.Hero)),
-			},
+			Content: []llmsdk.Part{llmsdk.NewTextPart(fmt.Sprintf("Cannot flag %s; it has not been logged yet. Intake the item first.", params.ItemID))},
 			IsError: true,
 		}, nil
 	}
 
-	delete(contextVal.Encounter.DownedAllies, heroKey)
+	ctx.FlaggedContraband[normalized] = struct{}{}
+	ctx.ReceiptNotes = append(ctx.ReceiptNotes, fmt.Sprintf("⚠️ %s held for review: %s", params.ItemID, params.Reason))
 
 	return llmagent.AgentToolResult{
-		Content: []llmsdk.Part{
-			llmsdk.NewTextPart(fmt.Sprintf("%s is stabilised and ready to rejoin when the next round begins.", params.Hero)),
-		},
+		Content: []llmsdk.Part{llmsdk.NewTextPart(fmt.Sprintf("%s marked for contraband inspection. Inform security before release.", params.ItemID))},
 		IsError: false,
 	}, nil
 }
 
-func listDownedAllies(m map[string]struct{}) []string {
-	allies := make([]string, 0, len(m))
-	for k := range m {
-		allies = append(allies, k)
+// issueReceiptTool highlights summarising context state and clearing it afterwards.
+type issueReceiptTool struct{}
+
+func (issueReceiptTool) Name() string { return "issue_receipt" }
+func (issueReceiptTool) Description() string {
+	return "Publish a receipt and clear the manifest ledger."
+}
+
+func (issueReceiptTool) Parameters() llmsdk.JSONSchema {
+	return llmsdk.JSONSchema{
+		"type": "object",
+		"properties": map[string]any{
+			"traveller": map[string]any{
+				"type":        "string",
+				"description": "Recipient of the receipt.",
+			},
+		},
+		"required":             []string{"traveller"},
+		"additionalProperties": false,
 	}
-	return allies
+}
+
+func (issueReceiptTool) Execute(_ context.Context, raw json.RawMessage, ctx *LostAndFoundContext, _ *llmagent.RunState) (llmagent.AgentToolResult, error) {
+	var params struct {
+		Traveller string `json:"traveller"`
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return llmagent.AgentToolResult{}, err
+	}
+
+	if len(ctx.IntakeLedger) == 0 {
+		return llmagent.AgentToolResult{
+			Content: []llmsdk.Part{llmsdk.NewTextPart(fmt.Sprintf("No items pending on manifest %s. Intake something before issuing a receipt.", ctx.ManifestID))},
+			IsError: true,
+		}, nil
+	}
+
+	cleared := []string{}
+	for id, record := range ctx.IntakeLedger {
+		if _, flagged := ctx.FlaggedContraband[id]; !flagged {
+			cleared = append(cleared, fmt.Sprintf("%s (%s)", id, record.Description))
+		}
+	}
+
+	summary := []string{
+		fmt.Sprintf("Receipt for %s on manifest %s:", params.Traveller, ctx.ManifestID),
+	}
+	if len(cleared) > 0 {
+		summary = append(summary, fmt.Sprintf("Cleared items: %s", strings.Join(cleared, ", ")))
+	} else {
+		summary = append(summary, "No items cleared—everything is held for review.")
+	}
+	if len(ctx.ReceiptNotes) > 0 {
+		summary = append(summary, "Notes:")
+		summary = append(summary, ctx.ReceiptNotes...)
+	}
+	summary = append(summary, fmt.Sprintf("%d item(s) require contraband follow-up.", len(ctx.FlaggedContraband)))
+
+	// Clear state so subsequent turns start fresh.
+	ctx.IntakeLedger = map[string]ItemRecord{}
+	ctx.FlaggedContraband = map[string]struct{}{}
+	ctx.ReceiptNotes = ctx.ReceiptNotes[:0]
+
+	return llmagent.AgentToolResult{
+		Content: []llmsdk.Part{llmsdk.NewTextPart(strings.Join(summary, "\n"))},
+		IsError: false,
+	}, nil
 }
 
 func main() {
-	godotenv.Load("../.env")
+	if err := godotenv.Load("../.env"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Fatalf("load env: %v", err)
+	}
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -224,60 +237,61 @@ func main() {
 
 	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
 
-	dungeonCoach := llmagent.NewAgent[*DungeonRunContext]("Torch", model,
+	agent := llmagent.NewAgent[*LostAndFoundContext](
+		"WaypointClerk",
+		model,
 		llmagent.WithInstructions(
-			llmagent.InstructionParam[*DungeonRunContext]{String: ptr(
-				"You are Torch, a steady co-Dungeon Master. Keep answers short and, when combat actions come up, lean on the provided tools to resolve them.",
-			)},
-			llmagent.InstructionParam[*DungeonRunContext]{String: ptr(
-				"If a requested action involves striking an enemy, call attack_enemy. If the party wants to help someone back up, call stabilize_ally before answering.",
-			)},
+			llmagent.InstructionParam[*LostAndFoundContext]{String: ptr("You are the archivist completing intake for Waypoint Seven's Interdimensional Lost & Found desk.")},
+			llmagent.InstructionParam[*LostAndFoundContext]{String: ptr("When travellers report belongings, call the available tools to mutate the manifest and then summarise your actions.")},
+			llmagent.InstructionParam[*LostAndFoundContext]{String: ptr("If a tool reports an error, acknowledge the issue and guide the traveller appropriately.")},
 		),
-		llmagent.WithTools(&AttackEnemyTool{}, &StabilizeAllyTool{}),
+		llmagent.WithTools(intakeItemTool{}, flagContrabandTool{}, issueReceiptTool{}),
 	)
 
-	successContext := createDungeonContext()
-	successResponse, err := dungeonCoach.Run(context.Background(), llmagent.AgentRequest[*DungeonRunContext]{
+	// Successful run exercises multiple tools in a single turn.
+	successCtx := newContext()
+	successResp, err := agent.Run(context.Background(), llmagent.AgentRequest[*LostAndFoundContext]{
+		Context: successCtx,
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(
 				llmsdk.NewUserMessage(
-					llmsdk.NewTextPart("Thorne will strike the ghoul with a battleaxe while Mira uses her turn to stabilise Finley. Help me resolve it."),
+					llmsdk.NewTextPart("Log the Chrono Locket as rush, flag the Folded star chart for contraband, then issue a receipt for Captain Lyra Moreno."),
 				),
 			),
 		},
-		Context: successContext,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("\n=== SUCCESS RUN ===")
+	fmt.Printf("%#v\n", successResp)
+	fmt.Println(successResp.Text())
 
-	fmt.Println("Success response:")
-	litter.Dump(successResponse)
-	fmt.Printf("Remaining enemy HP: %#v\n", successContext.Encounter.Enemies)
-	fmt.Printf("Downed allies after success run: %#v\n", listDownedAllies(successContext.Encounter.DownedAllies))
-
-	failureContext := createDungeonContext()
-	failureContext.ActionBudget["thorne"] = 0
-	failureContext.Encounter.DownedAllies = map[string]struct{}{}
-
-	failureResponse, err := dungeonCoach.Run(context.Background(), llmagent.AgentRequest[*DungeonRunContext]{
+	// Failure run demonstrates a tool error path.
+	failureCtx := newContext()
+	failureResp, err := agent.Run(context.Background(), llmagent.AgentRequest[*LostAndFoundContext]{
+		Context: failureCtx,
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(
 				llmsdk.NewUserMessage(
-					llmsdk.NewTextPart("Thorne wants to swing again at the marauder, and Mira tries to stabilise Finley anyway."),
+					llmsdk.NewTextPart("Issue a receipt immediately without logging anything."),
 				),
 			),
 		},
-		Context: failureContext,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Println("Failure response:")
-	litter.Dump(failureResponse)
+	fmt.Println("\n=== FAILURE RUN ===")
+	fmt.Printf("%#v\n", failureResp)
+	fmt.Println(failureResp.Text())
 }
 
-func ptr[T any](v T) *T {
-	return &v
+func ptr[T any](v T) *T { return &v }
+
+func ternary[T any](cond bool, a, b T) T {
+	if cond {
+		return a
+	}
+	return b
 }

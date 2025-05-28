@@ -2,11 +2,24 @@
 description = "Agents enable the development of agentic AI applications that can generate responses and execute tasks autonomously. Agents utilize the LLM SDK to interact with different language models and allow definitions of instructions, tools, and other language model parameters."
 edition = "2021"
 homepage = "https://llm-sdk.hoangvvo.com/"
+keywords = [
+  "llm",
+  "language model",
+  "agent",
+  "ai",
+  "openai",
+  "anthropic",
+  "cohere",
+  "mistral",
+]
 license = "MIT"
 name = "llm-agent"
 readme = "README.md"
 repository = "https://github.com/hoangvvo/llm-sdk"
 version = "0.1.0"
+
+[lib]
+name = "llm_agent"
 
 [lints.clippy]
 missing_errors_doc = "allow"

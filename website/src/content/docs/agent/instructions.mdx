@@ -2,15 +2,23 @@
 title: Instructions
 ---
 
-import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
 import goInstructionsExample from "../../../../../agent-go/examples/instructions/main.go?raw";
 import jsInstructionsExample from "../../../../../agent-js/examples/instructions.ts?raw";
 import rustInstructionsExample from "../../../../../agent-rust/examples/instructions.rs?raw";
-import { extractGoAgentInstructionTypes, extractRustAgentInstructionTypes, extractTypescriptAgentInstructionTypes } from "../../../utils/extract-types.ts";
+import {
+  extractGoAgentInstructionTypes,
+  extractRustAgentInstructionTypes,
+  extractTypescriptAgentInstructionTypes,
+} from "../../../utils/extract-types.ts";
 
-Instructions are used to guide the agent's behavior and can be either static or dynamic. They are injected into the system prompt to provide context and directives for the agent.
+Instructions are the scaffolding that steer every run. When you build an agent you can pass plain strings, context-aware functions, or async callbacks; right before each session starts the library resolves them (in order) into a single system prompt. Because the resolver receives the run `context`, you can tailor tone, policy, or knowledge base links per tenant without rebuilding the agent.
 
-Dynamic instructions receive the `context` provided in the `AgentRequest`.
+Keep instructions concise and layered: use static lines for global policy, then dynamic functions for request-specific details. If you need to defer heavy lookups (for example, loading account limits), perform that work inside the instruction function so the result is cached for the duration of the session.
+
+<Aside type="caution">
+  Dynamic instructions are resolved only once when the run session starts. They will not update again until you create a new session, so include per-turn data in the conversation or move it into a `ToolkitSession` that exposes `system_prompt` updates each turn.
+</Aside>
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -38,7 +46,7 @@ Dynamic instructions receive the `context` provided in the `AgentRequest`.
 
 ## Example
 
-Below is an example of how to use instructions in an agent:
+Below is a small agent that mixes static and dynamic instructions across the three SDKs.
 
 <Tabs>
   <TabItem label="TypeScript">

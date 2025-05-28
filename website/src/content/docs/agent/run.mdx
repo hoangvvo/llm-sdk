@@ -9,9 +9,73 @@ import {
   extractTypescriptAgentTypes,
 } from "../../../utils/extract-types.ts";
 
-## Agent Items
+Running an agent means wiring user input, model responses, and tool executions into a feedback loop. Each call to `run` (or `run_stream`) starts with the `AgentRequest` you provide, then the library drives the following cycle until it produces a final answer or hits a guard rail such as `max_turns`.
 
-Just as `Message`s are the building block of chat-based LLM context and `Part`s are the building block of each `Message`, `AgentItem`s are the building block of agent runs. They represent both the input and output of an agent run.
+```mermaid
+sequenceDiagram
+  participant Caller
+  participant Agent
+  participant RunSession
+  participant Model
+  participant Tools
+
+  Caller->>Agent: run({ input, context })
+  Agent->>RunSession: bind context + params
+  loop each turn
+    RunSession->>Model: generate(messages, tool list)
+    Model-->>RunSession: content + optional tool_calls
+    alt tool calls present
+      RunSession->>Tools: execute(tool_call.args)
+      Tools-->>RunSession: tool results (Part[])
+      RunSession->>Model: append tool results
+      Model-->>RunSession: content (should now exclude tool_calls)
+    else no tool calls
+      Note over RunSession: content already final
+    end
+  end
+  RunSession-->>Caller: AgentResponse
+```
+
+Behind the scenes the session tracks every intermediate item so you can append them to the next request and resume the conversation.
+
+## Shaping the request
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptAgentTypes(["AgentRequest"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustAgentTypes(["AgentRequest"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoAgentTypes(["AgentRequest"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
+An `AgentRequest` combines two pieces:
+
+- `input`: an ordered list of `AgentItem`s that represent the conversation you want the model to see.
+- `context`: the per-run value passed to instructions, toolkits, and tools.
+
+<Aside type="caution">
+  Runs are stateless. The library never replays earlier items automatically, so persist what you need (for example in a database) and send the combined history back as the next request's `input`.
+</Aside>
+
+## Agent items
+
+All inputs and outputs share the same `AgentItem` union, making it easy to stitch runs together. Each variant captures a different kind of turn artifact.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -50,61 +114,13 @@ Just as `Message`s are the building block of chat-based LLM context and `Part`s 
   </TabItem>
 </Tabs>
 
-For each agent run, the output `AgentItem`s can be appended to the input `AgentItem`s of the next run to maintain the conversation history.
+- `AgentItemMessage`: user messages, assistant messages, and tool messages you collected before calling `run`. Use these to seed the conversation or to replay prior turns.
+- `AgentItemModelResponse`: the model output produced during a run. It mirrors an assistant message but also carries usage and cost data. You can pass this back as input and it will be interpreted the same as an `AgentItemMessage` of `AssistantMessage`, yet the extra metadata is preserved for analytics.
+- `AgentItemTool`: the full record of a tool invocation for the turn, including the call ID, arguments, model-selected tool name, tool output, and the `is_error` flag. Conceptually it has the same effect as passing an `AgentItemMessage` of `ToolMessage`, but the richer shape makes it easier to audit or replay tool interactions when you resume a session.
 
-## Agent Request
+## Agent response
 
-An agent run is initiated by calling the `run` method with an `AgentRequest`, which includes the following:
-
-- `input`: The list of input `AgentItem` for the agent, such as `Message`s or `ModelResponse`s.
-- `context`: A user-provided value that can be accessed in instructions and tools.
-
-<Tabs>
-  <TabItem label="TypeScript">
-    <Code
-      code={extractTypescriptAgentTypes([
-        "AgentRequest",
-      ])}
-      lang="typescript"
-      title="types.ts"
-    />
-  </TabItem>
-  <TabItem label="Rust">
-    <Code
-      code={extractRustAgentTypes([
-        "AgentRequest",
-      ])}
-      lang="rust"
-      title="types.rs"
-    />
-  </TabItem>
-  <TabItem label="Go">
-    <Code
-      code={extractGoAgentTypes([
-        "AgentRequest",
-      ])}
-      lang="go"
-      title="types.go"
-    />
-  </TabItem>
-</Tabs>
-
-<Aside>
-  Each agent run is stateless, so it is recommended to implement a strategy to
-  persist the conversation history if needed.
-</Aside>
-
-Each run will continuously generate LLM completions, parse responses to check for tool calls, execute any tools, and feed the tool results back to the model until one of the following conditions is met:
-
-- The model generates a final response (i.e., no tool call).
-- The maximum number of turns is reached.
-
-## Agent Response
-
-`AgentResponse` includes the final response with the following properties:
-
-- `output`: A list of output `AgentItem`, such as `ToolMessage` and `AssistantMessage`, that were generated during the run. This can be used to append to the `input` of the next run.
-- `content`: The final content generated by the agent, which is usually the content of the last `AssistantMessage`.
+The `RunState` created per run (not exported directly) stitches these items together, constructs the `messages` payload for the model each turn, enforces `max_turns`, and ultimately produces the `AgentResponse`.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -130,13 +146,20 @@ Each run will continuously generate LLM completions, parse responses to check fo
   </TabItem>
 </Tabs>
 
-## Streaming
+The `content` field is what you typically show to the user; `output` is the full list of items generated during the run and is the piece you should append to the next request's `input` when continuing the conversation.
 
-The library also provides a streaming interface, similar to streaming LLM completions, to stream the agent run progress, including part deltas (e.g., text deltas, audio deltas) and intermediate tool calls. Each event can either be:
+```mermaid
+flowchart TD
+  H[Persisted history] --> A[Compose AgentRequest input]
+  A --> B[run]
+  B --> C[AgentResponse output]
+  C --> D[Append output to history]
+  D -->|Append into history| H
+```
 
-- `AgentStreamEventPartial`: Contains the `PartialModelResponse` as generated by the LLM SDK, which includes part deltas.
-- `AgentStreamItemEvent`: Contains an `AgentItem` that was generated during the run.
-- `AgentStreamResponseEvent`: The final response of the agent run, which includes the `AgentResponse`.
+## Streaming runs
+
+`run_stream` emits progress as soon as the model responds or a tool finishes. You receive three event shapes, which align with the non-streaming artifacts:
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -173,3 +196,8 @@ The library also provides a streaming interface, similar to streaming LLM comple
   </TabItem>
 </Tabs>
 
+- `AgentStreamEventPartial`: incremental deltas from the language model (for example, text chunks, audio samples). Use them to render streaming output.
+- `AgentStreamItemEvent`: emitted whenever the run state records a new item (a model response or a tool call/result). This mirrors what will later show up in the `output` array of the final response.
+- `AgentStreamResponseEvent`: fired once the run ends, bundling the same `AgentResponse` shape you get from non-streaming runs.
+
+Use the stream when you want to surface partial answers, display tool progress, or fan out work while the run continues. The same items emitted during streaming will appear in the final `AgentResponse.output`, so you can rely on stream events for real-time UX and use the terminal response to persist state.

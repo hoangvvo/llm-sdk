@@ -1,7 +1,8 @@
 ---
 title: Toolkits
 ---
-import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+
+import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
 import goToolkitsExample from "../../../../../agent-go/examples/toolkits/main.go?raw";
 import jsToolkitsExample from "../../../../../agent-js/examples/toolkits.ts?raw";
 import rustToolkitsExample from "../../../../../agent-rust/examples/toolkits.rs?raw";
@@ -11,16 +12,9 @@ import {
   extractTypescriptAgentToolkitTypes,
 } from "../../../utils/extract-types.ts";
 
-Toolkits let an agent assemble dynamic instructions and tools for each run session. Unlike static
-instructions or tool lists, a toolkit can perform asynchronous work inside
-`Toolkit.createSession`—for example fetching user-specific data—and then expose a synchronous
-`ToolkitSession` that the agent loop can call to get the current instructions and tools for each
-turn.
+Toolkits let an agent assemble dynamic instructions and tools for each run session. Unlike static instructions or tool lists, a toolkit can perform asynchronous work inside `Toolkit.create_session`--for example, fetching account data--before handing the agent loop a synchronous `ToolkitSession` snapshot of instructions and tools to use for that run.
 
-In addition, a `ToolkitSession` can hold state that persists across multiple calls to the run session,
-as well as swapping out tools or instructions based on the current state.
-
-## Interfaces
+That session can keep its own mutable state: reuse it across multiple calls to `RunSession.run`, swap prompts or tools as the workflow advances, and close resources (database handles, network clients, etc.) when the [`RunSession`](../agent-vs-run-session#run-session) ends.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -46,10 +40,18 @@ as well as swapping out tools or instructions based on the current state.
   </TabItem>
 </Tabs>
 
+<Aside type="note">
+  One good way to think about this is that `Toolkit` is to `ToolkitSession` is similar to `Agent` is to `RunSession`.
+</Aside>
+
 ## Example
 
-The following example demonstrates a Pokémon battle coach that adapts to the current match. Harsh
-Sunlight unlocks `solar_beam`, while sleeping opponents enable `dream_eater` and `nightmare`.
+The example below follows an interdimensional Lost & Found desk. `create_session` loads the
+traveler's manifest asynchronously, while the toolkit session tracks phases (intake → recovery →
+handoff) to unlock or retire tools as the conversation progresses. The driver code reuses the same
+`RunSession`, so you can see toolkit state mutate and the dynamic tool list update turn by turn.
+
+![toolkits example](../../../../assets/examples/toolkits.gif)
 
 <Tabs>
   <TabItem label="TypeScript">

@@ -1,162 +1,746 @@
-use std::{env, sync::Arc, time::Duration};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use dotenvy::dotenv;
 use llm_agent::{
-    Agent, AgentParams, AgentRequest, AgentTool, AgentToolResult, Toolkit, ToolkitSession,
+    Agent, AgentItem, AgentParams, AgentResponse, AgentTool, AgentToolResult, RunSessionRequest,
+    Toolkit, ToolkitSession,
 };
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     Message, Part,
 };
-use serde_json::Value;
+use serde::Deserialize;
 use tokio::time::sleep;
 
-type MatchId = &'static str;
+type VisitorId = &'static str;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Weather {
-    HarshSunlight,
-    None,
-}
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Clone, Copy)]
-enum MoveKind {
-    Flamethrower,
-    SolarBeam,
-    AirSlash,
-    ShadowBall,
-    Hypnosis,
-    DreamEater,
-    Nightmare,
+struct RiftContext {
+    visitor_id: VisitorId,
 }
 
 #[derive(Clone)]
-struct PokemonState {
-    name: &'static str,
-    ability: &'static str,
-    item: Option<&'static str>,
-    moves: &'static [MoveKind],
+struct RiftManifest {
+    visitor_name: &'static str,
+    origin_reality: &'static str,
+    arrival_signature: &'static str,
+    contraband_risk: &'static str,
+    sentimental_inventory: &'static [&'static str],
+    outstanding_anomalies: &'static [&'static str],
+    turbulence_level: &'static str,
+    courtesy_note: &'static str,
 }
 
-#[derive(Clone)]
-struct OpponentState {
-    name: &'static str,
-    typing: &'static [&'static str],
-    status: &'static str,
-    hint: &'static str,
+// Mock manifest store to show Toolkit::create_session performing async I/O
+// before the session starts.
+async fn fetch_rift_manifest(visitor_id: VisitorId) -> Result<Arc<RiftManifest>, BoxError> {
+    let manifest = match visitor_id {
+        "aurora-shift" => RiftManifest {
+            visitor_name: "Captain Lyra Moreno",
+            origin_reality: "Aurora-9 Spiral",
+            arrival_signature: "slipped in trailing aurora dust and a three-second echo",
+            contraband_risk: "elevated",
+            sentimental_inventory: &[
+                "Chrono Locket (Timeline 12)",
+                "Folded star chart annotated in ultraviolet",
+            ],
+            outstanding_anomalies: &[
+                "Glitter fog refuses to obey gravity",
+                "Field report cites duplicate footfalls arriving 4s late",
+            ],
+            turbulence_level: "moderate",
+            courtesy_note: "Prefers dry humor, allergic to paradox puns.",
+        },
+        "ember-paradox" => RiftManifest {
+            visitor_name: "Archivist Rune Tal",
+            origin_reality: "Ember Paradox Belt",
+            arrival_signature: "emerged in a plume of cooled obsidian and smoke",
+            contraband_risk: "critical",
+            sentimental_inventory: &[
+                "Glass bead containing their brother's timeline",
+                "A singed manifesto titled 'Do Not Fold'",
+            ],
+            outstanding_anomalies: &[
+                "Customs still waiting on clearance form 88-A",
+                "Phoenix feather repeats ignition loop every two minutes",
+            ],
+            turbulence_level: "volatile",
+            courtesy_note: "Responds well to calm checklists and precise handoffs.",
+        },
+        other => return Err(format!("unknown visitor {other}").into()),
+    };
+
+    sleep(Duration::from_millis(60)).await;
+    Ok(Arc::new(manifest))
 }
 
-#[derive(Clone)]
-struct BattleState {
-    weather: Weather,
-    arena: &'static str,
-    crowd_note: &'static str,
-    pokemon: PokemonState,
-    opponent: OpponentState,
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Intake,
+    Recovery,
+    Handoff,
+    Closed,
 }
 
-#[derive(Clone)]
-struct BattleContext {
-    match_id: MatchId,
+struct LostAndFoundState {
+    manifest: Arc<RiftManifest>,
+    phase: Phase,
+    pass_verified: bool,
+    tagged_items: Vec<String>,
+    prophecy_count: u8,
+    drone_deployed: bool,
 }
 
-struct MoveTool {
-    kind: MoveKind,
-    state: Arc<BattleState>,
+impl LostAndFoundState {
+    fn new(manifest: Arc<RiftManifest>) -> Self {
+        Self {
+            manifest,
+            phase: Phase::Intake,
+            pass_verified: false,
+            tagged_items: Vec::new(),
+            prophecy_count: 0,
+            drone_deployed: false,
+        }
+    }
+}
+
+// Toolkit session keeps manifest snapshot and mutable workflow flags so each
+// turn can surface new prompt/tool sets.
+struct LostAndFoundToolkitSession {
+    state: Arc<Mutex<LostAndFoundState>>,
 }
 
 #[async_trait]
-impl AgentTool<BattleContext> for MoveTool {
+impl ToolkitSession<RiftContext> for LostAndFoundToolkitSession {
+    fn system_prompt(&self) -> Option<String> {
+        let state = self.state.lock().expect("state poisoned");
+        Some(build_prompt(&state))
+    }
+
+    fn tools(&self) -> Vec<Arc<dyn AgentTool<RiftContext>>> {
+        let snapshot = {
+            let state = self.state.lock().expect("state poisoned");
+            (
+                state.phase,
+                state.pass_verified,
+                state.tagged_items.len(),
+                state.prophecy_count,
+            )
+        };
+
+        let (phase, pass_verified, tagged_len, prophecy_count) = snapshot;
+        if phase == Phase::Closed {
+            println!("[Toolkit] Tools for phase {}: <none>", phase_label(phase));
+            return Vec::new();
+        }
+
+        let mut tools: Vec<Arc<dyn AgentTool<RiftContext>>> = vec![
+            Arc::new(StabilizeRiftTool {
+                state: Arc::clone(&self.state),
+            }),
+            Arc::new(LogItemTool {
+                state: Arc::clone(&self.state),
+            }),
+        ];
+
+        if !pass_verified {
+            tools.push(Arc::new(VerifyPassTool {
+                state: Arc::clone(&self.state),
+            }));
+        }
+
+        if phase == Phase::Recovery && pass_verified {
+            tools.push(Arc::new(SummonRetrievalDroneTool {
+                state: Arc::clone(&self.state),
+            }));
+
+            if prophecy_count == 0 {
+                tools.push(Arc::new(ConsultProphetTool {
+                    state: Arc::clone(&self.state),
+                }));
+            }
+
+            if tagged_len > 0 {
+                tools.push(Arc::new(IssueQuantumReceiptTool {
+                    state: Arc::clone(&self.state),
+                }));
+            }
+        }
+
+        if phase == Phase::Handoff {
+            tools.push(Arc::new(CloseManifestTool {
+                state: Arc::clone(&self.state),
+            }));
+        }
+
+        let names = if tools.is_empty() {
+            "<none>".to_string()
+        } else {
+            tools
+                .iter()
+                .map(|tool| tool.name())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        println!(
+            "[Toolkit] Tools for phase {}: {}",
+            phase_label(phase),
+            names
+        );
+
+        tools
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), BoxError> {
+        Ok(())
+    }
+}
+
+struct LostAndFoundToolkit;
+
+#[async_trait]
+impl Toolkit<RiftContext> for LostAndFoundToolkit {
+    async fn create_session(
+        &self,
+        context: &RiftContext,
+    ) -> Result<Box<dyn ToolkitSession<RiftContext> + Send + Sync>, BoxError> {
+        let manifest = fetch_rift_manifest(context.visitor_id).await?;
+        let state = LostAndFoundState::new(manifest);
+        Ok(Box::new(LostAndFoundToolkitSession {
+            state: Arc::new(Mutex::new(state)),
+        }))
+    }
+}
+
+fn build_prompt(state: &LostAndFoundState) -> String {
+    let manifest = &state.manifest;
+    let mut lines = vec![
+        "You are the Archivist manning Interdimensional Waypoint Seven's Lost & Found counter."
+            .to_string(),
+        format!(
+            "Visitor: {} from {} ({}).",
+            manifest.visitor_name, manifest.origin_reality, manifest.arrival_signature
+        ),
+        format!(
+            "Contraband risk: {}. Turbulence: {}.",
+            manifest.contraband_risk, manifest.turbulence_level
+        ),
+    ];
+
+    if manifest.sentimental_inventory.is_empty() {
+        lines.push("Sentimental inventory on file: none".into());
+    } else {
+        lines.push(format!(
+            "Sentimental inventory on file: {}",
+            manifest.sentimental_inventory.join("; ")
+        ));
+    }
+
+    if manifest.outstanding_anomalies.is_empty() {
+        lines.push("Outstanding anomalies: none".into());
+    } else {
+        lines.push(format!(
+            "Outstanding anomalies: {}",
+            manifest.outstanding_anomalies.join("; ")
+        ));
+    }
+
+    if state.tagged_items.is_empty() {
+        lines.push("No traveler-reported items logged yet; invite concise descriptions.".into());
+    } else {
+        lines.push(format!(
+            "Traveler has logged: {}",
+            state.tagged_items.join("; ")
+        ));
+    }
+
+    if state.drone_deployed {
+        lines.push("Retrieval drone currently deployed; acknowledge its status.".into());
+    }
+
+    lines.push(format!("Current phase: {}.", phase_label(state.phase)));
+
+    match state.phase {
+        Phase::Intake => {
+            if !state.pass_verified {
+                lines.push(
+                    "Stabilise the arrival and prioritise verify_pass before promising retrieval."
+                        .into(),
+                );
+            }
+        }
+        Phase::Recovery => lines.push(
+            "Phase focus: coordinate retrieval. Summon the drone or consult the prophet before \
+             issuing a quantum receipt."
+                .into(),
+        ),
+        Phase::Handoff => lines.push(
+            "Phase focus: wrap neatly. Close the manifest once receipt status is settled.".into(),
+        ),
+        Phase::Closed => lines.push(
+            "Manifest is archived. No toolkit tools remain; offer a tidy summary and dismiss \
+             politely."
+                .into(),
+        ),
+    }
+
+    lines.push("Tone: dry, organised, lightly amused. Reference protocol, not headcanon.".into());
+    lines.push(manifest.courtesy_note.into());
+    lines.push(
+        "When tools are available, invoke exactly one relevant tool before concluding. If none \
+         remain, summarise the closure instead."
+            .into(),
+    );
+
+    lines.join("\n")
+}
+
+fn phase_label(phase: Phase) -> &'static str {
+    match phase {
+        Phase::Intake => "INTAKE",
+        Phase::Recovery => "RECOVERY",
+        Phase::Handoff => "HANDOFF",
+        Phase::Closed => "CLOSED",
+    }
+}
+
+struct StabilizeRiftTool {
+    state: Arc<Mutex<LostAndFoundState>>,
+}
+
+#[derive(Deserialize)]
+struct StabilizeArgs {
+    technique: Option<String>,
+}
+
+#[async_trait]
+impl AgentTool<RiftContext> for StabilizeRiftTool {
     fn name(&self) -> String {
-        self.kind.name().to_string()
+        "stabilize_rift".into()
     }
 
     fn description(&self) -> String {
-        self.kind.description().to_string()
+        "Describe how you calm the rift turbulence and reassure the traveler.".into()
     }
 
     fn parameters(&self) -> llm_sdk::JSONSchema {
         serde_json::json!({
             "type": "object",
             "properties": {
-                "target": {
+                "technique": {
                     "type": "string",
-                    "description": "Optional target override; defaults to the opposing Pokémon."
+                    "description": "Optional note about the stabilisation technique used."
                 }
             },
-            "required": [],
+            "required": ["technique"],
             "additionalProperties": false
         })
     }
 
     async fn execute(
         &self,
-        args: Value,
-        _context: &BattleContext,
-        _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        let target = args
-            .get("target")
-            .and_then(Value::as_str)
-            .unwrap_or(self.state.opponent.name);
+        args: serde_json::Value,
+        _context: &RiftContext,
+        _state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, BoxError> {
+        let args: StabilizeArgs = serde_json::from_value(args)?;
+        let (turbulence, technique_raw) = {
+            let state = self.state.lock().expect("state poisoned");
+            (
+                state.manifest.turbulence_level,
+                args.technique.unwrap_or_default(),
+            )
+        };
+
+        let technique = technique_raw.trim().to_string();
+
+        let mut sentence = format!("I cycle the containment field to damp {turbulence} turbulence");
+        if !technique.is_empty() {
+            sentence.push_str(&format!(" using {technique}"));
+        }
+        sentence.push('.');
+
+        println!(
+            "[tool] stabilize_rift invoked with technique={}",
+            if technique.is_empty() {
+                "<none>".to_string()
+            } else {
+                technique.clone()
+            }
+        );
 
         Ok(AgentToolResult {
-            content: vec![Part::text(self.kind.execute(&self.state, target))],
+            content: vec![Part::text(sentence)],
             is_error: false,
         })
     }
 }
 
-struct UseItemTool;
-struct AttemptEscapeTool;
+struct LogItemTool {
+    state: Arc<Mutex<LostAndFoundState>>,
+}
+
+#[derive(Deserialize)]
+struct LogItemArgs {
+    item: String,
+    #[serde(default)]
+    timeline: Option<String>,
+}
 
 #[async_trait]
-impl AgentTool<BattleContext> for UseItemTool {
+impl AgentTool<RiftContext> for LogItemTool {
     fn name(&self) -> String {
-        "use_item".into()
+        "log_item".into()
     }
 
     fn description(&self) -> String {
-        "Use a held or bag item to swing the battle.".into()
+        "Record a traveler-reported possession so recovery tools know what to fetch.".into()
     }
 
     fn parameters(&self) -> llm_sdk::JSONSchema {
         serde_json::json!({
             "type": "object",
             "properties": {
-                "item": { "type": "string", "description": "Name of the item to use." }
+                "item": { "type": "string", "description": "Name of the missing item." },
+                "timeline": { "type": "string", "description": "Optional timeline or reality tag for the item." }
             },
-            "required": ["item"],
+            "required": ["item", "timeline"],
             "additionalProperties": false
         })
     }
 
     async fn execute(
         &self,
-        args: Value,
-        _context: &BattleContext,
-        _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        let item = args
-            .get("item")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "item is required")?;
+        args: serde_json::Value,
+        _context: &RiftContext,
+        _state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, BoxError> {
+        let args: LogItemArgs = serde_json::from_value(args)?;
+        let mut state = self.state.lock().expect("state poisoned");
+
+        let mut label = args.item;
+        if let Some(timeline) = args.timeline {
+            let trimmed = timeline.trim();
+            if !trimmed.is_empty() {
+                label = format!("{label} ({trimmed})");
+            }
+        }
+        state.tagged_items.push(label.clone());
+        let ledger = state.tagged_items.join("; ");
+
+        println!("[tool] log_item recorded {label}");
+
         Ok(AgentToolResult {
-            content: vec![Part::text(format!("I use the {item} to shift momentum."))],
+            content: vec![Part::text(format!(
+                "Logged {label} for retrieval queue. Current ledger: {ledger}."
+            ))],
             is_error: false,
         })
     }
 }
 
+struct VerifyPassTool {
+    state: Arc<Mutex<LostAndFoundState>>,
+}
+
+#[derive(Deserialize)]
+struct VerifyPassArgs {
+    clearance_code: String,
+}
+
 #[async_trait]
-impl AgentTool<BattleContext> for AttemptEscapeTool {
+impl AgentTool<RiftContext> for VerifyPassTool {
     fn name(&self) -> String {
-        "attempt_escape".into()
+        "verify_pass".into()
     }
 
     fn description(&self) -> String {
-        "Attempt to flee if the battle is unwinnable.".into()
+        "Validate the traveler's interdimensional pass to unlock recovery tools.".into()
+    }
+
+    fn parameters(&self) -> llm_sdk::JSONSchema {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "clearance_code": {
+                    "type": "string",
+                    "description": "Code supplied by the traveler for verification."
+                }
+            },
+            "required": ["clearance_code"],
+            "additionalProperties": false
+        })
+    }
+
+    async fn execute(
+        &self,
+        args: serde_json::Value,
+        _context: &RiftContext,
+        _run_state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, BoxError> {
+        let args: VerifyPassArgs = serde_json::from_value(args)?;
+        let mut state = self.state.lock().expect("state poisoned");
+        state.pass_verified = true;
+        state.phase = Phase::Recovery;
+
+        println!(
+            "[tool] verify_pass authenticated clearance_code={}",
+            args.clearance_code
+        );
+
+        Ok(AgentToolResult {
+            content: vec![Part::text(format!(
+                "Pass authenticated with code {}. Recovery protocols online.",
+                args.clearance_code
+            ))],
+            is_error: false,
+        })
+    }
+}
+
+struct SummonRetrievalDroneTool {
+    state: Arc<Mutex<LostAndFoundState>>,
+}
+
+#[derive(Deserialize)]
+struct SummonDroneArgs {
+    #[serde(default)]
+    designation: Option<String>,
+    #[serde(default)]
+    target: Option<String>,
+}
+
+#[async_trait]
+impl AgentTool<RiftContext> for SummonRetrievalDroneTool {
+    fn name(&self) -> String {
+        "summon_retrieval_drone".into()
+    }
+
+    fn description(&self) -> String {
+        "Dispatch a retrieval drone to recover a logged item from the rift queue.".into()
+    }
+
+    fn parameters(&self) -> llm_sdk::JSONSchema {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "designation": {
+                    "type": "string",
+                    "description": "Optional drone designation to flavour the dispatch."
+                },
+                "target": {
+                    "type": "string",
+                    "description": "Specific item to prioritise; defaults to the first logged item."
+                }
+            },
+            "required": ["designation", "target"],
+            "additionalProperties": false
+        })
+    }
+
+    async fn execute(
+        &self,
+        args: serde_json::Value,
+        _context: &RiftContext,
+        _run_state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, BoxError> {
+        let args: SummonDroneArgs = serde_json::from_value(args)?;
+        let mut state = self.state.lock().expect("state poisoned");
+        state.drone_deployed = true;
+
+        let designation = args
+            .designation
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "Drone Theta".to_string());
+
+        let target = args
+            .target
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                state
+                    .tagged_items
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "the most recently logged item".to_string())
+            });
+
+        println!(
+            "[tool] summon_retrieval_drone dispatched designation={} target={}",
+            designation, target
+        );
+
+        Ok(AgentToolResult {
+            content: vec![Part::text(format!(
+                "Dispatched {designation} to retrieve {target}."
+            ))],
+            is_error: false,
+        })
+    }
+}
+
+struct ConsultProphetTool {
+    state: Arc<Mutex<LostAndFoundState>>,
+}
+
+#[derive(Deserialize)]
+struct ConsultProphetArgs {
+    #[serde(default)]
+    topic: Option<String>,
+}
+
+#[async_trait]
+impl AgentTool<RiftContext> for ConsultProphetTool {
+    fn name(&self) -> String {
+        "consult_prophet_agent".into()
+    }
+
+    fn description(&self) -> String {
+        "Ping Prophet Sigma for probability guidance when the queue misbehaves.".into()
+    }
+
+    fn parameters(&self) -> llm_sdk::JSONSchema {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "Optional focus question for the prophet agent."
+                }
+            },
+            "required": ["topic"],
+            "additionalProperties": false
+        })
+    }
+
+    async fn execute(
+        &self,
+        args: serde_json::Value,
+        _context: &RiftContext,
+        _run_state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, BoxError> {
+        let args: ConsultProphetArgs = serde_json::from_value(args)?;
+        let mut state = self.state.lock().expect("state poisoned");
+        state.prophecy_count = state.prophecy_count.saturating_add(1);
+
+        let anomaly = state
+            .manifest
+            .outstanding_anomalies
+            .first()
+            .copied()
+            .unwrap_or("no immediate hazards");
+
+        let mut sentence = format!("Prophet Sigma notes anomaly priority: {anomaly}");
+        if let Some(topic) = args
+            .topic
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+        {
+            println!("[tool] consult_prophet_agent requested topic={topic}");
+            sentence.push_str(&format!(" while considering {topic}."));
+        } else {
+            println!("[tool] consult_prophet_agent requested topic=<none>");
+            sentence.push('.');
+        }
+
+        Ok(AgentToolResult {
+            content: vec![Part::text(sentence)],
+            is_error: false,
+        })
+    }
+}
+
+struct IssueQuantumReceiptTool {
+    state: Arc<Mutex<LostAndFoundState>>,
+}
+
+#[derive(Deserialize)]
+struct IssueReceiptArgs {
+    #[serde(default)]
+    recipient: Option<String>,
+}
+
+#[async_trait]
+impl AgentTool<RiftContext> for IssueQuantumReceiptTool {
+    fn name(&self) -> String {
+        "issue_quantum_receipt".into()
+    }
+
+    fn description(&self) -> String {
+        "Generate a quantum receipt confirming which items are cleared for handoff.".into()
+    }
+
+    fn parameters(&self) -> llm_sdk::JSONSchema {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "recipient": {
+                    "type": "string",
+                    "description": "Optional recipient line for the receipt header."
+                }
+            },
+            "required": ["recipient"],
+            "additionalProperties": false
+        })
+    }
+
+    async fn execute(
+        &self,
+        args: serde_json::Value,
+        _context: &RiftContext,
+        _run_state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, BoxError> {
+        let args: IssueReceiptArgs = serde_json::from_value(args)?;
+        let mut state = self.state.lock().expect("state poisoned");
+
+        let recipient = args
+            .recipient
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| state.manifest.visitor_name.to_string());
+
+        let items = state.tagged_items.join("; ");
+        state.phase = Phase::Handoff;
+
+        println!(
+            "[tool] issue_quantum_receipt issued to {} for items={}",
+            recipient,
+            if items.is_empty() {
+                "<none>".to_string()
+            } else {
+                items.clone()
+            }
+        );
+
+        Ok(AgentToolResult {
+            content: vec![Part::text(format!(
+                "Issued quantum receipt to {recipient} for {items}. Handoff phase engaged."
+            ))],
+            is_error: false,
+        })
+    }
+}
+
+struct CloseManifestTool {
+    state: Arc<Mutex<LostAndFoundState>>,
+}
+
+#[async_trait]
+impl AgentTool<RiftContext> for CloseManifestTool {
+    fn name(&self) -> String {
+        "close_manifest".into()
+    }
+
+    fn description(&self) -> String {
+        "Archive the case once items are delivered and note any lingering anomalies.".into()
     }
 
     fn parameters(&self) -> llm_sdk::JSONSchema {
@@ -170,252 +754,79 @@ impl AgentTool<BattleContext> for AttemptEscapeTool {
 
     async fn execute(
         &self,
-        _args: Value,
-        _context: &BattleContext,
+        _args: serde_json::Value,
+        _context: &RiftContext,
         _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<AgentToolResult, BoxError> {
+        let mut state = self.state.lock().expect("state poisoned");
+        state.phase = Phase::Closed;
+
+        let anomaly_count = state.manifest.outstanding_anomalies.len();
+
+        println!("[tool] close_manifest archived manifest with anomaly_reminders={anomaly_count}");
+
         Ok(AgentToolResult {
-            content: vec![Part::text(
-                "I search for an opening to retreat from the field.",
-            )],
+            content: vec![Part::text(format!(
+                "Archived manifest with {anomaly_count} anomaly reminder(s) for facilities."
+            ))],
             is_error: false,
         })
     }
 }
 
-/// ToolkitSession caching the prompt and tools so the agent sees synchronous getters backed by
-/// the async work performed during create_session.
-struct BattleToolkitSession {
-    prompt: String,
-    tools: Vec<Arc<dyn AgentTool<BattleContext>>>,
+// Static tool configured directly on the agent to contrast toolkit-provided
+// tools.
+struct PageSecurityTool;
+
+#[derive(Deserialize)]
+struct PageSecurityArgs {
+    reason: String,
 }
 
 #[async_trait]
-impl ToolkitSession<BattleContext> for BattleToolkitSession {
-    fn system_prompt(&self) -> Option<String> {
-        Some(self.prompt.clone())
+impl AgentTool<RiftContext> for PageSecurityTool {
+    fn name(&self) -> String {
+        "page_security".into()
     }
 
-    fn tools(&self) -> Vec<Arc<dyn AgentTool<BattleContext>>> {
-        self.tools.clone()
+    fn description(&self) -> String {
+        "Escalate to security if contraband risk becomes unmanageable.".into()
     }
 
-    async fn close(self: Box<Self>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        Ok(())
-    }
-}
-
-/// Toolkit that performs async lookups in create_session to enable dynamic guidance/capabilities
-/// per match while still returning a synchronous ToolkitSession.
-struct BattleToolkit;
-
-#[async_trait]
-impl Toolkit<BattleContext> for BattleToolkit {
-    async fn create_session(
-        &self,
-        context: &BattleContext,
-    ) -> Result<
-        Box<dyn ToolkitSession<BattleContext> + Send + Sync>,
-        Box<dyn std::error::Error + Send + Sync>,
-    > {
-        let state = Arc::new(load_battle_state(context.match_id).await?);
-        // create_session performs async fetches so the returned session can expose synchronous
-        // prompt/tool views while still adapting to each battle.
-        let session = BattleToolkitSession {
-            prompt: build_prompt(&state),
-            tools: build_move_tools(&state),
-        };
-        Ok(Box::new(session))
-    }
-}
-
-async fn load_battle_state(
-    match_id: MatchId,
-) -> Result<BattleState, Box<dyn std::error::Error + Send + Sync>> {
-    let state = match match_id {
-        "sun-showdown" => BattleState {
-            weather: Weather::HarshSunlight,
-            arena: "Pyrite Crater",
-            crowd_note: "Crowd roars when attacks lean into the blazing sun.",
-            pokemon: PokemonState {
-                name: "Charizard",
-                ability: "Solar Power",
-                item: Some("Choice Specs"),
-                moves: &[
-                    MoveKind::Flamethrower,
-                    MoveKind::SolarBeam,
-                    MoveKind::AirSlash,
-                ],
+    fn parameters(&self) -> llm_sdk::JSONSchema {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "reason": { "type": "string", "description": "Why security needs to step in." }
             },
-            opponent: OpponentState {
-                name: "Ferrothorn",
-                typing: &["Grass", "Steel"],
-                status: "healthy",
-                hint: "likes to turtle behind Leech Seed and Iron Defense.",
-            },
-        },
-        "dream-dusk" => BattleState {
-            weather: Weather::None,
-            arena: "Midnight Colosseum",
-            crowd_note: "Spectators fall silent for sinister dream tactics.",
-            pokemon: PokemonState {
-                name: "Haunter",
-                ability: "Levitate",
-                item: Some("Wide Lens"),
-                moves: &[
-                    MoveKind::ShadowBall,
-                    MoveKind::Hypnosis,
-                    MoveKind::DreamEater,
-                    MoveKind::Nightmare,
-                ],
-            },
-            opponent: OpponentState {
-                name: "Gardevoir",
-                typing: &["Psychic", "Fairy"],
-                status: "asleep",
-                hint: "was stacking Calm Mind boosts before dozing off.",
-            },
-        },
-        _ => return Err(format!("unknown match {match_id}").into()),
-    };
-    sleep(Duration::from_millis(25)).await;
-    Ok(state)
-}
-
-fn build_move_tools(state: &BattleState) -> Vec<Arc<dyn AgentTool<BattleContext>>> {
-    state
-        .pokemon
-        .moves
-        .iter()
-        .filter(|kind| kind.available(state))
-        .map(|kind| {
-            Arc::new(MoveTool {
-                kind: *kind,
-                state: Arc::new(state.clone()),
-            }) as Arc<dyn AgentTool<BattleContext>>
+            "required": ["reason"],
+            "additionalProperties": false
         })
-        .collect()
-}
-
-fn build_prompt(state: &BattleState) -> String {
-    let mut parts = vec![format!(
-        "You are {} battling in {}.",
-        state.pokemon.name, state.arena
-    )];
-    match state.weather {
-        Weather::HarshSunlight => parts.push(
-            "Harsh Sunlight supercharges Fire attacks, lets Solar Beam skip charging, and weakens Water coverage.".into(),
-        ),
-        Weather::None => parts.push("There is no active weather effect.".into()),
-    }
-    if let Some(item) = state.pokemon.item {
-        parts.push(format!(
-            "Ability: {}, holding {}.",
-            state.pokemon.ability, item
-        ));
-    } else {
-        parts.push(format!("Ability: {}.", state.pokemon.ability));
-    }
-    parts.push(format!(
-        "Opponent: {} ({}), currently {}. {}",
-        state.opponent.name,
-        state.opponent.typing.join("/"),
-        state.opponent.status,
-        state.opponent.hint
-    ));
-    parts.push(format!("Crowd note: {}", state.crowd_note));
-    parts.push(
-        "Call one available move tool (or use_item / attempt_escape) before finalising and explain why the field makes it sensible.".into(),
-    );
-    parts.join(" ")
-}
-
-impl MoveKind {
-    fn name(&self) -> &'static str {
-        match self {
-            MoveKind::Flamethrower => "flamethrower",
-            MoveKind::SolarBeam => "solar_beam",
-            MoveKind::AirSlash => "air_slash",
-            MoveKind::ShadowBall => "shadow_ball",
-            MoveKind::Hypnosis => "hypnosis",
-            MoveKind::DreamEater => "dream_eater",
-            MoveKind::Nightmare => "nightmare",
-        }
     }
 
-    fn description(&self) -> &'static str {
-        match self {
-            MoveKind::Flamethrower => {
-                "Flamethrower is a dependable Fire-type strike that thrives in Harsh Sunlight."
-            }
-            MoveKind::SolarBeam => {
-                "Solar Beam normally charges, but fires instantly in Harsh Sunlight."
-            }
-            MoveKind::AirSlash => {
-                "Air Slash provides Flying coverage with a flinch chance against slower foes."
-            }
-            MoveKind::ShadowBall => {
-                "Shadow Ball is Haunter's safest Ghost attack versus Psychic targets."
-            }
-            MoveKind::Hypnosis => "Hypnosis can return the opponent to sleep if they stir.",
-            MoveKind::DreamEater => {
-                "Dream Eater only works while the opponent sleeps, draining them and healing me."
-            }
-            MoveKind::Nightmare => {
-                "Nightmare curses a sleeping foe to lose HP at the end of each turn."
-            }
-        }
-    }
-
-    fn available(&self, state: &BattleState) -> bool {
-        match self {
-            MoveKind::SolarBeam => matches!(state.weather, Weather::HarshSunlight),
-            MoveKind::DreamEater | MoveKind::Nightmare => state.opponent.status == "asleep",
-            _ => true,
-        }
-    }
-
-    fn execute(&self, state: &BattleState, target: &str) -> String {
-        match self {
-            MoveKind::Flamethrower => {
-                let bonus = if matches!(state.weather, Weather::HarshSunlight) {
-                    ", the sunlight turning the flames white-hot"
-                } else {
-                    ""
-                };
-                format!("I scorch {target} with Flamethrower{bonus}.")
-            }
-            MoveKind::SolarBeam => format!(
-                "I gather sunlight and unleash Solar Beam on {target} without needing to charge."
-            ),
-            MoveKind::AirSlash => format!(
-                "I ride the thermals around {} and carve {target} with Air Slash.",
-                state.arena
-            ),
-            MoveKind::ShadowBall => format!(
-                "I hurl Shadow Ball at {target}, disrupting their {} defenses.",
-                state.opponent.typing.join("/")
-            ),
-            MoveKind::Hypnosis => {
-                format!("I sway and cast Hypnosis toward {target}, setting up dream tactics.")
-            }
-            MoveKind::DreamEater => format!(
-                "I feast on {target}'s dreams, restoring power to {}.",
-                state.pokemon.name
-            ),
-            MoveKind::Nightmare => format!(
-                "I lace {target}'s dreams with Nightmare so they suffer each turn while asleep."
-            ),
-        }
+    async fn execute(
+        &self,
+        args: serde_json::Value,
+        context: &RiftContext,
+        _run_state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, BoxError> {
+        let args: PageSecurityArgs = serde_json::from_value(args)?;
+        Ok(AgentToolResult {
+            content: vec![Part::text(format!(
+                "Security paged for {}: {}.",
+                context.visitor_id, args.reason
+            ))],
+            is_error: false,
+        })
     }
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> Result<(), BoxError> {
     dotenv().ok();
     let api_key = env::var("OPENAI_API_KEY")?;
     let model = Arc::new(OpenAIModel::new(
-        "gpt-4o",
+        "gpt-4o-mini",
         OpenAIModelOptions {
             api_key,
             ..Default::default()
@@ -423,46 +834,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     ));
 
     let agent = Agent::new(
-        AgentParams::new("Satoshi", model)
-            .add_instruction("Speak in first person as the active Pokémon.".to_string())
+        AgentParams::new("WaypointArchivist", model)
             .add_instruction(
-                "Always invoke exactly one tool before ending your answer, and mention how the field conditions justify it.".to_string(),
+                "You are the archivist at Waypoint Seven's Interdimensional Lost & Found desk."
+                    .to_string(),
             )
-            .add_tool(UseItemTool)
-            .add_tool(AttemptEscapeTool)
-            .add_toolkit(BattleToolkit),
+            .add_instruction(
+                "Keep responses under 120 words when possible and stay bone-dry with humour."
+                    .to_string(),
+            )
+            .add_instruction(|ctx: &RiftContext| {
+                Ok(format!(
+                    "Reference the visitor's manifest supplied by the toolkit for {}. Do not \
+                     invent new lore.",
+                    ctx.visitor_id
+                ))
+            })
+            .add_instruction(
+                "When tools remain, call exactly one per turn before concluding. If tools run \
+                 out, summarise the closure instead."
+                    .to_string(),
+            )
+            .add_tool(PageSecurityTool)
+            .add_toolkit(LostAndFoundToolkit),
     );
 
-    run_example(
-        &agent,
-        "sun-showdown",
-        "Ferrothorn is hiding behind Iron Defense again—what's our play?",
-    )
-    .await?;
-    run_example(
-        &agent,
-        "dream-dusk",
-        "Gardevoir is still asleep—press the advantage before it wakes up!",
-    )
-    .await?;
-
-    Ok(())
-}
-
-async fn run_example(
-    agent: &Agent<BattleContext>,
-    match_id: MatchId,
-    prompt: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    println!("\n=== {match_id} ===");
-    let response = agent
-        .run(AgentRequest {
-            context: BattleContext { match_id },
-            input: vec![llm_agent::AgentItem::Message(Message::user(vec![
-                Part::text(prompt),
-            ]))],
+    // Create a RunSession explicitly so the ToolkitSession persists across multiple
+    // turns.
+    let session = agent
+        .create_session(RiftContext {
+            visitor_id: "aurora-shift",
         })
         .await?;
-    println!("{}", response.text());
+
+    let mut transcript: Vec<AgentItem> = Vec::new();
+    let prompts = vec![
+        "I just slipped through the rift and my belongings are glittering in the wrong timeline. \
+         What now?",
+        "The Chrono Locket from Timeline 12 is missing, and the echo lag is getting worse.",
+        "The locket links to my sister's echo—anything else before I depart?",
+    ];
+
+    for (index, prompt) in prompts.iter().enumerate() {
+        println!("\n=== TURN {} ===", index + 1);
+
+        transcript.push(AgentItem::Message(Message::user(vec![Part::text(*prompt)])));
+
+        let mut response: AgentResponse = session
+            .run(RunSessionRequest {
+                input: transcript.clone(),
+            })
+            .await?;
+
+        println!("{}", response.text());
+        transcript.extend(response.output.drain(..));
+    }
+
+    session.close().await?;
+
     Ok(())
 }

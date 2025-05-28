@@ -14,328 +14,376 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[derive(Clone)]
-struct EnemyState {
-    hp: i32,
+/// Context shared across tool invocations. Tools mutate this state directly so
+/// we can showcase how agents can maintain memory without involving toolkits.
+#[derive(Default, Clone)]
+struct LostAndFoundContext {
+    manifest_id: String,
+    archivist: String,
+    intake_ledger: Arc<Mutex<HashMap<String, ItemRecord>>>,
+    flagged_contraband: Arc<Mutex<HashSet<String>>>,
+    receipt_notes: Arc<Mutex<Vec<String>>>,
 }
 
 #[derive(Clone)]
-struct EncounterState {
-    scene: String,
-    enemies: Arc<Mutex<HashMap<String, EnemyState>>>,
-    downed_allies: Arc<Mutex<HashSet<String>>>,
+struct ItemRecord {
+    description: String,
+    priority: String,
 }
 
-#[derive(Clone)]
-struct DungeonRunContext {
-    dungeon_master: String,
-    party_name: String,
-    encounter: EncounterState,
-    action_budget: Arc<Mutex<HashMap<String, i32>>>,
-}
-
-fn create_dungeon_context() -> DungeonRunContext {
-    let enemies = HashMap::from([
-        ("ghoul".to_string(), EnemyState { hp: 12 }),
-        ("marauder".to_string(), EnemyState { hp: 9 }),
-    ]);
-    let downed = HashSet::from(["finley".to_string()]);
-    let action_budget = HashMap::from([("thorne".to_string(), 1), ("mira".to_string(), 2)]);
-
-    DungeonRunContext {
-        dungeon_master: "Rowan".into(),
-        party_name: "Lanternbearers".into(),
-        encounter: EncounterState {
-            scene: "The Echo Bridge over the Sunken Keep".into(),
-            enemies: Arc::new(Mutex::new(enemies)),
-            downed_allies: Arc::new(Mutex::new(downed)),
-        },
-        action_budget: Arc::new(Mutex::new(action_budget)),
+fn create_context() -> LostAndFoundContext {
+    LostAndFoundContext {
+        manifest_id: "aurora-shift".into(),
+        archivist: "Quill".into(),
+        intake_ledger: Arc::new(Mutex::new(HashMap::new())),
+        flagged_contraband: Arc::new(Mutex::new(HashSet::new())),
+        receipt_notes: Arc::new(Mutex::new(Vec::new())),
     }
 }
+
+/// intake_item mirrors the TypeScript/Go examples: validates input and updates
+/// the ledger.
+struct IntakeItemTool;
 
 #[derive(Deserialize)]
-struct AttackEnemyParams {
-    attacker: String,
-    target: String,
-    weapon: String,
+struct IntakeItemParams {
+    item_id: String,
+    description: String,
+    priority: Option<String>,
 }
 
-struct AttackEnemyTool;
-
 #[async_trait]
-impl AgentTool<DungeonRunContext> for AttackEnemyTool {
+impl AgentTool<LostAndFoundContext> for IntakeItemTool {
     fn name(&self) -> String {
-        "attack_enemy".to_string()
+        "intake_item".into()
     }
     fn description(&self) -> String {
-        "Resolve a martial attack from a party member against an active enemy and update its hit \
-         points."
-            .to_string()
+        "Register an item reported by the traveller.".into()
     }
     fn parameters(&self) -> llm_sdk::JSONSchema {
         serde_json::json!({
             "type": "object",
             "properties": {
-                "attacker": {
-                    "type": "string",
-                    "description": "Name of the party member making the attack."
-                },
-                "target": {
-                    "type": "string",
-                    "description": "Enemy to strike."
-                },
-                "weapon": {
-                    "type": "string",
-                    "description": "Weapon or maneuver used for flavour and damage bias."
-                }
+                "item_id": { "type": "string", "description": "Identifier used on the manifest ledger." },
+                "description": { "type": "string", "description": "What the traveller says it looks like." },
+                "priority": { "type": "string", "enum": ["standard", "rush"] }
             },
-            "required": ["attacker", "target", "weapon"],
+            "required": ["item_id", "description"],
             "additionalProperties": false
         })
     }
     async fn execute(
         &self,
         args: Value,
-        context: &DungeonRunContext,
+        context: &LostAndFoundContext,
         _state: &llm_agent::RunState,
     ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: AttackEnemyParams = serde_json::from_value(args)?;
-
-        let attacker_key = params.attacker.trim().to_lowercase();
-        let target_key = params.target.trim().to_lowercase();
-
-        let mut action_budget = context
-            .action_budget
+        let params: IntakeItemParams = serde_json::from_value(args)?;
+        let key = params.item_id.trim().to_lowercase();
+        if key.is_empty() {
+            return Err("item_id cannot be empty".into());
+        }
+        let mut ledger = context
+            .intake_ledger
             .lock()
-            .expect("action budget mutex poisoned");
-        let remaining_actions = *action_budget.get(&attacker_key).unwrap_or(&0);
-
-        if remaining_actions <= 0 {
+            .expect("intake ledger mutex poisoned");
+        if ledger.contains_key(&key) {
             return Ok(AgentToolResult {
                 content: vec![Part::text(format!(
-                    "{} is out of actions this round. Ask another hero to step in or advance the \
-                     scene.",
-                    params.attacker
+                    "Item {} is already on the ledger—confirm the manifest number before adding \
+                     duplicates.",
+                    params.item_id
                 ))],
                 is_error: true,
             });
         }
 
-        let mut encounter_enemies = context
-            .encounter
-            .enemies
-            .lock()
-            .expect("encounter enemies mutex poisoned");
+        let priority = params.priority.unwrap_or_else(|| "standard".into());
+        ledger.insert(
+            key,
+            ItemRecord {
+                description: params.description.clone(),
+                priority: priority.clone(),
+            },
+        );
 
-        let enemy = encounter_enemies.get_mut(&target_key);
-        let Some(enemy_state) = enemy else {
+        context
+            .receipt_notes
+            .lock()
+            .expect("receipt notes mutex poisoned")
+            .push(format!(
+                "{}: {}{}",
+                params.item_id,
+                params.description,
+                if priority == "rush" {
+                    " (rush intake)"
+                } else {
+                    ""
+                }
+            ));
+
+        Ok(AgentToolResult {
+            content: vec![Part::text(format!(
+                "Logged {} as {}. Intake queue now holds {} item(s).",
+                params.description,
+                params.item_id,
+                ledger.len()
+            ))],
+            is_error: false,
+        })
+    }
+}
+
+/// flag_contraband highlights additional validation and shared-state updates.
+struct FlagContrabandTool;
+
+#[derive(Deserialize)]
+struct FlagContrabandParams {
+    item_id: String,
+    reason: String,
+}
+
+#[async_trait]
+impl AgentTool<LostAndFoundContext> for FlagContrabandTool {
+    fn name(&self) -> String {
+        "flag_contraband".into()
+    }
+    fn description(&self) -> String {
+        "Escalate a manifest item for contraband review.".into()
+    }
+    fn parameters(&self) -> llm_sdk::JSONSchema {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "item_id": { "type": "string" },
+                "reason": { "type": "string" }
+            },
+            "required": ["item_id", "reason"],
+            "additionalProperties": false
+        })
+    }
+    async fn execute(
+        &self,
+        args: Value,
+        context: &LostAndFoundContext,
+        _state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: FlagContrabandParams = serde_json::from_value(args)?;
+        let key = params.item_id.trim().to_lowercase();
+
+        let ledger = context
+            .intake_ledger
+            .lock()
+            .expect("intake ledger mutex poisoned");
+        if !ledger.contains_key(&key) {
             return Ok(AgentToolResult {
                 content: vec![Part::text(format!(
-                    "No enemy named {} remains at {}. Double-check the initiative order.",
-                    params.target, context.encounter.scene
+                    "Cannot flag {}; it has not been logged yet. Intake the item first.",
+                    params.item_id
                 ))],
                 is_error: true,
             });
-        };
+        }
+        drop(ledger);
 
-        let weapon_lower = params.weapon.to_lowercase();
-        let base_damage = if weapon_lower.contains("axe") { 7 } else { 5 };
-        let finesse_bonus = i32::from(weapon_lower.contains("dagger"));
-        let computed_damage = base_damage + (params.attacker.len() % 3) as i32 + finesse_bonus;
+        context
+            .flagged_contraband
+            .lock()
+            .expect("flagged contraband mutex poisoned")
+            .insert(key);
+        context
+            .receipt_notes
+            .lock()
+            .expect("receipt notes mutex poisoned")
+            .push(format!(
+                "⚠️ {} held for review: {}",
+                params.item_id, params.reason
+            ));
 
-        enemy_state.hp = (enemy_state.hp - computed_damage).max(0);
-        action_budget.insert(attacker_key, remaining_actions - 1);
+        Ok(AgentToolResult {
+            content: vec![Part::text(format!(
+                "{} marked for contraband inspection. Inform security before release.",
+                params.item_id
+            ))],
+            is_error: false,
+        })
+    }
+}
 
-        let defeated = if enemy_state.hp == 0 {
-            format!(" {} is defeated!", params.target)
+/// issue_receipt summarises everything, returning a final message and clearing
+/// state.
+struct IssueReceiptTool;
+
+#[derive(Deserialize)]
+struct IssueReceiptParams {
+    traveller: String,
+}
+
+#[async_trait]
+impl AgentTool<LostAndFoundContext> for IssueReceiptTool {
+    fn name(&self) -> String {
+        "issue_receipt".into()
+    }
+    fn description(&self) -> String {
+        "Publish a receipt for the traveller and clear the manifest ledger.".into()
+    }
+    fn parameters(&self) -> llm_sdk::JSONSchema {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "traveller": { "type": "string" }
+            },
+            "required": ["traveller"],
+            "additionalProperties": false
+        })
+    }
+    async fn execute(
+        &self,
+        args: Value,
+        context: &LostAndFoundContext,
+        _state: &llm_agent::RunState,
+    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
+        let params: IssueReceiptParams = serde_json::from_value(args)?;
+
+        let mut ledger = context
+            .intake_ledger
+            .lock()
+            .expect("intake ledger mutex poisoned");
+        if ledger.is_empty() {
+            return Ok(AgentToolResult {
+                content: vec![Part::text(format!(
+                    "No items pending on manifest {}. Intake something before issuing a receipt.",
+                    context.manifest_id
+                ))],
+                is_error: true,
+            });
+        }
+
+        let mut cleared = Vec::new();
+        {
+            let flagged = context
+                .flagged_contraband
+                .lock()
+                .expect("flagged contraband mutex poisoned");
+            for (id, record) in ledger.iter() {
+                if !flagged.contains(id) {
+                    cleared.push(format!("{} ({})", id, record.description));
+                }
+            }
+        }
+
+        let mut summary = vec![format!(
+            "Receipt for {} on manifest {}:",
+            params.traveller, context.manifest_id
+        )];
+        if !cleared.is_empty() {
+            summary.push(format!("Cleared items: {}", cleared.join(", ")));
         } else {
-            String::new()
-        };
-
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "{} hits {} for {} damage with the {}. {} now has {} HP.{}",
-                params.attacker,
-                params.target,
-                computed_damage,
-                params.weapon,
-                params.target,
-                enemy_state.hp,
-                defeated
-            ))],
-            is_error: false,
-        })
-    }
-}
-
-#[derive(Deserialize)]
-struct StabilizeAllyParams {
-    hero: String,
-}
-
-struct StabilizeAllyTool;
-
-#[async_trait]
-impl AgentTool<DungeonRunContext> for StabilizeAllyTool {
-    fn name(&self) -> String {
-        "stabilize_ally".to_string()
-    }
-    fn description(&self) -> String {
-        "Spend the round stabilising a downed ally. Removes them from the downed list if available."
-            .to_string()
-    }
-    fn parameters(&self) -> llm_sdk::JSONSchema {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "hero": {
-                    "type": "string",
-                    "description": "Name of the ally to stabilise."
-                }
-            },
-            "required": ["hero"],
-            "additionalProperties": false
-        })
-    }
-    async fn execute(
-        &self,
-        args: Value,
-        context: &DungeonRunContext,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: StabilizeAllyParams = serde_json::from_value(args)?;
-
-        let hero_key = params.hero.trim().to_lowercase();
-        let mut downed = context
-            .encounter
-            .downed_allies
-            .lock()
-            .expect("downed allies mutex poisoned");
-
-        if !downed.remove(&hero_key) {
-            return Ok(AgentToolResult {
-                content: vec![Part::text(format!(
-                    "{} is already on their feet. Consider taking another tactical action instead \
-                     of stabilising.",
-                    params.hero
-                ))],
-                is_error: true,
-            });
+            summary.push("No items cleared—everything is held for review.".into());
         }
+        {
+            let notes = context
+                .receipt_notes
+                .lock()
+                .expect("receipt notes mutex poisoned");
+            if !notes.is_empty() {
+                summary.push("Notes:".into());
+                summary.extend(notes.iter().cloned());
+            }
+        }
+        let contraband_count = context
+            .flagged_contraband
+            .lock()
+            .expect("flagged contraband mutex poisoned")
+            .len();
+        summary.push(format!(
+            "{} item(s) require contraband follow-up.",
+            contraband_count
+        ));
+
+        // Clear state for the next manifest.
+        ledger.clear();
+        context
+            .flagged_contraband
+            .lock()
+            .expect("flagged contraband mutex poisoned")
+            .clear();
+        context
+            .receipt_notes
+            .lock()
+            .expect("receipt notes mutex poisoned")
+            .clear();
 
         Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "{} is stabilised and ready to rejoin when the next round begins.",
-                params.hero
-            ))],
+            content: vec![Part::text(summary.join("\n"))],
             is_error: false,
         })
     }
-}
-
-fn describe_enemies(context: &DungeonRunContext) -> HashMap<String, i32> {
-    context
-        .encounter
-        .enemies
-        .lock()
-        .expect("encounter enemies mutex poisoned")
-        .iter()
-        .map(|(name, state)| (name.clone(), state.hp))
-        .collect()
-}
-
-fn describe_downed_allies(context: &DungeonRunContext) -> Vec<String> {
-    context
-        .encounter
-        .downed_allies
-        .lock()
-        .expect("downed allies mutex poisoned")
-        .iter()
-        .cloned()
-        .collect()
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
+    let api_key = env::var("OPENAI_API_KEY")?;
     let model = Arc::new(OpenAIModel::new(
         "gpt-4o",
         OpenAIModelOptions {
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY environment variable must be set"),
+            api_key,
             ..Default::default()
         },
     ));
 
-    let dungeon_coach = Agent::<DungeonRunContext>::builder("Torch", model)
+    let agent = Agent::builder("WaypointClerk", model)
         .add_instruction(
-            "You are Torch, a steady co-Dungeon Master. Keep answers short and, when combat \
-             actions come up, lean on the provided tools to resolve them.",
+            "You are the archivist completing intake for Waypoint Seven's Interdimensional Lost & \
+             Found desk.",
         )
         .add_instruction(
-            "If a requested action involves striking an enemy, call attack_enemy. If the party \
-             wants to help someone back up, call stabilize_ally before answering.",
+            "When travellers report belongings, call the available tools to mutate the manifest \
+             and then summarise your actions.",
         )
-        .add_tool(AttackEnemyTool)
-        .add_tool(StabilizeAllyTool)
+        .add_instruction(
+            "If a tool reports an error, acknowledge the issue and guide the traveller \
+             appropriately.",
+        )
+        .add_tool(IntakeItemTool)
+        .add_tool(FlagContrabandTool)
+        .add_tool(IssueReceiptTool)
         .build();
 
-    let success_context = create_dungeon_context();
-    let success_response = dungeon_coach
+    // Success path: multiple tools fired in one turn.
+    let success_context = create_context();
+    let success_response = agent
         .run(AgentRequest {
             context: success_context.clone(),
             input: vec![llm_agent::AgentItem::Message(Message::user(vec![
                 Part::text(
-                    "Thorne will strike the ghoul with a battleaxe while Mira uses her turn to \
-                     stabilise Finley. Help me resolve it.",
+                    "Log the Chrono Locket as rush, flag the Folded star chart for contraband, \
+                     then issue a receipt for Captain Lyra Moreno.",
                 ),
             ]))],
         })
         .await?;
 
-    println!("Success response:\n{success_response:#?}");
+    println!("\n=== SUCCESS RUN ===");
+    println!("{success_response:#?}");
     println!("{}", success_response.text());
-    println!(
-        "Remaining enemy HP: {:?}",
-        describe_enemies(&success_context)
-    );
-    println!(
-        "Downed allies after success run: {:?}",
-        describe_downed_allies(&success_context)
-    );
 
-    let failure_context = create_dungeon_context();
-    {
-        let mut budget = failure_context
-            .action_budget
-            .lock()
-            .expect("action budget mutex poisoned");
-        budget.insert("thorne".into(), 0);
-    }
-    {
-        let mut downed = failure_context
-            .encounter
-            .downed_allies
-            .lock()
-            .expect("downed allies mutex poisoned");
-        downed.clear();
-    }
-
-    let failure_response = dungeon_coach
+    // Failure path: illustrate tool error handling.
+    let failure_context = create_context();
+    let failure_response = agent
         .run(AgentRequest {
             context: failure_context,
             input: vec![llm_agent::AgentItem::Message(Message::user(vec![
-                Part::text(
-                    "Thorne wants to swing again at the marauder, and Mira tries to stabilise \
-                     Finley anyway.",
-                ),
+                Part::text("Issue a receipt immediately without logging anything."),
             ]))],
         })
         .await?;
 
-    println!("Failure response:\n{failure_response:#?}");
+    println!("\n=== FAILURE RUN ===");
+    println!("{failure_response:#?}");
+    println!("{}", failure_response.text());
 
     Ok(())
 }

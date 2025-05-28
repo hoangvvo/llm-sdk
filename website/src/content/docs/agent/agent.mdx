@@ -3,47 +3,74 @@ title: Agent
 ---
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
-import { extractGoAgentParamsTypes, extractRustAgentParamsTypes, extractTypescriptAgentParamsTypes } from "../../../utils/extract-types.ts";
+import {
+  extractGoAgentParamsTypes,
+  extractGoAgentToolkitTypes,
+  extractRustAgentParamsTypes,
+  extractRustAgentToolkitTypes,
+  extractTypescriptAgentParamsTypes,
+  extractTypescriptAgentToolkitTypes,
+} from "../../../utils/extract-types.ts";
 
-An agent is constructed with the following parameters:
+An agent bundles the configuration that defines how your system should respond: which model to call, which instructions to inject, and which tools to expose. The same agent object can serve many users because it does not capture request-specific state; context always arrives at run time.
 
-- `name`: The identifier of the agent.
-- `model`: The language model instance from the LLM SDK.
-- `instructions`: A list of instructions to be injected into the system prompt to guide the agent's behavior.
-- `tools`: A list of _executable_ tools that the agent can call during its execution.
-- `response_format`: The expected response format from the agent. While the default is plain text, it can be customized to return structured output.
-- `max_turns`: The maximum number of turns the agent can take to complete a request.
-- Other sampling parameters: `temperature`, `top_p`, `max_tokens`, etc.
-- Model output options such as `modalities`, `reasoning`, and `audio`.
+## Agent parameters
 
-In addition, the agent is defined with a `context` generic type that can be accessed in the instructions (for dynamic instructions) and tools.
+`AgentParams` collect the knobs you use to describe a capability. The most common ones are shown below; every language shares the same concepts even if the syntax differs.
 
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptAgentParamsTypes([
-        "AgentParams",
-      ])}
+      code={extractTypescriptAgentParamsTypes(["AgentParams"])}
       lang="typescript"
       title="params.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustAgentParamsTypes([
-        "AgentParams",
-      ])}
+      code={extractRustAgentParamsTypes(["AgentParams"])}
       lang="rust"
       title="params.rs"
     />
   </TabItem>
   <TabItem label="Go">
     <Code
-      code={extractGoAgentParamsTypes([
-        "AgentParams",
-      ])}
+      code={extractGoAgentParamsTypes(["AgentParams"])}
       lang="go"
       title="params.go"
     />
   </TabItem>
 </Tabs>
+
+- `name` shows up in logs and telemetry.
+- `model` points to the `LanguageModel` instance from the SDK.
+- `instructions` enrich the system prompt. They can be static strings or functions that read the per-run context.
+- `tools` list executable helpers the model may call.
+- `toolkits` produce additional tools and system prompts at session time.
+- Sampling and output options (`temperature`, `response_format`, `modalities`, etc.) mirror the knobs on the underlying LLMs.
+- `max_turns` guards against infinite tool-calling loops.
+
+Because these parameters are pure data, you usually construct an agent once at startup and reuse it.
+
+## Context object
+
+An agent can be initialized with a `Context` generic that describes the shape of the per-run context you pass in. This is useful for including user information, session data, request metadata, or other parameters that instructions or tools may need.
+
+One important use case is to include authentication tokens, so your tools can make authenticated requests on behalf of the user. In some rarer cases, you could pass in a database connection or a cache handle.
+
+## Instructions, tools, and toolkits
+
+[Instructions](../instructions) can depend on the context you provide when running the agent. Returning a string from a function is enough; the library aggregates them into a single system prompt before each run.
+
+[Tools](../tools) are functions you expose to the model. Each tool has a name, description, and JSON schema for its arguments. The model decides when to call them based on the conversation and the tool definitions.
+If a [`ToolCallPart`](../../sdk/language-model#tool-call-part) appears in the model response, the library automatically invokes the corresponding tool and appends the result to the conversation.
+
+[Toolkits](../toolkits) let you derive tools and extra prompt snippets dynamically. Each toolkit generates a per-session object that stays alive until you close the run session, which is useful for holding onto database connections or scoped caches.
+
+Use `toolkits` sparingly for capabilities that need per-user initialisation or conditional logic. For simple helper functions that do not keep state, define them directly in `tools` instead.
+
+## Lifecycle with run sessions
+
+Agents remain stateless. When you call `agent.run`, `agent.run_stream`, or `agent.create_session`, the library creates a `RunSession` that binds the agent parameters to the context you pass in. That session resolves dynamic instructions, opens toolkit sessions, and keeps them around for the duration of the run. When you close the run session, those resources are released.
+
+See [Agent vs Run session](/agent/agent-vs-run-session) for a deeper dive into how the pieces fit together and when to choose each entry point.

@@ -1,5 +1,5 @@
 ---
-title: Planner–Executor
+title: Planner-Executor
 ---
 
 import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
@@ -11,19 +11,32 @@ import rustPlannerCode from "../../../../../agent-rust/examples/planner-executor
   This is an agent pattern that requires custom implementation. [Why?](/agent/#agent-patterns)
 </Aside>
 
-The Planner–Executor pattern breaks a user’s goal into actionable steps and iteratively updates an internal plan while executing at a high level.
-The plan is to guide the agent’s reasoning and do not have to be revealed to the user.
+The planner-executor pattern gives the model a private to-do list so it can tackle multi-step complex requirements by breaking them down into manageable pieces.
+It is popular for coding agents and investigative flows because the model can revise the plan between turns, mark items complete, and maintain chain-of-thought reasoning to carry out tasks efficiently and accurately.
 
-Implementing this pattern may allow the agent to produce better results for complex tasks, such as those done by a **coding agent**.
+```mermaid
+sequenceDiagram
+  participant User
+  participant Agent
+  participant Plan as Plan store
+  participant Tool as update_plan tool
 
-Internally, we implement a tool `update_plan` that accepts the following parameters:
+  User->>Agent: task prompt
+  Agent->>Plan: load current plan (if any)
+  Agent->>Tool: update_plan(explanation, steps)
+  Tool-->>Agent: plan accepted
+  Agent->>Plan: persist snapshot
+  Agent->>User: execute step / respond
+  Agent->>Plan: mark progress next turn
+```
 
-- `explanation`: string
-- `plan`: An array of steps, each step is an object with:
-  - `status`: one of `pending` | `in_progress` | `complete`
-  - `step`: string
+Each cycle the model may adjust the plan before acting; your code may optionally inspect the proposal, tweak it if necessary, and persist the snapshot so you can resume later or render progress in the UI.
 
-![Planner–Executor example](../../../../assets/examples/planner-executor.gif)
+The only tool required is `update_plan` with payload `{ explanation?: string; plan: { status: "pending" | "in_progress" | "complete"; step: string; }[] }`, so validate it, cap the number of steps if you want, and reject plans that skip prerequisites. Well-crafted instructions remind the model to update the plan before long actions, mark finished items as `complete`, and keep the list short for clarity.
+
+## Implementation
+
+![Planner-Executor example](../../../../assets/examples/planner-executor.gif)
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -36,3 +49,5 @@ Internally, we implement a tool `update_plan` that accepts the following paramet
     <Code code={goPlannerCode} lang="go" title="main.go" />
   </TabItem>
 </Tabs>
+
+Pair this pattern with the [Run Session lifecycle](./agent-vs-run-session) so each user or request gets an isolated copy of the plan.

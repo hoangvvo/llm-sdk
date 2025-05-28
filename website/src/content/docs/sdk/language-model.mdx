@@ -71,7 +71,7 @@ All models in the library implement the LanguageModel interface and can be used 
 
 ## Message
 
-`Message`s are primitives that make up the conversation history, and `Part`s are the building blocks of each message. The library converts them into a format suitable for the underlying LLM provider and maps those from different providers to the unified format.
+`Message`s are primitives that make up the conversation history, and [`Part`](#part) are the building blocks of each message. The library converts them into a format suitable for the underlying LLM provider and maps those from different providers to the unified format.
 
 Three message types are defined in the SDK: `UserMessage`, `AssistantMessage`, and `ToolMessage`.
 
@@ -101,7 +101,7 @@ Three message types are defined in the SDK: `UserMessage`, `AssistantMessage`, a
 
 ## Part
 
-The following `Part` types are implemented in the SDK: `TextPart`, `ImagePart`, `AudioPart`, `SourcePart` (for citation), `ToolCallPart`, and `ToolResultPart`.
+The following `Part` types are implemented in the SDK: [`TextPart`](#text-part), [`ImagePart`](#image-part), [`AudioPart`](#audio-part), [`SourcePart`](#source-part) (for citation), [`ToolCallPart`](#tool-call-part), and [`ToolResultPart`](#tool-result-part).
 
 <Tabs>
   <TabItem label="TypeScript">
