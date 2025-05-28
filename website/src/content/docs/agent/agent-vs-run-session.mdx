@@ -16,9 +16,9 @@ Agents and run sessions are two halves of the same workflow. The agent describes
 
 ## Agent
 
-An agent is a reusable blueprint. It keeps the shared configuration for a capability--name, default model, instructions, tools, and optional toolkits--and remains safe to reuse across users because it never captures request-specific state.
+An agent is a reusable **blueprint**. It keeps the shared configuration for a capability--name, default model, instructions, tools, and optional toolkits--and remains safe to reuse across users because it never captures request-specific state.
 
-It exposes three entry points: `run`, `run_stream`, and `create_session`. The first two spin up a temporary run session, execute exactly once, and always close it so you do not leak resources. Reach for `create_session` when you need to reuse initialized toolkits or run several calls back to back; you become responsible for closing that session afterwards.
+It exposes three entry points: `run`, `run_stream`, and `create_session`. The first two spin up a temporary run session, execute exactly once, and always close it so you do not leak resources. Reach for `create_session` when you need to reuse initialized toolkits (e.g. [MCP client connection](../mcp)) or run several calls back to back; you become responsible for closing that session afterwards.
 
 <Code
   code={`export class Agent<TContext> {
@@ -59,7 +59,7 @@ interface RunSessionRequest {
   title="run.ts"
 />
 
-Within a run session the bound context is passed to every toolkit session and tool invocation, keeping the runtime consistent for the lifetime of that session. When your workflow ends, call `close` to release toolkit resources and clear cached prompts. If you only need a single answer, stick with `agent.run` or `agent.run_stream`; otherwise reuse the session for as many runs as you need before closing it.
+Within a run session the bound context is passed to every toolkit session and tool invocation, keeping the runtime consistent for the lifetime of that session. When your workflow ends, call `close` to release toolkit resources and clear cached prompts. If you only need a single answer or do not have any stateful components, stick with `agent.run` or `agent.run_stream`; otherwise reuse the session for as many runs as you need before closing it.
 
 The flow looks like this:
 

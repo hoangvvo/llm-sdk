@@ -65,7 +65,7 @@ One important use case is to include authentication tokens, so your tools can ma
 [Tools](../tools) are functions you expose to the model. Each tool has a name, description, and JSON schema for its arguments. The model decides when to call them based on the conversation and the tool definitions.
 If a [`ToolCallPart`](../../sdk/language-model#tool-call-part) appears in the model response, the library automatically invokes the corresponding tool and appends the result to the conversation.
 
-[Toolkits](../toolkits) let you derive tools and extra prompt snippets dynamically. Each toolkit generates a per-session object that stays alive until you close the run session, which is useful for holding onto database connections or scoped caches.
+[Toolkits](../toolkits) let you derive tools and extra prompt snippets dynamically. Each toolkit generates a per-session object that stays alive until you close the run session, which is useful for holding onto database connections, scoped caches, or external protocol clients (such as [MCP](../mcp)).
 
 Use `toolkits` sparingly for capabilities that need per-user initialisation or conditional logic. For simple helper functions that do not keep state, define them directly in `tools` instead.
 
