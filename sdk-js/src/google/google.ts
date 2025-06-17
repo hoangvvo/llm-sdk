@@ -19,7 +19,7 @@ import {
 import {
   mapAudioFormatToMimeType,
   mapMimeTypeToAudioFormat,
-} from "../audio.utils.ts";
+} from "../audio-part.utils.ts";
 import { InvalidInputError, InvariantError } from "../errors.ts";
 import { generateString } from "../id.utils.ts";
 import type {

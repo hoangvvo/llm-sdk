@@ -1,8 +1,3 @@
-import {
-  arrayBufferToBase64,
-  base64ToArrayBuffer,
-  mergeInt16Arrays,
-} from "./audio.utils.ts";
 import { InvariantError } from "./errors.ts";
 import type {
   AudioFormat,
@@ -21,6 +16,11 @@ import type {
   ToolCallPartDelta,
 } from "./types.ts";
 import { sumModelUsage } from "./usage.utils.ts";
+import {
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  mergeInt16Arrays,
+} from "./utils/audio.utils.ts";
 
 /**
  * Internal representation of accumulated audio data with chunks stored separately

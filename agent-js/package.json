@@ -28,7 +28,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./typebox": "./dist/typebox/index.js",
-    "./zod": "./dist/zod/index.js"
+    "./zod": "./dist/zod/index.js",
+    "./mcp": "./dist/mcp/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -1,5 +1,5 @@
 mod accumulator;
-mod audio_utils;
+pub mod audio_part_utils;
 pub mod boxed_stream;
 mod client_utils;
 mod errors;
@@ -14,6 +14,7 @@ mod stream_utils;
 mod types;
 pub mod types_ext;
 pub mod usage_ext;
+mod utils;
 
 pub use accumulator::StreamAccumulator;
 pub use errors::{LanguageModelError, LanguageModelResult};

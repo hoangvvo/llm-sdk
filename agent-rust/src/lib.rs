@@ -1,6 +1,7 @@
 mod agent;
 mod errors;
 mod instruction;
+pub mod mcp;
 mod params;
 mod run;
 mod tool;

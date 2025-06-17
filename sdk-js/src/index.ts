@@ -1,4 +1,8 @@
 export { StreamAccumulator } from "./accumulator.ts";
+export {
+  mapAudioFormatToMimeType,
+  mapMimeTypeToAudioFormat,
+} from "./audio-part.utils.ts";
 export * from "./errors.ts";
 export {
   type LanguageModel,

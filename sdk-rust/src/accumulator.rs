@@ -1,5 +1,5 @@
 use crate::{
-    audio_utils, AudioFormat, AudioPart, ContentDelta, ImagePart, LanguageModelError,
+    utils::audio_utils, AudioFormat, AudioPart, ContentDelta, ImagePart, LanguageModelError,
     LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
     ReasoningPart, ToolCallPart,
 };

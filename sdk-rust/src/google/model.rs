@@ -5,10 +5,11 @@ use super::api::{
     ThinkingConfig, Tool, ToolConfig, VoiceConfig,
 };
 use crate::{
-    audio_utils, client_utils, id_utils, source_part_utils, stream_utils, AudioPart, ContentDelta,
-    ImagePart, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
-    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelTokensDetails,
-    ModelUsage, Part, PartialModelResponse, ReasoningPart, ResponseFormatOption, ToolChoiceOption,
+    audio_part_utils, client_utils, id_utils, source_part_utils, stream_utils, AudioPart,
+    ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
+    LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
+    ModelTokensDetails, ModelUsage, Part, PartialModelResponse, ReasoningPart,
+    ResponseFormatOption, ToolChoiceOption,
 };
 use async_stream::try_stream;
 use futures::StreamExt;
@@ -375,7 +376,7 @@ fn convert_to_google_parts(part: Part) -> Vec<GooglePart> {
         Part::Audio(audio_part) => vec![GooglePart {
             inline_data: Some(super::api::Blob2 {
                 data: Some(audio_part.audio_data),
-                mime_type: Some(audio_utils::map_audio_format_to_mime_type(
+                mime_type: Some(audio_part_utils::map_audio_format_to_mime_type(
                     &audio_part.format,
                 )),
                 display_name: None,
@@ -508,7 +509,9 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                             id: None,
                         })))
                     } else if mime_type.starts_with("audio/") {
-                        if let Ok(format) = audio_utils::map_mime_type_to_audio_format(&mime_type) {
+                        if let Ok(format) =
+                            audio_part_utils::map_mime_type_to_audio_format(&mime_type)
+                        {
                             Some(Ok(Part::Audio(AudioPart {
                                 audio_data: data,
                                 format,
