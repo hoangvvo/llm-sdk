@@ -3,18 +3,21 @@ import goAgentParamsTypes from "../../../agent-go/params.go?raw";
 import goAgentRunTypes from "../../../agent-go/run.go?raw";
 import goAgentToolTypes from "../../../agent-go/tool.go?raw";
 import goAgentToolkitTypes from "../../../agent-go/toolkit.go?raw";
+import goAgentMcpTypesSource from "../../../agent-go/mcp/types.go?raw";
 import goAgentTypes from "../../../agent-go/types.go?raw";
 import jsAgentInstructionTypes from "../../../agent-js/src/instruction.ts?raw";
 import jsAgentParamsTypes from "../../../agent-js/src/params.ts?raw";
 import jsAgentRunTypes from "../../../agent-js/src/run.ts?raw";
 import jsAgentToolTypes from "../../../agent-js/src/tool.ts?raw";
 import jsAgentToolkitTypes from "../../../agent-js/src/toolkit.ts?raw";
+import jsAgentMcpTypesSource from "../../../agent-js/src/mcp/types.ts?raw";
 import jsAgentTypes from "../../../agent-js/src/types.ts?raw";
 import rustAgentInstructionTypes from "../../../agent-rust/src/instruction.rs?raw";
 import rustAgentParamsTypes from "../../../agent-rust/src/params.rs?raw";
 import rustAgentRunTypes from "../../../agent-rust/src/run.rs?raw";
 import rustAgentToolTypes from "../../../agent-rust/src/tool.rs?raw";
 import rustAgentToolkitTypes from "../../../agent-rust/src/toolkit.rs?raw";
+import rustAgentMcpTypesSource from "../../../agent-rust/src/mcp/types.rs?raw";
 import rustAgentTypes from "../../../agent-rust/src/types.rs?raw";
 import goTypes from "../../../sdk-go/types.go?raw";
 import jsTypes from "../../../sdk-js/src/types.ts?raw";
@@ -65,6 +68,15 @@ export const extractRustAgentToolkitTypes = (typeNames: string[]) =>
 
 export const extractTypescriptAgentToolkitTypes = (typeNames: string[]) =>
   extractCombined(jsAgentToolkitTypes, typeNames, "ts");
+
+export const extractGoAgentMcpTypes = (typeNames: string[]) =>
+  extractCombined(goAgentMcpTypesSource, typeNames, "go");
+
+export const extractRustAgentMcpTypes = (typeNames: string[]) =>
+  extractCombined(rustAgentMcpTypesSource, typeNames, "rust");
+
+export const extractTypescriptAgentMcpTypes = (typeNames: string[]) =>
+  extractCombined(jsAgentMcpTypesSource, typeNames, "ts");
 
 export const extractTypescriptAgentInstructionTypes = (typeNames: string[]) =>
   extractCombined(jsAgentInstructionTypes, typeNames, "ts");

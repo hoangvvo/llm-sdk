@@ -1,0 +1,177 @@
+---
+title: Model Context Protocol (MCP)
+---
+
+import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goMcpExample from "../../../../../agent-go/examples/mcp/main.go?raw";
+import jsMcpExample from "../../../../../agent-js/examples/mcp.ts?raw";
+import rustMcpExample from "../../../../../agent-rust/examples/mcp.rs?raw";
+import {
+  extractGoAgentMcpTypes,
+  extractRustAgentMcpTypes,
+  extractTypescriptAgentMcpTypes,
+} from "../../../utils/extract-types.ts";
+
+[Model Context Protocol](https://modelcontextprotocol.io/) (MCP) is an open standard for wiring assistants to external data sources, automation, and services without baking those integrations into your agent. MCP servers expose tools over a shared protocol, while clients (like this agent library) negotiate capabilities and relay tool calls. The MCP integration lets each run session attach to an MCP server, discover the tools it offers, and route tool invocations through the protocol using per-user credentials or transports.
+
+Under the hood this integration is just an implementation of the [`Toolkit`](../toolkits) primitive, so it shares the same lifecycle and composition rules as your other toolkits. The MCP connection opens during session creation and closes when the session ends.
+
+## Configuration types
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptAgentMcpTypes([
+        "MCPInit",
+        "MCPParams",
+        "MCPStdioParams",
+        "MCPStreamableHTTPParams",
+      ])}
+      lang="typescript"
+      title="mcp/types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustAgentMcpTypes([
+        "MCPInit",
+        "MCPParams",
+        "MCPStdioParams",
+        "MCPStreamableHTTPParams",
+      ])}
+      lang="rust"
+      title="mcp/types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoAgentMcpTypes([
+        "MCPInit",
+        "MCPParams",
+        "MCPStdioParams",
+        "MCPStreamableHTTPParams",
+      ])}
+      lang="go"
+      title="mcp/types.go"
+    />
+  </TabItem>
+</Tabs>
+
+- `MCPInit` lets you pass static parameters or derive them from the per-run context. Use synchronous or asynchronous resolvers to fetch tokens, endpoints, or feature flags on demand.
+- `MCPParams` chooses the transport (`stdio` for local processes, `streamable-http` for hosted servers).
+- `authorization` is forwarded as provided. Supply ready-to-use credentials because the library does not negotiate OAuth flows on your behalf.
+
+## Context-aware setup
+
+This library is typically deployed as a single agent service that serves many users. The agent itself stays stateless; the run `context` carries caller-specific identifiers so `Toolkit.create_session` can resolve per-session details before the conversation starts. Use that resolver to look up OAuth tokens, choose the correct MCP endpoint, or apply tenant-level feature flags. It keeps the agent reusable while still routing each session through the appropriate integration—matching the lifecycle in [Agent vs Run session](../agent-vs-run-session).
+
+The snippets below show an init function that loads an OAuth token from storage based on the user ID in context and returns MCP parameters for that session.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={`import { Agent } from "@hoangvvo/llm-agent";
+import { mcpToolkit, type MCPParams } from "@hoangvvo/llm-agent/mcp";
+
+interface SessionContext {
+  tenantId: string;
+  userId: string;
+}
+
+async function resolveMcpParams(context: SessionContext): Promise<MCPParams> {
+  const token = await fetchMcpTokenForUser(context.userId);
+  const url = await resolveMcpEndpointForTenant(context.tenantId);
+  return {
+    type: "streamable-http",
+    url,
+    authorization: token,
+  };
+}
+
+const agent = new Agent<SessionContext>({
+  name: "Transit Concierge",
+  model,
+  toolkits: [mcpToolkit(resolveMcpParams)],
+});`}
+      lang="typescript"
+      title="agent.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={`use llm_agent::mcp::{MCPInit, MCPParams, MCPStreamableHTTPParams, MCPToolkit};
+
+let toolkit = MCPToolkit::new(MCPInit::from_async_fn(|context: &SessionContext| async move {
+    let token = fetch_mcp_token_for_user(&context.user_id).await?;
+    let url = resolve_mcp_endpoint_for_tenant(&context.tenant_id).await?;
+    Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
+        url,
+        authorization: Some(token),
+    }))
+}));
+
+let agent = Agent::builder("Transit Concierge", model)
+    .add_toolkit(toolkit)
+    .build();`}
+      lang="rust"
+      title="agent.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={`toolkit := llmmcp.NewMCPToolkit[*SessionContext](func(ctx context.Context, data *SessionContext) (llmmcp.MCPParams, error) {
+    if data == nil {
+        return llmmcp.MCPParams{}, fmt.Errorf("session context missing")
+    }
+
+    token, err := fetchMCPTokenForUser(ctx, data.UserID)
+    if err != nil {
+        return llmmcp.MCPParams{}, err
+    }
+
+    url, err := resolveMCPEndpointForTenant(ctx, data.TenantID)
+    if err != nil {
+        return llmmcp.MCPParams{}, err
+    }
+
+    return llmmcp.NewMCPStreamableHTTPParams(url, token), nil
+})
+
+agent := llmagent.NewAgent[*SessionContext](
+    "Transit Concierge",
+    model,
+    llmagent.WithToolkits(toolkit),
+)`}
+      lang="go"
+      title="agent.go"
+    />
+  </TabItem>
+</Tabs>
+
+<Aside type="note">
+  Stdio transports spawn a child process (`uvx`, `python`, etc.) for the lifetime of the run session. Streamable HTTP transports keep a persistent connection open when the server supports it.
+</Aside>
+
+## Tool lifecycle
+
+- At session start the toolkit calls `list_tools` and subscribes to `tool_list_changed`, so updates published by the server flow back automatically.
+- Each remote definition becomes an `AgentTool`, letting the agent runtime evaluate tool selection and error handling exactly the same way it does for local tools.
+- Tool responses are converted into SDK parts (text, image, audio) before being appended to the transcript.
+
+## Example: Streamable HTTP server
+
+The full examples below stand up a minimal shuttle-planning MCP server, register it through the toolkit, and run a single conversation turn against it.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsMcpExample} lang="typescript" title="examples/mcp.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustMcpExample} lang="rust" title="examples/mcp.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goMcpExample} lang="go" title="examples/mcp/main.go" />
+  </TabItem>
+</Tabs>
+
+When you create a run session manually, call its `close` method after the conversation so the MCP connection and any spawned processes shut down cleanly. The one-shot `run` and `run_stream` helpers already manage that lifecycle for you; see [Agent vs Run session](../agent-vs-run-session) for a refresher.

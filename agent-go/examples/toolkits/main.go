@@ -596,9 +596,7 @@ func (pageSecurityTool) Execute(_ context.Context, params json.RawMessage, ctx *
 func stringPtr(s string) *string { return &s }
 
 func main() {
-	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Fatalf("load env: %v", err)
-	}
+	godotenv.Load("../.env")
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -607,7 +605,7 @@ func main() {
 
 	model := openai.NewOpenAIModel("gpt-4o-mini", openai.OpenAIModelOptions{APIKey: apiKey})
 
-	agent := llmagent.NewAgent[*riftContext](
+	agent := llmagent.NewAgent(
 		"WaypointArchivist",
 		model,
 		llmagent.WithInstructions(

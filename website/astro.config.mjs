@@ -54,6 +54,7 @@ export default defineConfig({
             { slug: "agent/toolkits" },
             { slug: "agent/run" },
             { slug: "agent/agent-vs-run-session" },
+            { slug: "agent/mcp" },
             { slug: "agent/structured-output" },
             { slug: "agent/delegation" },
             { slug: "agent/memory" },

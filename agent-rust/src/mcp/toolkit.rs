@@ -86,7 +86,7 @@ where
             MCPParams::StreamableHttp(MCPStreamableHTTPParams { url, authorization }) => {
                 let mut config = StreamableHttpClientTransportConfig::with_uri(url.clone());
                 if let Some(token) = authorization.as_deref() {
-                    config = config.auth_header(ensure_bearer_prefix(token));
+                    config = config.auth_header(strip_bearer_prefix(token));
                 }
                 let transport = StreamableHttpClientTransport::from_config(config);
                 serve_client(handler, transport).await?
@@ -233,11 +233,15 @@ where
     }
 }
 
-fn ensure_bearer_prefix(token: &str) -> String {
-    if token.to_ascii_lowercase().starts_with("bearer ") {
-        token.to_string()
+// Remove "Bearer " or "bearer " prefix if present because the rmcp library already adds it.
+fn strip_bearer_prefix(token: &str) -> String {
+    let trimmed = token.trim();
+    if let Some(rest) = trimmed.strip_prefix("Bearer ") {
+        rest.to_string()
+    } else if let Some(rest) = trimmed.strip_prefix("bearer ") {
+        rest.to_string()
     } else {
-        format!("Bearer {}", token)
+        trimmed.to_string()
     }
 }
 
@@ -294,7 +298,6 @@ where
             .list_all_tools()
             .await
             .map_err(|err| Box::new(err) as BoxedError)?;
-
         let mut new_tools: Vec<Arc<dyn AgentTool<TCtx>>> = Vec::with_capacity(specs.len());
         for spec in specs {
             let remote = MCPRemoteTool::new(service.clone(), spec);

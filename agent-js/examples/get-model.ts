@@ -10,7 +10,6 @@ import { CohereModel } from "@hoangvvo/llm-sdk/cohere";
 import { GoogleModel } from "@hoangvvo/llm-sdk/google";
 import { MistralModel } from "@hoangvvo/llm-sdk/mistral";
 import { OpenAIChatModel, OpenAIModel } from "@hoangvvo/llm-sdk/openai";
-import dotenv from "dotenv";
 import modelList from "../../website/models.json" with { type: "json" };
 
 function assert(condition: unknown, msg: string): asserts condition {
@@ -20,8 +19,11 @@ function assert(condition: unknown, msg: string): asserts condition {
 }
 
 try {
+  // import here to avoid non-Node.js environment error
+  const dotenv = await import("dotenv");
+  const { join } = await import("path");
   dotenv.config({
-    path: "../.env",
+    path: join(import.meta.dirname, "../../.env"),
   });
 } catch {
   // ignore
