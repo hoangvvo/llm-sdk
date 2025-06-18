@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	llmmcp "github.com/hoangvvo/llm-sdk/agent-go/mcp"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 )
 
@@ -52,6 +54,7 @@ var availableTools = []llmagent.AgentTool[*MyContext]{
 
 type AgentOptions struct {
 	EnabledTools         []string
+	MCPServers           []llmmcp.MCPParams
 	DisabledInstructions bool
 	Temperature          *float64
 	TopP                 *float64
@@ -65,7 +68,7 @@ type AgentOptions struct {
 
 func createAgent(model llmsdk.LanguageModel, modelInfo *ModelInfo, options *AgentOptions) *llmagent.Agent[*MyContext] {
 	var tools []llmagent.AgentTool[*MyContext]
-	if len(options.EnabledTools) > 0 {
+	if options.EnabledTools != nil {
 		toolNameSet := make(map[string]bool)
 		for _, name := range options.EnabledTools {
 			toolNameSet[name] = true
@@ -88,6 +91,10 @@ func createAgent(model llmsdk.LanguageModel, modelInfo *ModelInfo, options *Agen
 		llmagent.WithInstructions(agentInstructions...),
 		llmagent.WithTools(tools...),
 		llmagent.WithMaxTurns[*MyContext](5),
+	}
+
+	if mcpToolkits := createMcpToolkits(options.MCPServers); len(mcpToolkits) > 0 {
+		opts = append(opts, llmagent.WithToolkits[*MyContext](mcpToolkits...))
 	}
 
 	if options.Temperature != nil {
@@ -116,6 +123,51 @@ func createAgent(model llmsdk.LanguageModel, modelInfo *ModelInfo, options *Agen
 	}
 
 	return llmagent.NewAgent("MyAgent", model, opts...)
+}
+
+func createMcpToolkits(servers []llmmcp.MCPParams) []llmagent.Toolkit[*MyContext] {
+	if len(servers) == 0 {
+		return nil
+	}
+
+	toolkits := make([]llmagent.Toolkit[*MyContext], 0, len(servers))
+
+	for _, server := range servers {
+		if httpParams, ok := server.StreamableHTTPParams(); ok {
+			url := strings.TrimSpace(httpParams.URL)
+			if url == "" {
+				continue
+			}
+			authorization := strings.TrimSpace(httpParams.Authorization)
+			params := llmmcp.NewMCPStreamableHTTPParams(url, authorization)
+			toolkit := llmmcp.NewMCPToolkit(llmmcp.StaticMCPInit[*MyContext](params))
+			toolkits = append(toolkits, toolkit)
+			continue
+		}
+
+		if stdioParams, ok := server.StdioParams(); ok {
+			command := strings.TrimSpace(stdioParams.Command)
+			if command == "" {
+				continue
+			}
+			args := make([]string, 0, len(stdioParams.Args))
+			for _, arg := range stdioParams.Args {
+				trimmed := strings.TrimSpace(arg)
+				if trimmed != "" {
+					args = append(args, trimmed)
+				}
+			}
+			params := llmmcp.NewMCPStdioParams(command, args)
+			toolkit := llmmcp.NewMCPToolkit(llmmcp.StaticMCPInit[*MyContext](params))
+			toolkits = append(toolkits, toolkit)
+		}
+	}
+
+	if len(toolkits) == 0 {
+		return nil
+	}
+
+	return toolkits
 }
 
 func ptr[T any](v T) *T {

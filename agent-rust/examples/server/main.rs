@@ -11,7 +11,7 @@ use context::MyContext;
 use dotenvy::dotenv;
 use futures::{stream::Stream, StreamExt};
 use get_model::{get_model, get_model_list, ModelInfo};
-use llm_agent::{AgentRequest, BoxedError};
+use llm_agent::{mcp::MCPParams, AgentRequest, BoxedError};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Duration};
 use tower_http::cors::{Any, CorsLayer};
@@ -30,6 +30,7 @@ struct RunStreamBody {
     model_id: String,
     input: AgentRequest<MyContext>,
     enabled_tools: Option<Vec<String>>,
+    mcp_servers: Option<Vec<MCPParams>>,
     disabled_instructions: Option<bool>,
     temperature: Option<f64>,
     top_p: Option<f64>,
@@ -79,14 +80,28 @@ async fn run_stream_handler(
     )
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let RunStreamBody {
+        input,
+        enabled_tools,
+        mcp_servers,
+        disabled_instructions,
+        temperature,
+        top_p,
+        top_k,
+        frequency_penalty,
+        presence_penalty,
+        ..
+    } = body;
+
     let options = AgentOptions {
-        enabled_tools: body.enabled_tools,
-        disabled_instructions: body.disabled_instructions.unwrap_or(false),
-        temperature: body.temperature,
-        top_p: body.top_p,
-        top_k: body.top_k,
-        frequency_penalty: body.frequency_penalty,
-        presence_penalty: body.presence_penalty,
+        enabled_tools,
+        mcp_servers,
+        disabled_instructions: disabled_instructions.unwrap_or(false),
+        temperature,
+        top_p,
+        top_k,
+        frequency_penalty,
+        presence_penalty,
         audio: model_info.audio.clone(),
         reasoning: model_info.reasoning.clone(),
         modalities: model_info.modalities.clone(),
@@ -96,7 +111,7 @@ async fn run_stream_handler(
 
     // Create a stream that handles the agent run
     let stream = stream! {
-        match agent.run_stream(body.input).await {
+        match agent.run_stream(input).await {
             Ok(mut agent_stream) => {
                 while let Some(event_result) = agent_stream.next().await {
                     match event_result {
@@ -188,8 +203,8 @@ async fn main() -> Result<(), BoxedError> {
         .layer(
             CorsLayer::new()
                 .allow_origin(["http://localhost:4321".parse().unwrap()])
-                .allow_methods(Any)
-                .allow_headers(Any)
+                .allow_methods(["GET", "POST", "OPTIONS"].map(|m| m.parse().unwrap()))
+                .allow_headers(["content-type", "authorization"].map(|h| h.parse().unwrap()))
                 .allow_credentials(true),
         )
         .with_state(state);

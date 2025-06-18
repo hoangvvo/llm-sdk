@@ -17,7 +17,12 @@ import type {
 import { stream as eventStream } from "fetch-event-stream";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelSelection } from "../components/sidebar.tsx";
-import type { AgentBehaviorSettings, ApiKeys, LoggedEvent } from "../types.ts";
+import type {
+  AgentBehaviorSettings,
+  ApiKeys,
+  LoggedEvent,
+  McpServerConfig,
+} from "../types.ts";
 import { createId } from "./utils.ts";
 
 interface UseAgentConfig<Context> {
@@ -26,6 +31,7 @@ interface UseAgentConfig<Context> {
   providerApiKeys: ApiKeys;
   userContext: Context;
   enabledTools: string[];
+  mcpServers: McpServerConfig[];
   disabledInstructions: boolean;
   agentBehavior: AgentBehaviorSettings;
   toolsInitialized: boolean;
@@ -84,6 +90,7 @@ export function useAgent<Context>(
     providerApiKeys,
     userContext,
     enabledTools,
+    mcpServers,
     disabledInstructions,
     agentBehavior,
     toolsInitialized,
@@ -168,6 +175,7 @@ export function useAgent<Context>(
             context: userContext,
           } satisfies AgentRequest<Context>,
           enabled_tools: toolsInitialized ? enabledTools : undefined,
+          mcp_servers: prepareMcpServerPayload(mcpServers),
           disabled_instructions: disabledInstructions,
           temperature: agentBehavior.temperature,
           top_p: agentBehavior.top_p,
@@ -360,6 +368,46 @@ export function useAgent<Context>(
       streamingParts,
     ],
   );
+}
+
+function prepareMcpServerPayload(
+  servers: McpServerConfig[],
+): McpServerConfig[] | undefined {
+  if (servers.length === 0) {
+    return undefined;
+  }
+
+  const sanitized: McpServerConfig[] = [];
+
+  for (const server of servers) {
+    if (server.type === "streamable-http") {
+      const url = server.url.trim();
+      if (!url) {
+        continue;
+      }
+      const authorization = server.authorization?.trim();
+      if (authorization) {
+        sanitized.push({ type: "streamable-http", url, authorization });
+      } else {
+        sanitized.push({ type: "streamable-http", url });
+      }
+    } else {
+      const command = server.command.trim();
+      if (!command) {
+        continue;
+      }
+      const args = server.args
+        ?.map((arg) => arg.trim())
+        .filter((arg) => arg.length > 0);
+      if (args && args.length > 0) {
+        sanitized.push({ type: "stdio", command, args });
+      } else {
+        sanitized.push({ type: "stdio", command });
+      }
+    }
+  }
+
+  return sanitized.length > 0 ? sanitized : undefined;
 }
 
 /* eslint-disable @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unnecessary-type-assertion */

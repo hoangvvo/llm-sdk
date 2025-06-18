@@ -30,7 +30,7 @@ async function runStreamHandler(
 
     const model = getModel(provider, model_id, modelInfo.metadata, apiKey);
 
-    const { enabled_tools, ...params } = json;
+    const { enabled_tools, mcp_servers, ...params } = json;
 
     const enabledToolsParam = Array.isArray(enabled_tools)
       ? Array.from(
@@ -42,8 +42,13 @@ async function runStreamHandler(
         )
       : undefined;
 
+    const mcpServersParam = Array.isArray(mcp_servers)
+      ? mcp_servers
+      : undefined;
+
     agent = createAgent(model, modelInfo, {
       enabledTools: enabledToolsParam,
+      mcpServers: mcpServersParam,
       ...params,
     });
   } catch (err) {

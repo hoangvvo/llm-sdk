@@ -11,6 +11,7 @@ import (
 	"slices"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	llmmcp "github.com/hoangvvo/llm-sdk/agent-go/mcp"
 )
 
 type RunStreamBody struct {
@@ -18,6 +19,7 @@ type RunStreamBody struct {
 	ModelID              string                            `json:"model_id"`
 	Input                llmagent.AgentRequest[*MyContext] `json:"input"`
 	EnabledTools         []string                          `json:"enabled_tools,omitempty"`
+	MCPServers           []llmmcp.MCPParams                `json:"mcp_servers,omitempty"`
 	DisabledInstructions bool                              `json:"disabled_instructions,omitempty"`
 	Temperature          *float64                          `json:"temperature,omitempty"`
 	TopP                 *float64                          `json:"top_p,omitempty"`
@@ -64,12 +66,13 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 	model := getModel(req.Provider, req.ModelID, modelInfo.Metadata, apiKey)
 
 	var enabledTools []string
-	if len(req.EnabledTools) > 0 {
+	if req.EnabledTools != nil {
 		enabledTools = slices.Compact(req.EnabledTools)
 	}
 
 	options := &AgentOptions{
 		EnabledTools:         enabledTools,
+		MCPServers:           req.MCPServers,
 		DisabledInstructions: req.DisabledInstructions,
 		Temperature:          req.Temperature,
 		TopP:                 req.TopP,

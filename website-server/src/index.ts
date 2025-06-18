@@ -57,7 +57,7 @@ async function handleRunStream(request: Request): Promise<Response> {
 
     const model = getModel(provider, model_id, modelInfo.metadata, apiKey);
 
-    const { enabled_tools, ...params } = json;
+    const { enabled_tools, mcp_servers, ...params } = json;
 
     const enabledToolsParam = Array.isArray(enabled_tools)
       ? Array.from(
@@ -70,8 +70,13 @@ async function handleRunStream(request: Request): Promise<Response> {
         )
       : undefined;
 
+    const mcpServersParam = Array.isArray(mcp_servers)
+      ? mcp_servers
+      : undefined;
+
     agent = createAgent(model, modelInfo, {
       enabledTools: enabledToolsParam,
+      mcpServers: mcpServersParam,
       ...params,
     });
   } catch (err: unknown) {
@@ -132,8 +137,8 @@ async function handleRunStream(request: Request): Promise<Response> {
 
 export default {
   async fetch(request, env): Promise<Response> {
-    // @ts-expect-error: shimming process.env
     globalThis.process = {
+      // @ts-expect-error: shimming process.env
       env: env,
     };
 

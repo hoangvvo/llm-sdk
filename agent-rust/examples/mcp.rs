@@ -36,7 +36,8 @@ use std::{
 use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle, time::sleep};
 
 // This example demonstrates:
-// 1. Launching a minimal streamable HTTP MCP server using the official Rust SDK.
+// 1. Launching a minimal streamable HTTP MCP server using the official Rust
+//    SDK.
 // 2. Registering that server through the MCP toolkit primitive.
 // 3. Having the agent call the remote tool during a conversation.
 
@@ -74,7 +75,8 @@ async fn run_agent_demo() -> Result<(), BoxedError> {
     let agent = Agent::<SessionContext>::builder("Sage", model)
         .add_instruction("You are Sage, the shuttle concierge for the Transit Hub.")
         .add_instruction(
-            "Lean on connected transit systems before guessing, and tailor advice to the rider's shift.",
+            "Lean on connected transit systems before guessing, and tailor advice to the rider's \
+             shift.",
         )
         .add_instruction(|context: &SessionContext| {
             Ok(format!(
@@ -82,8 +84,9 @@ async fn run_agent_demo() -> Result<(), BoxedError> {
                 context.rider_name
             ))
         })
-        // The MCP toolkit primitive resolves transport params per session. Here we pull the rider-specific
-        // authorization token from context so each agent session connects with the correct credentials.
+        // The MCP toolkit primitive resolves transport params per session. Here we pull the
+        // rider-specific authorization token from context so each agent session connects
+        // with the correct credentials.
         .add_toolkit(MCPToolkit::new(|context: &SessionContext| {
             Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
                 url: SERVER_URL.to_string(),

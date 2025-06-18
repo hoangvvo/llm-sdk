@@ -20,6 +20,7 @@ import { base64ToArrayBuffer } from "./lib/utils.ts";
 import type {
   AgentBehaviorSettings,
   ApiKeys,
+  McpServerConfig,
   ModelInfo,
   MyContext,
   ToolInfo,
@@ -39,6 +40,7 @@ const STORAGE_KEY_CONTEXT = "console-user-context";
 const STORAGE_KEY_ENABLED_TOOLS = "console-enabled-tools";
 const STORAGE_KEY_DISABLED_INSTRUCTIONS = "console-disabled-instructions";
 const STORAGE_KEY_AGENT_BEHAVIOR = "console-agent-behavior";
+const STORAGE_KEY_MCP_SERVERS = "console-mcp-servers";
 
 type SessionPhase =
   | "idle"
@@ -118,6 +120,10 @@ export function RealtimeApp() {
     (() => ({})) as () => MyContext,
   );
   const [toolsInitialized, setToolsInitialized] = useState(false);
+  const [mcpServers, setMcpServers] = useLocalStorageState<McpServerConfig[]>(
+    STORAGE_KEY_MCP_SERVERS,
+    () => [],
+  );
 
   const hasExampleServerOptions = EXAMPLE_SERVER_URL_OPTIONS.length > 0;
   const [apiBaseUrl, setApiBaseUrl] = useLocalStorageState<string>(
@@ -312,6 +318,13 @@ export function RealtimeApp() {
     [toolOptions],
   );
 
+  const handleMcpServersChange = useCallback(
+    (next: McpServerConfig[]) => {
+      setMcpServers(next);
+    },
+    [setMcpServers],
+  );
+
   const { add16BitPCM, interruptPlayback, isPlaying } = useAudio();
 
   const {
@@ -329,6 +342,7 @@ export function RealtimeApp() {
       providerApiKeys,
       userContext,
       enabledTools,
+      mcpServers,
       disabledInstructions,
       agentBehavior,
       toolsInitialized,
@@ -579,6 +593,8 @@ export function RealtimeApp() {
         enabledTools={enabledTools}
         onEnabledToolsChange={handleEnabledToolsChange}
         toolErrorMessage={toolsError}
+        mcpServers={mcpServers}
+        onMcpServersChange={handleMcpServersChange}
         disabledInstructions={disabledInstructions}
         onDisabledInstructionsChange={setDisabledInstructions}
         toolsInitialized={toolsInitialized}

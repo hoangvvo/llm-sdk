@@ -40,6 +40,18 @@ export interface ToolInfo {
   description?: string;
 }
 
+export type McpServerConfig =
+  | {
+      type: "streamable-http";
+      url: string;
+      authorization?: string;
+    }
+  | {
+      type: "stdio";
+      command: string;
+      args?: string[];
+    };
+
 export interface AgentBehaviorSettings {
   temperature?: number;
   top_p?: number;

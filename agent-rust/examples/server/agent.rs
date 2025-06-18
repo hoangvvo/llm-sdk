@@ -1,5 +1,8 @@
 use chrono::Utc;
-use llm_agent::{Agent, AgentTool};
+use llm_agent::{
+    mcp::{MCPInit, MCPParams, MCPToolkit},
+    Agent, AgentTool,
+};
 use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions};
 use std::sync::Arc;
 
@@ -18,6 +21,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AgentOptions {
     pub enabled_tools: Option<Vec<String>>,
+    pub mcp_servers: Option<Vec<MCPParams>>,
     pub disabled_instructions: bool,
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
@@ -181,5 +185,52 @@ pub fn create_agent(
         builder = builder.modalities(modalities.clone());
     }
 
+    if let Some(mcp_servers) = &options.mcp_servers {
+        for params in mcp_servers.iter().cloned() {
+            if let Some(toolkit) = create_mcp_toolkit(params) {
+                builder = builder.add_toolkit(toolkit);
+            }
+        }
+    }
+
     builder.build()
+}
+
+fn create_mcp_toolkit(params: MCPParams) -> Option<MCPToolkit<MyContext>> {
+    match params {
+        MCPParams::StreamableHttp(mut http) => {
+            let url = http.url.trim().to_string();
+            if url.is_empty() {
+                return None;
+            }
+            http.url = url;
+            if let Some(auth) = http.authorization.take() {
+                let trimmed = auth.trim();
+                if !trimmed.is_empty() {
+                    http.authorization = Some(trimmed.to_string());
+                }
+            }
+
+            Some(MCPToolkit::new(MCPInit::from_params(
+                MCPParams::StreamableHttp(http),
+            )))
+        }
+        MCPParams::Stdio(mut stdio) => {
+            let command = stdio.command.trim().to_string();
+            if command.is_empty() {
+                return None;
+            }
+            stdio.command = command;
+            stdio.args = stdio
+                .args
+                .into_iter()
+                .map(|arg| arg.trim().to_string())
+                .filter(|arg| !arg.is_empty())
+                .collect();
+
+            Some(MCPToolkit::new(MCPInit::from_params(MCPParams::Stdio(
+                stdio,
+            ))))
+        }
+    }
 }

@@ -21,8 +21,10 @@ use rmcp::{
     },
 };
 use serde_json::Value;
-use std::io::{Error as IoError, ErrorKind};
-use std::sync::{Arc, OnceLock, RwLock, Weak};
+use std::{
+    io::{Error as IoError, ErrorKind},
+    sync::{Arc, OnceLock, RwLock, Weak},
+};
 use tokio::process::Command;
 
 type MCPRunningService<TCtx> = RunningService<RoleClient, MCPToolkitState<TCtx>>;
@@ -213,7 +215,8 @@ where
     }
 }
 
-// Remove "Bearer " or "bearer " prefix if present because the rmcp library already adds it.
+// Remove "Bearer " or "bearer " prefix if present because the rmcp library
+// already adds it.
 fn strip_bearer_prefix(token: &str) -> String {
     let trimmed = token.trim();
     if let Some(rest) = trimmed.strip_prefix("Bearer ") {

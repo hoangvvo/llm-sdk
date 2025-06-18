@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   AgentBehaviorSettings,
   ApiKeys,
+  McpServerConfig,
   MyContext,
   ToolInfo,
 } from "../types";
@@ -36,6 +37,8 @@ interface SidebarProps {
   enabledTools: string[];
   onEnabledToolsChange: (tools: string[]) => void;
   toolErrorMessage?: string | null;
+  mcpServers: McpServerConfig[];
+  onMcpServersChange: (servers: McpServerConfig[]) => void;
   disabledInstructions: boolean;
   onDisabledInstructionsChange: (value: boolean) => void;
   toolsInitialized: boolean;
@@ -59,6 +62,8 @@ export function Sidebar({
   enabledTools,
   onEnabledToolsChange,
   toolErrorMessage,
+  mcpServers,
+  onMcpServersChange,
   disabledInstructions,
   onDisabledInstructionsChange,
   toolsInitialized,
@@ -86,6 +91,7 @@ export function Sidebar({
           errorMessage={toolErrorMessage}
           initialized={toolsInitialized}
         />
+        <McpServerSection servers={mcpServers} onChange={onMcpServersChange} />
         <AgentBehaviorSection
           behavior={behavior}
           onChange={onBehaviorChange}
@@ -496,6 +502,218 @@ function ToolSection({
             (initialized ? "No tools available." : "Loading tools…")}
         </p>
       )}
+    </div>
+  );
+}
+
+interface McpServerSectionProps {
+  servers: McpServerConfig[];
+  onChange: (servers: McpServerConfig[]) => void;
+}
+
+function McpServerSection({ servers, onChange }: McpServerSectionProps) {
+  const updateServer = (
+    index: number,
+    updater: (current: McpServerConfig) => McpServerConfig,
+  ) => {
+    onChange(
+      servers.map((server, currentIndex) =>
+        currentIndex === index ? updater(server) : server,
+      ),
+    );
+  };
+
+  const handleAddServer = () => {
+    onChange([
+      ...servers,
+      { type: "streamable-http", url: "", authorization: "" },
+    ]);
+  };
+
+  const handleRemoveServer = (index: number) => {
+    onChange(servers.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const handleTypeChange = (index: number, type: McpServerConfig["type"]) => {
+    updateServer(index, (server) => {
+      if (type === server.type) {
+        return server;
+      }
+      if (type === "streamable-http") {
+        return { type: "streamable-http", url: "", authorization: "" };
+      }
+      return { type: "stdio", command: "", args: [] };
+    });
+  };
+
+  const handleStreamableHttpChange = (
+    index: number,
+    field: "url" | "authorization",
+    value: string,
+  ) => {
+    updateServer(index, (server) => {
+      if (server.type !== "streamable-http") {
+        return server;
+      }
+      if (field === "url") {
+        return { ...server, url: value };
+      }
+      return { ...server, authorization: value };
+    });
+  };
+
+  const handleStdioCommandChange = (index: number, value: string) => {
+    updateServer(index, (server) => {
+      if (server.type !== "stdio") {
+        return server;
+      }
+      return { ...server, command: value };
+    });
+  };
+
+  const handleStdioArgsChange = (index: number, value: string) => {
+    const parts = value
+      .split(/\s+/)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+    updateServer(index, (server) => {
+      if (server.type !== "stdio") {
+        return server;
+      }
+      return { ...server, args: parts };
+    });
+  };
+
+  return (
+    <div className="console-surface space-y-3">
+      <h2 className="console-section-title">MCP Servers</h2>
+      <p className="text-xs text-slate-500">
+        Connect Model Context Protocol servers to access additional tools.
+      </p>
+      {servers.length > 0 ? (
+        <div className="space-y-3">
+          {servers.map((server, index) => {
+            const headerLabel = `Server ${String(index + 1)}`;
+            return (
+              <div
+                key={`mcp-server-${String(index)}`}
+                className="console-surface p-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="console-microcaps text-slate-500">
+                    {headerLabel}
+                  </span>
+                  <button
+                    type="button"
+                    className="console-button console-button-quiet"
+                    onClick={() => {
+                      handleRemoveServer(index);
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <label className="console-label mt-3 block">
+                  Connection type
+                  <select
+                    className="console-field mt-2 w-full"
+                    value={server.type}
+                    onChange={(event) => {
+                      handleTypeChange(
+                        index,
+                        event.target.value as McpServerConfig["type"],
+                      );
+                    }}
+                  >
+                    <option value="streamable-http">Streamable HTTP</option>
+                    <option value="stdio">Stdio</option>
+                  </select>
+                </label>
+                {server.type === "streamable-http" ? (
+                  <div className="mt-3 space-y-3">
+                    <label className="console-label">
+                      Server URL
+                      <input
+                        type="text"
+                        className="console-field mt-2 w-full"
+                        placeholder="e.g. https://example.com/mcp"
+                        value={server.url}
+                        onChange={(event) => {
+                          handleStreamableHttpChange(
+                            index,
+                            "url",
+                            event.currentTarget.value,
+                          );
+                        }}
+                      />
+                    </label>
+                    <label className="console-label">
+                      Authorization header (optional)
+                      <input
+                        type="text"
+                        className="console-field mt-2 w-full"
+                        placeholder="Bearer token or other header value"
+                        value={server.authorization ?? ""}
+                        onChange={(event) => {
+                          handleStreamableHttpChange(
+                            index,
+                            "authorization",
+                            event.currentTarget.value,
+                          );
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    <label className="console-label">
+                      Command
+                      <input
+                        type="text"
+                        className="console-field mt-2 w-full"
+                        placeholder="Executable for the MCP server"
+                        value={server.command}
+                        onChange={(event) => {
+                          handleStdioCommandChange(
+                            index,
+                            event.currentTarget.value,
+                          );
+                        }}
+                      />
+                    </label>
+                    <label className="console-label">
+                      Arguments (optional)
+                      <input
+                        type="text"
+                        className="console-field mt-2 w-full"
+                        placeholder="Space-separated arguments"
+                        value={(server.args ?? []).join(" ")}
+                        onChange={(event) => {
+                          handleStdioArgsChange(
+                            index,
+                            event.currentTarget.value,
+                          );
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-slate-500">
+          No MCP servers configured. Add one to expose remote tools.
+        </p>
+      )}
+      <button
+        type="button"
+        className="console-button"
+        onClick={handleAddServer}
+      >
+        Add MCP Server
+      </button>
     </div>
   );
 }
