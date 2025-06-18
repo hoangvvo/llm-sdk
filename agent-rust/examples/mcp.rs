@@ -1,4 +1,3 @@
-use anyhow::{Context, Result};
 use axum::{
     extract::Request,
     http::{header, HeaderMap, Method, StatusCode},
@@ -10,7 +9,7 @@ use axum::{
 use dotenvy::dotenv;
 use llm_agent::{
     mcp::{MCPParams, MCPStreamableHTTPParams, MCPToolkit},
-    Agent, AgentItem, AgentRequest,
+    Agent, AgentItem, AgentRequest, BoxedError,
 };
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -28,7 +27,12 @@ use rmcp::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use std::{env, sync::Arc, time::Duration};
+use std::{
+    env,
+    io::{Error as IoError, ErrorKind},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle, time::sleep};
 
 // This example demonstrates:
@@ -47,7 +51,7 @@ struct SessionContext {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), BoxedError> {
     dotenv().ok();
 
     let server = start_stub_mcp_server().await?;
@@ -56,9 +60,8 @@ async fn main() -> Result<()> {
     run_result
 }
 
-async fn run_agent_demo() -> Result<()> {
-    let api_key =
-        env::var("OPENAI_API_KEY").context("OPENAI_API_KEY environment variable must be set")?;
+async fn run_agent_demo() -> Result<(), BoxedError> {
+    let api_key = env::var("OPENAI_API_KEY").map_err(|_| missing_env("OPENAI_API_KEY"))?;
 
     let model = Arc::new(OpenAIModel::new(
         "gpt-4o-mini",
@@ -99,7 +102,10 @@ async fn run_agent_demo() -> Result<()> {
         )]))],
     };
 
-    let response = agent.run(request).await?;
+    let response = agent
+        .run(request)
+        .await
+        .map_err(|err| Box::new(err) as BoxedError)?;
 
     println!("=== Agent Response ===");
     let reply = response.text();
@@ -112,7 +118,7 @@ async fn run_agent_demo() -> Result<()> {
     Ok(())
 }
 
-async fn start_stub_mcp_server() -> Result<ServerGuard> {
+async fn start_stub_mcp_server() -> Result<ServerGuard, BoxedError> {
     let session_manager = Arc::new(LocalSessionManager::default());
     let service: StreamableHttpService<ShuttleServer, _> = StreamableHttpService::new(
         || Ok(ShuttleServer::default()),
@@ -125,7 +131,9 @@ async fn start_stub_mcp_server() -> Result<ServerGuard> {
         .fallback_service(service)
         .layer(middleware::from_fn(authenticate));
 
-    let listener = TcpListener::bind(SERVER_ADDR).await?;
+    let listener = TcpListener::bind(SERVER_ADDR)
+        .await
+        .map_err(|err| Box::new(err) as BoxedError)?;
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     let handle = tokio::spawn(async move {
@@ -247,14 +255,21 @@ struct ServerGuard {
 }
 
 impl ServerGuard {
-    async fn shutdown(self) -> Result<()> {
+    async fn shutdown(self) -> Result<(), BoxedError> {
         if let Some(tx) = self.shutdown {
             let _ = tx.send(());
         }
 
         match self.handle.await {
             Ok(()) => Ok(()),
-            Err(err) => Err(err.into()),
+            Err(err) => Err(Box::new(err) as BoxedError),
         }
     }
+}
+
+fn missing_env(var: &str) -> BoxedError {
+    Box::new(IoError::new(
+        ErrorKind::NotFound,
+        format!("{var} environment variable must be set"),
+    ))
 }

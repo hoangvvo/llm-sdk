@@ -140,6 +140,6 @@ target/
 
 **/examples/**/*.{png,jpg,jpeg,gif,pcm,wav,mp3}
 
-.gocache
+.gocache*/
 
 secret.md

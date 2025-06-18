@@ -22,7 +22,7 @@ pub fn map_mime_type_to_audio_format(mime_type: &str) -> LanguageModelResult<Aud
         .to_lowercase();
     Ok(match formatted_mime_type.as_str() {
         "audio/wav" => AudioFormat::Wav,
-        "audio/mp3" => AudioFormat::Mp3,
+        "audio/mp3" | "audio/mpeg" => AudioFormat::Mp3,
         "audio/l16" => AudioFormat::Linear16,
         "audio/flac" => AudioFormat::Flac,
         "audio/basic" => AudioFormat::Mulaw, // Default to Mulaw for "audio/basic"

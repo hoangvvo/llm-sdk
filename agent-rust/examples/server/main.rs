@@ -1,5 +1,4 @@
 use agent::{create_agent, AgentOptions};
-use anyhow::Result;
 use async_stream::stream;
 use axum::{
     extract::State,
@@ -12,7 +11,7 @@ use context::MyContext;
 use dotenvy::dotenv;
 use futures::{stream::Stream, StreamExt};
 use get_model::{get_model, get_model_list, ModelInfo};
-use llm_agent::AgentRequest;
+use llm_agent::{AgentRequest, BoxedError};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Duration};
 use tower_http::cors::{Any, CorsLayer};
@@ -157,7 +156,7 @@ async fn home_handler() -> &'static str {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), BoxedError> {
     // Load environment variables
     dotenv().ok();
 
@@ -197,11 +196,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Start server
     let port = env::var("PORT").unwrap_or_else(|_| "4000".to_string());
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
+        .await
+        .map_err(|err| Box::new(err) as BoxedError)?;
 
     println!("Server listening on http://localhost:{port}");
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .await
+        .map_err(|err| Box::new(err) as BoxedError)?;
 
     Ok(())
 }

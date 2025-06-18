@@ -7,12 +7,11 @@ use crate::{
     toolkit::{Toolkit, ToolkitSession},
     RunState,
 };
-use anyhow::anyhow;
 use async_trait::async_trait;
 use llm_sdk;
 use rmcp::{
     handler::client::ClientHandler,
-    model::{CallToolRequestParam, Tool},
+    model::{CallToolRequestParam, CallToolResult, Tool},
     service::{serve_client, NotificationContext, RoleClient, RunningService},
     transport::{
         child_process::TokioChildProcess,
@@ -22,8 +21,11 @@ use rmcp::{
     },
 };
 use serde_json::Value;
-use std::sync::{Arc, Mutex};
+use std::io::{Error as IoError, ErrorKind};
+use std::sync::{Arc, OnceLock, RwLock, Weak};
 use tokio::process::Command;
+
+type MCPRunningService<TCtx> = RunningService<RoleClient, MCPToolkitState<TCtx>>;
 
 /// Toolkit implementation backed by the Model Context Protocol.
 pub struct MCPToolkit<TCtx>
@@ -62,8 +64,8 @@ struct MCPToolkitSession<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
-    service: Arc<RunningService<RoleClient, MCPClientHandler<TCtx>>>,
-    cache: Arc<ToolCache<TCtx>>,
+    service: Arc<MCPRunningService<TCtx>>,
+    state: MCPToolkitState<TCtx>,
 }
 
 impl<TCtx> MCPToolkitSession<TCtx>
@@ -71,10 +73,8 @@ where
     TCtx: Send + Sync + 'static,
 {
     async fn new(params: MCPParams) -> Result<Self, BoxedError> {
-        let cache = Arc::new(ToolCache::new());
-        let handler = MCPClientHandler {
-            cache: cache.clone(),
-        };
+        let state = MCPToolkitState::new();
+        let handler = state.clone();
 
         let service = match params {
             MCPParams::Stdio(MCPStdioParams { command, args }) => {
@@ -93,14 +93,11 @@ where
             }
         };
 
-        let service_arc = Arc::new(service);
-        cache.install_service(service_arc.clone());
-        cache.refresh_with_service(&service_arc).await?;
+        let service = Arc::new(service);
+        state.register_service(&service);
+        state.refresh_with(&service).await?;
 
-        Ok(Self {
-            service: service_arc,
-            cache,
-        })
+        Ok(Self { service, state })
     }
 }
 
@@ -114,7 +111,7 @@ where
     }
 
     fn tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
-        self.cache.tools()
+        self.state.tools()
     }
 
     async fn close(self: Box<Self>) -> Result<(), BoxedError> {
@@ -130,37 +127,11 @@ where
     }
 }
 
-struct MCPClientHandler<TCtx>
-where
-    TCtx: Send + Sync + 'static,
-{
-    cache: Arc<ToolCache<TCtx>>,
-}
-
-impl<TCtx> ClientHandler for MCPClientHandler<TCtx>
-where
-    TCtx: Send + Sync + 'static,
-{
-    fn on_tool_list_changed(
-        &self,
-        _context: NotificationContext<RoleClient>,
-    ) -> impl std::future::Future<Output = ()> + Send + '_ {
-        let cache = self.cache.clone();
-        async move {
-            if let Err(err) = cache.refresh().await {
-                cache.record_error(err);
-            } else {
-                cache.clear_error();
-            }
-        }
-    }
-}
-
 struct MCPRemoteTool<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
-    service: Arc<RunningService<RoleClient, MCPClientHandler<TCtx>>>,
+    service: Weak<MCPRunningService<TCtx>>,
     name: String,
     description: String,
     parameters: llm_sdk::JSONSchema,
@@ -170,12 +141,13 @@ impl<TCtx> MCPRemoteTool<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
-    fn new(service: Arc<RunningService<RoleClient, MCPClientHandler<TCtx>>>, tool: Tool) -> Self {
-        let parameters = Value::Object((*tool.input_schema).clone());
-        let description = tool.description.map(|d| d.to_string()).unwrap_or_default();
+    fn new(service: &Arc<MCPRunningService<TCtx>>, tool: Tool) -> Self {
+        let parameters =
+            Value::Object(Arc::try_unwrap(tool.input_schema).unwrap_or_else(|arc| (*arc).clone()));
+        let description = tool.description.map(|d| d.into_owned()).unwrap_or_default();
         Self {
-            service,
-            name: tool.name.to_string(),
+            service: Arc::downgrade(service),
+            name: tool.name.into_owned(),
             description,
             parameters,
         }
@@ -209,9 +181,8 @@ where
             Value::Null => None,
             Value::Object(map) => Some(map),
             other => {
-                return Err(
-                    anyhow!("MCP tool arguments must be an object, received {other}").into(),
-                )
+                let message = format!("MCP tool arguments must be an object, received {other}");
+                return Err(Box::new(IoError::new(ErrorKind::InvalidInput, message)));
             }
         };
 
@@ -220,14 +191,23 @@ where
             arguments,
         };
 
-        let result = self
-            .service
+        let Some(service) = self.service.upgrade() else {
+            return Err(Box::new(IoError::new(
+                ErrorKind::NotConnected,
+                "MCP service not initialised",
+            )));
+        };
+        let result = service
             .call_tool(request)
             .await
             .map_err(|err| Box::new(err) as BoxedError)?;
 
-        let content = convert_mcp_content(&result.content)?;
-        let is_error = result.is_error.unwrap_or(false);
+        let CallToolResult {
+            content, is_error, ..
+        } = result;
+
+        let content = convert_mcp_content(content)?;
+        let is_error = is_error.unwrap_or(false);
 
         Ok(AgentToolResult { content, is_error })
     }
@@ -245,91 +225,107 @@ fn strip_bearer_prefix(token: &str) -> String {
     }
 }
 
-struct ToolCache<TCtx>
+struct MCPToolkitState<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
-    service: Mutex<Option<Arc<RunningService<RoleClient, MCPClientHandler<TCtx>>>>>,
-    state: Mutex<ToolCacheState<TCtx>>,
+    service: Arc<OnceLock<Weak<MCPRunningService<TCtx>>>>,
+    tools: Arc<RwLock<Result<Vec<Arc<dyn AgentTool<TCtx>>>, String>>>,
 }
 
-struct ToolCacheState<TCtx>
+impl<TCtx> Clone for MCPToolkitState<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
-    tools: Vec<Arc<dyn AgentTool<TCtx>>>,
-    error: Option<String>,
+    fn clone(&self) -> Self {
+        Self {
+            service: Arc::clone(&self.service),
+            tools: Arc::clone(&self.tools),
+        }
+    }
 }
 
-impl<TCtx> ToolCache<TCtx>
+impl<TCtx> MCPToolkitState<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
     fn new() -> Self {
         Self {
-            service: Mutex::new(None),
-            state: Mutex::new(ToolCacheState {
-                tools: Vec::new(),
-                error: None,
-            }),
+            service: Arc::new(OnceLock::new()),
+            tools: Arc::new(RwLock::new(Ok(Vec::new()))),
         }
     }
 
-    fn install_service(&self, service: Arc<RunningService<RoleClient, MCPClientHandler<TCtx>>>) {
-        *self.service.lock().expect("service mutex poisoned") = Some(service);
+    fn register_service(&self, service: &Arc<MCPRunningService<TCtx>>) {
+        let _ = self.service.set(Arc::downgrade(service));
     }
 
     async fn refresh(&self) -> Result<(), BoxedError> {
-        let service = {
-            let guard = self.service.lock().expect("service mutex poisoned");
-            guard.clone()
-        }
-        .ok_or_else(|| anyhow!("MCP service not initialised"))?;
-
-        self.refresh_with_service(&service).await
+        let service = self.service()?;
+        self.refresh_with(&service).await
     }
 
-    async fn refresh_with_service(
-        &self,
-        service: &Arc<RunningService<RoleClient, MCPClientHandler<TCtx>>>,
-    ) -> Result<(), BoxedError> {
+    async fn refresh_with(&self, service: &Arc<MCPRunningService<TCtx>>) -> Result<(), BoxedError> {
         let specs = service
             .peer()
             .list_all_tools()
             .await
             .map_err(|err| Box::new(err) as BoxedError)?;
+
         let mut new_tools: Vec<Arc<dyn AgentTool<TCtx>>> = Vec::with_capacity(specs.len());
         for spec in specs {
-            let remote = MCPRemoteTool::new(service.clone(), spec);
+            let remote = MCPRemoteTool::new(service, spec);
             new_tools.push(Arc::new(remote));
         }
 
-        let mut state = self.state.lock().expect("tool cache lock poisoned");
-        state.tools = new_tools;
-        state.error = None;
+        let mut guard = self.tools.write().expect("tool registry lock poisoned");
+        *guard = Ok(new_tools);
         Ok(())
     }
 
     fn tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
-        let state = self.state.lock().expect("tool cache lock poisoned");
-        if let Some(message) = state.error.as_ref() {
-            panic!("mcp tool discovery failed: {message}");
+        let guard = self.tools.read().expect("tool registry lock poisoned");
+        match guard.as_ref() {
+            Ok(tools) => tools.clone(),
+            Err(message) => panic!("mcp tool discovery failed: {message}"),
         }
-        state.tools.clone()
     }
 
     fn record_error<E>(&self, err: E)
     where
         E: std::fmt::Display,
     {
-        if let Ok(mut state) = self.state.lock() {
-            state.error = Some(err.to_string());
+        if let Ok(mut guard) = self.tools.write() {
+            *guard = Err(err.to_string());
         }
     }
 
-    fn clear_error(&self) {
-        if let Ok(mut state) = self.state.lock() {
-            state.error = None;
+    fn service(&self) -> Result<Arc<MCPRunningService<TCtx>>, BoxedError> {
+        self.service
+            .get()
+            .and_then(Weak::upgrade)
+            .ok_or_else(|| -> BoxedError {
+                Box::new(IoError::new(
+                    ErrorKind::NotConnected,
+                    "MCP service not initialised",
+                ))
+            })
+    }
+}
+
+impl<TCtx> ClientHandler for MCPToolkitState<TCtx>
+where
+    TCtx: Send + Sync + 'static,
+{
+    fn on_tool_list_changed(
+        &self,
+        _context: NotificationContext<RoleClient>,
+    ) -> impl std::future::Future<Output = ()> + Send + '_ {
+        let state = self.clone();
+        async move {
+            if let Err(err) = state.refresh().await {
+                state.record_error(err);
+            }
         }
     }
 }

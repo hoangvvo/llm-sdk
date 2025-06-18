@@ -27,17 +27,21 @@ pedantic = "warn"
 use_self = "warn"
 
 [dependencies]
-anyhow = "1.0.95"
 async-stream = "0.3.6"
 async-trait = "0.1.86"
+base64 = "0.22.1"
 futures = "0.3.31"
 llm-sdk = { version = "0.1.0", path = "../sdk-rust" }
-rmcp = { version = "0.7.0", features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest", "transport-streamable-http-server"] }
+rmcp = { version = "0.7.0", features = [
+  "client",
+  "transport-child-process",
+  "transport-streamable-http-client-reqwest",
+  "transport-streamable-http-server",
+] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.134"
 thiserror = "2.0.11"
 tokio = { version = "1.42.0", features = ["macros", "rt", "process"] }
-base64 = "0.22.1"
 
 [dev-dependencies]
 axum = "0.8.1"
