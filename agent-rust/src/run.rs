@@ -1,5 +1,6 @@
 use crate::{
     instruction,
+    opentelemetry::{start_tool_span, trace_agent_run, trace_agent_stream, AgentSpanMethod},
     toolkit::ToolkitSession,
     types::{AgentItemTool, AgentStream, AgentStreamEvent},
     AgentError, AgentItem, AgentParams, AgentResponse, AgentStreamItemEvent, AgentTool,
@@ -106,10 +107,16 @@ where
                     })?;
 
                 let input_args = args.clone();
-                let tool_res = agent_tool
-                    .execute(args, &context, run_state)
-                    .await
-                    .map_err(AgentError::ToolExecution)?;
+                let tool_name_value = agent_tool.name();
+                let tool_description = agent_tool.description();
+                let tool_res = start_tool_span(
+                    &tool_call_id,
+                    &tool_name_value,
+                    &tool_description,
+                    agent_tool.execute(args, &context, run_state),
+                )
+                .await
+                .map_err(AgentError::ToolExecution)?;
 
                 let item = AgentItemTool {
                     tool_call_id,
@@ -131,35 +138,39 @@ where
     /// Run a non-streaming execution of the agent.
     pub async fn run(&self, request: RunSessionRequest) -> Result<AgentResponse, AgentError> {
         let RunSessionRequest { input } = request;
-        let state = RunState::new(input, self.params.max_turns);
 
-        loop {
-            let (input, tools) = self.get_turn_params(&state).await?;
-            let model_response = self.params.model.generate(input).await?;
-            let content = model_response.content.clone();
+        trace_agent_run(&self.params.name, AgentSpanMethod::Run, async move {
+            let state = RunState::new(input, self.params.max_turns);
 
-            state.append_model_response(model_response).await;
+            loop {
+                let (input, tools) = self.get_turn_params(&state).await?;
+                let model_response = self.params.model.generate(input).await?;
+                let content = model_response.content.clone();
 
-            let mut process_stream = self.process(&state, content, tools).await;
+                state.append_model_response(model_response).await;
 
-            while let Some(event) = process_stream.next().await {
-                let event = event?;
-                match event {
-                    ProcessEvents::Item(items) => {
-                        state.append_item(items).await;
-                    }
-                    ProcessEvents::Response(final_content) => {
-                        return Ok(state.create_response(final_content).await);
-                    }
-                    ProcessEvents::Next => {
-                        /* continue the loop */
-                        break;
+                let mut process_stream = self.process(&state, content, tools).await;
+
+                while let Some(event) = process_stream.next().await {
+                    let event = event?;
+                    match event {
+                        ProcessEvents::Item(items) => {
+                            state.append_item(items).await;
+                        }
+                        ProcessEvents::Response(final_content) => {
+                            return Ok(state.create_response(final_content).await);
+                        }
+                        ProcessEvents::Next => {
+                            /* continue the loop */
+                            break;
+                        }
                     }
                 }
-            }
 
-            state.turn().await?;
-        }
+                state.turn().await?;
+            }
+        })
+        .await
     }
 
     /// Run a streaming execution of the agent.
@@ -173,6 +184,7 @@ where
             system_prompt: self.system_prompt.clone(),
             toolkit_sessions: self.toolkit_sessions.clone(),
         });
+
         let stream = async_stream::try_stream! {
             loop {
                 let (input, tools) = session.get_turn_params(&state).await?;
@@ -196,20 +208,17 @@ where
                 let content = model_response.content.clone();
 
                 let (item, index) = state.append_model_response(model_response).await;
-                yield AgentStreamEvent::Item(
-                    AgentStreamItemEvent { item, index }
-                );
+                yield AgentStreamEvent::Item(AgentStreamItemEvent { item, index });
 
                 let mut process_stream = session.process(&state, content, tools).await;
 
                 while let Some(event) = process_stream.next().await {
                     let event = event?;
+
                     match event {
                         ProcessEvents::Item(item) => {
                             let index = state.append_item(item.clone()).await;
-                            yield AgentStreamEvent::Item(
-                                AgentStreamItemEvent { item, index }
-                            );
+                            yield AgentStreamEvent::Item(AgentStreamItemEvent { item, index });
                         }
                         ProcessEvents::Response(final_content) => {
                             let response = state.create_response(final_content).await;
@@ -226,7 +235,7 @@ where
             }
         };
 
-        Ok(AgentStream::from_stream(stream))
+        Ok(trace_agent_stream(&self.params.name, stream))
     }
 
     pub async fn close(self) -> Result<(), AgentError> {
@@ -311,7 +320,6 @@ where
         Ok((input, tools))
     }
 }
-
 /// RunSessionRequest contains the input items used for a run.
 pub struct RunSessionRequest {
     /// Input holds the items for this run, such as LLM messages.

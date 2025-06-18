@@ -12,7 +12,7 @@ import (
 )
 
 // Initialize the tracer lazily to allow user to have a chance to configure the global tracer provider
-var tracer = otel.Tracer("github.com/hoangvvo/llm-agent")
+var tracer = otel.Tracer("github.com/hoangvvo/llm-sdk/agent-go")
 
 // AgentSpan manages the span for an agent run
 type AgentSpan struct {

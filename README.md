@@ -5,14 +5,14 @@
 - **LLM SDK** – cross-language clients (JavaScript, Rust, Go) that talk to multiple LLM providers through one `LanguageModel` interface.
 - **LLM Agent** – a minimal, transparent agent runtime that orchestrates models, tools, and structured output using the SDK under the hood.
 
-| Package     | Language              | Version                                                                                                                                       | Link                                                              |
-| ----------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `llm-sdk`   | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-sdk?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-sdk)           | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-js)    |
-| `llm-sdk`   | Rust                  |                                                                                                                                               | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-rust)  |
-| `llm-sdk`   | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/sdk-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/sdk-go)     | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-go)    |
-| `llm-agent` | JavaScript/TypeScript |                                                                                                                                               | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-agent) |
-| `llm-agent` | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-agent?style=flat-square)](https://crates.io/crates/llm-agent)                               | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-agent) |
-| `llm-agent` | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/agent-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-agent) |
+| Package     | Language              | Version                                                                                                                                       | Link                                                               |
+| ----------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `llm-sdk`   | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-sdk?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-sdk)           | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-js)     |
+| `llm-sdk`   | Rust                  |                                                                                                                                               | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-rust)   |
+| `llm-sdk`   | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/sdk-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/sdk-go)     | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-go)     |
+| `llm-agent` | JavaScript/TypeScript |                                                                                                                                               | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/agent-js)   |
+| `llm-agent` | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-agent?style=flat-square)](https://crates.io/crates/llm-agent)                               | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/agent-rust) |
+| `llm-agent` | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/agent-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/agent-go)   |
 
 The accompanying [Console app](./website) demonstrates the libraries end-to-end.
 

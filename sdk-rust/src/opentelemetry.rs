@@ -2,22 +2,18 @@ use crate::{
     LanguageModelInput, LanguageModelResult, LanguageModelStream, ModelResponse, ModelUsage,
     PartialModelResponse,
 };
-use opentelemetry::{
-    global::{self, BoxedSpan, BoxedTracer},
-    trace::{Span, Status, Tracer},
-    Context, KeyValue,
-};
-use serde::Serialize;
-use std::{sync::LazyLock, time::SystemTime};
+use futures::StreamExt;
+use opentelemetry::trace::Status;
+use std::time::Instant;
+use tracing::{info_span, Span};
+use tracing_futures::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-#[derive(Serialize)]
-pub struct LMSpan {
-    provider: String,
-    model_id: String,
+pub struct LmSpan {
+    span: Span,
     usage: Option<ModelUsage>,
     cost: Option<f64>,
-    start_time: SystemTime,
-    /// Time to first token, in seconds
+    start_time: Instant,
     time_to_first_token: Option<f64>,
     max_tokens: Option<u32>,
     temperature: Option<f64>,
@@ -26,45 +22,44 @@ pub struct LMSpan {
     presence_penalty: Option<f64>,
     frequency_penalty: Option<f64>,
     seed: Option<i64>,
-
-    #[serde(skip)]
-    span: BoxedSpan,
 }
 
-static TRACER: LazyLock<BoxedTracer> = LazyLock::new(|| global::tracer("llm-sdk-rs"));
+impl LmSpan {
+    pub fn new(provider: &str, model_id: &str, method: &str, input: &LanguageModelInput) -> Self {
+        let span = match method {
+            "stream" => info_span!("llm_sdk.stream"),
+            _ => info_span!("llm_sdk.generate"),
+        };
+        span.set_attribute("gen_ai.operation.name", "generate_content");
+        span.set_attribute("gen_ai.provider.name", provider.to_string());
+        span.set_attribute("gen_ai.request.model", model_id.to_string());
+        span.set_attribute("llm_sdk.method", method.to_string());
 
-impl LMSpan {
-    pub fn new(
-        provider: &str,
-        model_id: &str,
-        method: &str,
-        input: &LanguageModelInput,
-    ) -> (Context, Self) {
-        let span = TRACER
-            .span_builder(format!("llm_sdk.{method}"))
-            .start(&*TRACER);
+        Self {
+            span,
+            usage: None,
+            cost: None,
+            start_time: Instant::now(),
+            time_to_first_token: None,
+            max_tokens: input.max_tokens,
+            temperature: input.temperature,
+            top_p: input.top_p,
+            top_k: input.top_k,
+            presence_penalty: input.presence_penalty,
+            frequency_penalty: input.frequency_penalty,
+            seed: input.seed,
+        }
+    }
 
-        let cx = Context::current();
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
 
-        (
-            cx,
-            Self {
-                provider: provider.to_string(),
-                model_id: model_id.to_string(),
-                usage: None,
-                cost: None,
-                start_time: SystemTime::now(),
-                time_to_first_token: None,
-                max_tokens: input.max_tokens,
-                temperature: input.temperature,
-                top_p: input.top_p,
-                top_k: input.top_k,
-                presence_penalty: input.presence_penalty,
-                frequency_penalty: input.frequency_penalty,
-                seed: input.seed,
-                span,
-            },
-        )
+    pub async fn instrument_future<F>(&self, future: F) -> F::Output
+    where
+        F: std::future::Future,
+    {
+        future.instrument(self.span()).await
     }
 
     pub fn on_response(&mut self, response: &ModelResponse) {
@@ -78,139 +73,80 @@ impl LMSpan {
 
     pub fn on_stream_partial(&mut self, partial: &PartialModelResponse) {
         if let Some(usage) = &partial.usage {
-            self.usage.get_or_insert_with(Default::default).add(usage);
+            self.usage
+                .get_or_insert_with(ModelUsage::default)
+                .add(usage);
         }
         if let Some(cost) = partial.cost {
             *self.cost.get_or_insert(0.0) += cost;
         }
         if partial.delta.is_some() && self.time_to_first_token.is_none() {
-            self.time_to_first_token = Some(
-                self.start_time
-                    .elapsed()
-                    .map(|d| d.as_secs_f64())
-                    .unwrap_or(0.0),
-            );
+            self.time_to_first_token = Some(self.elapsed_seconds());
         }
     }
 
-    pub fn on_error(&mut self, error: &dyn std::error::Error) {
-        self.span.record_error(error);
+    pub fn on_error(&mut self, error: &(dyn std::error::Error + 'static)) {
+        self.span
+            .set_attribute("exception.message", error.to_string());
         self.span.set_status(Status::error(error.to_string()));
     }
 
     pub fn on_end(&mut self) {
-        // https://opentelemetry.io/docs/specs/semconv/gen-ai/
-        self.span.set_attributes(vec![
-            KeyValue::new("gen_ai.operation.name", "generate_content"),
-            KeyValue::new("gen_ai.provider.name", self.provider.clone()),
-            KeyValue::new("gen_ai.request.model", self.model_id.clone()),
-        ]);
         if let Some(usage) = &self.usage {
-            self.span.set_attribute(KeyValue::new(
-                "gen_ai.usage.input_tokens",
-                i64::from(usage.input_tokens),
-            ));
-            self.span.set_attribute(KeyValue::new(
-                "gen_ai.usage.output_tokens",
-                i64::from(usage.output_tokens),
-            ));
+            self.span
+                .set_attribute("gen_ai.usage.input_tokens", i64::from(usage.input_tokens));
+            self.span
+                .set_attribute("gen_ai.usage.output_tokens", i64::from(usage.output_tokens));
         }
+
         if let Some(cost) = self.cost {
-            self.span.set_attribute(KeyValue::new("llm_sdk.cost", cost));
+            self.span.set_attribute("llm_sdk.cost", cost);
         }
+
         if let Some(time_to_first_token) = self.time_to_first_token {
-            self.span.set_attribute(KeyValue::new(
-                "gen_ai.server.time_to_first_token",
-                time_to_first_token,
-            ));
+            self.span
+                .set_attribute("gen_ai.server.time_to_first_token", time_to_first_token);
         }
+
         if let Some(max_tokens) = self.max_tokens {
-            self.span.set_attribute(KeyValue::new(
-                "gen_ai.request.max_tokens",
-                i64::from(max_tokens),
-            ));
+            self.span
+                .set_attribute("gen_ai.request.max_tokens", i64::from(max_tokens));
         }
         if let Some(temperature) = self.temperature {
             self.span
-                .set_attribute(KeyValue::new("gen_ai.request.temperature", temperature));
+                .set_attribute("gen_ai.request.temperature", temperature);
         }
         if let Some(top_p) = self.top_p {
-            self.span
-                .set_attribute(KeyValue::new("gen_ai.request.top_p", top_p));
+            self.span.set_attribute("gen_ai.request.top_p", top_p);
         }
         if let Some(top_k) = self.top_k {
             self.span
-                .set_attribute(KeyValue::new("gen_ai.request.top_k", i64::from(top_k)));
+                .set_attribute("gen_ai.request.top_k", i64::from(top_k));
         }
         if let Some(presence_penalty) = self.presence_penalty {
-            self.span.set_attribute(KeyValue::new(
-                "gen_ai.request.presence_penalty",
-                presence_penalty,
-            ));
+            self.span
+                .set_attribute("gen_ai.request.presence_penalty", presence_penalty);
         }
         if let Some(frequency_penalty) = self.frequency_penalty {
-            self.span.set_attribute(KeyValue::new(
-                "gen_ai.request.frequency_penalty",
-                frequency_penalty,
-            ));
+            self.span
+                .set_attribute("gen_ai.request.frequency_penalty", frequency_penalty);
         }
         if let Some(seed) = self.seed {
-            self.span
-                .set_attribute(KeyValue::new("gen_ai.request.seed", seed));
+            self.span.set_attribute("gen_ai.request.seed", seed);
         }
-        self.span.end();
+    }
+
+    fn elapsed_seconds(&self) -> f64 {
+        self.start_time.elapsed().as_secs_f64()
     }
 }
 
-/// Wrapper for streams to add tracing
-pub struct TracedStream {
-    inner: LanguageModelStream,
-    span: Option<LMSpan>,
-}
-
-impl TracedStream {
-    pub fn new(inner: LanguageModelStream, span: LMSpan) -> Self {
-        Self {
-            inner,
-            span: Some(span),
-        }
+impl Drop for LmSpan {
+    fn drop(&mut self) {
+        self.on_end();
     }
 }
 
-impl futures::Stream for TracedStream {
-    type Item = LanguageModelResult<PartialModelResponse>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        let poll_result = std::pin::Pin::new(&mut self.inner).poll_next(cx);
-
-        match &poll_result {
-            std::task::Poll::Ready(Some(Ok(partial))) => {
-                if let Some(ref mut span) = self.span {
-                    span.on_stream_partial(partial);
-                }
-            }
-            std::task::Poll::Ready(Some(Err(error))) => {
-                if let Some(ref mut span) = self.span {
-                    span.on_error(error);
-                }
-            }
-            std::task::Poll::Ready(None) => {
-                // Stream ended, finish the span
-                if let Some(mut span) = self.span.take() {
-                    span.on_end();
-                }
-            }
-            _ => {}
-        }
-
-        poll_result
-    }
-}
-
-/// Helper function to wrap generate calls with tracing
 pub async fn trace_generate<F, Fut>(
     provider: &str,
     model_id: &str,
@@ -221,9 +157,8 @@ where
     F: FnOnce(LanguageModelInput) -> Fut,
     Fut: std::future::Future<Output = LanguageModelResult<ModelResponse>>,
 {
-    let (_ctx, mut span) = LMSpan::new(provider, model_id, "generate", &input);
-
-    let result = f(input).await;
+    let mut span = LmSpan::new(provider, model_id, "generate", &input);
+    let result = span.instrument_future(f(input)).await;
 
     match &result {
         Ok(response) => span.on_response(response),
@@ -234,7 +169,6 @@ where
     result
 }
 
-/// Helper function to wrap stream calls with tracing
 pub async fn trace_stream<F, Fut>(
     provider: &str,
     model_id: &str,
@@ -245,17 +179,34 @@ where
     F: FnOnce(LanguageModelInput) -> Fut,
     Fut: std::future::Future<Output = LanguageModelResult<LanguageModelStream>>,
 {
-    let (_ctx, span) = LMSpan::new(provider, model_id, "stream", &input);
-
-    let stream_result = f(input).await;
+    let mut span = LmSpan::new(provider, model_id, "stream", &input);
+    let stream_result = span.instrument_future(f(input)).await;
 
     match stream_result {
-        Ok(stream) => {
-            let traced_stream = TracedStream::new(stream, span);
-            Ok(LanguageModelStream::from_stream(traced_stream))
+        Ok(mut stream) => {
+            let span_handle = span.span();
+            let streaming_span = span;
+            let instrumented = async_stream::try_stream! {
+                let mut span_state = streaming_span;
+
+                while let Some(item) = stream.next().await {
+                    match item {
+                        Ok(partial) => {
+                            span_state.on_stream_partial(&partial);
+                            yield partial;
+                        }
+                        Err(err) => {
+                            span_state.on_error(&err);
+                            Err(err)?;
+                        }
+                    }
+                }
+            }
+            .instrument(span_handle);
+
+            Ok(LanguageModelStream::from_stream(instrumented))
         }
         Err(error) => {
-            let mut span = span;
             span.on_error(&error);
             span.on_end();
             Err(error)

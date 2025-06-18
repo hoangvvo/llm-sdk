@@ -32,6 +32,7 @@ async-trait = "0.1.86"
 base64 = "0.22.1"
 futures = "0.3.31"
 llm-sdk = { version = "0.1.0", path = "../sdk-rust" }
+opentelemetry = "0.30"
 rmcp = { version = "0.7.0", features = [
   "client",
   "transport-child-process",
@@ -42,11 +43,20 @@ serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.134"
 thiserror = "2.0.11"
 tokio = { version = "1.42.0", features = ["macros", "rt", "process"] }
+tracing = "0.1"
+tracing-futures = { version = "0.2", features = ["std", "futures-03"] }
+tracing-opentelemetry = "0.31"
 
 [dev-dependencies]
 axum = "0.8.1"
 chrono = "0.4"
 dotenvy = { version = "0.15.7" }
+opentelemetry-otlp = { version = "0.30", features = [
+  "http-proto",
+  "trace",
+  "reqwest-client",
+] }
+opentelemetry_sdk = { version = "0.30", features = ["rt-tokio", "trace"] }
 rand = { version = "0.8" }
 reqwest = { version = "0.12.9", features = ["json"] }
 schemars = "1.0.4"
@@ -54,4 +64,5 @@ similar = "2"
 tokio = { version = "1.42.0", features = ["full"] }
 tower = "0.5.1"
 tower-http = { version = "0.6.2", features = ["cors"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 urlencoding = "2.1.3"

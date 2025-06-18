@@ -60,6 +60,7 @@ export default defineConfig({
             { slug: "agent/memory" },
             { slug: "agent/artifacts" },
             { slug: "agent/planner-executor" },
+            { slug: "agent/tracing" },
             { slug: "agent/testing" },
           ],
         },
