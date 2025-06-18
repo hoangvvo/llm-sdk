@@ -115,7 +115,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.ts)
 
 ```bash
-node --env-file=../.env examples/generate-text.ts
+node examples/generate-text.ts
 ```
 
 ## Migration

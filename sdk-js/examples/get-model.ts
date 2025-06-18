@@ -4,7 +4,23 @@ import { CohereModel } from "@hoangvvo/llm-sdk/cohere";
 import { GoogleModel } from "@hoangvvo/llm-sdk/google";
 import { MistralModel } from "@hoangvvo/llm-sdk/mistral";
 import { OpenAIChatModel, OpenAIModel } from "@hoangvvo/llm-sdk/openai";
-import assert from "node:assert";
+
+function assert(
+  condition: unknown,
+  msg = "Assertion failed",
+): asserts condition {
+  if (!condition) {
+    throw new Error(msg);
+  }
+}
+
+try {
+  const dotenv = await import("dotenv");
+  const path = await import("path");
+  dotenv.config({ path: path.join(import.meta.dirname, "../../.env") });
+} catch {
+  // Do nothing
+}
 
 export function getModel(provider: string, modelId: string): LanguageModel {
   switch (provider) {

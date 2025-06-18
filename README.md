@@ -91,6 +91,8 @@ Also check out some popular agent implementations, including:
 - [Artifacts (Canvas)](https://llm-sdk.hoangvvo.com/agent/artifacts)
 - [Planner–Executor](https://llm-sdk.hoangvvo.com/agent/planner-executor)
 
+**Note**: To run examples, create an `.env` file in the root folder (folder containing this README) with your API keys.
+
 ## Agent Patterns
 
 This agent **library** (not _framework_) is designed for transparency and control.

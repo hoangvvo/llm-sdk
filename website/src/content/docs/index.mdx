@@ -2,9 +2,22 @@
 title: llm-sdk
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 import imageConsoleChat from "../../../assets/console-chat.png";
 
+<CardGrid>
+  <LinkCard
+    title="Get started with Agent"
+    description="Learn how to build agentic AI applications using llm-agent."
+    href="/agent"
+  />
+  <LinkCard
+    title="Get started with SDK"
+    description="Use various LLM providers with a unified interface using llm-sdk."
+    href="/sdk"
+  />
+</CardGrid>
 
 `llm-sdk` is a suite of libraries to interact with various Large Language Model (LLM) providers through a unified API and build agentic AI applications.
 

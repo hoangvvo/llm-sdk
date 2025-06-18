@@ -155,7 +155,7 @@ agent := llmagent.NewAgent[*SessionContext](
 ## Tool lifecycle
 
 - At session start the toolkit calls `list_tools` and subscribes to `tool_list_changed`, so updates published by the server flow back automatically.
-- Each remote definition becomes an `AgentTool`, letting the agent runtime evaluate tool selection and error handling exactly the same way it does for local tools.
+- Each remote definition becomes an [`AgentTool`](../tools), letting the agent runtime evaluate tool selection and error handling exactly the same way it does for local tools.
 - Tool responses are converted into SDK parts (text, image, audio) before being appended to the transcript.
 
 ## Example: Streamable HTTP server

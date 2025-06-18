@@ -78,6 +78,7 @@ export default defineConfig({
         },
       ],
       plugins: [ion()],
+      customCss: ["./src/styles/custom.css"],
     }),
     react(),
     mermaid({

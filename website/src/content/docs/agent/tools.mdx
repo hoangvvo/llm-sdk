@@ -17,7 +17,7 @@ Tools let the model delegate work to your code. Each definition bundles a `name`
 Use descriptive verbs for names (`search_docs`, `create_ticket`) and write the description as if you were coaching the model. Parameters should only include data the model can realistically supply. If you need to resolve identifiers or fetch additional state, do so inside `execute` where you still have access to the run session `context` and the full `RunState` history.
 
 <Aside type="danger">
-  Avoid exposing immutable data as tool parameters. If a parameter controls access (for example, `current_user_id` or `account_id`), a malicious prompt or jailbreak might coerce the model into supplying a forged value. Instead, keep those values in the context object and read them inside `execute` so the model can never override them.
+  Avoid exposing immutable data as tool parameters. For example, if a parameter determines access (`current_user_id` or `account_id`), a malicious prompt or jailbreak might coerce the model into supplying a forged value. Instead, keep those values in the context object and read them inside `execute` so the model can never override them.
 </Aside>
 
 <Tabs>
