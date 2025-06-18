@@ -11,6 +11,7 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/tracing"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
@@ -78,156 +79,127 @@ func (m *OpenAIModel) Metadata() *llmsdk.LanguageModelMetadata {
 
 // Generate implements synchronous generation
 func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
-	spanCtx, span := llmsdk.NewLMSpan(ctx, Provider, m.modelID, "generate", input)
-	ctx = spanCtx
-
-	var err error
-	defer func() {
+	return tracing.TraceGenerate(ctx, Provider, m.modelID, input, func(ctx context.Context) (*llmsdk.ModelResponse, error) {
+		params, err := convertToResponseCreateParams(input, m.modelID)
 		if err != nil {
-			span.OnError(err)
+			return nil, err
 		}
-		span.OnEnd()
-	}()
 
-	params, err := convertToResponseCreateParams(input, m.modelID)
-	if err != nil {
-		return nil, err
-	}
+		params.Stream = ptr.To(false)
 
-	params.Stream = ptr.To(false)
+		response, err := clientutils.DoJSON[openaiapi.Response](ctx, m.client, clientutils.JSONRequestConfig{
+			URL:  fmt.Sprintf("%s/responses", m.baseURL),
+			Body: params,
+			Headers: map[string]string{
+				"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	response, err := clientutils.DoJSON[openaiapi.Response](ctx, m.client, clientutils.JSONRequestConfig{
-		URL:  fmt.Sprintf("%s/responses", m.baseURL),
-		Body: params,
-		Headers: map[string]string{
-			"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
-		},
+		content, err := mapOpenAIOutputItems(response.Output)
+		if err != nil {
+			return nil, err
+		}
+
+		var usage *llmsdk.ModelUsage
+		if response.Usage != nil {
+			usage = mapOpenAIUsage(*response.Usage)
+		}
+
+		result := &llmsdk.ModelResponse{
+			Content: content,
+			Usage:   usage,
+		}
+
+		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
+			cost := usage.CalculateCost(m.metadata.Pricing)
+			result.Cost = &cost
+		}
+
+		return result, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := mapOpenAIOutputItems(response.Output)
-	if err != nil {
-		return nil, err
-	}
-
-	var usage *llmsdk.ModelUsage
-	if response.Usage != nil {
-		usage = mapOpenAIUsage(*response.Usage)
-	}
-
-	result := &llmsdk.ModelResponse{
-		Content: content,
-		Usage:   usage,
-	}
-
-	if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-		cost := usage.CalculateCost(m.metadata.Pricing)
-		result.Cost = &cost
-	}
-
-	span.OnResponse(result)
-	return result, nil
 }
 
 // Stream implements streaming generation
 func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.LanguageModelStream, error) {
-	params, err := convertToResponseCreateParams(input, m.modelID)
-	if err != nil {
-		return nil, err
-	}
-	params.Stream = ptr.To(true)
+	return tracing.TraceStream(ctx, Provider, m.modelID, input, func(ctx context.Context) (*llmsdk.LanguageModelStream, error) {
+		params, err := convertToResponseCreateParams(input, m.modelID)
+		if err != nil {
+			return nil, err
+		}
+		params.Stream = ptr.To(true)
 
-	sseStream, err := clientutils.DoSSE[openaiapi.ResponseStreamEvent](ctx, m.client, clientutils.SSERequestConfig{
-		URL:  fmt.Sprintf("%s/responses", m.baseURL),
-		Body: params,
-		Headers: map[string]string{
-			"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
+		sseStream, err := clientutils.DoSSE[openaiapi.ResponseStreamEvent](ctx, m.client, clientutils.SSERequestConfig{
+			URL:  fmt.Sprintf("%s/responses", m.baseURL),
+			Body: params,
+			Headers: map[string]string{
+				"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	responseCh := make(chan *llmsdk.PartialModelResponse)
-	errCh := make(chan error, 1)
+		responseCh := make(chan *llmsdk.PartialModelResponse)
+		errCh := make(chan error, 1)
 
-	go func() {
-		defer close(responseCh)
-		defer close(errCh)
-		defer sseStream.Close()
+		go func() {
+			defer close(responseCh)
+			defer close(errCh)
+			defer sseStream.Close()
 
-		spanCtx, span := llmsdk.NewLMSpan(ctx, Provider, m.modelID, "stream", input)
-		ctx = spanCtx
+			refusal := ""
 
-		var err error
-		defer func() {
-			if err != nil {
-				span.OnError(err)
-			}
-			span.OnEnd()
-		}()
+			for sseStream.Next() {
+				streamEvent, err := sseStream.Current()
+				if err != nil {
+					errCh <- fmt.Errorf("failed to get sse event: %w", err)
+					return
+				}
+				if streamEvent == nil {
+					continue
+				}
 
-		refusal := ""
+				if streamEvent.ResponseRefusalDeltaEvent != nil {
+					refusal += streamEvent.ResponseRefusalDeltaEvent.Delta
+				}
 
-		for sseStream.Next() {
-			var streamEvent *openaiapi.ResponseStreamEvent
-			streamEvent, err = sseStream.Current()
-			if err != nil {
-				errCh <- fmt.Errorf("failed to get sse event: %w", err)
-				return
-			}
-			if streamEvent == nil {
-				continue
-			}
+				partDelta, err := mapOpenAIStreamEvent(*streamEvent)
+				if err != nil {
+					errCh <- fmt.Errorf("failed to map stream event: %w", err)
+					return
+				}
 
-			// Handle refusal accumulation
-			if streamEvent.ResponseRefusalDeltaEvent != nil {
-				refusal += streamEvent.ResponseRefusalDeltaEvent.Delta
-			}
+				if partDelta != nil {
+					responseCh <- &llmsdk.PartialModelResponse{Delta: partDelta}
+				}
 
-			// Map stream event to content delta
-			var partDelta *llmsdk.ContentDelta
-			partDelta, err = mapOpenAIStreamEvent(*streamEvent)
-			if err != nil {
-				errCh <- fmt.Errorf("failed to map stream event: %w", err)
-				return
-			}
-
-			if partDelta != nil {
-				partial := &llmsdk.PartialModelResponse{Delta: partDelta}
-				span.OnStreamPartial(partial)
-				responseCh <- partial
-			}
-
-			// Handle completion event for usage
-			if streamEvent.ResponseCompletedEvent != nil {
-				if streamEvent.ResponseCompletedEvent.Response.Usage != nil {
-					usage := mapOpenAIUsage(*streamEvent.ResponseCompletedEvent.Response.Usage)
-					partial := &llmsdk.PartialModelResponse{Usage: usage}
-					if m.metadata != nil && m.metadata.Pricing != nil {
-						partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
+				if streamEvent.ResponseCompletedEvent != nil {
+					if streamEvent.ResponseCompletedEvent.Response.Usage != nil {
+						usage := mapOpenAIUsage(*streamEvent.ResponseCompletedEvent.Response.Usage)
+						partial := &llmsdk.PartialModelResponse{Usage: usage}
+						if m.metadata != nil && m.metadata.Pricing != nil {
+							partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
+						}
+						responseCh <- partial
 					}
-					span.OnStreamPartial(partial)
-					responseCh <- partial
 				}
 			}
-		}
 
-		if err = sseStream.Err(); err != nil {
-			errCh <- fmt.Errorf("scanner error: %w", err)
-			return
-		}
+			if err := sseStream.Err(); err != nil {
+				errCh <- fmt.Errorf("scanner error: %w", err)
+				return
+			}
 
-		// Check for refusal error
-		if refusal != "" {
-			err = llmsdk.NewRefusalError(refusal)
-			errCh <- err
-		}
-	}()
+			if refusal != "" {
+				errCh <- llmsdk.NewRefusalError(refusal)
+			}
+		}()
 
-	return stream.New(responseCh, errCh), nil
+		return stream.New(responseCh, errCh), nil
+	})
 }
 
 // MARK: - Convert To OpenAI API Types

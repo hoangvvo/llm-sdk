@@ -169,54 +169,44 @@ func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*Ag
 		return nil, NewInvariantError("run session not initialized")
 	}
 
-	span, ctx := NewAgentSpan(ctx, s.params.Name, "run")
-	var err error
-	defer func() {
-		if err != nil {
-			span.OnError(err)
-		}
-		span.OnEnd()
-	}()
+	return traceRun(ctx, s.params.Name, "run", func(ctx context.Context) (*AgentResponse, error) {
+		state := NewRunState(request.Input, s.params.MaxTurns)
 
-	state := NewRunState(request.Input, s.params.MaxTurns)
-
-	for {
-		input, tools := s.getTurnParams(state)
-		var modelResponse *llmsdk.ModelResponse
-		modelResponse, err = s.params.Model.Generate(ctx, input)
-		if err != nil {
-			err = NewLanguageModelError(err)
-			return nil, err
-		}
-
-		content := modelResponse.Content
-
-		state.AppendModelResponse(*modelResponse)
-
-		processStream := s.process(ctx, state, content, tools)
-		for processStream.Next() {
-			event := processStream.Current()
-			if event.Response != nil {
-				response := state.CreateResponse(*event.Response)
-				span.OnResponse(response)
-				return response, nil
+		for {
+			input, tools := s.getTurnParams(state)
+			modelResponse, err := s.params.Model.Generate(ctx, input)
+			if err != nil {
+				return nil, NewLanguageModelError(err)
 			}
-			if event.Item != nil {
-				state.AppendItem(*event.Item)
+
+			content := modelResponse.Content
+
+			state.AppendModelResponse(*modelResponse)
+
+			processStream := s.process(ctx, state, content, tools)
+			for processStream.Next() {
+				event := processStream.Current()
+				if event.Response != nil {
+					response := state.CreateResponse(*event.Response)
+					return response, nil
+				}
+				if event.Item != nil {
+					state.AppendItem(*event.Item)
+				}
+				if event.Next != nil {
+					// continue to next iteration
+					break
+				}
 			}
-			if event.Next != nil {
-				// continue to next iteration
-				break
+			if err := processStream.Err(); err != nil {
+				return nil, err
+			}
+
+			if err := state.Turn(); err != nil {
+				return nil, err
 			}
 		}
-		if err = processStream.Err(); err != nil {
-			return nil, err
-		}
-
-		if err = state.Turn(); err != nil {
-			return nil, err
-		}
-	}
+	})
 }
 
 // RunStream runs a streaming execution of the agent.
@@ -225,103 +215,86 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 		return nil, NewInvariantError("run session not initialized")
 	}
 
-	span, ctx := NewAgentSpan(ctx, s.params.Name, "run_stream")
+	return traceRunStream(ctx, s.params.Name, "run_stream", func(ctx context.Context) (*AgentStream, error) {
+		state := NewRunState(request.Input, s.params.MaxTurns)
 
-	state := NewRunState(request.Input, s.params.MaxTurns)
+		eventChan := make(chan *AgentStreamEvent)
+		errChan := make(chan error, 1)
 
-	eventChan := make(chan *AgentStreamEvent)
-	errChan := make(chan error, 1)
+		go func() {
+			defer close(eventChan)
+			defer close(errChan)
 
-	go func() {
-		var err error
-		defer close(eventChan)
-		defer close(errChan)
-		defer func() {
-			if err != nil {
-				span.OnError(err)
-			}
-			span.OnEnd()
-		}()
+			for {
+				input, tools := s.getTurnParams(state)
 
-		for {
-			input, tools := s.getTurnParams(state)
+				modelStream, err := s.params.Model.Stream(ctx, input)
+				if err != nil {
+					errChan <- NewLanguageModelError(err)
+					return
+				}
 
-			var modelStream *llmsdk.LanguageModelStream
-			modelStream, err = s.params.Model.Stream(ctx, input)
-			if err != nil {
-				err := NewLanguageModelError(err)
-				errChan <- err
-				return
-			}
+				accumulator := llmsdk.NewStreamAccumulator()
 
-			accumulator := llmsdk.NewStreamAccumulator()
+				for modelStream.Next() {
+					partial := modelStream.Current()
 
-			for modelStream.Next() {
-				partial := modelStream.Current()
+					if err := accumulator.AddPartial(*partial); err != nil {
+						errChan <- NewInvariantError(fmt.Sprintf("failed to accumulate stream: %v", err))
+						return
+					}
 
-				if err = accumulator.AddPartial(*partial); err != nil {
-					err = NewInvariantError(fmt.Sprintf("failed to accumulate stream: %v", err))
+					eventChan <- &AgentStreamEvent{Partial: partial}
+				}
+
+				if err := modelStream.Err(); err != nil {
+					errChan <- NewLanguageModelError(err)
+					return
+				}
+
+				modelResponse, err := accumulator.ComputeResponse()
+				if err != nil {
 					errChan <- err
 					return
 				}
 
-				eventChan <- &AgentStreamEvent{
-					Partial: partial,
-				}
-			}
+				content := modelResponse.Content
 
-			if err = modelStream.Err(); err != nil {
-				err := NewLanguageModelError(err)
-				errChan <- err
-				return
-			}
+				item, index := state.AppendModelResponse(modelResponse)
 
-			var modelResponse llmsdk.ModelResponse
-			modelResponse, err = accumulator.ComputeResponse()
-			if err != nil {
-				errChan <- err
-				return
-			}
+				eventChan <- NewAgentStreamItemEvent(index, item)
 
-			content := modelResponse.Content
-
-			item, index := state.AppendModelResponse(modelResponse)
-
-			eventChan <- NewAgentStreamItemEvent(index, item)
-
-			processStream := s.process(ctx, state, content, tools)
-			for processStream.Next() {
-				event := processStream.Current()
-				if event.Response != nil {
-					response := state.CreateResponse(*event.Response)
-					span.OnResponse(response)
-					eventChan <- &AgentStreamEvent{
-						Response: response,
+				processStream := s.process(ctx, state, content, tools)
+				for processStream.Next() {
+					event := processStream.Current()
+					if event.Response != nil {
+						response := state.CreateResponse(*event.Response)
+						eventChan <- &AgentStreamEvent{Response: response}
+						return
 					}
+					if event.Item != nil {
+						index := state.AppendItem(*event.Item)
+						eventChan <- NewAgentStreamItemEvent(index, *event.Item)
+					}
+					if event.Next != nil {
+						// continue to next iteration
+						break
+					}
+				}
+				if err := processStream.Err(); err != nil {
+					errChan <- err
 					return
 				}
-				if event.Item != nil {
-					index := state.AppendItem(*event.Item)
-					eventChan <- NewAgentStreamItemEvent(index, *event.Item)
-				}
-				if event.Next != nil {
-					// continue to next iteration
-					break
+
+				if err := state.Turn(); err != nil {
+					errChan <- err
+					return
 				}
 			}
-			if err = processStream.Err(); err != nil {
-				errChan <- err
-				return
-			}
+		}()
 
-			if err = state.Turn(); err != nil {
-				errChan <- err
-				return
-			}
-		}
-	}()
-
-	return stream.New(eventChan, errChan), nil
+		return stream.New(eventChan, errChan), nil
+	})
 }
 
 func (s *RunSession[C]) Close(ctx context.Context) error {

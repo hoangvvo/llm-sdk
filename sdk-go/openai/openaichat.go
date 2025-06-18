@@ -10,6 +10,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/tracing"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
@@ -67,169 +68,135 @@ func (m *OpenAIChatModel) Metadata() *llmsdk.LanguageModelMetadata {
 
 // Generate implements synchronous generation
 func (m *OpenAIChatModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
-	spanCtx, span := llmsdk.NewLMSpan(ctx, Provider, m.modelID, "generate", input)
-	ctx = spanCtx
-
-	var err error
-	defer func() {
+	return tracing.TraceGenerate(ctx, Provider, m.modelID, input, func(ctx context.Context) (*llmsdk.ModelResponse, error) {
+		params, err := convertToOpenAICreateParams(input, m.modelID)
 		if err != nil {
-			span.OnError(err)
+			return nil, err
 		}
-		span.OnEnd()
-	}()
 
-	params, err := convertToOpenAICreateParams(input, m.modelID)
-	if err != nil {
-		return nil, err
-	}
+		completion, err := clientutils.DoJSON[openaiapi.ChatCompletion](ctx, m.client, clientutils.JSONRequestConfig{
+			URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
+			Body: params,
+			Headers: map[string]string{
+				"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	completion, err := clientutils.DoJSON[openaiapi.ChatCompletion](ctx, m.client, clientutils.JSONRequestConfig{
-		URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
-		Body: params,
-		Headers: map[string]string{
-			"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
-		},
+		if len(completion.Choices) == 0 {
+			return nil, llmsdk.NewInvariantError(m.Provider(), "no choices in response")
+		}
+
+		choice := completion.Choices[0]
+		if choice.Message.Refusal != nil && *choice.Message.Refusal != "" {
+			return nil, fmt.Errorf("request was refused: %s", *choice.Message.Refusal)
+		}
+
+		content, err := m.mapOpenAIMessage(choice.Message, params)
+		if err != nil {
+			return nil, err
+		}
+
+		var usage *llmsdk.ModelUsage
+		if completion.Usage != nil {
+			usage = &llmsdk.ModelUsage{
+				InputTokens:  int(completion.Usage.PromptTokens),
+				OutputTokens: int(completion.Usage.CompletionTokens),
+			}
+		}
+
+		result := &llmsdk.ModelResponse{
+			Content: content,
+			Usage:   usage,
+		}
+		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
+			cost := usage.CalculateCost(m.metadata.Pricing)
+			result.Cost = &cost
+		}
+
+		return result, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(completion.Choices) == 0 {
-		err = llmsdk.NewInvariantError(m.Provider(), "no choices in response")
-		return nil, err
-	}
-
-	choice := completion.Choices[0]
-	if choice.Message.Refusal != nil && *choice.Message.Refusal != "" {
-		err = fmt.Errorf("request was refused: %s", *choice.Message.Refusal)
-		return nil, err
-	}
-
-	content, err := m.mapOpenAIMessage(choice.Message, params)
-	if err != nil {
-		return nil, err
-	}
-
-	var usage *llmsdk.ModelUsage
-	if completion.Usage != nil {
-		usage = &llmsdk.ModelUsage{
-			InputTokens:  int(completion.Usage.PromptTokens),
-			OutputTokens: int(completion.Usage.CompletionTokens),
-		}
-	}
-
-	result := &llmsdk.ModelResponse{
-		Content: content,
-		Usage:   usage,
-	}
-	if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-		cost := usage.CalculateCost(m.metadata.Pricing)
-		result.Cost = &cost
-	}
-
-	span.OnResponse(result)
-
-	return result, nil
 }
 
 // Stream implements streaming generation
 func (m *OpenAIChatModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.LanguageModelStream, error) {
+	return tracing.TraceStream(ctx, Provider, m.modelID, input, func(ctx context.Context) (*llmsdk.LanguageModelStream, error) {
+		params, err := convertToOpenAICreateParams(input, m.modelID)
+		if err != nil {
+			return nil, err
+		}
+		params.Stream = ptr.To(true)
 
-	params, err := convertToOpenAICreateParams(input, m.modelID)
-	if err != nil {
-		return nil, err
-	}
-	params.Stream = ptr.To(true)
+		sseStream, err := clientutils.DoSSE[openaiapi.ChatCompletionChunk](ctx, m.client, clientutils.SSERequestConfig{
+			URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
+			Body: params,
+			Headers: map[string]string{
+				"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	sseStream, err := clientutils.DoSSE[openaiapi.ChatCompletionChunk](ctx, m.client, clientutils.SSERequestConfig{
-		URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
-		Body: params,
-		Headers: map[string]string{
-			"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
+		responseCh := make(chan *llmsdk.PartialModelResponse)
+		errCh := make(chan error, 1)
 
-	responseCh := make(chan *llmsdk.PartialModelResponse)
-	errCh := make(chan error, 1)
+		go func() {
+			defer close(responseCh)
+			defer close(errCh)
+			defer sseStream.Close()
 
-	go func() {
-		defer close(responseCh)
-		defer close(errCh)
-		defer sseStream.Close()
+			var allContentDeltas []llmsdk.ContentDelta
 
-		spanCtx, span := llmsdk.NewLMSpan(ctx, Provider, m.modelID, "stream", input)
-		ctx = spanCtx
-
-		var err error
-		defer func() {
-			if err != nil {
-				span.OnError(err)
-			}
-			span.OnEnd()
-		}()
-
-		var allContentDeltas []llmsdk.ContentDelta
-
-		for sseStream.Next() {
-			var chunk *openaiapi.ChatCompletionChunk
-			chunk, err = sseStream.Current()
-			if err != nil {
-				errCh <- fmt.Errorf("failed to get sse chunk: %w", err)
-				return
-			}
-			if chunk == nil {
-				continue
-			}
-
-			if len(chunk.Choices) > 0 {
-				choice := chunk.Choices[0]
-
-				if choice.Delta.Refusal != nil && *choice.Delta.Refusal != "" {
-					err = llmsdk.NewRefusalError(*choice.Delta.Refusal)
-					errCh <- err
+			for sseStream.Next() {
+				chunk, err := sseStream.Current()
+				if err != nil {
+					errCh <- fmt.Errorf("failed to get sse chunk: %w", err)
 					return
 				}
+				if chunk == nil {
+					continue
+				}
 
-				incomingDeltas := m.mapOpenAIDelta(choice.Delta, allContentDeltas, params)
-				allContentDeltas = slices.Concat(allContentDeltas, incomingDeltas)
+				if len(chunk.Choices) > 0 {
+					choice := chunk.Choices[0]
 
-				for _, delta := range incomingDeltas {
-					partial := &llmsdk.PartialModelResponse{
-						Delta: &delta,
+					if choice.Delta.Refusal != nil && *choice.Delta.Refusal != "" {
+						errCh <- llmsdk.NewRefusalError(*choice.Delta.Refusal)
+						return
 					}
 
-					span.OnStreamPartial(partial)
+					incomingDeltas := m.mapOpenAIDelta(choice.Delta, allContentDeltas, params)
+					allContentDeltas = slices.Concat(allContentDeltas, incomingDeltas)
 
+					for _, delta := range incomingDeltas {
+						partial := &llmsdk.PartialModelResponse{Delta: &delta}
+						responseCh <- partial
+					}
+				}
+
+				if chunk.Usage != nil {
+					usage := &llmsdk.ModelUsage{
+						InputTokens:  int(chunk.Usage.PromptTokens),
+						OutputTokens: int(chunk.Usage.CompletionTokens),
+					}
+					partial := &llmsdk.PartialModelResponse{Usage: usage}
+					if m.metadata != nil && m.metadata.Pricing != nil {
+						partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
+					}
 					responseCh <- partial
 				}
 			}
 
-			if chunk.Usage != nil {
-				usage := &llmsdk.ModelUsage{
-					InputTokens:  int(chunk.Usage.PromptTokens),
-					OutputTokens: int(chunk.Usage.CompletionTokens),
-				}
-				partial := &llmsdk.PartialModelResponse{
-					Usage: usage,
-				}
-				if m.metadata != nil && m.metadata.Pricing != nil {
-					partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
-				}
-				span.OnStreamPartial(partial)
-
-				responseCh <- partial
+			if err := sseStream.Err(); err != nil {
+				errCh <- fmt.Errorf("scanner error: %w", err)
 			}
-		}
+		}()
 
-		if err = sseStream.Err(); err != nil {
-			errCh <- fmt.Errorf("scanner error: %w", err)
-		}
-	}()
-
-	return stream.New(responseCh, errCh), nil
+		return stream.New(responseCh, errCh), nil
+	})
 }
 
 // MARK: - Convert To OpenAI API Types

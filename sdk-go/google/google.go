@@ -11,6 +11,7 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/google/googleapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/tracing"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/randutil"
@@ -71,148 +72,123 @@ func (m *GoogleModel) Metadata() *llmsdk.LanguageModelMetadata {
 }
 
 func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
-	spanCtx, span := llmsdk.NewLMSpan(ctx, string(Provider), m.modelID, "generate", input)
-	ctx = spanCtx
-
-	var err error
-	defer func() {
+	return tracing.TraceGenerate(ctx, string(Provider), m.modelID, input, func(ctx context.Context) (*llmsdk.ModelResponse, error) {
+		params, err := convertToGenerateContentParameters(input, m.modelID)
 		if err != nil {
-			span.OnError(err)
+			return nil, err
 		}
-		span.OnEnd()
-	}()
 
-	params, err := convertToGenerateContentParameters(input, m.modelID)
-	if err != nil {
-		return nil, err
-	}
+		response, err := clientutils.DoJSON[googleapi.GenerateContentResponse](ctx, m.client, clientutils.JSONRequestConfig{
+			URL: fmt.Sprintf("%s/%s/models/%s:generateContent", m.baseURL, m.apiVersion, m.modelID),
+			Headers: map[string]string{
+				"x-goog-api-key": m.apiKey,
+				"Content-Type":   "application/json",
+			},
+			Body: params,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	response, err := clientutils.DoJSON[googleapi.GenerateContentResponse](ctx, m.client, clientutils.JSONRequestConfig{
-		URL: fmt.Sprintf("%s/%s/models/%s:generateContent", m.baseURL, m.apiVersion, m.modelID),
-		Headers: map[string]string{
-			"x-goog-api-key": m.apiKey,
-			"Content-Type":   "application/json",
-		},
-		Body: params,
+		if len(response.Candidates) == 0 {
+			return nil, llmsdk.NewInvariantError(Provider, "no candidates returned")
+		}
+
+		content, err := mapGoogleContent(response.Candidates[0].Content.Parts)
+		if err != nil {
+			return nil, err
+		}
+
+		var usage *llmsdk.ModelUsage
+		if response.UsageMetadata != nil {
+			usage = mapGoogleUsageMetadata(*response.UsageMetadata)
+		}
+
+		result := &llmsdk.ModelResponse{
+			Content: content,
+			Usage:   usage,
+		}
+
+		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
+			cost := usage.CalculateCost(m.metadata.Pricing)
+			result.Cost = &cost
+		}
+
+		return result, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(response.Candidates) == 0 {
-		return nil, llmsdk.NewInvariantError(Provider, "no candidates returned")
-	}
-
-	content, err := mapGoogleContent(response.Candidates[0].Content.Parts)
-	if err != nil {
-		return nil, err
-	}
-
-	var usage *llmsdk.ModelUsage
-	if response.UsageMetadata != nil {
-		usage = mapGoogleUsageMetadata(*response.UsageMetadata)
-	}
-
-	result := &llmsdk.ModelResponse{
-		Content: content,
-		Usage:   usage,
-	}
-
-	if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-		cost := usage.CalculateCost(m.metadata.Pricing)
-		result.Cost = &cost
-	}
-
-	span.OnResponse(result)
-	return result, nil
 }
 
 func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.LanguageModelStream, error) {
-	params, err := convertToGenerateContentParameters(input, m.modelID)
-	if err != nil {
-		return nil, err
-	}
+	return tracing.TraceStream(ctx, string(Provider), m.modelID, input, func(ctx context.Context) (*llmsdk.LanguageModelStream, error) {
+		params, err := convertToGenerateContentParameters(input, m.modelID)
+		if err != nil {
+			return nil, err
+		}
 
-	sseStream, err := clientutils.DoSSE[googleapi.GenerateContentResponse](ctx, m.client, clientutils.SSERequestConfig{
-		URL: fmt.Sprintf("%s/%s/models/%s:streamGenerateContent?alt=sse", m.baseURL, m.apiVersion, m.modelID),
-		Headers: map[string]string{
-			"x-goog-api-key": m.apiKey,
-		},
-		Body: params,
-	})
-	if err != nil {
-		return nil, err
-	}
+		sseStream, err := clientutils.DoSSE[googleapi.GenerateContentResponse](ctx, m.client, clientutils.SSERequestConfig{
+			URL: fmt.Sprintf("%s/%s/models/%s:streamGenerateContent?alt=sse", m.baseURL, m.apiVersion, m.modelID),
+			Headers: map[string]string{
+				"x-goog-api-key": m.apiKey,
+			},
+			Body: params,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	responseCh := make(chan *llmsdk.PartialModelResponse)
-	errCh := make(chan error, 1)
+		responseCh := make(chan *llmsdk.PartialModelResponse)
+		errCh := make(chan error, 1)
 
-	go func() {
-		defer close(responseCh)
-		defer close(errCh)
-		defer sseStream.Close()
+		go func() {
+			defer close(responseCh)
+			defer close(errCh)
+			defer sseStream.Close()
 
-		spanCtx, span := llmsdk.NewLMSpan(ctx, string(Provider), m.modelID, "stream", input)
-		ctx = spanCtx
+			allContentDeltas := []llmsdk.ContentDelta{}
 
-		var err error
-		defer func() {
-			if err != nil {
-				span.OnError(err)
-			}
-			span.OnEnd()
-		}()
-
-		allContentDeltas := []llmsdk.ContentDelta{}
-
-		for sseStream.Next() {
-			var streamEvent *googleapi.GenerateContentResponse
-			streamEvent, err = sseStream.Current()
-
-			if err != nil {
-				errCh <- fmt.Errorf("failed to get sse event: %w", err)
-				return
-			}
-			if streamEvent == nil || len(streamEvent.Candidates) == 0 {
-				continue
-			}
-
-			candidate := streamEvent.Candidates[0]
-			if candidate.Content != nil {
-				var incomingContentDeltas []llmsdk.ContentDelta
-				incomingContentDeltas, err = mapGoogleContentToDelta(*candidate.Content, allContentDeltas)
+			for sseStream.Next() {
+				streamEvent, err := sseStream.Current()
 				if err != nil {
-					errCh <- fmt.Errorf("failed to map content delta: %w", err)
+					errCh <- fmt.Errorf("failed to get sse event: %w", err)
 					return
 				}
+				if streamEvent == nil || len(streamEvent.Candidates) == 0 {
+					continue
+				}
 
-				allContentDeltas = append(allContentDeltas, incomingContentDeltas...)
+				candidate := streamEvent.Candidates[0]
+				if candidate.Content != nil {
+					incomingContentDeltas, err := mapGoogleContentToDelta(*candidate.Content, allContentDeltas)
+					if err != nil {
+						errCh <- fmt.Errorf("failed to map content delta: %w", err)
+						return
+					}
 
-				for _, delta := range incomingContentDeltas {
-					partial := &llmsdk.PartialModelResponse{Delta: &delta}
-					span.OnStreamPartial(partial)
+					allContentDeltas = append(allContentDeltas, incomingContentDeltas...)
+
+					for _, delta := range incomingContentDeltas {
+						partial := &llmsdk.PartialModelResponse{Delta: &delta}
+						responseCh <- partial
+					}
+				}
+
+				if streamEvent.UsageMetadata != nil {
+					usage := mapGoogleUsageMetadata(*streamEvent.UsageMetadata)
+					partial := &llmsdk.PartialModelResponse{Usage: usage}
+					if m.metadata != nil && m.metadata.Pricing != nil {
+						partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
+					}
 					responseCh <- partial
 				}
 			}
 
-			if streamEvent.UsageMetadata != nil {
-				usage := mapGoogleUsageMetadata(*streamEvent.UsageMetadata)
-				partial := &llmsdk.PartialModelResponse{Usage: usage}
-				if m.metadata != nil && m.metadata.Pricing != nil {
-					partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
-				}
-				span.OnStreamPartial(partial)
-				responseCh <- partial
+			if err := sseStream.Err(); err != nil {
+				errCh <- fmt.Errorf("scanner error: %w", err)
 			}
-		}
+		}()
 
-		if err = sseStream.Err(); err != nil {
-			errCh <- fmt.Errorf("scanner error: %w", err)
-			return
-		}
-	}()
-
-	return stream.New(responseCh, errCh), nil
+		return stream.New(responseCh, errCh), nil
+	})
 }
 
 func convertToGenerateContentParameters(input *llmsdk.LanguageModelInput, modelID string) (*googleapi.GenerateContentParameters, error) {

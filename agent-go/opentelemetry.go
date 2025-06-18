@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -26,7 +27,7 @@ type AgentSpan struct {
 // NewAgentSpan creates a new agent span
 func NewAgentSpan(ctx context.Context, agentName string, method string) (*AgentSpan, context.Context) {
 	spanName := fmt.Sprintf("llm_agent.%s", method)
-	newCtx, span := tracer.Start(ctx, spanName)
+	ctx, span := tracer.Start(ctx, spanName)
 
 	return &AgentSpan{
 		agentName: agentName,
@@ -34,7 +35,7 @@ func NewAgentSpan(ctx context.Context, agentName string, method string) (*AgentS
 		usage:     nil,
 		cost:      0,
 		span:      span,
-	}, newCtx
+	}, ctx
 }
 
 // OnResponse updates the span with response information
@@ -89,7 +90,7 @@ func startActiveToolSpan(
 	toolDescription string,
 	fn func(context.Context) (AgentToolResult, error),
 ) (AgentToolResult, error) {
-	spanCtx, span := tracer.Start(ctx, "llm_agent.tool")
+	ctx, span := tracer.Start(ctx, "llm_agent.tool")
 	defer func() {
 		// Set attributes following OpenTelemetry semantic conventions
 		span.SetAttributes(
@@ -102,7 +103,7 @@ func startActiveToolSpan(
 		span.End()
 	}()
 
-	res, err := fn(spanCtx)
+	res, err := fn(ctx)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -110,4 +111,73 @@ func startActiveToolSpan(
 	}
 
 	return res, nil
+}
+
+func traceRun(
+	ctx context.Context,
+	agentName string,
+	method string,
+	fn func(context.Context) (*AgentResponse, error),
+) (*AgentResponse, error) {
+	span, ctx := NewAgentSpan(ctx, agentName, method)
+	defer span.OnEnd()
+
+	response, err := fn(ctx)
+	if err != nil {
+		span.OnError(err)
+		return nil, err
+	}
+
+	if response != nil {
+		span.OnResponse(response)
+	}
+
+	return response, nil
+}
+
+func traceRunStream(
+	ctx context.Context,
+	agentName string,
+	method string,
+	fn func(context.Context) (*AgentStream, error),
+) (*AgentStream, error) {
+	span, ctx := NewAgentSpan(ctx, agentName, method)
+
+	innerStream, err := fn(ctx)
+	if err != nil {
+		span.OnError(err)
+		span.OnEnd()
+		return nil, err
+	}
+	if innerStream == nil {
+		span.OnEnd()
+		return nil, nil
+	}
+
+	eventCh := make(chan *AgentStreamEvent)
+	errCh := make(chan error, 1)
+
+	go func() {
+		defer close(eventCh)
+		defer close(errCh)
+		defer span.OnEnd()
+
+		for innerStream.Next() {
+			event := innerStream.Current()
+			if event == nil {
+				continue
+			}
+			if event.Response != nil {
+				span.OnResponse(event.Response)
+			}
+			eventCh <- event
+		}
+
+		if err := innerStream.Err(); err != nil {
+			span.OnError(err)
+			errCh <- err
+		}
+	}()
+
+	return stream.New(eventCh, errCh), nil
 }
