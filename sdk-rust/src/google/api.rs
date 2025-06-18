@@ -81,7 +81,6 @@ pub struct Part {
     pub text: Option<String>,
 }
 
-///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Blob2 {
@@ -99,7 +98,6 @@ pub struct Blob2 {
     pub mime_type: Option<String>,
 }
 
-///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileData {

@@ -66,7 +66,7 @@ async fn mock_language_model_tracks_generate_inputs_and_returns_results() {
         LanguageModelError::InvalidInput(msg) => {
             assert_eq!(msg, "generate error");
         }
-        other => panic!("unexpected error variant: {:?}", other),
+        other => panic!("unexpected error variant: {other:?}"),
     }
     let tracked = model.tracked_generate_inputs();
     assert_eq!(tracked.len(), 2);
@@ -102,7 +102,7 @@ async fn mock_language_model_tracks_generate_inputs_and_returns_results() {
             assert_eq!(provider, "mock");
             assert_eq!(message, "no mocked generate results available");
         }
-        other => panic!("unexpected error variant: {:?}", other),
+        other => panic!("unexpected error variant: {other:?}"),
     }
 }
 
@@ -148,7 +148,7 @@ async fn mock_language_model_tracks_stream_inputs_and_yields_partials() {
     };
     match err {
         LanguageModelError::InvalidInput(msg) => assert_eq!(msg, "stream error"),
-        other => panic!("unexpected error variant: {:?}", other),
+        other => panic!("unexpected error variant: {other:?}"),
     }
     let tracked = model.tracked_stream_inputs();
     assert_eq!(tracked.len(), 2);
@@ -184,7 +184,7 @@ async fn mock_language_model_tracks_stream_inputs_and_yields_partials() {
             assert_eq!(provider, "mock");
             assert_eq!(message, "no mocked stream results available");
         }
-        other => panic!("unexpected error variant: {:?}", other),
+        other => panic!("unexpected error variant: {other:?}"),
     }
 }
 

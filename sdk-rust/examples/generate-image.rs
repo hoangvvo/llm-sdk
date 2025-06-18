@@ -33,14 +33,14 @@ async fn main() {
         _ => None,
     }) {
         let ext = image_part.mime_type.split('/').nth(1).unwrap_or("png");
-        let file_name = format!("image.{}", ext);
+        let file_name = format!("image.{ext}");
 
         let image_bytes = BASE64_STANDARD
             .decode(&image_part.image_data)
             .expect("invalid base64 image data");
 
         fs::write(&file_name, image_bytes).expect("failed to write image file");
-        println!("Saved image to {}", file_name);
+        println!("Saved image to {file_name}");
 
         println!("Rendering image to terminal...");
         // viuer prints the image directly in supported terminals
@@ -60,10 +60,7 @@ async fn main() {
                 .args(["/C", "start", "", &file_name])
                 .status()
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "unsupported OS for auto-open",
-            ))
+            Err(std::io::Error::other("unsupported OS for auto-open"))
         };
 
         sleep(Duration::from_secs(5)).await;

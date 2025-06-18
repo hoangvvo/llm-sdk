@@ -14,7 +14,7 @@ use get_model::{get_model, get_model_list, ModelInfo};
 use llm_agent::{mcp::MCPParams, AgentRequest, BoxedError};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Duration};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
 mod agent;
 mod artifacts_tools;

@@ -207,13 +207,18 @@ impl ShuttleServer {
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for ShuttleServer {
     fn get_info(&self) -> ServerInfo {
-        let mut info = ServerInfo::default();
-        info.capabilities = ServerCapabilities::builder().enable_tools().build();
-        info.server_info.name = "shuttle-scheduler".into();
-        info.server_info.title = Some("Transit hub shuttle coordinator".into());
-        info.instructions =
-            Some("Authenticate with the shuttle control token before calling tools.".into());
-        info
+        ServerInfo {
+            capabilities: ServerCapabilities::builder().enable_tools().build(),
+            server_info: rmcp::model::Implementation {
+                name: "shuttle-scheduler".into(),
+                title: Some("Transit hub shuttle coordinator".into()),
+                ..Default::default()
+            },
+            instructions: Some(
+                "Authenticate with the shuttle control token before calling tools.".into(),
+            ),
+            ..Default::default()
+        }
     }
 }
 

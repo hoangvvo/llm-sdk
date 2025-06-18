@@ -20,7 +20,7 @@ use rmcp::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use std::{sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
@@ -396,12 +396,12 @@ impl ServerHandler for StubMcpService {
         async move {
             state.register_peer(context.peer.clone()).await;
             context.peer.set_peer_info(request);
-            Ok(state.server_info())
+            Ok(SharedState::server_info())
         }
     }
 
     fn get_info(&self) -> ServerInfo {
-        self.state.server_info()
+        SharedState::server_info()
     }
 
     fn list_tools(
@@ -443,20 +443,21 @@ impl ServerHandler for StubMcpService {
 }
 
 impl SharedState {
-    fn server_info(&self) -> ServerInfo {
-        let mut info = ServerInfo::default();
-        info.server_info = Implementation {
-            name: "stub-mcp".to_string(),
-            version: "1.0.0".to_string(),
-            title: None,
-            icons: None,
-            website_url: None,
-        };
-        info.capabilities = ServerCapabilities::builder()
-            .enable_tools()
-            .enable_tool_list_changed()
-            .build();
-        info
+    fn server_info() -> ServerInfo {
+        ServerInfo {
+            server_info: Implementation {
+                name: "stub-mcp".to_string(),
+                version: "1.0.0".to_string(),
+                title: None,
+                icons: None,
+                website_url: None,
+            },
+            capabilities: ServerCapabilities::builder()
+                .enable_tools()
+                .enable_tool_list_changed()
+                .build(),
+            ..Default::default()
+        }
     }
 }
 

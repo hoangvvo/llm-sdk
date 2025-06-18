@@ -121,7 +121,7 @@ impl AgentTool<TracingContext> for NotifyTool {
             // trace the internal formatting + dispatch work
             info!("formatting message");
             sleep(Duration::from_millis(80)).await;
-            span.record("notification.message_length", params.message.len() as i64);
+            span.record("notification.message_length", params.message.len());
             info!("dispatching message");
 
             let payload = json!({

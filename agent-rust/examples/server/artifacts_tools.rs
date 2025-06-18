@@ -11,7 +11,7 @@ fn rand_id(n_bytes: usize) -> String {
     let mut b = vec![0u8; n_bytes];
     rand::thread_rng().fill_bytes(&mut b);
     // hex encode
-    b.iter().map(|x| format!("{:02x}", x)).collect::<String>()
+    b.iter().map(|x| format!("{x:02x}")).collect::<String>()
 }
 
 fn find_artifact<'a>(ctx: &'a MyContext, id: &str) -> Option<&'a Artifact> {
@@ -115,12 +115,8 @@ impl AgentTool<MyContext> for ArtifactUpdateTool {
             let prev = find_artifact(context, &params.id);
             let now = Utc::now().to_rfc3339();
             let next_version = prev.and_then(|a| a.version).unwrap_or(0) + 1;
-            let title = prev
-                .map(|a| a.title.clone())
-                .unwrap_or_else(|| "Untitled".to_string());
-            let kind = prev
-                .map(|a| a.kind.clone())
-                .unwrap_or(ArtifactKind::Markdown);
+            let title = prev.map_or_else(|| "Untitled".to_string(), |a| a.title.clone());
+            let kind = prev.map_or(ArtifactKind::Markdown, |a| a.kind.clone());
             let prev_content = prev.map(|a| a.content.clone()).unwrap_or_default();
             let artifact = Artifact {
                 id: params.id.clone(),

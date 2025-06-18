@@ -35,14 +35,14 @@ pub struct GoogleModelOptions {
 
 impl GoogleModel {
     #[must_use]
-    pub fn new(model_id: impl ToString, options: GoogleModelOptions) -> Self {
+    pub fn new(model_id: impl Into<String>, options: GoogleModelOptions) -> Self {
         let client = Client::new();
         let base_url = options
             .base_url
             .unwrap_or_else(|| "https://generativelanguage.googleapis.com/v1beta".to_string());
 
         Self {
-            model_id: model_id.to_string(),
+            model_id: model_id.into(),
             api_key: options.api_key,
             base_url,
             client,

@@ -106,7 +106,11 @@ impl AgentTool<MyContext> for SearchWikipediaTool {
 
             let search_data: Vec<Value> = search_response.json().await?;
 
-            if search_data.len() < 2 || search_data[1].as_array().map_or(true, |a| a.is_empty()) {
+            if search_data.len() < 2
+                || search_data[1]
+                    .as_array()
+                    .is_none_or(std::vec::Vec::is_empty)
+            {
                 return Ok(AgentToolResult {
                     content: vec![Part::text(serde_json::to_string(&serde_json::json!({
                         "results": [],
@@ -322,7 +326,7 @@ impl AgentTool<MyContext> for GetNewsTool {
                 )
             };
 
-            let url = format!("https://newsapi.org/v2/{}", endpoint);
+            let url = format!("https://newsapi.org/v2/{endpoint}");
 
             let response = client
                 .get(&url)
