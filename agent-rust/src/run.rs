@@ -21,7 +21,7 @@ use std::sync::Arc;
 /// It initializes all necessary components for the agent to run
 /// and handles the execution of the agent's tasks.
 /// Once finished, the session cleans up any resources used during the run.
-/// The session can be reused in multiple runs. RunSession binds to a specific
+/// The session can be reused in multiple runs. `RunSession` binds to a specific
 ///
 /// context value that is used to resolve instructions and invoke tools, while
 /// input items remain per run and are supplied to each invocation.
@@ -208,7 +208,7 @@ where
                 let content = model_response.content.clone();
 
                 let (item, index) = state.append_model_response(model_response).await;
-                yield AgentStreamEvent::Item(AgentStreamItemEvent { item, index });
+                yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
 
                 let mut process_stream = session.process(&state, content, tools).await;
 
@@ -218,7 +218,7 @@ where
                     match event {
                         ProcessEvents::Item(item) => {
                             let index = state.append_item(item.clone()).await;
-                            yield AgentStreamEvent::Item(AgentStreamItemEvent { item, index });
+                            yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
                         }
                         ProcessEvents::Response(final_content) => {
                             let response = state.create_response(final_content).await;
@@ -243,7 +243,7 @@ where
             let _ = join_all(
                 toolkit_sessions
                     .into_iter()
-                    .map(|toolkit_session| toolkit_session.close()),
+                    .map(super::toolkit::ToolkitSession::close),
             )
             .await;
         }
@@ -281,7 +281,7 @@ where
             }
         }
 
-        let mut tools: Vec<Arc<dyn AgentTool<TCtx>>> = self.params.tools.iter().cloned().collect();
+        let mut tools: Vec<Arc<dyn AgentTool<TCtx>>> = self.params.tools.clone();
 
         for session in self.toolkit_sessions.iter() {
             if let Some(prompt) = session.system_prompt() {
@@ -320,7 +320,7 @@ where
         Ok((input, tools))
     }
 }
-/// RunSessionRequest contains the input items used for a run.
+/// `RunSessionRequest` contains the input items used for a run.
 pub struct RunSessionRequest {
     /// Input holds the items for this run, such as LLM messages.
     pub input: Vec<AgentItem>,

@@ -1,11 +1,5 @@
-use std::{
-    env,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
-
-use async_trait::async_trait;
 use dotenvy::dotenv;
+use futures::future::BoxFuture;
 use llm_agent::{
     Agent, AgentItem, AgentParams, AgentResponse, AgentTool, AgentToolResult, RunSessionRequest,
     Toolkit, ToolkitSession,
@@ -15,6 +9,11 @@ use llm_sdk::{
     Message, Part,
 };
 use serde::Deserialize;
+use std::{
+    env,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::time::sleep;
 
 type VisitorId = &'static str;
@@ -117,7 +116,6 @@ struct LostAndFoundToolkitSession {
     state: Arc<Mutex<LostAndFoundState>>,
 }
 
-#[async_trait]
 impl ToolkitSession<RiftContext> for LostAndFoundToolkitSession {
     fn system_prompt(&self) -> Option<String> {
         let state = self.state.lock().expect("state poisoned");
@@ -198,24 +196,27 @@ impl ToolkitSession<RiftContext> for LostAndFoundToolkitSession {
         tools
     }
 
-    async fn close(self: Box<Self>) -> Result<(), BoxError> {
-        Ok(())
+    fn close(self: Box<Self>) -> BoxFuture<'static, Result<(), BoxError>> {
+        Box::pin(async move { Ok(()) })
     }
 }
 
 struct LostAndFoundToolkit;
 
-#[async_trait]
 impl Toolkit<RiftContext> for LostAndFoundToolkit {
-    async fn create_session(
-        &self,
-        context: &RiftContext,
-    ) -> Result<Box<dyn ToolkitSession<RiftContext> + Send + Sync>, BoxError> {
-        let manifest = fetch_rift_manifest(context.visitor_id).await?;
-        let state = LostAndFoundState::new(manifest);
-        Ok(Box::new(LostAndFoundToolkitSession {
-            state: Arc::new(Mutex::new(state)),
-        }))
+    fn create_session<'a>(
+        &'a self,
+        context: &'a RiftContext,
+    ) -> BoxFuture<'a, Result<Box<dyn ToolkitSession<RiftContext> + Send + Sync>, BoxError>> {
+        Box::pin(async move {
+            let manifest = fetch_rift_manifest(context.visitor_id).await?;
+            let state = LostAndFoundState::new(manifest);
+            let boxed: Box<dyn ToolkitSession<RiftContext> + Send + Sync> =
+                Box::new(LostAndFoundToolkitSession {
+                    state: Arc::new(Mutex::new(state)),
+                });
+            Ok(boxed)
+        })
     }
 }
 
@@ -320,7 +321,6 @@ struct StabilizeArgs {
     technique: Option<String>,
 }
 
-#[async_trait]
 impl AgentTool<RiftContext> for StabilizeRiftTool {
     fn name(&self) -> String {
         "stabilize_rift".into()
@@ -344,41 +344,44 @@ impl AgentTool<RiftContext> for StabilizeRiftTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &RiftContext,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, BoxError> {
-        let args: StabilizeArgs = serde_json::from_value(args)?;
-        let (turbulence, technique_raw) = {
-            let state = self.state.lock().expect("state poisoned");
-            (
-                state.manifest.turbulence_level,
-                args.technique.unwrap_or_default(),
-            )
-        };
+        _context: &'a RiftContext,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxError>> {
+        Box::pin(async move {
+            let args: StabilizeArgs = serde_json::from_value(args)?;
+            let (turbulence, technique_raw) = {
+                let state = self.state.lock().expect("state poisoned");
+                (
+                    state.manifest.turbulence_level,
+                    args.technique.unwrap_or_default(),
+                )
+            };
 
-        let technique = technique_raw.trim().to_string();
+            let technique = technique_raw.trim().to_string();
 
-        let mut sentence = format!("I cycle the containment field to damp {turbulence} turbulence");
-        if !technique.is_empty() {
-            sentence.push_str(&format!(" using {technique}"));
-        }
-        sentence.push('.');
-
-        println!(
-            "[tool] stabilize_rift invoked with technique={}",
-            if technique.is_empty() {
-                "<none>".to_string()
-            } else {
-                technique.clone()
+            let mut sentence =
+                format!("I cycle the containment field to damp {turbulence} turbulence");
+            if !technique.is_empty() {
+                sentence.push_str(&format!(" using {technique}"));
             }
-        );
+            sentence.push('.');
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(sentence)],
-            is_error: false,
+            println!(
+                "[tool] stabilize_rift invoked with technique={}",
+                if technique.is_empty() {
+                    "<none>".to_string()
+                } else {
+                    technique.clone()
+                }
+            );
+
+            Ok(AgentToolResult {
+                content: vec![Part::text(sentence)],
+                is_error: false,
+            })
         })
     }
 }
@@ -394,7 +397,6 @@ struct LogItemArgs {
     timeline: Option<String>,
 }
 
-#[async_trait]
 impl AgentTool<RiftContext> for LogItemTool {
     fn name(&self) -> String {
         "log_item".into()
@@ -416,32 +418,34 @@ impl AgentTool<RiftContext> for LogItemTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &RiftContext,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, BoxError> {
-        let args: LogItemArgs = serde_json::from_value(args)?;
-        let mut state = self.state.lock().expect("state poisoned");
+        _context: &'a RiftContext,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxError>> {
+        Box::pin(async move {
+            let args: LogItemArgs = serde_json::from_value(args)?;
+            let mut state = self.state.lock().expect("state poisoned");
 
-        let mut label = args.item;
-        if let Some(timeline) = args.timeline {
-            let trimmed = timeline.trim();
-            if !trimmed.is_empty() {
-                label = format!("{label} ({trimmed})");
+            let mut label = args.item;
+            if let Some(timeline) = args.timeline {
+                let trimmed = timeline.trim();
+                if !trimmed.is_empty() {
+                    label = format!("{label} ({trimmed})");
+                }
             }
-        }
-        state.tagged_items.push(label.clone());
-        let ledger = state.tagged_items.join("; ");
+            state.tagged_items.push(label.clone());
+            let ledger = state.tagged_items.join("; ");
 
-        println!("[tool] log_item recorded {label}");
+            println!("[tool] log_item recorded {label}");
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "Logged {label} for retrieval queue. Current ledger: {ledger}."
-            ))],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(format!(
+                    "Logged {label} for retrieval queue. Current ledger: {ledger}."
+                ))],
+                is_error: false,
+            })
         })
     }
 }
@@ -455,7 +459,6 @@ struct VerifyPassArgs {
     clearance_code: String,
 }
 
-#[async_trait]
 impl AgentTool<RiftContext> for VerifyPassTool {
     fn name(&self) -> String {
         "verify_pass".into()
@@ -479,28 +482,30 @@ impl AgentTool<RiftContext> for VerifyPassTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &RiftContext,
-        _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, BoxError> {
-        let args: VerifyPassArgs = serde_json::from_value(args)?;
-        let mut state = self.state.lock().expect("state poisoned");
-        state.pass_verified = true;
-        state.phase = Phase::Recovery;
+        _context: &'a RiftContext,
+        _run_state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxError>> {
+        Box::pin(async move {
+            let args: VerifyPassArgs = serde_json::from_value(args)?;
+            let mut state = self.state.lock().expect("state poisoned");
+            state.pass_verified = true;
+            state.phase = Phase::Recovery;
 
-        println!(
-            "[tool] verify_pass authenticated clearance_code={}",
-            args.clearance_code
-        );
-
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "Pass authenticated with code {}. Recovery protocols online.",
+            println!(
+                "[tool] verify_pass authenticated clearance_code={}",
                 args.clearance_code
-            ))],
-            is_error: false,
+            );
+
+            Ok(AgentToolResult {
+                content: vec![Part::text(format!(
+                    "Pass authenticated with code {}. Recovery protocols online.",
+                    args.clearance_code
+                ))],
+                is_error: false,
+            })
         })
     }
 }
@@ -517,7 +522,6 @@ struct SummonDroneArgs {
     target: Option<String>,
 }
 
-#[async_trait]
 impl AgentTool<RiftContext> for SummonRetrievalDroneTool {
     fn name(&self) -> String {
         "summon_retrieval_drone".into()
@@ -545,44 +549,46 @@ impl AgentTool<RiftContext> for SummonRetrievalDroneTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &RiftContext,
-        _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, BoxError> {
-        let args: SummonDroneArgs = serde_json::from_value(args)?;
-        let mut state = self.state.lock().expect("state poisoned");
-        state.drone_deployed = true;
+        _context: &'a RiftContext,
+        _run_state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxError>> {
+        Box::pin(async move {
+            let args: SummonDroneArgs = serde_json::from_value(args)?;
+            let mut state = self.state.lock().expect("state poisoned");
+            state.drone_deployed = true;
 
-        let designation = args
-            .designation
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "Drone Theta".to_string());
+            let designation = args
+                .designation
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "Drone Theta".to_string());
 
-        let target = args
-            .target
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| {
-                state
-                    .tagged_items
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| "the most recently logged item".to_string())
-            });
+            let target = args
+                .target
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| {
+                    state
+                        .tagged_items
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| "the most recently logged item".to_string())
+                });
 
-        println!(
-            "[tool] summon_retrieval_drone dispatched designation={} target={}",
-            designation, target
-        );
+            println!(
+                "[tool] summon_retrieval_drone dispatched designation={designation} \
+                 target={target}"
+            );
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "Dispatched {designation} to retrieve {target}."
-            ))],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(format!(
+                    "Dispatched {designation} to retrieve {target}."
+                ))],
+                is_error: false,
+            })
         })
     }
 }
@@ -597,7 +603,6 @@ struct ConsultProphetArgs {
     topic: Option<String>,
 }
 
-#[async_trait]
 impl AgentTool<RiftContext> for ConsultProphetTool {
     fn name(&self) -> String {
         "consult_prophet_agent".into()
@@ -621,39 +626,41 @@ impl AgentTool<RiftContext> for ConsultProphetTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &RiftContext,
-        _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, BoxError> {
-        let args: ConsultProphetArgs = serde_json::from_value(args)?;
-        let mut state = self.state.lock().expect("state poisoned");
-        state.prophecy_count = state.prophecy_count.saturating_add(1);
+        _context: &'a RiftContext,
+        _run_state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxError>> {
+        Box::pin(async move {
+            let args: ConsultProphetArgs = serde_json::from_value(args)?;
+            let mut state = self.state.lock().expect("state poisoned");
+            state.prophecy_count = state.prophecy_count.saturating_add(1);
 
-        let anomaly = state
-            .manifest
-            .outstanding_anomalies
-            .first()
-            .copied()
-            .unwrap_or("no immediate hazards");
+            let anomaly = state
+                .manifest
+                .outstanding_anomalies
+                .first()
+                .copied()
+                .unwrap_or("no immediate hazards");
 
-        let mut sentence = format!("Prophet Sigma notes anomaly priority: {anomaly}");
-        if let Some(topic) = args
-            .topic
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-        {
-            println!("[tool] consult_prophet_agent requested topic={topic}");
-            sentence.push_str(&format!(" while considering {topic}."));
-        } else {
-            println!("[tool] consult_prophet_agent requested topic=<none>");
-            sentence.push('.');
-        }
+            let mut sentence = format!("Prophet Sigma notes anomaly priority: {anomaly}");
+            if let Some(topic) = args
+                .topic
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+            {
+                println!("[tool] consult_prophet_agent requested topic={topic}");
+                sentence.push_str(&format!(" while considering {topic}."));
+            } else {
+                println!("[tool] consult_prophet_agent requested topic=<none>");
+                sentence.push('.');
+            }
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(sentence)],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(sentence)],
+                is_error: false,
+            })
         })
     }
 }
@@ -668,7 +675,6 @@ struct IssueReceiptArgs {
     recipient: Option<String>,
 }
 
-#[async_trait]
 impl AgentTool<RiftContext> for IssueQuantumReceiptTool {
     fn name(&self) -> String {
         "issue_quantum_receipt".into()
@@ -692,39 +698,41 @@ impl AgentTool<RiftContext> for IssueQuantumReceiptTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &RiftContext,
-        _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, BoxError> {
-        let args: IssueReceiptArgs = serde_json::from_value(args)?;
-        let mut state = self.state.lock().expect("state poisoned");
+        _context: &'a RiftContext,
+        _run_state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxError>> {
+        Box::pin(async move {
+            let args: IssueReceiptArgs = serde_json::from_value(args)?;
+            let mut state = self.state.lock().expect("state poisoned");
 
-        let recipient = args
-            .recipient
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| state.manifest.visitor_name.to_string());
+            let recipient = args
+                .recipient
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| state.manifest.visitor_name.to_string());
 
-        let items = state.tagged_items.join("; ");
-        state.phase = Phase::Handoff;
+            let items = state.tagged_items.join("; ");
+            state.phase = Phase::Handoff;
 
-        println!(
-            "[tool] issue_quantum_receipt issued to {} for items={}",
-            recipient,
-            if items.is_empty() {
-                "<none>".to_string()
-            } else {
-                items.clone()
-            }
-        );
+            println!(
+                "[tool] issue_quantum_receipt issued to {} for items={}",
+                recipient,
+                if items.is_empty() {
+                    "<none>".to_string()
+                } else {
+                    items.clone()
+                }
+            );
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "Issued quantum receipt to {recipient} for {items}. Handoff phase engaged."
-            ))],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(format!(
+                    "Issued quantum receipt to {recipient} for {items}. Handoff phase engaged."
+                ))],
+                is_error: false,
+            })
         })
     }
 }
@@ -733,7 +741,6 @@ struct CloseManifestTool {
     state: Arc<Mutex<LostAndFoundState>>,
 }
 
-#[async_trait]
 impl AgentTool<RiftContext> for CloseManifestTool {
     fn name(&self) -> String {
         "close_manifest".into()
@@ -752,24 +759,28 @@ impl AgentTool<RiftContext> for CloseManifestTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         _args: serde_json::Value,
-        _context: &RiftContext,
-        _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, BoxError> {
-        let mut state = self.state.lock().expect("state poisoned");
-        state.phase = Phase::Closed;
+        _context: &'a RiftContext,
+        _run_state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxError>> {
+        Box::pin(async move {
+            let mut state = self.state.lock().expect("state poisoned");
+            state.phase = Phase::Closed;
 
-        let anomaly_count = state.manifest.outstanding_anomalies.len();
+            let anomaly_count = state.manifest.outstanding_anomalies.len();
 
-        println!("[tool] close_manifest archived manifest with anomaly_reminders={anomaly_count}");
+            println!(
+                "[tool] close_manifest archived manifest with anomaly_reminders={anomaly_count}"
+            );
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "Archived manifest with {anomaly_count} anomaly reminder(s) for facilities."
-            ))],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(format!(
+                    "Archived manifest with {anomaly_count} anomaly reminder(s) for facilities."
+                ))],
+                is_error: false,
+            })
         })
     }
 }
@@ -783,7 +794,6 @@ struct PageSecurityArgs {
     reason: String,
 }
 
-#[async_trait]
 impl AgentTool<RiftContext> for PageSecurityTool {
     fn name(&self) -> String {
         "page_security".into()
@@ -804,19 +814,21 @@ impl AgentTool<RiftContext> for PageSecurityTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        context: &RiftContext,
-        _run_state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, BoxError> {
-        let args: PageSecurityArgs = serde_json::from_value(args)?;
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "Security paged for {}: {}.",
-                context.visitor_id, args.reason
-            ))],
-            is_error: false,
+        context: &'a RiftContext,
+        _run_state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxError>> {
+        Box::pin(async move {
+            let args: PageSecurityArgs = serde_json::from_value(args)?;
+            Ok(AgentToolResult {
+                content: vec![Part::text(format!(
+                    "Security paged for {}: {}.",
+                    context.visitor_id, args.reason
+                ))],
+                is_error: false,
+            })
         })
     }
 }
@@ -868,7 +880,7 @@ async fn main() -> Result<(), BoxError> {
         .await?;
 
     let mut transcript: Vec<AgentItem> = Vec::new();
-    let prompts = vec![
+    let prompts = [
         "I just slipped through the rift and my belongings are glittering in the wrong timeline. \
          What now?",
         "The Chrono Locket from Timeline 12 is missing, and the echo lag is getting worse.",
@@ -887,7 +899,7 @@ async fn main() -> Result<(), BoxError> {
             .await?;
 
         println!("{}", response.text());
-        transcript.extend(response.output.drain(..));
+        transcript.append(&mut response.output);
     }
 
     session.close().await?;

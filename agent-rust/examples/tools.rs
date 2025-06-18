@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use dotenvy::dotenv;
+use futures::future::BoxFuture;
 use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -41,8 +41,8 @@ fn create_context() -> LostAndFoundContext {
     }
 }
 
-/// intake_item mirrors the TypeScript/Go examples: validates input and updates
-/// the ledger.
+/// `intake_item` mirrors the TypeScript/Go examples: validates input and
+/// updates the ledger.
 struct IntakeItemTool;
 
 #[derive(Deserialize)]
@@ -52,7 +52,6 @@ struct IntakeItemParams {
     priority: Option<String>,
 }
 
-#[async_trait]
 impl AgentTool<LostAndFoundContext> for IntakeItemTool {
     fn name(&self) -> String {
         "intake_item".into()
@@ -72,69 +71,71 @@ impl AgentTool<LostAndFoundContext> for IntakeItemTool {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        context: &LostAndFoundContext,
+        context: &'a LostAndFoundContext,
         _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: IntakeItemParams = serde_json::from_value(args)?;
-        let key = params.item_id.trim().to_lowercase();
-        if key.is_empty() {
-            return Err("item_id cannot be empty".into());
-        }
-        let mut ledger = context
-            .intake_ledger
-            .lock()
-            .expect("intake ledger mutex poisoned");
-        if ledger.contains_key(&key) {
-            return Ok(AgentToolResult {
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: IntakeItemParams = serde_json::from_value(args)?;
+            let key = params.item_id.trim().to_lowercase();
+            if key.is_empty() {
+                return Err("item_id cannot be empty".into());
+            }
+            let mut ledger = context
+                .intake_ledger
+                .lock()
+                .expect("intake ledger mutex poisoned");
+            if ledger.contains_key(&key) {
+                return Ok(AgentToolResult {
+                    content: vec![Part::text(format!(
+                        "Item {} is already on the ledger—confirm the manifest number before \
+                         adding duplicates.",
+                        params.item_id
+                    ))],
+                    is_error: true,
+                });
+            }
+
+            let priority = params.priority.unwrap_or_else(|| "standard".into());
+            ledger.insert(
+                key,
+                ItemRecord {
+                    description: params.description.clone(),
+                    priority: priority.clone(),
+                },
+            );
+
+            context
+                .receipt_notes
+                .lock()
+                .expect("receipt notes mutex poisoned")
+                .push(format!(
+                    "{}: {}{}",
+                    params.item_id,
+                    params.description,
+                    if priority == "rush" {
+                        " (rush intake)"
+                    } else {
+                        ""
+                    }
+                ));
+
+            Ok(AgentToolResult {
                 content: vec![Part::text(format!(
-                    "Item {} is already on the ledger—confirm the manifest number before adding \
-                     duplicates.",
-                    params.item_id
+                    "Logged {} as {}. Intake queue now holds {} item(s).",
+                    params.description,
+                    params.item_id,
+                    ledger.len()
                 ))],
-                is_error: true,
-            });
-        }
-
-        let priority = params.priority.unwrap_or_else(|| "standard".into());
-        ledger.insert(
-            key,
-            ItemRecord {
-                description: params.description.clone(),
-                priority: priority.clone(),
-            },
-        );
-
-        context
-            .receipt_notes
-            .lock()
-            .expect("receipt notes mutex poisoned")
-            .push(format!(
-                "{}: {}{}",
-                params.item_id,
-                params.description,
-                if priority == "rush" {
-                    " (rush intake)"
-                } else {
-                    ""
-                }
-            ));
-
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "Logged {} as {}. Intake queue now holds {} item(s).",
-                params.description,
-                params.item_id,
-                ledger.len()
-            ))],
-            is_error: false,
+                is_error: false,
+            })
         })
     }
 }
 
-/// flag_contraband highlights additional validation and shared-state updates.
+/// `flag_contraband` highlights additional validation and shared-state updates.
 struct FlagContrabandTool;
 
 #[derive(Deserialize)]
@@ -143,7 +144,6 @@ struct FlagContrabandParams {
     reason: String,
 }
 
-#[async_trait]
 impl AgentTool<LostAndFoundContext> for FlagContrabandTool {
     fn name(&self) -> String {
         "flag_contraband".into()
@@ -162,56 +162,58 @@ impl AgentTool<LostAndFoundContext> for FlagContrabandTool {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        context: &LostAndFoundContext,
+        context: &'a LostAndFoundContext,
         _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: FlagContrabandParams = serde_json::from_value(args)?;
-        let key = params.item_id.trim().to_lowercase();
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: FlagContrabandParams = serde_json::from_value(args)?;
+            let key = params.item_id.trim().to_lowercase();
 
-        let ledger = context
-            .intake_ledger
-            .lock()
-            .expect("intake ledger mutex poisoned");
-        if !ledger.contains_key(&key) {
-            return Ok(AgentToolResult {
+            let ledger = context
+                .intake_ledger
+                .lock()
+                .expect("intake ledger mutex poisoned");
+            if !ledger.contains_key(&key) {
+                return Ok(AgentToolResult {
+                    content: vec![Part::text(format!(
+                        "Cannot flag {}; it has not been logged yet. Intake the item first.",
+                        params.item_id
+                    ))],
+                    is_error: true,
+                });
+            }
+            drop(ledger);
+
+            context
+                .flagged_contraband
+                .lock()
+                .expect("flagged contraband mutex poisoned")
+                .insert(key);
+            context
+                .receipt_notes
+                .lock()
+                .expect("receipt notes mutex poisoned")
+                .push(format!(
+                    "⚠️ {} held for review: {}",
+                    params.item_id, params.reason
+                ));
+
+            Ok(AgentToolResult {
                 content: vec![Part::text(format!(
-                    "Cannot flag {}; it has not been logged yet. Intake the item first.",
+                    "{} marked for contraband inspection. Inform security before release.",
                     params.item_id
                 ))],
-                is_error: true,
-            });
-        }
-        drop(ledger);
-
-        context
-            .flagged_contraband
-            .lock()
-            .expect("flagged contraband mutex poisoned")
-            .insert(key);
-        context
-            .receipt_notes
-            .lock()
-            .expect("receipt notes mutex poisoned")
-            .push(format!(
-                "⚠️ {} held for review: {}",
-                params.item_id, params.reason
-            ));
-
-        Ok(AgentToolResult {
-            content: vec![Part::text(format!(
-                "{} marked for contraband inspection. Inform security before release.",
-                params.item_id
-            ))],
-            is_error: false,
+                is_error: false,
+            })
         })
     }
 }
 
-/// issue_receipt summarises everything, returning a final message and clearing
-/// state.
+/// `issue_receipt` summarises everything, returning a final message and
+/// clearing state.
 struct IssueReceiptTool;
 
 #[derive(Deserialize)]
@@ -219,7 +221,6 @@ struct IssueReceiptParams {
     traveller: String,
 }
 
-#[async_trait]
 impl AgentTool<LostAndFoundContext> for IssueReceiptTool {
     fn name(&self) -> String {
         "issue_receipt".into()
@@ -237,86 +238,88 @@ impl AgentTool<LostAndFoundContext> for IssueReceiptTool {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        context: &LostAndFoundContext,
+        context: &'a LostAndFoundContext,
         _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: IssueReceiptParams = serde_json::from_value(args)?;
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: IssueReceiptParams = serde_json::from_value(args)?;
 
-        let mut ledger = context
-            .intake_ledger
-            .lock()
-            .expect("intake ledger mutex poisoned");
-        if ledger.is_empty() {
-            return Ok(AgentToolResult {
-                content: vec![Part::text(format!(
-                    "No items pending on manifest {}. Intake something before issuing a receipt.",
-                    context.manifest_id
-                ))],
-                is_error: true,
-            });
-        }
-
-        let mut cleared = Vec::new();
-        {
-            let flagged = context
-                .flagged_contraband
+            let mut ledger = context
+                .intake_ledger
                 .lock()
-                .expect("flagged contraband mutex poisoned");
-            for (id, record) in ledger.iter() {
-                if !flagged.contains(id) {
-                    cleared.push(format!("{} ({})", id, record.description));
+                .expect("intake ledger mutex poisoned");
+            if ledger.is_empty() {
+                return Ok(AgentToolResult {
+                    content: vec![Part::text(format!(
+                        "No items pending on manifest {}. Intake something before issuing a \
+                         receipt.",
+                        context.manifest_id
+                    ))],
+                    is_error: true,
+                });
+            }
+
+            let mut cleared = Vec::new();
+            {
+                let flagged = context
+                    .flagged_contraband
+                    .lock()
+                    .expect("flagged contraband mutex poisoned");
+                for (id, record) in ledger.iter() {
+                    if !flagged.contains(id) {
+                        cleared.push(format!("{} ({})", id, record.description));
+                    }
                 }
             }
-        }
 
-        let mut summary = vec![format!(
-            "Receipt for {} on manifest {}:",
-            params.traveller, context.manifest_id
-        )];
-        if !cleared.is_empty() {
-            summary.push(format!("Cleared items: {}", cleared.join(", ")));
-        } else {
-            summary.push("No items cleared—everything is held for review.".into());
-        }
-        {
-            let notes = context
+            let mut summary = vec![format!(
+                "Receipt for {} on manifest {}:",
+                params.traveller, context.manifest_id
+            )];
+            if cleared.is_empty() {
+                summary.push("No items cleared—everything is held for review.".into());
+            } else {
+                summary.push(format!("Cleared items: {}", cleared.join(", ")));
+            }
+            {
+                let notes = context
+                    .receipt_notes
+                    .lock()
+                    .expect("receipt notes mutex poisoned");
+                if !notes.is_empty() {
+                    summary.push("Notes:".into());
+                    summary.extend(notes.iter().cloned());
+                }
+            }
+            let contraband_count = context
+                .flagged_contraband
+                .lock()
+                .expect("flagged contraband mutex poisoned")
+                .len();
+            summary.push(format!(
+                "{contraband_count} item(s) require contraband follow-up."
+            ));
+
+            // Clear state for the next manifest.
+            ledger.clear();
+            context
+                .flagged_contraband
+                .lock()
+                .expect("flagged contraband mutex poisoned")
+                .clear();
+            context
                 .receipt_notes
                 .lock()
-                .expect("receipt notes mutex poisoned");
-            if !notes.is_empty() {
-                summary.push("Notes:".into());
-                summary.extend(notes.iter().cloned());
-            }
-        }
-        let contraband_count = context
-            .flagged_contraband
-            .lock()
-            .expect("flagged contraband mutex poisoned")
-            .len();
-        summary.push(format!(
-            "{} item(s) require contraband follow-up.",
-            contraband_count
-        ));
+                .expect("receipt notes mutex poisoned")
+                .clear();
 
-        // Clear state for the next manifest.
-        ledger.clear();
-        context
-            .flagged_contraband
-            .lock()
-            .expect("flagged contraband mutex poisoned")
-            .clear();
-        context
-            .receipt_notes
-            .lock()
-            .expect("receipt notes mutex poisoned")
-            .clear();
-
-        Ok(AgentToolResult {
-            content: vec![Part::text(summary.join("\n"))],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(summary.join("\n"))],
+                is_error: false,
+            })
         })
     }
 }

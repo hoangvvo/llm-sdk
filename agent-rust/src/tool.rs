@@ -1,5 +1,5 @@
 use crate::RunState;
-use async_trait::async_trait;
+use futures::future::BoxFuture;
 use llm_sdk::{JSONSchema, Part, Tool};
 use serde_json::Value;
 use std::{error::Error, fmt::Debug};
@@ -8,7 +8,6 @@ use std::{error::Error, fmt::Debug};
  * Agent tool that can be used by the agent to perform specific tasks. Any
  * type that implements the `AgentTool` trait can be used as a tool.
  */
-#[async_trait]
 pub trait AgentTool<TCtx>: Send + Sync {
     /// Name of the tool.
     fn name(&self) -> String;
@@ -23,12 +22,12 @@ pub trait AgentTool<TCtx>: Send + Sync {
     /// If the tool throws an error, the agent will be interrupted and the error
     /// will be propagated. To avoid interrupting the agent, the tool must
     /// return an `AgentToolResult` with `is_error` set to true.
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        context: &TCtx,
-        state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>>;
+        context: &'a TCtx,
+        state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>>;
 }
 
 impl<TCtx> Debug for dyn AgentTool<TCtx> {

@@ -1307,7 +1307,6 @@ name = "llm-agent"
 version = "0.1.0"
 dependencies = [
  "async-stream",
- "async-trait",
  "axum",
  "base64 0.22.1",
  "chrono",
@@ -1340,7 +1339,6 @@ name = "llm-sdk"
 version = "0.1.0"
 dependencies = [
  "async-stream",
- "async-trait",
  "base64 0.22.1",
  "dotenvy",
  "eventsource-stream",

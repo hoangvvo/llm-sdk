@@ -26,9 +26,10 @@ pub struct LmSpan {
 
 impl LmSpan {
     pub fn new(provider: &str, model_id: &str, method: &str, input: &LanguageModelInput) -> Self {
-        let span = match method {
-            "stream" => info_span!("llm_sdk.stream"),
-            _ => info_span!("llm_sdk.generate"),
+        let span = if method == "stream" {
+            info_span!("llm_sdk.stream")
+        } else {
+            info_span!("llm_sdk.generate")
         };
         span.set_attribute("gen_ai.operation.name", "generate_content");
         span.set_attribute("gen_ai.provider.name", provider.to_string());

@@ -56,7 +56,7 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
     let agent = Agent::new(AgentParams::new("mcp-test", model.clone()).add_toolkit(
         MCPToolkit::new({
             let stub_url = stub_url.clone();
-            move |_: &()| {
+            move |(): &()| {
                 Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
                     url: stub_url.clone(),
                     authorization: None,
@@ -156,7 +156,7 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
     let agent = Agent::new(AgentParams::new("mcp-test", model.clone()).add_toolkit(
         MCPToolkit::new({
             let stub_url = stub_url.clone();
-            move |_: &()| {
+            move |(): &()| {
                 Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
                     url: stub_url.clone(),
                     authorization: None,
@@ -430,7 +430,7 @@ impl ServerHandler for StubMcpService {
                 return Err(ErrorData::invalid_params("tool not found", None));
             }
 
-            let args_map = request.arguments.unwrap_or_else(Map::new);
+            let args_map = request.arguments.unwrap_or_default();
             let args_value = Value::Object(args_map);
             let args: ListShuttlesArgs = serde_json::from_value(args_value).map_err(|err| {
                 ErrorData::invalid_params(format!("invalid arguments: {err}"), None)
@@ -477,8 +477,8 @@ enum Shift {
 impl Shift {
     fn as_str(&self) -> &'static str {
         match self {
-            Shift::Evening => "evening",
-            Shift::Overnight => "overnight",
+            Self::Evening => "evening",
+            Self::Overnight => "overnight",
         }
     }
 }
@@ -542,7 +542,7 @@ async fn start_stub_mcp_server() -> Result<StubServer, BoxedError> {
     let addr = listener
         .local_addr()
         .map_err(|err| Box::new(err) as BoxedError)?;
-    let url = format!("http://{}", addr);
+    let url = format!("http://{addr}");
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 

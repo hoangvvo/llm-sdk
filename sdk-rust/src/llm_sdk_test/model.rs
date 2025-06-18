@@ -1,13 +1,11 @@
-use std::{collections::VecDeque, sync::Mutex};
-
-use futures::stream;
-
 use crate::{
     boxed_stream::BoxedStream,
     errors::{LanguageModelError, LanguageModelResult},
     language_model::{LanguageModel, LanguageModelMetadata, LanguageModelStream},
     LanguageModelInput, ModelResponse, PartialModelResponse,
 };
+use futures::{future::BoxFuture, stream};
+use std::{collections::VecDeque, sync::Mutex};
 
 /// Result for a mocked `generate` call.
 /// It can either be a full response or an error to return.
@@ -18,11 +16,13 @@ pub enum MockGenerateResult {
 
 impl MockGenerateResult {
     /// Construct a result that yields the provided response.
+    #[must_use]
     pub fn response(response: ModelResponse) -> Self {
         Self::Response(response)
     }
 
     /// Construct a result that yields the provided error.
+    #[must_use]
     pub fn error(error: LanguageModelError) -> Self {
         Self::Error(error)
     }
@@ -52,11 +52,13 @@ pub enum MockStreamResult {
 
 impl MockStreamResult {
     /// Construct a result that yields the provided partial responses.
+    #[must_use]
     pub fn partials(partials: Vec<PartialModelResponse>) -> Self {
         Self::Partials(partials)
     }
 
     /// Construct a result that yields the provided error.
+    #[must_use]
     pub fn error(error: LanguageModelError) -> Self {
         Self::Error(error)
     }
@@ -134,6 +136,7 @@ impl Default for MockLanguageModel {
 
 impl MockLanguageModel {
     /// Construct a new mock language model instance.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -220,7 +223,6 @@ impl MockLanguageModel {
     }
 }
 
-#[async_trait::async_trait]
 impl LanguageModel for MockLanguageModel {
     fn provider(&self) -> &'static str {
         self.provider
@@ -234,42 +236,52 @@ impl LanguageModel for MockLanguageModel {
         self.metadata.as_ref()
     }
 
-    async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
-        let mut state = self.state.lock().expect("mock state poisoned");
-        state.tracked_generate_inputs.push(input.clone());
+    fn generate(
+        &self,
+        input: LanguageModelInput,
+    ) -> BoxFuture<'_, LanguageModelResult<ModelResponse>> {
+        Box::pin(async move {
+            let mut state = self.state.lock().expect("mock state poisoned");
+            state.tracked_generate_inputs.push(input.clone());
 
-        let result = state.mocked_generate_results.pop_front().ok_or_else(|| {
-            LanguageModelError::Invariant(
-                self.provider,
-                "no mocked generate results available".into(),
-            )
-        })?;
+            let result = state.mocked_generate_results.pop_front().ok_or_else(|| {
+                LanguageModelError::Invariant(
+                    self.provider,
+                    "no mocked generate results available".into(),
+                )
+            })?;
 
-        match result {
-            MockGenerateResult::Response(response) => Ok(response),
-            MockGenerateResult::Error(error) => Err(error),
-        }
+            match result {
+                MockGenerateResult::Response(response) => Ok(response),
+                MockGenerateResult::Error(error) => Err(error),
+            }
+        })
     }
 
-    async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream> {
-        let mut state = self.state.lock().expect("mock state poisoned");
+    fn stream(
+        &self,
+        input: LanguageModelInput,
+    ) -> BoxFuture<'_, LanguageModelResult<LanguageModelStream>> {
+        Box::pin(async move {
+            let mut state = self.state.lock().expect("mock state poisoned");
 
-        let result = state.mocked_stream_results.pop_front().ok_or_else(|| {
-            LanguageModelError::Invariant(
-                self.provider,
-                "no mocked stream results available".into(),
-            )
-        })?;
+            let result = state.mocked_stream_results.pop_front().ok_or_else(|| {
+                LanguageModelError::Invariant(
+                    self.provider,
+                    "no mocked stream results available".into(),
+                )
+            })?;
 
-        state.tracked_stream_inputs.push(input.clone());
+            state.tracked_stream_inputs.push(input.clone());
 
-        match result {
-            MockStreamResult::Error(error) => Err(error),
-            MockStreamResult::Partials(partials) => {
-                let stream = stream_from_partials(partials);
-                Ok(stream)
+            match result {
+                MockStreamResult::Error(error) => Err(error),
+                MockStreamResult::Partials(partials) => {
+                    let stream = stream_from_partials(partials);
+                    Ok(stream)
+                }
             }
-        }
+        })
     }
 }
 

@@ -1,11 +1,3 @@
-use chrono::Utc;
-use llm_agent::{
-    mcp::{MCPInit, MCPParams, MCPToolkit},
-    Agent, AgentTool,
-};
-use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions};
-use std::sync::Arc;
-
 use crate::{
     artifacts_tools::{
         ArtifactCreateTool, ArtifactDeleteTool, ArtifactGetTool, ArtifactListTool,
@@ -17,6 +9,13 @@ use crate::{
     information_tools::{GetNewsTool, SearchWikipediaTool},
     weather_tools::{GetCoordinatesTool, GetWeatherTool},
 };
+use chrono::Utc;
+use llm_agent::{
+    mcp::{MCPInit, MCPParams, MCPToolkit},
+    Agent, AgentTool,
+};
+use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AgentOptions {

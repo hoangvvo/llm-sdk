@@ -1,8 +1,7 @@
+use crate::LanguageModelInputExtra;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-
-use crate::LanguageModelInputExtra;
 
 // https://platform.openai.com/docs/api-reference/responses/create
 

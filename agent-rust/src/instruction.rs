@@ -1,6 +1,5 @@
-use std::pin::Pin;
-
 use crate::errors::BoxedError;
+use std::pin::Pin;
 
 pub enum InstructionParam<TCtx> {
     String(String),

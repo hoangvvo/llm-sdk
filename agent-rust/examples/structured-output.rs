@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use dotenvy::dotenv;
+use futures::future::BoxFuture;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -23,7 +23,6 @@ struct SearchFlightsParams {
 
 struct SearchFlightsTool;
 
-#[async_trait]
 impl AgentTool<()> for SearchFlightsTool {
     fn name(&self) -> String {
         "search_flights".to_string()
@@ -34,36 +33,38 @@ impl AgentTool<()> for SearchFlightsTool {
     fn parameters(&self) -> JSONSchema {
         schemars::schema_for!(SearchFlightsParams).into()
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
         _context: &(),
-        _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: SearchFlightsParams = serde_json::from_value(args)?;
-        println!(
-            "Searching flights from {} to {} on {}",
-            params.from, params.to, params.date
-        );
-        Ok(AgentToolResult {
-            content: vec![Part::text(
-                json!([
-                    {
-                        "airline": "Vietnam Airlines",
-                        "departure": format!("{}T10:00:00", params.date),
-                        "arrival": format!("{}T12:00:00", params.date),
-                        "price": 150
-                    },
-                    {
-                        "airline": "Southwest Airlines",
-                        "departure": format!("{}T11:00:00", params.date),
-                        "arrival": format!("{}T13:00:00", params.date),
-                        "price": 120
-                    }
-                ])
-                .to_string(),
-            )],
-            is_error: false,
+        _state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: SearchFlightsParams = serde_json::from_value(args)?;
+            println!(
+                "Searching flights from {} to {} on {}",
+                params.from, params.to, params.date
+            );
+            Ok(AgentToolResult {
+                content: vec![Part::text(
+                    json!([
+                        {
+                            "airline": "Vietnam Airlines",
+                            "departure": format!("{}T10:00:00", params.date),
+                            "arrival": format!("{}T12:00:00", params.date),
+                            "price": 150
+                        },
+                        {
+                            "airline": "Southwest Airlines",
+                            "departure": format!("{}T11:00:00", params.date),
+                            "arrival": format!("{}T13:00:00", params.date),
+                            "price": 120
+                        }
+                    ])
+                    .to_string(),
+                )],
+                is_error: false,
+            })
         })
     }
 }
@@ -81,7 +82,6 @@ struct SearchHotelsParams {
 
 struct SearchHotelsTool;
 
-#[async_trait]
 impl AgentTool<()> for SearchHotelsTool {
     fn name(&self) -> String {
         "search_hotels".to_string()
@@ -92,36 +92,38 @@ impl AgentTool<()> for SearchHotelsTool {
     fn parameters(&self) -> JSONSchema {
         schemars::schema_for!(SearchHotelsParams).into()
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
         _context: &(),
-        _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: SearchHotelsParams = serde_json::from_value(args)?;
-        println!(
-            "Searching hotels in {} from {} for {} nights",
-            params.city, params.check_in, params.nights
-        );
-        Ok(AgentToolResult {
-            content: vec![Part::text(
-                json!([
-                    {
-                        "name": "The Plaza",
-                        "location": params.city.to_string(),
-                        "pricePerNight": 150,
-                        "rating": 4.8
-                    },
-                    {
-                        "name": "Hotel Ritz",
-                        "location": params.city.to_string(),
-                        "pricePerNight": 200,
-                        "rating": 4.7
-                    }
-                ])
-                .to_string(),
-            )],
-            is_error: false,
+        _state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: SearchHotelsParams = serde_json::from_value(args)?;
+            println!(
+                "Searching hotels in {} from {} for {} nights",
+                params.city, params.check_in, params.nights
+            );
+            Ok(AgentToolResult {
+                content: vec![Part::text(
+                    json!([
+                        {
+                            "name": "The Plaza",
+                            "location": params.city.to_string(),
+                            "pricePerNight": 150,
+                            "rating": 4.8
+                        },
+                        {
+                            "name": "Hotel Ritz",
+                            "location": params.city.to_string(),
+                            "pricePerNight": 200,
+                            "rating": 4.7
+                        }
+                    ])
+                    .to_string(),
+                )],
+                is_error: false,
+            })
         })
     }
 }

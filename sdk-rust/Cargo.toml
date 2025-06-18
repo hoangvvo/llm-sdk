@@ -30,7 +30,6 @@ utoipa = ["dep:utoipa"]
 
 [dependencies]
 async-stream = "0.3.6"
-async-trait = "0.1.86"
 base64 = "0.22.1"
 eventsource-stream = "0.2.3"
 futures = "0.3.31"

@@ -7,7 +7,7 @@ use crate::{
     toolkit::{Toolkit, ToolkitSession},
     RunState,
 };
-use async_trait::async_trait;
+use futures::future::BoxFuture;
 use llm_sdk;
 use rmcp::{
     handler::client::ClientHandler,
@@ -46,22 +46,24 @@ where
     }
 }
 
-#[async_trait]
 impl<TCtx> Toolkit<TCtx> for MCPToolkit<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
-    async fn create_session(
-        &self,
-        context: &TCtx,
-    ) -> Result<Box<dyn ToolkitSession<TCtx> + Send + Sync>, BoxedError> {
-        let params = self.init.resolve(context).await?;
-        let session = MCPToolkitSession::new(params).await?;
-        Ok(Box::new(session))
+    fn create_session<'a>(
+        &'a self,
+        context: &'a TCtx,
+    ) -> BoxFuture<'a, Result<Box<dyn ToolkitSession<TCtx> + Send + Sync>, BoxedError>> {
+        Box::pin(async move {
+            let params = self.init.resolve(context).await?;
+            let session = MCPToolkitSession::new(params).await?;
+            let boxed: Box<dyn ToolkitSession<TCtx> + Send + Sync> = Box::new(session);
+            Ok(boxed)
+        })
     }
 }
 
-/// ToolkitSession implementation that exposes MCP tools to the agent runtime.
+/// `ToolkitSession` implementation that exposes MCP tools to the agent runtime.
 struct MCPToolkitSession<TCtx>
 where
     TCtx: Send + Sync + 'static,
@@ -103,7 +105,6 @@ where
     }
 }
 
-#[async_trait]
 impl<TCtx> ToolkitSession<TCtx> for MCPToolkitSession<TCtx>
 where
     TCtx: Send + Sync + 'static,
@@ -116,16 +117,18 @@ where
         self.state.tools()
     }
 
-    async fn close(self: Box<Self>) -> Result<(), BoxedError> {
-        match Arc::try_unwrap(self.service) {
-            Ok(service) => {
-                let _ = service.cancel().await;
+    fn close(self: Box<Self>) -> BoxFuture<'static, Result<(), BoxedError>> {
+        Box::pin(async move {
+            match Arc::try_unwrap(self.service) {
+                Ok(service) => {
+                    let _ = service.cancel().await;
+                }
+                Err(arc) => {
+                    arc.cancellation_token().cancel();
+                }
             }
-            Err(arc) => {
-                arc.cancellation_token().cancel();
-            }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 }
 
@@ -146,7 +149,10 @@ where
     fn new(service: &Arc<MCPRunningService<TCtx>>, tool: Tool) -> Self {
         let parameters =
             Value::Object(Arc::try_unwrap(tool.input_schema).unwrap_or_else(|arc| (*arc).clone()));
-        let description = tool.description.map(|d| d.into_owned()).unwrap_or_default();
+        let description = tool
+            .description
+            .map(std::borrow::Cow::into_owned)
+            .unwrap_or_default();
         Self {
             service: Arc::downgrade(service),
             name: tool.name.into_owned(),
@@ -156,7 +162,6 @@ where
     }
 }
 
-#[async_trait]
 impl<TCtx> AgentTool<TCtx> for MCPRemoteTool<TCtx>
 where
     TCtx: Send + Sync + 'static,
@@ -173,45 +178,49 @@ where
         self.parameters.clone()
     }
 
-    async fn execute(
+    fn execute(
         &self,
         args: Value,
         _context: &TCtx,
         _state: &RunState,
-    ) -> Result<AgentToolResult, BoxedError> {
-        let arguments = match args {
-            Value::Null => None,
-            Value::Object(map) => Some(map),
-            other => {
-                let message = format!("MCP tool arguments must be an object, received {other}");
-                return Err(Box::new(IoError::new(ErrorKind::InvalidInput, message)));
-            }
-        };
+    ) -> BoxFuture<'_, Result<AgentToolResult, BoxedError>> {
+        Box::pin(async move {
+            let arguments = match args {
+                Value::Null => None,
+                Value::Object(map) => Some(map),
+                other => {
+                    let message = format!("MCP tool arguments must be an object, received {other}");
+                    return Err(
+                        Box::new(IoError::new(ErrorKind::InvalidInput, message)) as BoxedError
+                    );
+                }
+            };
 
-        let request = CallToolRequestParam {
-            name: self.name.clone().into(),
-            arguments,
-        };
+            let request = CallToolRequestParam {
+                name: self.name.clone().into(),
+                arguments,
+            };
 
-        let Some(service) = self.service.upgrade() else {
-            return Err(Box::new(IoError::new(
-                ErrorKind::NotConnected,
-                "MCP service not initialised",
-            )));
-        };
-        let result = service
-            .call_tool(request)
-            .await
-            .map_err(|err| Box::new(err) as BoxedError)?;
+            let Some(service) = self.service.upgrade() else {
+                return Err(Box::new(IoError::new(
+                    ErrorKind::NotConnected,
+                    "MCP service not initialised",
+                )) as BoxedError);
+            };
+            let result = service
+                .call_tool(request)
+                .await
+                .map_err(|err| Box::new(err) as BoxedError)?;
 
-        let CallToolResult {
-            content, is_error, ..
-        } = result;
+            let CallToolResult {
+                content, is_error, ..
+            } = result;
 
-        let content = convert_mcp_content(content)?;
-        let is_error = is_error.unwrap_or(false);
+            let content = convert_mcp_content(content)?;
+            let is_error = is_error.unwrap_or(false);
 
-        Ok(AgentToolResult { content, is_error })
+            Ok(AgentToolResult { content, is_error })
+        })
     }
 }
 

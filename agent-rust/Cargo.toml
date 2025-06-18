@@ -28,7 +28,6 @@ use_self = "warn"
 
 [dependencies]
 async-stream = "0.3.6"
-async-trait = "0.1.86"
 base64 = "0.22.1"
 futures = "0.3.31"
 llm-sdk = { version = "0.1.0", path = "../sdk-rust" }

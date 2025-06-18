@@ -1,14 +1,13 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
-
 use dotenvy::dotenv;
+use futures::future::BoxFuture;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 #[derive(Clone)]
 enum ArtifactKind {
     Markdown,
@@ -98,7 +97,6 @@ type Ctx = ();
 struct ArtifactCreate {
     store: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for ArtifactCreate {
     fn name(&self) -> String {
         "artifact_create".into()
@@ -118,24 +116,26 @@ impl AgentTool<Ctx> for ArtifactCreate {
             "additionalProperties":false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _ctx: &Ctx,
+        _ctx: &'a Ctx,
         _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        #[derive(Deserialize)]
-        struct In {
-            title: String,
-            kind: String,
-            content: String,
-        }
-        let p: In = serde_json::from_value(args)?;
-        println!("[artifacts.create] title={} kind={}", p.title, p.kind);
-        let a = self.store.create(p.title, p.kind, p.content);
-        Ok(AgentToolResult {
-            content: vec![Part::text(json!({"artifact":a}).to_string())],
-            is_error: false,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            #[derive(Deserialize)]
+            struct In {
+                title: String,
+                kind: String,
+                content: String,
+            }
+            let p: In = serde_json::from_value(args)?;
+            println!("[artifacts.create] title={} kind={}", p.title, p.kind);
+            let a = self.store.create(p.title, p.kind, p.content);
+            Ok(AgentToolResult {
+                content: vec![Part::text(json!({"artifact":a}).to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -143,7 +143,6 @@ impl AgentTool<Ctx> for ArtifactCreate {
 struct ArtifactUpdate {
     store: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for ArtifactUpdate {
     fn name(&self) -> String {
         "artifact_update".into()
@@ -159,28 +158,30 @@ impl AgentTool<Ctx> for ArtifactUpdate {
             "additionalProperties":false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _ctx: &Ctx,
+        _ctx: &'a Ctx,
         _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        #[derive(Deserialize)]
-        struct In {
-            id: String,
-            content: String,
-        }
-        let p: In = serde_json::from_value(args)?;
-        let before = self.store.get(&p.id).content;
-        println!("[artifacts.update] id={} len={}", p.id, p.content.len());
-        let (a, _before) = self.store.update(&p.id, p.content);
-        println!(
-            "\n=== Diff (old → new) ===\n{}========================\n",
-            render_diff(&before, &a.content)
-        );
-        Ok(AgentToolResult {
-            content: vec![Part::text(json!({"artifact":a}).to_string())],
-            is_error: false,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            #[derive(Deserialize)]
+            struct In {
+                id: String,
+                content: String,
+            }
+            let p: In = serde_json::from_value(args)?;
+            let before = self.store.get(&p.id).content;
+            println!("[artifacts.update] id={} len={}", p.id, p.content.len());
+            let (a, _before) = self.store.update(&p.id, p.content);
+            println!(
+                "\n=== Diff (old → new) ===\n{}========================\n",
+                render_diff(&before, &a.content)
+            );
+            Ok(AgentToolResult {
+                content: vec![Part::text(json!({"artifact":a}).to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -188,7 +189,6 @@ impl AgentTool<Ctx> for ArtifactUpdate {
 struct ArtifactGet {
     store: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for ArtifactGet {
     fn name(&self) -> String {
         "artifact_get".into()
@@ -199,22 +199,24 @@ impl AgentTool<Ctx> for ArtifactGet {
     fn parameters(&self) -> JSONSchema {
         json!({"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false})
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _ctx: &Ctx,
+        _ctx: &'a Ctx,
         _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        #[derive(Deserialize)]
-        struct In {
-            id: String,
-        }
-        let p: In = serde_json::from_value(args)?;
-        println!("[artifacts.get] id={}", p.id);
-        let a = self.store.get(&p.id);
-        Ok(AgentToolResult {
-            content: vec![Part::text(json!({"artifact":a}).to_string())],
-            is_error: false,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            #[derive(Deserialize)]
+            struct In {
+                id: String,
+            }
+            let p: In = serde_json::from_value(args)?;
+            println!("[artifacts.get] id={}", p.id);
+            let a = self.store.get(&p.id);
+            Ok(AgentToolResult {
+                content: vec![Part::text(json!({"artifact":a}).to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -222,7 +224,6 @@ impl AgentTool<Ctx> for ArtifactGet {
 struct ArtifactList {
     store: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for ArtifactList {
     fn name(&self) -> String {
         "artifact_list".into()
@@ -233,17 +234,19 @@ impl AgentTool<Ctx> for ArtifactList {
     fn parameters(&self) -> JSONSchema {
         json!({"type":"object","properties":{},"additionalProperties":false})
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         _args: serde_json::Value,
-        _ctx: &Ctx,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        println!("[artifacts.list]");
-        let list = self.store.list();
-        Ok(AgentToolResult {
-            content: vec![Part::text(json!({"artifacts":list}).to_string())],
-            is_error: false,
+        _ctx: &'a Ctx,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            println!("[artifacts.list]");
+            let list = self.store.list();
+            Ok(AgentToolResult {
+                content: vec![Part::text(json!({"artifacts":list}).to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -251,7 +254,6 @@ impl AgentTool<Ctx> for ArtifactList {
 struct ArtifactDelete {
     store: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for ArtifactDelete {
     fn name(&self) -> String {
         "artifact_delete".into()
@@ -262,22 +264,24 @@ impl AgentTool<Ctx> for ArtifactDelete {
     fn parameters(&self) -> JSONSchema {
         json!({"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false})
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _ctx: &Ctx,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        #[derive(Deserialize)]
-        struct In {
-            id: String,
-        }
-        let p: In = serde_json::from_value(args)?;
-        println!("[artifacts.delete] id={}", p.id);
-        let ok = self.store.delete(&p.id);
-        Ok(AgentToolResult {
-            content: vec![Part::text(json!({"success":ok}).to_string())],
-            is_error: false,
+        _ctx: &'a Ctx,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            #[derive(Deserialize)]
+            struct In {
+                id: String,
+            }
+            let p: In = serde_json::from_value(args)?;
+            println!("[artifacts.delete] id={}", p.id);
+            let ok = self.store.delete(&p.id);
+            Ok(AgentToolResult {
+                content: vec![Part::text(json!({"success":ok}).to_string())],
+                is_error: false,
+            })
         })
     }
 }

@@ -22,6 +22,7 @@ where
     TCtx: Send + Sync + 'static,
 {
     /// Returns an init that always yields the supplied parameters.
+    #[must_use]
     pub fn from_params(params: MCPParams) -> Self {
         Self::Params(params)
     }
@@ -46,9 +47,9 @@ where
     /// Resolve parameters for the supplied context.
     pub(crate) async fn resolve(&self, context: &TCtx) -> Result<MCPParams, BoxedError> {
         match self {
-            MCPInit::Params(params) => Ok(params.clone()),
-            MCPInit::Func(func) => func(context),
-            MCPInit::AsyncFunc(func) => func(context).await,
+            Self::Params(params) => Ok(params.clone()),
+            Self::Func(func) => func(context),
+            Self::AsyncFunc(func) => func(context).await,
         }
     }
 }
@@ -58,7 +59,7 @@ where
     TCtx: Send + Sync + 'static,
 {
     fn from(value: MCPParams) -> Self {
-        MCPInit::from_params(value)
+        Self::from_params(value)
     }
 }
 
@@ -68,14 +69,14 @@ where
     F: Fn(&TCtx) -> Result<MCPParams, BoxedError> + Send + Sync + 'static,
 {
     fn from(value: F) -> Self {
-        MCPInit::from_fn(value)
+        Self::from_fn(value)
     }
 }
 
 // For async resolvers use `MCPInit::from_async_fn` explicitly to preserve
 // clarity.
 
-/// MCPParams describes how to reach an MCP server.
+/// `MCPParams` describes how to reach an MCP server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum MCPParams {

@@ -1,6 +1,9 @@
-use async_trait::async_trait;
 use dotenvy::dotenv;
-use futures::lock::{Mutex, MutexGuard};
+use futures::{
+    future::BoxFuture,
+    lock::{Mutex, MutexGuard},
+    FutureExt,
+};
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -40,7 +43,6 @@ impl<TCtx> AgentTransferTool<TCtx> {
     }
 }
 
-#[async_trait]
 impl<TCtx> AgentTool<TCtx> for AgentTransferTool<TCtx>
 where
     TCtx: Send + Sync + Clone + 'static,
@@ -57,28 +59,30 @@ where
     fn parameters(&self) -> JSONSchema {
         schemars::schema_for!(DelegateParams).into()
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         params: Value,
-        context: &TCtx,
+        context: &'a TCtx,
         _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: DelegateParams = serde_json::from_value(params)?;
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: DelegateParams = serde_json::from_value(params)?;
 
-        println!("[-> {} agent]: {}", self.agent.name, params.task);
+            println!("[-> {} agent]: {}", self.agent.name, params.task);
 
-        let result = self
-            .agent
-            .run(AgentRequest {
-                input: vec![AgentItem::Message(Message::user(vec![Part::Text(
-                    params.task.into(),
-                )]))],
-                context: (*context).clone(),
+            let result = self
+                .agent
+                .run(AgentRequest {
+                    input: vec![AgentItem::Message(Message::user(vec![Part::Text(
+                        params.task.into(),
+                    )]))],
+                    context: (*context).clone(),
+                })
+                .await?;
+            Ok(AgentToolResult {
+                content: result.content,
+                is_error: false,
             })
-            .await?;
-        Ok(AgentToolResult {
-            content: result.content,
-            is_error: false,
         })
     }
 }
@@ -120,7 +124,6 @@ struct CreateOrderParams {
 
 struct CreateOrderTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for CreateOrderTool {
     fn name(&self) -> String {
         "create_order".to_string()
@@ -131,34 +134,36 @@ impl AgentTool<MyContext> for CreateOrderTool {
     fn parameters(&self) -> JSONSchema {
         schemars::schema_for!(CreateOrderParams).into()
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         params: Value,
-        context: &MyContext,
+        context: &'a MyContext,
         _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: CreateOrderParams = serde_json::from_value(params)?;
-        println!(
-            "[order.create_order] Creating order for {} with quantity {}",
-            params.customer_name, params.quantity
-        );
-        // Randomly finish between 1 to 10 seconds
-        let completion_duration = Duration::from_millis((rand::random::<u64>() % 9000) + 1000);
-        context
-            .push_order(Order {
-                customer_name: params.customer_name,
-                address: params.address,
-                quantity: params.quantity,
-                completion_time: Instant::now() + completion_duration,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: CreateOrderParams = serde_json::from_value(params)?;
+            println!(
+                "[order.create_order] Creating order for {} with quantity {}",
+                params.customer_name, params.quantity
+            );
+            // Randomly finish between 1 to 10 seconds
+            let completion_duration = Duration::from_millis((rand::random::<u64>() % 9000) + 1000);
+            context
+                .push_order(Order {
+                    customer_name: params.customer_name,
+                    address: params.address,
+                    quantity: params.quantity,
+                    completion_time: Instant::now() + completion_duration,
+                })
+                .await;
+            Ok(AgentToolResult {
+                content: vec![Part::Text(
+                    serde_json::json!({ "status": "creating" })
+                        .to_string()
+                        .into(),
+                )],
+                is_error: false,
             })
-            .await;
-        Ok(AgentToolResult {
-            content: vec![Part::Text(
-                serde_json::json!({ "status": "creating" })
-                    .to_string()
-                    .into(),
-            )],
-            is_error: false,
         })
     }
 }
@@ -177,7 +182,6 @@ struct OrderStatus {
 
 struct GetOrdersTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for GetOrdersTool {
     fn name(&self) -> String {
         "get_orders".to_string()
@@ -188,42 +192,47 @@ impl AgentTool<MyContext> for GetOrdersTool {
     fn parameters(&self) -> JSONSchema {
         schemars::schema_for!(GetOrdersParams).into()
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         _params: Value,
-        context: &MyContext,
+        context: &'a MyContext,
         _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let now = Instant::now();
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        async move {
+            let now = Instant::now();
 
-        let mut result = Vec::new();
-        let mut completed_count = 0;
+            let mut result = Vec::new();
+            let mut completed_count = 0;
 
-        let orders_guard = context.get_orders().await;
-        for order in orders_guard.iter() {
-            let status = if order.completion_time <= now {
-                completed_count += 1;
-                "completed"
-            } else {
-                "pending"
-            };
+            let orders_guard = context.get_orders().await;
+            for order in orders_guard.iter() {
+                let status = if order.completion_time <= now {
+                    completed_count += 1;
+                    "completed"
+                } else {
+                    "pending"
+                };
 
-            result.push(OrderStatus {
-                customer_name: order.customer_name.clone(),
-                address: order.address.clone(),
-                quantity: order.quantity,
-                status: status.to_string(),
-            });
+                result.push(OrderStatus {
+                    customer_name: order.customer_name.clone(),
+                    address: order.address.clone(),
+                    quantity: order.quantity,
+                    status: status.to_string(),
+                });
+            }
+            println!(
+                "[order.get_orders] Retrieving orders. Found {completed_count} completed orders."
+            );
+
+            // Remove completed orders
+            context.prune_orders().await;
+
+            Ok(AgentToolResult {
+                content: vec![Part::Text(serde_json::to_string(&result)?.into())],
+                is_error: false,
+            })
         }
-        println!("[order.get_orders] Retrieving orders. Found {completed_count} completed orders.");
-
-        // Remove completed orders
-        context.prune_orders().await;
-
-        Ok(AgentToolResult {
-            content: vec![Part::Text(serde_json::to_string(&result)?.into())],
-            is_error: false,
-        })
+        .boxed()
     }
 }
 
@@ -236,7 +245,6 @@ struct DeliverOrderParams {
 
 pub struct DeliverOrderTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for DeliverOrderTool {
     fn name(&self) -> String {
         "deliver_order".to_string()
@@ -247,23 +255,25 @@ impl AgentTool<MyContext> for DeliverOrderTool {
     fn parameters(&self) -> JSONSchema {
         schemars::schema_for!(DeliverOrderParams).into()
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         params: Value,
         _context: &MyContext,
         _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: DeliverOrderParams = serde_json::from_value(params)?;
-        println!(
-            "[delivery.deliver_order] Delivering order for {} to {}",
-            params.customer_name, params.address
-        );
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: DeliverOrderParams = serde_json::from_value(params)?;
+            println!(
+                "[delivery.deliver_order] Delivering order for {} to {}",
+                params.customer_name, params.address
+            );
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(
-                serde_json::json!({ "status": "delivering" }).to_string(),
-            )],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(
+                    serde_json::json!({ "status": "delivering" }).to_string(),
+                )],
+                is_error: false,
+            })
         })
     }
 }

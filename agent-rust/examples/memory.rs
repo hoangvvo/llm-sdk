@@ -1,14 +1,13 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
-
 use dotenvy::dotenv;
+use futures::future::BoxFuture;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, InstructionParam};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 // Memory pattern example: core + archival memory tools and instructions.
 
 #[derive(Clone, Default)]
@@ -74,7 +73,6 @@ type Ctx = ();
 struct CoreMemoryUpdate {
     store: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for CoreMemoryUpdate {
     fn name(&self) -> String {
         "core_memory_update".into()
@@ -90,34 +88,36 @@ impl AgentTool<Ctx> for CoreMemoryUpdate {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &Ctx,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        #[derive(Deserialize)]
-        struct In {
-            id: String,
-            content: String,
-        }
-        let mut input: In = serde_json::from_value(args)?;
-        println!(
-            "[memory.core_memory_update] id={} len={}",
-            input.id,
-            input.content.len()
-        );
-        if input.id.trim().is_empty() {
-            input.id = rand_id();
-        }
-        let updated = self.store.update_core(MemoryBlock {
-            id: input.id,
-            content: input.content,
-        });
-        let body = json!({"core_memories": updated}).to_string();
-        Ok(AgentToolResult {
-            content: vec![Part::text(body)],
-            is_error: false,
+        _context: &'a Ctx,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            #[derive(Deserialize)]
+            struct In {
+                id: String,
+                content: String,
+            }
+            let mut input: In = serde_json::from_value(args)?;
+            println!(
+                "[memory.core_memory_update] id={} len={}",
+                input.id,
+                input.content.len()
+            );
+            if input.id.trim().is_empty() {
+                input.id = rand_id();
+            }
+            let updated = self.store.update_core(MemoryBlock {
+                id: input.id,
+                content: input.content,
+            });
+            let body = json!({"core_memories": updated}).to_string();
+            Ok(AgentToolResult {
+                content: vec![Part::text(body)],
+                is_error: false,
+            })
         })
     }
 }
@@ -125,7 +125,6 @@ impl AgentTool<Ctx> for CoreMemoryUpdate {
 struct ArchivalSearch {
     store: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for ArchivalSearch {
     fn name(&self) -> String {
         "archival_memory_search".into()
@@ -141,24 +140,26 @@ impl AgentTool<Ctx> for ArchivalSearch {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &Ctx,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        #[derive(Deserialize)]
-        struct In {
-            query: String,
-        }
-        let input: In = serde_json::from_value(args)?;
-        println!("[memory.archival_memory_search] query=\"{}\"", input.query);
-        // TODO: Replace with semantic vector search using embeddings
-        let results = self.store.search_archival(&input.query);
-        let body = json!({"results": results}).to_string();
-        Ok(AgentToolResult {
-            content: vec![Part::text(body)],
-            is_error: false,
+        _context: &'a Ctx,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            #[derive(Deserialize)]
+            struct In {
+                query: String,
+            }
+            let input: In = serde_json::from_value(args)?;
+            println!("[memory.archival_memory_search] query=\"{}\"", input.query);
+            // TODO: Replace with semantic vector search using embeddings
+            let results = self.store.search_archival(&input.query);
+            let body = json!({"results": results}).to_string();
+            Ok(AgentToolResult {
+                content: vec![Part::text(body)],
+                is_error: false,
+            })
         })
     }
 }
@@ -166,7 +167,6 @@ impl AgentTool<Ctx> for ArchivalSearch {
 struct ArchivalUpdate {
     store: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for ArchivalUpdate {
     fn name(&self) -> String {
         "archival_memory_update".into()
@@ -182,38 +182,40 @@ impl AgentTool<Ctx> for ArchivalUpdate {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _context: &Ctx,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        #[derive(Deserialize)]
-        struct In {
-            id: String,
-            content: String,
-        }
-        let mut input: In = serde_json::from_value(args)?;
-        println!(
-            "[memory.archival_memory_update] id={} len={}",
-            input.id,
-            input.content.len()
-        );
-        if input.id.trim().is_empty() {
-            input.id = rand_id();
-        }
-        self.store.update_archival(MemoryBlock {
-            id: input.id.clone(),
-            content: input.content.clone(),
-        });
-        let resp = if input.content.trim().is_empty() {
-            json!({"success": true, "action": "deleted"})
-        } else {
-            json!({"success": true, "action": "updated", "memory": {"id": input.id, "content": input.content}})
-        };
-        Ok(AgentToolResult {
-            content: vec![Part::text(resp.to_string())],
-            is_error: false,
+        _context: &'a Ctx,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            #[derive(Deserialize)]
+            struct In {
+                id: String,
+                content: String,
+            }
+            let mut input: In = serde_json::from_value(args)?;
+            println!(
+                "[memory.archival_memory_update] id={} len={}",
+                input.id,
+                input.content.len()
+            );
+            if input.id.trim().is_empty() {
+                input.id = rand_id();
+            }
+            self.store.update_archival(MemoryBlock {
+                id: input.id.clone(),
+                content: input.content.clone(),
+            });
+            let resp = if input.content.trim().is_empty() {
+                json!({"success": true, "action": "deleted"})
+            } else {
+                json!({"success": true, "action": "updated", "memory": {"id": input.id, "content": input.content}})
+            };
+            Ok(AgentToolResult {
+                content: vec![Part::text(resp.to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -237,16 +239,16 @@ async fn main() {
 
     let store = Store::default();
 
-    let memory_prompt = r#"You can remember information learned from interactions with the user in two types of memory called core memory and archival memory.
+    let memory_prompt = r"You can remember information learned from interactions with the user in two types of memory called core memory and archival memory.
 Core memory is always available in your conversation context, providing essential, foundational context for keeping track of key details about the user.
 As core memory is limited in size, it is important to only store the most important information. For other less important details, use archival memory.
 Archival memory is infinite size, but is held outside of your immediate context, so you must explicitly run a search operation to see data inside it.
-Archival memory is used to remember less significant details about the user or information found during the conversation. When the user mentions a name, topic, or details you don't know, search your archival memory to see if you have any information about it."#;
+Archival memory is used to remember less significant details about the user or information found during the conversation. When the user mentions a name, topic, or details you don't know, search your archival memory to see if you have any information about it.";
 
-    let rules_prompt = r#"You cannot see prior conversation turns beyond what is provided in the current input.
+    let rules_prompt = r"You cannot see prior conversation turns beyond what is provided in the current input.
 When a user shares a durable preference or profile detail, call core_memory_update to store it.
 When asked to recall such facts and it's not present in the current input, rely on the core memories in this prompt.
-For less important or long-tail info, use archival_memory_search before answering."#;
+For less important or long-tail info, use archival_memory_search before answering.";
 
     let agent = Agent::new(
         llm_agent::AgentParams::new("memory", model.clone())
@@ -254,7 +256,7 @@ For less important or long-tail info, use archival_memory_search before answerin
             .add_instruction(rules_prompt)
             .add_instruction(InstructionParam::AsyncFunc(Box::new({
                 let store = store.clone();
-                move |_| {
+                move |()| {
                     let store = store.clone();
                     Box::pin(async move {
                         let blocks = store.fetch_core();
@@ -313,7 +315,7 @@ For less important or long-tail info, use archival_memory_search before answerin
            Analytics weekly sessions, and the paid ads spend spreadsheet. "
         + "Please tuck this away so you can look it up later.";
     let items3: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(&turn3)]))];
-    println!("[user] {}", turn3);
+    println!("[user] {turn3}");
     let res3 = agent
         .run(AgentRequest {
             context: (),
@@ -326,7 +328,7 @@ For less important or long-tail info, use archival_memory_search before answerin
     // Turn 4 — fetch the saved background notes
     let turn4 = "Can you pull up what we have under 'q3-report-research'?";
     let items4: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(turn4)]))];
-    println!("[user] {}", turn4);
+    println!("[user] {turn4}");
     let res4 = agent
         .run(AgentRequest {
             context: (),

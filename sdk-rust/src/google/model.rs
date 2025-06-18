@@ -12,7 +12,7 @@ use crate::{
     ResponseFormatOption, ToolChoiceOption,
 };
 use async_stream::try_stream;
-use futures::StreamExt;
+use futures::{future::BoxFuture, StreamExt};
 use reqwest::Client;
 use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
@@ -57,7 +57,6 @@ impl GoogleModel {
     }
 }
 
-#[async_trait::async_trait]
 impl LanguageModel for GoogleModel {
     fn provider(&self) -> &'static str {
         PROVIDER
@@ -71,136 +70,147 @@ impl LanguageModel for GoogleModel {
         self.metadata.as_deref()
     }
 
-    async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
-        crate::opentelemetry::trace_generate(
-            self.provider(),
-            &self.model_id(),
-            input,
-            |input| async move {
-                let params = convert_to_generate_content_parameters(input, &self.model_id)?;
+    fn generate(
+        &self,
+        input: LanguageModelInput,
+    ) -> BoxFuture<'_, LanguageModelResult<ModelResponse>> {
+        Box::pin(async move {
+            crate::opentelemetry::trace_generate(
+                self.provider(),
+                &self.model_id(),
+                input,
+                |input| async move {
+                    let params = convert_to_generate_content_parameters(input, &self.model_id)?;
 
-                let url = format!(
-                    "{}/models/{}:generateContent?key={}",
-                    self.base_url, self.model_id, self.api_key
-                );
+                    let url = format!(
+                        "{}/models/{}:generateContent?key={}",
+                        self.base_url, self.model_id, self.api_key
+                    );
 
-                let response: GenerateContentResponse = client_utils::send_json(
-                    &self.client,
-                    &url,
-                    &params,
-                    reqwest::header::HeaderMap::new(),
-                )
-                .await?;
+                    let response: GenerateContentResponse = client_utils::send_json(
+                        &self.client,
+                        &url,
+                        &params,
+                        reqwest::header::HeaderMap::new(),
+                    )
+                    .await?;
 
-                let candidate = response
-                    .candidates
-                    .and_then(|c| c.into_iter().next())
-                    .ok_or_else(|| {
-                        LanguageModelError::Invariant(
-                            PROVIDER,
-                            "No candidate in response".to_string(),
-                        )
-                    })?;
+                    let candidate = response
+                        .candidates
+                        .and_then(|c| c.into_iter().next())
+                        .ok_or_else(|| {
+                            LanguageModelError::Invariant(
+                                PROVIDER,
+                                "No candidate in response".to_string(),
+                            )
+                        })?;
 
-                let content = map_google_content(
-                    candidate.content.and_then(|c| c.parts).unwrap_or_default(),
-                )?;
+                    let content = map_google_content(
+                        candidate.content.and_then(|c| c.parts).unwrap_or_default(),
+                    )?;
 
-                let usage = response
-                    .usage_metadata
-                    .map(|u| map_google_usage_metadata(&u));
+                    let usage = response
+                        .usage_metadata
+                        .map(|u| map_google_usage_metadata(&u));
 
-                let cost = if let (Some(usage), Some(pricing)) = (
-                    usage.as_ref(),
-                    self.metadata().and_then(|m| m.pricing.as_ref()),
-                ) {
-                    Some(usage.calculate_cost(pricing))
-                } else {
-                    None
-                };
+                    let cost = if let (Some(usage), Some(pricing)) = (
+                        usage.as_ref(),
+                        self.metadata().and_then(|m| m.pricing.as_ref()),
+                    ) {
+                        Some(usage.calculate_cost(pricing))
+                    } else {
+                        None
+                    };
 
-                Ok(ModelResponse {
-                    content,
-                    usage,
-                    cost,
-                })
-            },
-        )
-        .await
+                    Ok(ModelResponse {
+                        content,
+                        usage,
+                        cost,
+                    })
+                },
+            )
+            .await
+        })
     }
 
-    async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream> {
-        crate::opentelemetry::trace_stream(
-            self.provider(),
-            &self.model_id(),
-            input,
-            |input| async move {
-                let params = convert_to_generate_content_parameters(input, &self.model_id)?;
-                let metadata = self.metadata.clone();
+    fn stream(
+        &self,
+        input: LanguageModelInput,
+    ) -> BoxFuture<'_, LanguageModelResult<LanguageModelStream>> {
+        Box::pin(async move {
+            crate::opentelemetry::trace_stream(
+                self.provider(),
+                &self.model_id(),
+                input,
+                |input| async move {
+                    let params = convert_to_generate_content_parameters(input, &self.model_id)?;
+                    let metadata = self.metadata.clone();
 
-                let url = format!(
-                    "{}/models/{}:streamGenerateContent?key={}&alt=sse",
-                    self.base_url, self.model_id, self.api_key
-                );
+                    let url = format!(
+                        "{}/models/{}:streamGenerateContent?key={}&alt=sse",
+                        self.base_url, self.model_id, self.api_key
+                    );
 
-                let mut chunk_stream = client_utils::send_sse_stream::<_, GenerateContentResponse>(
-                    &self.client,
-                    &url,
-                    &params,
-                    reqwest::header::HeaderMap::new(),
-                    self.provider(),
-                )
-                .await?;
+                    let mut chunk_stream =
+                        client_utils::send_sse_stream::<_, GenerateContentResponse>(
+                            &self.client,
+                            &url,
+                            &params,
+                            reqwest::header::HeaderMap::new(),
+                            self.provider(),
+                        )
+                        .await?;
 
-                let stream = try_stream! {
-                    let mut all_content_deltas: Vec<ContentDelta> = Vec::new();
+                    let stream = try_stream! {
+                        let mut all_content_deltas: Vec<ContentDelta> = Vec::new();
 
-                    while let Some(chunk) = chunk_stream.next().await {
-                        let response = chunk?;
+                        while let Some(chunk) = chunk_stream.next().await {
+                            let response = chunk?;
 
-                        let candidate = response
-                            .candidates
-                            .and_then(|c| c.into_iter().next());
+                            let candidate = response
+                                .candidates
+                                .and_then(|c| c.into_iter().next());
 
-                        if let Some(candidate) = candidate {
-                            if let Some(content) = candidate.content {
-                                if let Some(parts) = content.parts {
-                                    let incoming_deltas = map_google_content_to_delta(
-                                        parts,
-                                        &all_content_deltas,
-                                    )?;
+                            if let Some(candidate) = candidate {
+                                if let Some(content) = candidate.content {
+                                    if let Some(parts) = content.parts {
+                                        let incoming_deltas = map_google_content_to_delta(
+                                            parts,
+                                            &all_content_deltas,
+                                        )?;
 
-                                    all_content_deltas.extend(incoming_deltas.clone());
+                                        all_content_deltas.extend(incoming_deltas.clone());
 
-                                    for delta in incoming_deltas {
-                                        yield PartialModelResponse {
-                                            delta: Some(delta),
-                                            usage: None,
-                                            cost: None,
-                                        };
+                                        for delta in incoming_deltas {
+                                            yield PartialModelResponse {
+                                                delta: Some(delta),
+                                                usage: None,
+                                                cost: None,
+                                            };
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        if let Some(usage_metadata) = response.usage_metadata {
-                            let usage = map_google_usage_metadata(&usage_metadata);
-                            yield PartialModelResponse {
-                                delta: None,
-                                cost: metadata
-                                    .as_ref()
-                                    .and_then(|m| m.pricing.as_ref())
-                                    .map(|pricing| usage.calculate_cost(pricing)),
-                                usage: Some(usage),
-                            };
+                            if let Some(usage_metadata) = response.usage_metadata {
+                                let usage = map_google_usage_metadata(&usage_metadata);
+                                yield PartialModelResponse {
+                                    delta: None,
+                                    cost: metadata
+                                        .as_ref()
+                                        .and_then(|m| m.pricing.as_ref())
+                                        .map(|pricing| usage.calculate_cost(pricing)),
+                                    usage: Some(usage),
+                                };
+                            }
                         }
-                    }
-                };
+                    };
 
-                Ok(LanguageModelStream::from_stream(stream))
-            },
-        )
-        .await
+                    Ok(LanguageModelStream::from_stream(stream))
+                },
+            )
+            .await
+        })
     }
 }
 

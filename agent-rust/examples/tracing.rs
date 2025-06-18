@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use dotenvy::dotenv;
+use futures::future::BoxFuture;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -30,7 +30,6 @@ struct WeatherArgs {
 
 struct WeatherTool;
 
-#[async_trait]
 impl AgentTool<TracingContext> for WeatherTool {
     fn name(&self) -> String {
         "get_weather".into()
@@ -54,30 +53,32 @@ impl AgentTool<TracingContext> for WeatherTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        _context: &TracingContext,
-        _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: WeatherArgs = serde_json::from_value(args)?;
-        // Attach a child span so downstream work is correlated with the agent span.
-        let span = info_span!("tools.get_weather", city = %params.city);
-        let _guard = span.enter();
+        _context: &'a TracingContext,
+        _state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: WeatherArgs = serde_json::from_value(args)?;
+            // Attach a child span so downstream work is correlated with the agent span.
+            let span = info_span!("tools.get_weather", city = %params.city);
+            let _guard = span.enter();
 
-        // simulate an internal dependency call while the span is active
-        info!("looking up forecast");
-        sleep(Duration::from_millis(120)).await;
+            // simulate an internal dependency call while the span is active
+            info!("looking up forecast");
+            sleep(Duration::from_millis(120)).await;
 
-        let payload = json!({
-            "city": params.city,
-            "forecast": "Sunny",
-            "temperature_c": 24,
-        });
+            let payload = json!({
+                "city": params.city,
+                "forecast": "Sunny",
+                "temperature_c": 24,
+            });
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(payload.to_string())],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(payload.to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -93,7 +94,6 @@ struct NotifyArgs {
 
 struct NotifyTool;
 
-#[async_trait]
 impl AgentTool<TracingContext> for NotifyTool {
     fn name(&self) -> String {
         "send_notification".into()
@@ -107,31 +107,33 @@ impl AgentTool<TracingContext> for NotifyTool {
         schemars::schema_for!(NotifyArgs).into()
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        _context: &TracingContext,
-        _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: NotifyArgs = serde_json::from_value(args)?;
-        let span = info_span!("tools.send_notification", phone = %params.phone_number);
-        let _guard = span.enter();
+        _context: &'a TracingContext,
+        _state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: NotifyArgs = serde_json::from_value(args)?;
+            let span = info_span!("tools.send_notification", phone = %params.phone_number);
+            let _guard = span.enter();
 
-        // trace the internal formatting + dispatch work
-        info!("formatting message");
-        sleep(Duration::from_millis(80)).await;
-        span.record("notification.message_length", params.message.len() as i64);
-        info!("dispatching message");
+            // trace the internal formatting + dispatch work
+            info!("formatting message");
+            sleep(Duration::from_millis(80)).await;
+            span.record("notification.message_length", params.message.len() as i64);
+            info!("dispatching message");
 
-        let payload = json!({
-            "status": "sent",
-            "phone_number": params.phone_number,
-            "message": params.message,
-        });
+            let payload = json!({
+                "status": "sent",
+                "phone_number": params.phone_number,
+                "message": params.message,
+            });
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(payload.to_string())],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(payload.to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -184,7 +186,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let agent = Agent::<TracingContext>::builder("Trace Assistant", model)
         // Mirror the guidance used across the JS/Go tracing examples.
         .add_instruction("Coordinate weather updates and notifications for clients.")
-        .add_instruction("When a request needs both a forecast and a notification, call get_weather before send_notification and summarize the tool results in your reply.")
+        .add_instruction(
+            "When a request needs both a forecast and a notification, call get_weather before \
+             send_notification and summarize the tool results in your reply.",
+        )
         .add_instruction(|ctx: &TracingContext| {
             Ok(format!(
                 "When asked to contact someone, include a friendly note from {}.",
@@ -207,7 +212,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let response = agent.run(request).await?;
-    println!("Agent response: {:#?}", response);
+    println!("Agent response: {response:#?}");
 
     provider.force_flush().ok();
 

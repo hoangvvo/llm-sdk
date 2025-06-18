@@ -1,12 +1,11 @@
-use async_trait::async_trait;
+use crate::context::{Artifact, ArtifactKind, MyContext};
 use chrono::Utc;
+use futures::future::BoxFuture;
 use llm_agent::{AgentTool, AgentToolResult};
 use llm_sdk::{JSONSchema, Part};
 use rand::RngCore;
 use serde::Deserialize;
 use serde_json::Value;
-
-use crate::context::{Artifact, ArtifactKind, MyContext};
 
 fn rand_id(n_bytes: usize) -> String {
     let mut b = vec![0u8; n_bytes];
@@ -31,7 +30,6 @@ struct ArtifactCreateParams {
 
 pub struct ArtifactCreateTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for ArtifactCreateTool {
     fn name(&self) -> String {
         "artifact_create".to_string()
@@ -54,27 +52,29 @@ impl AgentTool<MyContext> for ArtifactCreateTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        _context: &MyContext,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        let params: ArtifactCreateParams = serde_json::from_value(args)?;
-        let now = Utc::now().to_rfc3339();
-        let id = rand_id(5);
-        let artifact = Artifact {
-            id,
-            title: params.title,
-            kind: params.kind,
-            content: params.content,
-            version: Some(1),
-            updated_at: Some(now),
-        };
-        let payload = serde_json::json!({"op": "artifact_create", "artifact": artifact});
-        Ok(AgentToolResult {
-            content: vec![Part::text(payload.to_string())],
-            is_error: false,
+        _context: &'a MyContext,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: ArtifactCreateParams = serde_json::from_value(args)?;
+            let now = Utc::now().to_rfc3339();
+            let id = rand_id(5);
+            let artifact = Artifact {
+                id,
+                title: params.title,
+                kind: params.kind,
+                content: params.content,
+                version: Some(1),
+                updated_at: Some(now),
+            };
+            let payload = serde_json::json!({"op": "artifact_create", "artifact": artifact});
+            Ok(AgentToolResult {
+                content: vec![Part::text(payload.to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -88,7 +88,6 @@ struct ArtifactUpdateParams {
 
 pub struct ArtifactUpdateTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for ArtifactUpdateTool {
     fn name(&self) -> String {
         "artifact_update".to_string()
@@ -105,35 +104,37 @@ impl AgentTool<MyContext> for ArtifactUpdateTool {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        context: &MyContext,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        let params: ArtifactUpdateParams = serde_json::from_value(args)?;
-        let prev = find_artifact(context, &params.id);
-        let now = Utc::now().to_rfc3339();
-        let next_version = prev.and_then(|a| a.version).unwrap_or(0) + 1;
-        let title = prev
-            .map(|a| a.title.clone())
-            .unwrap_or_else(|| "Untitled".to_string());
-        let kind = prev
-            .map(|a| a.kind.clone())
-            .unwrap_or(ArtifactKind::Markdown);
-        let prev_content = prev.map(|a| a.content.clone()).unwrap_or_default();
-        let artifact = Artifact {
-            id: params.id.clone(),
-            title,
-            kind,
-            content: params.content,
-            version: Some(next_version),
-            updated_at: Some(now),
-        };
-        let payload = serde_json::json!({"op": "artifact_update", "id": params.id, "prev_content": prev_content, "artifact": artifact});
-        Ok(AgentToolResult {
-            content: vec![Part::text(payload.to_string())],
-            is_error: false,
+        context: &'a MyContext,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: ArtifactUpdateParams = serde_json::from_value(args)?;
+            let prev = find_artifact(context, &params.id);
+            let now = Utc::now().to_rfc3339();
+            let next_version = prev.and_then(|a| a.version).unwrap_or(0) + 1;
+            let title = prev
+                .map(|a| a.title.clone())
+                .unwrap_or_else(|| "Untitled".to_string());
+            let kind = prev
+                .map(|a| a.kind.clone())
+                .unwrap_or(ArtifactKind::Markdown);
+            let prev_content = prev.map(|a| a.content.clone()).unwrap_or_default();
+            let artifact = Artifact {
+                id: params.id.clone(),
+                title,
+                kind,
+                content: params.content,
+                version: Some(next_version),
+                updated_at: Some(now),
+            };
+            let payload = serde_json::json!({"op": "artifact_update", "id": params.id, "prev_content": prev_content, "artifact": artifact});
+            Ok(AgentToolResult {
+                content: vec![Part::text(payload.to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -145,7 +146,6 @@ struct ArtifactGetParams {
 }
 pub struct ArtifactGetTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for ArtifactGetTool {
     fn name(&self) -> String {
         "artifact_get".to_string()
@@ -161,19 +161,21 @@ impl AgentTool<MyContext> for ArtifactGetTool {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        context: &MyContext,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        let params: ArtifactGetParams = serde_json::from_value(args)?;
-        let artifact = find_artifact(context, &params.id);
-        let payload =
-            serde_json::json!({"op": "artifact_get", "id": params.id, "artifact": artifact});
-        Ok(AgentToolResult {
-            content: vec![Part::text(payload.to_string())],
-            is_error: false,
+        context: &'a MyContext,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: ArtifactGetParams = serde_json::from_value(args)?;
+            let artifact = find_artifact(context, &params.id);
+            let payload =
+                serde_json::json!({"op": "artifact_get", "id": params.id, "artifact": artifact});
+            Ok(AgentToolResult {
+                content: vec![Part::text(payload.to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -181,7 +183,6 @@ impl AgentTool<MyContext> for ArtifactGetTool {
 // artifact_list
 pub struct ArtifactListTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for ArtifactListTool {
     fn name(&self) -> String {
         "artifact_list".to_string()
@@ -192,16 +193,19 @@ impl AgentTool<MyContext> for ArtifactListTool {
     fn parameters(&self) -> JSONSchema {
         serde_json::json!({"type": "object", "properties": {}, "additionalProperties": false})
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         _args: Value,
-        context: &MyContext,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        let payload = serde_json::json!({"op": "artifact_list", "artifacts": context.artifacts});
-        Ok(AgentToolResult {
-            content: vec![Part::text(payload.to_string())],
-            is_error: false,
+        context: &'a MyContext,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            let payload =
+                serde_json::json!({"op": "artifact_list", "artifacts": context.artifacts});
+            Ok(AgentToolResult {
+                content: vec![Part::text(payload.to_string())],
+                is_error: false,
+            })
         })
     }
 }
@@ -213,7 +217,6 @@ struct ArtifactDeleteParams {
 }
 pub struct ArtifactDeleteTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for ArtifactDeleteTool {
     fn name(&self) -> String {
         "artifact_delete".to_string()
@@ -229,17 +232,19 @@ impl AgentTool<MyContext> for ArtifactDeleteTool {
             "additionalProperties": false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        _context: &MyContext,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        let params: ArtifactDeleteParams = serde_json::from_value(args)?;
-        let payload = serde_json::json!({"op": "artifact_delete", "id": params.id});
-        Ok(AgentToolResult {
-            content: vec![Part::text(payload.to_string())],
-            is_error: false,
+        _context: &'a MyContext,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: ArtifactDeleteParams = serde_json::from_value(args)?;
+            let payload = serde_json::json!({"op": "artifact_delete", "id": params.id});
+            Ok(AgentToolResult {
+                content: vec![Part::text(payload.to_string())],
+                is_error: false,
+            })
         })
     }
 }

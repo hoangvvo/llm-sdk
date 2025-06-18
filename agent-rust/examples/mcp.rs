@@ -43,7 +43,7 @@ use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle, time::sleep};
 
 const SERVER_ADDR: &str = "127.0.0.1:39811";
 const SERVER_URL: &str = "http://127.0.0.1:39811";
-const AUTH_TOKEN: &'static str = "transit-hub-secret";
+const AUTH_TOKEN: &str = "transit-hub-secret";
 
 #[derive(Clone)]
 struct SessionContext {
@@ -115,7 +115,7 @@ async fn run_agent_demo() -> Result<(), BoxedError> {
     if reply.is_empty() {
         println!("{:?}", response.content);
     } else {
-        println!("{}", reply);
+        println!("{reply}");
     }
 
     Ok(())
@@ -244,7 +244,7 @@ fn has_valid_token(headers: &HeaderMap, method: &Method) -> bool {
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
     {
-        if token.trim() == format!("Bearer {}", AUTH_TOKEN) {
+        if token.trim() == format!("Bearer {AUTH_TOKEN}") {
             return true;
         }
     }

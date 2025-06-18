@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     client_utils,
     language_model::{LanguageModelMetadata, LanguageModelStream},
@@ -11,8 +9,9 @@ use crate::{
     ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, UserMessage,
 };
 use async_stream::try_stream;
-use futures::stream::StreamExt;
+use futures::{future::BoxFuture, stream::StreamExt};
 use reqwest::{header, Client};
+use std::sync::Arc;
 
 const PROVIDER: &str = "openai";
 
@@ -60,7 +59,6 @@ impl OpenAIChatModel {
     }
 }
 
-#[async_trait::async_trait]
 impl LanguageModel for OpenAIChatModel {
     fn provider(&self) -> &'static str {
         PROVIDER
@@ -74,137 +72,147 @@ impl LanguageModel for OpenAIChatModel {
         self.metadata.as_deref()
     }
 
-    async fn generate(&self, input: LanguageModelInput) -> LanguageModelResult<ModelResponse> {
-        crate::opentelemetry::trace_generate(
-            self.provider(),
-            &self.model_id(),
-            input,
-            |input| async move {
-                let params = into_openai_create_params(input, self.model_id.clone())?;
+    fn generate(
+        &self,
+        input: LanguageModelInput,
+    ) -> BoxFuture<'_, LanguageModelResult<ModelResponse>> {
+        Box::pin(async move {
+            crate::opentelemetry::trace_generate(
+                self.provider(),
+                &self.model_id(),
+                input,
+                |input| async move {
+                    let params = into_openai_create_params(input, self.model_id.clone())?;
 
-                let mut header_map = reqwest::header::HeaderMap::new();
-                if let Ok(header_val) =
-                    header::HeaderValue::from_str(&format!("Bearer {}", self.api_key))
-                {
-                    header_map.insert(header::AUTHORIZATION, header_val);
-                }
-                let json: openai_api::ChatCompletion = client_utils::send_json(
-                    &self.client,
-                    &format!("{}/chat/completions", self.base_url),
-                    &params,
-                    header_map,
-                )
-                .await?;
-
-                let Some(choice) = json.choices.into_iter().next() else {
-                    return Err(LanguageModelError::Invariant(
-                        PROVIDER,
-                        "No choices in response".to_string(),
-                    ));
-                };
-
-                let openai_api::ChatCompletionChoice { message, .. } = choice;
-
-                if let Some(refusal) = message.refusal {
-                    return Err(LanguageModelError::Refusal(refusal));
-                }
-
-                let content = map_openai_message(message, &params)?;
-
-                let usage: Option<ModelUsage> = json.usage.map(Into::into);
-
-                let cost = if let (Some(usage), Some(pricing)) = (
-                    usage.as_ref(),
-                    self.metadata.as_ref().and_then(|m| m.pricing.as_ref()),
-                ) {
-                    Some(usage.calculate_cost(pricing))
-                } else {
-                    None
-                };
-
-                Ok(ModelResponse {
-                    content,
-                    usage,
-                    cost,
-                })
-            },
-        )
-        .await
-    }
-
-    async fn stream(&self, input: LanguageModelInput) -> LanguageModelResult<LanguageModelStream> {
-        crate::opentelemetry::trace_stream(
-            self.provider(),
-            &self.model_id(),
-            input,
-            |input| async move {
-                let metadata = self.metadata.clone();
-                let mut params = into_openai_create_params(input, self.model_id.clone())?;
-                params.stream = Some(true);
-
-                let mut header_map = reqwest::header::HeaderMap::new();
-                if let Ok(header_val) =
-                    header::HeaderValue::from_str(&format!("Bearer {}", self.api_key))
-                {
-                    header_map.insert(header::AUTHORIZATION, header_val);
-                }
-
-                let mut chunk_stream =
-                    client_utils::send_sse_stream::<_, openai_api::ChatCompletionChunk>(
+                    let mut header_map = reqwest::header::HeaderMap::new();
+                    if let Ok(header_val) =
+                        header::HeaderValue::from_str(&format!("Bearer {}", self.api_key))
+                    {
+                        header_map.insert(header::AUTHORIZATION, header_val);
+                    }
+                    let json: openai_api::ChatCompletion = client_utils::send_json(
                         &self.client,
                         &format!("{}/chat/completions", self.base_url),
                         &params,
                         header_map,
-                        PROVIDER,
                     )
                     .await?;
 
-                let stream = try_stream! {
-                    let mut refusal = String::new();
-                    let mut all_content_deltas: Vec<ContentDelta> = Vec::new();
+                    let Some(choice) = json.choices.into_iter().next() else {
+                        return Err(LanguageModelError::Invariant(
+                            PROVIDER,
+                            "No choices in response".to_string(),
+                        ));
+                    };
 
-                    while let Some(chunk_result) = chunk_stream.next().await {
-                        let chunk = chunk_result?;
+                    let openai_api::ChatCompletionChoice { message, .. } = choice;
 
-                        let choice = chunk.choices.into_iter().next();
-                        if let Some(choice) = choice {
-                            if let Some(refusal_text) = &choice.delta.refusal {
-                                refusal.push_str(refusal_text);
+                    if let Some(refusal) = message.refusal {
+                        return Err(LanguageModelError::Refusal(refusal));
+                    }
+
+                    let content = map_openai_message(message, &params)?;
+
+                    let usage: Option<ModelUsage> = json.usage.map(Into::into);
+
+                    let cost = if let (Some(usage), Some(pricing)) = (
+                        usage.as_ref(),
+                        self.metadata.as_ref().and_then(|m| m.pricing.as_ref()),
+                    ) {
+                        Some(usage.calculate_cost(pricing))
+                    } else {
+                        None
+                    };
+
+                    Ok(ModelResponse {
+                        content,
+                        usage,
+                        cost,
+                    })
+                },
+            )
+            .await
+        })
+    }
+
+    fn stream(
+        &self,
+        input: LanguageModelInput,
+    ) -> BoxFuture<'_, LanguageModelResult<LanguageModelStream>> {
+        Box::pin(async move {
+            crate::opentelemetry::trace_stream(
+                self.provider(),
+                &self.model_id(),
+                input,
+                |input| async move {
+                    let metadata = self.metadata.clone();
+                    let mut params = into_openai_create_params(input, self.model_id.clone())?;
+                    params.stream = Some(true);
+
+                    let mut header_map = reqwest::header::HeaderMap::new();
+                    if let Ok(header_val) =
+                        header::HeaderValue::from_str(&format!("Bearer {}", self.api_key))
+                    {
+                        header_map.insert(header::AUTHORIZATION, header_val);
+                    }
+
+                    let mut chunk_stream =
+                        client_utils::send_sse_stream::<_, openai_api::ChatCompletionChunk>(
+                            &self.client,
+                            &format!("{}/chat/completions", self.base_url),
+                            &params,
+                            header_map,
+                            PROVIDER,
+                        )
+                        .await?;
+
+                    let stream = try_stream! {
+                        let mut refusal = String::new();
+                        let mut all_content_deltas: Vec<ContentDelta> = Vec::new();
+
+                        while let Some(chunk_result) = chunk_stream.next().await {
+                            let chunk = chunk_result?;
+
+                            let choice = chunk.choices.into_iter().next();
+                            if let Some(choice) = choice {
+                                if let Some(refusal_text) = &choice.delta.refusal {
+                                    refusal.push_str(refusal_text);
+                                }
+
+                                let incoming_content_deltas = map_openai_delta(
+                                    choice.delta,
+                                    &all_content_deltas,
+                                    &params,
+                                );
+                                all_content_deltas.extend(incoming_content_deltas.clone());
+                                for delta in incoming_content_deltas {
+                                    yield PartialModelResponse {
+                                        delta: Some(delta),
+                                        ..Default::default()
+                                    };
+                                }
                             }
 
-                            let incoming_content_deltas = map_openai_delta(
-                                choice.delta,
-                                &all_content_deltas,
-                                &params,
-                            );
-                            all_content_deltas.extend(incoming_content_deltas.clone());
-                            for delta in incoming_content_deltas {
+                            if let Some(usage) = chunk.usage {
+                                let usage = ModelUsage::from(usage.clone());
                                 yield PartialModelResponse {
-                                    delta: Some(delta),
+                                    cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing)),
+                                    usage: Some(usage),
                                     ..Default::default()
                                 };
                             }
                         }
 
-                        if let Some(usage) = chunk.usage {
-                            let usage = ModelUsage::from(usage.clone());
-                            yield PartialModelResponse {
-                                cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing)),
-                                usage: Some(usage),
-                                ..Default::default()
-                            };
+                        if !refusal.is_empty() {
+                            Err(LanguageModelError::Refusal(refusal))?;
                         }
-                    }
+                    };
 
-                    if !refusal.is_empty() {
-                        Err(LanguageModelError::Refusal(refusal))?;
-                    }
-                };
-
-                Ok(LanguageModelStream::from_stream(stream))
-            },
-        )
-        .await
+                    Ok(LanguageModelStream::from_stream(stream))
+                },
+            )
+            .await
+        })
     }
 }
 

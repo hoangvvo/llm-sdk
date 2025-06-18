@@ -1,5 +1,6 @@
 use crate::{AudioFormat, LanguageModelError, LanguageModelResult};
 
+#[must_use]
 pub fn map_audio_format_to_mime_type(format: &AudioFormat) -> String {
     match format {
         AudioFormat::Wav => "audio/wav",

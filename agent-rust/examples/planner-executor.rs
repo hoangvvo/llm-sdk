@@ -1,13 +1,13 @@
-use std::{
-    io::Write,
-    sync::{Arc, Mutex},
-};
-
 use dotenvy::dotenv;
+use futures::future::BoxFuture;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::{
+    io::Write,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Clone, Serialize, Deserialize)]
 struct PlanItem {
@@ -39,7 +39,7 @@ fn format_todos(s: &Store) -> String {
     out.push_str(&format!("\n─ PLAN (internal) · {} items\n", list.len()));
     let expl = s.explanation();
     if !expl.is_empty() {
-        out.push_str(&format!("Explanation: {}\n", expl));
+        out.push_str(&format!("Explanation: {expl}\n"));
     }
     if list.is_empty() {
         out.push_str("(empty)\n");
@@ -72,7 +72,6 @@ type Ctx = ();
 struct UpdatePlan {
     s: Store,
 }
-#[async_trait::async_trait]
 impl AgentTool<Ctx> for UpdatePlan {
     fn name(&self) -> String {
         "update_plan".into()
@@ -102,24 +101,26 @@ impl AgentTool<Ctx> for UpdatePlan {
             "additionalProperties":false
         })
     }
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: serde_json::Value,
-        _ctx: &Ctx,
-        _state: &llm_agent::RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        #[derive(Deserialize)]
-        struct In {
-            explanation: String,
-            plan: Vec<PlanItem>,
-        }
-        let p: In = serde_json::from_value(args)?;
-        self.s.set(p.plan.clone(), p.explanation.clone());
-        Ok(AgentToolResult {
-            content: vec![Part::text(
-                json!({"ok": true, "explanation": p.explanation, "plan": p.plan}).to_string(),
-            )],
-            is_error: false,
+        _ctx: &'a Ctx,
+        _state: &'a llm_agent::RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            #[derive(Deserialize)]
+            struct In {
+                explanation: String,
+                plan: Vec<PlanItem>,
+            }
+            let p: In = serde_json::from_value(args)?;
+            self.s.set(p.plan.clone(), p.explanation.clone());
+            Ok(AgentToolResult {
+                content: vec![Part::text(
+                    json!({"ok": true, "explanation": p.explanation, "plan": p.plan}).to_string(),
+                )],
+                is_error: false,
+            })
         })
     }
 }
@@ -175,7 +176,7 @@ async fn main() {
         let mut visible: Vec<String> = vec![];
         for p in &res.content {
             if let Part::Text(t) = p {
-                visible.push(t.text.clone())
+                visible.push(t.text.clone());
             }
         }
         if !visible.is_empty() {
@@ -189,7 +190,7 @@ async fn main() {
         if all_done {
             break;
         }
-        items.push(AgentItem::Message(Message::user(vec![Part::text("NEXT")])))
+        items.push(AgentItem::Message(Message::user(vec![Part::text("NEXT")])));
     }
 
     clear_and_render(&messages, &store);

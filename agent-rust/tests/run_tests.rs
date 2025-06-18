@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 type DynError = Box<dyn std::error::Error + Send + Sync>;
-
-use futures::{StreamExt, TryStreamExt};
+use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use llm_agent::{
     AgentError, AgentItem, AgentItemTool, AgentParams, AgentResponse, AgentStreamEvent,
     AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam, RunSession,
@@ -98,7 +97,6 @@ struct MockToolkitSession<TCtx> {
     state: Arc<MockToolkitSessionState<TCtx>>,
 }
 
-#[async_trait::async_trait]
 impl<TCtx> ToolkitSession<TCtx> for MockToolkitSession<TCtx>
 where
     TCtx: Send + Sync + 'static,
@@ -115,10 +113,12 @@ where
         self.state.tools.clone()
     }
 
-    async fn close(self: Box<Self>) -> Result<(), DynError> {
-        let mut calls = self.state.close_calls.lock().unwrap();
-        *calls += 1;
-        Ok(())
+    fn close(self: Box<Self>) -> BoxFuture<'static, Result<(), DynError>> {
+        Box::pin(async move {
+            let mut calls = self.state.close_calls.lock().unwrap();
+            *calls += 1;
+            Ok(())
+        })
     }
 }
 
@@ -139,19 +139,21 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl<TCtx> Toolkit<TCtx> for MockToolkit<TCtx>
 where
     TCtx: Send + Sync + Clone + 'static,
 {
-    async fn create_session(
-        &self,
-        context: &TCtx,
-    ) -> Result<Box<dyn ToolkitSession<TCtx> + Send + Sync>, DynError> {
-        self.created_contexts.lock().unwrap().push(context.clone());
-        Ok(Box::new(MockToolkitSession {
-            state: self.state.clone(),
-        }))
+    fn create_session<'a>(
+        &'a self,
+        context: &'a TCtx,
+    ) -> BoxFuture<'a, Result<Box<dyn ToolkitSession<TCtx> + Send + Sync>, DynError>> {
+        Box::pin(async move {
+            self.created_contexts.lock().unwrap().push(context.clone());
+            let boxed: Box<dyn ToolkitSession<TCtx> + Send + Sync> = Box::new(MockToolkitSession {
+                state: self.state.clone(),
+            });
+            Ok(boxed)
+        })
     }
 }
 
@@ -182,7 +184,6 @@ impl LookupOrderTool {
     }
 }
 
-#[async_trait::async_trait]
 impl AgentTool<CustomerContext> for LookupOrderTool {
     fn name(&self) -> String {
         "lookup-order".to_string()
@@ -203,34 +204,35 @@ impl AgentTool<CustomerContext> for LookupOrderTool {
         })
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        context: &CustomerContext,
-        state: &RunState,
-    ) -> Result<AgentToolResult, DynError> {
-        let order_id = args
-            .get("orderId")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "missing orderId".to_string())?
-            .to_string();
+        context: &'a CustomerContext,
+        state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, DynError>> {
+        Box::pin(async move {
+            let order_id = args
+                .get("orderId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "missing orderId".to_string())?
+                .to_string();
 
-        let turn = *state.current_turn.lock().await;
-        self.executions.lock().unwrap().push(OrderExecution {
-            context: context.clone(),
-            args: args.clone(),
-            turn,
-        });
+            let turn = *state.current_turn.lock().await;
+            self.executions.lock().unwrap().push(OrderExecution {
+                context: context.clone(),
+                args: args.clone(),
+                turn,
+            });
 
-        let text = format!("Order {order_id} ready for {}", context.customer);
-        Ok(AgentToolResult {
-            content: vec![Part::text(text)],
-            is_error: false,
+            let text = format!("Order {order_id} ready for {}", context.customer);
+            Ok(AgentToolResult {
+                content: vec![Part::text(text)],
+                is_error: false,
+            })
         })
     }
 }
 
-#[async_trait::async_trait]
 impl AgentTool<()> for MockTool {
     fn name(&self) -> String {
         self.name.clone()
@@ -244,14 +246,16 @@ impl AgentTool<()> for MockTool {
         json!({"type": "object", "properties": {}})
     }
 
-    async fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
         _context: &(),
-        state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>> {
-        self.all_calls.lock().unwrap().push(args.clone());
-        (self.execute)(args, state)
+        state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
+        Box::pin(async move {
+            self.all_calls.lock().unwrap().push(args.clone());
+            (self.execute)(args, state)
+        })
     }
 }
 

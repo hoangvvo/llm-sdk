@@ -5,13 +5,13 @@ A Rust library to implement LLM agents that work with any LLM providers.
 ## Usage
 
 ```rust
-use async_trait::async_trait;
 use dotenvy::dotenv;
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part,
 };
+use futures::future::BoxFuture;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -37,7 +37,6 @@ struct GetWeatherParams {
 // Define the agent tools
 struct GetWeatherTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for GetWeatherTool {
     fn name(&self) -> String {
         "get_weather".to_string()
@@ -58,25 +57,27 @@ impl AgentTool<MyContext> for GetWeatherTool {
           "additionalProperties": false
         })
     }
-    async fn execute(
+    fn execute(
         &self,
         args: Value,
         _context: &MyContext,
         _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: GetWeatherParams = serde_json::from_value(args)?;
-        println!("Getting weather for {}", params.city);
+    ) -> BoxFuture<'_, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: GetWeatherParams = serde_json::from_value(args)?;
+            println!("Getting weather for {}", params.city);
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(
-                json!({
-                    "city": params.city,
-                    "forecast": "Sunny",
-                    "temperatureC": 25
-                })
-                .to_string(),
-            )],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(
+                    json!({
+                        "city": params.city,
+                        "forecast": "Sunny",
+                        "temperatureC": 25
+                    })
+                    .to_string(),
+                )],
+                is_error: false,
+            })
         })
     }
 }
@@ -93,7 +94,6 @@ struct SendMessageParams {
 
 struct SendMessageTool;
 
-#[async_trait]
 impl AgentTool<MyContext> for SendMessageTool {
     fn name(&self) -> String {
         "send_message".to_string()
@@ -104,27 +104,29 @@ impl AgentTool<MyContext> for SendMessageTool {
     fn parameters(&self) -> JSONSchema {
         schemars::schema_for!(SendMessageParams).into()
     }
-    async fn execute(
+    fn execute(
         &self,
         args: Value,
         _context: &MyContext,
         _state: &RunState,
-    ) -> Result<AgentToolResult, Box<dyn Error + Send + Sync>> {
-        let params: SendMessageParams = serde_json::from_value(args)?;
-        println!(
-            "Sending message to {}: {}",
-            params.phone_number, params.message
-        );
+    ) -> BoxFuture<'_, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
+        Box::pin(async move {
+            let params: SendMessageParams = serde_json::from_value(args)?;
+            println!(
+                "Sending message to {}: {}",
+                params.phone_number, params.message
+            );
 
-        Ok(AgentToolResult {
-            content: vec![Part::text(
-                json!({
-                    "message": params.message,
-                    "status": "sent"
-                })
-                .to_string(),
-            )],
-            is_error: false,
+            Ok(AgentToolResult {
+                content: vec![Part::text(
+                    json!({
+                        "message": params.message,
+                        "status": "sent"
+                    })
+                    .to_string(),
+                )],
+                is_error: false,
+            })
         })
     }
 }
