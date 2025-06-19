@@ -18,14 +18,14 @@ The accompanying [Console app](./website) demonstrates the libraries end-to-end.
 
 ![Console Chat Application screenshot](./website/assets/console-chat.png)
 
-> **Status**: both libraries are currently `v0`. The SDK surface is largely stable; the Agent API may evolve. Feedback and contributions are welcome.
+> **Status**: both libraries are currently `v0`. The SDK library APIs are largely stable; the Agent library APIs may evolve. Feedback and contributions are welcome.
 
 ## Why use llm-sdk
 
 - Supports multiple LLM providers with a unified API.
 - Handles multiple modalities: Text, Image, and Audio.
 - Supports streaming, including for image and audio.
-- Supports citations and reasoning for supported models.
+- Supports citations (RAG) and reasoning for supported models.
 - Reports token usage and calculates the cost of a request when provided with the model’s pricing information.
 - Unified serialization across programming languages (systems in different languages can work together).
 - Integrates OpenTelemetry for tracing.
@@ -42,16 +42,16 @@ Each implements the TypeScript reference specification in [`schema/sdk.ts`](./sc
 
 ### Supported providers
 
-| Provider                     | Sampling Params                                                   | Function Calling | Structured Output | Text Input | Image Input | Audio Input | Citation [^source-as-text] | Text Output | Image Output | Audio Output | Reasoning |
-| ---------------------------- | ----------------------------------------------------------------- | ---------------- | ----------------- | ---------- | ----------- | ----------- | -------------------------- | ----------- | ------------ | ------------ | --------- |
-| **OpenAI (Responses)**       | ✅ except `top_k`,`frequency_penalty`, `presence_penalty`, `seed` | ✅               | ✅                | ✅         | ✅          | ✅          | ➖                         | ✅          | ✅           | ➖           | ✅        |
-| **OpenAI (Chat Completion)** | ✅ except `top_k`                                                 | ✅               | ✅                | ✅         | ✅          | ✅          | ➖                         | ✅          | ➖           | ✅           | ➖        |
-| **Anthropic**                | ✅ except `frequency_penalty`, `presence_penalty`, `seed`         | ✅               | ➖                | ✅         | ✅          | ➖          | ✅                         | ✅          | ➖           | ➖           | ✅        |
-| **Google**                   | ✅                                                                | ✅               | ✅                | ✅         | ✅          | ✅          | ➖                         | ✅          | ✅           | ✅           | ✅        |
-| **Cohere**                   | ✅                                                                | ✅               | ✅                | ✅         | ✅          | ➖          | ✅                         | ✅          | ➖           | ➖           | ✅        |
-| **Mistral**                  | ✅ except `top_k`                                                 | ✅               | ✅                | ✅         | ✅          | ✅          | 🚧                         | ✅          | ➖           | ➖           | ✅        |
+| Provider                     | Sampling Params                                                   | Function Calling | Structured Output | Reasoning | Citation [^source-as-text]                                                              | Text Input | Image Input | Audio Input | Text Output | Image Output | Audio Output |
+| ---------------------------- | ----------------------------------------------------------------- | ---------------- | ----------------- | --------- | --------------------------------------------------------------------------------------- | ---------- | ----------- | ----------- | ----------- | ------------ | ------------ |
+| **OpenAI (Responses)**       | ✅ except `top_k`,`frequency_penalty`, `presence_penalty`, `seed` | ✅               | ✅                | ✅        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ✅           | ➖           |
+| **OpenAI (Chat Completion)** | ✅ except `top_k`                                                 | ✅               | ✅                | ➖        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ➖           | ✅           |
+| **Anthropic**                | ✅ except `frequency_penalty`, `presence_penalty`, `seed`         | ✅               | ➖                | ✅        | ✅ ([Search results](https://docs.claude.com/en/docs/build-with-claude/search-results)) | ✅         | ✅          | ➖          | ✅          | ➖           | ➖           |
+| **Google**                   | ✅                                                                | ✅               | ✅                | ✅        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ✅           | ✅           |
+| **Cohere**                   | ✅                                                                | ✅               | ✅                | ✅        | ✅ ([Document](https://docs.cohere.com/v2/docs/retrieval-augmented-generation-rag))     | ✅         | ✅          | ➖          | ✅          | ➖           | ➖           |
+| **Mistral**                  | ✅ except `top_k`                                                 | ✅               | ✅                | ✅        | 🚧                                                                                      | ✅         | ✅          | ✅          | ✅          | ➖           | ➖           |
 
-Keys: ✅ supported · 🚧 planned · ➖ not exposed by the provider.
+Keys: ✅ supported · 🚧 planned · ➖ not available from provider.
 
 [^source-as-text]: Source Input (citation) is not supported by all providers and may be converted to compatible inputs instead.
 
@@ -96,7 +96,7 @@ Also check out some popular agent implementations, including:
 ## Agent Patterns
 
 This agent **library** (not _framework_) is designed for transparency and control.
-Unlike many “agentic” frameworks, it ships with no hidden prompt templates or secret parsing rules—and that’s on purpose:
+Unlike many “agentic” frameworks, it ships with no hidden prompt templates or secret parsing rules, and that’s on purpose:
 
 - Nothing hidden – What you write is what runs. No secret prompts or “special sauce” behind the scenes, so your instructions aren’t quietly overridden.
 - Works in any settings – Many frameworks bake in English-only prompts. Here, the model sees only your words, in whichever language or format.

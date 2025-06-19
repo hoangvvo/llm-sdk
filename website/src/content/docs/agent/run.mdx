@@ -166,7 +166,7 @@ flowchart TD
     <Code
       code={extractTypescriptAgentTypes([
         "AgentStreamEvent",
-        "AgentStreamEventPartial",
+        "AgentStreamPartialEvent",
         "AgentStreamItemEvent",
         "AgentStreamResponseEvent",
       ])}
@@ -196,7 +196,7 @@ flowchart TD
   </TabItem>
 </Tabs>
 
-- `AgentStreamEventPartial`: incremental deltas from the language model (for example, text chunks, audio samples). Use them to render streaming output.
+- `AgentStreamPartialEvent`: incremental deltas from the language model (for example, text chunks, audio samples). Use them to render streaming output.
 - `AgentStreamItemEvent`: emitted whenever the run state records a new item (a model response or a tool call/result). This mirrors what will later show up in the `output` array of the final response.
 - `AgentStreamResponseEvent`: fired once the run ends, bundling the same `AgentResponse` shape you get from non-streaming runs.
 

@@ -38,6 +38,33 @@ const getTimeTool = tool({
   },
 });
 
+// Create an agent tool using zod with type inference
+// npm install zod zod-to-json-schema
+const sendMessageTool = zodTool({
+  name: "send_message",
+  description: "Send a text message",
+  parameters: z.object({
+    message: z.string().min(1).max(500),
+    phoneNumber: z.string(),
+  }),
+  execute(params) {
+    // inferred as { message: string, phoneNumber: string }
+    const { message, phoneNumber } = params;
+    console.log(`Sending message to ${phoneNumber}: ${message}`);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            success: true,
+          }),
+        },
+      ],
+      is_error: false,
+    };
+  },
+});
+
 // Create an agent tool using @sinclair/typebox with type inference
 // npm install @sinclair/typebox
 const getWeatherTool = typeboxTool({
@@ -61,33 +88,6 @@ const getWeatherTool = typeboxTool({
             city,
             forecast: "Sunny",
             temperatureC: 25,
-          }),
-        },
-      ],
-      is_error: false,
-    };
-  },
-});
-
-// Create an agent tool using zod with type inference
-// npm install zod zod-to-json-schema
-const sendMessageTool = zodTool({
-  name: "send_message",
-  description: "Send a text message",
-  parameters: z.object({
-    message: z.string().min(1).max(500),
-    phoneNumber: z.string(),
-  }),
-  execute(params) {
-    // inferred as { message: string, phoneNumber: string }
-    const { message, phoneNumber } = params;
-    console.log(`Sending message to ${phoneNumber}: ${message}`);
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            success: true,
           }),
         },
       ],

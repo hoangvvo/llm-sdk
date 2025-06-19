@@ -14,11 +14,10 @@ npm install @hoangvvo/llm-agent
 import { Agent, tool, type AgentItem } from "@hoangvvo/llm-agent";
 import { typeboxTool } from "@hoangvvo/llm-agent/typebox";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
-import { OpenAIModel } from "@hoangvvo/llm-sdk/openai";
 import { Type } from "@sinclair/typebox";
-import assert from "node:assert";
 import readline from "node:readline/promises";
 import { z } from "zod";
+import { getModel } from "./get-model.ts";
 
 // Define the context interface that can be accessed in the instructions and tools
 interface MyContext {
@@ -26,11 +25,7 @@ interface MyContext {
 }
 
 // Define the model to use for the Agent
-assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
-const model = new OpenAIModel({
-  apiKey: process.env["OPENAI_API_KEY"],
-  modelId: "gpt-4o",
-});
+const model = getModel("openai", "gpt-4o");
 
 // Define the agent tools
 const getTimeTool = tool({
@@ -48,6 +43,33 @@ const getTimeTool = tool({
           type: "text",
           text: JSON.stringify({
             current_time: new Date().toISOString(),
+          }),
+        },
+      ],
+      is_error: false,
+    };
+  },
+});
+
+// Create an agent tool using zod with type inference
+// npm install zod zod-to-json-schema
+const sendMessageTool = zodTool({
+  name: "send_message",
+  description: "Send a text message",
+  parameters: z.object({
+    message: z.string().min(1).max(500),
+    phoneNumber: z.string(),
+  }),
+  execute(params) {
+    // inferred as { message: string, phoneNumber: string }
+    const { message, phoneNumber } = params;
+    console.log(`Sending message to ${phoneNumber}: ${message}`);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            success: true,
           }),
         },
       ],
@@ -79,33 +101,6 @@ const getWeatherTool = typeboxTool({
             city,
             forecast: "Sunny",
             temperatureC: 25,
-          }),
-        },
-      ],
-      is_error: false,
-    };
-  },
-});
-
-// Create an agent tool using zod with type inference
-// npm install zod zod-to-json-schema
-const sendMessageTool = zodTool({
-  name: "send_message",
-  description: "Send a text message",
-  parameters: z.object({
-    message: z.string().min(1).max(500),
-    phoneNumber: z.string(),
-  }),
-  execute(params) {
-    // inferred as { message: string, phoneNumber: string }
-    const { message, phoneNumber } = params;
-    console.log(`Sending message to ${phoneNumber}: ${message}`);
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            success: true,
           }),
         },
       ],
