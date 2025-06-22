@@ -101,7 +101,7 @@ type AudioPart struct {
 // SourcePart represents a part of the message that contains a source with structured content.
 // It will be used for citation for supported models.
 type SourcePart struct {
-	// The source URL or identifier of the document.
+	// The URL or identifier of the document.
 	Source string `json:"source"`
 	// The title of the document.
 	Title string `json:"title"`
@@ -148,6 +148,10 @@ type ReasoningPart struct {
 type Citation struct {
 	// The URL or identifier of the document being cited.
 	Source string `json:"source"`
+	// The title of the document being cited.
+	Title *string `json:"title,omitempty"`
+	// The text snippet from the document being cited.
+	CitedText *string `json:"cited_text,omitempty"`
 	// The start index of the document content part being cited.
 	StartIndex int `json:"start_index"`
 	// The end index of the document content part being cited.
@@ -292,7 +296,18 @@ type PartDelta struct {
 
 // TextPartDelta represents a delta update for a text part, used in streaming or incremental updates of a message.
 type TextPartDelta struct {
-	Text string `json:"text"`
+	Text     string         `json:"text"`
+	Citation *CitationDelta `json:"citation,omitempty"`
+}
+
+// CitationDelta represents a delta update for a citation part, used in streaming of citation messages.
+type CitationDelta struct {
+	Type       string  `json:"type"`
+	Source     *string `json:"source,omitempty"`
+	Title      *string `json:"title,omitempty"`
+	CitedText  *string `json:"cited_text,omitempty"`
+	StartIndex *int    `json:"start_index,omitempty"`
+	EndIndex   *int    `json:"end_index,omitempty"`
 }
 
 // ToolCallPartDelta represents a delta update for a tool call part, used in streaming of a tool invocation.

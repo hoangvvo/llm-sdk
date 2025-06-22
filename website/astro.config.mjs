@@ -42,6 +42,7 @@ export default defineConfig({
             { slug: "sdk/function-calling" },
             { slug: "sdk/structured-output" },
             { slug: "sdk/reasoning" },
+            { slug: "sdk/citations" },
             { slug: "sdk/testing" },
           ],
         },

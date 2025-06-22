@@ -21,6 +21,7 @@ fn text_partial(text: &str) -> PartialModelResponse {
             index: 0,
             part: PartDelta::Text(TextPartDelta {
                 text: text.to_string(),
+                citation: None,
             }),
         }),
         ..PartialModelResponse::default()

@@ -1,7 +1,8 @@
 use crate::{
-    utils::audio_utils, AudioFormat, AudioPart, ContentDelta, ImagePart, LanguageModelError,
-    LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    ReasoningPart, ToolCallPart,
+    utils::audio_utils, AudioFormat, AudioPart, Citation, CitationDelta, ContentDelta, ImagePart,
+    LanguageModelError, LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta,
+    PartialModelResponse, ReasoningPart, ReasoningPartDelta, TextPart, ToolCallPart,
+    ToolCallPartDelta,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -10,15 +11,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone)]
 struct AccumulatedTextData {
     text: String,
-}
-
-/// Internal representation of accumulated tool call data
-#[derive(Debug, Clone)]
-struct AccumulatedToolCallData {
-    tool_name: String,
-    tool_call_id: Option<String>,
-    args: String,
-    id: Option<String>,
+    citations: BTreeMap<usize, CitationDelta>,
 }
 
 /// Internal representation of accumulated image data
@@ -42,22 +35,14 @@ struct AccumulatedAudioData {
     id: Option<String>,
 }
 
-/// Internal representation of accumulated reasoning data
-#[derive(Debug, Clone)]
-struct AccumulatedReasoningData {
-    text: String,
-    signature: Option<String>,
-    id: Option<String>,
-}
-
 /// Represents accumulated data for different part types
 #[derive(Debug, Clone)]
 enum AccumulatedData {
     Text(AccumulatedTextData),
-    ToolCall(AccumulatedToolCallData),
+    ToolCall(ToolCallPartDelta),
     Image(AccumulatedImageData),
     Audio(AccumulatedAudioData),
-    Reasoning(AccumulatedReasoningData),
+    Reasoning(ReasoningPartDelta),
 }
 
 /// Initializes accumulated data from a delta
@@ -65,13 +50,16 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
     match delta.part {
         PartDelta::Text(text_delta) => AccumulatedData::Text(AccumulatedTextData {
             text: text_delta.text,
+            citations: text_delta
+                .citation
+                .map(|citation| {
+                    let mut map = BTreeMap::new();
+                    map.insert(0, citation);
+                    map
+                })
+                .unwrap_or_default(),
         }),
-        PartDelta::ToolCall(tool_delta) => AccumulatedData::ToolCall(AccumulatedToolCallData {
-            tool_name: tool_delta.tool_name.unwrap_or_default(),
-            tool_call_id: tool_delta.tool_call_id,
-            args: tool_delta.args.unwrap_or_default(),
-            id: tool_delta.id,
-        }),
+        PartDelta::ToolCall(tool_delta) => AccumulatedData::ToolCall(tool_delta),
         PartDelta::Image(image_delta) => AccumulatedData::Image(AccumulatedImageData {
             image_data: image_delta.image_data.unwrap_or_default(),
             mime_type: image_delta.mime_type,
@@ -90,13 +78,7 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             transcript: audio_delta.transcript.unwrap_or_default(),
             id: audio_delta.id,
         }),
-        PartDelta::Reasoning(reasoning_delta) => {
-            AccumulatedData::Reasoning(AccumulatedReasoningData {
-                text: reasoning_delta.text.unwrap_or_default(),
-                signature: reasoning_delta.signature,
-                id: reasoning_delta.id,
-            })
-        }
+        PartDelta::Reasoning(reasoning_delta) => AccumulatedData::Reasoning(reasoning_delta),
     }
 }
 
@@ -105,16 +87,23 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
     match (existing, delta.part) {
         (AccumulatedData::Text(ref mut existing_text), PartDelta::Text(text_delta)) => {
             existing_text.text.push_str(&text_delta.text);
+            if let Some(citation) = text_delta.citation {
+                let index = existing_text.citations.len();
+                existing_text.citations.insert(index, citation);
+            }
         }
         (AccumulatedData::ToolCall(ref mut existing_tool), PartDelta::ToolCall(tool_delta)) => {
             if let Some(tool_name) = tool_delta.tool_name {
-                existing_tool.tool_name.push_str(&tool_name);
+                existing_tool
+                    .tool_name
+                    .get_or_insert_default()
+                    .push_str(&tool_name);
             }
             if tool_delta.tool_call_id.is_some() {
                 existing_tool.tool_call_id = tool_delta.tool_call_id;
             }
             if let Some(args) = tool_delta.args {
-                existing_tool.args.push_str(&args);
+                existing_tool.args.get_or_insert_default().push_str(&args);
             }
             if tool_delta.id.is_some() {
                 existing_tool.id = tool_delta.id;
@@ -162,7 +151,10 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             PartDelta::Reasoning(reasoning_delta),
         ) => {
             if let Some(text) = reasoning_delta.text {
-                existing_reasoning.text.push_str(&text);
+                existing_reasoning
+                    .text
+                    .get_or_insert_default()
+                    .push_str(&text);
             }
             if reasoning_delta.signature.is_some() {
                 existing_reasoning.signature = reasoning_delta.signature;
@@ -181,8 +173,68 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
 }
 
 /// Creates a text part from accumulated text data
-fn create_text_part(data: AccumulatedTextData) -> Part {
-    Part::text(data.text)
+fn create_text_part(data: AccumulatedTextData, index: usize) -> LanguageModelResult<Part> {
+    let mut text_part = TextPart {
+        text: data.text,
+        citations: None,
+    };
+
+    if !data.citations.is_empty() {
+        let citation_count = data.citations.len();
+        let mut collected_citations = Vec::with_capacity(citation_count);
+
+        for (_, citation_delta) in data.citations {
+            let CitationDelta {
+                r#type,
+                source,
+                title,
+                cited_text,
+                start_index,
+                end_index,
+            } = citation_delta;
+
+            if !r#type.is_empty() && r#type != "citation" {
+                return Err(LanguageModelError::Invariant(
+                    "",
+                    format!(
+                        "Invalid citation type \"{}\" for text part at index {}",
+                        r#type, index
+                    ),
+                ));
+            }
+
+            let source_dbg = source.clone();
+            let start_dbg = start_index;
+            let end_dbg = end_index;
+
+            let (Some(source), Some(start_index), Some(end_index)) =
+                (source, start_index, end_index)
+            else {
+                return Err(LanguageModelError::Invariant(
+                    "",
+                    format!(
+                        "Incomplete citation data for text part at index {}: source={:?}, \
+                         start_index={:?}, end_index={:?}",
+                        index, source_dbg, start_dbg, end_dbg
+                    ),
+                ));
+            };
+
+            collected_citations.push(Citation {
+                source,
+                title,
+                cited_text,
+                start_index,
+                end_index,
+            });
+        }
+
+        if !collected_citations.is_empty() {
+            text_part.citations = Some(collected_citations);
+        }
+    }
+
+    Ok(Part::Text(text_part))
 }
 
 /// Parses tool call arguments from JSON string
@@ -197,7 +249,7 @@ fn parse_tool_call_args(args: &str) -> LanguageModelResult<Value> {
 }
 
 /// Creates a tool call part from accumulated tool call data
-fn create_tool_call_part(data: AccumulatedToolCallData, index: usize) -> LanguageModelResult<Part> {
+fn create_tool_call_part(data: ToolCallPartDelta, index: usize) -> LanguageModelResult<Part> {
     let tool_call_id = data.tool_call_id.ok_or_else(|| {
         LanguageModelError::Invariant(
             "",
@@ -205,17 +257,19 @@ fn create_tool_call_part(data: AccumulatedToolCallData, index: usize) -> Languag
         )
     })?;
 
-    if data.tool_name.is_empty() {
-        return Err(LanguageModelError::Invariant(
+    let tool_name = data.tool_name.ok_or_else(|| {
+        LanguageModelError::Invariant(
             "",
             format!("Missing required field tool_name at index {index}"),
-        ));
-    }
+        )
+    })?;
+
+    let args = data.args.unwrap_or_default();
 
     Ok(Part::ToolCall(ToolCallPart {
         tool_call_id,
-        tool_name: data.tool_name,
-        args: parse_tool_call_args(&data.args)?,
+        tool_name,
+        args: parse_tool_call_args(&args)?,
         id: data.id,
     }))
 }
@@ -279,9 +333,9 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
     }))
 }
 
-fn create_reasoning_part(data: AccumulatedReasoningData) -> Part {
+fn create_reasoning_part(data: ReasoningPartDelta) -> Part {
     Part::Reasoning(ReasoningPart {
-        text: data.text,
+        text: data.text.unwrap_or_default(),
         signature: data.signature,
         id: data.id,
     })
@@ -290,7 +344,7 @@ fn create_reasoning_part(data: AccumulatedReasoningData) -> Part {
 /// Creates a final Part from accumulated data
 fn create_part(data: AccumulatedData, index: usize) -> LanguageModelResult<Part> {
     match data {
-        AccumulatedData::Text(text_data) => Ok(create_text_part(text_data)),
+        AccumulatedData::Text(text_data) => create_text_part(text_data, index),
         AccumulatedData::ToolCall(tool_data) => create_tool_call_part(tool_data, index),
         AccumulatedData::Image(image_data) => create_image_part(image_data, index),
         AccumulatedData::Audio(audio_data) => create_audio_part(audio_data),

@@ -10,15 +10,8 @@ import (
 
 // AccumulatedTextData represents accumulated text data
 type AccumulatedTextData struct {
-	Text string
-}
-
-// AccumulatedToolCallData represents accumulated tool call data
-type AccumulatedToolCallData struct {
-	ToolName   string
-	ToolCallID *string
-	Args       string
-	ID         *string
+	Text      string
+	Citations map[int]CitationDelta
 }
 
 // AccumulatedImageData represents accumulated image data
@@ -40,70 +33,47 @@ type AccumulatedAudioData struct {
 	ID              *string
 }
 
-type AccumulatedReasoningData struct {
-	Text      string
-	Signature *string
-	ID        *string
-}
-
 // AccumulatedData represents accumulated data for different part types
-type AccumulatedData interface {
-	Type() PartType
+type AccumulatedData struct {
+	Text      *AccumulatedTextData
+	ToolCall  *ToolCallPartDelta
+	Image     *AccumulatedImageData
+	Audio     *AccumulatedAudioData
+	Reasoning *ReasoningPartDelta
 }
 
-func (a *AccumulatedTextData) Type() PartType {
-	return PartTypeText
-}
-
-func (a *AccumulatedToolCallData) Type() PartType {
-	return PartTypeToolCall
-}
-
-func (a *AccumulatedImageData) Type() PartType {
-	return PartTypeImage
-}
-
-func (a *AccumulatedAudioData) Type() PartType {
-	return PartTypeAudio
-}
-
-func (a *AccumulatedReasoningData) Type() PartType {
-	return PartTypeReasoning
-}
-
-// newAccumulatedData creates accumulated data from a delta
-func newAccumulatedData(delta ContentDelta) AccumulatedData {
+// newDelta creates accumulated data from a delta
+func newDelta(delta ContentDelta) *AccumulatedData {
 	switch {
 	case delta.Part.TextPartDelta != nil:
-		return &AccumulatedTextData{
-			Text: delta.Part.TextPartDelta.Text,
+		textDelta := delta.Part.TextPartDelta
+		textData := &AccumulatedTextData{
+			Text: textDelta.Text,
+		}
+		if textDelta.Citation != nil {
+			textData.Citations = make(map[int]CitationDelta)
+			textData.Citations[0] = *textDelta.Citation
+		}
+		return &AccumulatedData{
+			Text: textData,
 		}
 	case delta.Part.ToolCallPartDelta != nil:
-		toolName := ""
-		if delta.Part.ToolCallPartDelta.ToolName != nil {
-			toolName = *delta.Part.ToolCallPartDelta.ToolName
-		}
-		args := ""
-		if delta.Part.ToolCallPartDelta.Args != nil {
-			args = *delta.Part.ToolCallPartDelta.Args
-		}
-		return &AccumulatedToolCallData{
-			ToolName:   toolName,
-			ToolCallID: delta.Part.ToolCallPartDelta.ToolCallID,
-			Args:       args,
-			ID:         delta.Part.ToolCallPartDelta.ID,
+		return &AccumulatedData{
+			ToolCall: delta.Part.ToolCallPartDelta,
 		}
 	case delta.Part.ImagePartDelta != nil:
 		imageData := ""
 		if delta.Part.ImagePartDelta.ImageData != nil {
 			imageData = *delta.Part.ImagePartDelta.ImageData
 		}
-		return &AccumulatedImageData{
-			ImageData: imageData,
-			Width:     delta.Part.ImagePartDelta.Width,
-			Height:    delta.Part.ImagePartDelta.Height,
-			MimeType:  delta.Part.ImagePartDelta.MimeType,
-			ID:        delta.Part.ImagePartDelta.ID,
+		return &AccumulatedData{
+			Image: &AccumulatedImageData{
+				ImageData: imageData,
+				Width:     delta.Part.ImagePartDelta.Width,
+				Height:    delta.Part.ImagePartDelta.Height,
+				MimeType:  delta.Part.ImagePartDelta.MimeType,
+				ID:        delta.Part.ImagePartDelta.ID,
+			},
 		}
 	case delta.Part.AudioPartDelta != nil:
 		var audioDataChunks []string
@@ -114,19 +84,19 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 		if delta.Part.AudioPartDelta.Transcript != nil {
 			transcript = *delta.Part.AudioPartDelta.Transcript
 		}
-		return &AccumulatedAudioData{
-			AudioDataChunks: audioDataChunks,
-			Format:          delta.Part.AudioPartDelta.Format,
-			SampleRate:      delta.Part.AudioPartDelta.SampleRate,
-			Channels:        delta.Part.AudioPartDelta.Channels,
-			Transcript:      transcript,
-			ID:              delta.Part.AudioPartDelta.ID,
+		return &AccumulatedData{
+			Audio: &AccumulatedAudioData{
+				AudioDataChunks: audioDataChunks,
+				Format:          delta.Part.AudioPartDelta.Format,
+				SampleRate:      delta.Part.AudioPartDelta.SampleRate,
+				Channels:        delta.Part.AudioPartDelta.Channels,
+				Transcript:      transcript,
+				ID:              delta.Part.AudioPartDelta.ID,
+			},
 		}
 	case delta.Part.ReasoningPartDelta != nil:
-		return &AccumulatedReasoningData{
-			Text:      delta.Part.ReasoningPartDelta.Text,
-			Signature: delta.Part.ReasoningPartDelta.Signature,
-			ID:        delta.Part.ReasoningPartDelta.ID,
+		return &AccumulatedData{
+			Reasoning: delta.Part.ReasoningPartDelta,
 		}
 	default:
 		return nil
@@ -135,35 +105,51 @@ func newAccumulatedData(delta ContentDelta) AccumulatedData {
 
 // mergeDelta merges an incoming delta with existing accumulated data
 func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
-	switch existingData := existing.(type) {
-	case *AccumulatedTextData:
+	switch {
+	case existing.Text != nil:
 		textPartDelta := delta.Part.TextPartDelta
 		if textPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is text, incoming type is not text", delta.Index)
 		}
+		existingData := existing.Text
 		existingData.Text += textPartDelta.Text
-	case *AccumulatedToolCallData:
+		if textPartDelta.Citation != nil {
+			if existingData.Citations == nil {
+				existingData.Citations = make(map[int]CitationDelta)
+			}
+			citationIndex := len(existingData.Citations)
+			existingData.Citations[citationIndex] = *textPartDelta.Citation
+		}
+	case existing.ToolCall != nil:
 		toolCallPartDelta := delta.Part.ToolCallPartDelta
 		if toolCallPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is tool-call, incoming type is not tool-call", delta.Index)
 		}
+		existingData := existing.ToolCall
 		if toolCallPartDelta.ToolName != nil {
-			existingData.ToolName += *toolCallPartDelta.ToolName
+			if existingData.ToolName == nil {
+				existingData.ToolName = new(string)
+			}
+			*existingData.ToolName += *toolCallPartDelta.ToolName
 		}
 		if toolCallPartDelta.ToolCallID != nil {
 			existingData.ToolCallID = toolCallPartDelta.ToolCallID
 		}
 		if toolCallPartDelta.Args != nil {
-			existingData.Args += *toolCallPartDelta.Args
+			if existingData.Args == nil {
+				existingData.Args = new(string)
+			}
+			*existingData.Args += *toolCallPartDelta.Args
 		}
 		if toolCallPartDelta.ID != nil {
 			existingData.ID = toolCallPartDelta.ID
 		}
-	case *AccumulatedImageData:
+	case existing.Image != nil:
 		imagePartDelta := delta.Part.ImagePartDelta
 		if imagePartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is image, incoming type is not image", delta.Index)
 		}
+		existingData := existing.Image
 		if imagePartDelta.ImageData != nil {
 			existingData.ImageData += *imagePartDelta.ImageData
 		}
@@ -180,11 +166,12 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 			existingData.ID = imagePartDelta.ID
 		}
 
-	case *AccumulatedAudioData:
+	case existing.Audio != nil:
 		audioPartDelta := delta.Part.AudioPartDelta
 		if audioPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is audio, incoming type is not audio", delta.Index)
 		}
+		existingData := existing.Audio
 		if audioPartDelta.AudioData != nil {
 			existingData.AudioDataChunks = append(existingData.AudioDataChunks, *audioPartDelta.AudioData)
 		}
@@ -204,11 +191,12 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 			existingData.ID = audioPartDelta.ID
 		}
 
-	case *AccumulatedReasoningData:
+	case existing.Reasoning != nil:
 		reasoningPartDelta := delta.Part.ReasoningPartDelta
 		if reasoningPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is reasoning, incoming type is not reasoning", delta.Index)
 		}
+		existingData := existing.Reasoning
 		existingData.Text += reasoningPartDelta.Text
 		if reasoningPartDelta.Signature != nil {
 			existingData.Signature = reasoningPartDelta.Signature
@@ -223,8 +211,62 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 }
 
 // createTextPart creates a text part from accumulated text data
-func createTextPart(data *AccumulatedTextData) Part {
-	return NewTextPart(data.Text)
+func createTextPart(data *AccumulatedTextData, index int) (Part, error) {
+	textPart := &TextPart{
+		Text: data.Text,
+	}
+
+	if len(data.Citations) > 0 {
+		indices := make([]int, 0, len(data.Citations))
+		for citationIndex := range data.Citations {
+			indices = append(indices, citationIndex)
+		}
+		sort.Ints(indices)
+
+		citations := make([]Citation, 0, len(indices))
+		for _, citationIndex := range indices {
+			citationDelta := data.Citations[citationIndex]
+			if citationDelta.Type != "" && citationDelta.Type != "citation" {
+				return Part{}, NewInvariantError(
+					"",
+					fmt.Sprintf("Invalid citation type %q for text part at index %d", citationDelta.Type, index),
+				)
+			}
+			if citationDelta.Source == nil || citationDelta.StartIndex == nil || citationDelta.EndIndex == nil {
+				return Part{}, NewInvariantError(
+					"",
+					fmt.Sprintf(
+						"Incomplete citation data for text part at index %d: source=%v, start_index=%v, end_index=%v",
+						index,
+						citationDelta.Source,
+						citationDelta.StartIndex,
+						citationDelta.EndIndex,
+					),
+				)
+			}
+
+			citation := Citation{
+				Source:     *citationDelta.Source,
+				StartIndex: *citationDelta.StartIndex,
+				EndIndex:   *citationDelta.EndIndex,
+			}
+			if citationDelta.Title != nil {
+				citation.Title = citationDelta.Title
+			}
+			if citationDelta.CitedText != nil {
+				citation.CitedText = citationDelta.CitedText
+			}
+			citations = append(citations, citation)
+		}
+
+		if len(citations) > 0 {
+			textPart.Citations = citations
+		}
+	}
+
+	return Part{
+		TextPart: textPart,
+	}, nil
 }
 
 // parseToolCallArgs parses tool call arguments from JSON string
@@ -241,20 +283,24 @@ func parseToolCallArgs(args string) (map[string]any, error) {
 }
 
 // createToolCallPart creates a tool call part from accumulated tool call data
-func createToolCallPart(data *AccumulatedToolCallData, index int) (Part, error) {
+func createToolCallPart(data *ToolCallPartDelta, index int) (Part, error) {
 	if data.ToolCallID == nil {
 		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required field tool_call_id at index %d", index))
 	}
-	if data.ToolName == "" {
+	if data.ToolName == nil {
 		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required field tool_name at index %d", index))
 	}
 
-	args, err := parseToolCallArgs(data.Args)
+	strArgs := ""
+	if data.Args != nil {
+		strArgs = *data.Args
+	}
+	args, err := parseToolCallArgs(strArgs)
 	if err != nil {
 		return Part{}, err
 	}
 
-	toolCallPart := NewToolCallPart(*data.ToolCallID, data.ToolName, args)
+	toolCallPart := NewToolCallPart(*data.ToolCallID, *data.ToolName, args)
 	toolCallPart.ToolCallPart.ID = data.ID
 	return toolCallPart, nil
 }
@@ -309,7 +355,7 @@ func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 }
 
 // createReasoningPart creates a reasoning part from accumulated reasoning data
-func createReasoningPart(data *AccumulatedReasoningData) Part {
+func createReasoningPart(data *ReasoningPartDelta) Part {
 	return Part{
 		ReasoningPart: &ReasoningPart{
 			Text:      data.Text,
@@ -321,17 +367,17 @@ func createReasoningPart(data *AccumulatedReasoningData) Part {
 
 // createPart creates a final Part from accumulated data
 func createPart(data AccumulatedData, index int) (Part, error) {
-	switch d := data.(type) {
-	case *AccumulatedTextData:
-		return createTextPart(d), nil
-	case *AccumulatedToolCallData:
-		return createToolCallPart(d, index)
-	case *AccumulatedImageData:
-		return createImagePart(d, index)
-	case *AccumulatedAudioData:
-		return createAudioPart(d)
-	case *AccumulatedReasoningData:
-		return createReasoningPart(d), nil
+	switch {
+	case data.Text != nil:
+		return createTextPart(data.Text, index)
+	case data.ToolCall != nil:
+		return createToolCallPart(data.ToolCall, index)
+	case data.Image != nil:
+		return createImagePart(data.Image, index)
+	case data.Audio != nil:
+		return createAudioPart(data.Audio)
+	case data.Reasoning != nil:
+		return createReasoningPart(data.Reasoning), nil
 	default:
 		return Part{}, fmt.Errorf("unknown accumulated data type at index %d", index)
 	}
@@ -417,11 +463,11 @@ func (s *StreamAccumulator) processDelta(delta ContentDelta) error {
 	if exists {
 		return mergeDelta(existing, delta)
 	} else {
-		accumulated := newAccumulatedData(delta)
+		accumulated := newDelta(delta)
 		if accumulated == nil {
 			return fmt.Errorf("unable to initialize accumulated data for delta at index %d", delta.Index)
 		}
-		s.accumulatedParts[delta.Index] = accumulated
+		s.accumulatedParts[delta.Index] = *accumulated
 		return nil
 	}
 }

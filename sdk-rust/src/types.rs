@@ -169,7 +169,7 @@ pub struct AudioPart {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct SourcePart {
-    /// The source URL or identifier of the document.
+    /// The URL or identifier of the document.
     pub source: String,
     /// The title of the document.
     pub title: String,
@@ -233,6 +233,16 @@ pub struct Citation {
      */
     pub source: String,
     /**
+     * The title of the document being cited.
+     */
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /**
+     * The text snippet from the document being cited.
+     */
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cited_text: Option<String>,
+    /**
      * The start index of the document content part being cited.
      */
     pub start_index: usize,
@@ -262,6 +272,32 @@ pub struct AssistantMessage {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct TextPartDelta {
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub citation: Option<CitationDelta>,
+}
+
+/// A delta update for a citation part, used in streaming of citation messages.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct CitationDelta {
+    /// The type of the citation delta.
+    #[serde(rename = "type")]
+    pub r#type: String,
+    /// The URL or identifier of the document being cited.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// The title of the document being cited.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The text snippet from the document being cited.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cited_text: Option<String>,
+    /// The start index of the document content part being cited.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_index: Option<usize>,
+    /// The end index of the document content part being cited.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_index: Option<usize>,
 }
 
 /// A delta update for a tool call part, used in streaming of a tool invocation.

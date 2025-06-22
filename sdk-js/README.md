@@ -113,6 +113,8 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`structured-output`: Structured output](./examples/structured-output.ts)
 - [`generate-reasoning`: Generate reasoning](./examples/generate-reasoning.ts)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.ts)
+- [`generate-citations`: Generate citations (RAG)](./examples/generate-citations.ts)
+- [`stream-citations`: Stream citations (RAG)](./examples/stream-citations.ts)
 
 ```bash
 node examples/generate-text.ts

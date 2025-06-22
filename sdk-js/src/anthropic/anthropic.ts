@@ -1,13 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NotImplementedError, UnsupportedError } from "../errors.ts";
+import { UnsupportedError } from "../errors.ts";
 import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
-import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import { looselyConvertPartToPartDelta } from "../stream.utils.ts";
 import type {
+  Citation,
+  CitationDelta,
   ContentDelta,
   ImagePart,
   LanguageModelInput,
@@ -19,13 +20,10 @@ import type {
   PartialModelResponse,
   ReasoningOptions,
   ReasoningPart,
-  ReasoningPartDelta,
   SourcePart,
   TextPart,
-  TextPartDelta,
   Tool,
   ToolCallPart,
-  ToolCallPartDelta,
   ToolChoiceOption,
   ToolResultPart,
 } from "../types.ts";
@@ -213,7 +211,7 @@ function convertToAnthropicContentBlockParam(
     case "image":
       return convertToAnthropicImageBlockParam(part);
     case "source":
-      return convertToAnthropicDocumentBlockParam(part);
+      return convertToAnthropicSearchResultBlockParam(part);
     case "tool-call":
       return convertToAnthropicToolUseBlockParam(part);
     case "tool-result":
@@ -251,36 +249,27 @@ function convertToAnthropicImageBlockParam(
   };
 }
 
-function convertToAnthropicDocumentBlockParam(
+function convertToAnthropicSearchResultBlockParam(
   part: SourcePart,
-): Anthropic.DocumentBlockParam {
+): Anthropic.SearchResultBlockParam {
   return {
-    type: "document",
+    type: "search_result",
+    source: part.source,
     title: part.title,
-    source: {
-      type: "content",
-      content: part.content.map(convertToAnthropicContentBlockSourceContent),
-    },
+    content: part.content.map((part) => {
+      // only text blocks are allowed inside source blocks
+      if (part.type !== "text") {
+        throw new UnsupportedError(
+          PROVIDER,
+          `Cannot convert source part to Anthropic SearchResultBlockParam content for type ${part.type}`,
+        );
+      }
+      return convertToAnthropicTextBlockParam(part);
+    }),
     citations: {
       enabled: true,
     },
   };
-}
-
-function convertToAnthropicContentBlockSourceContent(
-  part: Part,
-): Anthropic.ContentBlockSourceContent {
-  switch (part.type) {
-    case "text":
-      return convertToAnthropicTextBlockParam(part);
-    case "image":
-      return convertToAnthropicImageBlockParam(part);
-    default:
-      throw new UnsupportedError(
-        PROVIDER,
-        `Cannot convert part to Anthropic ContentBlockSourceContent for type ${part.type}`,
-      );
-  }
 }
 
 function convertToAnthropicToolUseBlockParam(
@@ -297,15 +286,16 @@ function convertToAnthropicToolUseBlockParam(
 function convertToAnthropicToolResultBlockParam(
   part: ToolResultPart,
 ): Anthropic.ToolResultBlockParam {
-  const toolResultPartContent = getCompatiblePartsWithoutSourceParts(
-    part.content,
-  );
   return {
     type: "tool_result",
     tool_use_id: part.tool_call_id,
-    content: toolResultPartContent.map((part) => {
+    content: part.content.map((part) => {
       const blockParam = convertToAnthropicContentBlockParam(part);
-      if (blockParam.type !== "text" && blockParam.type !== "image") {
+      if (
+        blockParam.type !== "text" &&
+        blockParam.type !== "image" &&
+        blockParam.type !== "search_result"
+      ) {
         throw new UnsupportedError(
           PROVIDER,
           `Cannot convert tool result part to Anthropic ToolResultBlockParam content for type ${blockParam.type}`,
@@ -391,63 +381,66 @@ function convertToAnthropicThinkingConfigParam(
 function mapAnthropicMessage(
   contentBlocks: Anthropic.Messages.ContentBlock[],
 ): Part[] {
-  return contentBlocks.map(mapAnthropicBlock);
+  return contentBlocks.map(mapAnthropicBlock).filter((b) => !!b);
 }
 
-function mapAnthropicBlock(block: Anthropic.Messages.ContentBlock): Part {
+function mapAnthropicBlock(
+  block: Anthropic.Messages.ContentBlock,
+): Part | null {
   switch (block.type) {
     case "text":
       return mapAnthropicTextBlock(block);
     case "tool_use":
-      return mapAnthropicToolUseBlock(block);
+      return {
+        type: "tool-call",
+        tool_call_id: block.id,
+        tool_name: block.name,
+        args: block.input as Record<string, unknown>,
+      };
     case "thinking":
-      return mapAnthropicThinkingBlock(block);
+      return {
+        type: "reasoning",
+        text: block.thinking,
+        signature: block.signature,
+      };
     case "redacted_thinking":
-      return mapAnthropicRedactedThinkingBlock(block);
+      return {
+        type: "reasoning",
+        text: "",
+        signature: block.data,
+      };
     default:
-      throw new NotImplementedError(
-        PROVIDER,
-        `Cannot map Anthropic content block for type ${block.type}`,
-      );
+      return null;
   }
 }
 
 function mapAnthropicTextBlock(block: Anthropic.Messages.TextBlock): TextPart {
-  return {
+  const textPart: TextPart = {
     type: "text",
     text: block.text,
   };
-}
 
-function mapAnthropicToolUseBlock(
-  block: Anthropic.Messages.ToolUseBlock,
-): ToolCallPart {
-  return {
-    type: "tool-call",
-    tool_call_id: block.id,
-    tool_name: block.name,
-    args: block.input as Record<string, unknown>,
-  };
-}
+  if (block.citations) {
+    textPart.citations = block.citations
+      .map((textCitation): Citation | null => {
+        if (textCitation.type === "search_result_location") {
+          const citation: Citation = {
+            source: textCitation.source,
+            cited_text: textCitation.cited_text,
+            start_index: textCitation.start_block_index,
+            end_index: textCitation.end_block_index,
+          };
+          if (textCitation.title) {
+            citation.title = textCitation.title;
+          }
+          return citation;
+        }
+        return null;
+      })
+      .filter((c) => !!c);
+  }
 
-function mapAnthropicThinkingBlock(
-  block: Anthropic.Messages.ThinkingBlock,
-): ReasoningPart {
-  return {
-    type: "reasoning",
-    text: block.thinking,
-    signature: block.signature,
-  };
-}
-
-function mapAnthropicRedactedThinkingBlock(
-  block: Anthropic.Messages.RedactedThinkingBlock,
-): ReasoningPart {
-  return {
-    type: "reasoning",
-    text: "",
-    signature: block.data,
-  };
+  return textPart;
 }
 
 // MARK: To SDK Delta
@@ -455,18 +448,19 @@ function mapAnthropicRedactedThinkingBlock(
 function mapAnthropicRawContentBlockStartEvent(
   event: Anthropic.RawContentBlockStartEvent,
 ): ContentDelta[] {
-  const part = looselyConvertPartToPartDelta(
-    mapAnthropicBlock(event.content_block),
-  );
-  if (part.type === "tool-call") {
+  const part = mapAnthropicBlock(event.content_block);
+  if (!part) return [];
+  const partDelta = looselyConvertPartToPartDelta(part);
+
+  if (partDelta.type === "tool-call") {
     // Start event for tool call should not have content
-    part.args = "";
+    partDelta.args = "";
   }
 
   return [
     {
       index: event.index,
-      part,
+      part: partDelta,
     },
   ];
 }
@@ -475,6 +469,7 @@ function mapAnthropicRawContentBlockDeltaEvent(
   event: Anthropic.RawContentBlockDeltaEvent,
 ): ContentDelta[] {
   const partDelta = mapAnthropicRawContentBlockDelta(event.delta);
+  if (!partDelta) return [];
   return [
     {
       index: event.index,
@@ -485,52 +480,51 @@ function mapAnthropicRawContentBlockDeltaEvent(
 
 function mapAnthropicRawContentBlockDelta(
   delta: Anthropic.RawContentBlockDelta,
-): PartDelta {
+): PartDelta | null {
   switch (delta.type) {
     case "text_delta":
-      return mapAnthropicTextDelta(delta);
+      return {
+        type: "text",
+        text: delta.text,
+      };
     case "input_json_delta":
-      return mapAnthropicInputJSONDelta(delta);
+      return {
+        type: "tool-call",
+        args: delta.partial_json,
+      };
     case "thinking_delta":
-      return mapAnthropicThinkingDelta(delta);
+      return {
+        type: "reasoning",
+        text: delta.thinking,
+      };
     case "signature_delta":
       return {
         type: "reasoning",
         signature: delta.signature,
         text: "",
       };
-    default: {
-      throw new NotImplementedError(
-        PROVIDER,
-        `Cannot map Anthropic raw content block delta for type ${delta.type}`,
-      );
-    }
+    case "citations_delta":
+      if (delta.citation.type === "search_result_location") {
+        const citation: CitationDelta = {
+          type: "citation",
+          start_index: delta.citation.start_block_index,
+          end_index: delta.citation.end_block_index,
+          source: delta.citation.source,
+          cited_text: delta.citation.cited_text,
+        };
+        if (delta.citation.title) {
+          citation.title = delta.citation.title;
+        }
+        return {
+          type: "text",
+          text: "",
+          citation,
+        };
+      }
+      return null;
+    default:
+      return null;
   }
-}
-
-function mapAnthropicTextDelta(delta: Anthropic.TextDelta): TextPartDelta {
-  return {
-    type: "text",
-    text: delta.text,
-  };
-}
-
-function mapAnthropicInputJSONDelta(
-  delta: Anthropic.InputJSONDelta,
-): ToolCallPartDelta {
-  return {
-    type: "tool-call",
-    args: delta.partial_json,
-  };
-}
-
-function mapAnthropicThinkingDelta(
-  delta: Anthropic.ThinkingDelta,
-): ReasoningPartDelta {
-  return {
-    type: "reasoning",
-    text: delta.thinking,
-  };
 }
 
 // MARK: To SDK Usage

@@ -321,6 +321,7 @@ function separatePartsAndDocuments(parts: Part[]): {
   for (const part of parts) {
     if (part.type === "source") {
       documents.push({
+        id: part.source,
         data: convertToCohereDocumentData(part),
       });
     } else {

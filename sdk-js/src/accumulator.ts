@@ -2,6 +2,8 @@ import { InvariantError } from "./errors.ts";
 import type {
   AudioFormat,
   AudioPart,
+  Citation,
+  CitationDelta,
   ContentDelta,
   ImagePart,
   ImagePartDelta,
@@ -11,7 +13,7 @@ import type {
   PartialModelResponse,
   ReasoningPart,
   ReasoningPartDelta,
-  TextPartDelta,
+  TextPart,
   ToolCallPart,
   ToolCallPartDelta,
 } from "./types.ts";
@@ -21,6 +23,12 @@ import {
   base64ToArrayBuffer,
   mergeInt16Arrays,
 } from "./utils/audio.utils.ts";
+
+interface AccumulatedTextData {
+  type: "text";
+  text: string;
+  citations: Map<number, CitationDelta>;
+}
 
 /**
  * Internal representation of accumulated audio data with chunks stored separately
@@ -36,7 +44,7 @@ interface AccumulatedAudioData {
 }
 
 type AccumulatedData =
-  | TextPartDelta
+  | AccumulatedTextData
   | ToolCallPartDelta
   | ImagePartDelta
   | ReasoningPartDelta
@@ -45,48 +53,25 @@ type AccumulatedData =
 /**
  * Initializes accumulated data from a delta
  */
-function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
+function createDelta(delta: ContentDelta): AccumulatedData {
   switch (delta.part.type) {
-    case "text":
-      return {
+    case "text": {
+      const textData: AccumulatedTextData = {
         type: "text",
         text: delta.part.text,
+        citations: new Map<number, CitationDelta>(),
       };
-
-    case "tool-call": {
-      const toolCallPartDelta: ToolCallPartDelta = {
-        type: "tool-call",
-        tool_name: delta.part.tool_name ?? "",
-        args: delta.part.args ?? "",
-      };
-      if (delta.part.tool_call_id) {
-        toolCallPartDelta.tool_call_id = delta.part.tool_call_id;
+      if (delta.part.citation) {
+        textData.citations.set(0, delta.part.citation);
       }
-      if (delta.part.id) {
-        toolCallPartDelta.id = delta.part.id;
-      }
-      return toolCallPartDelta;
+      return textData;
     }
 
-    case "image": {
-      const imagePartDelta: ImagePartDelta = {
-        type: "image",
-        image_data: delta.part.image_data ?? "",
-      };
-      if (delta.part.mime_type) {
-        imagePartDelta.mime_type = delta.part.mime_type;
-      }
-      if (typeof delta.part.width === "number") {
-        imagePartDelta.width = delta.part.width;
-      }
-      if (typeof delta.part.height === "number") {
-        imagePartDelta.height = delta.part.height;
-      }
-      if (delta.part.id) {
-        imagePartDelta.id = delta.part.id;
-      }
-      return imagePartDelta;
-    }
+    case "tool-call":
+      return delta.part;
+
+    case "image":
+      return delta.part;
 
     case "audio": {
       const audioData: AccumulatedAudioData = {
@@ -112,9 +97,7 @@ function initializeAccumulatedData(delta: ContentDelta): AccumulatedData {
     }
 
     case "reasoning":
-      return {
-        ...delta.part,
-      };
+      return delta.part;
   }
 }
 
@@ -132,8 +115,15 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
 
   switch (delta.part.type) {
     case "text": {
-      const existingPart = existing as TextPartDelta;
+      const existingPart = existing as AccumulatedTextData;
       existingPart.text += delta.part.text;
+      if (delta.part.citation) {
+        // We only support a full citation partial for now as that
+        // is the case for all model providers. That means each citation
+        // delta will have index = length of existing citations
+        const citationIndex = existingPart.citations.size;
+        existingPart.citations.set(citationIndex, delta.part.citation);
+      }
       break;
     }
     case "tool-call": {
@@ -217,11 +207,45 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
 /**
  * Creates a text part from accumulated text data
  */
-function createTextPart(data: TextPartDelta): Part {
-  return {
+function createTextPart(data: AccumulatedTextData): Part {
+  const textPart: TextPart = {
     type: "text",
     text: data.text,
   };
+
+  if (data.citations.size > 0) {
+    // Sort citations by their original index to maintain order
+    const sortedCitations = Array.from(data.citations.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([, citation]) => citation);
+    textPart.citations = sortedCitations.map((citationDelta): Citation => {
+      if (
+        !citationDelta.source ||
+        citationDelta.start_index === undefined ||
+        citationDelta.end_index === undefined
+      ) {
+        throw new Error(
+          `Incomplete citation data: source=${String(citationDelta.source)}, ` +
+            `start_index=${String(citationDelta.start_index)}, end_index=${String(citationDelta.end_index)}`,
+        );
+      }
+      const citation: Citation = {
+        source: citationDelta.source,
+        start_index: citationDelta.start_index,
+        end_index: citationDelta.end_index,
+      };
+      if (citationDelta.title) {
+        citation.title = citationDelta.title;
+      }
+      if (citationDelta.cited_text) {
+        citation.cited_text = citationDelta.cited_text;
+      }
+
+      return citation;
+    });
+  }
+
+  return textPart;
 }
 
 /**
@@ -413,7 +437,7 @@ export class StreamAccumulator {
     if (existing) {
       mergeDelta(existing, delta);
     } else {
-      this.#accumulatedParts.set(delta.index, initializeAccumulatedData(delta));
+      this.#accumulatedParts.set(delta.index, createDelta(delta));
     }
   }
 

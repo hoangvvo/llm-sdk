@@ -94,12 +94,12 @@
     "AgentStreamEvent": {
       "description": "Stream events emitted by the agent during runStream call.",
       "oneOf": [
-        { "$ref": "#/definitions/AgentStreamEventPartial" },
+        { "$ref": "#/definitions/AgentStreamPartialEvent" },
         { "$ref": "#/definitions/AgentStreamItemEvent" },
         { "$ref": "#/definitions/AgentStreamResponseEvent" }
       ]
     },
-    "AgentStreamEventPartial": {
+    "AgentStreamPartialEvent": {
       "allOf": [
         { "$ref": "file:///./sdk.json#/definitions/PartialModelResponse" },
         {

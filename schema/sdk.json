@@ -150,7 +150,7 @@
         "type": { "const": "source" },
         "source": {
           "type": "string",
-          "description": "The source URL or identifier of the document."
+          "description": "The URL or identifier of the document."
         },
         "title": {
           "type": "string",
@@ -162,7 +162,7 @@
           "items": { "$ref": "#/definitions/Part" }
         }
       },
-      "required": ["type", "title", "content"],
+      "required": ["type", "source", "title", "content"],
       "additionalProperties": false
     },
     "ToolCallPart": {
@@ -242,23 +242,31 @@
       "type": "object",
       "description": "Represents a citation for a part.",
       "properties": {
-        "source_id": {
+        "source": {
           "type": "string",
-          "description": "The ID of the document being cited."
+          "description": "The URL or identifier of the document being cited."
         },
-        "start_source_part_index": {
+        "title": {
+          "type": "string",
+          "description": "The title of the document being cited."
+        },
+        "cited_text": {
+          "type": "string",
+          "description": "The text snippet from the document being cited."
+        },
+        "start_index": {
           "type": "number",
           "description": "The start index of the document content part being cited."
         },
-        "end_source_part_index": {
+        "end_index": {
           "type": "number",
           "description": "The end index of the document content part being cited."
         }
       },
       "required": [
-        "source_id",
-        "start_source_part_index",
-        "end_source_part_index"
+        "source",
+        "start_index",
+        "end_index"
       ],
       "additionalProperties": false
     },
@@ -306,9 +314,39 @@
       "description": "A delta update for a text part, used in streaming or incremental updates of a message.",
       "properties": {
         "type": { "const": "text" },
-        "text": { "type": "string" }
+        "text": { "type": "string" },
+        "citation": { "$ref": "#/definitions/CitationDelta" }
       },
       "required": ["type", "text"],
+      "additionalProperties": false
+    },
+    "CitationDelta": {
+      "type": "object",
+      "description": "A delta update for a citation part, used in streaming of citation messages.",
+      "properties": {
+        "type": { "const": "citation" },
+        "source": {
+          "type": "string",
+          "description": "The URL or identifier of the document being cited."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the document being cited."
+        },
+        "cited_text": {
+          "type": "string",
+          "description": "The text snippet from the document being cited."
+        },
+        "start_index": {
+          "type": "number",
+          "description": "The start index of the document content part being cited."
+        },
+        "end_index": {
+          "type": "number",
+          "description": "The end index of the document content part being cited."
+        }
+      },
+      "required": ["type"],
       "additionalProperties": false
     },
     "ToolCallPartDelta": {

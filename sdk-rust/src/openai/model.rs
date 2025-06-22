@@ -676,6 +676,7 @@ fn map_openai_stream_event(
         ResponseStreamEvent::TextDelta(text_delta_event) => {
             let text_part = PartDelta::Text(TextPartDelta {
                 text: text_delta_event.delta,
+                citation: None,
             });
             Ok(Some(ContentDelta {
                 index: text_delta_event.output_index,

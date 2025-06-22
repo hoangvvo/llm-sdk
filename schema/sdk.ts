@@ -137,6 +137,10 @@ export interface AudioPart {
 export interface SourcePart {
   type: "source";
   /**
+   * The URL or identifier of the document.
+   */
+  source: string;
+  /**
    * The title of the document.
    */
   title: string;
@@ -214,18 +218,28 @@ export interface ReasoningPart {
  */
 export interface Citation {
   /**
-   * The ID of the document being cited.
+   * The URL or identifier of the document being cited.
    */
-  source_id: string;
+  source: string;
+
+  /**
+   * The title of the document being cited.
+   */
+  title?: string;
+
+  /**
+   * The text snippet from the document being cited.
+   */
+  cited_text?: string;
 
   /**
    * The start index of the document content part being cited.
    */
-  start_source_part_index: number;
+  start_index: number;
   /**
    * The end index of the document content part being cited.
    */
-  end_source_part_index: number;
+  end_index: number;
 }
 /**
  * Represents a message sent by the user.
@@ -247,6 +261,33 @@ export interface AssistantMessage {
 export interface TextPartDelta {
   type: "text";
   text: string;
+  citation?: CitationDelta;
+}
+/**
+ * A delta update for a citation part, used in streaming of citation messages.
+ */
+export interface CitationDelta {
+  type: "citation";
+  /**
+   * The URL or identifier of the document being cited.
+   */
+  source?: string;
+  /**
+   * The title of the document being cited.
+   */
+  title?: string;
+  /**
+   * The text snippet from the document being cited.
+   */
+  cited_text?: string;
+  /**
+   * The start index of the document content part being cited.
+   */
+  start_index?: number;
+  /**
+   * The end index of the document content part being cited.
+   */
+  end_index?: number;
 }
 /**
  * A delta update for a tool call part, used in streaming of a tool invocation.

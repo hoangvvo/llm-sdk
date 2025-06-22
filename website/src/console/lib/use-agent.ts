@@ -3,7 +3,7 @@ import type {
   AgentItemMessage,
   AgentRequest,
   AgentStreamEvent,
-  AgentStreamEventPartial,
+  AgentStreamPartialEvent,
 } from "@hoangvvo/llm-agent";
 import type {
   AudioPart,
@@ -410,10 +410,10 @@ function prepareMcpServerPayload(
   return sanitized.length > 0 ? sanitized : undefined;
 }
 
-/* eslint-disable @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unnecessary-type-assertion */
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 function reduceContentDelta(
   parts: Part[],
-  partial: AgentStreamEventPartial,
+  partial: AgentStreamPartialEvent,
 ): Part[] {
   const delta = partial.delta;
   if (!delta) {
@@ -421,7 +421,7 @@ function reduceContentDelta(
   }
 
   const part = delta.part;
-  if (!part || typeof part !== "object" || typeof part.type !== "string") {
+  if (typeof part !== "object" || typeof part.type !== "string") {
     return parts;
   }
 
@@ -434,7 +434,7 @@ function reduceContentDelta(
         next[index]?.type === "text" && typeof next[index].text === "string"
           ? next[index].text
           : "";
-      const text = `${previousText}${part.text ?? ""}`;
+      const text = `${previousText}${part.text}`;
       next[index] = {
         type: "text",
         text,
@@ -488,7 +488,7 @@ function reduceContentDelta(
       const separator = previousReasoning.text ? "\n" : "";
       next[index] = {
         ...previousReasoning,
-        text: `${previousReasoning.text}${separator}${part.text ?? ""}`,
+        text: `${previousReasoning.text}${separator}${part.text}`,
         signature: part.signature ?? previousReasoning.signature,
         id: part.id ?? previousReasoning.id,
       } satisfies ReasoningPart;

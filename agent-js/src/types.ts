@@ -79,11 +79,11 @@ export interface AgentItemTool {
  * Stream events emitted by the agent during runStream call.
  */
 export type AgentStreamEvent =
-  | AgentStreamEventPartial
+  | AgentStreamPartialEvent
   | AgentStreamItemEvent
   | AgentStreamResponseEvent;
 
-export interface AgentStreamEventPartial extends PartialModelResponse {
+export interface AgentStreamPartialEvent extends PartialModelResponse {
   event: "partial";
 }
 

@@ -683,7 +683,10 @@ fn map_openai_delta(
 
     if let Some(content) = delta.content {
         if !content.is_empty() {
-            let text_part = TextPartDelta { text: content };
+            let text_part = TextPartDelta {
+                text: content,
+                citation: None,
+            };
             let part = PartDelta::Text(text_part);
             let index = stream_utils::guess_delta_index(
                 &part,

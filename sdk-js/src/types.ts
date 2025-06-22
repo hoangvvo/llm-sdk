@@ -137,7 +137,7 @@ export interface AudioPart {
 export interface SourcePart {
   type: "source";
   /**
-   * The source URL or identifier of the document.
+   * The URL or identifier of the document.
    */
   source: string;
   /**
@@ -223,6 +223,16 @@ export interface Citation {
   source: string;
 
   /**
+   * The title of the document being cited.
+   */
+  title?: string;
+
+  /**
+   * The text snippet from the document being cited.
+   */
+  cited_text?: string;
+
+  /**
    * The start index of the document content part being cited.
    */
   start_index: number;
@@ -251,6 +261,7 @@ export interface AssistantMessage {
 export interface TextPartDelta {
   type: "text";
   text: string;
+  citation?: CitationDelta;
 }
 /**
  * A delta update for a tool call part, used in streaming of a tool invocation.
@@ -345,6 +356,34 @@ export interface ReasoningPartDelta {
    * The ID of the reasoning part, if applicable
    */
   id?: string;
+}
+/**
+ * A delta update for a citation part, used in streaming of citation messages.
+ */
+export interface CitationDelta {
+  type: "citation";
+  /**
+   * The URL or identifier of the document being cited.
+   */
+  source?: string;
+
+  /**
+   * The title of the document being cited.
+   */
+  title?: string;
+
+  /**
+   * The text snippet from the document being cited.
+   */
+  cited_text?: string;
+  /**
+   * The start index of the document content part being cited.
+   */
+  start_index?: number;
+  /**
+   * The end index of the document content part being cited.
+   */
+  end_index?: number;
 }
 /**
  * Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.
