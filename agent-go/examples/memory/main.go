@@ -212,7 +212,7 @@ For less important or long-tail info, use archival_memory_search before answerin
 	// Demo: four independent sessions (agent cannot see prior turns except via memory)
 	ctx := context.Background()
 
-	// Turn 1 — store a core memory
+	// Turn 1: store a core memory
 	items1 := []llmagent.AgentItem{
 		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Remember that my favorite color is blue."))),
 	}
@@ -223,7 +223,7 @@ For less important or long-tail info, use archival_memory_search before answerin
 	}
 	litter.Dump(res1.Content)
 
-	// Turn 2 — recall using core memory
+	// Turn 2: recall using core memory
 	items2 := []llmagent.AgentItem{
 		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("What's my favorite color?"))),
 	}
@@ -234,7 +234,7 @@ For less important or long-tail info, use archival_memory_search before answerin
 	}
 	litter.Dump(res2.Content)
 
-	// Turn 3 — capture background notes for later lookup (archival)
+	// Turn 3: capture background notes for later lookup (archival)
 	turn3 := "I captured some background notes titled 'q3-report-research' for future reference: " +
 		"Key data sources for the Q3 report include Salesforce pipeline exports, Google Analytics weekly sessions, and the paid ads spend spreadsheet. " +
 		"Please tuck this away so you can look it up later."
@@ -248,7 +248,7 @@ For less important or long-tail info, use archival_memory_search before answerin
 	}
 	litter.Dump(res3.Content)
 
-	// Turn 4 — fetch the saved background notes via search
+	// Turn 4: fetch the saved background notes via search
 	turn4 := "Can you pull up what we have under 'q3-report-research'?"
 	items4 := []llmagent.AgentItem{
 		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart(turn4))),

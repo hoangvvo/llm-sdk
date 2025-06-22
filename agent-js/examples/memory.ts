@@ -134,7 +134,7 @@ For less important or long-tail info, use archival_memory_search before answerin
 });
 
 // Demo: four independent turns to show core + archival memory
-// Turn 1 — store a core memory
+// Turn 1: store a core memory
 const items1: AgentItem[] = [
   {
     type: "message",
@@ -150,7 +150,7 @@ console.log(
 const res1 = await memoryAgent.run({ context: undefined, input: items1 });
 console.dir(res1.content, { depth: null });
 
-// Turn 2 — recall using core memory (no prior messages)
+// Turn 2: recall using core memory (no prior messages)
 const items2: AgentItem[] = [
   {
     type: "message",
@@ -164,7 +164,7 @@ console.log(
 const res2 = await memoryAgent.run({ context: undefined, input: items2 });
 console.dir(res2.content, { depth: null });
 
-// Turn 3 — store less-important info in archival memory
+// Turn 3: store less-important info in archival memory
 const items3: AgentItem[] = [
   {
     type: "message",
@@ -186,7 +186,7 @@ console.log(
 const res3 = await memoryAgent.run({ context: undefined, input: items3 });
 console.dir(res3.content, { depth: null });
 
-// Turn 4 — recall via archival search (no prior messages)
+// Turn 4: recall via archival search (no prior messages)
 const items4: AgentItem[] = [
   {
     type: "message",

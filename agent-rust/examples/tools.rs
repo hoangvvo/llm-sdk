@@ -90,7 +90,7 @@ impl AgentTool<LostAndFoundContext> for IntakeItemTool {
             if ledger.contains_key(&key) {
                 return Ok(AgentToolResult {
                     content: vec![Part::text(format!(
-                        "Item {} is already on the ledger—confirm the manifest number before \
+                        "Item {} is already on the ledger, confirm the manifest number before \
                          adding duplicates.",
                         params.item_id
                     ))],
@@ -280,7 +280,7 @@ impl AgentTool<LostAndFoundContext> for IssueReceiptTool {
                 params.traveller, context.manifest_id
             )];
             if cleared.is_empty() {
-                summary.push("No items cleared—everything is held for review.".into());
+                summary.push("No items cleared, everything is held for review.".into());
             } else {
                 summary.push(format!("Cleared items: {}", cleared.join(", ")));
             }

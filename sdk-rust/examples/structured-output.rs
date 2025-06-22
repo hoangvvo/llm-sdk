@@ -31,8 +31,7 @@ Instructions:
 
 In a large bowl, whisk together flour, sugar, baking powder, baking soda, and salt.
 In another bowl, mix buttermilk, milk, egg, and melted butter.
-Pour the wet ingredients into the dry and stir until just combined (batter will be lumpy
-—don't overmix).
+Pour the wet ingredients into the dry and stir until just combined (batter will be lumpy don't overmix).
 Heat a skillet over medium heat and lightly grease with butter or oil.
 Pour 1/4 cup batter for each pancake. Cook until bubbles form on the surface,
 then flip and cook until golden brown.

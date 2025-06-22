@@ -74,7 +74,7 @@ const intakeItemTool = tool<
         content: [
           {
             type: "text",
-            text: `Item ${args.item_id} is already on the ledger—confirm the manifest number before adding duplicates.`,
+            text: `Item ${args.item_id} is already on the ledger; confirm the manifest number before adding duplicates.`,
           },
         ],
         is_error: true,
@@ -187,7 +187,7 @@ const issueReceiptTool = typeboxTool({
       `Receipt for ${args.traveller} on manifest ${ctx.manifestId}:`,
       cleared.length > 0
         ? `Cleared items: ${cleared.join(", ")}`
-        : "No items cleared—everything is held for review.",
+        : "No items cleared; everything is held for review.",
     ];
     if (ctx.receiptNotes.length > 0) {
       summaryLines.push("Notes:");

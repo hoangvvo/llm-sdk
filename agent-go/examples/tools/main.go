@@ -85,7 +85,7 @@ func (intakeItemTool) Execute(_ context.Context, raw json.RawMessage, ctx *LostA
 	}
 	if _, exists := ctx.IntakeLedger[normalized]; exists {
 		return llmagent.AgentToolResult{
-			Content: []llmsdk.Part{llmsdk.NewTextPart(fmt.Sprintf("Item %s is already on the ledger—confirm the manifest number before adding duplicates.", params.ItemID))},
+			Content: []llmsdk.Part{llmsdk.NewTextPart(fmt.Sprintf("Item %s is already on the ledger; confirm the manifest number before adding duplicates.", params.ItemID))},
 			IsError: true,
 		}, nil
 	}
@@ -206,7 +206,7 @@ func (issueReceiptTool) Execute(_ context.Context, raw json.RawMessage, ctx *Los
 	if len(cleared) > 0 {
 		summary = append(summary, fmt.Sprintf("Cleared items: %s", strings.Join(cleared, ", ")))
 	} else {
-		summary = append(summary, "No items cleared—everything is held for review.")
+		summary = append(summary, "No items cleared; everything is held for review.")
 	}
 	if len(ctx.ReceiptNotes) > 0 {
 		summary = append(summary, "Notes:")

@@ -63,7 +63,7 @@ Under the hood this integration is just an implementation of the [`Toolkit`](../
 
 ## Context-aware setup
 
-This library is typically deployed as a single agent service that serves many users. The agent itself stays stateless; the run `context` carries caller-specific identifiers so `Toolkit.create_session` can resolve per-session details before the conversation starts. Use that resolver to look up OAuth tokens, choose the correct MCP endpoint, or apply tenant-level feature flags. It keeps the agent reusable while still routing each session through the appropriate integration—matching the lifecycle in [Agent vs Run session](../agent-vs-run-session).
+This library is typically deployed as a single agent service that serves many users. The agent itself stays stateless; the run `context` carries caller-specific identifiers so `Toolkit.create_session` can resolve per-session details before the conversation starts. Use that resolver to look up OAuth tokens, choose the correct MCP endpoint, or apply tenant-level feature flags. It keeps the agent reusable while still routing each session through the appropriate integration, matching the lifecycle in [Agent vs Run session](../agent-vs-run-session).
 
 The snippets below show an init function that loads an OAuth token from storage based on the user ID in context and returns MCP parameters for that session.
 

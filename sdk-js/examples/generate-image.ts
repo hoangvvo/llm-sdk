@@ -17,7 +17,7 @@ const response = await model.generate({
           text:
             "A bright, sunlit green hill with a single large, leafy tree, " +
             "fluffy clouds drifting across a deep blue sky, painted in the warm, " +
-            "detailed, hand-painted style of a Studio Ghibli landscape—soft colors, " +
+            "detailed, hand-painted style of a Studio Ghibli landscape, soft colors, " +
             "gentle light, and a sense of quiet wonder.",
         },
       ],

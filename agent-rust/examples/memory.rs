@@ -279,7 +279,7 @@ For less important or long-tail info, use archival_memory_search before answerin
     );
 
     // Four independent sessions (agent cannot see prior turns except via memory)
-    // Turn 1 — store a core memory
+    // Turn 1: store a core memory
     let items1: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
         "Remember that my favorite color is blue.",
     )]))];
@@ -293,7 +293,7 @@ For less important or long-tail info, use archival_memory_search before answerin
         .expect("run failed");
     println!("res1: {:#?}", res1.content);
 
-    // Turn 2 — recall using core memory (no prior messages)
+    // Turn 2: recall using core memory (no prior messages)
     let items2: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
         "What's my favorite color?",
     )]))];
@@ -307,7 +307,7 @@ For less important or long-tail info, use archival_memory_search before answerin
         .expect("run failed");
     println!("res2: {:#?}", res2.content);
 
-    // Turn 3 — capture background notes for later lookup
+    // Turn 3: capture background notes for later lookup
     let turn3 = "I captured some background notes titled 'q3-report-research' for future \
                  reference: "
         .to_string()
@@ -325,7 +325,7 @@ For less important or long-tail info, use archival_memory_search before answerin
         .expect("run failed");
     println!("res3: {:#?}", res3.content);
 
-    // Turn 4 — fetch the saved background notes
+    // Turn 4: fetch the saved background notes
     let turn4 = "Can you pull up what we have under 'q3-report-research'?";
     let items4: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(turn4)]))];
     println!("[user] {turn4}");

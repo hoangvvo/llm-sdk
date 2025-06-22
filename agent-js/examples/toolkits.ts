@@ -544,7 +544,7 @@ async function runDemo() {
   const prompts = [
     "I just slipped through the rift and my belongings are glittering in the wrong timeline. What now?",
     "The Chrono Locket from Timeline 12 is missing, and the echo lag is getting worse.",
-    "The locket links to my sister's echo—anything else before I depart?",
+    "The locket links to my sister's echo; anything else before I depart?",
   ];
 
   for (const [index, prompt] of prompts.entries()) {

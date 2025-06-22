@@ -32,7 +32,7 @@ The flow works like this:
 1. The coordinate agent calls the suitable sub-agent via the `transfer_to_{agent}` tool. The tool takes the task string and rewrites it into a single `UserMessage`.
 2. It invokes the target agent’s run method with that message.
 3. The sub-agent executes independently and returns a structured result.
-4. The coordinator receives that result and uses it—along with its own reasoning—to craft a combined response for the overall workflow.
+4. The coordinator receives that result and uses it, along with its own reasoning, to craft a combined response for the overall workflow.
 
 ## Implementation
 

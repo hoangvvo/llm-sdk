@@ -22,7 +22,7 @@ The structured output will come as a `TextPart` and require parsing into an obje
 
 ![structured-output](../../../../assets/examples/structured-output.gif)
 
-In the example below a "travel agent" orchestrates two tools—`search_flights` and `search_hotels`—and requires the language model to emit the final answer as JSON conforming to a `travel_plan` schema. The agent gathers flight and hotel options, merges them into the structured payload, and prints the parsed object so downstream systems can consume it without extra parsing heuristics.
+In the example below a "travel agent" orchestrates two tools, `search_flights` and `search_hotels`, and requires the language model to emit the final answer as JSON conforming to a `travel_plan` schema. The agent gathers flight and hotel options, merges them into the structured payload, and prints the parsed object so downstream systems can consume it without extra parsing heuristics.
 
 <Tabs>
   <TabItem label="TypeScript">
