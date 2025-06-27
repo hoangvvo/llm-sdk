@@ -26,5 +26,5 @@ export interface ToolkitSession<TContext> {
   /**
    * Release any resources that were allocated for the session.
    */
-  close(): Promise<void> | void;
+  close(): Promise<void>;
 }

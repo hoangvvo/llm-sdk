@@ -11,9 +11,13 @@ export async function getPromptForInstructionParams<TContext>(
   instructions: InstructionParam<TContext>[],
   ctx: TContext,
 ) {
-  return Promise.all(
-    instructions.map((instruction) => {
-      return typeof instruction === "function" ? instruction(ctx) : instruction;
-    }),
-  ).then((results) => results.join("\n"));
+  const results = await Promise.all(
+    instructions.map((instruction) =>
+      typeof instruction === "function"
+        ? Promise.resolve(instruction(ctx))
+        : Promise.resolve(instruction),
+    ),
+  );
+
+  return results.join("\n");
 }

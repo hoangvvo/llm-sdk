@@ -17,7 +17,7 @@ Instructions are the scaffolding that steer every run. When you build an agent y
 Keep instructions concise and layered: use static lines for global policy, then dynamic functions for request-specific details. If you need to defer heavy lookups (for example, loading account limits), perform that work inside the instruction function so the result is cached for the duration of the session.
 
 <Aside type="caution">
-  If you use `create_session`, note that dynamic instructions are resolved only once when the run session starts. They will not update again until you create a new session, so include per-turn data in the conversation or move it into a [`ToolkitSession`](../toolkits) that exposes `system_prompt` updates each turn.
+  If you use `create_session`, note that dynamic instructions are resolved only once when the run session starts. They will not update again until you create a new session, so include per-turn data in the conversation or move it into a [`ToolkitSession`](../toolkits/) that exposes `system_prompt` updates each turn.
 </Aside>
 
 <Tabs>

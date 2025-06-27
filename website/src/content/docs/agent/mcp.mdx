@@ -14,7 +14,7 @@ import {
 
 [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) is an open standard for wiring assistants to external data sources, automation, and services without baking those integrations into your agent. MCP servers expose tools over a shared protocol, while clients (like this agent library) negotiate capabilities and relay tool calls. The MCP integration lets each run session attach to an MCP server, discover the tools it offers, and route tool invocations through the protocol using per-user credentials or transports.
 
-Under the hood this integration is just an implementation of the [`Toolkit`](../toolkits) primitive, so it shares the same lifecycle and composition rules as your other toolkits. The MCP connection opens during session creation and closes when the session ends.
+Under the hood this integration is just an implementation of the [`Toolkit`](../toolkits/) primitive, so it shares the same lifecycle and composition rules as your other toolkits. The MCP connection opens during session creation and closes when the session ends.
 
 ## Configuration types
 
@@ -63,7 +63,7 @@ Under the hood this integration is just an implementation of the [`Toolkit`](../
 
 ## Context-aware setup
 
-This library is typically deployed as a single agent service that serves many users. The agent itself stays stateless; the run `context` carries caller-specific identifiers so `Toolkit.create_session` can resolve per-session details before the conversation starts. Use that resolver to look up OAuth tokens, choose the correct MCP endpoint, or apply tenant-level feature flags. It keeps the agent reusable while still routing each session through the appropriate integration, matching the lifecycle in [Agent vs Run session](../agent-vs-run-session).
+This library is typically deployed as a single agent service that serves many users. The agent itself stays stateless; the run `context` carries caller-specific identifiers so `Toolkit.create_session` can resolve per-session details before the conversation starts. Use that resolver to look up OAuth tokens, choose the correct MCP endpoint, or apply tenant-level feature flags. It keeps the agent reusable while still routing each session through the appropriate integration, matching the lifecycle in [Agent vs Run session](../agent-vs-run-session/).
 
 The snippets below show an init function that loads an OAuth token from storage based on the user ID in context and returns MCP parameters for that session.
 
@@ -149,13 +149,14 @@ agent := llmagent.NewAgent[*SessionContext](
 </Tabs>
 
 <Aside type="note">
-  Stdio transports spawn a child process (`uvx`, `python`, etc.) for the lifetime of the run session. Streamable HTTP transports keep a persistent connection open when the server supports it.
+  Stdio transports spawn a child process (`npx`, `python`, etc.) for the lifetime of the run session. Streamable HTTP transports keep a persistent connection open when the server supports it.
+  Make sure they shut down cleanly when the session ends to avoid resource leaks.
 </Aside>
 
 ## Tool lifecycle
 
 - At session start the toolkit calls `list_tools` and subscribes to `tool_list_changed`, so updates published by the server flow back automatically.
-- Each remote definition becomes an [`AgentTool`](../tools), letting the agent runtime evaluate tool selection and error handling exactly the same way it does for local tools.
+- Each remote definition becomes an [`AgentTool`](../tools/), letting the agent runtime evaluate tool selection and error handling exactly the same way it does for local tools.
 - Tool responses are converted into SDK parts (text, image, audio) before being appended to the transcript.
 
 ## Example: Streamable HTTP server
@@ -174,4 +175,4 @@ The full examples below stand up a minimal shuttle-planning MCP server, register
   </TabItem>
 </Tabs>
 
-When you create a run session manually, call its `close` method after the conversation so the MCP connection and any spawned processes shut down cleanly. The one-shot `run` and `run_stream` helpers already manage that lifecycle for you; see [Agent vs Run session](../agent-vs-run-session) for a refresher.
+When you create a run session manually, call its `close` method after the conversation so the MCP connection and any spawned processes shut down cleanly. The one-shot `run` and `run_stream` helpers already manage that lifecycle for you; see [Agent vs Run session](../agent-vs-run-session/) for a refresher.

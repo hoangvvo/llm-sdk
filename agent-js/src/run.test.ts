@@ -205,6 +205,40 @@ suite("RunSession#run", () => {
     });
   });
 
+  test("returns existing assistant response without generating a new model output", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      instructions: [],
+      max_turns: 10,
+      response_format: { type: "text" },
+      tools: [],
+      context: {},
+    });
+
+    const response = await session.run({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "What did I say?" }],
+        },
+        {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "text", text: "Cached answer" }],
+        },
+      ],
+    });
+
+    t.assert.deepStrictEqual(response, {
+      content: [{ type: "text", text: "Cached answer" }],
+      output: [],
+    });
+  });
+
   test("executes multiple tool calls in parallel", async (t: TestContext) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const tool1Execute = t.mock.fn((_args) => ({
@@ -644,6 +678,235 @@ suite("RunSession#run", () => {
     );
   });
 
+  test("resumes tool processing from tool message with partial results", async (t: TestContext) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const toolExecute = t.mock.fn((_: object) => ({
+      content: [{ type: "text", text: "call_2 result" }],
+      is_error: false,
+    }));
+
+    const tool = createMockTool<object>("resume_tool", null, toolExecute);
+
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
+        content: [{ type: "text", text: "Final reply" }],
+      },
+    });
+
+    const session = await RunSession.create({
+      name: "resumable",
+      model,
+      instructions: [],
+      max_turns: 10,
+      response_format: { type: "text" },
+      tools: [tool],
+      context: {},
+    });
+
+    const response = await session.run({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Continue" }],
+        },
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "resume_tool",
+              tool_call_id: "call_1",
+              args: { step: 1 },
+            },
+            {
+              type: "tool-call",
+              tool_name: "resume_tool",
+              tool_call_id: "call_2",
+              args: { step: 2 },
+            },
+          ],
+        },
+        {
+          type: "message",
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              tool_name: "resume_tool",
+              tool_call_id: "call_1",
+              content: [{ type: "text", text: "already done" }],
+              is_error: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    t.assert.strictEqual(toolExecute.mock.calls.length, 1);
+    t.assert.deepStrictEqual(toolExecute.mock.calls[0]?.arguments[0], {
+      step: 2,
+    });
+
+    t.assert.deepStrictEqual(response, {
+      content: [{ type: "text", text: "Final reply" }],
+      output: [
+        {
+          type: "tool",
+          tool_name: "resume_tool",
+          tool_call_id: "call_2",
+          input: { step: 2 },
+          output: [{ type: "text", text: "call_2 result" }],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [{ type: "text", text: "Final reply" }],
+        },
+      ],
+    });
+  });
+
+  test("resumes tool processing when trailing items are individual tool entries", async (t: TestContext) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const toolExecute = t.mock.fn((_args: object) => ({
+      content: [{ type: "text", text: "call_2 via item" }],
+      is_error: false,
+    }));
+
+    const tool = createMockTool<object>("resume_tool", null, toolExecute);
+
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
+        content: [{ type: "text", text: "Final reply from items" }],
+      },
+    });
+
+    const session = await RunSession.create({
+      name: "resumable_tool_items",
+      model,
+      instructions: [],
+      max_turns: 10,
+      response_format: { type: "text" },
+      tools: [tool],
+      context: {},
+    });
+
+    const response = await session.run({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Continue" }],
+        },
+        {
+          type: "model",
+          content: [
+            {
+              type: "tool-call",
+              tool_name: "resume_tool",
+              tool_call_id: "call_1",
+              args: { stage: 1 },
+            },
+            {
+              type: "tool-call",
+              tool_name: "resume_tool",
+              tool_call_id: "call_2",
+              args: { stage: 2 },
+            },
+          ],
+        },
+        {
+          type: "tool",
+          tool_name: "resume_tool",
+          tool_call_id: "call_1",
+          input: { stage: 1 },
+          output: [{ type: "text", text: "already done" }],
+          is_error: false,
+        },
+      ],
+    });
+
+    t.assert.strictEqual(toolExecute.mock.calls.length, 1);
+    t.assert.deepStrictEqual(toolExecute.mock.calls[0]?.arguments[0], {
+      stage: 2,
+    });
+
+    t.assert.deepStrictEqual(response, {
+      content: [{ type: "text", text: "Final reply from items" }],
+      output: [
+        {
+          type: "tool",
+          tool_name: "resume_tool",
+          tool_call_id: "call_2",
+          input: { stage: 2 },
+          output: [{ type: "text", text: "call_2 via item" }],
+          is_error: false,
+        },
+        {
+          type: "model",
+          content: [{ type: "text", text: "Final reply from items" }],
+        },
+      ],
+    });
+  });
+
+  test("throws AgentInvariantError when tool results lack preceding assistant content", async (t: TestContext) => {
+    const tool = createMockTool<object>("resume_tool", null, () => ({
+      content: [{ type: "text", text: "unused" }],
+      is_error: false,
+    }));
+
+    const model = new MockLanguageModel();
+
+    const session = await RunSession.create({
+      name: "resumable_error",
+      model,
+      instructions: [],
+      max_turns: 10,
+      response_format: { type: "text" },
+      tools: [tool],
+      context: {},
+    });
+
+    await t.assert.rejects(
+      async () => {
+        await session.run({
+          input: [
+            {
+              type: "message",
+              role: "user",
+              content: [{ type: "text", text: "Resume" }],
+            },
+            {
+              type: "message",
+              role: "tool",
+              content: [
+                {
+                  type: "tool-result",
+                  tool_name: "resume_tool",
+                  tool_call_id: "call_1",
+                  content: [{ type: "text", text: "orphan" }],
+                  is_error: false,
+                },
+              ],
+            },
+          ],
+        });
+      },
+      (err: any) => {
+        t.assert.strictEqual(err instanceof AgentInvariantError, true);
+        t.assert.match(
+          err.message,
+          /Expected a model item or assistant message before tool results/,
+        );
+        return true;
+      },
+    );
+  });
+
   test("handles tool returning error result", async (t: TestContext) => {
     const toolExecute = t.mock.fn<AgentTool<any>["execute"]>(() => ({
       content: [{ type: "text", text: "Error: Invalid parameters" }],
@@ -910,8 +1173,6 @@ suite("RunSession#run", () => {
     }
     const context: Context = { customer: "Ada" };
     const createdContexts: Context[] = [];
-    let systemPromptCalls = 0;
-    let toolsCalls = 0;
     let closeCalls = 0;
     const executed: {
       ctx: Context;
@@ -946,11 +1207,9 @@ suite("RunSession#run", () => {
 
     const toolkitSession: ToolkitSession<Context> = {
       getSystemPrompt() {
-        systemPromptCalls += 1;
         return "Toolkit prompt";
       },
       getTools() {
-        toolsCalls += 1;
         return [dynamicTool];
       },
       close() {
@@ -988,29 +1247,25 @@ suite("RunSession#run", () => {
     });
 
     t.assert.deepStrictEqual(createdContexts, [context]);
-    t.assert.strictEqual(systemPromptCalls, 2);
-    t.assert.strictEqual(toolsCalls, 2);
-
     t.assert.deepStrictEqual(executed, [
       {
         ctx: context,
         args: { orderId: "123" },
-        turn: 0,
+        turn: 1,
       },
     ]);
 
-    t.assert.deepStrictEqual(
-      model.trackedGenerateInputs.map((input) => input.system_prompt),
-      ["Toolkit prompt", "Toolkit prompt"],
-    );
-    t.assert.deepStrictEqual(model.trackedGenerateInputs[0]?.tools, [
-      {
-        name: "lookup-order",
-        description: "Lookup an order by ID",
-        parameters: dynamicTool.parameters,
-      },
-    ]);
-
+    t.assert.strictEqual(model.trackedGenerateInputs.length, 2);
+    for (const input of model.trackedGenerateInputs) {
+      t.assert.strictEqual(input.system_prompt, "Toolkit prompt");
+      t.assert.deepStrictEqual(input.tools, [
+        {
+          name: "lookup-order",
+          description: "Lookup an order by ID",
+          parameters: dynamicTool.parameters,
+        },
+      ]);
+    }
     t.assert.deepStrictEqual(response, {
       content: [{ type: "text", text: "Order ready" }],
       output: [
@@ -1643,8 +1898,6 @@ suite("RunSession#runStream", () => {
     }
     const context: Context = { customer: "Ben" };
     const createdContexts: Context[] = [];
-    let systemPromptCalls = 0;
-    let toolsCalls = 0;
     let closeCalls = 0;
 
     const dynamicTool: AgentTool<Context> = {
@@ -1665,11 +1918,9 @@ suite("RunSession#runStream", () => {
 
     const toolkitSession: ToolkitSession<Context> = {
       getSystemPrompt() {
-        systemPromptCalls += 1;
         return "Streaming toolkit prompt";
       },
       getTools() {
-        toolsCalls += 1;
         return [dynamicTool];
       },
       close() {
@@ -1748,12 +1999,21 @@ suite("RunSession#runStream", () => {
     });
 
     t.assert.deepStrictEqual(createdContexts, [context]);
-    t.assert.strictEqual(systemPromptCalls, 1);
-    t.assert.strictEqual(toolsCalls, 1);
-
     t.assert.deepStrictEqual(
       model.trackedStreamInputs.map((input) => input.system_prompt),
       ["Streaming toolkit prompt"],
+    );
+    t.assert.deepStrictEqual(
+      model.trackedStreamInputs.map((input) => input.tools),
+      [
+        [
+          {
+            name: "noop",
+            description: "No operation",
+            parameters: dynamicTool.parameters,
+          },
+        ],
+      ],
     );
     t.assert.deepStrictEqual(model.trackedStreamInputs[0]?.tools, [
       {

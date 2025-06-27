@@ -3,7 +3,7 @@
 `llm-sdk` is an open-source suite for building production LLM workflows with a consistent developer experience across languages. It ships two libraries:
 
 - **LLM SDK** – cross-language clients (JavaScript, Rust, Go) that talk to multiple LLM providers through one `LanguageModel` interface.
-- **LLM Agent** – a minimal, transparent agent runtime that orchestrates models, tools, and structured output using the SDK under the hood.
+- **LLM Agent** – a minimal, transparent agent library that orchestrates model generations and tool executions using the SDK under the hood.
 
 | Package     | Language              | Version                                                                                                                                       | Link                                                               |
 | ----------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |

@@ -49,6 +49,7 @@ async fn agent_run_stream_creates_session_streams_and_finishes() {
             index: 0,
             part: PartDelta::Text(TextPartDelta {
                 text: "Mock".to_string(),
+                citation: None,
             }),
         }),
         ..Default::default()
@@ -78,6 +79,7 @@ async fn agent_run_stream_creates_session_streams_and_finishes() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "Mock".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()

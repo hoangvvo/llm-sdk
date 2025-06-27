@@ -18,7 +18,7 @@ Agents and run sessions are two halves of the same workflow. The agent describes
 
 An agent is a reusable **blueprint**. It keeps the shared configuration for a capability--name, default model, instructions, tools, and optional toolkits--and remains safe to reuse across users because it never captures request-specific state.
 
-It exposes three entry points: `run`, `run_stream`, and `create_session`. The first two spin up a temporary run session, execute exactly once, and always close it so you do not leak resources. Reach for `create_session` when you need to reuse initialized toolkits (e.g. [MCP Toolkit](../mcp)) or run several calls back to back; you become responsible for closing that session afterwards.
+It exposes three entry points: `run`, `run_stream`, and `create_session`. The first two spin up a temporary run session, execute exactly once, and always close it so you do not leak resources. Reach for `create_session` when you need to reuse initialized toolkits (e.g. [MCP Toolkit](../mcp/)) or run several calls back to back; you become responsible for closing that session afterwards.
 
 <Code
   code={`export class Agent<TContext> {
@@ -88,4 +88,4 @@ sequenceDiagram
 
 `run_stream` follows the same lifecycle but emits partial deltas the moment the language model produces them. Internally the session uses a stream accumulator to turn those deltas into the final response before yielding tool events and the closing payload back to you.
 
-A typical web request creates the agent once, derives a context for the user, opens a run session, supplies the current conversation as [`AgentItem[]`](../run#agent-items), gathers the response (streaming or not), and finally closes the session. This separation keeps per-user data explicit while letting the same agent power every tenant without risk of leakage.
+A typical web request creates the agent once, derives a context for the user, opens a run session, supplies the current conversation as [`AgentItem[]`](../run/#agent-items), gathers the response (streaming or not), and finally closes the session. This separation keeps per-user data explicit while letting the same agent power every tenant without risk of leakage.

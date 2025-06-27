@@ -81,21 +81,30 @@ func (s *RunSession[C]) initialize(ctx context.Context) error {
 	return nil
 }
 
-// process processes the model response and decide whether to continue the loop or
-// return the response
+// process flow:
+//
+//  1. Peek latest run item to locate assistant content.
+//
+//     1a. Tail is user message -> emit Next. Go to 3.
+//
+//     1b. Tail is tool/tool message -> gather processed ids, backtrack to assistant/model content. Go to 2.
+//
+//     1c. Tail is assistant/model -> use its content. Go to 2.
+//
+//  2. Scan assistant content for tool calls.
+//
+//     2a. Tool calls remaining -> execute unprocessed tools, emit each Item, then emit Next. Go to 3.
+//
+//     2b. No tool calls -> emit Response. Go to 4.
+//
+//  3. Outer loop: bump turn, refresh params, request model response, append it, then re-enter step 1.
+//
+//  4. Return final response to caller.
 func (s *RunSession[C]) process(
 	ctx context.Context,
 	runState *RunState,
-	content []llmsdk.Part,
 	tools []AgentTool[C],
 ) *stream.Stream[ProcessEvents] {
-	var toolCallParts []*llmsdk.ToolCallPart
-	for _, part := range content {
-		if part.ToolCallPart != nil {
-			toolCallParts = append(toolCallParts, part.ToolCallPart)
-		}
-	}
-
 	currCh := make(chan ProcessEvents)
 	errCh := make(chan error, 1)
 
@@ -103,17 +112,140 @@ func (s *RunSession[C]) process(
 		defer close(currCh)
 		defer close(errCh)
 
-		// If no tool calls were found, return the model response as is
-		if len(toolCallParts) == 0 {
-			currCh <- ProcessEvents{
-				Response: &content,
-			}
+		allItems := runState.Items()
+		if len(allItems) == 0 {
+			errCh <- NewInvariantError("no items in the run state")
 			return
 		}
 
-		// Build AgentItem tool results for each tool call
+		lastItem := allItems[len(allItems)-1]
+
+		var content []llmsdk.Part
+		// a set of tool call IDs that have been processed
+		processedToolCallIDs := make(map[string]struct{})
+
+		switch {
+		case lastItem.Model != nil:
+			// ========== Case: Assistant Message [from AgentItemModelResponse] ==========
+			// Last item is a model response, process it
+			content = lastItem.Model.Content
+		case lastItem.Message != nil:
+			switch {
+			case lastItem.Message.AssistantMessage != nil:
+				// ========== Case: Assistant Message [from AgentItemMessage] ==========
+				// Last item is an assistant message, process it
+				content = lastItem.Message.AssistantMessage.Content
+			case lastItem.Message.UserMessage != nil:
+				// ========== Case: User Message ==========
+				// last item is a user message, so we need to generate a model response
+				currCh <- ProcessEvents{Next: &struct{}{}}
+				return
+			case lastItem.Message.ToolMessage != nil:
+				// ========== Case: Tool Results (from AgentItemMessage) ==========
+				// Track the tool call ids that have been processed to avoid duplicate execution
+				for _, part := range lastItem.Message.ToolMessage.Content {
+					if part.ToolResultPart != nil {
+						processedToolCallIDs[part.ToolResultPart.ToolCallID] = struct{}{}
+					}
+				}
+
+				// We are in the middle of processing tool results, the 2nd last item should be a model response
+				if len(allItems) < 2 {
+					errCh <- NewInvariantError("no preceding assistant content found before tool results")
+					return
+				}
+
+				previousItem := allItems[len(allItems)-2]
+				switch {
+				case previousItem.Model != nil:
+					content = previousItem.Model.Content
+
+				case previousItem.Message != nil && previousItem.Message.AssistantMessage != nil:
+					content = previousItem.Message.AssistantMessage.Content
+
+				default:
+					errCh <- NewInvariantError("expected a model item or assistant message before tool results")
+					return
+				}
+			default:
+				errCh <- NewInvariantError("unsupported message role in run state")
+				return
+			}
+
+		case lastItem.Tool != nil:
+			// ========== Case: Tool Results (from AgentItemTool) ==========
+			// Each tool result is an individual item in this representation, so there could be other
+			// AgentItemTool before this one. We loop backwards to find the first non-tool item while also
+			// tracking the called tool ids to avoid duplicate execution
+
+			for i := len(allItems) - 1; i >= 0; i-- {
+				item := allItems[i]
+
+				if item.Tool != nil {
+					processedToolCallIDs[item.Tool.ToolCallID] = struct{}{}
+					// Continue searching for the originating model/assistant item
+					continue
+				} else if item.Model != nil {
+					// Found the originating model response
+					content = item.Model.Content
+					break
+				} else if item.Message != nil {
+					if item.Message.ToolMessage != nil {
+						// Collect all tool call ids in the tool message
+						for _, part := range item.Message.ToolMessage.Content {
+							if part.ToolResultPart != nil {
+								processedToolCallIDs[part.ToolResultPart.ToolCallID] = struct{}{}
+							}
+						}
+						// Continue searching for the originating model/assistant item
+						continue
+					}
+					if item.Message.AssistantMessage != nil {
+						// Found the originating assistant message
+						content = item.Message.AssistantMessage.Content
+						break
+					}
+					if item.Message.UserMessage != nil {
+						errCh <- NewInvariantError("expected a model item or assistant message before tool results")
+						return
+					}
+				} else {
+					errCh <- NewInvariantError("invalid item type in run state")
+				}
+			}
+
+			if content == nil {
+				errCh <- NewInvariantError("no model or assistant message found before tool results")
+				return
+			}
+		default:
+			errCh <- NewInvariantError("unsupported item type in run state")
+			return
+		}
+
+		if len(content) == 0 {
+			errCh <- NewInvariantError("no assistant content found to process")
+			return
+		}
+
+		var toolCallParts []*llmsdk.ToolCallPart
+		for _, part := range content {
+			if part.ToolCallPart != nil {
+				toolCallParts = append(toolCallParts, part.ToolCallPart)
+			}
+		}
+
+		if len(toolCallParts) == 0 {
+			currCh <- ProcessEvents{Response: &content}
+			return
+		}
 
 		for _, toolCallPart := range toolCallParts {
+			if _, exists := processedToolCallIDs[toolCallPart.ToolCallID]; exists {
+				// Tool call has already been processed
+				continue
+			}
+
 			var agentTool AgentTool[C]
 			for _, tool := range tools {
 				if tool.Name() == toolCallPart.ToolName {
@@ -154,10 +286,10 @@ func (s *RunSession[C]) process(
 				toolRes.Content,
 				toolRes.IsError,
 			)
-			currCh <- ProcessEvents{
-				Item: &item,
-			}
+			currCh <- ProcessEvents{Item: &item}
 		}
+
+		currCh <- ProcessEvents{Next: &struct{}{}}
 	}()
 
 	return stream.New(currCh, errCh)
@@ -171,30 +303,23 @@ func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*Ag
 
 	return traceRun(ctx, s.params.Name, "run", func(ctx context.Context) (*AgentResponse, error) {
 		state := NewRunState(request.Input, s.params.MaxTurns)
+		tools := s.getTools()
 
 		for {
-			input, tools := s.getTurnParams(state)
-			modelResponse, err := s.params.Model.Generate(ctx, input)
-			if err != nil {
-				return nil, NewLanguageModelError(err)
-			}
-
-			content := modelResponse.Content
-
-			state.AppendModelResponse(*modelResponse)
-
-			processStream := s.process(ctx, state, content, tools)
+			processStream := s.process(ctx, state, tools)
 			for processStream.Next() {
 				event := processStream.Current()
 				if event.Response != nil {
-					response := state.CreateResponse(*event.Response)
+					response := state.createResponse(*event.Response)
 					return response, nil
 				}
 				if event.Item != nil {
-					state.AppendItem(*event.Item)
+					state.appendItem(*event.Item)
 				}
 				if event.Next != nil {
-					// continue to next iteration
+					if err := state.turn(); err != nil {
+						return nil, err
+					}
 					break
 				}
 			}
@@ -202,9 +327,14 @@ func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*Ag
 				return nil, err
 			}
 
-			if err := state.Turn(); err != nil {
-				return nil, err
+			input, nextTools := s.getTurnParams(state)
+			tools = nextTools
+			modelResponse, err := s.params.Model.Generate(ctx, input)
+			if err != nil {
+				return nil, NewLanguageModelError(err)
 			}
+
+			state.appendModelResponse(*modelResponse)
 		}
 	})
 }
@@ -225,8 +355,37 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 			defer close(eventChan)
 			defer close(errChan)
 
+			tools := s.getTools()
+
 			for {
-				input, tools := s.getTurnParams(state)
+				processStream := s.process(ctx, state, tools)
+
+				for processStream.Next() {
+					event := processStream.Current()
+					if event.Response != nil {
+						response := state.createResponse(*event.Response)
+						eventChan <- &AgentStreamEvent{Response: response}
+						return
+					}
+					if event.Item != nil {
+						index := state.appendItem(*event.Item)
+						eventChan <- NewAgentStreamItemEvent(index, *event.Item)
+					}
+					if event.Next != nil {
+						if err := state.turn(); err != nil {
+							errChan <- err
+							return
+						}
+						break
+					}
+				}
+				if err := processStream.Err(); err != nil {
+					errChan <- err
+					return
+				}
+
+				input, nextTools := s.getTurnParams(state)
+				tools = nextTools
 
 				modelStream, err := s.params.Model.Stream(ctx, input)
 				if err != nil {
@@ -258,38 +417,9 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 					return
 				}
 
-				content := modelResponse.Content
-
-				item, index := state.AppendModelResponse(modelResponse)
+				item, index := state.appendModelResponse(modelResponse)
 
 				eventChan <- NewAgentStreamItemEvent(index, item)
-
-				processStream := s.process(ctx, state, content, tools)
-				for processStream.Next() {
-					event := processStream.Current()
-					if event.Response != nil {
-						response := state.CreateResponse(*event.Response)
-						eventChan <- &AgentStreamEvent{Response: response}
-						return
-					}
-					if event.Item != nil {
-						index := state.AppendItem(*event.Item)
-						eventChan <- NewAgentStreamItemEvent(index, *event.Item)
-					}
-					if event.Next != nil {
-						// continue to next iteration
-						break
-					}
-				}
-				if err := processStream.Err(); err != nil {
-					errChan <- err
-					return
-				}
-
-				if err := state.Turn(); err != nil {
-					errChan <- err
-					return
-				}
 			}
 		}()
 
@@ -325,7 +455,7 @@ func (s *RunSession[C]) Close(ctx context.Context) error {
 
 func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInput, []AgentTool[C]) {
 	input := &llmsdk.LanguageModelInput{
-		Messages:         state.GetTurnMessages(),
+		Messages:         state.getTurnMessages(),
 		ResponseFormat:   s.params.ResponseFormat,
 		Temperature:      s.params.Temperature,
 		TopP:             s.params.TopP,
@@ -342,9 +472,6 @@ func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInp
 		systemPrompts = append(systemPrompts, *s.staticSystemPrompt)
 	}
 
-	tools := make([]AgentTool[C], len(s.staticTools))
-	copy(tools, s.staticTools)
-
 	for _, toolkitSession := range s.toolkitSessions {
 		if toolkitSession == nil {
 			continue
@@ -352,15 +479,14 @@ func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInp
 		if prompt := toolkitSession.SystemPrompt(); prompt != nil && *prompt != "" {
 			systemPrompts = append(systemPrompts, *prompt)
 		}
-		if toolkitTools := toolkitSession.Tools(); len(toolkitTools) > 0 {
-			tools = append(tools, toolkitTools...)
-		}
 	}
 
 	if len(systemPrompts) > 0 {
 		joined := strings.Join(systemPrompts, "\n")
 		input.SystemPrompt = ptr.To(joined)
 	}
+
+	tools := s.getTools()
 
 	if len(tools) > 0 {
 		sdkTools := make([]llmsdk.Tool, 0, len(tools))
@@ -375,6 +501,20 @@ func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInp
 	}
 
 	return input, tools
+}
+
+func (s *RunSession[C]) getTools() []AgentTool[C] {
+	tools := make([]AgentTool[C], len(s.staticTools))
+	copy(tools, s.staticTools)
+	for _, toolkitSession := range s.toolkitSessions {
+		if toolkitSession == nil {
+			continue
+		}
+		if toolkitTools := toolkitSession.Tools(); len(toolkitTools) > 0 {
+			tools = append(tools, toolkitTools...)
+		}
+	}
+	return tools
 }
 
 // RunSessionRequest contains the input used for a run.
@@ -414,9 +554,9 @@ func NewRunState(input []AgentItem, maxTurns uint) *RunState {
 	}
 }
 
-// Turn marks a new turn in the conversation and throw an error if max turns
+// turn marks a new turn in the conversation and throw an error if max turns
 // exceeded.
-func (s *RunState) Turn() error {
+func (s *RunState) turn() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -427,16 +567,16 @@ func (s *RunState) Turn() error {
 	return nil
 }
 
-// AppendItem adds an AgentItem to the run state and returns its index.
-func (s *RunState) AppendItem(item AgentItem) int {
+// appendItem adds an AgentItem to the run state and returns its index.
+func (s *RunState) appendItem(item AgentItem) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.output = append(s.output, item)
 	return len(s.output) - 1
 }
 
-// AppendModelResponse appends a model response as a model AgentItem and returns it and its index.
-func (s *RunState) AppendModelResponse(resp llmsdk.ModelResponse) (AgentItem, int) {
+// appendModelResponse appends a model response as a model AgentItem and returns it and its index.
+func (s *RunState) appendModelResponse(resp llmsdk.ModelResponse) (AgentItem, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	item := NewAgentItemModelResponse(resp)
@@ -444,17 +584,17 @@ func (s *RunState) AppendModelResponse(resp llmsdk.ModelResponse) (AgentItem, in
 	return item, len(s.output) - 1
 }
 
-func (s *RunState) GetItems() []AgentItem {
+func (s *RunState) Items() []AgentItem {
 	return slices.Concat(s.input, s.output)
 }
 
-// GetTurnMessages gets LLM messages to use in the `LanguageModelInput` for the turn
-func (s *RunState) GetTurnMessages() []llmsdk.Message {
+// getTurnMessages gets LLM messages to use in the `LanguageModelInput` for the turn
+func (s *RunState) getTurnMessages() []llmsdk.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	messages := []llmsdk.Message{}
-	items := s.GetItems()
+	items := s.Items()
 
 	for _, it := range items {
 		if msg := it.Message; msg != nil {
@@ -484,7 +624,7 @@ func (s *RunState) GetTurnMessages() []llmsdk.Message {
 	return messages
 }
 
-func (s *RunState) CreateResponse(finalContent []llmsdk.Part) *AgentResponse {
+func (s *RunState) createResponse(finalContent []llmsdk.Part) *AgentResponse {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

@@ -104,14 +104,124 @@ export class RunSession<TContext> {
   }
 
   /**
-   * Process the model response and decide whether to continue the loop or
-   * return the response
+   * process() flow:
+   * 1. Peek latest run item to locate assistant content.
+   *    1a. Tail is user message → emit `next`. Go to 3.
+   *    1b. Tail is tool/tool message → gather processed ids, backtrack to assistant/model content. Go to 2.
+   *    1c. Tail is assistant/model → use its content. Go to 2.
+   * 2. Scan assistant content for tool calls.
+   *    2a. Tool calls remaining → execute unprocessed tools, emit each as `item`, then emit `next`. Go to 3.
+   *    2b. No tool calls → emit `response`. Go to 4.
+   * 3. Outer loop: bump turn, refresh params, request model response, append it, then re-enter step 1.
+   * 4. Return final response to caller.
    */
   async *#process(
     state: RunState,
-    content: Part[],
     tools: AgentTool<TContext>[],
   ): AsyncGenerator<ProcessEvents> {
+    // Examining the last items in the state determines the next step.
+    const allItems = state.getItems();
+    const lastItem = allItems.at(-1);
+    if (!lastItem) {
+      throw new AgentInvariantError("No items in the run state.");
+    }
+
+    let content: Part[] | null = null;
+    const processedToolCallIds = new Set<string>();
+    if (lastItem.type === "model") {
+      // ========== Case: Assistant Message [from AgentItemModelResponse] ==========
+      // Last item is a model response, process it
+      content = lastItem.content;
+    } else if (lastItem.type === "message") {
+      if (lastItem.role === "assistant") {
+        // ========== Case: Assistant Message [from AgentItemMessage] ==========
+        // Last item is an assistant message, process it
+        content = lastItem.content;
+      } else if (lastItem.role === "user") {
+        // ========== Case: User Message ==========
+        // last item is a user message, so we need to generate a model response
+        yield {
+          type: "next",
+        };
+        return;
+      } else {
+        // ========== Case: Tool Results (from AgentItemMessage) ==========
+        // Track the tool call ids that have been processed to avoid duplicate execution
+        for (const part of lastItem.content) {
+          if (part.type === "tool-result") {
+            processedToolCallIds.add(part.tool_call_id);
+          }
+        }
+
+        // We are in the middle of processing tool results, the 2nd last item should be a model response
+        const secondLastItem = allItems.at(-2);
+        if (!secondLastItem) {
+          throw new AgentInvariantError(
+            "No second last item in the run state.",
+          );
+        }
+        if (secondLastItem.type === "model") {
+          content = secondLastItem.content;
+        } else if (
+          secondLastItem.type === "message" &&
+          secondLastItem.role === "assistant"
+        ) {
+          content = secondLastItem.content;
+        } else {
+          throw new AgentInvariantError(
+            "Expected a model item or assistant message before tool results.",
+          );
+        }
+      }
+    } else {
+      // ========== Case: Tool Results (from AgentItemTool) ==========
+      // Each tool result is an individual item in this representation, so there could be other
+      // AgentItemTool before this one. We loop backwards to find the first non-tool item while also
+      // tracking the called tool ids to avoid duplicate execution
+      for (let i = allItems.length - 1; i >= 0; i--) {
+        const item = allItems[i];
+        if (!item) {
+          // should not happen
+          throw new AgentInvariantError("No items in the run state.");
+        }
+        if (item.type === "tool") {
+          processedToolCallIds.add(item.tool_call_id);
+          // Continue searching for the originating model/assistant item
+          continue;
+        } else if (item.type === "model") {
+          // Found the originating model response
+          content = item.content;
+          break;
+        } else {
+          // Remaining possibility is a message item
+          if (item.role === "tool") {
+            // Collect all tool call ids in the tool message
+            const toolCallParts = item.content.filter(
+              (part) => part.type === "tool-result",
+            );
+            for (const part of toolCallParts) {
+              processedToolCallIds.add(part.tool_call_id);
+            }
+            // Continue searching for the originating model/assistant item
+            continue;
+          }
+          if (item.role === "assistant") {
+            // Found the originating model response
+            content = item.content;
+            break;
+          }
+          throw new AgentInvariantError(
+            "Expected a model item or assistant message before tool results.",
+          );
+        }
+      }
+      if (!content) {
+        throw new AgentInvariantError(
+          "No model or assistant message found before tool results.",
+        );
+      }
+    }
+
     const toolCallParts = content.filter((part) => part.type === "tool-call");
 
     if (!toolCallParts.length) {
@@ -123,6 +233,11 @@ export class RunSession<TContext> {
     }
 
     for (const toolCallPart of toolCallParts) {
+      if (processedToolCallIds.has(toolCallPart.tool_call_id)) {
+        // Tool call has already been processed
+        continue;
+      }
+
       const agentTool = tools.find(
         (tool) => tool.name === toolCallPart.tool_name,
       );
@@ -182,30 +297,10 @@ export class RunSession<TContext> {
 
     try {
       const state = new RunState(request.input, this.#params.max_turns);
+      let tools = this.#getTools(); // get initial tool set
 
       for (;;) {
-        const { input: languageModelInput, tools } = this.#getTurnParams(state);
-
-        const modelResponse: ModelResponse = await span.withContext(
-          async () => {
-            try {
-              const response =
-                await this.#params.model.generate(languageModelInput);
-              return response;
-            } catch (err) {
-              if (err instanceof LanguageModelError) {
-                throw new AgentLanguageModelError(err);
-              }
-              throw err;
-            }
-          },
-        );
-
-        const { content } = modelResponse;
-
-        state.appendModelResponse(modelResponse);
-
-        const processStream = this.#process(state, content, tools);
+        const processStream = this.#process(state, tools);
         // Patch next to propogate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalNext = processStream.next.bind(processStream);
@@ -222,11 +317,34 @@ export class RunSession<TContext> {
             return response;
           }
           if (event.type === "next") {
-            // continue the loop
+            // continue the loop and generate a new model response
             state.turn();
             break;
           }
         }
+
+        const turnParams = this.#getTurnParams(state);
+        const languageModelInput = turnParams.input;
+        tools = turnParams.tools;
+
+        const modelResponse: ModelResponse = await span.withContext(
+          async () => {
+            try {
+              const response =
+                await this.#params.model.generate(languageModelInput);
+              return response;
+            } catch (err) {
+              if (err instanceof LanguageModelError) {
+                throw new AgentLanguageModelError(err);
+              }
+              throw err;
+            }
+          },
+        );
+
+        state.appendModelResponse(modelResponse);
+
+        // Continue to loop to process the model response
       }
     } catch (err) {
       span.onError(err);
@@ -250,9 +368,45 @@ export class RunSession<TContext> {
 
     try {
       const state = new RunState(request.input, this.#params.max_turns);
+      let tools = this.#getTools(); // get initial tool set
 
       for (;;) {
-        const { input: languageModelInput, tools } = this.#getTurnParams(state);
+        const processStream = this.#process(state, tools);
+        // Patch next to propogate tracing context
+        // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
+        const originalProcessStreamNext =
+          processStream.next.bind(processStream);
+        processStream.next = (...args) =>
+          span.withContext(() => originalProcessStreamNext(...args));
+
+        for await (const event of processStream) {
+          if (event.type === "item") {
+            const index = state.appendItem(event.item);
+            yield {
+              event: "item",
+              item: event.item,
+              index,
+            };
+          }
+          if (event.type === "response") {
+            const response = state.createResponse(event.content);
+            span.onResponse(response);
+            yield {
+              event: "response",
+              ...response,
+            };
+            return response;
+          }
+          if (event.type === "next") {
+            // continue the loop and generate a new model response
+            state.turn();
+            break;
+          }
+        }
+
+        const turnParams = this.#getTurnParams(state);
+        const languageModelInput = turnParams.input;
+        tools = turnParams.tools;
 
         const modelStream = this.#params.model.stream(languageModelInput);
         // Patch next to propogate tracing context
@@ -287,42 +441,7 @@ export class RunSession<TContext> {
           item,
         };
 
-        const { content } = response;
-
-        const processStream = this.#process(state, content, tools);
-        // Patch next to propogate tracing context
-        // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
-        const originalProcessStreamNext =
-          processStream.next.bind(processStream);
-        processStream.next = (...args) =>
-          span.withContext(() => originalProcessStreamNext(...args));
-
-        for await (const event of processStream) {
-          if (event.type === "item") {
-            const index = state.appendItem(event.item);
-            yield {
-              event: "item",
-              item: event.item,
-              index,
-            };
-          }
-          if (event.type === "response") {
-            const response = state.createResponse(event.content);
-            span.onResponse(response);
-            yield {
-              event: "response",
-              ...response,
-            };
-            return response;
-          }
-          if (event.type === "next") {
-            // continue the loop
-            state.turn();
-            break;
-          }
-        }
-
-        state.turn();
+        // Continue to loop to process the model response
       }
     } catch (err) {
       span.onError(err);
@@ -346,6 +465,22 @@ export class RunSession<TContext> {
     this.#toolkit_sessions = [];
 
     this.#initialized = false;
+  }
+
+  /**
+   * Compute all the tools from static params and toolkit sessions
+   */
+  #getTools(): AgentTool<TContext>[] {
+    const tools = [...this.#static_tools];
+
+    for (const toolkitSession of this.#toolkit_sessions) {
+      const toolkitTools = toolkitSession.getTools();
+      if (toolkitTools.length > 0) {
+        tools.push(...toolkitTools);
+      }
+    }
+
+    return tools;
   }
 
   /**
@@ -373,24 +508,21 @@ export class RunSession<TContext> {
       if (this.#static_system_prompt && this.#static_system_prompt.length > 0) {
         systemPrompts.push(this.#static_system_prompt);
       }
-      const tools = [...this.#static_tools];
-
-      // Add toolkit prompts and tools
+      // Add toolkit prompts
       for (const toolkitSession of this.#toolkit_sessions) {
         const toolkitPrompt = toolkitSession.getSystemPrompt();
         if (toolkitPrompt?.length) {
           systemPrompts.push(toolkitPrompt);
         }
-        const toolkitTools = toolkitSession.getTools();
-        if (toolkitTools.length > 0) {
-          tools.push(...toolkitTools);
-        }
       }
 
-      // Add system prompt and tools to language model input if available
+      // Add system prompt
       if (systemPrompts.length > 0) {
         input.system_prompt = systemPrompts.join("\n");
       }
+
+      // Add tools
+      const tools = this.#getTools();
       if (tools.length > 0) {
         input.tools = tools.map((tool) => ({
           name: tool.name,

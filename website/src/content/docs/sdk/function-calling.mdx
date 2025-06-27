@@ -64,7 +64,7 @@ Include these tools when you call the model. In the streaming APIs, pass them on
 
 ## Detect tool calls from the model
 
-When the model wants to call something, the assistant message carries one or more [`ToolCallPart`](../language-model#tool-call-part)s. Each part includes the tool name and JSON arguments that you must parse before executing your own code.
+When the model wants to call something, the assistant message carries one or more [`ToolCallPart`](../language-model/#tool-call-part)s. Each part includes the tool name and JSON arguments that you must parse before executing your own code.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -94,7 +94,7 @@ Execute each requested function in your application. Handle failures yourself--i
 
 ## Return the results as a tool message
 
-After execution, respond with a single `ToolMessage` that contains one or more [`ToolResultPart`](../language-model#tool-result-part)s for every call you serviced. The model uses these results to continue reasoning or to compose the final answer.
+After execution, respond with a single `ToolMessage` that contains one or more [`ToolResultPart`](../language-model/#tool-result-part)s for every call you serviced. The model uses these results to continue reasoning or to compose the final answer.
 
 <Tabs>
   <TabItem label="TypeScript">

@@ -9,8 +9,9 @@ use llm_agent::{
 };
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
-    ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
-    PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta, UserMessage,
+    AssistantMessage, ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse,
+    ModelUsage, Part, PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta,
+    ToolMessage, UserMessage,
 };
 use serde_json::{json, Value};
 
@@ -78,14 +79,6 @@ impl<TCtx> MockToolkitSessionState<TCtx> {
             tools_calls: std::sync::Mutex::new(0),
             close_calls: std::sync::Mutex::new(0),
         })
-    }
-
-    fn system_prompt_calls(&self) -> usize {
-        *self.system_prompt_calls.lock().unwrap()
-    }
-
-    fn tools_calls(&self) -> usize {
-        *self.tools_calls.lock().unwrap()
     }
 
     fn close_calls(&self) -> usize {
@@ -476,6 +469,242 @@ async fn run_executes_multiple_tool_calls_in_parallel() {
     assert_eq!(response, expected);
     assert_eq!(tool1.recorded_calls(), vec![json!({"param": "value1"})]);
     assert_eq!(tool2.recorded_calls(), vec![json!({"param": "value2"})]);
+}
+
+#[tokio::test]
+async fn run_returns_existing_assistant_response_without_new_model_output() {
+    let model = Arc::new(MockLanguageModel::new());
+
+    let session = new_run_session(Arc::new(AgentParams::new("cached", model.clone())), ()).await;
+
+    let response = session
+        .run(RunSessionRequest {
+            input: vec![
+                AgentItem::Message(Message::User(UserMessage {
+                    content: vec![Part::text("What did I say?")],
+                })),
+                AgentItem::Message(Message::Assistant(AssistantMessage {
+                    content: vec![Part::text("Cached answer")],
+                })),
+            ],
+        })
+        .await
+        .expect("run succeeds");
+
+    assert_eq!(
+        response,
+        AgentResponse {
+            content: vec![Part::text("Cached answer")],
+            output: vec![],
+        }
+    );
+    assert!(model.tracked_generate_inputs().is_empty());
+
+    close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
+    let resume_tool = MockTool::with_execute_fn(
+        "resume_tool",
+        AgentToolResult {
+            content: vec![],
+            is_error: false,
+        },
+        |_args, _state| {
+            Ok(AgentToolResult {
+                content: vec![Part::text("call_2 result")],
+                is_error: false,
+            })
+        },
+    );
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Final reply")],
+        ..Default::default()
+    });
+
+    let session = new_run_session(
+        Arc::new(AgentParams::new("resumable", model.clone()).add_tool(resume_tool.clone())),
+        (),
+    )
+    .await;
+
+    let response = session
+        .run(RunSessionRequest {
+            input: vec![
+                AgentItem::Message(Message::User(UserMessage {
+                    content: vec![Part::text("Continue")],
+                })),
+                AgentItem::Model(ModelResponse {
+                    content: vec![
+                        Part::tool_call("call_1", "resume_tool", json!({"step": 1})),
+                        Part::tool_call("call_2", "resume_tool", json!({"step": 2})),
+                    ],
+                    ..Default::default()
+                }),
+                AgentItem::Message(Message::Tool(ToolMessage {
+                    content: vec![Part::tool_result(
+                        "call_1",
+                        "resume_tool",
+                        vec![Part::text("already done")],
+                    )],
+                })),
+            ],
+        })
+        .await
+        .expect("run succeeds");
+
+    assert_eq!(resume_tool.recorded_calls(), vec![json!({"step": 2})]);
+
+    assert_eq!(
+        response,
+        AgentResponse {
+            content: vec![Part::text("Final reply")],
+            output: vec![
+                AgentItem::Tool(AgentItemTool {
+                    tool_call_id: "call_2".to_string(),
+                    tool_name: "resume_tool".to_string(),
+                    input: json!({"step": 2}),
+                    output: vec![Part::text("call_2 result")],
+                    is_error: false,
+                }),
+                AgentItem::Model(ModelResponse {
+                    content: vec![Part::text("Final reply")],
+                    ..Default::default()
+                }),
+            ],
+        }
+    );
+
+    close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_resumes_tool_processing_when_trailing_items_are_tool_entries() {
+    let resume_tool = MockTool::with_execute_fn(
+        "resume_tool",
+        AgentToolResult {
+            content: vec![],
+            is_error: false,
+        },
+        |_args, _state| {
+            Ok(AgentToolResult {
+                content: vec![Part::text("call_2 via item")],
+                is_error: false,
+            })
+        },
+    );
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Final reply from items")],
+        ..Default::default()
+    });
+
+    let session = new_run_session(
+        Arc::new(
+            AgentParams::new("resumable_tool_items", model.clone()).add_tool(resume_tool.clone()),
+        ),
+        (),
+    )
+    .await;
+
+    let response = session
+        .run(RunSessionRequest {
+            input: vec![
+                AgentItem::Message(Message::User(UserMessage {
+                    content: vec![Part::text("Continue")],
+                })),
+                AgentItem::Model(ModelResponse {
+                    content: vec![
+                        Part::tool_call("call_1", "resume_tool", json!({"stage": 1})),
+                        Part::tool_call("call_2", "resume_tool", json!({"stage": 2})),
+                    ],
+                    ..Default::default()
+                }),
+                AgentItem::Tool(AgentItemTool {
+                    tool_call_id: "call_1".to_string(),
+                    tool_name: "resume_tool".to_string(),
+                    input: json!({"stage": 1}),
+                    output: vec![Part::text("already done")],
+                    is_error: false,
+                }),
+            ],
+        })
+        .await
+        .expect("run succeeds");
+
+    assert_eq!(resume_tool.recorded_calls(), vec![json!({"stage": 2})]);
+
+    assert_eq!(
+        response,
+        AgentResponse {
+            content: vec![Part::text("Final reply from items")],
+            output: vec![
+                AgentItem::Tool(AgentItemTool {
+                    tool_call_id: "call_2".to_string(),
+                    tool_name: "resume_tool".to_string(),
+                    input: json!({"stage": 2}),
+                    output: vec![Part::text("call_2 via item")],
+                    is_error: false,
+                }),
+                AgentItem::Model(ModelResponse {
+                    content: vec![Part::text("Final reply from items")],
+                    ..Default::default()
+                }),
+            ],
+        }
+    );
+
+    close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_errors_when_tool_results_lack_preceding_assistant_content() {
+    let resume_tool = MockTool::new(
+        "resume_tool",
+        AgentToolResult {
+            content: vec![Part::text("unused")],
+            is_error: false,
+        },
+    );
+
+    let model = Arc::new(MockLanguageModel::new());
+
+    let session = new_run_session(
+        Arc::new(AgentParams::new("resumable_error", model).add_tool(resume_tool.clone())),
+        (),
+    )
+    .await;
+
+    let err = session
+        .run(RunSessionRequest {
+            input: vec![
+                AgentItem::Message(Message::User(UserMessage {
+                    content: vec![Part::text("Resume")],
+                })),
+                AgentItem::Message(Message::Tool(ToolMessage {
+                    content: vec![Part::tool_result(
+                        "call_1",
+                        "resume_tool",
+                        vec![Part::text("orphan")],
+                    )],
+                })),
+            ],
+        })
+        .await
+        .expect_err("run fails");
+
+    match err {
+        AgentError::Invariant(msg) => {
+            assert!(msg.contains("Expected a model item or assistant message"));
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+
+    close_run_session(session).await;
 }
 
 #[tokio::test]
@@ -913,14 +1142,12 @@ async fn run_merges_toolkit_prompts_and_tools() {
         contexts_handle.lock().unwrap().clone(),
         vec![context.clone()]
     );
-    assert_eq!(toolkit_session_state.system_prompt_calls(), 2);
-    assert_eq!(toolkit_session_state.tools_calls(), 2);
 
     let executions = lookup_tool.executions();
     assert_eq!(executions.len(), 1);
     assert_eq!(executions[0].context, context);
     assert_eq!(executions[0].args, json!({"orderId": "123"}));
-    assert_eq!(executions[0].turn, 0);
+    assert_eq!(executions[0].turn, 1);
 
     let inputs = model.tracked_generate_inputs();
     assert_eq!(inputs.len(), 2);
@@ -972,6 +1199,7 @@ async fn run_stream_streams_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "Hel".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -981,6 +1209,7 @@ async fn run_stream_streams_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "lo".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -990,6 +1219,7 @@ async fn run_stream_streams_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "!".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1021,6 +1251,7 @@ async fn run_stream_streams_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "Hel".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1030,6 +1261,7 @@ async fn run_stream_streams_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "lo".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1039,6 +1271,7 @@ async fn run_stream_streams_response_when_no_tool_call() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "!".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1072,6 +1305,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
             index: 0,
             part: PartDelta::Text(TextPartDelta {
                 text: "Done".to_string(),
+                citation: None,
             }),
         }),
         ..Default::default()
@@ -1117,6 +1351,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "Done".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1139,8 +1374,6 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
 
     assert_eq!(events, expected);
     assert_eq!(contexts_handle.lock().unwrap().clone(), vec![context]);
-    assert_eq!(toolkit_session_state.system_prompt_calls(), 1);
-    assert_eq!(toolkit_session_state.tools_calls(), 1);
     assert!(lookup_tool.executions().is_empty());
 
     let inputs = model.tracked_stream_inputs();
@@ -1190,6 +1423,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "Final".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1199,6 +1433,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: " response".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1262,6 +1497,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "Final".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1271,6 +1507,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: " response".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()
@@ -1353,6 +1590,7 @@ async fn run_stream_handles_multiple_turns() {
             index: 0,
             part: PartDelta::Text(TextPartDelta {
                 text: "All done".to_string(),
+                citation: None,
             }),
         }),
         ..Default::default()
@@ -1444,6 +1682,7 @@ async fn run_stream_handles_multiple_turns() {
                 index: 0,
                 part: PartDelta::Text(TextPartDelta {
                     text: "All done".to_string(),
+                    citation: None,
                 }),
             }),
             ..Default::default()

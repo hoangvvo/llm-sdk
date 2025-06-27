@@ -585,6 +585,250 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 	}
 }
 
+func TestRun_ReturnsExistingAssistantResponseWithoutNewModelOutput(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "cached",
+			Model:          model,
+			Instructions:   nil,
+			Tools:          nil,
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
+		map[string]interface{}{},
+	)
+
+	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("What did I say?")}},
+			}),
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				AssistantMessage: &llmsdk.AssistantMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Cached answer")}},
+			}),
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	expected := &llmagent.AgentResponse{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Cached answer")},
+		Output:  []llmagent.AgentItem{},
+	}
+	if diff := cmp.Diff(expected, response); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+
+	if len(model.TrackedGenerateInputs()) != 0 {
+		t.Fatalf("expected no model invocations, got %d", len(model.TrackedGenerateInputs()))
+	}
+
+	if err := session.Close(context.Background()); err != nil {
+		t.Fatalf("expected no close error, got %v", err)
+	}
+}
+
+func TestRun_ResumesToolProcessingFromToolMessageWithPartialResults(t *testing.T) {
+	tool := NewMockTool[map[string]interface{}](
+		"resume_tool",
+		llmagent.AgentToolResult{
+			Content: []llmsdk.Part{llmsdk.NewTextPart("call_2 result")},
+			IsError: false,
+		},
+		nil,
+	)
+
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueGenerateResult(
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+			Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply")},
+		}),
+	)
+
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "resumable",
+			Model:          model,
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
+		map[string]interface{}{},
+	)
+
+	call1Args := json.RawMessage(`{"step": 1}`)
+	call2Args := json.RawMessage(`{"step": 2}`)
+	isError := false
+	toolResult := llmsdk.NewToolResultPart("call_1", "resume_tool", []llmsdk.Part{llmsdk.NewTextPart("already done")}, isError)
+
+	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Continue")}},
+			}),
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+				Content: []llmsdk.Part{
+					{ToolCallPart: &llmsdk.ToolCallPart{ToolName: "resume_tool", ToolCallID: "call_1", Args: call1Args}},
+					{ToolCallPart: &llmsdk.ToolCallPart{ToolName: "resume_tool", ToolCallID: "call_2", Args: call2Args}},
+				},
+			}),
+			llmagent.NewAgentItemMessage(llmsdk.Message{ToolMessage: &llmsdk.ToolMessage{Content: []llmsdk.Part{toolResult}}}),
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(tool.AllCalls) != 1 || string(tool.AllCalls[0]) != string(call2Args) {
+		t.Fatalf("unexpected tool calls: %v", tool.AllCalls)
+	}
+
+	expected := &llmagent.AgentResponse{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply")},
+		Output: []llmagent.AgentItem{
+			llmagent.NewAgentItemTool("call_2", "resume_tool", call2Args, []llmsdk.Part{llmsdk.NewTextPart("call_2 result")}, false),
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply")}}),
+		},
+	}
+	if diff := cmp.Diff(expected, response); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+
+	if err := session.Close(context.Background()); err != nil {
+		t.Fatalf("expected no close error, got %v", err)
+	}
+}
+
+func TestRun_ResumesToolProcessingWhenTrailingToolEntries(t *testing.T) {
+	tool := NewMockTool[map[string]interface{}](
+		"resume_tool",
+		llmagent.AgentToolResult{
+			Content: []llmsdk.Part{llmsdk.NewTextPart("call_2 via item")},
+			IsError: false,
+		},
+		nil,
+	)
+
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueGenerateResult(
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+			Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply from items")},
+		}),
+	)
+
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "resumable_tool_items",
+			Model:          model,
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
+		map[string]interface{}{},
+	)
+
+	call1Args := json.RawMessage(`{"stage": 1}`)
+	call2Args := json.RawMessage(`{"stage": 2}`)
+	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Continue")}},
+			}),
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
+				Content: []llmsdk.Part{
+					{ToolCallPart: &llmsdk.ToolCallPart{ToolName: "resume_tool", ToolCallID: "call_1", Args: call1Args}},
+					{ToolCallPart: &llmsdk.ToolCallPart{ToolName: "resume_tool", ToolCallID: "call_2", Args: call2Args}},
+				},
+			}),
+			llmagent.NewAgentItemTool("call_1", "resume_tool", call1Args, []llmsdk.Part{llmsdk.NewTextPart("already done")}, false),
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(tool.AllCalls) != 1 || string(tool.AllCalls[0]) != string(call2Args) {
+		t.Fatalf("unexpected tool calls: %v", tool.AllCalls)
+	}
+
+	expected := &llmagent.AgentResponse{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply from items")},
+		Output: []llmagent.AgentItem{
+			llmagent.NewAgentItemTool("call_2", "resume_tool", call2Args, []llmsdk.Part{llmsdk.NewTextPart("call_2 via item")}, false),
+			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply from items")}}),
+		},
+	}
+	if diff := cmp.Diff(expected, response); diff != "" {
+		t.Errorf("response mismatch (-want +got):\n%s", diff)
+	}
+
+	if err := session.Close(context.Background()); err != nil {
+		t.Fatalf("expected no close error, got %v", err)
+	}
+}
+
+func TestRun_ReturnsErrorWhenToolResultsLackPrecedingAssistantContent(t *testing.T) {
+	tool := NewMockTool[map[string]interface{}](
+		"resume_tool",
+		llmagent.AgentToolResult{
+			Content: []llmsdk.Part{llmsdk.NewTextPart("unused")},
+			IsError: false,
+		},
+		nil,
+	)
+
+	model := llmsdktest.NewMockLanguageModel()
+
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[map[string]interface{}]{
+			Name:           "resumable_error",
+			Model:          model,
+			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			ResponseFormat: llmsdk.NewResponseFormatText(),
+			MaxTurns:       10,
+		},
+		map[string]interface{}{},
+	)
+
+	isError := false
+	_, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Resume")}},
+			}),
+			llmagent.NewAgentItemMessage(llmsdk.Message{
+				ToolMessage: &llmsdk.ToolMessage{Content: []llmsdk.Part{{
+					ToolResultPart: &llmsdk.ToolResultPart{
+						ToolCallID: "call_1",
+						ToolName:   "resume_tool",
+						Content:    []llmsdk.Part{llmsdk.NewTextPart("orphan")},
+						IsError:    isError,
+					},
+				}}},
+			}),
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	var agentErr *llmagent.AgentError
+	if !errors.As(err, &agentErr) || agentErr.Kind != llmagent.InvariantErrorKind {
+		t.Fatalf("expected invariant error, got %v", err)
+	}
+
+	if err := session.Close(context.Background()); err != nil {
+		t.Fatalf("expected no close error, got %v", err)
+	}
+}
+
 func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 	toolResult := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
@@ -1126,13 +1370,6 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 		t.Fatalf("unexpected contexts (-want +got):\n%s", diff)
 	}
 
-	if toolkitSession.systemPromptCalls != 2 {
-		t.Fatalf("expected 2 system prompt calls, got %d", toolkitSession.systemPromptCalls)
-	}
-	if toolkitSession.toolsCalls != 2 {
-		t.Fatalf("expected 2 tools calls, got %d", toolkitSession.toolsCalls)
-	}
-
 	if len(executed) != 1 {
 		t.Fatalf("expected 1 tool execution, got %d", len(executed))
 	}
@@ -1142,8 +1379,8 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 	if executed[0].Args["orderId"] != "123" {
 		t.Fatalf("expected orderId 123, got %s", executed[0].Args["orderId"])
 	}
-	if executed[0].Turn != 0 {
-		t.Fatalf("expected execution on turn 0, got %d", executed[0].Turn)
+	if executed[0].Turn != 1 {
+		t.Fatalf("expected execution on turn 1, got %d", executed[0].Turn)
 	}
 
 	inputs := model.TrackedGenerateInputs()
@@ -1683,13 +1920,6 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 	if diff := cmp.Diff([]customerContext{ctxVal}, createdContexts); diff != "" {
 		t.Fatalf("unexpected contexts (-want +got):\n%s", diff)
 	}
-	if toolkitSession.systemPromptCalls != 1 {
-		t.Fatalf("expected 1 system prompt call, got %d", toolkitSession.systemPromptCalls)
-	}
-	if toolkitSession.toolsCalls != 1 {
-		t.Fatalf("expected 1 tools call, got %d", toolkitSession.toolsCalls)
-	}
-
 	inputs := model.TrackedStreamInputs()
 	if len(inputs) != 1 {
 		t.Fatalf("expected 1 tracked stream input, got %d", len(inputs))

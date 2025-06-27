@@ -15,7 +15,7 @@ use llm_sdk::{
     boxed_stream::BoxedStream, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
     ToolCallPart, ToolMessage, ToolResultPart,
 };
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 /// Manages the run session for an agent.
 /// It initializes all necessary components for the agent to run
@@ -64,17 +64,156 @@ where
         })
     }
 
-    /// Process the model response and decide whether to continue the loop or
-    /// return the response
+    /// process() flow:
+    /// 1. Peek latest run item to locate assistant content.
+    ///
+    ///    1a. Tail is user message -> emit `Next`. Go to 3.
+    ///
+    ///    1b. Tail is tool/tool message -> gather processed ids, backtrack to
+    /// assistant/model content. Go to 2.
+    ///
+    ///    1c. Tail is assistant/model -> use its content. Go to 2.
+    ///
+    /// 2. Scan assistant content for tool calls.
+    ///
+    ///    2a. Tool calls remaining -> execute unprocessed tools, emit each
+    /// `Item`, then emit `Next`. Go to 3.
+    ///
+    ///    2b. No tool calls -> emit `Response`. Go to 4.
+    ///
+    /// 3. Outer loop: bump turn, refresh params, request model response, append
+    ///    it, then re-enter step 1.
+    ///
+    /// 4. Return final response to caller.
     async fn process<'a>(
         &'a self,
         run_state: &'a RunState,
-        parts: Vec<Part>,
         tools: Vec<Arc<dyn AgentTool<TCtx>>>,
     ) -> BoxedStream<'a, Result<ProcessEvents, AgentError>> {
         let context = self.context.clone();
         let stream = try_stream! {
-            let tool_call_parts: Vec<ToolCallPart> = parts
+            let items = run_state.items().await;
+            // Examining the last items in the state determines the next step.
+            let last_item = items.last().cloned().ok_or_else(|| {
+                AgentError::Invariant("No items in the run state.".to_string())
+            })?;
+
+            let mut content: Option<Vec<Part>> = None;
+            let mut processed_tool_call_ids: HashSet<String> = HashSet::new();
+
+            match last_item {
+                AgentItem::Model(model_response) => {
+                    // ========== Case: Assistant Message [from AgentItemModelResponse] ==========
+                    // Last item is a model response, process it
+                    content = Some(model_response.content);
+                }
+                AgentItem::Message(message) => match message {
+                    Message::Assistant(assistant_message) => {
+                        // ========== Case: Assistant Message [from AgentItemMessage] ==========
+                        // Last item is an assistant message, process it
+                        content = Some(assistant_message.content);
+                    }
+                    Message::User(_) => {
+                        // ========== Case: User Message ==========
+                        // last item is a user message, so we need to generate a model response
+                        yield ProcessEvents::Next;
+                        return;
+                    }
+                    Message::Tool(tool_message) => {
+                        // ========== Case: Tool Results (from AgentItemMessage) ==========
+                        // Track the tool call ids that have been processed to avoid duplicate execution
+                        for part in tool_message.content {
+                            if let Part::ToolResult(result) = part {
+                                processed_tool_call_ids.insert(result.tool_call_id);
+                            }
+                        }
+
+                        // We are in the middle of processing tool results, the 2nd last item should be a model response
+                        let previous_item = items
+                            .len()
+                            .checked_sub(2)
+                            .and_then(|idx| items.get(idx))
+                            .cloned()
+                            .ok_or_else(|| {
+                                AgentError::Invariant(
+                                    "No preceding assistant content found before tool results.".to_string(),
+                                )
+                            })?;
+
+                        let resolved = match previous_item {
+                            AgentItem::Model(model_response) => model_response.content,
+                            AgentItem::Message(prev_message) => match prev_message {
+                                Message::Assistant(assistant_message) => assistant_message.content,
+                                _ => {
+                                    Err(AgentError::Invariant(
+                                        "Expected a model item or assistant message before tool results.".to_string(),
+                                    ))?
+                                }
+                            },
+                            _ => {
+                                Err(AgentError::Invariant(
+                                    "Expected a model item or assistant message before tool results.".to_string(),
+                                ))?
+                            }
+                        };
+                        content = Some(resolved);
+                    }
+                },
+                AgentItem::Tool(_) => {
+                    // ========== Case: Tool Results (from AgentItemTool) ==========
+                    // Each tool result is an individual item in this representation, so there could be other
+                    // AgentItemTool before this one. We loop backwards to find the first non-tool item while also
+                    // tracking the called tool ids to avoid duplicate execution
+                    for item in items.into_iter().rev() {
+                        match item {
+                            AgentItem::Tool(tool_item) => {
+                                processed_tool_call_ids.insert(tool_item.tool_call_id);
+                                // Continue searching for the originating model/assistant item
+                                continue;
+                            }
+                            AgentItem::Model(model_response) => {
+                                // Found the originating model response
+                                content = Some(model_response.content.clone());
+                                break;
+                            }
+                            AgentItem::Message(message) => match message {
+                                Message::Tool(tool_message) => {
+                                    // Collect all tool call ids in the tool message
+                                    for part in tool_message.content {
+                                        if let Part::ToolResult(result) = part {
+                                            processed_tool_call_ids.insert(result.tool_call_id);
+                                        }
+                                    }
+                                    // Continue searching for the originating model/assistant item
+                                    continue;
+                                }
+                                Message::Assistant(assistant_message) => {
+                                    // Found the originating model response
+                                    content = Some(assistant_message.content.clone());
+                                    break;
+                                }
+                                Message::User(_) => {
+                                    Err(AgentError::Invariant(
+                                        "Expected a model item or assistant message before tool results.".to_string(),
+                                    ))?;
+                                }
+                            },
+                        }
+                    }
+
+                    if content.is_none() {
+                        Err(AgentError::Invariant(
+                            "No model or assistant message found before tool results.".to_string(),
+                        ))?;
+                    }
+                }
+            }
+
+            let content = content.ok_or_else(|| {
+                AgentError::Invariant("No assistant content found to process.".to_string())
+            })?;
+
+            let tool_call_parts: Vec<ToolCallPart> = content
                 .iter()
                 .filter_map(|part| {
                     if let Part::ToolCall(tool_call) = part {
@@ -85,13 +224,20 @@ where
                 })
                 .collect();
 
+
             // If no tool calls were found, return the model response as is
             if tool_call_parts.is_empty() {
-                yield ProcessEvents::Response(parts);
+                yield ProcessEvents::Response(content);
                 return;
             }
 
             for tool_call_part in tool_call_parts {
+                if processed_tool_call_ids.contains(&tool_call_part.tool_call_id)
+                {
+                    // Tool call has already been processed
+                    continue;
+                }
+
                 let ToolCallPart {
                     tool_call_id,
                     tool_name,
@@ -141,33 +287,32 @@ where
 
         trace_agent_run(&self.params.name, AgentSpanMethod::Run, async move {
             let state = RunState::new(input, self.params.max_turns);
+            let mut tools = self.get_tools();
 
             loop {
-                let (input, tools) = self.get_turn_params(&state).await?;
-                let model_response = self.params.model.generate(input).await?;
-                let content = model_response.content.clone();
-
-                state.append_model_response(model_response).await;
-
-                let mut process_stream = self.process(&state, content, tools).await;
+                let mut process_stream = self.process(&state, tools).await;
 
                 while let Some(event) = process_stream.next().await {
                     let event = event?;
                     match event {
-                        ProcessEvents::Item(items) => {
-                            state.append_item(items).await;
+                        ProcessEvents::Item(item) => {
+                            state.append_item(item).await;
                         }
                         ProcessEvents::Response(final_content) => {
                             return Ok(state.create_response(final_content).await);
                         }
                         ProcessEvents::Next => {
-                            /* continue the loop */
+                            state.turn().await?;
                             break;
                         }
                     }
                 }
 
-                state.turn().await?;
+                let (input, next_tools) = self.get_turn_params(&state).await?;
+                tools = next_tools;
+
+                let model_response = self.params.model.generate(input).await?;
+                state.append_model_response(model_response).await;
             }
         })
         .await
@@ -186,8 +331,33 @@ where
         });
 
         let stream = async_stream::try_stream! {
+            let mut tools = session.get_tools();
+
             loop {
-                let (input, tools) = session.get_turn_params(&state).await?;
+                let mut process_stream = session.process(&state, tools).await;
+
+                while let Some(event) = process_stream.next().await {
+                    let event = event?;
+
+                    match event {
+                        ProcessEvents::Item(item) => {
+                            let index = state.append_item(item.clone()).await;
+                            yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
+                        }
+                        ProcessEvents::Response(final_content) => {
+                            let response = state.create_response(final_content).await;
+                            yield AgentStreamEvent::Response(response);
+                            return;
+                        }
+                        ProcessEvents::Next => {
+                            state.turn().await?;
+                            break;
+                        }
+                    }
+                }
+
+                let (input, next_tools) = session.get_turn_params(&state).await?;
+                tools = next_tools;
 
                 let mut model_stream = session.params.model.stream(input).await?;
 
@@ -205,33 +375,8 @@ where
 
                 let model_response = accumulator.compute_response()?;
 
-                let content = model_response.content.clone();
-
                 let (item, index) = state.append_model_response(model_response).await;
                 yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
-
-                let mut process_stream = session.process(&state, content, tools).await;
-
-                while let Some(event) = process_stream.next().await {
-                    let event = event?;
-
-                    match event {
-                        ProcessEvents::Item(item) => {
-                            let index = state.append_item(item.clone()).await;
-                            yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
-                        }
-                        ProcessEvents::Response(final_content) => {
-                            let response = state.create_response(final_content).await;
-                            yield AgentStreamEvent::Response(response);
-                            return;
-                        }
-                        ProcessEvents::Next => {
-                            /* continue the loop */
-                        }
-                    }
-                }
-
-                state.turn().await?;
             }
         };
 
@@ -281,18 +426,15 @@ where
             }
         }
 
-        let mut tools: Vec<Arc<dyn AgentTool<TCtx>>> = self.params.tools.clone();
-
         for session in self.toolkit_sessions.iter() {
             if let Some(prompt) = session.system_prompt() {
                 if !prompt.is_empty() {
                     system_prompts.push(prompt);
                 }
             }
-
-            let toolkit_tools = session.tools();
-            tools.extend(toolkit_tools);
         }
+
+        let tools = self.get_tools();
 
         let mut input = LanguageModelInput {
             messages: state.get_turn_messages().await,
@@ -318,6 +460,15 @@ where
         }
 
         Ok((input, tools))
+    }
+
+    fn get_tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
+        let mut tools: Vec<Arc<dyn AgentTool<TCtx>>> = self.params.tools.clone();
+        for session in self.toolkit_sessions.iter() {
+            let toolkit_tools = session.tools();
+            tools.extend(toolkit_tools);
+        }
+        tools
     }
 }
 /// `RunSessionRequest` contains the input items used for a run.
@@ -347,7 +498,7 @@ pub struct RunState {
 
 impl RunState {
     #[must_use]
-    pub fn new(input: Vec<AgentItem>, max_turns: usize) -> Self {
+    fn new(input: Vec<AgentItem>, max_turns: usize) -> Self {
         Self {
             max_turns,
             input,
@@ -358,7 +509,7 @@ impl RunState {
 
     /// Mark a new turn in the conversation and throw an error if max turns
     /// exceeded.
-    pub async fn turn(&self) -> Result<(), AgentError> {
+    async fn turn(&self) -> Result<(), AgentError> {
         let mut current_turn = self.current_turn.lock().await;
         *current_turn += 1;
         if *current_turn > self.max_turns {
@@ -369,15 +520,25 @@ impl RunState {
 
     /// Add `AgentItems` to the run state and return the index of the added
     /// item.
-    pub async fn append_item(&self, item: AgentItem) -> usize {
+    async fn append_item(&self, item: AgentItem) -> usize {
         let mut output: futures::lock::MutexGuard<'_, Vec<AgentItem>> = self.output.lock().await;
         output.push(item);
         output.len() - 1
     }
 
+    /// Return all items in the run, both input and output.
+    pub async fn items(&self) -> Vec<AgentItem> {
+        let output = self.output.lock().await;
+        self.input
+            .iter()
+            .cloned()
+            .chain(output.iter().cloned())
+            .collect()
+    }
+
     /// Append a model response to the run state and return the created item and
     /// its index.
-    pub async fn append_model_response(&self, response: ModelResponse) -> (AgentItem, usize) {
+    async fn append_model_response(&self, response: ModelResponse) -> (AgentItem, usize) {
         let mut output = self.output.lock().await;
         let item = AgentItem::Model(response);
         output.push(item.clone());
@@ -386,7 +547,7 @@ impl RunState {
 
     /// Get LLM messages to use in the `LanguageModelInput` for the turn
     #[must_use]
-    pub async fn get_turn_messages(&self) -> Vec<Message> {
+    async fn get_turn_messages(&self) -> Vec<Message> {
         let output = self.output.lock().await;
         let mut messages: Vec<Message> = Vec::new();
         let iter = self.input.iter().cloned().chain(output.iter().cloned());
@@ -423,7 +584,7 @@ impl RunState {
     }
 
     #[must_use]
-    pub async fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
+    async fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
         let output = self.output.lock().await;
         AgentResponse {
             content: final_content,

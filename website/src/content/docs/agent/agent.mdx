@@ -60,12 +60,12 @@ One important use case is to include authentication tokens, so your tools can ma
 
 ## Instructions, tools, and toolkits
 
-[Instructions](../instructions) can depend on the context you provide when running the agent. Returning a string from a function is enough; the library aggregates them into a single system prompt before each run.
+[Instructions](../instructions/) can depend on the context you provide when running the agent. Returning a string from a function is enough; the library aggregates them into a single system prompt before each run.
 
-[Tools](../tools) are functions you expose to the model. Each tool has a name, description, and JSON schema for its arguments. The model decides when to call them based on the conversation and the tool definitions.
-If a [`ToolCallPart`](../../sdk/language-model#tool-call-part) appears in the model response, the library automatically invokes the corresponding tool and appends the result to the conversation.
+[Tools](../tools/) are functions you expose to the model. Each tool has a name, description, and JSON schema for its arguments. The model decides when to call them based on the conversation and the tool definitions.
+If a [`ToolCallPart`](../../sdk/language-model/#tool-call-part) appears in the model response, the library automatically invokes the corresponding tool and appends the result to the conversation.
 
-[Toolkits](../toolkits) let you derive tools and extra prompt snippets dynamically. Each toolkit generates a per-session object that stays alive until you close the run session, which is useful for holding onto database connections, scoped caches, or external protocol clients (such as [MCP](../mcp)).
+[Toolkits](../toolkits/) let you derive tools and extra prompt snippets dynamically. Each toolkit generates a per-session object that stays alive until you close the run session, which is useful for holding onto database connections, scoped caches, or external protocol clients (such as [MCP](../mcp/)).
 
 Use `toolkits` sparingly for capabilities that need per-user initialisation or conditional logic. For simple helper functions that do not keep state, define them directly in `tools` instead.
 
@@ -73,4 +73,4 @@ Use `toolkits` sparingly for capabilities that need per-user initialisation or c
 
 Agents remain stateless. When you call `agent.run`, `agent.run_stream`, or `agent.create_session`, the library creates a `RunSession` that binds the agent parameters to the context you pass in. That session resolves dynamic instructions, opens toolkit sessions, and keeps them around for the duration of the run. When you close the run session, those resources are released.
 
-See [Agent vs Run session](/agent/agent-vs-run-session) for a deeper dive into how the pieces fit together and when to choose each entry point.
+See [Agent vs Run session](/agent/agent-vs-run-session/) for a deeper dive into how the pieces fit together and when to choose each entry point.

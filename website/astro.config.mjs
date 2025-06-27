@@ -56,6 +56,7 @@ export default defineConfig({
             { slug: "agent/toolkits" },
             { slug: "agent/run" },
             { slug: "agent/agent-vs-run-session" },
+            { slug: "agent/resumability" },
             { slug: "agent/mcp" },
             { slug: "agent/structured-output" },
             { slug: "agent/delegation" },
