@@ -226,9 +226,7 @@ func (issueReceiptTool) Execute(_ context.Context, raw json.RawMessage, ctx *Los
 }
 
 func main() {
-	if err := godotenv.Load("../.env"); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Fatalf("load env: %v", err)
-	}
+	godotenv.Load("../.env")
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -237,7 +235,7 @@ func main() {
 
 	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
 
-	agent := llmagent.NewAgent[*LostAndFoundContext](
+	agent := llmagent.NewAgent(
 		"WaypointClerk",
 		model,
 		llmagent.WithInstructions(

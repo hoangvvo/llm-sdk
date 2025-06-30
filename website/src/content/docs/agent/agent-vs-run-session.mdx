@@ -2,7 +2,7 @@
 title: Agent vs Run session
 ---
 
-import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
 import {
   extractGoAgentRunTypes,
   extractGoAgentTypes,
@@ -40,7 +40,12 @@ Because the agent stays stateless, every request must provide its own `context`.
 
 ## Run session
 
-A run session binds an agent to a specific context. When it is created, the session applies parameter defaults, resolves all context-aware instructions, and asks each toolkit for a per-session instance with personalized prompts and tools. Static tools from the agent configuration are combined with toolkit-provided tools into a single roster for the run. Each call to `run` or `run_stream` starts from a clean `RunState` made from the `AgentItem[]` you pass in. The session never remembers prior inputs once the call finishes, so persist any conversation history you care about and include it explicitly on the next run.
+A run session binds an agent to a specific context. When it is created, the session applies parameter defaults, resolves all context-aware instructions, and asks each toolkit for a per-session instance with personalized prompts and tools. Static tools from the agent configuration are combined with toolkit-provided tools into a single roster for the run. Each call to `run` or `run_stream` starts from a clean `RunState` made from the `AgentItem[]` you pass in.
+
+<Aside type="caution">
+  Despite the name "session", a run session does not persist `AgentItem`s between calls. Every `run` or `run_stream` starts fresh from the `input` you provide.
+  If you want to continue a conversation, the `output` from one call must be appended to the `input` of the next.
+</Aside>
 
 <Code
   code={`

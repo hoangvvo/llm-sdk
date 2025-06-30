@@ -1,4 +1,4 @@
-import { Agent, getResponseText, tool } from "@hoangvvo/llm-agent";
+import { Agent, getContentText, tool } from "@hoangvvo/llm-agent";
 import { typeboxTool } from "@hoangvvo/llm-agent/typebox";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
 import { Type } from "@sinclair/typebox";
@@ -248,7 +248,7 @@ const successResponse = await lostAndFoundAgent.run({
 
 console.log("\n=== SUCCESS RUN ===");
 console.dir(successResponse, { depth: null });
-console.log(getResponseText(successResponse));
+console.log(getContentText(successResponse));
 
 // Failure case: demonstrate tool error handling in the same scenario.
 const failureContext = createContext();
@@ -270,4 +270,4 @@ const failureResponse = await lostAndFoundAgent.run({
 
 console.log("\n=== FAILURE RUN ===");
 console.dir(failureResponse, { depth: null });
-console.log(getResponseText(failureResponse));
+console.log(getContentText(failureResponse));

@@ -2,7 +2,7 @@
 title: Resumability
 ---
 
-Runs across the agent libraries are deterministic so that a run can pick up exactly where it left off. The run logic can reprocess saved items, skip work that is already done, and only generate a model response when strictly necessary. This page explains how that works and how to take advantage of it.
+Runs across the agent libraries are deterministic so that a run can pick up exactly where it left off. The run logic can skip work that is already done and only generate a model response when strictly necessary. This page explains how that works and how to take advantage of it.
 
 ## How a run progresses
 
@@ -46,8 +46,8 @@ You can pause or move a run to another process as long as you persist the accumu
 
 This unlocks practical scenarios:
 
-- Long-running workflows where individual tool calls may take minutes or require retries—replay the run without duplicating successful steps.
-- Human-in-the-loop approvals: pause after emitting a tool request, store the state, and resume only once the approval arrives.
+- Long-running workflows where individual tool calls may take minutes or require retries. Replay the run without duplicating successful steps.
+- [Human-in-the-loop](../human-in-the-loop/) approvals: pause after emitting a tool request, store the state, and resume only once the approval arrives.
 - Cross-environment execution: capture state in a background worker, ship it to a web worker or another server, and continue confidently knowing the behavior stays deterministic.
 
 When coupled with toolkits and context binding, a run becomes a resumable controller that can survive restarts, manual interventions, or infrastructure changes without losing its place in the conversation. All of this comes for free without setting up checkpoints or specialized infrastructure. Just save the items and re-run them when you need to continue.

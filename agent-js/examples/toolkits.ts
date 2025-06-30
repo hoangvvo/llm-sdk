@@ -5,7 +5,7 @@ import type {
   Toolkit,
   ToolkitSession,
 } from "@hoangvvo/llm-agent";
-import { Agent, getResponseText, tool } from "@hoangvvo/llm-agent";
+import { Agent, getContentText, tool } from "@hoangvvo/llm-agent";
 import { getModel } from "./get-model.ts";
 
 type VisitorId = "aurora-shift" | "ember-paradox";
@@ -559,7 +559,7 @@ async function runDemo() {
     const response = await session.run({ input: transcript });
 
     console.log(`\n=== TURN ${index + 1} ===`);
-    console.log(getResponseText(response));
+    console.log(getContentText(response));
 
     // Feed model/tool outputs back into the transcript for the next turn.
     transcript.push(...response.output);

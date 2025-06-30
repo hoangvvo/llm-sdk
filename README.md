@@ -82,7 +82,7 @@ Read the full documentation on [llm-sdk.hoangvvo.com](https://llm-sdk.hoangvvo.c
 - [SDK Overview](https://llm-sdk.hoangvvo.com/sdk)
 - [Language Model basics](https://llm-sdk.hoangvvo.com/sdk/language-model)
 - [Agent concepts](https://llm-sdk.hoangvvo.com/agent/agent)
-- [Run sessions explained](https://llm-sdk.hoangvvo.com/agent/run)
+- [Agent run](https://llm-sdk.hoangvvo.com/agent/run)
 
 Also check out some popular agent implementations, including:
 
@@ -90,6 +90,7 @@ Also check out some popular agent implementations, including:
 - [Memory](https://llm-sdk.hoangvvo.com/agent/memory)
 - [Artifacts (Canvas)](https://llm-sdk.hoangvvo.com/agent/artifacts)
 - [Planner–Executor](https://llm-sdk.hoangvvo.com/agent/planner-executor)
+- [Human-in-the-loop](https://llm-sdk.hoangvvo.com/agent/human-in-the-loop)
 
 **Note**: To run examples, create an `.env` file in the root folder (folder containing this README) with your API keys.
 

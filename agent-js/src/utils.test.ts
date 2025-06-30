@@ -1,9 +1,9 @@
 import test, { type TestContext } from "node:test";
 
 import type { AgentResponse } from "./types.ts";
-import { getResponseText } from "./utils.ts";
+import { getContentText } from "./utils.ts";
 
-void test("getResponseText concatenates text parts", (t: TestContext) => {
+void test("getContentText concatenates text parts", (t: TestContext) => {
   const response: AgentResponse = {
     output: [],
     content: [
@@ -13,10 +13,10 @@ void test("getResponseText concatenates text parts", (t: TestContext) => {
     ],
   };
 
-  t.assert.strictEqual(getResponseText(response), "Hello world");
+  t.assert.strictEqual(getContentText(response), "Hello world");
 });
 
-void test("getResponseText omits non-text and empty strings", (t: TestContext) => {
+void test("getContentText omits non-text and empty strings", (t: TestContext) => {
   const response: AgentResponse = {
     output: [],
     content: [
@@ -25,5 +25,5 @@ void test("getResponseText omits non-text and empty strings", (t: TestContext) =
     ],
   };
 
-  t.assert.strictEqual(getResponseText(response), "");
+  t.assert.strictEqual(getContentText(response), "");
 });
