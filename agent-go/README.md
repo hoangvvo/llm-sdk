@@ -239,6 +239,7 @@ Find examples in the [examples](./examples/) folder:
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts/main.go)
 - [`memory`: Memory pattern (core + archival)](./examples/memory/main.go)
 - [`planner-executor`: Plan TODOs and execute](./examples/planner-executor/main.go)
+- [`require-approval`: Human-in-the-loop approval](./examples/require-approval/main.go)
 
 ```bash
 go run ./examples/agent

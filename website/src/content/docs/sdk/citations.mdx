@@ -102,6 +102,8 @@ In this case, 2 of the `TextPart`s contain `Citation` entries that point to the 
 
 ## Generate citations
 
+![generate-citations](../../../../assets/examples/generate-citations.gif)
+
 Include `SourcePart` entries in your messages (either directly from the user or via tool outputs) so the model can ground its response. Each source needs a stable `source` identifier or URL, a human-readable `title`, and the document `content` broken into structured parts.
 
 Use `generate()` when you want a single response that includes citations. The SDK returns `TextPart` objects whose `citations` array points to the matching `source` identifiers and spans within your provided documents.

@@ -94,6 +94,8 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`structured-output`: Structured output](./examples/structured-output.rs)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning.rs)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.rs)
+- [`generate-citations`: Generate citations](./examples/generate-citations.rs)
+- [`stream-citations`: Stream citations](./examples/stream-citations.rs)
 
 ```bash
 cargo run --example generate-text

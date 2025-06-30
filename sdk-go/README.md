@@ -110,6 +110,8 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`structured-output`: Structured output](./examples/structured-output/main.go)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning/main.go)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning/main.go)
+- [`generate-citations`: Generate citations](./examples/generate-citations/main.go)
+- [`stream-citations`: Stream citations](./examples/stream-citations/main.go)
 
 ```bash
 go run ./examples/generate-text

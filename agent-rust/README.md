@@ -219,6 +219,7 @@ Find examples in the [examples](./examples/) folder:
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts.rs)
 - [`memory`: Memory pattern (core + archival)](./examples/memory.rs)
 - [`planner-executor`: Plan TODOs and execute](./examples/planner-executor.rs)
+- [`require-approval`: Human-in-the-loop approval](./examples/require-approval.rs)
 
 ```bash
 cargo run --example agent
