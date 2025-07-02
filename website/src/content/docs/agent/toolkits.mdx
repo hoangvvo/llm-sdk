@@ -44,6 +44,52 @@ That session can keep its own mutable state: reuse it across multiple calls to `
   One good way to put it is that `Toolkit` is to `ToolkitSession` is similar to `Agent` is to `RunSession`.
 </Aside>
 
+## Sequence diagram
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant RunSession
+    participant Toolkit
+    participant ToolkitSession
+    participant Model
+    participant Tools as Tool calls
+
+    Agent->>RunSession: createSession(context, instructions, tools, toolkits)
+    Note right of RunSession: Apply defaults, stash static tools
+    RunSession->>RunSession: instructions -> static system prompt
+    RunSession->>Toolkit: createSession(context)
+    Toolkit-->>RunSession: ToolkitSession handle
+    Note right of ToolkitSession: May preload prompts/tools
+
+    Agent->>RunSession: run(input)
+    RunSession->>ToolkitSession: getSystemPrompt()/getTools()
+    ToolkitSession-->>RunSession: Dynamic prompt + tools
+    RunSession->>Model: generate(request, static prompt + dynamic prompt, static tools + dynamic tools)
+    Model-->>RunSession: response / tool calls
+
+    loop During run
+        RunSession->>Tools: execute(tool call, context)
+        Tools-->>RunSession: tool result
+        RunSession->>Model: append result (if needed)
+        Model-->>RunSession: follow-up
+    end
+
+    alt Toolkit updates itself
+        RunSession->>ToolkitSession: request refresh
+        ToolkitSession->>ToolkitSession: update internal state
+        ToolkitSession-->>RunSession: new prompt/tools
+    end
+
+    RunSession->>Model: generate(request, static prompt + updated dynamic prompt, static tools + updated dynamic tools)
+    Model-->>RunSession: response / tool calls
+
+    RunSession-->>Agent: AgentResponse
+    Agent->>RunSession: close()
+    RunSession->>ToolkitSession: close()
+    ToolkitSession-->>RunSession: release resources
+```
+
 ## Example
 
 The example below follows an interdimensional Lost & Found desk. `create_session` loads the
