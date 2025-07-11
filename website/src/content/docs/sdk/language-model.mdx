@@ -327,6 +327,34 @@ The following `Part` types are implemented in the SDK: [`TextPart`](#text-part),
   </TabItem>
 </Tabs>
 
+## Citation
+
+Certain parts include `Citation`s, which language models can use to cite `SourcePart` in their responses.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["Citation"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["Citation"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["Citation"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
 ## Model Response
 
 The response from the language model is represented as a `ModelResponse` that includes:

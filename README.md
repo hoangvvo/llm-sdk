@@ -5,14 +5,14 @@
 - **LLM SDK** – cross-language clients (JavaScript, Rust, Go) that talk to multiple LLM providers through one `LanguageModel` interface.
 - **LLM Agent** – a minimal, transparent agent library that orchestrates model generations and tool executions using the SDK under the hood.
 
-| Package               | Language              | Version                                                                                                                                       | Link                                                             |
-| --------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `@hoangvvo/llm-sdk`   | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-sdk?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-sdk)           | [NPM](https://www.npmjs.com/package/@hoangvvo/llm-sdk)           |
-| `llm-sdk-rs`          | Rust                  |                                                                                                                                               | [crates.io](https://crates.io/crates/llm-sdk-rs)                 |
-| `llm-sdk`             | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/sdk-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/sdk-go)     | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-go)   |
-| `@hoangvvo/llm-agent` | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-agent?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-agent)       | [NPM](https://www.npmjs.com/package/@hoangvvo/llm-agent)         |
-| `llm-agent`           | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-agent?style=flat-square)](https://crates.io/crates/llm-agent)                               | [crates.io](https://crates.io/crates/llm-agent)                  |
-| `llm-agent`           | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/agent-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/agent-go) |
+| Package                         | Language              | Version                                                                                                                                       | Link                                                             |
+| ------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `@hoangvvo/llm-sdk`             | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-sdk?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-sdk)           | [NPM](https://www.npmjs.com/package/@hoangvvo/llm-sdk)           |
+| `llm-sdk-rs`                    | Rust                  |                                                                                                                                               | [crates.io](https://crates.io/crates/llm-sdk-rs)                 |
+| `github.com/hoangvvo/llm-sdk`   | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/sdk-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/sdk-go)     | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-go)   |
+| `@hoangvvo/llm-agent`           | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-agent?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-agent)       | [NPM](https://www.npmjs.com/package/@hoangvvo/llm-agent)         |
+| `llm-agent`                     | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-agent?style=flat-square)](https://crates.io/crates/llm-agent)                               | [crates.io](https://crates.io/crates/llm-agent)                  |
+| `github.com/hoangvvo/llm-agent` | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/agent-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/agent-go) |
 
 The accompanying [Console app](./website) demonstrates the libraries end-to-end.
 
@@ -25,6 +25,7 @@ The accompanying [Console app](./website) demonstrates the libraries end-to-end.
 - Supports multiple LLM providers with a unified API.
 - Handles multiple modalities: Text, Image, and Audio.
 - Supports streaming, including for image and audio.
+- Supports multi-modality tool results (image/audio returned from tools).
 - Supports citations (RAG) and reasoning for supported models.
 - Reports token usage and calculates the cost of a request when provided with the model’s pricing information.
 - Unified serialization across programming languages (systems in different languages can work together).
