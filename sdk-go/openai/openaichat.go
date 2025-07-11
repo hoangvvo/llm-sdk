@@ -24,11 +24,14 @@ type OpenAIChatModel struct {
 	baseURL  string
 	client   *http.Client
 	metadata *llmsdk.LanguageModelMetadata
+	headers  map[string]string
 }
 
 type OpenAIChatModelOptions struct {
-	BaseURL string
-	APIKey  string
+	BaseURL    string
+	APIKey     string
+	Headers    map[string]string
+	HTTPClient *http.Client
 }
 
 // NewOpenAIChatModel creates a new OpenAI model instance
@@ -38,11 +41,22 @@ func NewOpenAIChatModel(modelID string, options OpenAIChatModelOptions) *OpenAIC
 		baseURL = DefaultBaseURL
 	}
 
+	client := options.HTTPClient
+	if client == nil {
+		client = &http.Client{}
+	}
+
+	headers := map[string]string{}
+	for k, v := range options.Headers {
+		headers[k] = v
+	}
+
 	return &OpenAIChatModel{
 		modelID: modelID,
 		apiKey:  options.APIKey,
 		baseURL: baseURL,
-		client:  &http.Client{},
+		client:  client,
+		headers: headers,
 	}
 }
 
@@ -66,6 +80,18 @@ func (m *OpenAIChatModel) Metadata() *llmsdk.LanguageModelMetadata {
 	return m.metadata
 }
 
+func (m *OpenAIChatModel) requestHeaders() map[string]string {
+	headers := map[string]string{
+		"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
+	}
+
+	for k, v := range m.headers {
+		headers[k] = v
+	}
+
+	return headers
+}
+
 // Generate implements synchronous generation
 func (m *OpenAIChatModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
 	return tracing.TraceGenerate(ctx, Provider, m.modelID, input, func(ctx context.Context) (*llmsdk.ModelResponse, error) {
@@ -75,11 +101,9 @@ func (m *OpenAIChatModel) Generate(ctx context.Context, input *llmsdk.LanguageMo
 		}
 
 		completion, err := clientutils.DoJSON[openaiapi.ChatCompletion](ctx, m.client, clientutils.JSONRequestConfig{
-			URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
-			Body: params,
-			Headers: map[string]string{
-				"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
-			},
+			URL:     fmt.Sprintf("%s/chat/completions", m.baseURL),
+			Body:    params,
+			Headers: m.requestHeaders(),
 		})
 		if err != nil {
 			return nil, err
@@ -130,11 +154,9 @@ func (m *OpenAIChatModel) Stream(ctx context.Context, input *llmsdk.LanguageMode
 		params.Stream = ptr.To(true)
 
 		sseStream, err := clientutils.DoSSE[openaiapi.ChatCompletionChunk](ctx, m.client, clientutils.SSERequestConfig{
-			URL:  fmt.Sprintf("%s/chat/completions", m.baseURL),
-			Body: params,
-			Headers: map[string]string{
-				"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
-			},
+			URL:     fmt.Sprintf("%s/chat/completions", m.baseURL),
+			Body:    params,
+			Headers: m.requestHeaders(),
 		})
 		if err != nil {
 			return nil, err

@@ -1,4 +1,5 @@
 mod accumulator;
+pub mod anthropic;
 pub mod audio_part_utils;
 pub mod boxed_stream;
 mod client_utils;

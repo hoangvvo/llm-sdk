@@ -20,8 +20,11 @@ use crate::{
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
-use reqwest::{header, Client};
-use std::sync::Arc;
+use reqwest::{
+    header::{self, HeaderMap, HeaderName, HeaderValue},
+    Client,
+};
+use std::{collections::HashMap, sync::Arc};
 
 const PROVIDER: &str = "openai";
 
@@ -31,23 +34,33 @@ pub struct OpenAIModel {
     base_url: String,
     client: Client,
     metadata: Option<Arc<LanguageModelMetadata>>,
+    headers: HashMap<String, String>,
 }
 
 #[derive(Clone, Default)]
 pub struct OpenAIModelOptions {
     pub base_url: Option<String>,
     pub api_key: String,
+    pub headers: Option<HashMap<String, String>>,
+    pub client: Option<Client>,
 }
 
 impl OpenAIModel {
     #[must_use]
     pub fn new(model_id: impl Into<String>, options: OpenAIModelOptions) -> Self {
-        let client = Client::new();
+        let OpenAIModelOptions {
+            base_url,
+            api_key,
+            headers,
+            client,
+        } = options;
 
-        let base_url = options
-            .base_url
-            .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
-        let api_key = options.api_key;
+        let base_url = base_url
+            .unwrap_or_else(|| "https://api.openai.com/v1".to_string())
+            .trim_end_matches('/')
+            .to_string();
+        let client = client.unwrap_or_else(Client::new);
+        let headers = headers.unwrap_or_default();
 
         Self {
             model_id: model_id.into(),
@@ -55,6 +68,7 @@ impl OpenAIModel {
             base_url,
             client,
             metadata: None,
+            headers,
         }
     }
 
@@ -62,6 +76,34 @@ impl OpenAIModel {
     pub fn with_metadata(mut self, metadata: LanguageModelMetadata) -> Self {
         self.metadata = Some(Arc::new(metadata));
         self
+    }
+
+    fn request_headers(&self) -> LanguageModelResult<HeaderMap> {
+        let mut headers = HeaderMap::new();
+
+        let auth_header =
+            HeaderValue::from_str(&format!("Bearer {}", self.api_key)).map_err(|error| {
+                LanguageModelError::InvalidInput(format!(
+                    "Invalid OpenAI API key header value: {error}"
+                ))
+            })?;
+        headers.insert(header::AUTHORIZATION, auth_header);
+
+        for (key, value) in &self.headers {
+            let header_name = HeaderName::from_bytes(key.as_bytes()).map_err(|error| {
+                LanguageModelError::InvalidInput(format!(
+                    "Invalid OpenAI header name '{key}': {error}"
+                ))
+            })?;
+            let header_value = HeaderValue::from_str(value).map_err(|error| {
+                LanguageModelError::InvalidInput(format!(
+                    "Invalid OpenAI header value for '{key}': {error}"
+                ))
+            })?;
+            headers.insert(header_name, header_value);
+        }
+
+        Ok(headers)
     }
 }
 
@@ -89,13 +131,7 @@ impl LanguageModel for OpenAIModel {
                 input,
                 |input| async move {
                     let params = convert_to_response_create_params(input, &self.model_id())?;
-
-                    let mut header_map = reqwest::header::HeaderMap::new();
-                    if let Ok(header_val) =
-                        header::HeaderValue::from_str(&format!("Bearer {}", self.api_key))
-                    {
-                        header_map.insert(header::AUTHORIZATION, header_val);
-                    }
+                    let header_map = self.request_headers()?;
 
                     let json: responses_api::Response = client_utils::send_json(
                         &self.client,
@@ -143,13 +179,7 @@ impl LanguageModel for OpenAIModel {
                     let metadata = self.metadata.clone();
                     let mut params = convert_to_response_create_params(input, &self.model_id())?;
                     params.stream = Some(true);
-
-                    let mut header_map = reqwest::header::HeaderMap::new();
-                    if let Ok(header_val) =
-                        header::HeaderValue::from_str(&format!("Bearer {}", self.api_key))
-                    {
-                        header_map.insert(header::AUTHORIZATION, header_val);
-                    }
+                    let header_map = self.request_headers()?;
 
                     let mut chunk_stream = client_utils::send_sse_stream::<_, ResponseStreamEvent>(
                         &self.client,

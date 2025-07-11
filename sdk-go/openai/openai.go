@@ -26,12 +26,15 @@ type OpenAIModel struct {
 	baseURL  string
 	client   *http.Client
 	metadata *llmsdk.LanguageModelMetadata
+	headers  map[string]string
 }
 
 // OpenAIModelOptions represents configuration options for OpenAI model
 type OpenAIModelOptions struct {
-	BaseURL string
-	APIKey  string
+	BaseURL    string
+	APIKey     string
+	Headers    map[string]string
+	HTTPClient *http.Client
 }
 
 type OpenAIReasoningEffort uint32
@@ -49,11 +52,22 @@ func NewOpenAIModel(modelID string, options OpenAIModelOptions) *OpenAIModel {
 		baseURL = DefaultBaseURL
 	}
 
+	client := options.HTTPClient
+	if client == nil {
+		client = &http.Client{}
+	}
+
+	headers := map[string]string{}
+	for k, v := range options.Headers {
+		headers[k] = v
+	}
+
 	return &OpenAIModel{
 		modelID: modelID,
 		apiKey:  options.APIKey,
 		baseURL: baseURL,
-		client:  &http.Client{},
+		client:  client,
+		headers: headers,
 	}
 }
 
@@ -77,6 +91,18 @@ func (m *OpenAIModel) Metadata() *llmsdk.LanguageModelMetadata {
 	return m.metadata
 }
 
+func (m *OpenAIModel) requestHeaders() map[string]string {
+	headers := map[string]string{
+		"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
+	}
+
+	for k, v := range m.headers {
+		headers[k] = v
+	}
+
+	return headers
+}
+
 // Generate implements synchronous generation
 func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
 	return tracing.TraceGenerate(ctx, Provider, m.modelID, input, func(ctx context.Context) (*llmsdk.ModelResponse, error) {
@@ -88,11 +114,9 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		params.Stream = ptr.To(false)
 
 		response, err := clientutils.DoJSON[openaiapi.Response](ctx, m.client, clientutils.JSONRequestConfig{
-			URL:  fmt.Sprintf("%s/responses", m.baseURL),
-			Body: params,
-			Headers: map[string]string{
-				"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
-			},
+			URL:     fmt.Sprintf("%s/responses", m.baseURL),
+			Body:    params,
+			Headers: m.requestHeaders(),
 		})
 		if err != nil {
 			return nil, err
@@ -132,11 +156,9 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 		params.Stream = ptr.To(true)
 
 		sseStream, err := clientutils.DoSSE[openaiapi.ResponseStreamEvent](ctx, m.client, clientutils.SSERequestConfig{
-			URL:  fmt.Sprintf("%s/responses", m.baseURL),
-			Body: params,
-			Headers: map[string]string{
-				"Authorization": fmt.Sprintf("Bearer %s", m.apiKey),
-			},
+			URL:     fmt.Sprintf("%s/responses", m.baseURL),
+			Body:    params,
+			Headers: m.requestHeaders(),
 		})
 		if err != nil {
 			return nil, err

@@ -24,6 +24,8 @@ type GoogleModelOptions struct {
 	BaseURL    string
 	APIKey     string
 	APIVersion string
+	Headers    map[string]string
+	HTTPClient *http.Client
 }
 
 type GoogleModel struct {
@@ -33,6 +35,7 @@ type GoogleModel struct {
 	modelID    string
 	client     *http.Client
 	metadata   *llmsdk.LanguageModelMetadata
+	headers    map[string]string
 }
 
 func NewGoogleModel(modelID string, options GoogleModelOptions) *GoogleModel {
@@ -45,12 +48,23 @@ func NewGoogleModel(modelID string, options GoogleModelOptions) *GoogleModel {
 		apiVersion = options.APIVersion
 	}
 
+	client := options.HTTPClient
+	if client == nil {
+		client = &http.Client{}
+	}
+
+	headers := map[string]string{}
+	for k, v := range options.Headers {
+		headers[k] = v
+	}
+
 	return &GoogleModel{
 		baseURL:    baseURL,
 		apiKey:     options.APIKey,
 		apiVersion: apiVersion,
 		modelID:    modelID,
-		client:     &http.Client{},
+		client:     client,
+		headers:    headers,
 	}
 }
 
@@ -71,6 +85,18 @@ func (m *GoogleModel) Metadata() *llmsdk.LanguageModelMetadata {
 	return m.metadata
 }
 
+func (m *GoogleModel) requestHeaders() map[string]string {
+	headers := map[string]string{
+		"x-goog-api-key": m.apiKey,
+	}
+
+	for k, v := range m.headers {
+		headers[k] = v
+	}
+
+	return headers
+}
+
 func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
 	return tracing.TraceGenerate(ctx, string(Provider), m.modelID, input, func(ctx context.Context) (*llmsdk.ModelResponse, error) {
 		params, err := convertToGenerateContentParameters(input, m.modelID)
@@ -79,12 +105,9 @@ func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		}
 
 		response, err := clientutils.DoJSON[googleapi.GenerateContentResponse](ctx, m.client, clientutils.JSONRequestConfig{
-			URL: fmt.Sprintf("%s/%s/models/%s:generateContent", m.baseURL, m.apiVersion, m.modelID),
-			Headers: map[string]string{
-				"x-goog-api-key": m.apiKey,
-				"Content-Type":   "application/json",
-			},
-			Body: params,
+			URL:     fmt.Sprintf("%s/%s/models/%s:generateContent", m.baseURL, m.apiVersion, m.modelID),
+			Headers: m.requestHeaders(),
+			Body:    params,
 		})
 		if err != nil {
 			return nil, err
@@ -126,11 +149,9 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 		}
 
 		sseStream, err := clientutils.DoSSE[googleapi.GenerateContentResponse](ctx, m.client, clientutils.SSERequestConfig{
-			URL: fmt.Sprintf("%s/%s/models/%s:streamGenerateContent?alt=sse", m.baseURL, m.apiVersion, m.modelID),
-			Headers: map[string]string{
-				"x-goog-api-key": m.apiKey,
-			},
-			Body: params,
+			URL:     fmt.Sprintf("%s/%s/models/%s:streamGenerateContent?alt=sse", m.baseURL, m.apiVersion, m.modelID),
+			Headers: m.requestHeaders(),
+			Body:    params,
 		})
 		if err != nil {
 			return nil, err

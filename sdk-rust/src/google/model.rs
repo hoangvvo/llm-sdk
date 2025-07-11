@@ -13,7 +13,10 @@ use crate::{
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
-use reqwest::Client;
+use reqwest::{
+    header::{HeaderMap, HeaderName, HeaderValue},
+    Client,
+};
 use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
 
@@ -25,28 +28,41 @@ pub struct GoogleModel {
     base_url: String,
     client: Client,
     metadata: Option<Arc<LanguageModelMetadata>>,
+    headers: HashMap<String, String>,
 }
 
 #[derive(Clone, Default)]
 pub struct GoogleModelOptions {
     pub api_key: String,
     pub base_url: Option<String>,
+    pub headers: Option<HashMap<String, String>>,
+    pub client: Option<Client>,
 }
 
 impl GoogleModel {
     #[must_use]
     pub fn new(model_id: impl Into<String>, options: GoogleModelOptions) -> Self {
-        let client = Client::new();
-        let base_url = options
-            .base_url
-            .unwrap_or_else(|| "https://generativelanguage.googleapis.com/v1beta".to_string());
+        let GoogleModelOptions {
+            api_key,
+            base_url,
+            headers,
+            client,
+        } = options;
+
+        let base_url = base_url
+            .unwrap_or_else(|| "https://generativelanguage.googleapis.com/v1beta".to_string())
+            .trim_end_matches('/')
+            .to_string();
+        let client = client.unwrap_or_else(Client::new);
+        let headers = headers.unwrap_or_default();
 
         Self {
             model_id: model_id.into(),
-            api_key: options.api_key,
+            api_key,
             base_url,
             client,
             metadata: None,
+            headers,
         }
     }
 
@@ -54,6 +70,26 @@ impl GoogleModel {
     pub fn with_metadata(mut self, metadata: LanguageModelMetadata) -> Self {
         self.metadata = Some(Arc::new(metadata));
         self
+    }
+
+    fn request_headers(&self) -> LanguageModelResult<HeaderMap> {
+        let mut headers = HeaderMap::new();
+
+        for (key, value) in &self.headers {
+            let header_name = HeaderName::from_bytes(key.as_bytes()).map_err(|error| {
+                LanguageModelError::InvalidInput(format!(
+                    "Invalid Google header name '{key}': {error}"
+                ))
+            })?;
+            let header_value = HeaderValue::from_str(value).map_err(|error| {
+                LanguageModelError::InvalidInput(format!(
+                    "Invalid Google header value for '{key}': {error}"
+                ))
+            })?;
+            headers.insert(header_name, header_value);
+        }
+
+        Ok(headers)
     }
 }
 
@@ -87,13 +123,9 @@ impl LanguageModel for GoogleModel {
                         self.base_url, self.model_id, self.api_key
                     );
 
-                    let response: GenerateContentResponse = client_utils::send_json(
-                        &self.client,
-                        &url,
-                        &params,
-                        reqwest::header::HeaderMap::new(),
-                    )
-                    .await?;
+                    let headers = self.request_headers()?;
+                    let response: GenerateContentResponse =
+                        client_utils::send_json(&self.client, &url, &params, headers).await?;
 
                     let candidate = response
                         .candidates
@@ -151,15 +183,14 @@ impl LanguageModel for GoogleModel {
                         self.base_url, self.model_id, self.api_key
                     );
 
-                    let mut chunk_stream =
-                        client_utils::send_sse_stream::<_, GenerateContentResponse>(
-                            &self.client,
-                            &url,
-                            &params,
-                            reqwest::header::HeaderMap::new(),
-                            self.provider(),
-                        )
-                        .await?;
+                    let headers = self.request_headers()?;
+                    let mut chunk_stream = client_utils::send_sse_stream::<
+                        _,
+                        GenerateContentResponse,
+                    >(
+                        &self.client, &url, &params, headers, self.provider()
+                    )
+                    .await?;
 
                     let stream = try_stream! {
                         let mut all_content_deltas: Vec<ContentDelta> = Vec::new();

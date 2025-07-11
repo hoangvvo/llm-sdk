@@ -14,6 +14,7 @@ import (
 	"os"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
+	"github.com/hoangvvo/llm-sdk/sdk-go/anthropic"
 	"github.com/hoangvvo/llm-sdk/sdk-go/google"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
@@ -40,6 +41,14 @@ func GetModel(provider, modelID string) llmsdk.LanguageModel {
 			panic("OPENAI_API_KEY environment variable is required")
 		}
 		return openai.NewOpenAIChatModel(modelID, openai.OpenAIChatModelOptions{
+			APIKey: apiKey,
+		})
+	case "anthropic":
+		apiKey := os.Getenv("ANTHROPIC_API_KEY")
+		if apiKey == "" {
+			panic("ANTHROPIC_API_KEY environment variable is required")
+		}
+		return anthropic.NewAnthropicModel(modelID, anthropic.AnthropicModelOptions{
 			APIKey: apiKey,
 		})
 	case "google":

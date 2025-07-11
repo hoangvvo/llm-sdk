@@ -1,4 +1,5 @@
 use llm_sdk::{
+    anthropic::{AnthropicModel, AnthropicModelOptions},
     google::{GoogleModel, GoogleModelOptions},
     openai::{OpenAIChatModel, OpenAIChatModelOptions, OpenAIModel, OpenAIModelOptions},
     LanguageModel,
@@ -19,6 +20,14 @@ pub fn get_model(provider: &str, model_id: &str) -> Box<dyn LanguageModel> {
             OpenAIChatModelOptions {
                 api_key: std::env::var("OPENAI_API_KEY")
                     .expect("OPENAI_API_KEY environment variable must be set"),
+                ..Default::default()
+            },
+        )),
+        "anthropic" => Box::new(AnthropicModel::new(
+            model_id.to_string(),
+            AnthropicModelOptions {
+                api_key: std::env::var("ANTHROPIC_API_KEY")
+                    .expect("ANTHROPIC_API_KEY environment variable must be set"),
                 ..Default::default()
             },
         )),
