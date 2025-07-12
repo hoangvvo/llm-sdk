@@ -1,5 +1,5 @@
 [package]
-description = "Agents enable the development of agentic AI applications that can generate responses and execute tasks autonomously. Agents utilize the LLM SDK to interact with different language models and allow definitions of instructions, tools, and other language model parameters."
+description = "The agent library to build LLM applications using the LLM SDK."
 edition = "2021"
 homepage = "https://llm-sdk.hoangvvo.com/"
 keywords = [

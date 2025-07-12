@@ -70,6 +70,13 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 		enabledTools = slices.Compact(req.EnabledTools)
 	}
 
+	for _, mcpServer := range req.MCPServers {
+		if _, ok := mcpServer.StdioParams(); ok && os.Getenv("ALLOW_STDIO_MCP") != "true" {
+			http.Error(w, "Stdio MCP server is not allowed. Set ALLOW_STDIO_MCP=true to allow it.", http.StatusBadRequest)
+			return
+		}
+	}
+
 	options := &AgentOptions{
 		EnabledTools:         enabledTools,
 		MCPServers:           req.MCPServers,

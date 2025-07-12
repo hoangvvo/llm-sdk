@@ -93,6 +93,20 @@ async fn run_stream_handler(
         ..
     } = body;
 
+    if let Some(mcp_servers) = &mcp_servers {
+        for mcp_server in mcp_servers {
+            if matches!(mcp_server, MCPParams::Stdio(_)) {
+                if env::var("ALLOW_STDIO_MCP").unwrap_or_default() != "true" {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        "Stdio MCP server is not allowed. Set ALLOW_STDIO_MCP=true to allow it."
+                            .to_string(),
+                    ));
+                }
+            }
+        }
+    }
+
     let options = AgentOptions {
         enabled_tools,
         mcp_servers,

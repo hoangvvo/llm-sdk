@@ -1,0 +1,47 @@
+services:
+  traefik:
+    image: "traefik:v3.5"
+    container_name: "traefik"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+      - "--entryPoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+  rust-server:
+    build:
+      context: ../agent-rust
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rust-server.rule=Host(`llm-sdk-server.hoangvvo.com`) && PathPrefix(`/rust-server`)"
+      - "traefik.http.middlewares.rust-server-stripprefix.stripprefix.prefixes=/rust-server"
+      - "traefik.http.routers.rust-server.entrypoints=web"
+
+  go-server:
+    build:
+      context: ../agent-go
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.go-server.rule=Host(`llm-sdk-server.hoangvvo.com`) && PathPrefix(`/go-server`)"
+      - "traefik.http.middlewares.go-server-stripprefix.stripprefix.prefixes=/go-server"
+      - "traefik.http.routers.go-server.entrypoints=web"
+
+networks:
+  proxy:
+    name: proxy

@@ -46,6 +46,19 @@ async function runStreamHandler(
       ? mcp_servers
       : undefined;
 
+    if (mcpServersParam) {
+      mcpServersParam.forEach((param) => {
+        if (
+          param.type === "stdio" &&
+          process.env["ALLOW_STDIO_MCP"] !== "true"
+        ) {
+          throw new Error(
+            "Stdio MCP server is not allowed. Set ALLOW_STDIO_MCP=true to allow it.",
+          );
+        }
+      });
+    }
+
     agent = createAgent(model, modelInfo, {
       enabledTools: enabledToolsParam,
       mcpServers: mcpServersParam,
