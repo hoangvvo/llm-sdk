@@ -1,6 +1,6 @@
 # @hoangvvo/llm-agent
 
-A JavaScript library to implement LLM agents that work with any LLM providers.
+The agent library to build LLM applications that work with any LLM providers.
 
 ## Installation
 

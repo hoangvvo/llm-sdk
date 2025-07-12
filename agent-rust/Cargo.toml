@@ -1,5 +1,5 @@
 [package]
-description = "The agent library to build LLM applications using the LLM SDK."
+description = "The agent library to build LLM applications that work with any LLM providers."
 edition = "2021"
 homepage = "https://llm-sdk.hoangvvo.com/"
 keywords = [

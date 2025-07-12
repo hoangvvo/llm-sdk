@@ -29,14 +29,13 @@ This works because of the [Resumability](../resumability/) guarantee. It will re
 
 ```mermaid
 sequenceDiagram
-    participant User
+    participant Human
     participant App
     participant Agent
     participant LLM
     participant Tool
-    participant Human
 
-    User->>App: submit request
+    Human->>App: submit request
     Note over App,Agent: Transcript = [user_message]
     App->>Agent: runStream([user_message], context)
     Agent->>LLM: request completion
@@ -57,7 +56,7 @@ sequenceDiagram
     LLM-->>Agent: assistant_message
     Agent-->>App: emit assistant_message
     Agent-->>App: final response
-    App-->>User: deliver outcome
+    App-->>Human: deliver outcome
 ```
 
 ## Implementation

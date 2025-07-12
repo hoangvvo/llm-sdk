@@ -70,7 +70,7 @@ Keys: ✅ supported · 🚧 planned · ➖ not available from provider.
 `llm-agent` wraps the SDK to provide a lightweight agent runtime:
 
 - **Agent** objects are stateless blueprints that declare instructions, tools, toolkits, and default model settings.
-- **Run sessions** bind an agent to a specific context value. Sessions resolve dynamic instructions once, initialize toolkit state, and stream model/tool events back to you. You decide whether to invoke `agent.run` for one-off calls or manage the session lifecycle yourself for multi-turn workflows.
+- **Run sessions** bind an agent to a specific context value. Sessions resolve dynamic instructions once, initialize toolkit state, and stream model/tool events back to you.
 - **Agent items** capture every turn: user/assistant messages, model responses (with usage metadata), and rich tool-call records. Append the output list to the next run’s input to continue a conversation.
 - **Streaming** mirrors non-streaming responses but emits partial deltas and tool events for real-time UX.
 

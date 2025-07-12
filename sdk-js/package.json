@@ -2,7 +2,7 @@
   "type": "module",
   "name": "@hoangvvo/llm-sdk",
   "version": "0.3.0",
-  "description": "A unified LLM SDK",
+  "description": "A JavaScript library that enables the development of applications that can interact with different language models through a unified interface.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
@@ -21,6 +21,16 @@
     "url": "https://github.com/hoangvvo/llm-sdk/issues"
   },
   "homepage": "https://github.com/hoangvvo/llm-sdk",
+  "keywords": [
+    "llm",
+    "language model",
+    "agent",
+    "ai",
+    "openai",
+    "anthropic",
+    "cohere",
+    "mistral"
+  ],
   "license": "MIT",
   "publishConfig": {
     "access": "public"

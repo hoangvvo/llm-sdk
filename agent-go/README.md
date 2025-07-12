@@ -1,6 +1,12 @@
 # llmagent
 
-A Go library to implement LLM agents that work with any LLM providers.
+The agent library to build LLM applications that work with any LLM providers.
+
+## Installation
+
+```bash
+go get github.com/hoangvvo/llm-sdk/agent-go
+```
 
 ## Usage
 

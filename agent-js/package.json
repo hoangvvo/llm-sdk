@@ -2,7 +2,7 @@
   "type": "module",
   "name": "@hoangvvo/llm-agent",
   "version": "0.1.0",
-  "description": "A unified LLM agent SDK",
+  "description": "The agent library to build LLM applications that work with any LLM providers.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
@@ -21,6 +21,16 @@
     "url": "https://github.com/hoangvvo/llm-sdk/issues"
   },
   "homepage": "https://github.com/hoangvvo/llm-sdk",
+  "keywords": [
+    "llm",
+    "language model",
+    "agent",
+    "ai",
+    "openai",
+    "anthropic",
+    "cohere",
+    "mistral"
+  ],
   "license": "MIT",
   "publishConfig": {
     "access": "public"

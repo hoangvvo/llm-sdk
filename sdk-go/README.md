@@ -2,6 +2,12 @@
 
 A Go library that provides a unified API to access the LLM APIs of various providers.
 
+## Installation
+
+```bash
+go get github.com/hoangvvo/llm-sdk/sdk-go
+```
+
 ## Usage
 
 All models implement the `LanguageModel` interface:

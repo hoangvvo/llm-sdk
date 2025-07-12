@@ -1,6 +1,12 @@
 # llm-agent for Rust
 
-A Rust library to implement LLM agents that work with any LLM providers.
+The agent library to build LLM applications that work with any LLM providers.
+
+## Installation
+
+```bash
+cargo add llm-agent
+```
 
 ## Usage
 

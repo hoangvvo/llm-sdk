@@ -1,6 +1,12 @@
 # llm-sdk for Rust
 
-A Rust library that provides a unified API to access the LLM APIs of various providers.
+A Rust library that enables the development of applications that can interact with different language models through a unified interface.
+
+## Installation
+
+```bash
+cargo add llm-sdk-rs
+```
 
 ## Usage
 
