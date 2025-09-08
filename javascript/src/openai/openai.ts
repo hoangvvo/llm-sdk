@@ -4,6 +4,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../models/language-model.js";
+import { traceLanguageModel } from "../models/opentelemetry.js";
 import type {
   AssistantMessage,
   AudioContainer,
@@ -59,6 +60,8 @@ export class OpenAIModel implements LanguageModel {
       baseURL: options.baseURL,
       apiKey: options.apiKey,
     });
+
+    traceLanguageModel(this);
   }
 
   async generate(input: OpenAILanguageModelInput): Promise<ModelResponse> {

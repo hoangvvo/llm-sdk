@@ -9,6 +9,7 @@ import {
   LanguageModel,
   LanguageModelMetadata,
 } from "../models/language-model.js";
+import { traceLanguageModel } from "../models/opentelemetry.js";
 import {
   AssistantMessage,
   ContentDelta,
@@ -50,6 +51,8 @@ export class MistralModel implements LanguageModel {
       apiKey: options.apiKey,
       ...(options.baseURL && { serverURL: options.baseURL }),
     });
+
+    traceLanguageModel(this);
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {

@@ -8,6 +8,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../models/language-model.js";
+import { traceLanguageModel } from "../models/opentelemetry.js";
 import type {
   AssistantMessage,
   ContentDelta,
@@ -48,6 +49,8 @@ export class AnthropicModel implements LanguageModel {
       baseURL: options.baseURL,
       apiKey: options.apiKey,
     });
+
+    traceLanguageModel(this);
   }
 
   async generate(input: AnthropicLanguageModelInput): Promise<ModelResponse> {

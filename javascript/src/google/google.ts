@@ -19,6 +19,7 @@ import type {
   LanguageModel,
   LanguageModelMetadata,
 } from "../models/language-model.js";
+import { traceLanguageModel } from "../models/opentelemetry.js";
 import type {
   AssistantMessage,
   ContentDelta,
@@ -64,6 +65,8 @@ export class GoogleModel implements LanguageModel {
     this.genModel = genAI.getGenerativeModel({
       model: options.modelId,
     });
+
+    traceLanguageModel(this);
   }
 
   async generate(input: GoogleLanguageModelInput): Promise<ModelResponse> {

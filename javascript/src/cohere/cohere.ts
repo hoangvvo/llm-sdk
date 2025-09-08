@@ -7,6 +7,7 @@ import {
   LanguageModel,
   LanguageModelMetadata,
 } from "../models/language-model.js";
+import { traceLanguageModel } from "../models/opentelemetry.js";
 import {
   AssistantMessage,
   ContentDelta,
@@ -45,6 +46,8 @@ export class CohereModel implements LanguageModel {
     this.cohere = new CohereClientV2({
       token: options.apiKey,
     });
+
+    traceLanguageModel(this);
   }
 
   async generate(input: LanguageModelInput): Promise<ModelResponse> {
