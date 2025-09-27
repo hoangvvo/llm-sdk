@@ -119,7 +119,7 @@ const artifactsAgent = new Agent<void>({
         console.log(
           `[artifacts.create] id=(auto) title=${args.title} kind=${args.kind}`,
         );
-        const artifact = store.create(args as any);
+        const artifact = store.create(args);
         return {
           content: [{ type: "text", text: JSON.stringify({ artifact }) }],
           is_error: false,

@@ -8,6 +8,16 @@ A JavaScript library that enables the development of applications that can inter
 npm install @hoangvvo/llm-sdk
 ```
 
+You also need to install the provider-specific packages:
+
+```bash
+npm install openai
+npm install @anthropic-ai/sdk
+npm install @google/genai
+npm install cohere-ai
+npm install @mistralai/mistralai
+```
+
 ## Usage
 
 All models implement the `LanguageModel` interface:

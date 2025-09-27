@@ -8,6 +8,19 @@ The agent library to build LLM applications that work with any LLM providers.
 npm install @hoangvvo/llm-agent
 ```
 
+To use [zod](https://github.com/colinhacks/zod) or [typebox](https://github.com/sinclairzx81/typebox) for tool definition, install the following packages:
+
+```bash
+npm install zod zod-to-json-schema
+npm install @sinclair/typebox
+```
+
+To use [MCP](https://modelcontextprotocol.io), install the following package:
+
+```bash
+npm install @modelcontextprotocol/sdk
+```
+
 ## Usage
 
 ```typescript

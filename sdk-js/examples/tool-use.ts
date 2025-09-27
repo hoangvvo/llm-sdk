@@ -100,10 +100,16 @@ do {
   for (const toolCallPart of toolCallParts) {
     const { tool_call_id, tool_name, args } = toolCallPart;
 
-    let toolResult: any;
+    let toolResult;
     switch (tool_name) {
       case "trade": {
-        toolResult = trade(args as any);
+        toolResult = trade(
+          args as {
+            action: "buy" | "sell";
+            quantity: number;
+            symbol: string;
+          },
+        );
         break;
       }
       default:

@@ -19,9 +19,12 @@ export default [
   ...tseslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked.map((config) => ({
     ...config,
-    files: ["**/src/**/*.{ts,tsx}"],
+    files: ["agent-js/src/**/*.{ts,tsx}", "sdk-js/src/**/*.{ts,tsx}"],
   })),
-  ...tseslint.configs.stylisticTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked.map((config) => ({
+    ...config,
+    files: ["agent-js/src/**/*.{ts,tsx}", "sdk-js/src/**/*.{ts,tsx}"],
+  })),
   {
     files: ["./app/**/*.{ts,tsx}"],
     ...reactHooks.configs["recommended-latest"],

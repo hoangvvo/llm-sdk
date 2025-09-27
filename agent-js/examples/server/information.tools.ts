@@ -204,14 +204,25 @@ export const getNewsTool = zodTool({
 
       const data = await response.json();
 
-      const articles = data.articles.slice(0, limit).map((article: any) => ({
-        title: article.title,
-        description: article.description,
-        url: article.url,
-        source: article.source?.name,
-        published_at: article.publishedAt,
-        author: article.author,
-      }));
+      const articles = data.articles
+        .slice(0, limit)
+        .map(
+          (article: {
+            title: string;
+            description: string;
+            url: string;
+            source: { name: string } | null;
+            publishedAt: string;
+            author: string;
+          }) => ({
+            title: article.title,
+            description: article.description,
+            url: article.url,
+            source: article.source?.name,
+            published_at: article.publishedAt,
+            author: article.author,
+          }),
+        );
 
       return {
         content: [

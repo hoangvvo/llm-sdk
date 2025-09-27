@@ -61,7 +61,7 @@ export const artifactUpdateTool = zodTool({
     const artifact: Artifact = {
       id,
       title: prev?.title ?? "Untitled",
-      kind: prev?.kind! ?? "markdown",
+      kind: prev?.kind ?? "markdown",
       content,
       version: (prev?.version ?? 0) + 1,
       updated_at: now,

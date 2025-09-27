@@ -100,7 +100,6 @@ export function extractNamed(
 
   const byName = new Map<string, Parser.SyntaxNode[]>();
   for (const h of hits) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     (byName.get(h.name) ?? byName.set(h.name, []).get(h.name)!).push(h.decl);
   }
 

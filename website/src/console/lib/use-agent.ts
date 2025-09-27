@@ -410,7 +410,6 @@ function prepareMcpServerPayload(
   return sanitized.length > 0 ? sanitized : undefined;
 }
 
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 function reduceContentDelta(
   parts: Part[],
   partial: AgentStreamPartialEvent,

@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { StreamProcessorSrc } from "./worklets/stream_processor.ts";
 
 /**

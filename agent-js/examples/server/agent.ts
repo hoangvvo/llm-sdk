@@ -52,12 +52,8 @@ export function createAgent(
     mcpServers?: McpServerConfig[] | undefined;
   },
 ): Agent<MyContext> {
-  const {
-    enabledTools,
-    disabledInstructions,
-    mcpServers,
-    ...agentParams
-  } = options ?? {};
+  const { enabledTools, disabledInstructions, mcpServers, ...agentParams } =
+    options ?? {};
 
   const toolNameSet = enabledTools ? new Set(enabledTools) : null;
   const tools =

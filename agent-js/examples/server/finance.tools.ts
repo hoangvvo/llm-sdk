@@ -103,7 +103,15 @@ export const getCryptoPriceTool = zodTool({
 
       const cryptoData = data[symbol.toLowerCase()];
 
-      const result: any = {
+      const result: {
+        symbol: string;
+        price: number;
+        currency: string;
+        last_updated: string | null;
+        market_cap?: number;
+        "24h_volume"?: number;
+        "24h_change_percent"?: number;
+      } = {
         symbol,
         price: cryptoData[currency.toLowerCase()],
         currency: currency.toUpperCase(),

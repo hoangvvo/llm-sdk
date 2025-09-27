@@ -140,7 +140,7 @@ for (let turn = 1; ; turn += 1) {
   // Capture only assistant-visible text to display back-to-back
   const visibleText = res.content
     .filter((p) => p.type === "text")
-    .map((p) => (p as any).text as string)
+    .map((p) => p.text)
     .join("\n");
   if (visibleText.trim()) messages.push(visibleText.trim());
 
