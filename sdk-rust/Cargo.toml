@@ -30,18 +30,18 @@ utoipa = ["dep:utoipa"]
 
 [dependencies]
 async-stream = "0.3.6"
-base64 = "0.22.1"
-eventsource-stream = "0.2.3"
-futures = "0.3.31"
-opentelemetry = "0.27"
-rand = "0.8.5"
-reqwest = { version = "0.12.12", features = ["json", "gzip", "stream"] }
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.134"
-thiserror = "2.0.11"
+base64 = "0.22"
+eventsource-stream = "0.2"
+futures = "0.3"
+opentelemetry = "0.30"
+rand = "0.9"
+reqwest = { version = "0.12", features = ["json", "gzip", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
 tracing = "0.1"
 tracing-futures = { version = "0.2", features = ["std", "futures-03"] }
-tracing-opentelemetry = "0.28"
+tracing-opentelemetry = "0.31"
 utoipa = { version = "5", optional = true }
 
 [dev-dependencies]
@@ -49,6 +49,5 @@ dotenvy = { version = "0.15.7" }
 paste = "1.0.15"
 regex = "1.11.1"
 rodio = "0.17"
-seq-macro = "0.3"
 tokio = { version = "1.42.0", features = ["full"] }
 viuer = "0.7"
