@@ -1,4 +1,4 @@
-#![allow(clippy::pedantic)]
+#![allow(clippy::pedantic, clippy::style, dead_code)]
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;

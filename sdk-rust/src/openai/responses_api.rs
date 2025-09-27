@@ -1,4 +1,4 @@
-#![allow(clippy::pedantic)]
+#![allow(clippy::pedantic, dead_code)]
 use crate::LanguageModelInputExtra;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

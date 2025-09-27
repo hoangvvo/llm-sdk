@@ -1,14 +1,19 @@
+import { includeIgnoreFile } from "@eslint/compat";
 import pluginJs from "@eslint/js";
 import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import { globalIgnores } from "eslint/config";
 import globals from "globals";
+import { join } from "node:path";
 import tseslint from "typescript-eslint";
+
+const gitignorePath = join(import.meta.dirname, ".gitignore");
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   globalIgnores(["**/node_modules/**", "**/dist/**"]),
+  includeIgnoreFile(gitignorePath, "Imported .gitignore patterns"),
   {
     files: ["**/*.{js,mjs,cjs,ts}"],
     rules: {

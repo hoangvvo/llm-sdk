@@ -12,6 +12,7 @@
     "test": "npm run test --workspaces"
   },
   "devDependencies": {
+    "@eslint/compat": "^1.4.0",
     "@eslint/js": "^9.36.0",
     "@tsconfig/strictest": "^2.0.6",
     "@types/audio-context": "^1.0.3",

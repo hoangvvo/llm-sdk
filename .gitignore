@@ -143,3 +143,5 @@ target/
 .gocache*/
 
 secret.md
+
+.astro
