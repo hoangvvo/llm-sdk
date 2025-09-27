@@ -2,16 +2,15 @@
 description = "The agent library to build LLM applications that work with any LLM providers."
 edition = "2021"
 homepage = "https://llm-sdk.hoangvvo.com/"
-keywords = [
-  "llm",
-  "language model",
-  "agent",
-  "ai",
-  "openai",
-  "anthropic",
-  "cohere",
-  "mistral",
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "README.md",
+  "LICENSE",
+  "examples/**/*",
+  "tests/**/*",
 ]
+keywords = ["llm", "language-model", "agent", "ai", "openai"]
 license = "MIT"
 name = "llm-agent"
 readme = "README.md"
@@ -30,7 +29,7 @@ use_self = "warn"
 async-stream = "0.3.6"
 base64 = "0.22"
 futures = "0.3"
-llm-sdk = { version = "0.1.0", path = "../sdk-rust" }
+llm-sdk-rs = { version = "0.1.0", path = "../sdk-rust" }
 opentelemetry = "0.30"
 rmcp = { version = "0.7", features = [
   "client",
