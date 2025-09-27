@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
-import { Type } from "@sinclair/typebox";
 import test, { type TestContext } from "node:test";
+import { Type } from "typebox";
 import type { AgentTool } from "../tool.ts";
 import { typeboxTool } from "./tool.ts";
 

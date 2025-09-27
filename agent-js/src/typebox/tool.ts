@@ -1,8 +1,8 @@
-import { type Static, type TSchema as TTypeboxSchema } from "@sinclair/typebox";
+import type { JSONSchema } from "@hoangvvo/llm-sdk";
+import { type Static, type TObject } from "typebox";
 import { type AgentToolResult } from "../tool.ts";
 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-export function typeboxTool<TContext, TSchema extends TTypeboxSchema>(params: {
+export function typeboxTool<TContext, TSchema extends TObject>(params: {
   /**
    * Name of the tool.
    */
@@ -26,7 +26,13 @@ export function typeboxTool<TContext, TSchema extends TTypeboxSchema>(params: {
     context: TContext,
   ): AgentToolResult | Promise<AgentToolResult>;
 }) {
-  // Strip away all the TypeBox-specific properties
-  params.parameters = JSON.parse(JSON.stringify(params.parameters)) as TSchema;
-  return params;
+  return params as {
+    name: string;
+    description: string;
+    parameters: JSONSchema;
+    execute(
+      args: Static<TSchema>,
+      context: TContext,
+    ): AgentToolResult | Promise<AgentToolResult>;
+  };
 }

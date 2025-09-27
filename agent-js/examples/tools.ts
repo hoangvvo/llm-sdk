@@ -1,7 +1,7 @@
 import { Agent, getContentText, tool } from "@hoangvvo/llm-agent";
 import { typeboxTool } from "@hoangvvo/llm-agent/typebox";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import z from "zod";
 import { getModel } from "./get-model.ts";
 
@@ -153,7 +153,7 @@ const flagContrabandTool = zodTool({
  * Another standard tool using TypeBox that demonstrates returning a final summary and clearing state.
  * Requires:
  *
- * npm install @sinclair/typebox
+ * npm install typebox
  */
 const issueReceiptTool = typeboxTool({
   name: "issue_receipt",

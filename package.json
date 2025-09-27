@@ -37,7 +37,6 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.205.0",
     "@opentelemetry/sdk-trace-base": "^2.1.0",
     "@opentelemetry/sdk-trace-node": "^2.1.0",
-    "@sinclair/typebox": "^0.34.41",
     "asciify-image": "^0.1.10",
     "audio-context": "^1.0.3",
     "audio-decode": "^2.2.3",
@@ -47,6 +46,7 @@
     "dotenv": "^16.0.0",
     "open": "^10.2.0",
     "openai": "^5.23.1",
+    "typebox": "^1.0.18",
     "zod": "^3.24.2",
     "zod-to-json-schema": "^3.24.6"
   },

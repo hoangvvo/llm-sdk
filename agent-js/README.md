@@ -27,8 +27,8 @@ npm install @modelcontextprotocol/sdk
 import { Agent, tool, type AgentItem } from "@hoangvvo/llm-agent";
 import { typeboxTool } from "@hoangvvo/llm-agent/typebox";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
-import { Type } from "@sinclair/typebox";
 import readline from "node:readline/promises";
+import { Type } from "typebox";
 import { z } from "zod";
 import { getModel } from "./get-model.ts";
 
@@ -91,8 +91,8 @@ const sendMessageTool = zodTool({
   },
 });
 
-// Create an agent tool using @sinclair/typebox with type inference
-// npm install @sinclair/typebox
+// Create an agent tool using typebox with type inference
+// npm install typebox
 const getWeatherTool = typeboxTool({
   name: "get_weather",
   description: "Get weather for a given city",
