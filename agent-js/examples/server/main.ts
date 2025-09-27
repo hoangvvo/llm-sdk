@@ -1,6 +1,6 @@
 import type { Agent } from "@hoangvvo/llm-agent";
 import http from "node:http";
-import { getModel, getModelList } from "../get-model.ts";
+import { getModel } from "../get-model.ts";
 import { availableTools, createAgent } from "./agent.ts";
 import type { MyContext } from "./context.ts";
 import type { RunStreamBody } from "./types.ts";
@@ -11,6 +11,7 @@ async function runStreamHandler(
 ) {
   let json: RunStreamBody;
   let agent: Agent<MyContext>;
+  let agentInput: RunStreamBody["input"] | undefined;
 
   try {
     const body = await readBody(req);
@@ -18,19 +19,19 @@ async function runStreamHandler(
 
     json = JSON.parse(body) as RunStreamBody;
 
-    const modelList = await getModelList();
+    const {
+      provider,
+      model_id,
+      metadata,
+      input,
+      enabled_tools,
+      mcp_servers,
+      ...params
+    } = json;
 
-    const { provider, model_id } = json;
-    const modelInfo = modelList.find(
-      (m) => m.provider === provider && m.model_id === model_id,
-    );
-    if (!modelInfo) {
-      throw new Error(`Model not found: ${provider} - ${model_id}`);
-    }
+    agentInput = input;
 
-    const model = getModel(provider, model_id, modelInfo.metadata, apiKey);
-
-    const { enabled_tools, mcp_servers, ...params } = json;
+    const model = getModel(provider, model_id, metadata, apiKey);
 
     const enabledToolsParam = Array.isArray(enabled_tools)
       ? Array.from(
@@ -42,25 +43,18 @@ async function runStreamHandler(
         )
       : undefined;
 
-    const mcpServersParam = Array.isArray(mcp_servers)
-      ? mcp_servers
-      : undefined;
+    const mcpServersParam = Array.isArray(mcp_servers) ? mcp_servers : [];
 
-    if (mcpServersParam) {
-      mcpServersParam.forEach((param) => {
-        if (
-          param.type === "stdio" &&
-          process.env["ALLOW_STDIO_MCP"] !== "true"
-        ) {
-          throw new Error(
-            "Stdio MCP server is not allowed. Set ALLOW_STDIO_MCP=true to allow it.",
-          );
-        }
-      });
-    }
+    mcpServersParam.forEach((param) => {
+      if (param.type === "stdio" && process.env["ALLOW_STDIO_MCP"] !== "true") {
+        throw new Error(
+          "Stdio MCP server is not allowed. Set ALLOW_STDIO_MCP=true to allow it.",
+        );
+      }
+    });
 
-    agent = createAgent(model, modelInfo, {
-      enabledTools: enabledToolsParam,
+    agent = createAgent(model, {
+      ...(enabledToolsParam ? { enabledTools: enabledToolsParam } : {}),
       mcpServers: mcpServersParam,
       ...params,
     });
@@ -70,9 +64,13 @@ async function runStreamHandler(
     return;
   }
 
-  const { input } = json;
+  if (!agentInput) {
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Missing input payload" }));
+    return;
+  }
 
-  const stream = agent.runStream(input);
+  const stream = agent.runStream(agentInput);
 
   // Return an SSE stream
   res.writeHead(200, {
@@ -93,17 +91,6 @@ async function runStreamHandler(
     res.end();
   } finally {
     res.end();
-  }
-}
-
-async function listModelsHandler(res: http.ServerResponse) {
-  try {
-    const modelList = await getModelList();
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(modelList));
-  } catch (err) {
-    res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: (err as Error).message }));
   }
 }
 
@@ -156,11 +143,6 @@ http
         void runStreamHandler(req, res);
         return;
       }
-    }
-
-    if (req.url === "/models") {
-      void listModelsHandler(res);
-      return;
     }
 
     if (req.url === "/tools") {

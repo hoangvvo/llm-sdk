@@ -76,11 +76,11 @@ export default defineConfig({
           items: [
             {
               label: "Chat",
-              link: "/console/chat",
+              link: "/console/chat/",
             },
             {
               label: "Realtime",
-              link: "/console/realtime",
+              link: "/console/realtime/",
             },
           ],
         },

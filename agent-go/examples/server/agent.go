@@ -53,20 +53,19 @@ var availableTools = []llmagent.AgentTool[*MyContext]{
 }
 
 type AgentOptions struct {
-	EnabledTools         []string
-	MCPServers           []llmmcp.MCPParams
-	DisabledInstructions bool
-	Temperature          *float64
-	TopP                 *float64
-	TopK                 *int
-	FrequencyPenalty     *float64
-	PresencePenalty      *float64
-	Audio                *llmsdk.AudioOptions
-	Reasoning            *llmsdk.ReasoningOptions
-	Modalities           []llmsdk.Modality
+	EnabledTools     []string
+	MCPServers       []llmmcp.MCPParams
+	Temperature      *float64
+	TopP             *float64
+	TopK             *int
+	FrequencyPenalty *float64
+	PresencePenalty  *float64
+	Audio            *llmsdk.AudioOptions
+	Reasoning        *llmsdk.ReasoningOptions
+	Modalities       []llmsdk.Modality
 }
 
-func createAgent(model llmsdk.LanguageModel, modelInfo *ModelInfo, options *AgentOptions) *llmagent.Agent[*MyContext] {
+func createAgent(model llmsdk.LanguageModel, options *AgentOptions) *llmagent.Agent[*MyContext] {
 	var tools []llmagent.AgentTool[*MyContext]
 	if options.EnabledTools != nil {
 		toolNameSet := make(map[string]bool)
@@ -82,19 +81,14 @@ func createAgent(model llmsdk.LanguageModel, modelInfo *ModelInfo, options *Agen
 		tools = availableTools
 	}
 
-	var agentInstructions []llmagent.InstructionParam[*MyContext]
-	if !options.DisabledInstructions {
-		agentInstructions = instructions
-	}
-
 	opts := []llmagent.AgentParamsOption[*MyContext]{
-		llmagent.WithInstructions(agentInstructions...),
+		llmagent.WithInstructions(instructions...),
 		llmagent.WithTools(tools...),
 		llmagent.WithMaxTurns[*MyContext](5),
 	}
 
 	if mcpToolkits := createMcpToolkits(options.MCPServers); len(mcpToolkits) > 0 {
-		opts = append(opts, llmagent.WithToolkits[*MyContext](mcpToolkits...))
+		opts = append(opts, llmagent.WithToolkits(mcpToolkits...))
 	}
 
 	if options.Temperature != nil {
@@ -118,8 +112,8 @@ func createAgent(model llmsdk.LanguageModel, modelInfo *ModelInfo, options *Agen
 	if options.Audio != nil {
 		opts = append(opts, llmagent.WithAudio[*MyContext](*options.Audio))
 	}
-	if modelInfo.Modalities != nil {
-		opts = append(opts, llmagent.WithModalities[*MyContext](modelInfo.Modalities...))
+	if options.Modalities != nil {
+		opts = append(opts, llmagent.WithModalities[*MyContext](options.Modalities...))
 	}
 
 	return llmagent.NewAgent("MyAgent", model, opts...)

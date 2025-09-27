@@ -218,7 +218,7 @@ impl AgentTool<MyContext> for ArtifactDeleteTool {
         "artifact_delete".to_string()
     }
     fn description(&self) -> String {
-        "Delete a document by id (client will persist)".to_string()
+        "Delete a document by id".to_string()
     }
     fn parameters(&self) -> JSONSchema {
         serde_json::json!({

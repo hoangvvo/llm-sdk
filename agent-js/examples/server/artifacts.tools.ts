@@ -125,7 +125,7 @@ export const artifactListTool = zodTool({
 
 export const artifactDeleteTool = zodTool({
   name: "artifact_delete",
-  description: "Delete a document by id (client will persist)",
+  description: "Delete a document by id",
   parameters: z.object({ id: z.string() }),
   async execute({ id }) {
     return {

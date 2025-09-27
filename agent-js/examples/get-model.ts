@@ -1,16 +1,9 @@
-import type {
-  AudioOptions,
-  LanguageModel,
-  LanguageModelMetadata,
-  Modality,
-  ReasoningOptions,
-} from "@hoangvvo/llm-sdk";
+import type { LanguageModel, LanguageModelMetadata } from "@hoangvvo/llm-sdk";
 import { AnthropicModel } from "@hoangvvo/llm-sdk/anthropic";
 import { CohereModel } from "@hoangvvo/llm-sdk/cohere";
 import { GoogleModel } from "@hoangvvo/llm-sdk/google";
 import { MistralModel } from "@hoangvvo/llm-sdk/mistral";
 import { OpenAIChatModel, OpenAIModel } from "@hoangvvo/llm-sdk/openai";
-import modelList from "../../website/models.json" with { type: "json" };
 
 function assert(condition: unknown, msg: string): asserts condition {
   if (!condition) {
@@ -105,18 +98,4 @@ export function getModel(
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
-}
-
-export async function getModelList() {
-  return modelList as ModelInfo[];
-}
-
-export interface ModelInfo {
-  provider: string;
-  model_id: string;
-  metadata: LanguageModelMetadata;
-  // some params options
-  audio?: AudioOptions;
-  reasoning?: ReasoningOptions;
-  modalities?: Modality[];
 }

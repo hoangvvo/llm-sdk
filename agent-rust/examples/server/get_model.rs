@@ -3,25 +3,13 @@ use llm_agent::BoxedError;
 use llm_sdk::{
     google::{GoogleModel, GoogleModelOptions},
     openai::{OpenAIChatModel, OpenAIChatModelOptions, OpenAIModel, OpenAIModelOptions},
-    AudioOptions, LanguageModel, LanguageModelMetadata, Modality, ReasoningOptions,
+    LanguageModel, LanguageModelMetadata,
 };
-use serde::{Deserialize, Serialize};
 use std::{
     env,
     io::{Error as IoError, ErrorKind},
-    path::PathBuf,
     sync::Arc,
 };
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ModelInfo {
-    pub provider: String,
-    pub model_id: String,
-    pub metadata: LanguageModelMetadata,
-    pub audio: Option<AudioOptions>,
-    pub reasoning: Option<ReasoningOptions>,
-    pub modalities: Option<Vec<Modality>>,
-}
 
 pub fn get_model(
     provider: &str,
@@ -83,15 +71,6 @@ pub fn get_model(
             format!("Unsupported provider: {provider}"),
         ))),
     }
-}
-
-pub fn get_model_list() -> Result<Vec<ModelInfo>, BoxedError> {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("../website/models.json");
-    let data = std::fs::read_to_string(path).map_err(|err| Box::new(err) as BoxedError)?;
-    let models: Vec<ModelInfo> =
-        serde_json::from_str(&data).map_err(|err| Box::new(err) as BoxedError)?;
-    Ok(models)
 }
 
 fn missing_env(var: &str) -> BoxedError {

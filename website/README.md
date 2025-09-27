@@ -42,4 +42,4 @@ Visit http://localhost:4321/console/realtime in your web browser to access the r
 
 ## Model list
 
-A list of models selectable in the console is provided in [models.json](./models.json). You can modify this file to add or remove models as needed.
+A list of models selectable in the console is provided in [models.json](../example-server/models.json). You can modify this file to add or remove models as needed.

@@ -12,20 +12,24 @@ import (
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
 	llmmcp "github.com/hoangvvo/llm-sdk/agent-go/mcp"
+	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 )
 
 type RunStreamBody struct {
-	Provider             string                            `json:"provider"`
-	ModelID              string                            `json:"model_id"`
-	Input                llmagent.AgentRequest[*MyContext] `json:"input"`
-	EnabledTools         []string                          `json:"enabled_tools,omitempty"`
-	MCPServers           []llmmcp.MCPParams                `json:"mcp_servers,omitempty"`
-	DisabledInstructions bool                              `json:"disabled_instructions,omitempty"`
-	Temperature          *float64                          `json:"temperature,omitempty"`
-	TopP                 *float64                          `json:"top_p,omitempty"`
-	TopK                 *int                              `json:"top_k,omitempty"`
-	FrequencyPenalty     *float64                          `json:"frequency_penalty,omitempty"`
-	PresencePenalty      *float64                          `json:"presence_penalty,omitempty"`
+	Provider         string                            `json:"provider"`
+	ModelID          string                            `json:"model_id"`
+	Metadata         llmsdk.LanguageModelMetadata      `json:"metadata"`
+	Input            llmagent.AgentRequest[*MyContext] `json:"input"`
+	EnabledTools     []string                          `json:"enabled_tools,omitempty"`
+	MCPServers       []llmmcp.MCPParams                `json:"mcp_servers,omitempty"`
+	Temperature      *float64                          `json:"temperature,omitempty"`
+	TopP             *float64                          `json:"top_p,omitempty"`
+	TopK             *int                              `json:"top_k,omitempty"`
+	FrequencyPenalty *float64                          `json:"frequency_penalty,omitempty"`
+	PresencePenalty  *float64                          `json:"presence_penalty,omitempty"`
+	Audio            *llmsdk.AudioOptions              `json:"audio,omitempty"`
+	Reasoning        *llmsdk.ReasoningOptions          `json:"reasoning,omitempty"`
+	Modalities       []llmsdk.Modality                 `json:"modalities,omitempty"`
 }
 
 func runStreamHandler(w http.ResponseWriter, r *http.Request) {
@@ -43,27 +47,7 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	apiKey := r.Header.Get("Authorization")
-
-	modelList, err := getModelList()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var modelInfo *ModelInfo
-	for _, m := range modelList {
-		if m.Provider == req.Provider && m.ModelID == req.ModelID {
-			modelInfo = &m
-			break
-		}
-	}
-
-	if modelInfo == nil {
-		http.Error(w, fmt.Sprintf("Model not found: %s - %s", req.Provider, req.ModelID), http.StatusBadRequest)
-		return
-	}
-
-	model := getModel(req.Provider, req.ModelID, modelInfo.Metadata, apiKey)
+	model := getModel(req.Provider, req.ModelID, req.Metadata, apiKey)
 
 	var enabledTools []string
 	if req.EnabledTools != nil {
@@ -78,20 +62,19 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	options := &AgentOptions{
-		EnabledTools:         enabledTools,
-		MCPServers:           req.MCPServers,
-		DisabledInstructions: req.DisabledInstructions,
-		Temperature:          req.Temperature,
-		TopP:                 req.TopP,
-		TopK:                 req.TopK,
-		FrequencyPenalty:     req.FrequencyPenalty,
-		PresencePenalty:      req.PresencePenalty,
-		Audio:                modelInfo.Audio,
-		Reasoning:            modelInfo.Reasoning,
-		Modalities:           modelInfo.Modalities,
+		EnabledTools:     enabledTools,
+		MCPServers:       req.MCPServers,
+		Temperature:      req.Temperature,
+		TopP:             req.TopP,
+		TopK:             req.TopK,
+		FrequencyPenalty: req.FrequencyPenalty,
+		PresencePenalty:  req.PresencePenalty,
+		Audio:            req.Audio,
+		Reasoning:        req.Reasoning,
+		Modalities:       req.Modalities,
 	}
 
-	agent := createAgent(model, modelInfo, options)
+	agent := createAgent(model, options)
 
 	stream, err := agent.RunStream(context.Background(), req.Input)
 	if err != nil {
@@ -127,20 +110,6 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 		errorData, _ := json.Marshal(map[string]string{"event": "error", "error": err.Error()})
 		fmt.Fprintf(w, "data: %s\n\n", errorData)
 		flusher.Flush()
-	}
-}
-
-func listModelsHandler(w http.ResponseWriter) {
-	modelList, err := getModelList()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(modelList); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 }
 
@@ -180,11 +149,6 @@ func main() {
 	mux.HandleFunc("POST /run-stream", func(w http.ResponseWriter, r *http.Request) {
 		setCORSHeaders(w)
 		runStreamHandler(w, r)
-	})
-
-	mux.HandleFunc("GET /models", func(w http.ResponseWriter, r *http.Request) {
-		setCORSHeaders(w)
-		listModelsHandler(w)
 	})
 
 	mux.HandleFunc("GET /tools", func(w http.ResponseWriter, r *http.Request) {

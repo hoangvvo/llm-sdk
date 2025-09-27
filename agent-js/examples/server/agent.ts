@@ -5,14 +5,18 @@ import {
   type Toolkit,
 } from "@hoangvvo/llm-agent";
 import { mcpToolkit } from "@hoangvvo/llm-agent/mcp";
-import type { LanguageModel } from "@hoangvvo/llm-sdk";
-import type { ModelInfo } from "../get-model.ts";
+import type {
+  AudioOptions,
+  LanguageModel,
+  Modality,
+  ReasoningOptions,
+} from "@hoangvvo/llm-sdk";
 import { getArtifactTools } from "./artifacts.tools.ts";
 import type { MyContext } from "./context.ts";
 import { getCryptoPriceTool, getStockPriceTool } from "./finance.tools.ts";
 import { getNewsTool, searchWikipediaTool } from "./information.tools.ts";
-import { getCoordinatesTool, getWeatherTool } from "./weather.tools.ts";
 import type { McpServerConfig } from "./types.ts";
+import { getCoordinatesTool, getWeatherTool } from "./weather.tools.ts";
 
 const instructions: InstructionParam<MyContext>[] = [
   `Answer in markdown format.
@@ -36,44 +40,41 @@ export const availableTools: AgentTool<MyContext>[] = [
   getWeatherTool,
 ];
 
+export interface AgentOptions {
+  enabledTools?: string[];
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  mcpServers?: McpServerConfig[];
+  audio?: AudioOptions;
+  reasoning?: ReasoningOptions;
+  modalities?: Modality[];
+}
+
 // Create a new instance of Agent for the request
 // In your application, you may want to reuse the same instance of Agent throughout the lifetime of your app
 export function createAgent(
   model: LanguageModel,
-  modelInfo: ModelInfo,
-  options?: {
-    enabledTools?: string[] | undefined;
-    disabledInstructions?: boolean | undefined;
-    temperature?: number;
-    top_p?: number;
-    top_k?: number;
-    frequency_penalty?: number;
-    presence_penalty?: number;
-    mcpServers?: McpServerConfig[] | undefined;
-  },
+  options?: AgentOptions,
 ): Agent<MyContext> {
-  const { enabledTools, disabledInstructions, mcpServers, ...agentParams } =
-    options ?? {};
+  const { enabledTools, mcpServers, ...agentParams } = options ?? {};
 
   const toolNameSet = enabledTools ? new Set(enabledTools) : null;
   const tools =
     toolNameSet === null
       ? availableTools
       : availableTools.filter((tool) => toolNameSet.has(tool.name));
-  const agentInstructions = disabledInstructions ? [] : instructions;
-
   const mcpToolkits = createMcpToolkits(mcpServers);
 
   return new Agent<MyContext>({
     name: "MyAgent",
-    instructions: agentInstructions,
+    instructions,
     model,
     tools,
     toolkits: mcpToolkits,
     max_turns: 5,
-    ...(modelInfo.audio && { audio: modelInfo.audio }),
-    ...(modelInfo.reasoning && { reasoning: modelInfo.reasoning }),
-    ...(modelInfo.modalities && { modalities: modelInfo.modalities }),
     ...agentParams,
   });
 }

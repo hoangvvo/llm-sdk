@@ -10,8 +10,9 @@ use axum::{
 use context::MyContext;
 use dotenvy::dotenv;
 use futures::{stream::Stream, StreamExt};
-use get_model::{get_model, get_model_list, ModelInfo};
+use get_model::get_model;
 use llm_agent::{mcp::MCPParams, AgentRequest, BoxedError};
+use llm_sdk::{AudioOptions, LanguageModelMetadata, Modality, ReasoningOptions};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Duration};
 use tower_http::cors::CorsLayer;
@@ -28,15 +29,18 @@ mod weather_tools;
 struct RunStreamBody {
     provider: String,
     model_id: String,
+    metadata: LanguageModelMetadata,
     input: AgentRequest<MyContext>,
     enabled_tools: Option<Vec<String>>,
     mcp_servers: Option<Vec<MCPParams>>,
-    disabled_instructions: Option<bool>,
     temperature: Option<f64>,
     top_p: Option<f64>,
     top_k: Option<i32>,
     frequency_penalty: Option<f64>,
     presence_penalty: Option<f64>,
+    audio: Option<AudioOptions>,
+    reasoning: Option<ReasoningOptions>,
+    modalities: Option<Vec<Modality>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -47,12 +51,10 @@ struct ToolInfo {
 
 #[derive(Clone)]
 struct AppState {
-    model_list: Vec<ModelInfo>,
     available_tools: Vec<ToolInfo>,
 }
 
 async fn run_stream_handler(
-    State(state): State<AppState>,
     headers: HeaderMap,
     Json(body): Json<RunStreamBody>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, axum::Error>>>, (StatusCode, String)> {
@@ -61,40 +63,28 @@ async fn run_stream_handler(
         .and_then(|h| h.to_str().ok())
         .map(std::string::ToString::to_string);
 
-    let model_info = state
-        .model_list
-        .iter()
-        .find(|m| m.provider == body.provider && m.model_id == body.model_id)
-        .ok_or_else(|| {
-            (
-                StatusCode::BAD_REQUEST,
-                format!("Model not found: {} - {}", body.provider, body.model_id),
-            )
-        })?;
-
-    let model = get_model(
-        &body.provider,
-        &body.model_id,
-        model_info.metadata.clone(),
-        api_key,
-    )
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
     let RunStreamBody {
+        provider,
+        model_id,
+        metadata,
         input,
         enabled_tools,
         mcp_servers,
-        disabled_instructions,
         temperature,
         top_p,
         top_k,
         frequency_penalty,
         presence_penalty,
-        ..
+        audio,
+        reasoning,
+        modalities,
     } = body;
 
-    if let Some(mcp_servers) = &mcp_servers {
-        for mcp_server in mcp_servers {
+    let model = get_model(&provider, &model_id, metadata, api_key)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if let Some(ref mcp_servers_list) = mcp_servers {
+        for mcp_server in mcp_servers_list {
             if matches!(mcp_server, MCPParams::Stdio(_)) {
                 if env::var("ALLOW_STDIO_MCP").unwrap_or_default() != "true" {
                     return Err((
@@ -110,18 +100,17 @@ async fn run_stream_handler(
     let options = AgentOptions {
         enabled_tools,
         mcp_servers,
-        disabled_instructions: disabled_instructions.unwrap_or(false),
         temperature,
         top_p,
         top_k,
         frequency_penalty,
         presence_penalty,
-        audio: model_info.audio.clone(),
-        reasoning: model_info.reasoning.clone(),
-        modalities: model_info.modalities.clone(),
+        audio,
+        reasoning,
+        modalities,
     };
 
-    let agent = create_agent(model, model_info, &options);
+    let agent = create_agent(model, &options);
 
     // Create a stream that handles the agent run
     let stream = stream! {
@@ -172,10 +161,6 @@ async fn run_stream_handler(
     ))
 }
 
-async fn list_models_handler(State(state): State<AppState>) -> Json<Vec<ModelInfo>> {
-    Json(state.model_list.clone())
-}
-
 async fn list_tools_handler(State(state): State<AppState>) -> Json<Vec<ToolInfo>> {
     Json(state.available_tools.clone())
 }
@@ -189,12 +174,6 @@ async fn main() -> Result<(), BoxedError> {
     // Load environment variables
     dotenv().ok();
 
-    // Initialize state
-    let model_list = get_model_list().unwrap_or_else(|e| {
-        eprintln!("Warning: Could not load models list: {e}");
-        vec![]
-    });
-
     let available_tools = agent::get_available_tools()
         .iter()
         .map(|tool| ToolInfo {
@@ -203,16 +182,12 @@ async fn main() -> Result<(), BoxedError> {
         })
         .collect();
 
-    let state = AppState {
-        model_list,
-        available_tools,
-    };
+    let state = AppState { available_tools };
 
     // Create router
     let app = Router::new()
         .route("/", get(home_handler))
         .route("/run-stream", post(run_stream_handler))
-        .route("/models", get(list_models_handler))
         .route("/tools", get(list_tools_handler))
         .layer(
             CorsLayer::new()

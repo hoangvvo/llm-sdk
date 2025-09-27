@@ -5,7 +5,6 @@ use crate::{
     },
     context::MyContext,
     finance_tools::{GetCryptoPriceTool, GetStockPriceTool},
-    get_model::ModelInfo,
     information_tools::{GetNewsTool, SearchWikipediaTool},
     weather_tools::{GetCoordinatesTool, GetWeatherTool},
 };
@@ -21,7 +20,6 @@ use std::sync::Arc;
 pub struct AgentOptions {
     pub enabled_tools: Option<Vec<String>>,
     pub mcp_servers: Option<Vec<MCPParams>>,
-    pub disabled_instructions: bool,
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
     pub top_k: Option<i32>,
@@ -50,40 +48,37 @@ pub fn get_available_tools() -> Vec<Box<dyn AgentTool<MyContext> + Send + Sync>>
 
 pub fn create_agent(
     model: Arc<dyn LanguageModel + Send + Sync>,
-    _model_info: &ModelInfo,
     options: &AgentOptions,
 ) -> Agent<MyContext> {
     let mut builder = llm_agent::AgentParams::new("MyAgent", model);
 
-    if !options.disabled_instructions {
-        builder = builder
-            .add_instruction(
-                "Answer in markdown format.\\nTo access certain tools, the user may have to \
-                 provide corresponding API keys in the context fields on the UI.",
-            )
-            .add_instruction(|context: &MyContext| {
-                let name = context.name.as_deref().unwrap_or("<not provided>");
-                let location = context.location.as_deref().unwrap_or("<not provided>");
-                let language = context.language.as_deref().unwrap_or("<not provided>");
-                Ok(format!(
-                    "The user name is {name}.\\nThe user location is {location}.\\nThe user \
-                     speaks {language} language."
-                ))
-            })
-            .add_instruction(|_context: &MyContext| {
-                Ok(format!(
-                    "The current date is {}.",
-                    Utc::now().format("%a %b %d %Y")
-                ))
-            })
-            .add_instruction(
-                "For substantive deliverables (documents/specs/code), use the artifact tools \
-                 (artifact_create, artifact_update, artifact_get, artifact_list, \
-                 artifact_delete).\\nKeep chat replies brief and put the full document content \
-                 into artifacts via these tools, rather than pasting large content into chat. \
-                 Reference documents by their id.",
-            );
-    }
+    builder = builder
+        .add_instruction(
+            "Answer in markdown format.\\nTo access certain tools, the user may have to provide \
+             corresponding API keys in the context fields on the UI.",
+        )
+        .add_instruction(|context: &MyContext| {
+            let name = context.name.as_deref().unwrap_or("<not provided>");
+            let location = context.location.as_deref().unwrap_or("<not provided>");
+            let language = context.language.as_deref().unwrap_or("<not provided>");
+            Ok(format!(
+                "The user name is {name}.\\nThe user location is {location}.\\nThe user speaks \
+                 {language} language."
+            ))
+        })
+        .add_instruction(|_context: &MyContext| {
+            Ok(format!(
+                "The current date is {}.",
+                Utc::now().format("%a %b %d %Y")
+            ))
+        })
+        .add_instruction(
+            "For substantive deliverables (documents/specs/code), use the artifact tools \
+             (artifact_create, artifact_update, artifact_get, artifact_list, \
+             artifact_delete).\\nKeep chat replies brief and put the full document content into \
+             artifacts via these tools, rather than pasting large content into chat. Reference \
+             documents by their id.",
+        );
 
     // Add tools based on enabled_tools filter
     let enabled_tools = options.enabled_tools.as_ref();

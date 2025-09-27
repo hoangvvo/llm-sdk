@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "models": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ModelInfo"
+      }
+    }
+  },
+  "required": ["models"],
+  "definitions": {
+    "ModelInfo": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "model_id": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "pricing": {
+              "$ref": "../schema/sdk.json#/definitions/LanguageModelPricing"
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "$ref": "../schema/sdk.json#/definitions/LanguageModelCapability"
+              }
+            }
+          }
+        },
+        "default_audio": {
+          "$ref": "../schema/sdk.json#/definitions/AudioOptions",
+          "description": "Default audio model options"
+        },
+        "default_reasoning": {
+          "$ref": "../schema/sdk.json#/definitions/ReasoningOptions",
+          "description": "Default reasoning options"
+        },
+        "default_modalities": {
+          "type": "array",
+          "items": {
+            "$ref": "../schema/sdk.json#/definitions/Modality"
+          },
+          "description": "Default modalities"
+        }
+      },
+      "required": ["provider", "model_id", "metadata"]
+    }
+  }
+}

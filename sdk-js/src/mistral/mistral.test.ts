@@ -10,12 +10,12 @@ suite("MistralModel", () => {
   assert(process.env["MISTRAL_API_KEY"], "MISTRAL_API_KEY must be set");
   const model = new MistralModel({
     apiKey: process.env["MISTRAL_API_KEY"],
-    modelId: "mistral-small-2409",
+    modelId: "mistral-small-2506",
   });
 
   const reasoningModel = new MistralModel({
     apiKey: process.env["MISTRAL_API_KEY"],
-    modelId: "mistral-small-2409",
+    modelId: "magistral-small-2509",
   });
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {

@@ -18,7 +18,11 @@ services:
 
   rust-server:
     build:
-      context: ../agent-rust
+      additional_contexts:
+        sdk-rust: ../sdk-rust
+        agent-rust: ../agent-rust
+        sdk-go: ../sdk-go
+        agent-go: ../agent-go
       dockerfile: ./Dockerfile
     restart: unless-stopped
     networks:
@@ -31,7 +35,11 @@ services:
 
   go-server:
     build:
-      context: ../agent-go
+      additional_contexts:
+        sdk-rust: ../sdk-rust
+        agent-rust: ../agent-rust
+        sdk-go: ../sdk-go
+        agent-go: ../agent-go
       dockerfile: ./Dockerfile
     restart: unless-stopped
     networks:
