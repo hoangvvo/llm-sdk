@@ -196,10 +196,7 @@ fn create_text_part(data: AccumulatedTextData, index: usize) -> LanguageModelRes
             if !r#type.is_empty() && r#type != "citation" {
                 return Err(LanguageModelError::Invariant(
                     "",
-                    format!(
-                        "Invalid citation type \"{}\" for text part at index {}",
-                        r#type, index
-                    ),
+                    format!("Invalid citation type \"{type}\" for text part at index {index}"),
                 ));
             }
 
@@ -213,9 +210,8 @@ fn create_text_part(data: AccumulatedTextData, index: usize) -> LanguageModelRes
                 return Err(LanguageModelError::Invariant(
                     "",
                     format!(
-                        "Incomplete citation data for text part at index {}: source={:?}, \
-                         start_index={:?}, end_index={:?}",
-                        index, source_dbg, start_dbg, end_dbg
+                        "Incomplete citation data for text part at index {index}: \
+                         source={source_dbg:?}, start_index={start_dbg:?}, end_index={end_dbg:?}"
                     ),
                 ));
             };

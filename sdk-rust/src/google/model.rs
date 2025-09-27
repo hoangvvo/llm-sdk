@@ -445,8 +445,8 @@ fn convert_to_google_parts(part: Part) -> Vec<GooglePart> {
         }],
         Part::ToolResult(tool_result_part) => vec![GooglePart {
             function_response: Some(FunctionResponse {
-                id: Some(tool_result_part.tool_call_id.clone()),
-                name: Some(tool_result_part.tool_name.clone()),
+                id: Some(tool_result_part.tool_call_id),
+                name: Some(tool_result_part.tool_name),
                 response: Some(convert_to_google_function_response(
                     tool_result_part.content,
                     tool_result_part.is_error.unwrap_or(false),
@@ -577,13 +577,13 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                     )))
                 }
             } else if let Some(function_call) = part.function_call {
-                if let Some(name) = &function_call.name {
+                if let Some(name) = function_call.name {
                     Some(Ok(Part::ToolCall(crate::ToolCallPart {
                         tool_call_id: function_call
                             .id
                             // Google does not always return id, generate one if missing
                             .unwrap_or_else(|| id_utils::generate_string(10)),
-                        tool_name: name.clone(),
+                        tool_name: name,
                         args: json!(function_call.args.unwrap_or_default()),
                         id: None,
                     })))
@@ -612,7 +612,6 @@ fn map_google_content_to_delta(
         let all_content_deltas = existing_deltas
             .iter()
             .chain(deltas.iter())
-            .cloned()
             .collect::<Vec<_>>();
         let part_delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
         let guessed_index = stream_utils::guess_delta_index(&part_delta, &all_content_deltas, None);

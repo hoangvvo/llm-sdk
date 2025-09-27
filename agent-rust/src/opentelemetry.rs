@@ -15,7 +15,7 @@ pub enum AgentSpanMethod {
 }
 
 impl AgentSpanMethod {
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             Self::Run => "run",
             Self::RunStream => "run_stream",

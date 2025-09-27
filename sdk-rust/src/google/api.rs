@@ -1,3 +1,4 @@
+#![allow(clippy::pedantic, clippy::style)]
 use crate::LanguageModelInputExtra;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -533,7 +534,7 @@ pub struct GoogleTypeDate {
 pub enum FinishReason {
     /// The finish reason is unspecified.
     #[serde(rename = "FINISH_REASON_UNSPECIFIED")]
-    FinishReasonUnspecified,
+    Unspecified,
     /// Token generation reached a natural stopping point or a configured stop
     /// sequence.
     #[serde(rename = "STOP")]

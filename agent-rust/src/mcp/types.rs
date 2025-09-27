@@ -6,6 +6,7 @@ use std::sync::Arc;
 /// Either a fixed MCP configuration or a resolver that derives parameters from
 /// the agent context.
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub enum MCPInit<TCtx>
 where
     TCtx: Send + Sync + 'static,

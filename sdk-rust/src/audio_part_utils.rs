@@ -14,6 +14,9 @@ pub fn map_audio_format_to_mime_type(format: &AudioFormat) -> String {
     .to_string()
 }
 
+/// Maps a MIME type string to an `AudioFormat` enum variant.
+/// # Errors
+/// Returns a `LanguageModelError::Invariant` if the MIME type is unsupported.
 pub fn map_mime_type_to_audio_format(mime_type: &str) -> LanguageModelResult<AudioFormat> {
     let formatted_mime_type = mime_type
         .split(';')

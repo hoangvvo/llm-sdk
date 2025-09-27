@@ -3,11 +3,10 @@ use crate::{
         self, Base64ImageSource, ContentBlock, ContentBlockDelta, ContentBlockDeltaEvent,
         ContentBlockStartEvent, CreateMessageParams, ImageSource, InputContentBlock, InputMessage,
         InputMessageContent, Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage,
-        MessageStartEvent, MessageStreamEvent, Metadata as AnthropicMetadata,
-        RequestCitationsConfig, RequestImageBlock, RequestSearchResultBlock, RequestTextBlock,
-        RequestThinkingBlock, RequestToolResultBlock, RequestToolUseBlock, SystemPrompt,
-        ThinkingConfigDisabled, ThinkingConfigEnabled, ThinkingConfigParam, ToolResultContent,
-        ToolResultContentBlock, Usage,
+        MessageStartEvent, MessageStreamEvent, RequestCitationsConfig, RequestImageBlock,
+        RequestSearchResultBlock, RequestTextBlock, RequestThinkingBlock, RequestToolResultBlock,
+        RequestToolUseBlock, SystemPrompt, ThinkingConfigDisabled, ThinkingConfigEnabled,
+        ThinkingConfigParam, Tool, ToolResultContent, ToolResultContentBlock, Usage,
     },
     client_utils, stream_utils, Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
@@ -62,7 +61,7 @@ impl AnthropicModel {
             .take()
             .unwrap_or_else(|| DEFAULT_API_VERSION.to_string());
 
-        let client = options.client.take().unwrap_or_else(Client::new);
+        let client = options.client.take().unwrap_or_default();
 
         let headers = options.headers.unwrap_or_default();
 
@@ -156,8 +155,8 @@ impl LanguageModel for AnthropicModel {
                     )
                     .await?;
 
-                    let content = map_anthropic_message(response.content)?;
-                    let usage = Some(map_anthropic_usage(response.usage));
+                    let content = map_anthropic_message(response.content);
+                    let usage = Some(map_anthropic_usage(&response.usage));
 
                     let cost =
                         if let (Some(usage), Some(metadata)) = (usage.as_ref(), self.metadata()) {
@@ -208,7 +207,7 @@ impl LanguageModel for AnthropicModel {
                         while let Some(event) = chunk_stream.next().await {
                             match event? {
                                 MessageStreamEvent::MessageStart(MessageStartEvent { message }) => {
-                                    let usage = map_anthropic_usage(message.usage);
+                                    let usage = map_anthropic_usage(&message.usage);
                                     let cost = metadata
                                         .as_ref()
                                         .and_then(|meta| meta.pricing.as_ref())
@@ -221,7 +220,7 @@ impl LanguageModel for AnthropicModel {
                                     };
                                 }
                                 MessageStreamEvent::MessageDelta(MessageDeltaEvent { usage, .. }) => {
-                                    let usage = map_anthropic_message_delta_usage(usage);
+                                    let usage = map_anthropic_message_delta_usage(&usage);
                                     let cost = metadata
                                         .as_ref()
                                         .and_then(|meta| meta.pricing.as_ref())
@@ -243,7 +242,7 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::ContentBlockDelta(ContentBlockDeltaEvent { delta, index }) => {
-                                    if let Some(delta) = map_anthropic_content_block_delta_event(delta, index)? {
+                                    if let Some(delta) = map_anthropic_content_block_delta_event(delta, index) {
                                         yield PartialModelResponse {
                                             delta: Some(delta),
                                             ..Default::default()
@@ -282,7 +281,7 @@ fn convert_to_anthropic_create_params(
         frequency_penalty: _,
         seed: _,
         modalities: _,
-        metadata,
+        metadata: _,
         audio: _,
         reasoning,
         extra,
@@ -295,11 +294,7 @@ fn convert_to_anthropic_create_params(
     let params = CreateMessageParams {
         max_tokens,
         messages: message_params,
-        metadata: metadata.as_ref().and_then(|meta| {
-            meta.get("user_id").map(|user_id| AnthropicMetadata {
-                user_id: Some(user_id.clone()),
-            })
-        }),
+        metadata: None,
         model: api::Model::String(model_id.to_string()),
         service_tier: None,
         stop_sequences: None,
@@ -307,12 +302,15 @@ fn convert_to_anthropic_create_params(
         system: system_prompt.map(SystemPrompt::String),
         temperature,
         thinking: reasoning
-            .map(|options| convert_to_anthropic_thinking_config(options, max_tokens))
-            .transpose()?,
-        tool_choice: tool_choice
-            .map(convert_to_anthropic_tool_choice)
-            .transpose()?,
-        tools: None,
+            .map(|options| convert_to_anthropic_thinking_config(&options, max_tokens)),
+        tool_choice: tool_choice.map(convert_to_anthropic_tool_choice),
+        tools: tools.map(|tool_list| {
+            tool_list
+                .into_iter()
+                .map(convert_tool)
+                .map(api::ToolUnion::Tool)
+                .collect()
+        }),
         top_k: top_k
             .map(|value| {
                 u32::try_from(value).map_err(|_| {
@@ -333,23 +331,15 @@ fn convert_to_anthropic_create_params(
     })?;
 
     if let Value::Object(ref mut map) = value {
-        if let Some(stream_value) = params.stream {
-            map.insert("stream".to_string(), Value::Bool(stream_value));
-        }
-
-        if let Some(tools) = tools {
-            map.insert("tools".to_string(), convert_tools_to_json(tools)?);
-        }
-
         if let Some(extra) = extra {
-            let extra_object = extra.as_object().ok_or_else(|| {
-                LanguageModelError::InvalidInput(
+            let Value::Object(extra_object) = extra else {
+                return Err(LanguageModelError::InvalidInput(
                     "Anthropic extra field must be a JSON object".to_string(),
-                )
-            })?;
+                ));
+            };
 
             for (key, val) in extra_object {
-                map.insert(key.clone(), val.clone());
+                map.insert(key, val);
             }
         }
     } else {
@@ -362,29 +352,14 @@ fn convert_to_anthropic_create_params(
     Ok(value)
 }
 
-fn convert_tools_to_json(tools: Vec<SdkTool>) -> LanguageModelResult<Value> {
-    let mut result = Vec::with_capacity(tools.len());
-
-    for tool in tools {
-        if !tool.parameters.is_object() {
-            return Err(LanguageModelError::InvalidInput(
-                "Anthropic tool parameters must be a JSON object".to_string(),
-            ));
-        }
-
-        let mut map = Map::new();
-        map.insert("name".to_string(), Value::String(tool.name));
-
-        if !tool.description.is_empty() {
-            map.insert("description".to_string(), Value::String(tool.description));
-        }
-
-        map.insert("input_schema".to_string(), tool.parameters);
-
-        result.push(Value::Object(map));
+fn convert_tool(tool: SdkTool) -> Tool {
+    Tool {
+        name: tool.name,
+        description: Some(tool.description),
+        input_schema: tool.parameters,
+        cache_control: None,
+        type_field: None,
     }
-
-    Ok(Value::Array(result))
 }
 
 fn convert_to_anthropic_messages(messages: Vec<Message>) -> LanguageModelResult<Vec<InputMessage>> {
@@ -440,7 +415,7 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
         Part::ToolResult(tool_result) => Ok(InputContentBlock::ToolResult(
             convert_tool_result_part(tool_result)?,
         )),
-        Part::Reasoning(reasoning_part) => convert_reasoning_part(reasoning_part),
+        Part::Reasoning(reasoning_part) => Ok(convert_reasoning_part(reasoning_part)),
         Part::Audio(_) => Err(LanguageModelError::Unsupported(
             PROVIDER,
             "Anthropic does not support audio parts".to_string(),
@@ -448,19 +423,17 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
     }
 }
 
-fn convert_reasoning_part(reasoning_part: ReasoningPart) -> LanguageModelResult<InputContentBlock> {
+fn convert_reasoning_part(reasoning_part: ReasoningPart) -> InputContentBlock {
     if reasoning_part.text.is_empty() && reasoning_part.signature.is_some() {
-        return Ok(InputContentBlock::RedactedThinking(
-            api::RequestRedactedThinkingBlock {
-                data: reasoning_part.signature.unwrap_or_default(),
-            },
-        ));
+        return InputContentBlock::RedactedThinking(api::RequestRedactedThinkingBlock {
+            data: reasoning_part.signature.unwrap_or_default(),
+        });
     }
 
-    Ok(InputContentBlock::Thinking(RequestThinkingBlock {
+    InputContentBlock::Thinking(RequestThinkingBlock {
         thinking: reasoning_part.text,
         signature: reasoning_part.signature.unwrap_or_default(),
-    }))
+    })
 }
 
 fn convert_tool_result_part(
@@ -562,81 +535,74 @@ fn normalize_tool_args(args: Value) -> LanguageModelResult<Value> {
     }
 }
 
-fn convert_to_anthropic_tool_choice(
-    choice: ToolChoiceOption,
-) -> LanguageModelResult<api::ToolChoice> {
+fn convert_to_anthropic_tool_choice(choice: ToolChoiceOption) -> api::ToolChoice {
     match choice {
-        ToolChoiceOption::Auto => Ok(api::ToolChoice::Auto(api::ToolChoiceAuto {
+        ToolChoiceOption::Auto => api::ToolChoice::Auto(api::ToolChoiceAuto {
             disable_parallel_tool_use: None,
-        })),
-        ToolChoiceOption::None => Ok(api::ToolChoice::None(api::ToolChoiceNone {})),
-        ToolChoiceOption::Required => Ok(api::ToolChoice::Any(api::ToolChoiceAny {
+        }),
+        ToolChoiceOption::None => api::ToolChoice::None(api::ToolChoiceNone {}),
+        ToolChoiceOption::Required => api::ToolChoice::Any(api::ToolChoiceAny {
             disable_parallel_tool_use: None,
-        })),
-        ToolChoiceOption::Tool(tool) => Ok(api::ToolChoice::Tool(api::ToolChoiceTool {
+        }),
+        ToolChoiceOption::Tool(tool) => api::ToolChoice::Tool(api::ToolChoiceTool {
             disable_parallel_tool_use: None,
             name: tool.tool_name,
-        })),
+        }),
     }
 }
 
 fn convert_to_anthropic_thinking_config(
-    reasoning: ReasoningOptions,
+    reasoning: &ReasoningOptions,
     max_tokens: u32,
-) -> LanguageModelResult<ThinkingConfigParam> {
+) -> ThinkingConfigParam {
     if !reasoning.enabled {
-        return Ok(ThinkingConfigParam::Disabled(ThinkingConfigDisabled {}));
+        return ThinkingConfigParam::Disabled(ThinkingConfigDisabled {});
     }
 
     let fallback = max_tokens.saturating_sub(1).max(1);
     let budget = reasoning
         .budget_tokens
-        .map(|value| value.max(1))
-        .unwrap_or(fallback);
+        .map_or(fallback, |value| value.max(1));
 
-    Ok(ThinkingConfigParam::Enabled(ThinkingConfigEnabled {
+    ThinkingConfigParam::Enabled(ThinkingConfigEnabled {
         budget_tokens: budget,
-    }))
-}
-
-fn map_anthropic_message(content: Vec<ContentBlock>) -> LanguageModelResult<Vec<Part>> {
-    let mut parts = Vec::new();
-    for block in content {
-        if let Some(part) = map_content_block(block)? {
-            parts.push(part);
-        }
-    }
-    Ok(parts)
-}
-
-fn map_content_block(block: ContentBlock) -> LanguageModelResult<Option<Part>> {
-    match block {
-        ContentBlock::Text(text_block) => Ok(Some(Part::Text(map_text_block(text_block)?))),
-        ContentBlock::Thinking(thinking_block) => {
-            Ok(Some(Part::Reasoning(map_thinking_block(thinking_block))))
-        }
-        ContentBlock::RedactedThinking(redacted_block) => Ok(Some(Part::Reasoning(
-            map_redacted_thinking_block(redacted_block),
-        ))),
-        ContentBlock::ToolUse(tool_use) => Ok(Some(Part::ToolCall(map_tool_use_block(tool_use)?))),
-        _ => Ok(None),
-    }
-}
-
-fn map_text_block(block: api::ResponseTextBlock) -> LanguageModelResult<TextPart> {
-    let citations = map_text_citations(block.citations)?;
-    Ok(TextPart {
-        text: block.text,
-        citations,
     })
 }
 
-fn map_text_citations(
-    citations: Option<Vec<api::ResponseCitation>>,
-) -> LanguageModelResult<Option<Vec<Citation>>> {
-    let Some(citations) = citations else {
-        return Ok(None);
-    };
+fn map_anthropic_message(content: Vec<ContentBlock>) -> Vec<Part> {
+    let mut parts = Vec::new();
+    for block in content {
+        if let Some(part) = map_content_block(block) {
+            parts.push(part);
+        }
+    }
+    parts
+}
+
+fn map_content_block(block: ContentBlock) -> Option<Part> {
+    match block {
+        ContentBlock::Text(text_block) => Some(Part::Text(map_text_block(text_block))),
+        ContentBlock::Thinking(thinking_block) => {
+            Some(Part::Reasoning(map_thinking_block(thinking_block)))
+        }
+        ContentBlock::RedactedThinking(redacted_block) => {
+            Some(Part::Reasoning(map_redacted_thinking_block(redacted_block)))
+        }
+        ContentBlock::ToolUse(tool_use) => Some(Part::ToolCall(map_tool_use_block(tool_use))),
+        _ => None,
+    }
+}
+
+fn map_text_block(block: api::ResponseTextBlock) -> TextPart {
+    let citations = map_text_citations(block.citations);
+    TextPart {
+        text: block.text,
+        citations,
+    }
+}
+
+fn map_text_citations(citations: Option<Vec<api::ResponseCitation>>) -> Option<Vec<Citation>> {
+    let citations = citations?;
 
     let mut results = Vec::new();
 
@@ -656,10 +622,6 @@ fn map_text_citations(
                 continue;
             }
 
-            if end_block_index < 0 {
-                continue;
-            }
-
             let mapped = Citation {
                 source,
                 title,
@@ -668,8 +630,8 @@ fn map_text_citations(
                 } else {
                     Some(cited_text)
                 },
-                start_index: start_block_index as usize,
-                end_index: end_block_index as usize,
+                start_index: start_block_index,
+                end_index: end_block_index,
             };
 
             results.push(mapped);
@@ -677,9 +639,9 @@ fn map_text_citations(
     }
 
     if results.is_empty() {
-        Ok(None)
+        None
     } else {
-        Ok(Some(results))
+        Some(results)
     }
 }
 
@@ -703,16 +665,16 @@ fn map_redacted_thinking_block(block: api::ResponseRedactedThinkingBlock) -> Rea
     }
 }
 
-fn map_tool_use_block(block: api::ResponseToolUseBlock) -> LanguageModelResult<ToolCallPart> {
-    Ok(ToolCallPart {
+fn map_tool_use_block(block: api::ResponseToolUseBlock) -> ToolCallPart {
+    ToolCallPart {
         tool_call_id: block.id,
         tool_name: block.name,
         args: block.input,
         id: None,
-    })
+    }
 }
 
-fn map_anthropic_usage(usage: Usage) -> ModelUsage {
+fn map_anthropic_usage(usage: &Usage) -> ModelUsage {
     ModelUsage {
         input_tokens: usage.input_tokens,
         output_tokens: usage.output_tokens,
@@ -720,7 +682,7 @@ fn map_anthropic_usage(usage: Usage) -> ModelUsage {
     }
 }
 
-fn map_anthropic_message_delta_usage(usage: MessageDeltaUsage) -> ModelUsage {
+fn map_anthropic_message_delta_usage(usage: &MessageDeltaUsage) -> ModelUsage {
     ModelUsage {
         input_tokens: usage.input_tokens.unwrap_or(0),
         output_tokens: usage.output_tokens,
@@ -730,17 +692,14 @@ fn map_anthropic_message_delta_usage(usage: MessageDeltaUsage) -> ModelUsage {
 
 fn map_anthropic_content_block_start_event(
     content_block: ContentBlock,
-    index: u32,
+    index: usize,
 ) -> LanguageModelResult<Vec<ContentDelta>> {
-    if let Some(part) = map_content_block(content_block)? {
+    if let Some(part) = map_content_block(content_block) {
         let mut delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
         if let PartDelta::ToolCall(tool_call_delta) = &mut delta {
             tool_call_delta.args = Some(String::new());
         }
-        Ok(vec![ContentDelta {
-            index: index as usize,
-            part: delta,
-        }])
+        Ok(vec![ContentDelta { index, part: delta }])
     } else {
         Ok(vec![])
     }
@@ -748,8 +707,8 @@ fn map_anthropic_content_block_start_event(
 
 fn map_anthropic_content_block_delta_event(
     delta: ContentBlockDelta,
-    index: u32,
-) -> LanguageModelResult<Option<ContentDelta>> {
+    index: usize,
+) -> Option<ContentDelta> {
     let part_delta = match delta {
         ContentBlockDelta::TextDelta(delta) => PartDelta::Text(TextPartDelta {
             text: delta.text,
@@ -772,26 +731,24 @@ fn map_anthropic_content_block_delta_event(
             id: None,
         }),
         ContentBlockDelta::CitationsDelta(delta) => {
-            if let Some(citation) = map_citation_delta(delta.citation)? {
+            if let Some(citation) = map_citation_delta(delta.citation) {
                 PartDelta::Text(TextPartDelta {
                     text: String::new(),
                     citation: Some(citation),
                 })
             } else {
-                return Ok(None);
+                return None;
             }
         }
     };
 
-    Ok(Some(ContentDelta {
-        index: index as usize,
+    Some(ContentDelta {
+        index,
         part: part_delta,
-    }))
+    })
 }
 
-fn map_citation_delta(
-    citation: api::ResponseCitation,
-) -> LanguageModelResult<Option<CitationDelta>> {
+fn map_citation_delta(citation: api::ResponseCitation) -> Option<CitationDelta> {
     let api::ResponseCitation::SearchResultLocation(api::ResponseSearchResultLocationCitation {
         cited_text,
         end_block_index,
@@ -801,7 +758,7 @@ fn map_citation_delta(
         title,
     }) = citation
     else {
-        return Ok(None);
+        return None;
     };
 
     let result = CitationDelta {
@@ -813,13 +770,9 @@ fn map_citation_delta(
         } else {
             Some(cited_text)
         },
-        start_index: Some(start_block_index as usize),
-        end_index: if end_block_index < 0 {
-            None
-        } else {
-            Some(end_block_index as usize)
-        },
+        start_index: Some(start_block_index),
+        end_index: Some(end_block_index),
     };
 
-    Ok(Some(result))
+    Some(result)
 }

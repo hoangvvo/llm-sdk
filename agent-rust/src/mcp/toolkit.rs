@@ -237,6 +237,7 @@ fn strip_bearer_prefix(token: &str) -> String {
     }
 }
 
+#[allow(clippy::type_complexity)]
 struct MCPToolkitState<TCtx>
 where
     TCtx: Send + Sync + 'static,

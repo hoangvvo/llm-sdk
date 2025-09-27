@@ -1,19 +1,11 @@
 use crate::errors::BoxedError;
-use std::pin::Pin;
+use futures::future::BoxFuture;
 
+#[allow(clippy::type_complexity)]
 pub enum InstructionParam<TCtx> {
     String(String),
     Func(Box<dyn Fn(&TCtx) -> Result<String, BoxedError> + Send + Sync>),
-    AsyncFunc(
-        Box<
-            dyn Fn(
-                    &TCtx,
-                )
-                    -> Pin<Box<dyn futures::Future<Output = Result<String, BoxedError>> + Send>>
-                + Send
-                + Sync,
-        >,
-    ),
+    AsyncFunc(Box<dyn Fn(&TCtx) -> BoxFuture<'_, Result<String, BoxedError>> + Send + Sync>),
 }
 
 impl<TCtx> InstructionParam<TCtx> {

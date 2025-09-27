@@ -51,11 +51,7 @@ where
     pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
         let AgentRequest { input, context } = request;
         let run_session = Arc::new(self.create_session(context).await?);
-        let mut stream = match run_session
-            .clone()
-            .run_stream(RunSessionRequest { input })
-            .await
-        {
+        let mut stream = match run_session.clone().run_stream(RunSessionRequest { input }) {
             Ok(stream) => stream,
             Err(err) => {
                 if let Ok(session) = Arc::try_unwrap(run_session) {

@@ -157,6 +157,8 @@ impl MockLanguageModel {
     }
 
     /// Enqueue one or more mocked generate results.
+    /// # Panics
+    /// Panics if the internal state mutex is poisoned.
     pub fn enqueue_generate_results<I>(&self, results: I) -> &Self
     where
         I: IntoIterator<Item = MockGenerateResult>,
@@ -178,6 +180,8 @@ impl MockLanguageModel {
     }
 
     /// Enqueue one or more mocked stream results.
+    /// # Panics
+    /// Panics if the internal state mutex is poisoned.
     pub fn enqueue_stream_results<I>(&self, results: I) -> &Self
     where
         I: IntoIterator<Item = MockStreamResult>,
@@ -199,24 +203,32 @@ impl MockLanguageModel {
     }
 
     /// Retrieve the tracked generate inputs accumulated so far.
+    /// # Panics
+    /// Panics if the internal state mutex is poisoned.
     pub fn tracked_generate_inputs(&self) -> Vec<LanguageModelInput> {
         let state = self.state.lock().expect("mock state poisoned");
         state.tracked_generate_inputs.clone()
     }
 
     /// Retrieve the tracked stream inputs accumulated so far.
+    /// # Panics
+    /// Panics if the internal state mutex is poisoned.
     pub fn tracked_stream_inputs(&self) -> Vec<LanguageModelInput> {
         let state = self.state.lock().expect("mock state poisoned");
         state.tracked_stream_inputs.clone()
     }
 
     /// Reset tracked inputs without touching enqueued results.
+    /// # Panics
+    /// Panics if the internal state mutex is poisoned.
     pub fn reset(&self) {
         let mut state = self.state.lock().expect("mock state poisoned");
         state.reset();
     }
 
     /// Clear both tracked inputs and enqueued results.
+    /// # Panics
+    /// Panics if the internal state mutex is poisoned.
     pub fn restore(&self) {
         let mut state = self.state.lock().expect("mock state poisoned");
         state.restore();

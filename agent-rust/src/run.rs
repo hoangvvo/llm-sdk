@@ -64,20 +64,20 @@ where
         })
     }
 
-    /// process() flow:
+    /// `process()` flow:
     /// 1. Peek latest run item to locate assistant content.
     ///
     ///    1a. Tail is user message -> emit `Next`. Go to 3.
     ///
     ///    1b. Tail is tool/tool message -> gather processed ids, backtrack to
-    /// assistant/model content. Go to 2.
+    ///    assistant/model content. Go to 2.
     ///
     ///    1c. Tail is assistant/model -> use its content. Go to 2.
     ///
     /// 2. Scan assistant content for tool calls.
     ///
     ///    2a. Tool calls remaining -> execute unprocessed tools, emit each
-    /// `Item`, then emit `Next`. Go to 3.
+    ///    `Item`, then emit `Next`. Go to 3.
     ///
     ///    2b. No tool calls -> emit `Response`. Go to 4.
     ///
@@ -85,12 +85,13 @@ where
     ///    it, then re-enter step 1.
     ///
     /// 4. Return final response to caller.
-    async fn process<'a>(
+    #[allow(clippy::too_many_lines)]
+    fn process<'a>(
         &'a self,
         run_state: &'a RunState,
         tools: Vec<Arc<dyn AgentTool<TCtx>>>,
     ) -> BoxedStream<'a, Result<ProcessEvents, AgentError>> {
-        let context = self.context.clone();
+        let context_val = self.context.clone();
         let stream = try_stream! {
             let items = run_state.items().await;
             // Examining the last items in the state determines the next step.
@@ -150,7 +151,7 @@ where
                                     ))?
                                 }
                             },
-                            _ => {
+                            AgentItem::Tool(_) => {
                                 Err(AgentError::Invariant(
                                     "Expected a model item or assistant message before tool results.".to_string(),
                                 ))?
@@ -169,7 +170,6 @@ where
                             AgentItem::Tool(tool_item) => {
                                 processed_tool_call_ids.insert(tool_item.tool_call_id);
                                 // Continue searching for the originating model/assistant item
-                                continue;
                             }
                             AgentItem::Model(model_response) => {
                                 // Found the originating model response
@@ -185,7 +185,6 @@ where
                                         }
                                     }
                                     // Continue searching for the originating model/assistant item
-                                    continue;
                                 }
                                 Message::Assistant(assistant_message) => {
                                     // Found the originating model response
@@ -259,7 +258,7 @@ where
                     &tool_call_id,
                     &tool_name_value,
                     &tool_description,
-                    agent_tool.execute(args, &context, run_state),
+                    agent_tool.execute(args, &context_val, run_state),
                 )
                 .await
                 .map_err(AgentError::ToolExecution)?;
@@ -290,7 +289,7 @@ where
             let mut tools = self.get_tools();
 
             loop {
-                let mut process_stream = self.process(&state, tools).await;
+                let mut process_stream = self.process(&state, tools);
 
                 while let Some(event) = process_stream.next().await {
                     let event = event?;
@@ -319,7 +318,7 @@ where
     }
 
     /// Run a streaming execution of the agent.
-    pub async fn run_stream(&self, request: RunSessionRequest) -> Result<AgentStream, AgentError> {
+    pub fn run_stream(&self, request: RunSessionRequest) -> Result<AgentStream, AgentError> {
         let RunSessionRequest { input } = request;
         let state = Arc::new(RunState::new(input, self.params.max_turns));
 
@@ -334,7 +333,7 @@ where
             let mut tools = session.get_tools();
 
             loop {
-                let mut process_stream = session.process(&state, tools).await;
+                let mut process_stream = session.process(&state, tools);
 
                 while let Some(event) = process_stream.next().await {
                     let event = event?;

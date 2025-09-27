@@ -1,3 +1,4 @@
+#![allow(clippy::pedantic, clippy::style)]
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -151,18 +152,18 @@ pub struct MessageStopEvent {}
 #[derive(Serialize, Deserialize)]
 pub struct ContentBlockStartEvent {
     pub content_block: ContentBlock,
-    pub index: u32,
+    pub index: usize,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ContentBlockDeltaEvent {
     pub delta: ContentBlockDelta,
-    pub index: u32,
+    pub index: usize,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ContentBlockStopEvent {
-    pub index: u32,
+    pub index: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -265,7 +266,8 @@ pub enum ThinkingConfigParam {
 
 #[derive(Serialize, Deserialize)]
 pub struct ThinkingConfigEnabled {
-    /// Determines how many tokens Claude can use for its internal reasoning process
+    /// Determines how many tokens Claude can use for its internal reasoning
+    /// process
     pub budget_tokens: u32,
 }
 
@@ -337,7 +339,7 @@ pub struct Tool {
     pub description: Option<String>,
 
     /// JSON schema for this tool's input
-    pub input_schema: InputSchema,
+    pub input_schema: Value,
 
     /// Name of the tool
     pub name: String,
@@ -705,18 +707,6 @@ pub struct RequestSearchResultLocationCitation {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct InputSchema {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub properties: Option<Value>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub required: Option<Vec<String>>,
-
-    #[serde(rename = "type")]
-    pub type_field: String,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct UserLocation {
     /// The city of the user
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -875,10 +865,10 @@ pub struct ResponseWebSearchResultLocationCitation {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseSearchResultLocationCitation {
     pub cited_text: String,
-    pub end_block_index: i32,
+    pub end_block_index: usize,
     pub search_result_index: u32,
     pub source: String,
-    pub start_block_index: u32,
+    pub start_block_index: usize,
     pub title: Option<String>,
 }
 

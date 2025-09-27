@@ -14,7 +14,7 @@ use crate::{
 /// (e.g openai). We can match this against the existing tool call deltas
 pub fn guess_delta_index(
     part: &PartDelta,
-    all_content_deltas: &[ContentDelta],
+    all_content_deltas: &[&ContentDelta],
     tool_call_index: Option<usize>,
 ) -> usize {
     // contentDeltas may have the structure of

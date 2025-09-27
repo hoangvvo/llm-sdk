@@ -1236,7 +1236,6 @@ async fn run_stream_streams_response_when_no_tool_call() {
                 content: vec![Part::text("Hi")],
             }))],
         })
-        .await
         .expect("run_stream succeeds");
 
     let events = stream
@@ -1336,7 +1335,6 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
                 content: vec![Part::text("Hello")],
             }))],
         })
-        .await
         .expect("run_stream succeeds");
 
     let events = stream
@@ -1453,7 +1451,6 @@ async fn run_stream_streams_tool_call_execution_and_response() {
                 content: vec![Part::text("Use tool")],
             }))],
         })
-        .await
         .expect("run_stream succeeds");
 
     let events = stream
@@ -1609,7 +1606,6 @@ async fn run_stream_handles_multiple_turns() {
                 content: vec![Part::text("Calculate")],
             }))],
         })
-        .await
         .expect("run_stream succeeds");
 
     let events = stream
@@ -1792,14 +1788,11 @@ async fn run_stream_throws_max_turns_exceeded_error() {
     )
     .await;
 
-    let result = session
-        .clone()
-        .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Keep using tools")],
-            }))],
-        })
-        .await;
+    let result = session.clone().run_stream(RunSessionRequest {
+        input: vec![AgentItem::Message(Message::User(UserMessage {
+            content: vec![Part::text("Keep using tools")],
+        }))],
+    });
 
     match result {
         Err(AgentError::MaxTurnsExceeded(_)) => {}
@@ -1831,14 +1824,11 @@ async fn run_stream_throws_language_model_error() {
 
     let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
-    let result = session
-        .clone()
-        .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hello")],
-            }))],
-        })
-        .await;
+    let result = session.clone().run_stream(RunSessionRequest {
+        input: vec![AgentItem::Message(Message::User(UserMessage {
+            content: vec![Part::text("Hello")],
+        }))],
+    });
 
     match result {
         Err(AgentError::LanguageModel(err)) => {
