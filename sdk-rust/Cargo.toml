@@ -2,18 +2,17 @@
 description = "A Rust library that enables the development of applications that can interact with different language models through a unified interface."
 edition = "2021"
 homepage = "https://llm-sdk.hoangvvo.com/"
-keywords = [
-  "llm",
-  "language model",
-  "agent",
-  "ai",
-  "openai",
-  "anthropic",
-  "cohere",
-  "mistral",
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "README.md",
+  "LICENSE",
+  "examples/**/*",
+  "tests/**/*",
 ]
+keywords = ["llm", "language-model", "agent", "ai", "openai"]
 license = "MIT"
-name = "llm-sdk"
+name = "llm-sdk-rs"
 readme = "README.md"
 repository = "https://github.com/hoangvvo/llm-sdk"
 version = "0.1.0"
