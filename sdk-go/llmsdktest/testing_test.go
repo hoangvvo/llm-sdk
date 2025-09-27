@@ -1,7 +1,6 @@
 package llmsdktest_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -26,7 +25,7 @@ func TestMockLanguageModelGenerate(t *testing.T) {
 		llmsdktest.NewMockGenerateResultResponse(response3),
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	input1 := &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
@@ -124,7 +123,7 @@ func TestMockLanguageModelStream(t *testing.T) {
 		llmsdktest.NewMockStreamResultPartials(partials3),
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	streamInput1 := &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{

@@ -64,10 +64,8 @@ func newToolkitSession[C any](ctx context.Context, params MCPParams) (*toolkitSe
 		tools:     make([]llmagent.AgentTool[C], 0),
 	}
 	clientOpts := &mcp.ClientOptions{
-		ToolListChangedHandler: func(eventCtx context.Context, _ *mcp.ToolListChangedRequest) {
-			go func() {
-				_ = s.reloadTools(eventCtx)
-			}()
+		ToolListChangedHandler: func(ctx context.Context, _ *mcp.ToolListChangedRequest) {
+			_ = s.reloadTools(ctx)
 		},
 	}
 	s.client = mcp.NewClient(&mcp.Implementation{Name: "llm-agent-go", Version: "0.1.0"}, clientOpts)
@@ -82,7 +80,9 @@ func newToolkitSession[C any](ctx context.Context, params MCPParams) (*toolkitSe
 
 // initialize connects to the MCP server, hydrates the initial tool snapshot, and wires change notifications.
 func (s *toolkitSession[C]) initialize(ctx context.Context) error {
-	clientSession, err := s.client.Connect(ctx, s.transport, nil)
+	// TODO: mcp.ClientSession uses the same context for the lifetime of the session.
+	// so we need to use context.Background() here.
+	clientSession, err := s.client.Connect(context.Background(), s.transport, nil)
 	if err != nil {
 		return fmt.Errorf("connect MCP client: %w", err)
 	}

@@ -5,11 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 
@@ -71,19 +70,19 @@ func startStubMCPServer() (*stubServer, error) {
 
 	handler := gomcp.NewStreamableHTTPHandler(
 		func(*http.Request) *gomcp.Server { return server },
-		&gomcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true},
+		&gomcp.StreamableHTTPOptions{Stateless: false, JSONResponse: true},
 	)
 
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
+	addr := listener.Addr().(*net.TCPAddr)
+	baseURL := fmt.Sprintf("http://127.0.0.1:%d", addr.Port)
 
 	srv := &http.Server{Handler: handler}
 	go func() {
-		if serveErr := srv.Serve(listener); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-			// best effort logging via testing output when available
-		}
+		_ = srv.Serve(listener)
 	}()
 
 	cleanup := func() {
@@ -107,7 +106,7 @@ func startStubMCPServer() (*stubServer, error) {
 	}
 
 	return &stubServer{
-		url:        "http://" + listener.Addr().String(),
+		url:        baseURL,
 		stop:       cleanup,
 		updateTool: update,
 	}, nil
@@ -116,21 +115,11 @@ func startStubMCPServer() (*stubServer, error) {
 func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 	stub, err := startStubMCPServer()
 	if err != nil {
-		var opErr *net.OpError
-		if errors.As(err, &opErr) {
-			var sysErr *os.SyscallError
-			if errors.As(opErr.Err, &sysErr) {
-				switch sysErr.Err {
-				case syscall.EACCES, syscall.EPERM:
-					t.Skipf("skipping: listening on loopback blocked (%v)", sysErr.Err)
-				}
-			}
-		}
 		t.Fatalf("start stub server: %v", err)
 	}
 	t.Cleanup(stub.stop)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	model := llmsdktest.NewMockLanguageModel()
 	toolCallArgs, err := json.Marshal(map[string]string{"shift": "evening"})
@@ -152,7 +141,7 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Ready to roll."}}},
 	}))
 
-	agent := llmagent.NewAgent[struct{}](
+	agent := llmagent.NewAgent(
 		"mcp-test",
 		model,
 		llmagent.WithToolkits(
@@ -165,12 +154,8 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 		t.Fatalf("create session: %v", err)
 	}
 	t.Cleanup(func() {
-		if cerr := session.Close(ctx); cerr != nil {
-			var exitErr *exec.ExitError
-			if errors.As(cerr, &exitErr) && exitErr.ExitCode() == 13 {
-				return
-			}
-			t.Errorf("close session: %v", cerr)
+		if err := session.Close(ctx); err != nil {
+			t.Errorf("close session: %v", err)
 		}
 	})
 
@@ -222,16 +207,6 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 	stub, err := startStubMCPServer()
 	if err != nil {
-		var opErr *net.OpError
-		if errors.As(err, &opErr) {
-			var sysErr *os.SyscallError
-			if errors.As(opErr.Err, &sysErr) {
-				switch sysErr.Err {
-				case syscall.EACCES, syscall.EPERM:
-					t.Skipf("skipping: listening on loopback blocked (%v)", sysErr.Err)
-				}
-			}
-		}
 		t.Fatalf("start stub server: %v", err)
 	}
 	t.Cleanup(stub.stop)
@@ -273,7 +248,7 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Routes synced."}}},
 	}))
 
-	agent := llmagent.NewAgent[struct{}](
+	agent := llmagent.NewAgent(
 		"mcp-test",
 		model,
 		llmagent.WithToolkits(

@@ -23,7 +23,9 @@ func buildTransport(params MCPParams) (mcp.Transport, error) {
 		if httpParams.URL == "" {
 			return nil, errors.New("mcp streamable-http url cannot be empty")
 		}
-		transport := &mcp.StreamableClientTransport{Endpoint: httpParams.URL}
+		transport := &mcp.StreamableClientTransport{
+			Endpoint: httpParams.URL,
+		}
 		if token := strings.TrimSpace(httpParams.Authorization); token != "" {
 			client := &http.Client{Transport: &authHeaderRoundTripper{
 				base:  http.DefaultTransport,

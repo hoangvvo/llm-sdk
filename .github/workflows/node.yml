@@ -21,10 +21,12 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
         run: npm ci
-      - name: Run lint
-        run: npm run lint
+
       - name: Run build
         run: npm run build
+
+      - name: Run lint
+        run: npm run lint
 
       - name: Run tests
         run: npm test -w=agent-js

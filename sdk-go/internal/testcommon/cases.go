@@ -1,7 +1,6 @@
 package testcommon
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -164,7 +163,7 @@ func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCaseName string, 
 		opt(&testCase)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	input := &testCase.Input
 	if testCase.AdditionalInput != nil {

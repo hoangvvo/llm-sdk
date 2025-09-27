@@ -94,7 +94,7 @@ func (t *MockAgentTool[C]) Execute(ctx context.Context, params json.RawMessage, 
 
 func mustNewRunSession[C any](t *testing.T, params *llmagent.AgentParams[C], contextVal C) *llmagent.RunSession[C] {
 	t.Helper()
-	session, err := llmagent.NewRunSession(context.Background(), params, contextVal)
+	session, err := llmagent.NewRunSession(t.Context(), params, contextVal)
 	if err != nil {
 		t.Fatalf("failed to create run session: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -208,7 +208,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 		map[string]interface{}{"testContext": true},
 	)
 
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -341,7 +341,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -473,7 +473,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -601,7 +601,7 @@ func TestRun_ReturnsExistingAssistantResponseWithoutNewModelOutput(t *testing.T)
 		map[string]interface{}{},
 	)
 
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("What did I say?")}},
@@ -627,7 +627,7 @@ func TestRun_ReturnsExistingAssistantResponseWithoutNewModelOutput(t *testing.T)
 		t.Fatalf("expected no model invocations, got %d", len(model.TrackedGenerateInputs()))
 	}
 
-	if err := session.Close(context.Background()); err != nil {
+	if err := session.Close(t.Context()); err != nil {
 		t.Fatalf("expected no close error, got %v", err)
 	}
 }
@@ -666,7 +666,7 @@ func TestRun_ResumesToolProcessingFromToolMessageWithPartialResults(t *testing.T
 	isError := false
 	toolResult := llmsdk.NewToolResultPart("call_1", "resume_tool", []llmsdk.Part{llmsdk.NewTextPart("already done")}, isError)
 
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Continue")}},
@@ -699,7 +699,7 @@ func TestRun_ResumesToolProcessingFromToolMessageWithPartialResults(t *testing.T
 		t.Errorf("response mismatch (-want +got):\n%s", diff)
 	}
 
-	if err := session.Close(context.Background()); err != nil {
+	if err := session.Close(t.Context()); err != nil {
 		t.Fatalf("expected no close error, got %v", err)
 	}
 }
@@ -735,7 +735,7 @@ func TestRun_ResumesToolProcessingWhenTrailingToolEntries(t *testing.T) {
 
 	call1Args := json.RawMessage(`{"stage": 1}`)
 	call2Args := json.RawMessage(`{"stage": 2}`)
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Continue")}},
@@ -768,7 +768,7 @@ func TestRun_ResumesToolProcessingWhenTrailingToolEntries(t *testing.T) {
 		t.Errorf("response mismatch (-want +got):\n%s", diff)
 	}
 
-	if err := session.Close(context.Background()); err != nil {
+	if err := session.Close(t.Context()); err != nil {
 		t.Fatalf("expected no close error, got %v", err)
 	}
 }
@@ -798,7 +798,7 @@ func TestRun_ReturnsErrorWhenToolResultsLackPrecedingAssistantContent(t *testing
 	)
 
 	isError := false
-	_, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Resume")}},
@@ -824,7 +824,7 @@ func TestRun_ReturnsErrorWhenToolResultsLackPrecedingAssistantContent(t *testing
 		t.Fatalf("expected invariant error, got %v", err)
 	}
 
-	if err := session.Close(context.Background()); err != nil {
+	if err := session.Close(t.Context()); err != nil {
 		t.Fatalf("expected no close error, got %v", err)
 	}
 }
@@ -887,7 +887,7 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	_, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -940,7 +940,7 @@ func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	_, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -997,7 +997,7 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 		map[string]interface{}{},
 	)
 
-	_, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1066,7 +1066,7 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1166,7 +1166,7 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	_, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1239,7 +1239,7 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 		map[string]interface{}{"userRole": "developer"},
 	)
 
-	_, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1353,7 +1353,7 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 		ctxVal,
 	)
 
-	response, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1428,7 +1428,7 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 		t.Fatalf("response mismatch (-want +got):\n%s", diff)
 	}
 
-	if err := session.Close(context.Background()); err != nil {
+	if err := session.Close(t.Context()); err != nil {
 		t.Fatalf("expected no close error, got %v", err)
 	}
 	if toolkitSession.closeCalls != 1 {
@@ -1461,7 +1461,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	stream, err := session.RunStream(context.Background(), llmagent.RunSessionRequest{
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1583,7 +1583,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	stream, err := session.RunStream(context.Background(), llmagent.RunSessionRequest{
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1785,7 +1785,7 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	stream, err := session.RunStream(context.Background(), llmagent.RunSessionRequest{
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1867,7 +1867,7 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 		ctxVal,
 	)
 
-	stream, err := session.RunStream(context.Background(), llmagent.RunSessionRequest{
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1931,7 +1931,7 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 		t.Fatalf("unexpected tools: %v", inputs[0].Tools)
 	}
 
-	if err := session.Close(context.Background()); err != nil {
+	if err := session.Close(t.Context()); err != nil {
 		t.Fatalf("expected no close error, got %v", err)
 	}
 	if toolkitSession.closeCalls != 1 {
@@ -1964,7 +1964,7 @@ func TestRun_CloseCleansUpSessionResources(t *testing.T) {
 		map[string]interface{}{},
 	)
 
-	_, err := session.Run(context.Background(), llmagent.RunSessionRequest{
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
@@ -1980,11 +1980,11 @@ func TestRun_CloseCleansUpSessionResources(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if err := session.Close(context.Background()); err != nil {
+	if err := session.Close(t.Context()); err != nil {
 		t.Fatalf("expected no close error, got %v", err)
 	}
 
-	_, err = session.Run(context.Background(), llmagent.RunSessionRequest{
+	_, err = session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.Message{
 				UserMessage: &llmsdk.UserMessage{
