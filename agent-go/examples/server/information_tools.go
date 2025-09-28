@@ -40,19 +40,19 @@ func (t *SearchWikipediaTool) Parameters() llmsdk.JSONSchema {
 				"description": "Search query or article title",
 			},
 			"language": map[string]any{
-				"type":        []string{"string", "null"},
+				"type":        "string",
 				"description": "Wikipedia language edition",
 				"default":     "en",
 			},
 			"limit": map[string]any{
-				"type":        []string{"number", "null"},
+				"type":        "number",
 				"minimum":     1,
 				"maximum":     10,
 				"description": "Maximum number of results to return",
 				"default":     3,
 			},
 			"extract_length": map[string]any{
-				"type":        []string{"number", "null"},
+				"type":        "number",
 				"minimum":     50,
 				"maximum":     1200,
 				"description": "Number of characters for article extract",
@@ -262,33 +262,34 @@ func (t *GetNewsTool) Parameters() llmsdk.JSONSchema {
 		"type": "object",
 		"properties": map[string]any{
 			"query": map[string]any{
-				"type":        []string{"string", "null"},
+				"type":        "string",
 				"maxLength":   500,
 				"description": "Keywords or phrases to search for",
+				"default":     "",
 			},
 			"category": map[string]any{
-				"type":        []string{"string", "null"},
+				"type":        "string",
 				"enum":        []string{"business", "entertainment", "general", "health", "science", "sports", "technology"},
 				"default":     "general",
 				"description": "News category filter",
 			},
 			"country": map[string]any{
-				"type":        []string{"string", "null"},
+				"type":        "string",
 				"description": "ISO 2-letter country code",
 			},
 			"language": map[string]any{
-				"type":        []string{"string", "null"},
+				"type":        "string",
 				"default":     "en",
 				"description": "ISO 2-letter language code",
 			},
 			"sort_by": map[string]any{
-				"type":        []string{"string", "null"},
+				"type":        "string",
 				"enum":        []string{"relevancy", "popularity", "publishedAt"},
 				"default":     "publishedAt",
 				"description": "Sort order for results",
 			},
 			"limit": map[string]any{
-				"type":        []string{"number", "null"},
+				"type":        "number",
 				"minimum":     1,
 				"maximum":     100,
 				"default":     5,

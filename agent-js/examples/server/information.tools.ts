@@ -126,7 +126,7 @@ export const getNewsTool = zodTool({
     query: z
       .string()
       .max(500)
-      .optional()
+      .default("")
       .describe("Keywords or phrases to search for"),
     category: z
       .enum([
@@ -140,7 +140,7 @@ export const getNewsTool = zodTool({
       ])
       .default("general")
       .describe("News category filter"),
-    country: z.string().optional().describe("ISO 2-letter country code"),
+    country: z.string().describe("ISO 2-letter country code"),
     language: z.string().default("en").describe("ISO 2-letter language code"),
     sort_by: z
       .enum(["relevancy", "popularity", "publishedAt"])

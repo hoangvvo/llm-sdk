@@ -1,4 +1,9 @@
-import type { LanguageModelMetadata } from "@hoangvvo/llm-sdk";
+import type {
+  AudioOptions,
+  LanguageModelMetadata,
+  Modality,
+  ReasoningOptions,
+} from "@hoangvvo/llm-sdk";
 
 export interface LoggedEvent {
   id: string;
@@ -6,12 +11,6 @@ export interface LoggedEvent {
   name: string;
   timestamp: string;
   payload: unknown;
-}
-
-export interface ModelInfo {
-  provider: string;
-  model_id: string;
-  metadata?: LanguageModelMetadata;
 }
 
 export type ApiKeys = Record<string, string | undefined>;
@@ -58,4 +57,13 @@ export interface AgentBehaviorSettings {
   top_k?: number;
   frequency_penalty?: number;
   presence_penalty?: number;
+}
+
+export interface ModelInfo {
+  provider: string;
+  model_id: string;
+  metadata: LanguageModelMetadata;
+  default_modalities?: Modality[];
+  default_reasoning?: ReasoningOptions;
+  default_audio?: AudioOptions;
 }

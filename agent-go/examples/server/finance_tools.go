@@ -148,12 +148,12 @@ func (t *GetCryptoPriceTool) Parameters() llmsdk.JSONSchema {
 				"description": "Cryptocurrency symbol (e.g., bitcoin, ethereum)",
 			},
 			"currency": map[string]any{
-				"type":        []string{"string", "null"},
+				"type":        "string",
 				"description": "Target currency for price",
 				"default":     "usd",
 			},
 			"include_market_data": map[string]any{
-				"type":        []string{"boolean", "null"},
+				"type":        "boolean",
 				"description": "Include market cap, volume, and price changes",
 				"default":     true,
 			},

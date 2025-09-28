@@ -31,11 +31,11 @@ export default [
     files: ["agent-js/src/**/*.{ts,tsx}", "sdk-js/src/**/*.{ts,tsx}"],
   })),
   {
-    files: ["./app/**/*.{ts,tsx}"],
+    files: ["./website/**/*.{ts,tsx}"],
     ...reactHooks.configs["recommended-latest"],
   },
   {
-    files: ["./app/**/*.{ts,tsx}"],
+    files: ["./website/**/*.{ts,tsx}"],
     ...reactRefresh.configs.vite,
   },
   {

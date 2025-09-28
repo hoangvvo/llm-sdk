@@ -17,13 +17,8 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
   rust-server:
-    build:
-      additional_contexts:
-        sdk-rust: ../sdk-rust
-        agent-rust: ../agent-rust
-        sdk-go: ../sdk-go
-        agent-go: ../agent-go
-      dockerfile: ./Dockerfile
+    image: hoangvvodev/llm-sdk:latest
+    command: ["/usr/local/bin/rustserver"]
     restart: unless-stopped
     networks:
       - proxy
@@ -34,13 +29,8 @@ services:
       - "traefik.http.routers.rust-server.entrypoints=web"
 
   go-server:
-    build:
-      additional_contexts:
-        sdk-rust: ../sdk-rust
-        agent-rust: ../agent-rust
-        sdk-go: ../sdk-go
-        agent-go: ../agent-go
-      dockerfile: ./Dockerfile
+    image: hoangvvodev/llm-sdk:latest
+    command: ["/usr/local/bin/goserver"]
     restart: unless-stopped
     networks:
       - proxy

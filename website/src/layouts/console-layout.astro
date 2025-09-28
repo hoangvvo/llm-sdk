@@ -1,6 +1,6 @@
 ---
-import { Icon } from "@astrojs/starlight/components";
 import "../styles/global.css";
+import { Nav } from "./nav.tsx";
 export interface Props {
   title: string;
 }
@@ -15,49 +15,9 @@ const { title } = Astro.props;
     <title>llm-sdk | {title}</title>
     <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
-  <body class="flex">
-    <!-- Sidebar -->
-    <aside class="w-24 h-screen border-r border-gray-200 p-2">
-      <nav>
-        <a href="https://github.com/hoangvvo/llm-sdk" class="block">
-          <img
-            src="/logo-light.svg"
-            alt="Logo"
-            class="w-12 h-12 mx-auto mb-1 opacity-70 hover:opacity-80 transition-opacity"
-          />
-        </a>
-        <ul>
-          <li class="mb-2">
-            <a
-              href="/agent/"
-              class="flex gap-0.5 flex-col items-center text-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-2"
-            >
-              <Icon name="open-book" size="1.5rem" />
-              <span class="text-sm font-mono">Docs</span>
-            </a>
-          </li>
-          <li class="mb-2">
-            <a
-              href="/console/chat"
-              class="flex gap-0.5 flex-col items-center text-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-2"
-            >
-              <Icon name="comment" size="1.5rem" />
-              <span class="text-sm font-mono">Chat</span>
-            </a>
-          </li>
-          <li class="mb-2">
-            <a
-              href="/console/realtime"
-              class="flex gap-0.5 flex-col items-center text-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-2"
-            >
-              <Icon name="rss" size="1.5rem" />
-              <span class="text-sm font-mono">Realtime</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-    </aside>
-    <div class="flex-1 min-w-0">
+  <body class="flex flex-col lg:flex-row h-dvh">
+    <Nav />
+    <div class="flex-1 min-w-0 min-h-0">
       <slot />
     </div>
   </body>

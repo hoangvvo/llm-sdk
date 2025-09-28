@@ -10,7 +10,7 @@ export function ArtifactsPane({
   artifacts: Artifact[] | undefined;
   onDelete?: (id: string) => void;
 }) {
-  const list = artifacts ?? [];
+  const list = useMemo(() => artifacts ?? [], [artifacts]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = useMemo(
     () => list.find((a) => a.id === selectedId) ?? list[0],
@@ -40,7 +40,7 @@ export function ArtifactsPane({
     const next = new Map<string, string>();
     for (const a of list) next.set(a.id, a.content);
     prevMapRef.current = next;
-  }, [list]);
+  }, [list, selectedId]);
 
   if (list.length === 0) {
     return (
@@ -63,7 +63,7 @@ export function ArtifactsPane({
         </div>
       </div>
       <div className="overflow-x-auto overflow-y-hidden whitespace-nowrap">
-        <div className="-mb-px flex">
+        <div className="flex">
           {list.map((a) => {
             const isActive = selected.id === a.id;
             return (
@@ -98,38 +98,33 @@ function ArtifactViewer({
   onDelete?: (id: string) => void;
 }) {
   const [showDiff, setShowDiff] = useState(false);
-  const [lastDiffTokens, setLastDiffTokens] = useState<Change[] | null>(null);
-  const prevContentRef = useRef<string>(artifact?.content ?? "");
-  const timeoutRef = useRef<number | null>(null);
+  const prevContentMapRef = useRef<Map<string, string>>(new Map());
+  const [lastDiffTokensMap, setLastDiffTokensMap] = useState<
+    Record<string, Change[] | null>
+  >({});
+  const lastDiffTokens = lastDiffTokensMap[artifact?.id ?? ""] ?? null;
 
   useEffect(() => {
+    if (!artifact?.id) return;
     const curr = artifact?.content ?? "";
-    const prev = prevContentRef.current;
+    const prev = prevContentMapRef.current.get(artifact.id) ?? "";
     if (curr !== prev) {
       const tokens = diffWordsWithSpace(prev, curr);
-      setLastDiffTokens(tokens);
-      setShowDiff(true);
-      // hide diff after 5s then update prev
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = window.setTimeout(() => {
-        setShowDiff(false);
-        prevContentRef.current = curr;
-      }, 2000);
+      setLastDiffTokensMap((prev) => ({
+        ...prev,
+        [artifact.id]: tokens,
+      }));
+      prevContentMapRef.current.set(artifact.id, curr);
     }
-  }, [artifact?.content]);
-
-  useEffect(
-    () => () => {
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-    },
-    [],
-  );
+  }, [artifact?.content, artifact?.id]);
 
   return (
-    <div className="-mt-px flex min-h-0 flex-1 flex-col border border-slate-200 bg-white p-3 pb-2">
+    <div className="flex min-h-0 flex-1 flex-col border border-slate-200 bg-white px-3 py-1">
       <div className="mb-2">
-        <div className="font-semibold text-slate-800">{artifact?.title}</div>
-        <div className="text-xs text-slate-500">
+        <div className="truncate font-semibold text-slate-800">
+          {artifact?.title}
+        </div>
+        <div className="truncate text-xs text-slate-500">
           {artifact?.updated_at ?? ""}
         </div>
       </div>
@@ -162,26 +157,20 @@ function ArtifactViewer({
         )}
       </div>
       <div className="mt-0.5 flex justify-end gap-2">
-        {lastDiffTokens && !showDiff ? (
+        {lastDiffTokens && (
           <button
-            className="rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-100"
+            className={`rounded border border-amber-300 px-2 py-0.5 text-xs ${
+              showDiff
+                ? "border-green-300 bg-green-50 text-green-700"
+                : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+            }`}
             onClick={() => {
-              setShowDiff(true);
-              if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-              timeoutRef.current = window.setTimeout(() => {
-                setShowDiff(false);
-              }, 5000);
+              setShowDiff((v) => !v);
             }}
-            title="Show recent changes"
           >
-            Show changes
+            {showDiff ? "Hide changes" : "Show changes"}
           </button>
-        ) : null}
-        {showDiff ? (
-          <span className="rounded border border-green-300 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-            Changes applied
-          </span>
-        ) : null}
+        )}
         {artifact ? (
           <button
             className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50"

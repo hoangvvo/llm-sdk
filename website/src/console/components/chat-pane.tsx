@@ -111,13 +111,13 @@ function ConversationItem({ item }: { item: AgentItem }) {
           </div>
           <div className="mb-3">
             <div className="console-subheading">Input</div>
-            <pre className="mt-1 rounded-md bg-slate-100 p-3 text-xs break-words whitespace-pre-wrap text-slate-800">
+            <pre className="mt-1 max-h-[200px] overflow-y-auto rounded-md bg-slate-100 p-3 text-xs break-words whitespace-pre-wrap text-slate-800">
               {JSON.stringify(tool.input, null, 2)}
             </pre>
           </div>
           <div>
             <div className="console-subheading">Output</div>
-            <div className="max-h-[100px] overflow-y-auto">
+            <div className="max-h-[200px] overflow-y-auto">
               <PartsList parts={tool.output} />
             </div>
           </div>

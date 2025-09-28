@@ -244,10 +244,10 @@ impl AgentTool<MyContext> for GetNewsTool {
             "type": "object",
             "properties": {
                 "query": {
-                    "type": ["string", "null"],
+                    "type": "string",
                     "description": "Keywords or phrases to search for",
                     "maxLength": 500,
-                    "default": null
+                    "default": ""
                 },
                 "category": {
                     "type": "string",
@@ -256,9 +256,8 @@ impl AgentTool<MyContext> for GetNewsTool {
                     "default": "general"
                 },
                 "country": {
-                    "type": ["string", "null"],
-                    "description": "ISO 2-letter country code",
-                    "default": null
+                    "type": "string",
+                    "description": "ISO 2-letter country code"
                 },
                 "language": {
                     "type": "string",

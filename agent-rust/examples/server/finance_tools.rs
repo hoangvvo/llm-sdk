@@ -145,11 +145,11 @@ impl AgentTool<MyContext> for GetCryptoPriceTool {
                     "description": "Cryptocurrency symbol (e.g., bitcoin, ethereum)"
                 },
                 "currency": {
-                    "type": ["string", "null"],
+                    "type": "string",
                     "description": "Currency to get price in (default: usd)"
                 },
                 "include_market_data": {
-                    "type": ["boolean", "null"],
+                    "type": "boolean",
                     "description": "Include additional market data"
                 }
             },

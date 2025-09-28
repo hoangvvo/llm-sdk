@@ -82,7 +82,7 @@
   }
 
   .console-card-assistant {
-    @apply rounded-xl border border-sky-100 bg-sky-50/70 p-5;
+    @apply rounded-xl border border-sky-100 bg-sky-50/70 p-5 transition;
   }
 
   .console-card-tool {
@@ -90,7 +90,18 @@
   }
 
   .console-card-stream {
-    @apply rounded-xl border border-sky-100 bg-sky-50/70 p-5;
+    @apply rounded-xl border bg-sky-50/70 p-5 transition;
+    animation: pulsing-border 2s infinite;
+  }
+
+  @keyframes pulsing-border {
+    0%,
+    100% {
+      border-color: rgba(14, 164, 233, 0.4); /* sky-400 */
+    }
+    50% {
+      border-color: rgba(14, 164, 233, 0.1); /* sky-400 */
+    }
   }
 
   .console-card-source {

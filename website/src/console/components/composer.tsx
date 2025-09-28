@@ -46,7 +46,7 @@ export function Composer({
       }
       revokePreviews(attachments);
     };
-  }, []);
+  }, [attachments]);
 
   const canSubmit = useMemo(() => {
     const trimmed = inputText.trim();

@@ -2,45 +2,13 @@ import type { AudioPart } from "@hoangvvo/llm-sdk";
 import { useMicVAD, utils as vadUtils } from "@ricky0123/vad-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChatPane } from "./components/chat-pane.tsx";
-import {
-  Sidebar,
-  type ModelOption,
-  type ModelSelection,
-} from "./components/sidebar.tsx";
+import { ResponsiveSidebar } from "./components/sidebar.tsx";
 import { reduceArtifactsFromToolParts } from "./lib/artifacts.ts";
-import {
-  normalizeBaseUrl,
-  parseExampleServerUrls,
-} from "./lib/example-server.ts";
 import { useAgent } from "./lib/use-agent.ts";
 import { useAudio } from "./lib/use-audio.ts";
-import { useFetchInitialData } from "./lib/use-fetch-initial-data.ts";
-import { useLocalStorageState } from "./lib/use-local-storage-state.ts";
+import { useConsoleAppState } from "./lib/use-console-app-state.ts";
 import { base64ToArrayBuffer } from "./lib/utils.ts";
-import type {
-  AgentBehaviorSettings,
-  ApiKeys,
-  McpServerConfig,
-  ModelInfo,
-  MyContext,
-  ToolInfo,
-} from "./types.ts";
-
-const env = import.meta.env as Record<string, string | undefined>;
-
-const DEFAULT_API_BASE_URL = normalizeBaseUrl("http://localhost:4000");
-const STORAGE_KEY_SERVER_URL = "console-example-server-url";
-const EXAMPLE_SERVER_URL_OPTIONS = parseExampleServerUrls(
-  env.EXAMPLE_SERVER_URLS ?? env.PUBLIC_EXAMPLE_SERVER_URLS,
-);
-
-const STORAGE_KEY_MODEL = "console-selected-model";
-const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
-const STORAGE_KEY_CONTEXT = "console-user-context";
-const STORAGE_KEY_ENABLED_TOOLS = "console-enabled-tools";
-const STORAGE_KEY_DISABLED_INSTRUCTIONS = "console-disabled-instructions";
-const STORAGE_KEY_AGENT_BEHAVIOR = "console-agent-behavior";
-const STORAGE_KEY_MCP_SERVERS = "console-mcp-servers";
+import type { MyContext } from "./types.ts";
 
 type SessionPhase =
   | "idle"
@@ -95,257 +63,70 @@ interface MicVadState {
   toggle: () => void;
 }
 
+const REALTIME_HISTORY_STORAGE_KEY = "console-realtime-history";
+
 export function RealtimeApp() {
   const [visualVolume, setVisualVolume] = useState(0.12);
   const [turnCount, setTurnCount] = useState(0);
-
-  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
-  const [modelSelection, setModelSelection] =
-    useLocalStorageState<ModelSelection | null>(STORAGE_KEY_MODEL, null);
-  const [providerApiKeys, setProviderApiKeys] = useState<ApiKeys>({});
-  const [toolOptions, setToolOptions] = useState<ToolInfo[]>([]);
-  const [enabledTools, setEnabledTools] = useLocalStorageState<string[]>(
-    STORAGE_KEY_ENABLED_TOOLS,
-    () => [],
-  );
-  const [disabledInstructions, setDisabledInstructions] =
-    useLocalStorageState<boolean>(STORAGE_KEY_DISABLED_INSTRUCTIONS, false);
-  const [agentBehavior, setAgentBehavior] =
-    useLocalStorageState<AgentBehaviorSettings>(
-      STORAGE_KEY_AGENT_BEHAVIOR,
-      () => ({}),
-    );
-  const [userContext, setUserContext] = useLocalStorageState<MyContext>(
-    STORAGE_KEY_CONTEXT,
-    (() => ({})) as () => MyContext,
-  );
-  const [toolsInitialized, setToolsInitialized] = useState(false);
-  const [mcpServers, setMcpServers] = useLocalStorageState<McpServerConfig[]>(
-    STORAGE_KEY_MCP_SERVERS,
-    () => [],
-  );
-
-  const hasExampleServerOptions = EXAMPLE_SERVER_URL_OPTIONS.length > 0;
-  const [apiBaseUrl, setApiBaseUrl] = useLocalStorageState<string>(
-    STORAGE_KEY_SERVER_URL,
-    () => EXAMPLE_SERVER_URL_OPTIONS[0] ?? DEFAULT_API_BASE_URL,
-  );
-  const normalizedApiBaseUrl = useMemo(
-    () => normalizeBaseUrl(apiBaseUrl),
-    [apiBaseUrl],
-  );
-  const effectiveApiBaseUrl = hasExampleServerOptions
-    ? normalizedApiBaseUrl
-    : DEFAULT_API_BASE_URL;
-
-  useEffect(() => {
-    if (!hasExampleServerOptions) {
-      return;
-    }
-    if (!EXAMPLE_SERVER_URL_OPTIONS.includes(normalizedApiBaseUrl)) {
-      setApiBaseUrl(EXAMPLE_SERVER_URL_OPTIONS[0]);
-    }
-  }, [hasExampleServerOptions, normalizedApiBaseUrl, setApiBaseUrl]);
-
-  const handleServerUrlChange = useCallback(
-    (value: string) => {
-      setApiBaseUrl(normalizeBaseUrl(value));
-    },
-    [setApiBaseUrl],
-  );
-
-  const runStreamUrl = `${effectiveApiBaseUrl}/run-stream`;
-  const modelsUrl = `${effectiveApiBaseUrl}/models`;
-  const toolsUrl = `${effectiveApiBaseUrl}/tools`;
-
-  const [hasStoredToolPreference] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-    return window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLS) !== null;
-  });
-
-  const fetchModels = useCallback(
-    async (signal: AbortSignal) => {
-      const response = await fetch(modelsUrl, { signal });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch models (${String(response.status)})`);
-      }
-      return (await response.json()) as ModelInfo[];
-    },
-    [modelsUrl],
-  );
-
   const {
-    data: modelsData,
-    error: modelsError,
-    refetch: refetchModels,
-  } = useFetchInitialData(fetchModels);
-  useEffect(() => {
-    refetchModels();
-  }, [modelsUrl, refetchModels]);
-
-  useEffect(() => {
-    if (!modelsData) {
-      return;
-    }
-
-    const options = modelsData.map(mapModelInfo);
-    setModelOptions(options);
-    setProviderApiKeys((prev) => {
-      const next = { ...prev };
-      for (const option of options) {
-        const storageKey = getProviderApiKeyStorageKey(option.provider);
-        const storedValue = localStorage.getItem(storageKey);
-        if (storedValue) {
-          next[option.provider] = storedValue;
-        } else {
-          next[option.provider] = undefined;
-        }
-      }
-      return next;
-    });
-
-    if (options.length > 0) {
-      setModelSelection((current) => {
-        if (current) {
-          const stillValid = options.some(
-            (option) =>
-              option.provider === current.provider &&
-              option.modelId === current.modelId,
-          );
-          if (stillValid) {
-            return current;
-          }
-        }
-        return options[0];
-      });
-    } else {
-      setModelSelection(null);
-    }
-  }, [modelsData, setModelSelection]);
-
-  useEffect(() => {
-    if (!modelsError) {
-      return;
-    }
-    setModelOptions([]);
-    setModelSelection(null);
-  }, [modelsError, setModelSelection]);
-
-  const fetchTools = useCallback(
-    async (signal: AbortSignal) => {
-      const response = await fetch(toolsUrl, { signal });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tools (${String(response.status)})`);
-      }
-      return (await response.json()) as ToolInfo[];
-    },
-    [toolsUrl],
-  );
-
-  const {
-    data: toolsData,
-    error: toolsError,
-    refetch: refetchTools,
-  } = useFetchInitialData(fetchTools);
-  useEffect(() => {
-    refetchTools();
-  }, [refetchTools, toolsUrl]);
-
-  useEffect(() => {
-    if (!toolsData) {
-      return;
-    }
-
-    setToolOptions(toolsData);
-
-    const toolNames = toolsData.map((tool) => tool.name);
-
-    setEnabledTools((previous) => {
-      const baseSelection =
-        previous.length > 0 || hasStoredToolPreference ? previous : toolNames;
-      const baseSet = new Set(baseSelection);
-      const normalized = toolNames.filter((name) => baseSet.has(name));
-      if (arraysEqual(previous, normalized)) {
-        return previous;
-      }
-      return normalized;
-    });
-
-    setToolsInitialized(true);
-  }, [hasStoredToolPreference, setEnabledTools, toolsData]);
-
-  useEffect(() => {
-    if (!toolsError) {
-      return;
-    }
-    setToolOptions([]);
-    setToolsInitialized(true);
-  }, [toolsError]);
-
-  const handleSaveProviderApiKey = useCallback(
-    (provider: string, apiKey: string) => {
-      const trimmed = apiKey.trim();
-      setProviderApiKeys((prev) => {
-        const next = { ...prev };
-        const storageKey = getProviderApiKeyStorageKey(provider);
-        if (trimmed) {
-          next[provider] = trimmed;
-          localStorage.setItem(storageKey, trimmed);
-        } else {
-          next[provider] = undefined;
-          localStorage.removeItem(storageKey);
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const handleEnabledToolsChange = useCallback(
-    (next: string[]) => {
-      const toolNames = toolOptions.map((tool) => tool.name);
-      const toolNameSet = new Set(toolNames);
-      const allowed = new Set(next.filter((name) => toolNameSet.has(name)));
-      const normalized = toolNames.filter((name) => allowed.has(name));
-      setEnabledTools(normalized);
-      localStorage.setItem(
-        STORAGE_KEY_ENABLED_TOOLS,
-        JSON.stringify(normalized),
-      );
-    },
-    [toolOptions],
-  );
-
-  const handleMcpServersChange = useCallback(
-    (next: McpServerConfig[]) => {
-      setMcpServers(next);
-    },
-    [setMcpServers],
-  );
+    serverOptions,
+    serverUrl,
+    handleServerUrlChange,
+    runStreamUrl,
+    modelOptions,
+    modelSelection,
+    setModelSelection,
+    selectedModelOption,
+    providerApiKeys,
+    handleSaveProviderApiKey,
+    toolOptions,
+    toolsError,
+    toolsInitialized,
+    enabledTools,
+    handleEnabledToolsChange,
+    mcpServers,
+    handleMcpServersChange,
+    agentBehavior,
+    setAgentBehavior,
+    userContext,
+    setUserContext,
+    modelAudio,
+    setModelAudio,
+    modelReasoning,
+    setModelReasoning,
+    modelModalities,
+    setModelModalities,
+  } = useConsoleAppState<MyContext>();
 
   const { add16BitPCM, interruptPlayback, isPlaying } = useAudio();
+
+  const hasServerOptions = serverOptions.length > 0;
 
   const {
     isStreaming: agentIsStreaming,
     error: agentError,
+    setError: setAgentError,
     sendUserMessage,
     abort: abortAgent,
     items,
     nextItems,
     streamingParts,
+    resetConversation,
   } = useAgent<MyContext>(
     {
       runStreamUrl,
       modelSelection,
+      model: selectedModelOption ?? null,
       providerApiKeys,
       userContext,
       enabledTools,
       mcpServers,
-      disabledInstructions,
       agentBehavior,
       toolsInitialized,
+      audio: modelAudio,
+      reasoning: modelReasoning,
+      modalities: modelModalities,
+      historyStorageKey: REALTIME_HISTORY_STORAGE_KEY,
     },
     {
       onAudioDelta: (delta) => {
@@ -380,7 +161,7 @@ export function RealtimeApp() {
       void interruptPlayback();
     }
     setSpeechStarted(true);
-  }, [abortAgent, agentIsStreaming, isPlaying]);
+  }, [abortAgent, agentIsStreaming, isPlaying, interruptPlayback]);
 
   const handleSpeechEnd = useCallback(
     (audio: Float32Array) => {
@@ -526,9 +307,16 @@ export function RealtimeApp() {
     toggle();
   }, [loading, toggle]);
 
+  const handleNewChat = useCallback(() => {
+    resetConversation();
+    setAgentError(null);
+    setTurnCount(0);
+    setSpeechStarted(false);
+  }, [resetConversation, setAgentError]);
+
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-rose-50 font-mono text-slate-900">
-      <section className="flex min-w-0 flex-1 items-center justify-center border-slate-200/60 bg-white/60 backdrop-blur">
+    <div className="flex h-full w-full flex-col-reverse bg-gradient-to-br from-slate-50 via-white to-rose-50 font-mono text-slate-900 lg:flex-row">
+      <section className="flex min-w-0 flex-1 items-center justify-center">
         <div
           className="flex flex-col items-center gap-10 px-6 text-center"
           aria-live="polite"
@@ -568,21 +356,30 @@ export function RealtimeApp() {
           </div>
         </div>
       </section>
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
-        <ChatPane items={allItems} streamingParts={streamingParts} />
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col border-slate-200/70 lg:border-l">
+        <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-2">
+          <p className="text-xs font-semibold tracking-[0.25em] text-slate-700 uppercase">
+            Transcript
+          </p>
+          <button
+            type="button"
+            className="console-button"
+            onClick={handleNewChat}
+          >
+            New Chat
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <ChatPane items={allItems} streamingParts={streamingParts} />
+        </div>
       </section>
-      <Sidebar
-        serverOptions={
-          hasExampleServerOptions ? EXAMPLE_SERVER_URL_OPTIONS : []
-        }
-        serverUrl={hasExampleServerOptions ? normalizedApiBaseUrl : undefined}
-        onServerUrlChange={
-          hasExampleServerOptions ? handleServerUrlChange : undefined
-        }
+      <ResponsiveSidebar
+        serverOptions={hasServerOptions ? serverOptions : undefined}
+        serverUrl={hasServerOptions ? serverUrl : undefined}
+        onServerUrlChange={hasServerOptions ? handleServerUrlChange : undefined}
         models={modelOptions}
         selection={modelSelection}
         onModelSelectionChange={setModelSelection}
-        modelSelectionErrorMessage={modelsError}
         apiKeys={providerApiKeys}
         onSaveApiKey={handleSaveProviderApiKey}
         context={userContext}
@@ -595,9 +392,13 @@ export function RealtimeApp() {
         toolErrorMessage={toolsError}
         mcpServers={mcpServers}
         onMcpServersChange={handleMcpServersChange}
-        disabledInstructions={disabledInstructions}
-        onDisabledInstructionsChange={setDisabledInstructions}
         toolsInitialized={toolsInitialized}
+        modelAudio={modelAudio}
+        onModelAudioChange={setModelAudio}
+        modelReasoning={modelReasoning}
+        onModelReasoningChange={setModelReasoning}
+        modelModalities={modelModalities}
+        onModelModalitiesChange={setModelModalities}
       />
     </div>
   );
@@ -728,47 +529,4 @@ function StopIcon({ className }: { className?: string }) {
       <rect x="7" y="7" width="10" height="10" rx="2" />
     </svg>
   );
-}
-
-function mapModelInfo(info: ModelInfo): ModelOption {
-  return {
-    provider: info.provider,
-    modelId: info.model_id,
-    label: `${formatProviderName(info.provider)} – ${info.model_id}`,
-    metadata: info.metadata,
-  };
-}
-
-function arraysEqual<T>(left: T[], right: T[]): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (left.length !== right.length) {
-    return false;
-  }
-  for (let index = 0; index < left.length; index += 1) {
-    if (left[index] !== right[index]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function formatProviderName(provider: string): string {
-  const lookup: Record<string, string> = {
-    openai: "OpenAI",
-    "openai-chat-completion": "OpenAI (Chat Completions API)",
-    anthropic: "Anthropic",
-    google: "Google",
-    cohere: "Cohere",
-    mistral: "Mistral",
-  };
-  if (lookup[provider]) {
-    return lookup[provider];
-  }
-  return provider.replace(/-/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
-}
-
-function getProviderApiKeyStorageKey(provider: string): string {
-  return `${STORAGE_KEY_PROVIDER_PREFIX}${provider}`;
 }

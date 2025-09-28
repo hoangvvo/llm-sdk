@@ -273,7 +273,7 @@
     },
     {
       "provider": "cohere",
-      "model_id": "command-a-translate-08-2025",
+      "model_id": "command-a-reasoning-08-2025",
       "metadata": {
         "pricing": {
           "input_cost_per_text_token": 2.5e-6,

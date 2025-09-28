@@ -6,35 +6,43 @@ import type {
   AgentStreamPartialEvent,
 } from "@hoangvvo/llm-agent";
 import type {
+  AudioOptions,
   AudioPart,
   AudioPartDelta,
   ImagePart,
+  Modality,
   Part,
+  ReasoningOptions,
   ReasoningPart,
   TextPart,
   ToolCallPart,
 } from "@hoangvvo/llm-sdk";
 import { stream as eventStream } from "fetch-event-stream";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ModelSelection } from "../components/sidebar.tsx";
 import type {
   AgentBehaviorSettings,
   ApiKeys,
   LoggedEvent,
   McpServerConfig,
 } from "../types.ts";
+import type { ModelOption, ModelSelection } from "./use-console-app-state.ts";
+import { useLocalStorageState } from "./use-local-storage-state.ts";
 import { createId } from "./utils.ts";
 
 interface UseAgentConfig<Context> {
   runStreamUrl: string;
   modelSelection: ModelSelection | null;
+  model: ModelOption | null | undefined;
   providerApiKeys: ApiKeys;
   userContext: Context;
   enabledTools: string[];
   mcpServers: McpServerConfig[];
-  disabledInstructions: boolean;
   agentBehavior: AgentBehaviorSettings;
   toolsInitialized: boolean;
+  audio: AudioOptions | undefined;
+  reasoning: ReasoningOptions | undefined;
+  modalities: Modality[] | undefined;
+  historyStorageKey?: string;
 }
 
 interface UseAgentOptions {
@@ -82,21 +90,29 @@ function isAbortError(error: unknown): boolean {
 
 export function useAgent<Context>(
   config: UseAgentConfig<Context>,
-  options: UseAgentOptions = {},
+  { onAudioDelta, onToolResult }: UseAgentOptions = {},
 ): UseAgentReturn {
   const {
     runStreamUrl,
     modelSelection,
+    model,
     providerApiKeys,
     userContext,
     enabledTools,
     mcpServers,
-    disabledInstructions,
     agentBehavior,
     toolsInitialized,
+    audio,
+    reasoning,
+    modalities,
+    historyStorageKey,
   } = config;
 
-  const [items, setItems] = useState<AgentItem[]>([]);
+  const hasHistoryKey = Boolean(historyStorageKey);
+  const [items, setItems] = useLocalStorageState<AgentItem[]>(
+    historyStorageKey ?? "__agent-history-noop__",
+    () => [],
+  );
   const [nextItems, setNextItems] = useState<AgentItem[]>([]);
   const [streamingParts, setStreamingParts] = useState<Part[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -105,6 +121,7 @@ export function useAgent<Context>(
 
   const itemsRef = useRef<AgentItem[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const hasHydratedRef = useRef(!hasHistoryKey);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -141,11 +158,24 @@ export function useAgent<Context>(
     setItems([]);
     setNextItems([]);
     setStreamingParts([]);
-  }, [abort]);
+    itemsRef.current = [];
+  }, [abort, setItems]);
+
+  const hydrateConversation = useCallback(
+    (history: AgentItem[]) => {
+      abort();
+      setItems(history);
+      itemsRef.current = history;
+      setNextItems([]);
+      setStreamingParts([]);
+      hasHydratedRef.current = true;
+    },
+    [abort, setItems],
+  );
 
   const runAgent = useCallback(
     async (pendingUserItems: AgentItem[]) => {
-      if (!modelSelection) {
+      if (!modelSelection || !model) {
         setError("Select a model before sending a message");
         return;
       }
@@ -170,18 +200,21 @@ export function useAgent<Context>(
         const inputPayload = {
           provider: modelSelection.provider,
           model_id: modelSelection.modelId,
+          metadata: model.metadata,
           input: {
             input: conversation,
             context: userContext,
           } satisfies AgentRequest<Context>,
           enabled_tools: toolsInitialized ? enabledTools : undefined,
           mcp_servers: prepareMcpServerPayload(mcpServers),
-          disabled_instructions: disabledInstructions,
           temperature: agentBehavior.temperature,
           top_p: agentBehavior.top_p,
           top_k: agentBehavior.top_k,
           frequency_penalty: agentBehavior.frequency_penalty,
           presence_penalty: agentBehavior.presence_penalty,
+          audio,
+          reasoning,
+          modalities,
         };
 
         logEvent("client", "request", inputPayload);
@@ -225,7 +258,7 @@ export function useAgent<Context>(
             const deltaPart = parsed.delta?.part;
             if (deltaPart?.type === "audio" && deltaPart.audio_data) {
               try {
-                await options.onAudioDelta?.(deltaPart);
+                await onAudioDelta?.(deltaPart);
               } catch (err) {
                 console.error("Failed to handle audio delta", err);
               }
@@ -248,7 +281,7 @@ export function useAgent<Context>(
                 input: Record<string, unknown>;
               };
               try {
-                await options.onToolResult?.(
+                await onToolResult?.(
                   toolItem.tool_name,
                   toolItem.output,
                   toolItem.input,
@@ -305,16 +338,22 @@ export function useAgent<Context>(
       }
     },
     [
+      audio,
       agentBehavior,
-      disabledInstructions,
       enabledTools,
       logEvent,
       modelSelection,
-      options.onAudioDelta,
+      model,
+      modalities,
+      mcpServers,
+      onAudioDelta,
+      onToolResult,
       providerApiKeys,
+      reasoning,
       runStreamUrl,
       toolsInitialized,
       userContext,
+      setItems,
     ],
   );
 
@@ -353,9 +392,11 @@ export function useAgent<Context>(
       sendConversation,
       abort,
       resetConversation,
+      hydrateConversation,
     }),
     [
       abort,
+      hydrateConversation,
       error,
       eventLog,
       isStreaming,

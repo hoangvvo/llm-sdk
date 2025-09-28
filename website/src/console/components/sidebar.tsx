@@ -1,6 +1,15 @@
-import type { LanguageModelMetadata } from "@hoangvvo/llm-sdk";
+import type {
+  AudioOptions,
+  LanguageModelMetadata,
+  Modality,
+  ReasoningOptions,
+} from "@hoangvvo/llm-sdk";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type {
+  ModelOption,
+  ModelSelection,
+} from "../lib/use-console-app-state.ts";
 import type {
   AgentBehaviorSettings,
   ApiKeys,
@@ -9,15 +18,7 @@ import type {
   ToolInfo,
 } from "../types";
 
-export interface ModelSelection {
-  provider: string;
-  modelId: string;
-}
-
-export interface ModelOption extends ModelSelection {
-  label: string;
-  metadata?: LanguageModelMetadata;
-}
+const MODALITY_OPTIONS: Modality[] = ["text", "image", "audio"];
 
 interface SidebarProps {
   serverOptions?: string[];
@@ -26,7 +27,6 @@ interface SidebarProps {
   models: ModelOption[];
   selection: ModelSelection | null;
   onModelSelectionChange: Dispatch<SetStateAction<ModelSelection | null>>;
-  modelSelectionErrorMessage?: string | null;
   apiKeys: ApiKeys;
   onSaveApiKey: (provider: string, apiKey: string) => void;
   context: MyContext;
@@ -39,19 +39,65 @@ interface SidebarProps {
   toolErrorMessage?: string | null;
   mcpServers: McpServerConfig[];
   onMcpServersChange: (servers: McpServerConfig[]) => void;
-  disabledInstructions: boolean;
-  onDisabledInstructionsChange: (value: boolean) => void;
   toolsInitialized: boolean;
+  modelAudio: AudioOptions | undefined;
+  onModelAudioChange: (audio: AudioOptions | undefined) => void;
+  modelReasoning: ReasoningOptions | undefined;
+  onModelReasoningChange: (reasoning: ReasoningOptions | undefined) => void;
+  modelModalities: Modality[] | undefined;
+  onModelModalitiesChange: (modalities: Modality[] | undefined) => void;
 }
 
-export function Sidebar({
+export function ResponsiveSidebar(props: SidebarProps) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  return (
+    <>
+      <div className="hidden lg:block">
+        <Sidebar {...props} />
+      </div>
+      <button
+        type="button"
+        aria-label="Open settings"
+        className="fixed right-0 bottom-1/2 z-20 flex items-center justify-center rounded-l-full border border-r-0 border-slate-300 bg-white/80 px-3 py-2 text-[11px] font-semibold tracking-[0.3em] text-slate-900 uppercase backdrop-blur transition hover:bg-white/80 lg:hidden"
+        onClick={() => {
+          setIsSidebarOpen(true);
+        }}
+      >
+        Menu
+      </button>
+      {isSidebarOpen ? (
+        <div className="fixed inset-x-0 top-0 z-40 flex h-full flex-col overflow-hidden lg:hidden">
+          <div className="flex items-center justify-between bg-white px-6 py-4">
+            <p className="text-xs font-semibold tracking-[0.3em] text-slate-700 uppercase">
+              Console Settings
+            </p>
+            <button
+              type="button"
+              className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-slate-700 uppercase transition hover:border-slate-400 hover:text-slate-900"
+              onClick={() => {
+                setIsSidebarOpen(false);
+              }}
+            >
+              Close
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto border-t border-slate-200/70">
+            <Sidebar {...props} />
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function Sidebar({
   serverOptions,
   serverUrl,
   onServerUrlChange,
   models,
   selection,
   onModelSelectionChange,
-  modelSelectionErrorMessage,
   apiKeys,
   onSaveApiKey,
   context,
@@ -64,12 +110,34 @@ export function Sidebar({
   toolErrorMessage,
   mcpServers,
   onMcpServersChange,
-  disabledInstructions,
-  onDisabledInstructionsChange,
   toolsInitialized,
+  modelAudio,
+  onModelAudioChange,
+  modelReasoning,
+  onModelReasoningChange,
+  modelModalities,
+  onModelModalitiesChange,
 }: SidebarProps) {
+  const selectedModel = useMemo(() => {
+    if (!selection) {
+      return null;
+    }
+    return (
+      models.find(
+        (item) =>
+          item.provider === selection.provider &&
+          item.modelId === selection.modelId,
+      ) ?? null
+    );
+  }, [models, selection]);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
+  const [behaviorOpen, setBehaviorOpen] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
+  const [featuresOpen, setFeaturesOpen] = useState(false);
+
   return (
-    <aside className="flex h-full w-96 shrink-0 flex-col overflow-auto border-l border-slate-200/70 bg-white/60 px-6 py-6 backdrop-blur-sm">
+    <aside className="flex h-full w-full flex-col overflow-auto bg-white/60 px-6 py-6 backdrop-blur-sm lg:w-[360px] lg:shrink-0 lg:border-l lg:border-slate-200/70">
       <div className="space-y-6">
         <ServerSelectionSection
           options={serverOptions}
@@ -80,27 +148,324 @@ export function Sidebar({
           models={models}
           selection={selection}
           onChange={onModelSelectionChange}
-          errorMessage={modelSelectionErrorMessage}
           apiKeys={apiKeys}
           onSaveApiKey={onSaveApiKey}
         />
-        <ToolSection
-          tools={tools}
-          enabledTools={enabledTools}
-          onEnabledToolsChange={onEnabledToolsChange}
-          errorMessage={toolErrorMessage}
-          initialized={toolsInitialized}
-        />
-        <McpServerSection servers={mcpServers} onChange={onMcpServersChange} />
-        <AgentBehaviorSection
-          behavior={behavior}
-          onChange={onBehaviorChange}
-          disabledInstructions={disabledInstructions}
-          onDisabledInstructionsChange={onDisabledInstructionsChange}
-        />
-        <ContextSection context={context} onChange={onContextChange} />
+        <CollapsibleSection
+          title="Model Features"
+          isOpen={featuresOpen}
+          onToggle={() => {
+            setFeaturesOpen((prev) => !prev);
+          }}
+        >
+          <ModelFeaturesSection
+            selectedModel={selectedModel}
+            audio={modelAudio}
+            onAudioChange={onModelAudioChange}
+            reasoning={modelReasoning}
+            onReasoningChange={onModelReasoningChange}
+            modalities={modelModalities}
+            onModalitiesChange={onModelModalitiesChange}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          title={`Tools (${tools.length})`}
+          isOpen={toolsOpen}
+          onToggle={() => {
+            setToolsOpen((prev) => !prev);
+          }}
+        >
+          <ToolSection
+            tools={tools}
+            enabledTools={enabledTools}
+            onEnabledToolsChange={onEnabledToolsChange}
+            errorMessage={toolErrorMessage}
+            initialized={toolsInitialized}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          title={`MCP Servers (${mcpServers.length})`}
+          isOpen={mcpOpen}
+          onToggle={() => {
+            setMcpOpen((prev) => !prev);
+          }}
+        >
+          <McpServerSection
+            servers={mcpServers}
+            onChange={onMcpServersChange}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          title="Sampling Parameters"
+          isOpen={behaviorOpen}
+          onToggle={() => {
+            setBehaviorOpen((prev) => !prev);
+          }}
+        >
+          <AgentBehaviorSection
+            behavior={behavior}
+            onChange={onBehaviorChange}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          title="Context"
+          isOpen={contextOpen}
+          onToggle={() => {
+            setContextOpen((prev) => !prev);
+          }}
+        >
+          <ContextSection context={context} onChange={onContextChange} />
+        </CollapsibleSection>
       </div>
     </aside>
+  );
+}
+
+interface CollapsibleSectionProps {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}
+
+function CollapsibleSection({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: CollapsibleSectionProps) {
+  return (
+    <div className="space-y-3">
+      <button
+        type="button"
+        className={`flex w-full items-center justify-between rounded-md border border-slate-300 bg-white px-4 py-2 text-left text-xs font-semibold tracking-[0.2em] uppercase transition focus:ring-2 focus:ring-slate-500 focus:outline-none ${
+          isOpen
+            ? "text-slate-900 shadow-sm"
+            : "text-slate-600 hover:text-slate-900"
+        }`}
+        onClick={onToggle}
+        aria-expanded={isOpen}
+      >
+        <span>{title}</span>
+        <span
+          className={`text-base leading-none ${
+            isOpen ? "text-slate-900" : "text-slate-400"
+          }`}
+        >
+          {isOpen ? "▾" : "▸"}
+        </span>
+      </button>
+      {isOpen ? children : null}
+    </div>
+  );
+}
+
+interface ModelFeaturesSectionProps {
+  selectedModel: ModelOption | null;
+  audio: AudioOptions | undefined;
+  onAudioChange: (audio: AudioOptions | undefined) => void;
+  reasoning: ReasoningOptions | undefined;
+  onReasoningChange: (reasoning: ReasoningOptions | undefined) => void;
+  modalities: Modality[] | undefined;
+  onModalitiesChange: (modalities: Modality[] | undefined) => void;
+}
+
+function ModelFeaturesSection({
+  selectedModel,
+  audio,
+  onAudioChange,
+  reasoning,
+  onReasoningChange,
+  modalities,
+  onModalitiesChange,
+}: ModelFeaturesSectionProps) {
+  const audioEnabled = audio !== undefined;
+  const reasoningEnabled = reasoning?.enabled ?? false;
+  const currentModalities = modalities ?? selectedModel?.modalities ?? [];
+
+  const handleAudioToggle = (enabled: boolean) => {
+    if (enabled) {
+      onAudioChange(audio ?? selectedModel?.audio ?? { format: "linear16" });
+    } else {
+      onAudioChange(undefined);
+    }
+  };
+
+  const updateAudioField = (field: keyof AudioOptions, value: string) => {
+    const base = audio ?? selectedModel?.audio ?? { format: "" };
+    const next = { ...base, [field]: value } as AudioOptions;
+    onAudioChange(next);
+  };
+
+  const handleReasoningToggle = (enabled: boolean) => {
+    if (enabled) {
+      const base = reasoning ?? selectedModel?.reasoning ?? { enabled: true };
+      onReasoningChange({ ...base, enabled: true });
+    } else {
+      onReasoningChange(undefined);
+    }
+  };
+
+  const handleReasoningBudgetChange = (value: string) => {
+    if (value.trim() === "") {
+      if (!reasoning) {
+        return;
+      }
+      onReasoningChange({ ...reasoning, budget_tokens: undefined });
+      return;
+    }
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+    onReasoningChange({
+      ...(reasoning ?? { enabled: true }),
+      budget_tokens: parsed,
+    });
+  };
+
+  const handleModalitiesToggle = (modality: Modality, enabled: boolean) => {
+    const nextSet = new Set(currentModalities);
+    if (enabled) {
+      nextSet.add(modality);
+    } else {
+      nextSet.delete(modality);
+    }
+    const ordered = MODALITY_OPTIONS.filter((item) =>
+      nextSet.has(item),
+    ) as Modality[];
+    onModalitiesChange(ordered);
+  };
+
+  const handleResetDefaults = () => {
+    onAudioChange(selectedModel?.audio ?? undefined);
+    onReasoningChange(selectedModel?.reasoning ?? undefined);
+    onModalitiesChange(selectedModel?.modalities ?? undefined);
+  };
+
+  return (
+    <div className="console-surface space-y-4">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="console-label flex! items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+              checked={audioEnabled}
+              onChange={(event) => {
+                handleAudioToggle(event.target.checked);
+              }}
+            />
+            Enable audio output
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          Configure audio generation parameters for supported models.
+        </p>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <label className="console-label text-[11px]">
+            Audio format
+            <input
+              type="text"
+              className="console-field mt-1 w-full"
+              value={audio?.format ?? ""}
+              onChange={(event) => {
+                updateAudioField("format", event.target.value);
+              }}
+              disabled={!audioEnabled}
+              placeholder="e.g. linear16"
+            />
+          </label>
+          <label className="console-label text-[11px]">
+            Voice
+            <input
+              type="text"
+              className="console-field mt-1 w-full"
+              value={(audio as { voice?: string })?.voice ?? ""}
+              onChange={(event) => {
+                updateAudioField("voice", event.target.value);
+              }}
+              disabled={!audioEnabled}
+              placeholder="e.g. alloy"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="console-label flex! items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+              checked={reasoningEnabled}
+              onChange={(event) => {
+                handleReasoningToggle(event.target.checked);
+              }}
+            />
+            Enable reasoning
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          Enable reasoning tokens on reasoning models.
+        </p>
+        <label className="console-label text-[11px]">
+          Budget tokens
+          <input
+            type="number"
+            className="console-field mt-1 w-full"
+            value={
+              (reasoning as { budget_tokens?: number })?.budget_tokens ?? ""
+            }
+            onChange={(event) => {
+              handleReasoningBudgetChange(event.target.value);
+            }}
+            disabled={!reasoningEnabled}
+            min="0"
+            step="1"
+          />
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="console-label text-xs">Modalities</span>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          Select which content modalities the model may generate.
+        </p>
+        <div className="space-y-1">
+          {MODALITY_OPTIONS.map((modality) => {
+            const checked = currentModalities.includes(modality);
+            return (
+              <label
+                key={modality}
+                className="flex items-center gap-2 text-[11px] text-slate-600"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+                  checked={checked}
+                  onChange={(event) => {
+                    handleModalitiesToggle(modality, event.target.checked);
+                  }}
+                />
+                {modality}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="console-button console-button-quiet w-full text-[11px]"
+        onClick={handleResetDefaults}
+        disabled={!selectedModel}
+      >
+        Reset to defaults
+      </button>
+    </div>
   );
 }
 
@@ -145,7 +510,6 @@ interface ModelSelectionSectionProps {
   models: ModelOption[];
   selection: ModelSelection | null;
   onChange: Dispatch<SetStateAction<ModelSelection | null>>;
-  errorMessage?: string | null;
   apiKeys: ApiKeys;
   onSaveApiKey: (provider: string, apiKey: string) => void;
 }
@@ -154,7 +518,6 @@ function ModelSelectionSection({
   models,
   selection,
   onChange,
-  errorMessage,
   apiKeys,
   onSaveApiKey,
 }: ModelSelectionSectionProps) {
@@ -253,7 +616,7 @@ function ModelSelectionSection({
           </div>
         ) : (
           <div className="console-surface mt-3 text-sm text-slate-500">
-            {errorMessage ?? "Loading models…"}
+            Loading models…
           </div>
         )}
       </div>
@@ -325,15 +688,11 @@ function ModelSelectionSection({
 interface AgentBehaviorSectionProps {
   behavior: AgentBehaviorSettings;
   onChange: Dispatch<SetStateAction<AgentBehaviorSettings>>;
-  disabledInstructions: boolean;
-  onDisabledInstructionsChange: (value: boolean) => void;
 }
 
 function AgentBehaviorSection({
   behavior,
   onChange,
-  disabledInstructions,
-  onDisabledInstructionsChange,
 }: AgentBehaviorSectionProps) {
   const handleNumberChange =
     (key: keyof AgentBehaviorSettings, parser: (value: string) => number) =>
@@ -355,9 +714,8 @@ function AgentBehaviorSection({
 
   return (
     <div className="console-surface space-y-3">
-      <h2 className="console-section-title">Agent Behavior</h2>
       <p className="text-xs text-slate-500">
-        Tune sampling parameters for the agent.
+        Tune sampling parameters for the model.
       </p>
       <div className="grid grid-cols-1 gap-3">
         <NumberField
@@ -409,27 +767,6 @@ function AgentBehaviorSection({
           )}
         />
       </div>
-      <div className="border-t border-slate-200/70 pt-3">
-        <label className="flex items-start gap-3 text-xs text-slate-600">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
-            checked={disabledInstructions}
-            onChange={(event) => {
-              onDisabledInstructionsChange(event.target.checked);
-            }}
-          />
-          <span>
-            <span className="font-semibold text-slate-700">
-              Disable system instructions
-            </span>
-            <p className="text-[11px] leading-snug text-slate-500">
-              Prevents default instructions from being sent to the model
-              (workaround for some legacy models)
-            </p>
-          </span>
-        </label>
-      </div>
     </div>
   );
 }
@@ -466,7 +803,6 @@ function ToolSection({
 
   return (
     <div className="console-surface space-y-3">
-      <h2 className="console-section-title">Tools</h2>
       <p className="text-xs text-slate-500">
         Toggle which tools the agent can invoke during a run.
       </p>
@@ -475,10 +811,10 @@ function ToolSection({
           {tools.map((tool) => {
             const checked = enabledTools.includes(tool.name);
             return (
-              <li key={tool.name} className="flex items-start gap-2">
+              <li key={tool.name} className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
                   checked={checked}
                   onChange={(event) => {
                     handleToggleTool(tool.name, event.target.checked);
@@ -586,7 +922,6 @@ function McpServerSection({ servers, onChange }: McpServerSectionProps) {
 
   return (
     <div className="console-surface space-y-3">
-      <h2 className="console-section-title">MCP Servers</h2>
       <p className="text-xs text-slate-500">
         Connect Model Context Protocol servers to access additional tools.
       </p>
@@ -762,7 +1097,6 @@ interface ContextSectionProps {
 function ContextSection({ context, onChange }: ContextSectionProps) {
   return (
     <div className="console-surface space-y-3">
-      <h2 className="console-section-title">Context</h2>
       <p className="text-xs text-slate-500">
         Provide optional details the agent can use for its instructions and
         tools.
