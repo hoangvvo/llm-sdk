@@ -1,6 +1,7 @@
 use dotenvy::dotenv;
 use llm_agent::BoxedError;
 use llm_sdk::{
+    anthropic::{AnthropicModel, AnthropicModelOptions},
     google::{GoogleModel, GoogleModelOptions},
     openai::{OpenAIChatModel, OpenAIChatModelOptions, OpenAIModel, OpenAIModelOptions},
     LanguageModel, LanguageModelMetadata,
@@ -49,6 +50,22 @@ pub fn get_model(
             )
             .with_metadata(metadata);
             Ok(Arc::new(model))
+        }
+        "anthropic" => {
+            let api_key = api_key
+                .or_else(|| env::var("ANTHROPIC_API_KEY").ok())
+                .ok_or_else(|| missing_env("ANTHROPIC_API_KEY"))?;
+
+            Ok(Arc::new(
+                AnthropicModel::new(
+                    model_id,
+                    AnthropicModelOptions {
+                        api_key,
+                        ..Default::default()
+                    },
+                )
+                .with_metadata(metadata),
+            ))
         }
         "google" => {
             let api_key = api_key

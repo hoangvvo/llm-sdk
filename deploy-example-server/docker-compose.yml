@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    networks:
+      - proxy
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
@@ -26,7 +28,10 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.rust-server.rule=Host(`llm-sdk-server.hoangvvo.com`) && PathPrefix(`/rust-server`)"
       - "traefik.http.middlewares.rust-server-stripprefix.stripprefix.prefixes=/rust-server"
+      - "traefik.http.routers.rust-server.middlewares=rust-server-stripprefix"
       - "traefik.http.routers.rust-server.entrypoints=web"
+    env_file:
+      - .env
 
   go-server:
     image: hoangvvodev/llm-sdk:latest
@@ -38,7 +43,10 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.go-server.rule=Host(`llm-sdk-server.hoangvvo.com`) && PathPrefix(`/go-server`)"
       - "traefik.http.middlewares.go-server-stripprefix.stripprefix.prefixes=/go-server"
+      - "traefik.http.routers.go-server.middlewares=go-server-stripprefix"
       - "traefik.http.routers.go-server.entrypoints=web"
+    env_file:
+      - .env
 
 networks:
   proxy:

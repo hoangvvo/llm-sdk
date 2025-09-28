@@ -121,10 +121,12 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
+const appUrl = process.env["APP_URL"] ?? "http://localhost:4321";
+
 http
   .createServer((req, res) => {
     // CORS headers
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:4321");
+    res.setHeader("Access-Control-Allow-Origin", appUrl);
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader(
       "Access-Control-Allow-Headers",

@@ -353,6 +353,12 @@ export function RealtimeApp() {
                 Loading voice activity detector…
               </p>
             ) : null}
+            {!selectedModelOption?.modalities?.includes("audio") ? (
+              <p className="max-w-sm text-xs text-amber-500">
+                Selected model does not support audio input. Please select a
+                different model in the sidebar.
+              </p>
+            ) : null}
           </div>
         </div>
       </section>

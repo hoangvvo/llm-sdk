@@ -1,6 +1,6 @@
 # llm-sdk
 
-`llm-sdk` is an open-source suite for building production LLM workflows with a consistent developer experience across languages. It ships two libraries:
+`llm-sdk` is an open-source suite for building production LLM applications. It ships two libraries:
 
 - **LLM SDK** – cross-language clients (JavaScript, Rust, Go) that talk to multiple LLM providers through one `LanguageModel` interface.
 - **LLM Agent** – a minimal, transparent agent library that orchestrates model generations and tool executions using the SDK under the hood.
@@ -14,7 +14,7 @@
 | `llm-agent`                     | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-agent?style=flat-square)](https://crates.io/crates/llm-agent)                               | [crates.io](https://crates.io/crates/llm-agent)                  |
 | `github.com/hoangvvo/llm-agent` | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/agent-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) | [GitHub](https://github.com/hoangvvo/llm-sdk/tree/main/agent-go) |
 
-The accompanying [Console app](./website) demonstrates the libraries end-to-end.
+The accompanying [Console app](https://llm-sdk.hoangvvo.com/console/chat/) demonstrates the libraries end-to-end.
 
 ![Console Chat Application screenshot](./website/assets/console-chat.png)
 
@@ -23,13 +23,13 @@ The accompanying [Console app](./website) demonstrates the libraries end-to-end.
 ## Why use llm-sdk
 
 - Supports multiple LLM providers with a unified API.
-- Handles multiple modalities: Text, Image, and Audio.
-- Supports streaming, including for image and audio.
-- Supports multi-modality tool results (image/audio returned from tools).
+- Handles multiple modalities: Text, Image, and Audio. Supports streaming.
+- Supports multi-modality function calling (image/audio returned from tools).
 - Supports citations (RAG) and reasoning for supported models.
 - Reports token usage and calculates the cost of a request when provided with the model’s pricing information.
 - Unified serialization across programming languages (systems in different languages can work together).
 - Integrates OpenTelemetry for tracing.
+- _Zero abstraction_: the agent library is a thin for-loop around the SDK. No overcomplex abstractions like chains, graphs, or hidden prompt templates.
 
 ## LLM SDKs
 

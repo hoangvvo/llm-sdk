@@ -184,6 +184,8 @@ async fn main() -> Result<(), BoxedError> {
 
     let state = AppState { available_tools };
 
+    let app_url = env::var("APP_URL").unwrap_or_else(|_| "http://localhost:4321".to_string());
+
     // Create router
     let app = Router::new()
         .route("/", get(home_handler))
@@ -191,7 +193,7 @@ async fn main() -> Result<(), BoxedError> {
         .route("/tools", get(list_tools_handler))
         .layer(
             CorsLayer::new()
-                .allow_origin(["http://localhost:4321".parse().unwrap()])
+                .allow_origin([app_url.parse().unwrap()])
                 .allow_methods(["GET", "POST", "OPTIONS"].map(|m| m.parse().unwrap()))
                 .allow_headers(["content-type", "authorization"].map(|h| h.parse().unwrap()))
                 .allow_credentials(true),
