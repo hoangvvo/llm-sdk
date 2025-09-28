@@ -99,20 +99,20 @@ where
                 AgentError::Invariant("No items in the run state.".to_string())
             })?;
 
-            let mut content: Vec<Part> = Vec::new();
+            let mut content: Option<Vec<Part>> = None;
             let mut processed_tool_call_ids: HashSet<String> = HashSet::new();
 
             match last_item {
                 AgentItem::Model(model_response) => {
                     // ========== Case: Assistant Message [from AgentItemModelResponse] ==========
                     // Last item is a model response, process it
-                    content = model_response.content;
+                    content = Some(model_response.content);
                 }
                 AgentItem::Message(message) => match message {
                     Message::Assistant(assistant_message) => {
                         // ========== Case: Assistant Message [from AgentItemMessage] ==========
                         // Last item is an assistant message, process it
-                        content = assistant_message.content;
+                        content = Some(assistant_message.content);
                     }
                     Message::User(_) => {
                         // ========== Case: User Message ==========
@@ -157,7 +157,7 @@ where
                                 ))?
                             }
                         };
-                        content = resolved;
+                        content = Some(resolved);
                     }
                 },
                 AgentItem::Tool(_) => {
@@ -173,7 +173,7 @@ where
                             }
                             AgentItem::Model(model_response) => {
                                 // Found the originating model response
-                                content = model_response.content.clone();
+                                content = Some(model_response.content);
                                 break;
                             }
                             AgentItem::Message(message) => match message {
@@ -188,7 +188,7 @@ where
                                 }
                                 Message::Assistant(assistant_message) => {
                                     // Found the originating model response
-                                    content = assistant_message.content.clone();
+                                    content = Some(assistant_message.content);
                                     break;
                                 }
                                 Message::User(_) => {
@@ -199,20 +199,14 @@ where
                             },
                         }
                     }
-
-                    if content.is_empty() {
-                        Err(AgentError::Invariant(
-                            "No model or assistant message found before tool results.".to_string(),
-                        ))?;
-                    }
                 }
             }
 
-            let content = if content.is_empty() {
-                Err(AgentError::Invariant("No assistant content found to process.".to_string()))
-            } else {
-                Ok(content)
-            }?;
+            let content = content
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| AgentError::Invariant(
+                    "No assistant content found to process.".to_string(),
+                ))?;
 
             let tool_call_parts: Vec<ToolCallPart> = content
                 .iter()
@@ -253,14 +247,13 @@ where
                         AgentError::Invariant(format!("Tool {tool_name} not found for tool call"))
                     })?;
 
-                let input_args = args.clone();
                 let tool_name_value = agent_tool.name();
                 let tool_description = agent_tool.description();
                 let tool_res = start_tool_span(
                     &tool_call_id,
                     &tool_name_value,
                     &tool_description,
-                    agent_tool.execute(args, &context_val, run_state),
+                    agent_tool.execute(args.clone(), &context_val, run_state),
                 )
                 .await
                 .map_err(AgentError::ToolExecution)?;
@@ -268,7 +261,7 @@ where
                 let item = AgentItemTool {
                     tool_call_id,
                     tool_name,
-                    input: input_args,
+                    input: args,
                     output: tool_res.content,
                     is_error: tool_res.is_error,
                 };
