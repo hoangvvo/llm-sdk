@@ -99,20 +99,20 @@ where
                 AgentError::Invariant("No items in the run state.".to_string())
             })?;
 
-            let mut content: Option<Vec<Part>> = None;
+            let mut content: Vec<Part> = Vec::new();
             let mut processed_tool_call_ids: HashSet<String> = HashSet::new();
 
             match last_item {
                 AgentItem::Model(model_response) => {
                     // ========== Case: Assistant Message [from AgentItemModelResponse] ==========
                     // Last item is a model response, process it
-                    content = Some(model_response.content);
+                    content = model_response.content;
                 }
                 AgentItem::Message(message) => match message {
                     Message::Assistant(assistant_message) => {
                         // ========== Case: Assistant Message [from AgentItemMessage] ==========
                         // Last item is an assistant message, process it
-                        content = Some(assistant_message.content);
+                        content = assistant_message.content;
                     }
                     Message::User(_) => {
                         // ========== Case: User Message ==========
@@ -157,7 +157,7 @@ where
                                 ))?
                             }
                         };
-                        content = Some(resolved);
+                        content = resolved;
                     }
                 },
                 AgentItem::Tool(_) => {
@@ -173,7 +173,7 @@ where
                             }
                             AgentItem::Model(model_response) => {
                                 // Found the originating model response
-                                content = Some(model_response.content.clone());
+                                content = model_response.content.clone();
                                 break;
                             }
                             AgentItem::Message(message) => match message {
@@ -188,7 +188,7 @@ where
                                 }
                                 Message::Assistant(assistant_message) => {
                                     // Found the originating model response
-                                    content = Some(assistant_message.content.clone());
+                                    content = assistant_message.content.clone();
                                     break;
                                 }
                                 Message::User(_) => {
@@ -200,7 +200,7 @@ where
                         }
                     }
 
-                    if content.is_none() {
+                    if content.is_empty() {
                         Err(AgentError::Invariant(
                             "No model or assistant message found before tool results.".to_string(),
                         ))?;
@@ -208,9 +208,11 @@ where
                 }
             }
 
-            let content = content.ok_or_else(|| {
-                AgentError::Invariant("No assistant content found to process.".to_string())
-            })?;
+            let content = if content.is_empty() {
+                Err(AgentError::Invariant("No assistant content found to process.".to_string()))
+            } else {
+                Ok(content)
+            }?;
 
             let tool_call_parts: Vec<ToolCallPart> = content
                 .iter()

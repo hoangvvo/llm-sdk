@@ -222,6 +222,10 @@ export class RunSession<TContext> {
       }
     }
 
+    if (!content.length) {
+      throw new AgentInvariantError("No content in the assistant message.");
+    }
+
     const toolCallParts = content.filter((part) => part.type === "tool-call");
 
     if (!toolCallParts.length) {
