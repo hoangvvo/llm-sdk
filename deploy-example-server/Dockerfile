@@ -12,7 +12,8 @@ COPY --from=agent-go . ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o ./server ./examples/server
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN update-ca-certificates
 COPY --from=rust-builder /usr/local/cargo/bin/server /usr/local/bin/rustserver
 COPY --from=go-builder /usr/src/app/server /usr/local/bin/goserver
 EXPOSE 4000

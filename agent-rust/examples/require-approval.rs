@@ -198,7 +198,7 @@ fn log_item(item: &AgentItem) {
         AgentItem::Model(response) => {
             let text = render_parts(&response.content);
             if !text.is_empty() {
-                println!("\n[assistant]\n{}", text);
+                println!("\n[assistant]\n{text}");
             }
         }
         AgentItem::Tool(tool) => {
@@ -207,7 +207,7 @@ fn log_item(item: &AgentItem) {
             println!("  input={input}");
             let output = render_parts(&tool.output);
             if !output.is_empty() {
-                println!("  output={}", output);
+                println!("  output={output}");
             }
         }
     }

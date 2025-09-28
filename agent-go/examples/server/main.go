@@ -11,6 +11,7 @@ import (
 	"slices"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmmcp "github.com/hoangvvo/llm-sdk/agent-go/mcp"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 )
@@ -47,7 +48,11 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	apiKey := r.Header.Get("Authorization")
-	model := getModel(req.Provider, req.ModelID, req.Metadata, apiKey)
+	model, err := examples.GetModel(req.Provider, req.ModelID, req.Metadata, apiKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var enabledTools []string
 	if req.EnabledTools != nil {

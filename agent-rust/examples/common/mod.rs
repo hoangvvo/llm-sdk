@@ -1,4 +1,3 @@
-use dotenvy::dotenv;
 use llm_agent::BoxedError;
 use llm_sdk::{
     anthropic::{AnthropicModel, AnthropicModelOptions},
@@ -6,11 +5,7 @@ use llm_sdk::{
     openai::{OpenAIChatModel, OpenAIChatModelOptions, OpenAIModel, OpenAIModelOptions},
     LanguageModel, LanguageModelMetadata,
 };
-use std::{
-    env,
-    io::{Error as IoError, ErrorKind},
-    sync::Arc,
-};
+use std::{env, sync::Arc};
 
 pub fn get_model(
     provider: &str,
@@ -18,13 +13,11 @@ pub fn get_model(
     metadata: LanguageModelMetadata,
     api_key: Option<String>,
 ) -> Result<Arc<dyn LanguageModel + Send + Sync>, BoxedError> {
-    dotenv().ok();
-
     match provider {
         "openai" => {
             let api_key = api_key
                 .or_else(|| env::var("OPENAI_API_KEY").ok())
-                .ok_or_else(|| missing_env("OPENAI_API_KEY"))?;
+                .ok_or_else(|| "OPENAI_API_KEY is not set".to_string())?;
 
             Ok(Arc::new(
                 OpenAIModel::new(
@@ -40,21 +33,23 @@ pub fn get_model(
         "openai-chat-completion" => {
             let api_key = api_key
                 .or_else(|| env::var("OPENAI_API_KEY").ok())
-                .ok_or_else(|| missing_env("OPENAI_API_KEY"))?;
-            let model = OpenAIChatModel::new(
-                model_id,
-                OpenAIChatModelOptions {
-                    api_key,
-                    ..Default::default()
-                },
-            )
-            .with_metadata(metadata);
-            Ok(Arc::new(model))
+                .ok_or_else(|| "OPENAI_API_KEY is not set".to_string())?;
+
+            Ok(Arc::new(
+                OpenAIChatModel::new(
+                    model_id,
+                    OpenAIChatModelOptions {
+                        api_key,
+                        ..Default::default()
+                    },
+                )
+                .with_metadata(metadata),
+            ))
         }
         "anthropic" => {
             let api_key = api_key
                 .or_else(|| env::var("ANTHROPIC_API_KEY").ok())
-                .ok_or_else(|| missing_env("ANTHROPIC_API_KEY"))?;
+                .ok_or_else(|| "ANTHROPIC_API_KEY is not set".to_string())?;
 
             Ok(Arc::new(
                 AnthropicModel::new(
@@ -70,7 +65,7 @@ pub fn get_model(
         "google" => {
             let api_key = api_key
                 .or_else(|| env::var("GOOGLE_API_KEY").ok())
-                .ok_or_else(|| missing_env("GOOGLE_API_KEY"))?;
+                .ok_or_else(|| "GOOGLE_API_KEY is not set".to_string())?;
 
             Ok(Arc::new(
                 GoogleModel::new(
@@ -83,13 +78,6 @@ pub fn get_model(
                 .with_metadata(metadata),
             ))
         }
-        _ => Err(Box::new(IoError::new(
-            ErrorKind::InvalidInput,
-            format!("Unsupported provider: {provider}"),
-        ))),
+        _ => Err(format!("Unsupported provider: {provider}").into()),
     }
-}
-
-fn missing_env(var: &str) -> BoxedError {
-    format!("{var} is not set").into()
 }

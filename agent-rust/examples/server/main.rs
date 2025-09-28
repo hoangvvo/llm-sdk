@@ -10,7 +10,6 @@ use axum::{
 use context::MyContext;
 use dotenvy::dotenv;
 use futures::{stream::Stream, StreamExt};
-use get_model::get_model;
 use llm_agent::{mcp::MCPParams, AgentRequest, BoxedError};
 use llm_sdk::{AudioOptions, LanguageModelMetadata, Modality, ReasoningOptions};
 use serde::{Deserialize, Serialize};
@@ -19,9 +18,10 @@ use tower_http::cors::CorsLayer;
 
 mod agent;
 mod artifacts_tools;
+#[path = "../common/mod.rs"]
+mod common;
 mod context;
 mod finance_tools;
-mod get_model;
 mod information_tools;
 mod weather_tools;
 
@@ -80,19 +80,19 @@ async fn run_stream_handler(
         modalities,
     } = body;
 
-    let model = get_model(&provider, &model_id, metadata, api_key)
+    let model = common::get_model(&provider, &model_id, metadata, api_key)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if let Some(ref mcp_servers_list) = mcp_servers {
         for mcp_server in mcp_servers_list {
-            if matches!(mcp_server, MCPParams::Stdio(_)) {
-                if env::var("ALLOW_STDIO_MCP").unwrap_or_default() != "true" {
-                    return Err((
-                        StatusCode::BAD_REQUEST,
-                        "Stdio MCP server is not allowed. Set ALLOW_STDIO_MCP=true to allow it."
-                            .to_string(),
-                    ));
-                }
+            if matches!(mcp_server, MCPParams::Stdio(_))
+                && env::var("ALLOW_STDIO_MCP").unwrap_or_default() != "true"
+            {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Stdio MCP server is not allowed. Set ALLOW_STDIO_MCP=true to allow it."
+                        .to_string(),
+                ));
             }
         }
     }

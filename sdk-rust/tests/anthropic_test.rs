@@ -67,7 +67,7 @@ test_set!(
             input.reasoning = Some(ReasoningOptions {
                 enabled: true,
                 budget_tokens: Some(3000),
-            })
+            });
         }),
         ..Default::default()
     })
@@ -81,7 +81,7 @@ test_set!(
             input.reasoning = Some(ReasoningOptions {
                 enabled: true,
                 budget_tokens: Some(3000),
-            })
+            });
         }),
         ..Default::default()
     })

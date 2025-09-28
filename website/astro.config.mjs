@@ -68,6 +68,10 @@ export default defineConfig({
           ],
         },
         {
+          label: "Integrations",
+          items: [{ slug: "integrations/vercel-ai-sdk" }],
+        },
+        {
           label: "Observability",
           items: [{ slug: "observability/tracing" }],
         },

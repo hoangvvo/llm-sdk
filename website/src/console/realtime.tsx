@@ -316,9 +316,9 @@ export function RealtimeApp() {
 
   return (
     <div className="flex h-full w-full flex-col-reverse bg-gradient-to-br from-slate-50 via-white to-rose-50 font-mono text-slate-900 lg:flex-row">
-      <section className="flex min-w-0 flex-1 items-center justify-center">
+      <section className="flex min-w-0 flex-none items-center justify-center lg:flex-1">
         <div
-          className="flex flex-col items-center gap-10 px-6 text-center"
+          className="flex flex-col items-center gap-10 px-6 py-8 text-center"
           aria-live="polite"
           aria-label={statusAnnouncement}
         >

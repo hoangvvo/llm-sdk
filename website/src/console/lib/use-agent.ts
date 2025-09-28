@@ -525,10 +525,9 @@ function reduceContentDelta(
         next[index]?.type === "reasoning"
           ? (next[index] as ReasoningPart)
           : { type: "reasoning", text: "" };
-      const separator = previousReasoning.text ? "\n" : "";
       next[index] = {
         ...previousReasoning,
-        text: `${previousReasoning.text}${separator}${part.text}`,
+        text: `${previousReasoning.text ?? ""}${part.text ?? ""}`,
         signature: part.signature ?? previousReasoning.signature,
         id: part.id ?? previousReasoning.id,
       } satisfies ReasoningPart;
