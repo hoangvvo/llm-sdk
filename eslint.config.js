@@ -12,7 +12,7 @@ const gitignorePath = join(import.meta.dirname, ".gitignore");
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
-  globalIgnores(["**/node_modules/**", "**/dist/**"]),
+  globalIgnores(["**/node_modules/**", "**/dist/**", "**/*.d.ts"]),
   includeIgnoreFile(gitignorePath, "Imported .gitignore patterns"),
   {
     files: ["**/*.{js,mjs,cjs,ts}"],

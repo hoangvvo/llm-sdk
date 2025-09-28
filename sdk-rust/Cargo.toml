@@ -47,6 +47,4 @@ utoipa = { version = "5", optional = true }
 dotenvy = { version = "0.15.7" }
 paste = "1.0.15"
 regex = "1.11.1"
-rodio = "0.17"
 tokio = { version = "1.42.0", features = ["full"] }
-viuer = "0.7"

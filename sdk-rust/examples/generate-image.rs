@@ -42,26 +42,7 @@ async fn main() {
         fs::write(&file_name, image_bytes).expect("failed to write image file");
         println!("Saved image to {file_name}");
 
-        println!("Rendering image to terminal...");
-        // viuer prints the image directly in supported terminals
-        let config = viuer::Config::default();
-        if let Err(e) = viuer::print_from_file(&file_name, &config) {
-            eprintln!("Failed to render image: {e}");
-        }
-
-        println!("---");
-        // Try to open with the default image viewer
-        let _ = if cfg!(target_os = "macos") {
-            Command::new("open").arg(&file_name).status()
-        } else if cfg!(target_os = "linux") {
-            Command::new("xdg-open").arg(&file_name).status()
-        } else if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .args(["/C", "start", "", &file_name])
-                .status()
-        } else {
-            Err(std::io::Error::other("unsupported OS for auto-open"))
-        };
+        _ = open_file(&file_name);
 
         sleep(Duration::from_secs(5)).await;
         let _ = fs::remove_file(&file_name);
@@ -69,4 +50,25 @@ async fn main() {
     } else {
         eprintln!("Image part not found in response");
     }
+}
+
+fn open_file(path: &str) -> std::io::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").arg(path).status()?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open").arg(path).status()?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "", path])
+            .status()?;
+    }
+
+    Ok(())
 }

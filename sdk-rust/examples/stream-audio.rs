@@ -1,24 +1,21 @@
+// Requires ffplay (https://ffmpeg.org/) on PATH.
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
 use futures::StreamExt;
 use llm_sdk::{AudioFormat, AudioOptions, LanguageModelInput, Message, Modality, Part, PartDelta};
-use rodio::{buffer::SamplesBuffer, OutputStream, Sink};
+use serde_json::Value;
+use std::{
+    io::Write,
+    process::{Child, ChildStdin, Command, Stdio},
+};
 
 mod common;
-
-fn bytes_to_i16_le_samples(bytes: &[u8]) -> Vec<i16> {
-    let mut out = Vec::with_capacity(bytes.len() / 2);
-    for chunk in bytes.chunks_exact(2) {
-        out.push(i16::from_le_bytes([chunk[0], chunk[1]]));
-    }
-    out
-}
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai", "gpt-4o-audio-preview");
+    let model = common::get_model("openai-chat-completion", "gpt-4o-audio-preview");
 
     let mut stream = model
         .stream(LanguageModelInput {
@@ -36,50 +33,128 @@ async fn main() {
         .await
         .expect("failed to start stream");
 
-    // Lazy init: keep OutputStream alive and reuse its Sink
-    let mut out_stream: Option<(OutputStream, rodio::OutputStreamHandle, Sink)> = None;
+    let mut sample_rate: Option<u32> = None;
+    let mut channels: Option<u32> = None;
+    let mut ffplay: Option<(Child, ChildStdin)> = None;
 
     while let Some(item) = stream.next().await {
         let chunk = item.expect("stream error");
-        println!("{chunk:#?}");
+        log_partial(&chunk);
 
         if let Some(delta) = chunk.delta {
-            let part = delta.part; // not an Option
-            if let PartDelta::Audio(a) = part {
-                // audio_data is a String, not Option<String>
-                if let Some(b64_data) = a.audio_data {
-                    let sample_rate: u32 = a.sample_rate.unwrap_or(24_000);
-                    let channels: u32 = a.channels.unwrap_or(1);
+            if let PartDelta::Audio(audio) = delta.part {
+                if let Some(format) = audio.format {
+                    if format != AudioFormat::Linear16 {
+                        panic!("unsupported audio format: {format:?}");
+                    }
+                }
+                if let Some(b64) = audio.audio_data {
+                    let bytes = BASE64_STANDARD
+                        .decode(b64.as_bytes())
+                        .expect("invalid base64 audio");
 
-                    // Ensure audio output is initialized
-                    if out_stream.is_none() {
-                        let (s, h) =
-                            OutputStream::try_default().expect("no default audio output device");
-                        let k = Sink::try_new(&h).expect("failed creating sink");
-                        out_stream = Some((s, h, k));
+                    if sample_rate.is_none() {
+                        sample_rate = Some(audio.sample_rate.unwrap_or(24_000));
+                    }
+                    if channels.is_none() {
+                        channels = Some(audio.channels.unwrap_or(1));
                     }
 
-                    // Get a mutable handle to the sink
-                    let sink = &mut out_stream.as_mut().unwrap().2;
+                    if ffplay.is_none() {
+                        let rate = sample_rate.unwrap();
+                        let ch = channels.unwrap();
+                        ffplay = Some(start_ffplay(rate, ch));
+                        println!(
+                            "Streaming audio with ffplay ({} Hz, {} channel{}).",
+                            rate,
+                            ch,
+                            if ch == 1 { "" } else { "s" },
+                        );
+                    }
 
-                    // Decode base64 -> bytes -> i16 samples
-                    let bytes = BASE64_STANDARD
-                        .decode(b64_data.as_bytes())
-                        .expect("invalid base64 audio");
-                    let samples = bytes_to_i16_le_samples(&bytes);
-
-                    // Append chunk to the sink (seamless streaming)
-                    let source =
-                        SamplesBuffer::new(u16::try_from(channels).unwrap(), sample_rate, samples);
-                    sink.append(source);
+                    if let Some((_, ref mut stdin)) = ffplay {
+                        stdin
+                            .write_all(&bytes)
+                            .expect("failed to write audio to ffplay");
+                    }
                 }
             }
         }
     }
 
-    // Let the queued audio finish
-    if let Some((_, _, sink)) = out_stream {
-        sink.sleep_until_end();
-        println!("Playback finished");
+    if let Some((child, stdin)) = ffplay {
+        finish_ffplay(child, stdin);
+    }
+}
+
+fn start_ffplay(sample_rate: u32, channels: u32) -> (Child, ChildStdin) {
+    let mut child = Command::new("ffplay")
+        .args([
+            "-loglevel",
+            "error",
+            "-autoexit",
+            "-nodisp",
+            "-f",
+            "s16le",
+            "-ar",
+            &sample_rate.to_string(),
+            "-i",
+            "pipe:0",
+            "-af",
+            &format!(
+                "aformat=channel_layouts={}",
+                if channels <= 1 { "mono" } else { "stereo" }
+            ),
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .expect("failed to start ffplay");
+
+    let stdin = child.stdin.take().expect("ffplay stdin unavailable");
+    (child, stdin)
+}
+
+fn finish_ffplay(mut child: Child, mut stdin: ChildStdin) {
+    stdin.flush().expect("failed to flush ffplay stdin");
+    drop(stdin);
+
+    let status = child.wait().expect("failed to wait for ffplay");
+    if !status.success() {
+        panic!("ffplay exited with error");
+    }
+}
+
+fn log_partial(partial: &llm_sdk::PartialModelResponse) {
+    match serde_json::to_value(partial) {
+        Ok(mut value) => {
+            redact_audio_data(&mut value);
+            println!("{value:#?}");
+        }
+        Err(_) => println!("{partial:#?}"),
+    }
+}
+
+fn redact_audio_data(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            if let Some(Value::String(data)) = map.get_mut("audio_data") {
+                if let Ok(bytes) = BASE64_STANDARD.decode(data.as_bytes()) {
+                    *data = format!("[{} bytes]", bytes.len());
+                } else {
+                    *data = "[invalid audio_data]".to_string();
+                }
+            }
+            for entry in map.values_mut() {
+                redact_audio_data(entry);
+            }
+        }
+        Value::Array(array) => {
+            for item in array.iter_mut() {
+                redact_audio_data(item);
+            }
+        }
+        _ => {}
     }
 }

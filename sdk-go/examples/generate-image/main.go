@@ -13,8 +13,6 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
-
-	"github.com/qeesung/image2ascii/convert"
 )
 
 func main() {
@@ -61,16 +59,6 @@ func main() {
 			}
 			log.Println("Saved image to", fileName)
 
-			log.Println("Rendering image to terminal...")
-			converter := convert.NewImageConverter()
-			// Basic defaults; tune as needed
-			opts := convert.DefaultOptions
-			opts.FixedWidth = 80
-			opts.Colored = true
-			ascii := converter.ImageFile2ASCIIString(fileName, &opts)
-			fmt.Println(ascii)
-
-			fmt.Println("---")
 			_ = openFile(fileName)
 
 			time.Sleep(5 * time.Second)

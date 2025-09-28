@@ -1,7 +1,11 @@
+// Requires ffplay (https://ffmpeg.org/) on PATH.
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
 use llm_sdk::{AudioFormat, AudioOptions, LanguageModelInput, Message, Modality, Part};
-use std::io::Cursor;
+use std::{
+    io::Write,
+    process::{Command, Stdio},
+};
 
 mod common;
 
@@ -9,7 +13,7 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai", "gpt-4o-audio-preview");
+    let model = common::get_model("openai-chat-completion", "gpt-4o-audio-preview");
 
     let response = model
         .generate(LanguageModelInput {
@@ -37,13 +41,29 @@ async fn main() {
             .decode(&audio_part.audio_data)
             .expect("invalid base64 audio data");
 
-        let cursor = Cursor::new(audio_bytes);
-        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-        let sink = rodio::Sink::try_new(&stream_handle).unwrap();
+        play(&audio_bytes).expect("ffplay playback failed");
+    } else {
+        println!("Audio part not found in response");
+    }
+}
 
-        let source = rodio::Decoder::new(cursor).unwrap();
-        sink.append(source);
+fn play(audio: &[u8]) -> std::io::Result<()> {
+    let mut child = Command::new("ffplay")
+        .args(["-autoexit", "-nodisp", "-loglevel", "error", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .spawn()?;
 
-        sink.sleep_until_end();
+    {
+        let stdin = child.stdin.as_mut().expect("ffplay stdin unavailable");
+        stdin.write_all(audio)?;
+    }
+
+    let status = child.wait()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other("ffplay exited with error"))
     }
 }
