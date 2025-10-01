@@ -258,7 +258,7 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 
 	if input.MaxTokens != nil {
 		maxTokens := int(*input.MaxTokens)
-		params.MaxTokens = &maxTokens
+		params.MaxCompletionTokens = &maxTokens
 	}
 
 	if len(input.Modalities) > 0 {

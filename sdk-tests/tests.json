@@ -619,6 +619,58 @@
       }
     },
     {
+      "name": "generate_image",
+      "type": "generate",
+      "input": {
+        "modalities": ["text", "image"],
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Generate an image of a red apple on a white background."
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "content": [
+          {
+            "type": "image",
+            "id": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "stream_image",
+      "type": "stream",
+      "input": {
+        "modalities": ["text", "image"],
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Generate an image of a red apple on a white background."
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "content": [
+          {
+            "type": "image",
+            "id": false
+          }
+        ]
+      }
+    },
+    {
       "name": "generate_reasoning",
       "type": "generate",
       "input": {

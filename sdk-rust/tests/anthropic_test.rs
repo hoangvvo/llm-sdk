@@ -48,6 +48,18 @@ test_set!(anthropic_model(), structured_response_format);
 test_set!(anthropic_model(), source_part_input);
 
 test_set!(
+    ignore = "model does not support image generation",
+    anthropic_model(),
+    generate_image
+);
+
+test_set!(
+    ignore = "model does not support image generation",
+    anthropic_model(),
+    stream_image
+);
+
+test_set!(
     ignore = "model does not support audio generation",
     anthropic_model(),
     generate_audio

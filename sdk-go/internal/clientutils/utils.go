@@ -66,9 +66,11 @@ func DoJSON[T any](ctx context.Context, client *http.Client, config JSONRequestC
 		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(respBody))
 	}
 
+	decoder := json.NewDecoder(bytes.NewReader(respBody))
+
 	// Unmarshal response
 	var result T
-	if err := json.Unmarshal(respBody, &result); err != nil {
+	if err := decoder.Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 

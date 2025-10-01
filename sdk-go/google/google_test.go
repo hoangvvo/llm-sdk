@@ -13,6 +13,7 @@ import (
 
 var model *google.GoogleModel
 var audioModel *google.GoogleModel
+var imageModel *google.GoogleModel
 var reasoningModel *google.GoogleModel
 
 func TestMain(m *testing.M) {
@@ -26,6 +27,9 @@ func TestMain(m *testing.M) {
 		APIKey: apiKey,
 	})
 	audioModel = google.NewGoogleModel("gemini-2.5-flash-preview-tts", google.GoogleModelOptions{
+		APIKey: apiKey,
+	})
+	imageModel = google.NewGoogleModel("gemini-2.5-flash-image-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
 	reasoningModel = google.NewGoogleModel("gemini-2.0-flash-thinking-exp-01-21", google.GoogleModelOptions{
@@ -81,6 +85,14 @@ func TestStructuredResponseFormat(t *testing.T) {
 
 func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
+}
+
+func TestGenerateImage(t *testing.T) {
+	testcommon.RunTestCase(t, imageModel, "generate_image")
+}
+
+func TestStreamImage(t *testing.T) {
+	testcommon.RunTestCase(t, imageModel, "stream_image")
 }
 
 func TestGenerateAudio(t *testing.T) {

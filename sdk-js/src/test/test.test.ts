@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
 import test, { suite, type TestContext } from "node:test";
 import type { ModelResponse } from "../types.ts";
 import { MockLanguageModel } from "./test.ts";

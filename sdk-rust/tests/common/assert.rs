@@ -124,6 +124,39 @@ impl AudioPartAssertion {
 }
 
 #[derive(Debug, Clone)]
+pub struct ImagePartAssertion {
+    pub id: bool,
+}
+
+impl ImagePartAssertion {
+    pub fn assert(&self, content: &[Part]) -> Result<(), String> {
+        let found_part = content.iter().find(|part| {
+            if let Part::Image(image_part) = part {
+                if image_part.data.is_empty() {
+                    return false;
+                }
+                if self.id && image_part.id.is_none() {
+                    return false;
+                }
+                true
+            } else {
+                false
+            }
+        });
+
+        if found_part.is_none() {
+            return Err(format!(
+                "Expected matching image part:\nID required: {}\nReceived:\n{}",
+                self.id,
+                serde_json::to_string_pretty(content).unwrap()
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ReasoningPartAssertion {
     pub text: Regex,
 }
@@ -155,6 +188,7 @@ pub enum PartAssertion {
     Text(TextPartAssertion),
     ToolCall(ToolCallPartAssertion),
     Audio(AudioPartAssertion),
+    Image(ImagePartAssertion),
     Reasoning(ReasoningPartAssertion),
 }
 
@@ -164,6 +198,7 @@ impl PartAssertion {
             Self::Text(text_assertion) => text_assertion.assert(content),
             Self::ToolCall(tool_call_assertion) => tool_call_assertion.assert(content),
             Self::Audio(audio_assertion) => audio_assertion.assert(content),
+            Self::Image(image_assertion) => image_assertion.assert(content),
             Self::Reasoning(reasoning_assertion) => reasoning_assertion.assert(content),
         }
     }

@@ -179,7 +179,6 @@ function convertToOpenAICreateParams(
   const params: Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> = {
     model: modelId,
     messages: convertToOpenAIMessages(messages, system_prompt),
-    max_tokens: max_tokens ?? null,
     temperature: temperature ?? null,
     top_p: top_p ?? null,
     presence_penalty: presence_penalty ?? null,
@@ -188,6 +187,9 @@ function convertToOpenAICreateParams(
     modalities: modalities?.map(convertToOpenAIModality) ?? null,
     ...extra,
   };
+  if (typeof max_tokens === "number") {
+    params.max_completion_tokens = max_tokens;
+  }
   if (tools) {
     params.tools = tools.map(convertToOpenAITool);
   }

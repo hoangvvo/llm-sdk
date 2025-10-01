@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
-
 import {
   runTestCase,
   TEST_CASE_NAMES,
@@ -81,6 +79,22 @@ suite("AnthropicModel", () => {
   test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
   });
+
+  test(
+    TEST_CASE_NAMES.GENERATE_IMAGE,
+    { skip: "model does not support image generation" },
+    (t) => {
+      return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE);
+    },
+  );
+
+  test(
+    TEST_CASE_NAMES.STREAM_IMAGE,
+    { skip: "model does not support image generation" },
+    (t) => {
+      return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE);
+    },
+  );
 
   test(
     TEST_CASE_NAMES.GENERATE_AUDIO,

@@ -82,6 +82,16 @@ func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
 }
 
+func TestGenerateImage(t *testing.T) {
+	t.Skip("model does not support image generation")
+	testcommon.RunTestCase(t, model, "generate_image")
+}
+
+func TestStreamImage(t *testing.T) {
+	t.Skip("model does not support image generation")
+	testcommon.RunTestCase(t, model, "stream_image")
+}
+
 func TestGenerateAudio(t *testing.T) {
 	t.Skip("model does not support audio")
 	testcommon.RunTestCase(t, model, "generate_audio")

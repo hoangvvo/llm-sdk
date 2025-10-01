@@ -28,7 +28,7 @@ interface TestCaseJSON {
   input_tools?: string[];
   output: {
     content: {
-      type: "text" | "tool_call" | "audio" | "reasoning";
+      type: "text" | "tool_call" | "audio" | "image" | "reasoning";
       text?: string;
       tool_name?: string;
       args?: Record<string, string>;
@@ -100,6 +100,11 @@ function jsonToTestCase(jsonCase: TestCaseJSON): TestCase {
           id: part.id,
           transcript: part.transcript ? new RegExp(part.transcript) : undefined,
         } as PartAssertion;
+      } else if (part.type === "image") {
+        return {
+          type: "image",
+          id: part.id,
+        } as PartAssertion;
       } else if (part.type === "reasoning" && part.text) {
         return {
           type: "reasoning",
@@ -138,6 +143,8 @@ export const TEST_CASE_NAMES = {
   SOURCE_PART_INPUT: "source_part_input",
   GENERATE_AUDIO: "generate_audio",
   STREAM_AUDIO: "stream_audio",
+  GENERATE_IMAGE: "generate_image",
+  STREAM_IMAGE: "stream_image",
   GENERATE_REASONING: "generate_reasoning",
   STREAM_REASONING: "stream_reasoning",
 } as const;

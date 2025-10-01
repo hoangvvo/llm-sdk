@@ -11,7 +11,7 @@ type Scanner struct {
 	scanner *bufio.Scanner
 }
 
-const MaxScanTokenSize = 256 * 1024 // 256KB
+const MaxScanTokenSize = 5 * 1024 * 1024 // 5MB
 
 // NewScanner creates a new SSE scanner from an io.Reader
 func NewScanner(reader io.Reader) *Scanner {

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
 import { randomUUID } from "node:crypto";
 import {
   createServer,
@@ -439,7 +438,6 @@ suite("MCP toolkit", () => {
       { type: "image", mimeType: "image/png", data: IMAGE_DATA },
       { type: "audio", mimeType: "audio/mpeg", data: AUDIO_DATA },
       {
-        // @ts-expect-error Testing that unsupported types are skipped.
         type: "resource_link",
         uri: "https://example.com",
         name: "ignored",

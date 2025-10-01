@@ -106,6 +106,33 @@ func (a AudioPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 	t.Errorf("Expected matching audio part:\nReceived:\n%s", string(contentJSON))
 }
 
+type ImagePartAssertion struct {
+	ImageID bool // whether to check for image ID presence
+}
+
+func (a ImagePartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
+	t.Helper()
+
+	for _, part := range content {
+		if part.ImagePart != nil {
+			if len(part.ImagePart.Data) == 0 {
+				t.Errorf("Image data must be present")
+				return
+			}
+			if a.ImageID && (part.ImagePart.ID == nil || *part.ImagePart.ID == "") {
+				t.Errorf("Expected image ID to be present")
+				return
+			}
+
+			// pass
+			return
+		}
+	}
+
+	contentJSON, _ := json.MarshalIndent(content, "", "  ")
+	t.Errorf("Expected matching image part:\nReceived:\n%s", string(contentJSON))
+}
+
 type ReasoningPartAssertion struct {
 	Text *regexp.Regexp
 }
@@ -135,6 +162,7 @@ type PartAssertion struct {
 	ToolCallPart  *ToolCallPartAssertion
 	ReasoningPart *ReasoningPartAssertion
 	AudioPart     *AudioPartAssertion
+	ImagePart     *ImagePartAssertion
 }
 
 // TestMethod represents the test method type
@@ -172,6 +200,9 @@ func assertContentPart(t *testing.T, content []llmsdk.Part, assertions []PartAss
 		}
 		if assertion.AudioPart != nil {
 			assertion.AudioPart.Assert(t, content)
+		}
+		if assertion.ImagePart != nil {
+			assertion.ImagePart.Assert(t, content)
 		}
 		if assertion.ReasoningPart != nil {
 			assertion.ReasoningPart.Assert(t, content)
@@ -220,6 +251,14 @@ func NewAudioAssertion(audioID bool, transcriptPattern string) PartAssertion {
 		AudioPart: &AudioPartAssertion{
 			AudioID:    audioID,
 			Transcript: transcriptRegex,
+		},
+	}
+}
+
+func NewImageAssertion(imageID bool) PartAssertion {
+	return PartAssertion{
+		ImagePart: &ImagePartAssertion{
+			ImageID: imageID,
 		},
 	}
 }
