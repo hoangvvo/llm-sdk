@@ -147,8 +147,7 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
     case "image": {
       const existingPart = existing as ImagePartDelta;
       if (delta.part.data) {
-        existingPart.data =
-          (existingPart.data ?? "") + delta.part.data;
+        existingPart.data = (existingPart.data ?? "") + delta.part.data;
       }
       if (delta.part.mime_type) {
         existingPart.mime_type = delta.part.mime_type;

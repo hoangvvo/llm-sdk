@@ -543,7 +543,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                 if let (Some(data), Some(mime_type)) = (inline_data.data, inline_data.mime_type) {
                     if mime_type.starts_with("image/") {
                         Some(Ok(Part::Image(ImagePart {
-                            data: data,
+                            data,
                             mime_type,
                             width: None,
                             height: None,
@@ -554,7 +554,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                             audio_part_utils::map_mime_type_to_audio_format(&mime_type)
                         {
                             Some(Ok(Part::Audio(AudioPart {
-                                data: data,
+                                data,
                                 format,
                                 sample_rate: None,
                                 channels: None,

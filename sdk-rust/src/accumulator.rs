@@ -68,10 +68,7 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             id: image_delta.id,
         }),
         PartDelta::Audio(audio_delta) => AccumulatedData::Audio(AccumulatedAudioData {
-            data_chunks: audio_delta
-                .data
-                .map(|data| vec![data])
-                .unwrap_or_default(),
+            data_chunks: audio_delta.data.map(|data| vec![data]).unwrap_or_default(),
             format: audio_delta.format,
             sample_rate: audio_delta.sample_rate,
             channels: audio_delta.channels,

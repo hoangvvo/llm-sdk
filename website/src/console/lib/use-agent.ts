@@ -568,10 +568,7 @@ function sanitizePayload(value: unknown): unknown {
     for (const [key, entry] of Object.entries(
       value as Record<string, unknown>,
     )) {
-      if (
-        (key === "data" || key === "data") &&
-        typeof entry === "string"
-      ) {
+      if ((key === "data" || key === "data") && typeof entry === "string") {
         result[key] = `[${String(entry.length)} bytes base64]`;
       } else {
         result[key] = sanitizePayload(entry);
