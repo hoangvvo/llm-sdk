@@ -8,7 +8,7 @@
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint .",
-    "build": "npm run build --workspaces",
+    "build": "npm run build  --workspace=sdk-js --workspace=agent-js",
     "test": "npm run test --workspaces"
   },
   "devDependencies": {

@@ -15,7 +15,7 @@ license = "MIT"
 name = "llm-sdk-rs"
 readme = "README.md"
 repository = "https://github.com/hoangvvo/llm-sdk"
-version = "0.2.0"
+version = "0.1.0"
 
 [lib]
 name = "llm_sdk"

@@ -58,8 +58,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
-          git push
+
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Changes detected, committing..."
+            git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
+            git push
+          else
+            echo "No changes detected, skipping commit"
+          fi
       - name: Publish to npm
         run: npm publish --workspace=${{ github.event.inputs.module }}
 
@@ -77,10 +83,17 @@ jobs:
       - name: Set and commit version for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
         run: |
           sed -i 's/^version = ".*"/version = "${{ github.event.inputs.version }}"/' ./${{ github.event.inputs.module }}/Cargo.toml
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
-          git push
+
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Changes detected, committing..."
+            git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
+            git push
+          else
+            echo "No changes detected, skipping commit"
+          fi
       - run: cargo publish --manifest-path ./${{ github.event.inputs.module }}/Cargo.toml --token ${{ steps.auth.outputs.token }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
