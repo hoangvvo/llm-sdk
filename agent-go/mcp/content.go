@@ -17,23 +17,17 @@ func convertMCPContentToParts(contents []mcp.Content) ([]llmsdk.Part, error) {
 	for _, content := range contents {
 		switch c := content.(type) {
 		case *mcp.TextContent:
-			parts = append(parts, llmsdk.Part{TextPart: &llmsdk.TextPart{Text: c.Text}})
+			parts = append(parts, llmsdk.NewTextPart(c.Text))
 		case *mcp.ImageContent:
 			encoded := base64.StdEncoding.EncodeToString(c.Data)
-			parts = append(parts, llmsdk.Part{ImagePart: &llmsdk.ImagePart{
-				MimeType:  c.MIMEType,
-				ImageData: encoded,
-			}})
+			parts = append(parts, llmsdk.NewImagePart(encoded, c.MIMEType))
 		case *mcp.AudioContent:
 			format, err := partutil.MapMimeTypeToAudioFormat(c.MIMEType)
 			if err != nil {
 				return nil, fmt.Errorf("unsupported MCP audio format %q: %w", c.MIMEType, err)
 			}
 			encoded := base64.StdEncoding.EncodeToString(c.Data)
-			parts = append(parts, llmsdk.Part{AudioPart: &llmsdk.AudioPart{
-				AudioData: encoded,
-				Format:    format,
-			}})
+			parts = append(parts, llmsdk.NewAudioPart(encoded, format))
 		default:
 			// Skip content we cannot represent (e.g., resource links or embedded blobs).
 		}

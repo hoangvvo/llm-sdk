@@ -489,37 +489,27 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 
 	for _, part := range parts {
 		if part.Thought != nil && *part.Thought {
-			reasoningPart := llmsdk.Part{
-				ReasoningPart: &llmsdk.ReasoningPart{
-					Text:      "",
-					Signature: part.ThoughtSignature,
-				},
-			}
+			text := ""
 			if part.Text != nil {
-				reasoningPart.ReasoningPart.Text = *part.Text
+				text = *part.Text
 			}
-			result = append(result, reasoningPart)
+			opts := []llmsdk.ReasoingPartOption{}
+			if part.ThoughtSignature != nil {
+				opts = append(opts, llmsdk.WithReasoningSignature(*part.ThoughtSignature))
+			}
+			result = append(result, llmsdk.NewReasoningPart(text, opts...))
 			continue
 		}
 
 		if part.Text != nil {
-			result = append(result, llmsdk.Part{
-				TextPart: &llmsdk.TextPart{
-					Text: *part.Text,
-				},
-			})
+			result = append(result, llmsdk.NewTextPart(*part.Text))
 			continue
 		}
 
 		if part.InlineData != nil {
 			if part.InlineData.MimeType != nil && part.InlineData.Data != nil {
 				if strings.HasPrefix(*part.InlineData.MimeType, "image/") {
-					result = append(result, llmsdk.Part{
-						ImagePart: &llmsdk.ImagePart{
-							ImageData: *part.InlineData.Data,
-							MimeType:  *part.InlineData.MimeType,
-						},
-					})
+					result = append(result, llmsdk.NewImagePart(*part.InlineData.Data, *part.InlineData.MimeType))
 					continue
 				}
 
@@ -528,12 +518,7 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 					if err != nil {
 						return nil, llmsdk.NewInvariantError(Provider, fmt.Sprintf("unsupported audio mime type: %s", *part.InlineData.MimeType))
 					}
-					result = append(result, llmsdk.Part{
-						AudioPart: &llmsdk.AudioPart{
-							AudioData: *part.InlineData.Data,
-							Format:    format,
-						},
-					})
+					result = append(result, llmsdk.NewAudioPart(*part.InlineData.Data, format))
 					continue
 				}
 			}
@@ -549,13 +534,9 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 			} else {
 				toolCallID = fmt.Sprintf("call_%s", randutil.String(10))
 			}
-			result = append(result, llmsdk.Part{
-				ToolCallPart: &llmsdk.ToolCallPart{
-					ToolCallID: toolCallID,
-					ToolName:   *part.FunctionCall.Name,
-					Args:       part.FunctionCall.Args,
-				},
-			})
+			toolCallPart := llmsdk.NewToolCallPart(toolCallID, *part.FunctionCall.Name, json.RawMessage(part.FunctionCall.Args))
+			toolCallPart.ToolCallPart.Args = part.FunctionCall.Args
+			result = append(result, toolCallPart)
 			continue
 		}
 	}

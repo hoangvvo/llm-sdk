@@ -108,7 +108,7 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
+				llmsdk.NewTextPart("Hi!"),
 			},
 		}),
 	)
@@ -128,13 +128,7 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Hello!"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello!"))),
 		},
 	})
 
@@ -144,12 +138,12 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 
 	expectedResponse := &llmagent.AgentResponse{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
+			llmsdk.NewTextPart("Hi!"),
 		},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Hi!"}},
+					llmsdk.NewTextPart("Hi!"),
 				},
 			}),
 		},
@@ -163,7 +157,7 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 	toolResult := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+			llmsdk.NewTextPart("Tool result"),
 		},
 		IsError: false,
 	}
@@ -174,11 +168,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "test_tool",
-					ToolCallID: "call_1",
-					Args:       json.RawMessage(`{"param": "value"}`),
-				}},
+				llmsdk.NewToolCallPart("call_1", "test_tool", json.RawMessage(`{"param": "value"}`)),
 			},
 			Usage: &llmsdk.ModelUsage{
 				InputTokens:  1000,
@@ -190,7 +180,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Final response"}},
+				llmsdk.NewTextPart("Final response"),
 			},
 		}),
 	)
@@ -210,13 +200,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Use the tool"))),
 		},
 	})
 
@@ -241,39 +225,31 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 
 	expectedResponse := &llmagent.AgentResponse{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Final response"}},
+			llmsdk.NewTextPart("Final response"),
 		},
 		Output: []llmagent.AgentItem{
 			// Assistant tool call model item
 			llmagent.NewAgentItemModelResponse(
 				llmsdk.ModelResponse{
 					Content: []llmsdk.Part{
-						{ToolCallPart: &llmsdk.ToolCallPart{
-							ToolName:   "test_tool",
-							ToolCallID: "call_1",
-							Args:       json.RawMessage(`{"param": "value"}`),
-						}},
+						llmsdk.NewToolCallPart("call_1", "test_tool", json.RawMessage(`{"param": "value"}`)),
 					},
 					Usage: &llmsdk.ModelUsage{InputTokens: 1000, OutputTokens: 50},
 					Cost:  ptr.To(0.0015),
 				},
 			),
 			// Tool result item
-			{
-				Tool: &llmagent.AgentItemTool{
-					ToolCallID: "call_1",
-					ToolName:   "test_tool",
-					Input:      json.RawMessage(`{"param": "value"}`),
-					Output: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
-					},
-					IsError: false,
-				},
-			},
+			llmagent.NewAgentItemTool(
+				"call_1",
+				"test_tool",
+				json.RawMessage(`{"param": "value"}`),
+				[]llmsdk.Part{llmsdk.NewTextPart("Tool result")},
+				false,
+			),
 			// Final model item
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Final response"}},
+					llmsdk.NewTextPart("Final response"),
 				},
 			}),
 		},
@@ -287,14 +263,14 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 	tool1Result := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Tool 1 result"}},
+			llmsdk.NewTextPart("Tool 1 result"),
 		},
 		IsError: false,
 	}
 
 	tool2Result := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Tool 2 result"}},
+			llmsdk.NewTextPart("Tool 2 result"),
 		},
 		IsError: false,
 	}
@@ -318,7 +294,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Processed both tools"}},
+				llmsdk.NewTextPart("Processed both tools"),
 			},
 			Usage: &llmsdk.ModelUsage{
 				InputTokens:  50,
@@ -343,13 +319,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Use both tools"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Use both tools"))),
 		},
 	})
 
@@ -386,24 +356,20 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 				},
 				Usage: &llmsdk.ModelUsage{InputTokens: 2000, OutputTokens: 100},
 			}),
-			{ // tool result 1
-				Tool: &llmagent.AgentItemTool{
-					ToolCallID: "call_1",
-					ToolName:   "tool_1",
-					Input:      json.RawMessage(`{"param":"value1"}`),
-					Output:     []llmsdk.Part{llmsdk.NewTextPart("Tool 1 result")},
-					IsError:    false,
-				},
-			},
-			{ // tool result 2
-				Tool: &llmagent.AgentItemTool{
-					ToolCallID: "call_2",
-					ToolName:   "tool_2",
-					Input:      json.RawMessage(`{"param":"value2"}`),
-					Output:     []llmsdk.Part{llmsdk.NewTextPart("Tool 2 result")},
-					IsError:    false,
-				},
-			},
+			llmagent.NewAgentItemTool(
+				"call_1",
+				"tool_1",
+				json.RawMessage(`{"param":"value1"}`),
+				[]llmsdk.Part{llmsdk.NewTextPart("Tool 1 result")},
+				false,
+			),
+			llmagent.NewAgentItemTool(
+				"call_2",
+				"tool_2",
+				json.RawMessage(`{"param":"value2"}`),
+				[]llmsdk.Part{llmsdk.NewTextPart("Tool 2 result")},
+				false,
+			),
 			llmagent.NewAgentItemModelResponse(
 				llmsdk.ModelResponse{
 					Content: []llmsdk.Part{llmsdk.NewTextPart("Processed both tools")},
@@ -422,7 +388,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 	toolResult := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Calculation result"}},
+			llmsdk.NewTextPart("Calculation result"),
 		},
 		IsError: false,
 	}
@@ -433,29 +399,29 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "calculator",
-					ToolCallID: "call_1",
-					Args:       json.RawMessage([]byte(`{"operation": "add", "a": 1, "b": 2}`)),
-				}},
+				llmsdk.NewToolCallPart(
+					"call_1",
+					"calculator",
+					json.RawMessage([]byte(`{"operation": "add", "a": 1, "b": 2}`)),
+				),
 			},
 		}),
 	)
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "calculator",
-					ToolCallID: "call_2",
-					Args:       json.RawMessage([]byte(`{"operation": "multiply", "a": 3, "b": 4}`)),
-				}},
+				llmsdk.NewToolCallPart(
+					"call_2",
+					"calculator",
+					json.RawMessage([]byte(`{"operation": "multiply", "a": 3, "b": 4}`)),
+				),
 			},
 		}),
 	)
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "All calculations done"}},
+				llmsdk.NewTextPart("All calculations done"),
 			},
 		}),
 	)
@@ -475,13 +441,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Calculate some numbers"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Calculate some numbers"))),
 		},
 	})
 
@@ -529,52 +489,44 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 
 	expectedResponse := &llmagent.AgentResponse{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "All calculations done"}},
+			llmsdk.NewTextPart("All calculations done"),
 		},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "calculator",
-						ToolCallID: "call_1",
-						Args:       json.RawMessage(`{"operation": "add", "a": 1, "b": 2}`),
-					}},
+					llmsdk.NewToolCallPart(
+						"call_1",
+						"calculator",
+						json.RawMessage(`{"operation": "add", "a": 1, "b": 2}`),
+					),
 				},
 			}),
-			{
-				Tool: &llmagent.AgentItemTool{
-					ToolCallID: "call_1",
-					ToolName:   "calculator",
-					Input:      json.RawMessage(`{"operation": "add", "a": 1, "b": 2}`),
-					Output: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Calculation result"}},
-					},
-					IsError: false,
-				},
-			},
+			llmagent.NewAgentItemTool(
+				"call_1",
+				"calculator",
+				json.RawMessage(`{"operation": "add", "a": 1, "b": 2}`),
+				[]llmsdk.Part{llmsdk.NewTextPart("Calculation result")},
+				false,
+			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "calculator",
-						ToolCallID: "call_2",
-						Args:       json.RawMessage(`{"operation": "multiply", "a": 3, "b": 4}`),
-					}},
+					llmsdk.NewToolCallPart(
+						"call_2",
+						"calculator",
+						json.RawMessage(`{"operation": "multiply", "a": 3, "b": 4}`),
+					),
 				},
 			}),
-			{
-				Tool: &llmagent.AgentItemTool{
-					ToolCallID: "call_2",
-					ToolName:   "calculator",
-					Input:      json.RawMessage(`{"operation": "multiply", "a": 3, "b": 4}`),
-					Output: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Calculation result"}},
-					},
-					IsError: false,
-				},
-			},
+			llmagent.NewAgentItemTool(
+				"call_2",
+				"calculator",
+				json.RawMessage(`{"operation": "multiply", "a": 3, "b": 4}`),
+				[]llmsdk.Part{llmsdk.NewTextPart("Calculation result")},
+				false,
+			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "All calculations done"}},
+					llmsdk.NewTextPart("All calculations done"),
 				},
 			}),
 		},
@@ -603,12 +555,8 @@ func TestRun_ReturnsExistingAssistantResponseWithoutNewModelOutput(t *testing.T)
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("What did I say?")}},
-			}),
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				AssistantMessage: &llmsdk.AssistantMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Cached answer")}},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("What did I say?"))),
+			llmagent.NewAgentItemMessage(llmsdk.NewAssistantMessage(llmsdk.NewTextPart("Cached answer"))),
 		},
 	})
 	if err != nil {
@@ -668,16 +616,14 @@ func TestRun_ResumesToolProcessingFromToolMessageWithPartialResults(t *testing.T
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Continue")}},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Continue"))),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{ToolName: "resume_tool", ToolCallID: "call_1", Args: call1Args}},
-					{ToolCallPart: &llmsdk.ToolCallPart{ToolName: "resume_tool", ToolCallID: "call_2", Args: call2Args}},
+					llmsdk.NewToolCallPart("call_1", "resume_tool", call1Args),
+					llmsdk.NewToolCallPart("call_2", "resume_tool", call2Args),
 				},
 			}),
-			llmagent.NewAgentItemMessage(llmsdk.Message{ToolMessage: &llmsdk.ToolMessage{Content: []llmsdk.Part{toolResult}}}),
+			llmagent.NewAgentItemMessage(llmsdk.NewToolMessage(toolResult)),
 		},
 	})
 	if err != nil {
@@ -737,13 +683,11 @@ func TestRun_ResumesToolProcessingWhenTrailingToolEntries(t *testing.T) {
 	call2Args := json.RawMessage(`{"stage": 2}`)
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Continue")}},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Continue"))),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{ToolName: "resume_tool", ToolCallID: "call_1", Args: call1Args}},
-					{ToolCallPart: &llmsdk.ToolCallPart{ToolName: "resume_tool", ToolCallID: "call_2", Args: call2Args}},
+					llmsdk.NewToolCallPart("call_1", "resume_tool", call1Args),
+					llmsdk.NewToolCallPart("call_2", "resume_tool", call2Args),
 				},
 			}),
 			llmagent.NewAgentItemTool("call_1", "resume_tool", call1Args, []llmsdk.Part{llmsdk.NewTextPart("already done")}, false),
@@ -800,19 +744,13 @@ func TestRun_ReturnsErrorWhenToolResultsLackPrecedingAssistantContent(t *testing
 	isError := false
 	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{Content: []llmsdk.Part{llmsdk.NewTextPart("Resume")}},
-			}),
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				ToolMessage: &llmsdk.ToolMessage{Content: []llmsdk.Part{{
-					ToolResultPart: &llmsdk.ToolResultPart{
-						ToolCallID: "call_1",
-						ToolName:   "resume_tool",
-						Content:    []llmsdk.Part{llmsdk.NewTextPart("orphan")},
-						IsError:    isError,
-					},
-				}}},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Resume"))),
+			llmagent.NewAgentItemMessage(llmsdk.NewToolMessage(llmsdk.NewToolResultPart(
+				"call_1",
+				"resume_tool",
+				[]llmsdk.Part{llmsdk.NewTextPart("orphan")},
+				isError,
+			))),
 		},
 	})
 	if err == nil {
@@ -832,7 +770,7 @@ func TestRun_ReturnsErrorWhenToolResultsLackPrecedingAssistantContent(t *testing
 func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 	toolResult := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+			llmsdk.NewTextPart("Tool result"),
 		},
 		IsError: false,
 	}
@@ -843,33 +781,21 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "test_tool",
-					ToolCallID: "call_1",
-					Args:       json.RawMessage(`{}`),
-				}},
+				llmsdk.NewToolCallPart("call_1", "test_tool", json.RawMessage(`{}`)),
 			},
 		}),
 	)
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "test_tool",
-					ToolCallID: "call_2",
-					Args:       json.RawMessage(`{}`),
-				}},
+				llmsdk.NewToolCallPart("call_2", "test_tool", json.RawMessage(`{}`)),
 			},
 		}),
 	)
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "test_tool",
-					ToolCallID: "call_3",
-					Args:       json.RawMessage(`{}`),
-				}},
+				llmsdk.NewToolCallPart("call_3", "test_tool", json.RawMessage(`{}`)),
 			},
 		}),
 	)
@@ -877,25 +803,18 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       2,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			MaxTurns:     2,
 		},
 		map[string]interface{}{},
 	)
 
 	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Keep using tools"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Keep using tools"))),
 		},
 	})
 
@@ -918,11 +837,7 @@ func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "non_existent_tool",
-					ToolCallID: "call_1",
-					Args:       json.RawMessage(`{}`),
-				}},
+				llmsdk.NewToolCallPart("call_1", "non_existent_tool", json.RawMessage(`{}`)),
 			},
 		}),
 	)
@@ -930,25 +845,18 @@ func TestRun_ThrowsAgentInvariantError_WhenToolNotFound(t *testing.T) {
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       10,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{},
+			MaxTurns:     10,
 		},
 		map[string]interface{}{},
 	)
 
 	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Use a tool"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Use a tool"))),
 		},
 	})
 
@@ -975,11 +883,7 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "failing_tool",
-					ToolCallID: "call_1",
-					Args:       json.RawMessage(`{}`),
-				}},
+				llmsdk.NewToolCallPart("call_1", "failing_tool", json.RawMessage(`{}`)),
 			},
 		}),
 	)
@@ -987,25 +891,18 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       10,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			MaxTurns:     10,
 		},
 		map[string]interface{}{},
 	)
 
 	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Use the tool"))),
 		},
 	})
 
@@ -1026,7 +923,7 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 	toolResult := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Error: Invalid parameters"}},
+			llmsdk.NewTextPart("Error: Invalid parameters"),
 		},
 		IsError: true,
 	}
@@ -1037,18 +934,14 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "test_tool",
-					ToolCallID: "call_1",
-					Args:       json.RawMessage(`{"invalid": true}`),
-				}},
+				llmsdk.NewToolCallPart("call_1", "test_tool", json.RawMessage(`{"invalid": true}`)),
 			},
 		}),
 	)
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Handled the error"}},
+				llmsdk.NewTextPart("Handled the error"),
 			},
 		}),
 	)
@@ -1056,25 +949,18 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       10,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			MaxTurns:     10,
 		},
 		map[string]interface{}{},
 	)
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Use the tool"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Use the tool"))),
 		},
 	})
 
@@ -1096,32 +982,24 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 
 	expectedResponse := &llmagent.AgentResponse{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Handled the error"}},
+			llmsdk.NewTextPart("Handled the error"),
 		},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "test_tool",
-						ToolCallID: "call_1",
-						Args:       json.RawMessage(`{"invalid": true}`),
-					}},
+					llmsdk.NewToolCallPart("call_1", "test_tool", json.RawMessage(`{"invalid": true}`)),
 				},
 			}),
-			{
-				Tool: &llmagent.AgentItemTool{
-					ToolCallID: "call_1",
-					ToolName:   "test_tool",
-					Input:      json.RawMessage(`{"invalid": true}`),
-					Output: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Error: Invalid parameters"}},
-					},
-					IsError: true,
-				},
-			},
+			llmagent.NewAgentItemTool(
+				"call_1",
+				"test_tool",
+				json.RawMessage(`{"invalid": true}`),
+				[]llmsdk.Part{llmsdk.NewTextPart("Error: Invalid parameters")},
+				true,
+			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Handled the error"}},
+					llmsdk.NewTextPart("Handled the error"),
 				},
 			}),
 		},
@@ -1137,7 +1015,7 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Response"}},
+				llmsdk.NewTextPart("Response"),
 			},
 		}),
 	)
@@ -1155,7 +1033,6 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 			Model:            model,
 			Instructions:     []llmagent.InstructionParam[map[string]interface{}]{},
 			Tools:            []llmagent.AgentTool[map[string]interface{}]{},
-			ResponseFormat:   &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
 			MaxTurns:         10,
 			Temperature:      &temp,
 			TopP:             &topP,
@@ -1168,13 +1045,7 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 
 	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Hello"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
 		},
 	})
 
@@ -1210,7 +1081,7 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Response"}},
+				llmsdk.NewTextPart("Response"),
 			},
 		}),
 	)
@@ -1229,25 +1100,18 @@ func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testi
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   instructions,
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       10,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: instructions,
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{},
+			MaxTurns:     10,
 		},
 		map[string]interface{}{"userRole": "developer"},
 	)
 
 	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Hello"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
 		},
 	})
 
@@ -1276,18 +1140,14 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
-			Content: []llmsdk.Part{{
-				ToolCallPart: &llmsdk.ToolCallPart{
-					ToolName:   "lookup-order",
-					ToolCallID: "call-1",
-					Args:       json.RawMessage(`{"orderId":"123"}`),
-				},
-			}},
+			Content: []llmsdk.Part{
+				llmsdk.NewToolCallPart("call-1", "lookup-order", json.RawMessage(`{"orderId":"123"}`)),
+			},
 		}),
 	)
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
-			Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Order ready"}}},
+			Content: []llmsdk.Part{llmsdk.NewTextPart("Order ready")},
 		}),
 	)
 
@@ -1318,7 +1178,7 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 			orderID := args["orderId"]
 			text := "Order " + orderID + " ready for " + contextVal.Customer
 			return llmagent.AgentToolResult{
-				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: text}}},
+				Content: []llmsdk.Part{llmsdk.NewTextPart(text)},
 				IsError: false,
 			}, nil
 		},
@@ -1355,11 +1215,7 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Status?"}}},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Status?"))),
 		},
 	})
 	if err != nil {
@@ -1400,26 +1256,22 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Order ready"}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Order ready")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
-				Content: []llmsdk.Part{{
-					ToolCallPart: &llmsdk.ToolCallPart{
-						ToolName:   "lookup-order",
-						ToolCallID: "call-1",
-						Args:       json.RawMessage(`{"orderId":"123"}`),
-					},
-				}},
+				Content: []llmsdk.Part{
+					llmsdk.NewToolCallPart("call-1", "lookup-order", json.RawMessage(`{"orderId":"123"}`)),
+				},
 			}),
 			llmagent.NewAgentItemTool(
 				"call-1",
 				"lookup-order",
 				json.RawMessage(`{"orderId":"123"}`),
-				[]llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Order 123 ready for Ada"}}},
+				[]llmsdk.Part{llmsdk.NewTextPart("Order 123 ready for Ada")},
 				false,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
-				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Order ready"}}},
+				Content: []llmsdk.Part{llmsdk.NewTextPart("Order ready")},
 			}),
 		},
 	}
@@ -1442,34 +1294,27 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueStreamResult(
 		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Hel"}}}},
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "lo"}}}},
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "!"}}}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("Hel")}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("lo")}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("!")}},
 		}),
 	)
 
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       10,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{},
+			MaxTurns:     10,
 		},
 		map[string]interface{}{},
 	)
 
 	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Hi"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hi"))),
 		},
 	})
 	if err != nil {
@@ -1490,7 +1335,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 			Partial: &llmsdk.PartialModelResponse{
 				Delta: &llmsdk.ContentDelta{
 					Index: 0,
-					Part:  llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Hel"}},
+					Part:  llmsdk.NewTextPartDelta("Hel"),
 				},
 			},
 		},
@@ -1498,7 +1343,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 			Partial: &llmsdk.PartialModelResponse{
 				Delta: &llmsdk.ContentDelta{
 					Index: 0,
-					Part:  llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "lo"}},
+					Part:  llmsdk.NewTextPartDelta("lo"),
 				},
 			},
 		},
@@ -1506,7 +1351,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 			Partial: &llmsdk.PartialModelResponse{
 				Delta: &llmsdk.ContentDelta{
 					Index: 0,
-					Part:  llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "!"}},
+					Part:  llmsdk.NewTextPartDelta("!"),
 				},
 			},
 		},
@@ -1514,7 +1359,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 			Item: &llmagent.AgentStreamItemEvent{
 				Item: llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Hello!"}},
+						llmsdk.NewTextPart("Hello!"),
 					},
 				}),
 			},
@@ -1522,12 +1367,12 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 		{
 			Response: &llmagent.AgentResponse{
 				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Hello!"}},
+					llmsdk.NewTextPart("Hello!"),
 				},
 				Output: []llmagent.AgentItem{
 					llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hello!"}},
+							llmsdk.NewTextPart("Hello!"),
 						},
 					}),
 				},
@@ -1543,7 +1388,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 	toolResult := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+			llmsdk.NewTextPart("Tool result"),
 		},
 		IsError: false,
 	}
@@ -1557,41 +1402,34 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueStreamResult(
 		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-				ToolName:   &toolName,
-				ToolCallID: &callId,
-				Args:       &args,
-			}}}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolName(toolName),
+				llmsdk.WithToolCallPartDeltaToolCallID(callId),
+				llmsdk.WithToolCallPartDeltaArgs(args),
+			)}},
 		}),
 	)
 	model.EnqueueStreamResult(
 		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Final response"}}}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("Final response")}},
 		}),
 	)
 
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       10,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			MaxTurns:     10,
 		},
 		map[string]interface{}{},
 	)
 
 	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Use tool"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Use tool"))),
 		},
 	})
 	if err != nil {
@@ -1677,7 +1515,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 
 	expectedResponse := &llmagent.AgentResponse{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Final response"}},
+			llmsdk.NewTextPart("Final response"),
 		},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
@@ -1685,20 +1523,16 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 					llmsdk.NewToolCallPart("call_1", "test_tool", map[string]any{"operation": "add", "a": 1, "b": 2}),
 				},
 			}),
-			{
-				Tool: &llmagent.AgentItemTool{
-					ToolCallID: "call_1",
-					ToolName:   "test_tool",
-					Input:      json.RawMessage(`{"a":1,"b":2,"operation":"add"}`),
-					Output: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
-					},
-					IsError: false,
-				},
-			},
+			llmagent.NewAgentItemTool(
+				"call_1",
+				"test_tool",
+				json.RawMessage(`{"a":1,"b":2,"operation":"add"}`),
+				[]llmsdk.Part{llmsdk.NewTextPart("Tool result")},
+				false,
+			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Final response"}},
+					llmsdk.NewTextPart("Final response"),
 				},
 			}),
 		},
@@ -1730,7 +1564,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 	toolResult := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
-			{TextPart: &llmsdk.TextPart{Text: "Tool result"}},
+			llmsdk.NewTextPart("Tool result"),
 		},
 		IsError: false,
 	}
@@ -1746,54 +1580,47 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueStreamResult(
 		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-				ToolName:   &toolName,
-				ToolCallID: &callId1,
-				Args:       &args,
-			}}}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolName(toolName),
+				llmsdk.WithToolCallPartDeltaToolCallID(callId1),
+				llmsdk.WithToolCallPartDeltaArgs(args),
+			)}},
 		}),
 	)
 	model.EnqueueStreamResult(
 		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-				ToolName:   &toolName,
-				ToolCallID: &callId2,
-				Args:       &args,
-			}}}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolName(toolName),
+				llmsdk.WithToolCallPartDeltaToolCallID(callId2),
+				llmsdk.WithToolCallPartDeltaArgs(args),
+			)}},
 		}),
 	)
 	model.EnqueueStreamResult(
 		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-				ToolName:   &toolName,
-				ToolCallID: &callId3,
-				Args:       &args,
-			}}}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolName(toolName),
+				llmsdk.WithToolCallPartDeltaToolCallID(callId3),
+				llmsdk.WithToolCallPartDeltaArgs(args),
+			)}},
 		}),
 	)
 
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       2,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			MaxTurns:     2,
 		},
 		map[string]interface{}{},
 	)
 
 	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Keep using tools"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Keep using tools"))),
 		},
 	})
 	if err != nil {
@@ -1828,7 +1655,7 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueStreamResult(
 		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
-			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Done"}}}},
+			{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("Done")}},
 		}),
 	)
 
@@ -1869,11 +1696,7 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 
 	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Hello"}}},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
 		},
 	})
 	if err != nil {
@@ -1892,21 +1715,21 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 	expectedEvents := []*llmagent.AgentStreamEvent{
 		{
 			Partial: &llmsdk.PartialModelResponse{
-				Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Done"}}},
+				Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("Done")},
 			},
 		},
 		llmagent.NewAgentStreamItemEvent(
 			0,
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
-				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Done"}}},
+				Content: []llmsdk.Part{llmsdk.NewTextPart("Done")},
 			}),
 		),
 		{
 			Response: &llmagent.AgentResponse{
-				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Done"}}},
+				Content: []llmsdk.Part{llmsdk.NewTextPart("Done")},
 				Output: []llmagent.AgentItem{
 					llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
-						Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Done"}}},
+						Content: []llmsdk.Part{llmsdk.NewTextPart("Done")},
 					}),
 				},
 			},
@@ -1946,7 +1769,7 @@ func TestRun_CloseCleansUpSessionResources(t *testing.T) {
 	model.EnqueueGenerateResult(
 		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Response"}},
+				llmsdk.NewTextPart("Response"),
 			},
 		}),
 	)
@@ -1954,25 +1777,18 @@ func TestRun_CloseCleansUpSessionResources(t *testing.T) {
 	session := mustNewRunSession(
 		t,
 		&llmagent.AgentParams[map[string]interface{}]{
-			Name:           "test_agent",
-			Model:          model,
-			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{},
-			ResponseFormat: &llmsdk.ResponseFormatOption{Text: &llmsdk.ResponseFormatText{}},
-			MaxTurns:       10,
+			Name:         "test_agent",
+			Model:        model,
+			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
+			Tools:        []llmagent.AgentTool[map[string]interface{}]{},
+			MaxTurns:     10,
 		},
 		map[string]interface{}{},
 	)
 
 	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Hello"}},
-					},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
 		},
 	})
 
@@ -1986,11 +1802,7 @@ func TestRun_CloseCleansUpSessionResources(t *testing.T) {
 
 	_, err = session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
-			llmagent.NewAgentItemMessage(llmsdk.Message{
-				UserMessage: &llmsdk.UserMessage{
-					Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Hello again"}}},
-				},
-			}),
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello again"))),
 		},
 	})
 

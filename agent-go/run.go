@@ -364,7 +364,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 					event := processStream.Current()
 					if event.Response != nil {
 						response := state.createResponse(*event.Response)
-						eventChan <- &AgentStreamEvent{Response: response}
+						eventChan <- NewAgentStreamEventResponse(response)
 						return
 					}
 					if event.Item != nil {
@@ -403,7 +403,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 						return
 					}
 
-					eventChan <- &AgentStreamEvent{Partial: partial}
+					eventChan <- NewAgentStreamEventPartial(partial)
 				}
 
 				if err := modelStream.Err(); err != nil {

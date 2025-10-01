@@ -128,17 +128,11 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 	}
 	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 		Content: []llmsdk.Part{
-			{
-				ToolCallPart: &llmsdk.ToolCallPart{
-					ToolCallID: "call_1",
-					ToolName:   "list_shuttles",
-					Args:       toolCallArgs,
-				},
-			},
+			llmsdk.NewToolCallPart("call_1", "list_shuttles", toolCallArgs),
 		},
 	}))
 	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Ready to roll."}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
 	}))
 
 	agent := llmagent.NewAgent(
@@ -169,17 +163,11 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 	}
 
 	expected := &llmagent.AgentResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Ready to roll."}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{
-						ToolCallPart: &llmsdk.ToolCallPart{
-							ToolCallID: "call_1",
-							ToolName:   "list_shuttles",
-							Args:       toolCallArgs,
-						},
-					},
+					llmsdk.NewToolCallPart("call_1", "list_shuttles", toolCallArgs),
 				},
 			}),
 			llmagent.NewAgentItemTool(
@@ -187,14 +175,14 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 				"list_shuttles",
 				toolCallArgs,
 				[]llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Shuttle summary for evening shift."}},
-					{ImagePart: &llmsdk.ImagePart{MimeType: "image/png", ImageData: imageBase64}},
-					{AudioPart: &llmsdk.AudioPart{AudioData: audioBase64, Format: llmsdk.AudioFormatMP3}},
+					llmsdk.NewTextPart("Shuttle summary for evening shift."),
+					llmsdk.NewImagePart(imageBase64, "image/png"),
+					llmsdk.NewAudioPart(audioBase64, llmsdk.AudioFormatMP3),
 				},
 				false,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
-				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Ready to roll."}}},
+				Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
 			}),
 		},
 	}
@@ -221,31 +209,19 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 
 	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 		Content: []llmsdk.Part{
-			{
-				ToolCallPart: &llmsdk.ToolCallPart{
-					ToolCallID: "call_1",
-					ToolName:   "list_shuttles",
-					Args:       toolCallArgs,
-				},
-			},
+			llmsdk.NewToolCallPart("call_1", "list_shuttles", toolCallArgs),
 		},
 	}))
 	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Ready to roll."}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
 	}))
 	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 		Content: []llmsdk.Part{
-			{
-				ToolCallPart: &llmsdk.ToolCallPart{
-					ToolCallID: "call_2",
-					ToolName:   "list_shuttles_v2",
-					Args:       toolCallArgs,
-				},
-			},
+			llmsdk.NewToolCallPart("call_2", "list_shuttles_v2", toolCallArgs),
 		},
 	}))
 	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Routes synced."}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Routes synced.")},
 	}))
 
 	agent := llmagent.NewAgent(
@@ -280,17 +256,11 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 	}
 
 	expectedFirst := &llmagent.AgentResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Ready to roll."}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{
-						ToolCallPart: &llmsdk.ToolCallPart{
-							ToolCallID: "call_1",
-							ToolName:   "list_shuttles",
-							Args:       toolCallArgs,
-						},
-					},
+					llmsdk.NewToolCallPart("call_1", "list_shuttles", toolCallArgs),
 				},
 			}),
 			llmagent.NewAgentItemTool(
@@ -298,14 +268,14 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 				"list_shuttles",
 				toolCallArgs,
 				[]llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Shuttle summary for evening shift."}},
-					{ImagePart: &llmsdk.ImagePart{MimeType: "image/png", ImageData: imageBase64}},
-					{AudioPart: &llmsdk.AudioPart{AudioData: audioBase64, Format: llmsdk.AudioFormatMP3}},
+					llmsdk.NewTextPart("Shuttle summary for evening shift."),
+					llmsdk.NewImagePart(imageBase64, "image/png"),
+					llmsdk.NewAudioPart(audioBase64, llmsdk.AudioFormatMP3),
 				},
 				false,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
-				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Ready to roll."}}},
+				Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
 			}),
 		},
 	}
@@ -337,28 +307,22 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 	}
 
 	expectedSecond := &llmagent.AgentResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Routes synced."}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Routes synced.")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{
-						ToolCallPart: &llmsdk.ToolCallPart{
-							ToolCallID: "call_2",
-							ToolName:   "list_shuttles_v2",
-							Args:       toolCallArgs,
-						},
-					},
+					llmsdk.NewToolCallPart("call_2", "list_shuttles_v2", toolCallArgs),
 				},
 			}),
 			llmagent.NewAgentItemTool(
 				"call_2",
 				"list_shuttles_v2",
 				toolCallArgs,
-				[]llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Updated shuttle roster for evening shift."}}},
+				[]llmsdk.Part{llmsdk.NewTextPart("Updated shuttle roster for evening shift.")},
 				false,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
-				Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Routes synced."}}},
+				Content: []llmsdk.Part{llmsdk.NewTextPart("Routes synced.")},
 			}),
 		},
 	}

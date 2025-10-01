@@ -8,14 +8,14 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/audioutil"
 )
 
-// AccumulatedTextData represents accumulated text data
-type AccumulatedTextData struct {
+// accumulatedTextData represents accumulated text data
+type accumulatedTextData struct {
 	Text      string
 	Citations map[int]CitationDelta
 }
 
-// AccumulatedImageData represents accumulated image data
-type AccumulatedImageData struct {
+// accumulatedImageData represents accumulated image data
+type accumulatedImageData struct {
 	MimeType  *string
 	ImageData string
 	Width     *int
@@ -23,8 +23,8 @@ type AccumulatedImageData struct {
 	ID        *string
 }
 
-// AccumulatedAudioData represents accumulated audio data
-type AccumulatedAudioData struct {
+// accumulatedAudioData represents accumulated audio data
+type accumulatedAudioData struct {
 	AudioDataChunks []string
 	Format          *AudioFormat
 	SampleRate      *int
@@ -33,32 +33,32 @@ type AccumulatedAudioData struct {
 	ID              *string
 }
 
-// AccumulatedData represents accumulated data for different part types
-type AccumulatedData struct {
-	Text      *AccumulatedTextData
+// accumulatedData represents accumulated data for different part types
+type accumulatedData struct {
+	Text      *accumulatedTextData
 	ToolCall  *ToolCallPartDelta
-	Image     *AccumulatedImageData
-	Audio     *AccumulatedAudioData
+	Image     *accumulatedImageData
+	Audio     *accumulatedAudioData
 	Reasoning *ReasoningPartDelta
 }
 
 // newDelta creates accumulated data from a delta
-func newDelta(delta ContentDelta) *AccumulatedData {
+func newDelta(delta ContentDelta) *accumulatedData {
 	switch {
 	case delta.Part.TextPartDelta != nil:
 		textDelta := delta.Part.TextPartDelta
-		textData := &AccumulatedTextData{
+		textData := &accumulatedTextData{
 			Text: textDelta.Text,
 		}
 		if textDelta.Citation != nil {
 			textData.Citations = make(map[int]CitationDelta)
 			textData.Citations[0] = *textDelta.Citation
 		}
-		return &AccumulatedData{
+		return &accumulatedData{
 			Text: textData,
 		}
 	case delta.Part.ToolCallPartDelta != nil:
-		return &AccumulatedData{
+		return &accumulatedData{
 			ToolCall: delta.Part.ToolCallPartDelta,
 		}
 	case delta.Part.ImagePartDelta != nil:
@@ -66,8 +66,8 @@ func newDelta(delta ContentDelta) *AccumulatedData {
 		if delta.Part.ImagePartDelta.ImageData != nil {
 			imageData = *delta.Part.ImagePartDelta.ImageData
 		}
-		return &AccumulatedData{
-			Image: &AccumulatedImageData{
+		return &accumulatedData{
+			Image: &accumulatedImageData{
 				ImageData: imageData,
 				Width:     delta.Part.ImagePartDelta.Width,
 				Height:    delta.Part.ImagePartDelta.Height,
@@ -84,8 +84,8 @@ func newDelta(delta ContentDelta) *AccumulatedData {
 		if delta.Part.AudioPartDelta.Transcript != nil {
 			transcript = *delta.Part.AudioPartDelta.Transcript
 		}
-		return &AccumulatedData{
-			Audio: &AccumulatedAudioData{
+		return &accumulatedData{
+			Audio: &accumulatedAudioData{
 				AudioDataChunks: audioDataChunks,
 				Format:          delta.Part.AudioPartDelta.Format,
 				SampleRate:      delta.Part.AudioPartDelta.SampleRate,
@@ -95,7 +95,7 @@ func newDelta(delta ContentDelta) *AccumulatedData {
 			},
 		}
 	case delta.Part.ReasoningPartDelta != nil:
-		return &AccumulatedData{
+		return &accumulatedData{
 			Reasoning: delta.Part.ReasoningPartDelta,
 		}
 	default:
@@ -104,7 +104,7 @@ func newDelta(delta ContentDelta) *AccumulatedData {
 }
 
 // mergeDelta merges an incoming delta with existing accumulated data
-func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
+func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 	switch {
 	case existing.Text != nil:
 		textPartDelta := delta.Part.TextPartDelta
@@ -211,10 +211,8 @@ func mergeDelta(existing AccumulatedData, delta ContentDelta) error {
 }
 
 // createTextPart creates a text part from accumulated text data
-func createTextPart(data *AccumulatedTextData, index int) (Part, error) {
-	textPart := &TextPart{
-		Text: data.Text,
-	}
+func createTextPart(data *accumulatedTextData, index int) (Part, error) {
+	var opts []TextPartOption
 
 	if len(data.Citations) > 0 {
 		indices := make([]int, 0, len(data.Citations))
@@ -226,12 +224,6 @@ func createTextPart(data *AccumulatedTextData, index int) (Part, error) {
 		citations := make([]Citation, 0, len(indices))
 		for _, citationIndex := range indices {
 			citationDelta := data.Citations[citationIndex]
-			if citationDelta.Type != "" && citationDelta.Type != "citation" {
-				return Part{}, NewInvariantError(
-					"",
-					fmt.Sprintf("Invalid citation type %q for text part at index %d", citationDelta.Type, index),
-				)
-			}
 			if citationDelta.Source == nil || citationDelta.StartIndex == nil || citationDelta.EndIndex == nil {
 				return Part{}, NewInvariantError(
 					"",
@@ -260,13 +252,11 @@ func createTextPart(data *AccumulatedTextData, index int) (Part, error) {
 		}
 
 		if len(citations) > 0 {
-			textPart.Citations = citations
+			opts = append(opts, WithTextCitations(citations))
 		}
 	}
 
-	return Part{
-		TextPart: textPart,
-	}, nil
+	return NewTextPart(data.Text, opts...), nil
 }
 
 // parseToolCallArgs parses tool call arguments from JSON string
@@ -300,30 +290,37 @@ func createToolCallPart(data *ToolCallPartDelta, index int) (Part, error) {
 		return Part{}, err
 	}
 
-	toolCallPart := NewToolCallPart(*data.ToolCallID, *data.ToolName, args)
-	toolCallPart.ToolCallPart.ID = data.ID
+	var opts []ToolCallPartOption
+	if data.ID != nil {
+		opts = append(opts, WithToolCallPartID(*data.ID))
+	}
+
+	toolCallPart := NewToolCallPart(*data.ToolCallID, *data.ToolName, args, opts...)
 	return toolCallPart, nil
 }
 
 // createImagePart creates an image part from accumulated image data
-func createImagePart(data *AccumulatedImageData, index int) (Part, error) {
+func createImagePart(data *accumulatedImageData, index int) (Part, error) {
 	if data.MimeType == nil || data.ImageData == "" {
 		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required fields at index %d: ImageData=%v, MimeType=%v", index, data.ImageData, data.MimeType))
 	}
 
-	return Part{
-		ImagePart: &ImagePart{
-			ImageData: data.ImageData,
-			Width:     data.Width,
-			Height:    data.Height,
-			MimeType:  *data.MimeType,
-			ID:        data.ID,
-		},
-	}, nil
+	var opts []ImagePartOption
+	if data.Width != nil {
+		opts = append(opts, WithImageWidth(*data.Width))
+	}
+	if data.Height != nil {
+		opts = append(opts, WithImageHeight(*data.Height))
+	}
+	if data.ID != nil {
+		opts = append(opts, WithImageID(*data.ID))
+	}
+
+	return NewImagePart(data.ImageData, *data.MimeType, opts...), nil
 }
 
 // createAudioPart creates an audio part from accumulated audio data
-func createAudioPart(data *AccumulatedAudioData) (Part, error) {
+func createAudioPart(data *accumulatedAudioData) (Part, error) {
 	if data.Format == nil {
 		return Part{}, NewInvariantError("", "Missing required field format for audio part")
 	}
@@ -337,36 +334,37 @@ func createAudioPart(data *AccumulatedAudioData) (Part, error) {
 		return Part{}, err
 	}
 
-	var transcript *string
+	var opts []AudioPartOption
+	if data.SampleRate != nil {
+		opts = append(opts, WithAudioSampleRate(*data.SampleRate))
+	}
+	if data.Channels != nil {
+		opts = append(opts, WithAudioChannels(*data.Channels))
+	}
 	if data.Transcript != "" {
-		transcript = &data.Transcript
+		opts = append(opts, WithAudioTranscript(data.Transcript))
+	}
+	if data.ID != nil {
+		opts = append(opts, WithAudioID(*data.ID))
 	}
 
-	return Part{
-		AudioPart: &AudioPart{
-			AudioData:  concatenatedAudio,
-			Format:     *data.Format,
-			SampleRate: data.SampleRate,
-			Channels:   data.Channels,
-			Transcript: transcript,
-			ID:         data.ID,
-		},
-	}, nil
+	return NewAudioPart(concatenatedAudio, *data.Format, opts...), nil
 }
 
 // createReasoningPart creates a reasoning part from accumulated reasoning data
 func createReasoningPart(data *ReasoningPartDelta) Part {
-	return Part{
-		ReasoningPart: &ReasoningPart{
-			Text:      data.Text,
-			Signature: data.Signature,
-			ID:        data.ID,
-		},
+	var opts []ReasoingPartOption
+	if data.Signature != nil {
+		opts = append(opts, WithReasoningSignature(*data.Signature))
 	}
+	if data.ID != nil {
+		opts = append(opts, WithReasoningID(*data.ID))
+	}
+	return NewReasoningPart(data.Text, opts...)
 }
 
 // createPart creates a final Part from accumulated data
-func createPart(data AccumulatedData, index int) (Part, error) {
+func createPart(data accumulatedData, index int) (Part, error) {
 	switch {
 	case data.Text != nil:
 		return createTextPart(data.Text, index)
@@ -385,7 +383,7 @@ func createPart(data AccumulatedData, index int) (Part, error) {
 
 // StreamAccumulator manages the accumulation and merging of content deltas for streaming responses
 type StreamAccumulator struct {
-	accumulatedParts map[int]AccumulatedData
+	accumulatedParts map[int]accumulatedData
 	accumulatedUsage *ModelUsage
 	cost             float64
 }
@@ -393,7 +391,7 @@ type StreamAccumulator struct {
 // NewStreamAccumulator creates a new StreamAccumulator
 func NewStreamAccumulator() *StreamAccumulator {
 	return &StreamAccumulator{
-		accumulatedParts: make(map[int]AccumulatedData),
+		accumulatedParts: make(map[int]accumulatedData),
 		accumulatedUsage: nil,
 	}
 }
@@ -453,7 +451,7 @@ func (s *StreamAccumulator) IsEmpty() bool {
 
 // Clear clears all accumulated data
 func (s *StreamAccumulator) Clear() {
-	s.accumulatedParts = make(map[int]AccumulatedData)
+	s.accumulatedParts = make(map[int]accumulatedData)
 	s.accumulatedUsage = nil
 }
 

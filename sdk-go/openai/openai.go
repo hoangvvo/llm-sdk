@@ -607,15 +607,19 @@ func mapOpenAIOutputItems(items []openaiapi.ResponseOutputItem) ([]llmsdk.Part, 
 				width, height = parseOpenAIImageSize(responseOutputItemImageGenerationCall.Size)
 			}
 
-			parts = append(parts, llmsdk.Part{
-				ImagePart: &llmsdk.ImagePart{
-					ImageData: *responseOutputItemImageGenerationCall.Result,
-					MimeType:  fmt.Sprintf("image/%s", responseOutputItemImageGenerationCall.OutputFormat),
-					Width:     width,
-					Height:    height,
-					ID:        &responseOutputItemImageGenerationCall.ID,
-				},
-			})
+			imageOpts := []llmsdk.ImagePartOption{}
+			if width != nil {
+				imageOpts = append(imageOpts, llmsdk.WithImageWidth(*width))
+			}
+			if height != nil {
+				imageOpts = append(imageOpts, llmsdk.WithImageHeight(*height))
+			}
+			imageOpts = append(imageOpts, llmsdk.WithImageID(responseOutputItemImageGenerationCall.ID))
+			parts = append(parts, llmsdk.NewImagePart(
+				*responseOutputItemImageGenerationCall.Result,
+				fmt.Sprintf("image/%s", responseOutputItemImageGenerationCall.OutputFormat),
+				imageOpts...,
+			))
 
 		case item.ResponseReasoningItem != nil:
 			var summary = ""
@@ -625,13 +629,12 @@ func mapOpenAIOutputItems(items []openaiapi.ResponseOutputItem) ([]llmsdk.Part, 
 				}
 			}
 
-			parts = append(parts, llmsdk.Part{
-				ReasoningPart: &llmsdk.ReasoningPart{
-					Text:      summary,
-					Signature: item.ResponseReasoningItem.EncryptedContent,
-					ID:        ptr.To(item.ResponseReasoningItem.ID),
-				},
-			})
+			reasoningOpts := []llmsdk.ReasoingPartOption{}
+			if item.ResponseReasoningItem.EncryptedContent != nil {
+				reasoningOpts = append(reasoningOpts, llmsdk.WithReasoningSignature(*item.ResponseReasoningItem.EncryptedContent))
+			}
+			reasoningOpts = append(reasoningOpts, llmsdk.WithReasoningID(item.ResponseReasoningItem.ID))
+			parts = append(parts, llmsdk.NewReasoningPart(summary, reasoningOpts...))
 		}
 	}
 
@@ -682,22 +685,14 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 	case event.ResponseTextDeltaEvent != nil:
 		return &llmsdk.ContentDelta{
 			Index: event.ResponseTextDeltaEvent.OutputIndex,
-			Part: llmsdk.PartDelta{
-				TextPartDelta: &llmsdk.TextPartDelta{
-					Text: event.ResponseTextDeltaEvent.Delta,
-				},
-			},
+			Part:  llmsdk.NewTextPartDelta(event.ResponseTextDeltaEvent.Delta),
 		}, nil
 
 	case event.ResponseFunctionCallArgumentsDeltaEvent != nil:
 		// Note: function name is added in "response.output_item.added"
 		return &llmsdk.ContentDelta{
 			Index: event.ResponseFunctionCallArgumentsDeltaEvent.OutputIndex,
-			Part: llmsdk.PartDelta{
-				ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-					Args: ptr.To(event.ResponseFunctionCallArgumentsDeltaEvent.Delta),
-				},
-			},
+			Part:  llmsdk.NewToolCallPartDelta(llmsdk.WithToolCallPartDeltaArgs(event.ResponseFunctionCallArgumentsDeltaEvent.Delta)),
 		}, nil
 
 	case event.ResponseImageGenCallPartialImageEvent != nil:
@@ -730,11 +725,7 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 	case event.ResponseReasoningSummaryTextDeltaEvent != nil:
 		return &llmsdk.ContentDelta{
 			Index: event.ResponseReasoningSummaryTextDeltaEvent.OutputIndex,
-			Part: llmsdk.PartDelta{
-				ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
-					Text: event.ResponseReasoningSummaryTextDeltaEvent.Delta,
-				},
-			},
+			Part:  llmsdk.NewReasoningPartDelta(event.ResponseReasoningSummaryTextDeltaEvent.Delta),
 		}, nil
 
 	default:

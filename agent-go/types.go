@@ -74,24 +74,6 @@ type AgentItemModelResponse struct {
 	*llmsdk.ModelResponse
 }
 
-func NewAgentItemMessage(message llmsdk.Message) AgentItem {
-	return AgentItem{Message: &message}
-}
-
-func NewAgentItemModelResponse(response llmsdk.ModelResponse) AgentItem {
-	return AgentItem{Model: &AgentItemModelResponse{ModelResponse: &response}}
-}
-
-func NewAgentItemTool(toolCallID, toolName string, input json.RawMessage, output []llmsdk.Part, isError bool) AgentItem {
-	return AgentItem{Tool: &AgentItemTool{
-		ToolCallID: toolCallID,
-		ToolName:   toolName,
-		Input:      input,
-		Output:     output,
-		IsError:    isError,
-	}}
-}
-
 type AgentItemType string
 
 const (
@@ -237,13 +219,6 @@ func (e *AgentStreamEvent) UnmarshalJSON(data []byte) error {
 type AgentStreamItemEvent struct {
 	Index int       `json:"index"`
 	Item  AgentItem `json:"item"`
-}
-
-func NewAgentStreamItemEvent(index int, item AgentItem) *AgentStreamEvent {
-	return &AgentStreamEvent{Item: &AgentStreamItemEvent{
-		Index: index,
-		Item:  item,
-	}}
 }
 
 type AgentStreamEventType string

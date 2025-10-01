@@ -563,19 +563,17 @@ func mapOpenAIChatMessage(message openaichatapi.ChatCompletionResponseMessage, p
 			return nil, err
 		}
 
-		audioPart := llmsdk.AudioPart{
-			AudioData: message.Audio.Data,
-			Format:    format,
-			ID:        &message.Audio.ID,
-		}
+		audioOpts := []llmsdk.AudioPartOption{llmsdk.WithAudioID(message.Audio.ID)}
 		if message.Audio.Transcript != "" {
-			audioPart.Transcript = &message.Audio.Transcript
+			audioOpts = append(audioOpts, llmsdk.WithAudioTranscript(message.Audio.Transcript))
 		}
 		if format == llmsdk.AudioFormatLinear16 {
-			audioPart.SampleRate = ptr.To(OpenAIAudioSampleRate)
-			audioPart.Channels = ptr.To(OpenAIAudioChannels)
+			audioOpts = append(audioOpts,
+				llmsdk.WithAudioSampleRate(OpenAIAudioSampleRate),
+				llmsdk.WithAudioChannels(OpenAIAudioChannels),
+			)
 		}
-		parts = append(parts, llmsdk.Part{AudioPart: &audioPart})
+		parts = append(parts, llmsdk.NewAudioPart(message.Audio.Data, format, audioOpts...))
 	}
 
 	if message.ToolCalls != nil {
@@ -620,9 +618,7 @@ func mapOpenAIChatDelta(delta openaichatapi.ChatCompletionStreamResponseDelta, e
 	var result []llmsdk.ContentDelta
 
 	if delta.Content != nil && *delta.Content != "" {
-		part := llmsdk.PartDelta{
-			TextPartDelta: &llmsdk.TextPartDelta{Text: *delta.Content},
-		}
+		part := llmsdk.NewTextPartDelta(*delta.Content)
 		index := partutil.GuessDeltaIndex(part, append(existing, result...), nil)
 		result = append(result, llmsdk.ContentDelta{Index: index, Part: part})
 	}

@@ -1,15 +1,25 @@
 package llmsdk
 
-import (
-	"encoding/json"
-)
+import "encoding/json"
 
 // NewTextPart creates a new text part
-func NewTextPart(text string) Part {
-	return Part{
-		TextPart: &TextPart{
-			Text: text,
-		},
+func NewTextPart(text string, opts ...TextPartOption) Part {
+	textPart := &TextPart{
+		Text: text,
+	}
+
+	for _, opt := range opts {
+		opt(textPart)
+	}
+
+	return Part{TextPart: textPart}
+}
+
+type TextPartOption func(*TextPart)
+
+func WithTextCitations(citations []Citation) TextPartOption {
+	return func(p *TextPart) {
+		p.Citations = citations
 	}
 }
 
@@ -40,6 +50,12 @@ func WithImageWidth(width int) ImagePartOption {
 func WithImageHeight(height int) ImagePartOption {
 	return func(p *ImagePart) {
 		p.Height = &height
+	}
+}
+
+func WithImageID(imageID string) ImagePartOption {
+	return func(p *ImagePart) {
+		p.ID = &imageID
 	}
 }
 
@@ -85,6 +101,17 @@ func WithAudioID(audioID string) AudioPartOption {
 	}
 }
 
+// NewSourcePart creates a new source part
+func NewSourcePart(source string, title string, content []Part) Part {
+	return Part{
+		SourcePart: &SourcePart{
+			Source:  source,
+			Title:   title,
+			Content: content,
+		},
+	}
+}
+
 func NewReasoningPart(text string, opts ...ReasoingPartOption) Part {
 	reasoningPart := &ReasoningPart{
 		Text: text,
@@ -113,21 +140,18 @@ func WithReasoningID(id string) ReasoingPartOption {
 	}
 }
 
-// NewSourcePart creates a new source part
-func NewSourcePart(source string, title string, content []Part) Part {
-	return Part{
-		SourcePart: &SourcePart{
-			Source:  source,
-			Title:   title,
-			Content: content,
-		},
-	}
-}
-
 // NewToolCallPart creates a new tool call part
 func NewToolCallPart(toolCallID, toolName string, args any, opts ...ToolCallPartOption) Part {
-	// TODO: handle error
-	argsJSON, _ := json.Marshal(args)
+	var argsJSON []byte
+	switch v := args.(type) {
+	case nil:
+		argsJSON = nil
+	case json.RawMessage:
+		argsJSON = v
+	default:
+		// TODO: handle error
+		argsJSON, _ = json.Marshal(v)
+	}
 
 	toolCallPart := Part{
 		ToolCallPart: &ToolCallPart{
@@ -161,6 +185,222 @@ func NewToolResultPart(toolCallID, toolName string, content []Part, isError bool
 			Content:    content,
 			IsError:    isError,
 		},
+	}
+}
+
+// NewTextPartDelta constructs a text part delta with optional citation updates.
+func NewTextPartDelta(text string, opts ...TextPartDeltaOption) PartDelta {
+	textDelta := &TextPartDelta{Text: text}
+
+	for _, opt := range opts {
+		opt(textDelta)
+	}
+
+	return PartDelta{TextPartDelta: textDelta}
+}
+
+type TextPartDeltaOption func(*TextPartDelta)
+
+func WithTextPartDeltaCitation(citation *CitationDelta) TextPartDeltaOption {
+	return func(p *TextPartDelta) {
+		p.Citation = citation
+	}
+}
+
+// NewCitationDelta constructs a citation delta for streaming updates.
+func NewCitationDelta(opts ...CitationDeltaOption) *CitationDelta {
+	citation := &CitationDelta{}
+
+	for _, opt := range opts {
+		opt(citation)
+	}
+
+	return citation
+}
+
+type CitationDeltaOption func(*CitationDelta)
+
+func WithCitationDeltaSource(source string) CitationDeltaOption {
+	return func(c *CitationDelta) {
+		c.Source = &source
+	}
+}
+
+func WithCitationDeltaTitle(title string) CitationDeltaOption {
+	return func(c *CitationDelta) {
+		c.Title = &title
+	}
+}
+
+func WithCitationDeltaCitedText(citedText string) CitationDeltaOption {
+	return func(c *CitationDelta) {
+		c.CitedText = &citedText
+	}
+}
+
+func WithCitationDeltaStartIndex(start int) CitationDeltaOption {
+	return func(c *CitationDelta) {
+		c.StartIndex = &start
+	}
+}
+
+func WithCitationDeltaEndIndex(end int) CitationDeltaOption {
+	return func(c *CitationDelta) {
+		c.EndIndex = &end
+	}
+}
+
+// NewToolCallPartDelta constructs a tool call part delta for streaming tool invocations.
+func NewToolCallPartDelta(opts ...ToolCallPartDeltaOption) PartDelta {
+	toolCallDelta := &ToolCallPartDelta{}
+
+	for _, opt := range opts {
+		opt(toolCallDelta)
+	}
+
+	return PartDelta{ToolCallPartDelta: toolCallDelta}
+}
+
+type ToolCallPartDeltaOption func(*ToolCallPartDelta)
+
+func WithToolCallPartDeltaToolCallID(toolCallID string) ToolCallPartDeltaOption {
+	return func(p *ToolCallPartDelta) {
+		p.ToolCallID = &toolCallID
+	}
+}
+
+func WithToolCallPartDeltaToolName(toolName string) ToolCallPartDeltaOption {
+	return func(p *ToolCallPartDelta) {
+		p.ToolName = &toolName
+	}
+}
+
+func WithToolCallPartDeltaArgs(args string) ToolCallPartDeltaOption {
+	return func(p *ToolCallPartDelta) {
+		p.Args = &args
+	}
+}
+
+func WithToolCallPartDeltaID(id string) ToolCallPartDeltaOption {
+	return func(p *ToolCallPartDelta) {
+		p.ID = &id
+	}
+}
+
+// NewImagePartDelta constructs an image part delta for incremental image updates.
+func NewImagePartDelta(opts ...ImagePartDeltaOption) PartDelta {
+	imageDelta := &ImagePartDelta{}
+
+	for _, opt := range opts {
+		opt(imageDelta)
+	}
+
+	return PartDelta{ImagePartDelta: imageDelta}
+}
+
+type ImagePartDeltaOption func(*ImagePartDelta)
+
+func WithImagePartDeltaMimeType(mimeType string) ImagePartDeltaOption {
+	return func(p *ImagePartDelta) {
+		p.MimeType = &mimeType
+	}
+}
+
+func WithImagePartDeltaData(imageData string) ImagePartDeltaOption {
+	return func(p *ImagePartDelta) {
+		p.ImageData = &imageData
+	}
+}
+
+func WithImagePartDeltaWidth(width int) ImagePartDeltaOption {
+	return func(p *ImagePartDelta) {
+		p.Width = &width
+	}
+}
+
+func WithImagePartDeltaHeight(height int) ImagePartDeltaOption {
+	return func(p *ImagePartDelta) {
+		p.Height = &height
+	}
+}
+
+func WithImagePartDeltaID(id string) ImagePartDeltaOption {
+	return func(p *ImagePartDelta) {
+		p.ID = &id
+	}
+}
+
+// NewAudioPartDelta constructs an audio part delta for streamed audio results.
+func NewAudioPartDelta(opts ...AudioPartDeltaOption) PartDelta {
+	audioDelta := &AudioPartDelta{}
+
+	for _, opt := range opts {
+		opt(audioDelta)
+	}
+
+	return PartDelta{AudioPartDelta: audioDelta}
+}
+
+type AudioPartDeltaOption func(*AudioPartDelta)
+
+func WithAudioPartDeltaData(audioData string) AudioPartDeltaOption {
+	return func(p *AudioPartDelta) {
+		p.AudioData = &audioData
+	}
+}
+
+func WithAudioPartDeltaFormat(format AudioFormat) AudioPartDeltaOption {
+	return func(p *AudioPartDelta) {
+		p.Format = &format
+	}
+}
+
+func WithAudioPartDeltaSampleRate(sampleRate int) AudioPartDeltaOption {
+	return func(p *AudioPartDelta) {
+		p.SampleRate = &sampleRate
+	}
+}
+
+func WithAudioPartDeltaChannels(channels int) AudioPartDeltaOption {
+	return func(p *AudioPartDelta) {
+		p.Channels = &channels
+	}
+}
+
+func WithAudioPartDeltaTranscript(transcript string) AudioPartDeltaOption {
+	return func(p *AudioPartDelta) {
+		p.Transcript = &transcript
+	}
+}
+
+func WithAudioPartDeltaID(id string) AudioPartDeltaOption {
+	return func(p *AudioPartDelta) {
+		p.ID = &id
+	}
+}
+
+// NewReasoningPartDelta constructs a reasoning part delta for streamed reasoning traces.
+func NewReasoningPartDelta(text string, opts ...ReasoningPartDeltaOption) PartDelta {
+	reasoningDelta := &ReasoningPartDelta{Text: text}
+
+	for _, opt := range opts {
+		opt(reasoningDelta)
+	}
+
+	return PartDelta{ReasoningPartDelta: reasoningDelta}
+}
+
+type ReasoningPartDeltaOption func(*ReasoningPartDelta)
+
+func WithReasoningPartDeltaSignature(signature string) ReasoningPartDeltaOption {
+	return func(p *ReasoningPartDelta) {
+		p.Signature = &signature
+	}
+}
+
+func WithReasoningPartDeltaID(id string) ReasoningPartDeltaOption {
+	return func(p *ReasoningPartDelta) {
+		p.ID = &id
 	}
 }
 

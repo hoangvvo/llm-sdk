@@ -13,10 +13,10 @@ func TestMockLanguageModelGenerate(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 
 	response1 := llmsdk.ModelResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Hello, world!"}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Hello, world!")},
 	}
 	response3 := llmsdk.ModelResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "Goodbye, world!"}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Goodbye, world!")},
 	}
 
 	model.EnqueueGenerateResult(
@@ -29,7 +29,7 @@ func TestMockLanguageModelGenerate(t *testing.T) {
 
 	input1 := &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(llmsdk.Part{TextPart: &llmsdk.TextPart{Text: "Hi"}}),
+			llmsdk.NewUserMessage(llmsdk.NewTextPart("Hi")),
 		},
 	}
 	res1, err := model.Generate(ctx, input1)
@@ -49,7 +49,7 @@ func TestMockLanguageModelGenerate(t *testing.T) {
 
 	input2 := &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(llmsdk.Part{TextPart: &llmsdk.TextPart{Text: "Error"}}),
+			llmsdk.NewUserMessage(llmsdk.NewTextPart("Error")),
 		},
 	}
 	if _, err := model.Generate(ctx, input2); err == nil || err.Error() != "generate error" {
@@ -65,7 +65,7 @@ func TestMockLanguageModelGenerate(t *testing.T) {
 
 	input3 := &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(llmsdk.Part{TextPart: &llmsdk.TextPart{Text: "Goodbye"}}),
+			llmsdk.NewUserMessage(llmsdk.NewTextPart("Goodbye")),
 		},
 	}
 	res3, err := model.Generate(ctx, input3)
@@ -90,7 +90,7 @@ func TestMockLanguageModelGenerate(t *testing.T) {
 	}
 
 	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
-		Content: []llmsdk.Part{{TextPart: &llmsdk.TextPart{Text: "After reset"}}},
+		Content: []llmsdk.Part{llmsdk.NewTextPart("After reset")},
 	}))
 
 	model.Restore()
@@ -107,14 +107,14 @@ func TestMockLanguageModelStream(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 
 	partials1 := []llmsdk.PartialModelResponse{
-		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Hello"}}}},
-		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: ", "}}}},
-		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "world!"}}}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("Hello")}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta(", ")}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("world!")}},
 	}
 	partials3 := []llmsdk.PartialModelResponse{
-		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "Goodbye"}}}},
-		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: ", "}}}},
-		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "world!"}}}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("Goodbye")}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta(", ")}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("world!")}},
 	}
 
 	model.EnqueueStreamResult(
@@ -127,7 +127,7 @@ func TestMockLanguageModelStream(t *testing.T) {
 
 	streamInput1 := &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(llmsdk.Part{TextPart: &llmsdk.TextPart{Text: "Hi"}}),
+			llmsdk.NewUserMessage(llmsdk.NewTextPart("Hi")),
 		},
 	}
 	stream1, err := model.Stream(ctx, streamInput1)
@@ -148,7 +148,7 @@ func TestMockLanguageModelStream(t *testing.T) {
 
 	streamInput2 := &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(llmsdk.Part{TextPart: &llmsdk.TextPart{Text: "Error"}}),
+			llmsdk.NewUserMessage(llmsdk.NewTextPart("Error")),
 		},
 	}
 	if _, err := model.Stream(ctx, streamInput2); err == nil || err.Error() != "stream error" {
@@ -164,7 +164,7 @@ func TestMockLanguageModelStream(t *testing.T) {
 
 	streamInput3 := &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
-			llmsdk.NewUserMessage(llmsdk.Part{TextPart: &llmsdk.TextPart{Text: "Goodbye"}}),
+			llmsdk.NewUserMessage(llmsdk.NewTextPart("Goodbye")),
 		},
 	}
 	stream3, err := model.Stream(ctx, streamInput3)
@@ -189,7 +189,7 @@ func TestMockLanguageModelStream(t *testing.T) {
 	}
 
 	model.EnqueueStreamResult(llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
-		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: "After reset"}}}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("After reset")}},
 	}))
 
 	model.Restore()

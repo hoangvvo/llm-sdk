@@ -302,12 +302,21 @@ type TextPartDelta struct {
 
 // CitationDelta represents a delta update for a citation part, used in streaming of citation messages.
 type CitationDelta struct {
-	Type       string  `json:"type"`
 	Source     *string `json:"source,omitempty"`
 	Title      *string `json:"title,omitempty"`
 	CitedText  *string `json:"cited_text,omitempty"`
 	StartIndex *int    `json:"start_index,omitempty"`
 	EndIndex   *int    `json:"end_index,omitempty"`
+}
+
+func (c CitationDelta) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		*CitationDelta
+	}{
+		Type:          "citation",
+		CitationDelta: &c,
+	})
 }
 
 // ToolCallPartDelta represents a delta update for a tool call part, used in streaming of a tool invocation.

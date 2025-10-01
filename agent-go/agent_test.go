@@ -16,7 +16,7 @@ func TestAgent_Run(t *testing.T) {
 		model.EnqueueGenerateResult(
 			llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					{TextPart: &llmsdk.TextPart{Text: "Mock response"}},
+					llmsdk.NewTextPart("Mock response"),
 				},
 			}),
 		)
@@ -25,13 +25,7 @@ func TestAgent_Run(t *testing.T) {
 		response, err := agent.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 			Context: map[string]interface{}{},
 			Input: []llmagent.AgentItem{
-				llmagent.NewAgentItemMessage(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hello"}},
-						},
-					},
-				}),
+				llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
 			},
 		})
 
@@ -41,12 +35,12 @@ func TestAgent_Run(t *testing.T) {
 
 		expectedResponse := &llmagent.AgentResponse{
 			Content: []llmsdk.Part{
-				{TextPart: &llmsdk.TextPart{Text: "Mock response"}},
+				llmsdk.NewTextPart("Mock response"),
 			},
 			Output: []llmagent.AgentItem{
 				llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Mock response"}},
+						llmsdk.NewTextPart("Mock response"),
 					},
 				}),
 			},
@@ -66,9 +60,7 @@ func TestAgent_RunStream(t *testing.T) {
 				{
 					Delta: &llmsdk.ContentDelta{
 						Index: 0,
-						Part: llmsdk.PartDelta{
-							TextPartDelta: &llmsdk.TextPartDelta{Text: "Mock"},
-						},
+						Part:  llmsdk.NewTextPartDelta("Mock"),
 					},
 				},
 			}),
@@ -78,13 +70,7 @@ func TestAgent_RunStream(t *testing.T) {
 		stream, err := agent.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 			Context: map[string]interface{}{},
 			Input: []llmagent.AgentItem{
-				llmagent.NewAgentItemMessage(llmsdk.Message{
-					UserMessage: &llmsdk.UserMessage{
-						Content: []llmsdk.Part{
-							{TextPart: &llmsdk.TextPart{Text: "Hello"}},
-						},
-					},
-				}),
+				llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
 			},
 		})
 
@@ -106,9 +92,7 @@ func TestAgent_RunStream(t *testing.T) {
 				Partial: &llmsdk.PartialModelResponse{
 					Delta: &llmsdk.ContentDelta{
 						Index: 0,
-						Part: llmsdk.PartDelta{
-							TextPartDelta: &llmsdk.TextPartDelta{Text: "Mock"},
-						},
+						Part:  llmsdk.NewTextPartDelta("Mock"),
 					},
 				},
 			},
@@ -116,19 +100,19 @@ func TestAgent_RunStream(t *testing.T) {
 				0,
 				llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Mock"}},
+						llmsdk.NewTextPart("Mock"),
 					},
 				}),
 			),
 			{
 				Response: &llmagent.AgentResponse{
 					Content: []llmsdk.Part{
-						{TextPart: &llmsdk.TextPart{Text: "Mock"}},
+						llmsdk.NewTextPart("Mock"),
 					},
 					Output: []llmagent.AgentItem{
 						llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 							Content: []llmsdk.Part{
-								{TextPart: &llmsdk.TextPart{Text: "Mock"}},
+								llmsdk.NewTextPart("Mock"),
 							},
 						}),
 					},

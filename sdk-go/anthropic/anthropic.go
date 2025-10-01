@@ -514,40 +514,37 @@ func mapAnthropicMessage(content []anthropicapi.ContentBlock) ([]llmsdk.Part, er
 func mapAnthropicContentBlock(block anthropicapi.ContentBlock) (*llmsdk.Part, error) {
 	switch {
 	case block.ResponseTextBlock != nil:
-		textPart := llmsdk.TextPart{Text: block.ResponseTextBlock.Text}
 		citations, err := mapAnthropicTextCitations(block.ResponseTextBlock.Citations)
 		if err != nil {
 			return nil, err
 		}
+		opts := []llmsdk.TextPartOption{}
 		if len(citations) > 0 {
-			textPart.Citations = citations
+			opts = append(opts, llmsdk.WithTextCitations(citations))
 		}
-		return &llmsdk.Part{TextPart: &textPart}, nil
+		part := llmsdk.NewTextPart(block.ResponseTextBlock.Text, opts...)
+		return &part, nil
 
 	case block.ResponseToolUseBlock != nil:
 		args, err := json.Marshal(block.ResponseToolUseBlock.Input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal tool use input: %w", err)
 		}
-		return &llmsdk.Part{
-			ToolCallPart: &llmsdk.ToolCallPart{
-				ToolCallID: block.ResponseToolUseBlock.ID,
-				ToolName:   block.ResponseToolUseBlock.Name,
-				Args:       args,
-			},
-		}, nil
+		part := llmsdk.NewToolCallPart(block.ResponseToolUseBlock.ID, block.ResponseToolUseBlock.Name, json.RawMessage(args))
+		part.ToolCallPart.Args = args
+		return &part, nil
 
 	case block.ResponseThinkingBlock != nil:
-		part := llmsdk.ReasoningPart{Text: block.ResponseThinkingBlock.Thinking}
+		opts := []llmsdk.ReasoingPartOption{}
 		if block.ResponseThinkingBlock.Signature != "" {
-			signature := block.ResponseThinkingBlock.Signature
-			part.Signature = &signature
+			opts = append(opts, llmsdk.WithReasoningSignature(block.ResponseThinkingBlock.Signature))
 		}
-		return &llmsdk.Part{ReasoningPart: &part}, nil
+		part := llmsdk.NewReasoningPart(block.ResponseThinkingBlock.Thinking, opts...)
+		return &part, nil
 
 	case block.ResponseRedactedThinkingBlock != nil:
-		signature := block.ResponseRedactedThinkingBlock.Data
-		return &llmsdk.Part{ReasoningPart: &llmsdk.ReasoningPart{Text: "", Signature: &signature}}, nil
+		part := llmsdk.NewReasoningPart("", llmsdk.WithReasoningSignature(block.ResponseRedactedThinkingBlock.Data))
+		return &part, nil
 	}
 
 	return nil, nil
@@ -660,19 +657,23 @@ func mapAnthropicRawContentBlockDelta(raw interface{}) (*llmsdk.PartDelta, error
 	switch deltaType {
 	case "text_delta":
 		text, _ := deltaMap["text"].(string)
-		return &llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Text: text}}, nil
+		part := llmsdk.NewTextPartDelta(text)
+		return &part, nil
 
 	case "input_json_delta":
 		partial, _ := deltaMap["partial_json"].(string)
-		return &llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{Args: &partial}}, nil
+		part := llmsdk.NewToolCallPartDelta(llmsdk.WithToolCallPartDeltaArgs(partial))
+		return &part, nil
 
 	case "thinking_delta":
 		thinking, _ := deltaMap["thinking"].(string)
-		return &llmsdk.PartDelta{ReasoningPartDelta: &llmsdk.ReasoningPartDelta{Text: thinking}}, nil
+		part := llmsdk.NewReasoningPartDelta(thinking)
+		return &part, nil
 
 	case "signature_delta":
 		signature, _ := deltaMap["signature"].(string)
-		return &llmsdk.PartDelta{ReasoningPartDelta: &llmsdk.ReasoningPartDelta{Signature: &signature}}, nil
+		part := llmsdk.NewReasoningPartDelta("", llmsdk.WithReasoningPartDeltaSignature(signature))
+		return &part, nil
 
 	case "citations_delta":
 		rawCitation, ok := deltaMap["citation"].(map[string]any)
@@ -683,7 +684,8 @@ func mapAnthropicRawContentBlockDelta(raw interface{}) (*llmsdk.PartDelta, error
 		if err != nil || citationDelta == nil {
 			return nil, err
 		}
-		return &llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Citation: citationDelta}}, nil
+		part := llmsdk.NewTextPartDelta("", llmsdk.WithTextPartDeltaCitation(citationDelta))
+		return &part, nil
 	}
 
 	return nil, nil
@@ -695,7 +697,7 @@ func mapAnthropicCitationDelta(raw map[string]any) (*llmsdk.CitationDelta, error
 		return nil, nil
 	}
 
-	citation := &llmsdk.CitationDelta{Type: "citation"}
+	citation := &llmsdk.CitationDelta{}
 
 	if source, ok := raw["source"].(string); ok && source != "" {
 		citation.Source = ptr.To(source)
