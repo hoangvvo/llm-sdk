@@ -45,7 +45,7 @@
   "types": "./dist/index.d.ts",
   "module": "./dist/index.js",
   "dependencies": {
-    "@hoangvvo/llm-sdk": "0.3.0",
+    "@hoangvvo/llm-sdk": "^0.4.0",
     "@opentelemetry/api": "^1.9.0"
   }
 }
