@@ -1,4 +1,5 @@
 name: Release
+run-name: Release ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
 on:
   workflow_dispatch:
     inputs:
@@ -35,7 +36,7 @@ jobs:
 
   publish-npm:
     needs: validate
-    name: Publish ${{ github.event.inputs.module }}@${{ github.event.inputs.version }} to npm
+    name: Publish to npm
     runs-on: ubuntu-latest
     if: endsWith(github.event.inputs.module, '-js')
     steps:
@@ -64,7 +65,7 @@ jobs:
 
   publish-crates:
     needs: validate
-    name: Publish ${{ github.event.inputs.module }}@${{ github.event.inputs.version }} to crates.io
+    name: Publish to crates.io
     runs-on: ubuntu-latest
     if: endsWith(github.event.inputs.module, '-rust')
     steps:
@@ -91,11 +92,12 @@ jobs:
       needs.validate.result == 'success' &&
       (needs.publish-npm.result == 'success' || needs.publish-npm.result == 'skipped') &&
       (needs.publish-crates.result == 'success' || needs.publish-crates.result == 'skipped')
-    name: Create GitHub Release for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+    name: Create GitHub Release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: ncipollo/release-action@v1
+      - name: Create release for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+        uses: ncipollo/release-action@v1
         with:
           tag: "${{ github.event.inputs.module }}@v${{ github.event.inputs.version }}"
           generateReleaseNotes: true
