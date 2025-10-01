@@ -60,6 +60,10 @@ test_set!(openai_model(), generate_image);
 
 test_set!(openai_model(), stream_image);
 
+test_set!(openai_model(), generate_image_input);
+
+test_set!(openai_model(), stream_image_input);
+
 test_set!(
     ignore = "audio is not supported in responses api",
     openai_model(),

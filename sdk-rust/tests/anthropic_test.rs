@@ -59,6 +59,10 @@ test_set!(
     stream_image
 );
 
+test_set!(anthropic_model(), generate_image_input);
+
+test_set!(anthropic_model(), stream_image_input);
+
 test_set!(
     ignore = "model does not support audio generation",
     anthropic_model(),

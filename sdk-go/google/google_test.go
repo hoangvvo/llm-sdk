@@ -95,6 +95,14 @@ func TestStreamImage(t *testing.T) {
 	testcommon.RunTestCase(t, imageModel, "stream_image")
 }
 
+func TestGenerateImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, imageModel, "generate_image_input")
+}
+
+func TestStreamImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, imageModel, "stream_image_input")
+}
+
 func TestGenerateAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioModel, "generate_audio",
 		testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {

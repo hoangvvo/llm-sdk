@@ -100,6 +100,14 @@ suite("MistralModel", () => {
     },
   );
 
+  test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
+  });
+
   test(
     TEST_CASE_NAMES.GENERATE_AUDIO,
     { skip: "model does not support audio" },

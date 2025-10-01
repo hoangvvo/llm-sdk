@@ -66,6 +66,14 @@ func TestChatStreamImage(t *testing.T) {
 	testcommon.RunTestCase(t, chatModel, "stream_image")
 }
 
+func TestChatGenerateImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, chatModel, "generate_image_input")
+}
+
+func TestChatStreamImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, chatModel, "stream_image_input")
+}
+
 func TestChatGenerateAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioChatModel, "generate_audio", testcommon.WithAdditionalInput(
 		func(input *llmsdk.LanguageModelInput) {

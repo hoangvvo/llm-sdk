@@ -331,6 +331,20 @@ pub async fn test_stream_image(
     run_test_case(model, "stream_image", options).await
 }
 
+pub async fn test_generate_image_input(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "generate_image_input", options).await
+}
+
+pub async fn test_stream_image_input(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "stream_image_input", options).await
+}
+
 pub async fn test_generate_audio(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,

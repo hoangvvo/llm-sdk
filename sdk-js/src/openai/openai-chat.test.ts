@@ -87,6 +87,14 @@ suite("OpenAIChatModel", () => {
     },
   );
 
+  test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
+  });
+
   test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
       additionalInputs: (input) => ({

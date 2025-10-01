@@ -69,6 +69,10 @@ test_set!(
     stream_image
 );
 
+test_set!(openai_model(), generate_image_input);
+
+test_set!(openai_model(), stream_image_input);
+
 test_set!(
     openai_audio_model(),
     generate_audio,

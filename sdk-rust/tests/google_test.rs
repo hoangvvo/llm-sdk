@@ -81,6 +81,10 @@ test_set!(google_image_model(), generate_image);
 
 test_set!(google_image_model(), stream_image);
 
+test_set!(google_image_model(), generate_image_input);
+
+test_set!(google_image_model(), stream_image_input);
+
 test_set!(
     google_audio_model(),
     generate_audio,

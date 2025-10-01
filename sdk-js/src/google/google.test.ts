@@ -89,6 +89,14 @@ suite("GoogleModel", () => {
     return runTestCase(t, imageModel, TEST_CASE_NAMES.STREAM_IMAGE);
   });
 
+  test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, imageModel, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, imageModel, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
+  });
+
   test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
       additionalInputs: (input) => ({

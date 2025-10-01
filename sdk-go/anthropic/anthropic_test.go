@@ -92,6 +92,14 @@ func TestStreamImage(t *testing.T) {
 	testcommon.RunTestCase(t, model, "stream_image")
 }
 
+func TestGenerateImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_image_input")
+}
+
+func TestStreamImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_image_input")
+}
+
 func TestGenerateAudio(t *testing.T) {
 	t.Skip("model does not support audio")
 	testcommon.RunTestCase(t, model, "generate_audio")

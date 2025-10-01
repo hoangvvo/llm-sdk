@@ -145,6 +145,8 @@ export const TEST_CASE_NAMES = {
   STREAM_AUDIO: "stream_audio",
   GENERATE_IMAGE: "generate_image",
   STREAM_IMAGE: "stream_image",
+  GENERATE_IMAGE_INPUT: "generate_image_input",
+  STREAM_IMAGE_INPUT: "stream_image_input",
   GENERATE_REASONING: "generate_reasoning",
   STREAM_REASONING: "stream_reasoning",
 } as const;
