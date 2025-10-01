@@ -132,6 +132,10 @@ node examples/generate-text.ts
 
 ## Migration
 
+### To 0.4.0
+
+- `image_data` and `audio_data` have been renamed to just `data` in `ImagePart` and `AudioPart`.
+
 ### To 0.3.0
 
 - **OpenAI Chat**. The existing Chat completion `OpenAIModel` has been renamed to `OpenAIChatModel`. The Responses API now powers the `OpenAIModel`.

@@ -96,8 +96,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Create release for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+      - name: Create release ${{ github.event.inputs.module }}/${{ github.event.inputs.version }}
         uses: ncipollo/release-action@v1
         with:
-          tag: "${{ github.event.inputs.module }}@v${{ github.event.inputs.version }}"
+          tag: "${{ github.event.inputs.module }}/v${{ github.event.inputs.version }}"
           generateReleaseNotes: true

@@ -113,6 +113,12 @@ Find examples in the [examples](./examples/) folder to learn how to:
 cargo run --example generate-text
 ```
 
+## Migration
+
+### To 0.2.0
+
+- `image_data` and `audio_data` have been renamed to just `data` in `ImagePart` and `AudioPart`.
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)
