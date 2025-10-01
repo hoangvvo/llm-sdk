@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@hoangvvo/llm-sdk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A JavaScript library that enables the development of applications that can interact with different language models through a unified interface.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
