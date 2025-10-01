@@ -1,6 +1,8 @@
 package llmsdk
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // NewTextPart creates a new text part
 func NewTextPart(text string, opts ...TextPartOption) Part {
@@ -147,6 +149,8 @@ func NewToolCallPart(toolCallID, toolName string, args any, opts ...ToolCallPart
 	case nil:
 		argsJSON = nil
 	case json.RawMessage:
+		argsJSON = v
+	case []byte:
 		argsJSON = v
 	default:
 		// TODO: handle error

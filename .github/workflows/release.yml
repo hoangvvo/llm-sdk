@@ -1,0 +1,96 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 1.2.3)"
+        required: true
+      module:
+        type: choice
+        description: "module to release"
+        required: true
+        options:
+          - sdk-js
+          - agent-js
+          - sdk-rust
+          - agent-rust
+          - sdk-go
+          - agent-go
+
+permissions:
+  packages: write
+  contents: write
+  id-token: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        run: |
+          if [[ ! ${{ github.event.inputs.version }} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must be in the format X.Y.Z"
+            exit 1
+          fi
+
+  publish-npm:
+    needs: validate
+    name: Publish ${{ github.event.inputs.module }}@${{ github.event.inputs.version }} to npm
+    runs-on: ubuntu-latest
+    if: endsWith(github.event.inputs.module, '-js')
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.PAT }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Version
+        run: npm version ${{ github.event.inputs.version }} --workspace=${{ github.event.inputs.module }} --no-git-tag-version
+      - name: Commit version for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
+          git push
+      - name: Publish to npm
+        run: npm publish --workspace=${{ github.event.inputs.module }}
+
+  publish-crates:
+    needs: validate
+    name: Publish ${{ github.event.inputs.module }}@${{ github.event.inputs.version }} to crates.io
+    runs-on: ubuntu-latest
+    if: endsWith(github.event.inputs.module, '-rust')
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.PAT }}
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Set and commit version for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+        run: |
+          sed -i 's/^version = ".*"/version = "${{ github.event.inputs.version }}"/' ./${{ github.event.inputs.module }}/Cargo.toml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
+          git push
+      - run: cargo publish --manifest-path ./${{ github.event.inputs.module }}/Cargo.toml --token ${{ steps.auth.outputs.token }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  release:
+    needs: [validate, publish-npm, publish-crates]
+    name: Create GitHub Release for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ncipollo/release-action@v1
+        with:
+          tag: "${{ github.event.inputs.module }}@v${{ github.event.inputs.version }}"
+          generateReleaseNotes: true
