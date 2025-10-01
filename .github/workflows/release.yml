@@ -86,6 +86,11 @@ jobs:
 
   release:
     needs: [validate, publish-npm, publish-crates]
+    if: |
+      !cancelled() && 
+      needs.validate.result == 'success' &&
+      (needs.publish-npm.result == 'success' || needs.publish-npm.result == 'skipped') &&
+      (needs.publish-crates.result == 'success' || needs.publish-crates.result == 'skipped')
     name: Create GitHub Release for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
     runs-on: ubuntu-latest
     steps:
