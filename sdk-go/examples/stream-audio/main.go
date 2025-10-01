@@ -54,8 +54,8 @@ func main() {
 			if delta.Format != nil && *delta.Format != llmsdk.AudioFormatLinear16 {
 				log.Fatalf("unsupported audio format: %s", *delta.Format)
 			}
-			if delta.AudioData != nil {
-				pcm, err := base64.StdEncoding.DecodeString(*delta.AudioData)
+			if delta.Data != nil {
+				pcm, err := base64.StdEncoding.DecodeString(*delta.Data)
 				if err != nil {
 					log.Fatalf("Failed to decode audio: %v", err)
 				}
@@ -181,12 +181,12 @@ func redactPartial(partial *llmsdk.PartialModelResponse) any {
 func redactAudioFields(value any) any {
 	switch v := value.(type) {
 	case map[string]any:
-		if raw, ok := v["audio_data"].(string); ok {
+		if raw, ok := v["data"].(string); ok {
 			decoded, err := base64.StdEncoding.DecodeString(raw)
 			if err == nil {
-				v["audio_data"] = fmt.Sprintf("[%d bytes]", len(decoded))
+				v["data"] = fmt.Sprintf("[%d bytes]", len(decoded))
 			} else {
-				v["audio_data"] = "[invalid audio_data]"
+				v["data"] = "[invalid data]"
 			}
 		}
 		for key, val := range v {

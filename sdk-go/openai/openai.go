@@ -399,7 +399,7 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 				ResponseOutputItemImageGenerationCall: &openaiapi.ResponseOutputItemImageGenerationCall{
 					ID:     id,
 					Status: "completed",
-					Result: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.ImageData)),
+					Result: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data)),
 				},
 			})
 
@@ -460,7 +460,7 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.ResponseI
 		return &openaiapi.ResponseInputContent{
 			ResponseInputImage: &openaiapi.ResponseInputImage{
 				Detail:   "auto",
-				ImageURL: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.ImageData)),
+				ImageURL: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data)),
 			},
 		}, nil
 
@@ -478,7 +478,7 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.ResponseI
 		return &openaiapi.ResponseInputContent{
 			ResponseInputAudio: &openaiapi.ResponseInputAudio{
 				InputAudio: openaiapi.ResponseInputAudioInputAudio{
-					Data:   part.AudioPart.AudioData,
+					Data:   part.AudioPart.Data,
 					Format: format,
 				},
 			},
@@ -713,11 +713,11 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 			Index: responseImageGenCallPartialImageEvent.OutputIndex,
 			Part: llmsdk.PartDelta{
 				ImagePartDelta: &llmsdk.ImagePartDelta{
-					ImageData: ptr.To(responseImageGenCallPartialImageEvent.PartialImageB64),
-					MimeType:  mimeType,
-					Width:     width,
-					Height:    height,
-					ID:        &responseImageGenCallPartialImageEvent.ItemID,
+					Data:     ptr.To(responseImageGenCallPartialImageEvent.PartialImageB64),
+					MimeType: mimeType,
+					Width:    width,
+					Height:   height,
+					ID:       &responseImageGenCallPartialImageEvent.ItemID,
 				},
 			},
 		}, nil

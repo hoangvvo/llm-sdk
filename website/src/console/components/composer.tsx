@@ -406,14 +406,14 @@ async function buildInputParts(
       parts.push({
         type: "image",
         mime_type: attachment.file.type || "image/png",
-        image_data: base64,
+        data: base64,
       });
     } else {
       const format = getAudioFormat(attachment.file);
       parts.push({
         type: "audio",
         format,
-        audio_data: base64,
+        data: base64,
       });
     }
   }

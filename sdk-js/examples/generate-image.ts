@@ -32,7 +32,7 @@ if (!imagePart) {
 
 const fileName = `image.${imagePart.mime_type.split("/")[1] ?? "png"}`;
 
-await writeFile(fileName, imagePart.image_data, { encoding: "base64" });
+await writeFile(fileName, imagePart.data, { encoding: "base64" });
 console.log(`Saved image to ${fileName}`);
 
 launchFile(fileName);

@@ -130,7 +130,7 @@ pub struct ImagePart {
     /// The MIME type of the image. E.g. "image/jpeg", "image/png".
     pub mime_type: String,
     /// The base64-encoded image data.
-    pub image_data: String,
+    pub data: String,
     /// The width of the image in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<u32>,
@@ -147,7 +147,7 @@ pub struct ImagePart {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct AudioPart {
     /// The base64-encoded audio data.
-    pub audio_data: String,
+    pub data: String,
     /// The format of the audio.
     pub format: AudioFormat,
     /// The sample rate of the audio. E.g. 44100, 48000.
@@ -330,7 +330,7 @@ pub struct ImagePartDelta {
     pub mime_type: Option<String>,
     /// The base64-encoded image data.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub image_data: Option<String>,
+    pub data: Option<String>,
     /// The width of the image in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<u32>,
@@ -348,7 +348,7 @@ pub struct ImagePartDelta {
 pub struct AudioPartDelta {
     /// The base64-encoded audio data.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audio_data: Option<String>,
+    pub data: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<AudioFormat>,
     /// The sample rate of the audio. E.g. 44100, 48000.

@@ -106,7 +106,7 @@ export function assertAudioPart(
     if (part.type !== "audio") {
       return false;
     }
-    if (!part.audio_data) {
+    if (!part.data) {
       return false;
     }
     if (assertion.id && !part.id) {

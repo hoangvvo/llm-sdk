@@ -360,7 +360,7 @@ function convertToOpenAIContentPartImage(
   return {
     type: "image_url",
     image_url: {
-      url: `data:${part.mime_type};base64,${part.image_data}`,
+      url: `data:${part.mime_type};base64,${part.data}`,
     },
   };
 }
@@ -385,7 +385,7 @@ function convertToOpenAIContentPartInputAudio(
   return {
     type: "input_audio",
     input_audio: {
-      data: part.audio_data,
+      data: part.data,
       format,
     },
   };
@@ -590,7 +590,7 @@ function mapOpenAIMessage(
     }
     const audioPart: AudioPart = {
       type: "audio",
-      audio_data: message.audio.data,
+      data: message.audio.data,
       format: mapOpenAIAudioFormat(createParams.audio.format),
       id: message.audio.id,
       transcript: message.audio.transcript,
@@ -683,7 +683,7 @@ function mapOpenAIDelta(
       part.id = delta.audio.id;
     }
     if (delta.audio.data) {
-      part.audio_data = delta.audio.data;
+      part.data = delta.audio.data;
       if (createParams.audio?.format) {
         part.format = mapOpenAIAudioFormat(createParams.audio.format);
       }

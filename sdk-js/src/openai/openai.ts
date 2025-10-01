@@ -226,7 +226,7 @@ function convertUserMessageToResponseInputItem(
         case "image":
           return {
             type: "input_image",
-            image_url: `data:${part.mime_type};base64,${part.image_data}`,
+            image_url: `data:${part.mime_type};base64,${part.data}`,
             detail: "auto",
           };
         case "audio": {
@@ -247,7 +247,7 @@ function convertUserMessageToResponseInputItem(
           return {
             type: "input_audio",
             input_audio: {
-              data: part.audio_data,
+              data: part.data,
               format,
             },
           };
@@ -310,7 +310,7 @@ function convertAssistantMessageToResponseInputItems(
           id: part.id ?? "",
           type: "image_generation_call",
           status: "completed",
-          result: `data:${part.mime_type};base64,${part.image_data}`,
+          result: `data:${part.mime_type};base64,${part.data}`,
         };
       case "tool-call": {
         const responseInputItem: OpenAI.Responses.ResponseInputItem = {
@@ -523,7 +523,7 @@ function mapOpenAIOutputItems(
 
           const imagePart: ImagePart = {
             type: "image",
-            image_data: patchedItem.result,
+            data: patchedItem.result,
             mime_type: `image/${patchedItem.output_format}`,
           };
           if (typeof width === "number") {
@@ -652,7 +652,7 @@ function mapOpenAIStreamEvent(
 
       const imagePartDelta: ImagePartDelta = {
         type: "image",
-        image_data: patchedEvent.partial_image_b64,
+        data: patchedEvent.partial_image_b64,
       };
       if (patchedEvent.output_format) {
         imagePartDelta.mime_type = `image/${patchedEvent.output_format}`;

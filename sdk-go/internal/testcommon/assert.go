@@ -82,7 +82,7 @@ func (a AudioPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 
 	for _, part := range content {
 		if part.AudioPart != nil {
-			if len(part.AudioPart.AudioData) == 0 {
+			if len(part.AudioPart.Data) == 0 {
 				t.Errorf("Audio data must be present")
 				return
 			}

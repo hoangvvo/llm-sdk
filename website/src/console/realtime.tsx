@@ -130,11 +130,11 @@ export function RealtimeApp() {
     },
     {
       onAudioDelta: (delta) => {
-        if (!delta.audio_data || delta.audio_data.length === 0) {
+        if (!delta.data || delta.data.length === 0) {
           return;
         }
         try {
-          const buffer = base64ToArrayBuffer(delta.audio_data);
+          const buffer = base64ToArrayBuffer(delta.data);
           const pcm = new Int16Array(buffer);
           void add16BitPCM(pcm);
         } catch (err) {
@@ -180,7 +180,7 @@ export function RealtimeApp() {
       const audioPart: AudioPart = {
         type: "audio",
         format: "wav",
-        audio_data: base64,
+        data: base64,
         sample_rate: CAPTURE_SAMPLE_RATE,
         channels: CAPTURE_CHANNEL_COUNT,
       };

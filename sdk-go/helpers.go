@@ -26,10 +26,10 @@ func WithTextCitations(citations []Citation) TextPartOption {
 }
 
 // NewImagePart creates a new image part
-func NewImagePart(imageData, mimeType string, opts ...ImagePartOption) Part {
+func NewImagePart(data, mimeType string, opts ...ImagePartOption) Part {
 	imagePart := &ImagePart{
-		ImageData: imageData,
-		MimeType:  mimeType,
+		Data:     data,
+		MimeType: mimeType,
 	}
 
 	for _, opt := range opts {
@@ -62,10 +62,10 @@ func WithImageID(imageID string) ImagePartOption {
 }
 
 // NewAudioPart creates a new audio part
-func NewAudioPart(audioData string, format AudioFormat, opts ...AudioPartOption) Part {
+func NewAudioPart(data string, format AudioFormat, opts ...AudioPartOption) Part {
 	audioPart := &AudioPart{
-		AudioData: audioData,
-		Format:    format,
+		Data:   data,
+		Format: format,
 	}
 
 	for _, opt := range opts {
@@ -310,9 +310,9 @@ func WithImagePartDeltaMimeType(mimeType string) ImagePartDeltaOption {
 	}
 }
 
-func WithImagePartDeltaData(imageData string) ImagePartDeltaOption {
+func WithImagePartDeltaData(data string) ImagePartDeltaOption {
 	return func(p *ImagePartDelta) {
-		p.ImageData = &imageData
+		p.Data = &data
 	}
 }
 
@@ -347,9 +347,9 @@ func NewAudioPartDelta(opts ...AudioPartDeltaOption) PartDelta {
 
 type AudioPartDeltaOption func(*AudioPartDelta)
 
-func WithAudioPartDeltaData(audioData string) AudioPartDeltaOption {
+func WithAudioPartDeltaData(data string) AudioPartDeltaOption {
 	return func(p *AudioPartDelta) {
-		p.AudioData = &audioData
+		p.Data = &data
 	}
 }
 

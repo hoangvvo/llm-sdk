@@ -89,7 +89,7 @@ export interface ImagePart {
   /**
    * The base64-encoded image data.
    */
-  image_data: string;
+  data: string;
   /**
    * The width of the image in pixels.
    */
@@ -111,7 +111,7 @@ export interface AudioPart {
   /**
    * The base64-encoded audio data.
    */
-  audio_data: string;
+  data: string;
   format: AudioFormat;
   /**
    * The sample rate of the audio. E.g. 44100, 48000.
@@ -298,7 +298,7 @@ export interface ImagePartDelta {
   /**
    * The base64-encoded image data.
    */
-  image_data?: string;
+  data?: string;
   /**
    * The width of the image in pixels.
    */
@@ -320,7 +320,7 @@ export interface AudioPartDelta {
   /**
    * The base64-encoded audio data.
    */
-  audio_data?: string;
+  data?: string;
   format?: AudioFormat;
   /**
    * The sample rate of the audio. E.g. 44100, 48000.

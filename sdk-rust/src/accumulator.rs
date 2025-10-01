@@ -17,7 +17,7 @@ struct AccumulatedTextData {
 /// Internal representation of accumulated image data
 #[derive(Debug, Clone)]
 struct AccumulatedImageData {
-    image_data: String,
+    data: String,
     mime_type: Option<String>,
     width: Option<u32>,
     height: Option<u32>,
@@ -27,7 +27,7 @@ struct AccumulatedImageData {
 /// Internal representation of accumulated audio data
 #[derive(Debug, Clone)]
 struct AccumulatedAudioData {
-    audio_data_chunks: Vec<String>,
+    data_chunks: Vec<String>,
     format: Option<AudioFormat>,
     sample_rate: Option<u32>,
     channels: Option<u32>,
@@ -61,15 +61,15 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
         }),
         PartDelta::ToolCall(tool_delta) => AccumulatedData::ToolCall(tool_delta),
         PartDelta::Image(image_delta) => AccumulatedData::Image(AccumulatedImageData {
-            image_data: image_delta.image_data.unwrap_or_default(),
+            data: image_delta.data.unwrap_or_default(),
             mime_type: image_delta.mime_type,
             width: image_delta.width,
             height: image_delta.height,
             id: image_delta.id,
         }),
         PartDelta::Audio(audio_delta) => AccumulatedData::Audio(AccumulatedAudioData {
-            audio_data_chunks: audio_delta
-                .audio_data
+            data_chunks: audio_delta
+                .data
                 .map(|data| vec![data])
                 .unwrap_or_default(),
             format: audio_delta.format,
@@ -110,8 +110,8 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             }
         }
         (AccumulatedData::Image(ref mut existing_image), PartDelta::Image(image_delta)) => {
-            if let Some(image_data) = image_delta.image_data {
-                existing_image.image_data.push_str(&image_data);
+            if let Some(data) = image_delta.data {
+                existing_image.data.push_str(&data);
             }
             if image_delta.mime_type.is_some() {
                 existing_image.mime_type = image_delta.mime_type;
@@ -127,8 +127,8 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             }
         }
         (AccumulatedData::Audio(ref mut existing_audio), PartDelta::Audio(audio_delta)) => {
-            if let Some(audio_data) = audio_delta.audio_data {
-                existing_audio.audio_data_chunks.push(audio_data);
+            if let Some(data) = audio_delta.data {
+                existing_audio.data_chunks.push(data);
             }
             if audio_delta.format.is_some() {
                 existing_audio.format = audio_delta.format;
@@ -279,15 +279,15 @@ fn create_image_part(data: AccumulatedImageData, index: usize) -> LanguageModelR
         )
     })?;
 
-    if data.image_data.is_empty() {
+    if data.data.is_empty() {
         return Err(LanguageModelError::Invariant(
             "",
-            format!("Missing required field image_data for image part at index {index}"),
+            format!("Missing required field data for image part at index {index}"),
         ));
     }
 
     Ok(Part::Image(ImagePart {
-        image_data: data.image_data,
+        data: data.data,
         mime_type,
         width: data.width,
         height: data.height,
@@ -313,10 +313,10 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
         ));
     }
 
-    let concatenated_audio = audio_utils::concatenate_b64_audio_chunks(&data.audio_data_chunks)?;
+    let concatenated_audio = audio_utils::concatenate_b64_audio_chunks(&data.data_chunks)?;
 
     Ok(Part::Audio(AudioPart {
-        audio_data: concatenated_audio,
+        data: concatenated_audio,
         format,
         sample_rate: data.sample_rate,
         channels: data.channels,
@@ -345,8 +345,8 @@ fn create_part(data: AccumulatedData, index: usize) -> LanguageModelResult<Part>
     match data {
         AccumulatedData::Text(text_data) => create_text_part(text_data, index),
         AccumulatedData::ToolCall(tool_data) => create_tool_call_part(tool_data, index),
-        AccumulatedData::Image(image_data) => create_image_part(image_data, index),
-        AccumulatedData::Audio(audio_data) => create_audio_part(audio_data),
+        AccumulatedData::Image(data) => create_image_part(data, index),
+        AccumulatedData::Audio(data) => create_audio_part(data),
         AccumulatedData::Reasoning(reasoning_data) => Ok(create_reasoning_part(reasoning_data)),
     }
 }

@@ -326,7 +326,7 @@ impl TryFrom<UserMessage> for ResponseInputItem {
                                 file_id: None,
                                 image_url: format!(
                                     "data:{};base64,{}",
-                                    image_part.mime_type, image_part.image_data
+                                    image_part.mime_type, image_part.data
                                 )
                                 .into(),
                                 detail: "auto".to_string(),
@@ -348,7 +348,7 @@ impl TryFrom<UserMessage> for ResponseInputItem {
 
                             ResponseInputContent::InputAudio(ResponseInputAudio {
                                 input_audio: ResponseInputAudioInputAudio {
-                                    data: audio_part.audio_data,
+                                    data: audio_part.data,
                                     format: format.to_string(),
                                 },
                             })
@@ -414,7 +414,7 @@ fn convert_assistant_message_to_response_input_items(
                         status: "completed".to_string(),
                         result: Some(format!(
                             "data:{};base64,{}",
-                            image_part.mime_type, image_part.image_data
+                            image_part.mime_type, image_part.data
                         )),
                         output_format: image_part
                             .mime_type
@@ -741,7 +741,7 @@ fn map_openai_stream_event(
                 width,
                 height,
                 mime_type: Some(format!("image/{}", partial_image_event.output_format)),
-                image_data: Some(partial_image_event.partial_image_b64),
+                data: Some(partial_image_event.partial_image_b64),
                 id: Some(partial_image_event.item_id),
             });
 

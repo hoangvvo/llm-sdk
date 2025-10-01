@@ -34,7 +34,7 @@ for await (const partial of stream) {
   console.dir(redactAudioData(partial), { depth: null });
 
   const part = partial.delta?.part;
-  if (part?.type !== "audio" || !part.audio_data) continue;
+  if (part?.type !== "audio" || !part.data) continue;
 
   if (part.format && part.format !== "linear16") {
     throw new Error(`Unsupported audio format: ${part.format}`);
@@ -51,7 +51,7 @@ for await (const partial of stream) {
   }
 
   const currentPlayer = player;
-  currentPlayer.stdin.write(Buffer.from(part.audio_data, "base64"), (err) => {
+  currentPlayer.stdin.write(Buffer.from(part.data, "base64"), (err) => {
     if (err) {
       console.error("Error writing to ffplay stdin:", err);
     }
@@ -121,11 +121,11 @@ function redactAudioData(partial: unknown) {
       if (
         value &&
         typeof value === "object" &&
-        "audio_data" in value &&
-        typeof value.audio_data === "string"
+        "data" in value &&
+        typeof value.data === "string"
       ) {
-        const byteLength = Buffer.from(value.audio_data, "base64").length;
-        return { ...value, audio_data: `[${byteLength} bytes]` };
+        const byteLength = Buffer.from(value.data, "base64").length;
+        return { ...value, data: `[${byteLength} bytes]` };
       }
       return value;
     }),

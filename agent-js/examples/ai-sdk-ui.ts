@@ -752,7 +752,7 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
       return [
         {
           type: "image",
-          image_data: data,
+          data: data,
           mime_type: part.mediaType,
         },
       ];
@@ -761,7 +761,7 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
       return [
         {
           type: "audio",
-          audio_data: data,
+          data: data,
           format: mapMimeTypeToAudioFormat(part.mediaType),
         },
       ];

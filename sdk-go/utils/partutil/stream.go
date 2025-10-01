@@ -123,17 +123,17 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 	case part.ImagePart != nil:
 		return llmsdk.PartDelta{
 			ImagePartDelta: &llmsdk.ImagePartDelta{
-				MimeType:  &part.ImagePart.MimeType,
-				ImageData: &part.ImagePart.ImageData,
-				Width:     part.ImagePart.Width,
-				Height:    part.ImagePart.Height,
-				ID:        part.ImagePart.ID,
+				MimeType: &part.ImagePart.MimeType,
+				Data:     &part.ImagePart.Data,
+				Width:    part.ImagePart.Width,
+				Height:   part.ImagePart.Height,
+				ID:       part.ImagePart.ID,
 			},
 		}
 	case part.AudioPart != nil:
 		return llmsdk.PartDelta{
 			AudioPartDelta: &llmsdk.AudioPartDelta{
-				AudioData:  &part.AudioPart.AudioData,
+				Data:       &part.AudioPart.Data,
 				Format:     &part.AudioPart.Format,
 				SampleRate: part.AudioPart.SampleRate,
 				Channels:   part.AudioPart.Channels,

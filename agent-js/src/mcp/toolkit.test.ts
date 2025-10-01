@@ -234,11 +234,11 @@ suite("MCP toolkit", () => {
                 {
                   type: "image",
                   mime_type: "image/png",
-                  image_data: IMAGE_DATA,
+                  data: IMAGE_DATA,
                 },
                 {
                   type: "audio",
-                  audio_data: AUDIO_DATA,
+                  data: AUDIO_DATA,
                   format: "mp3",
                 },
               ],
@@ -348,11 +348,11 @@ suite("MCP toolkit", () => {
                 {
                   type: "image",
                   mime_type: "image/png",
-                  image_data: IMAGE_DATA,
+                  data: IMAGE_DATA,
                 },
                 {
                   type: "audio",
-                  audio_data: AUDIO_DATA,
+                  data: AUDIO_DATA,
                   format: "mp3",
                 },
               ],
@@ -453,11 +453,11 @@ suite("MCP toolkit", () => {
       {
         type: "image",
         mime_type: "image/png",
-        image_data: IMAGE_DATA,
+        data: IMAGE_DATA,
       },
       {
         type: "audio",
-        audio_data: AUDIO_DATA,
+        data: AUDIO_DATA,
         format: "mp3",
       },
     ]);

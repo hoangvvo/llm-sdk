@@ -258,7 +258,7 @@ function convertToGoogleParts(part: Part): GooglePart[] {
       return [
         {
           inlineData: {
-            data: part.image_data,
+            data: part.data,
             mimeType: part.mime_type,
           },
         },
@@ -267,7 +267,7 @@ function convertToGoogleParts(part: Part): GooglePart[] {
       return [
         {
           inlineData: {
-            data: part.audio_data,
+            data: part.data,
             mimeType: mapAudioFormatToMimeType(part.format),
           },
         },
@@ -444,7 +444,7 @@ function mapGoogleContent(parts: GooglePart[]): Part[] {
         }
         return {
           type: "image",
-          image_data: googlePart.inlineData.data,
+          data: googlePart.inlineData.data,
           mime_type: googlePart.inlineData.mimeType,
         };
       }
@@ -455,7 +455,7 @@ function mapGoogleContent(parts: GooglePart[]): Part[] {
         return {
           type: "audio",
           format: mapMimeTypeToAudioFormat(googlePart.inlineData.mimeType),
-          audio_data: googlePart.inlineData.data,
+          data: googlePart.inlineData.data,
         };
       }
       if (googlePart.functionCall) {

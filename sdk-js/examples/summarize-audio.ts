@@ -18,7 +18,7 @@ const response = await model.generate({
         },
         {
           type: "audio",
-          audio_data: Buffer.from(audio).toString("base64"),
+          data: Buffer.from(audio).toString("base64"),
           format: "opus",
         },
       ],

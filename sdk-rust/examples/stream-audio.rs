@@ -48,7 +48,7 @@ async fn main() {
                         panic!("unsupported audio format: {format:?}");
                     }
                 }
-                if let Some(b64) = audio.audio_data {
+                if let Some(b64) = audio.data {
                     let bytes = BASE64_STANDARD
                         .decode(b64.as_bytes())
                         .expect("invalid base64 audio");
@@ -129,30 +129,30 @@ fn finish_ffplay(mut child: Child, mut stdin: ChildStdin) {
 fn log_partial(partial: &llm_sdk::PartialModelResponse) {
     match serde_json::to_value(partial) {
         Ok(mut value) => {
-            redact_audio_data(&mut value);
+            redact_data(&mut value);
             println!("{value:#?}");
         }
         Err(_) => println!("{partial:#?}"),
     }
 }
 
-fn redact_audio_data(value: &mut Value) {
+fn redact_data(value: &mut Value) {
     match value {
         Value::Object(map) => {
-            if let Some(Value::String(data)) = map.get_mut("audio_data") {
+            if let Some(Value::String(data)) = map.get_mut("data") {
                 if let Ok(bytes) = BASE64_STANDARD.decode(data.as_bytes()) {
                     *data = format!("[{} bytes]", bytes.len());
                 } else {
-                    *data = "[invalid audio_data]".to_string();
+                    *data = "[invalid data]".to_string();
                 }
             }
             for entry in map.values_mut() {
-                redact_audio_data(entry);
+                redact_data(entry);
             }
         }
         Value::Array(array) => {
             for item in array.iter_mut() {
-                redact_audio_data(item);
+                redact_data(item);
             }
         }
         _ => {}

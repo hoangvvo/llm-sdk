@@ -436,7 +436,7 @@ fn convert_user_message(
                             detail: None,
                             url: format!(
                                 "data:{};base64,{}",
-                                image_part.mime_type, image_part.image_data
+                                image_part.mime_type, image_part.data
                             ),
                         },
                     },
@@ -459,7 +459,7 @@ fn convert_user_message(
                 content_parts.push(ChatCompletionRequestUserMessageContentPart::Audio(
                     ChatCompletionRequestMessageContentPartAudio {
                         input_audio: chat_api::InputAudio {
-                            data: audio_part.audio_data,
+                            data: audio_part.data,
                             format,
                         },
                     },
@@ -797,7 +797,7 @@ fn map_openai_message(
         }
     }
 
-    if let Some(chat_api::AudioResponseData::Audio(audio_data)) = message.audio {
+    if let Some(chat_api::AudioResponseData::Audio(data)) = message.audio {
         let audio_format = audio_params
             .map(|params| map_openai_audio_format(&params.format))
             .ok_or_else(|| {
@@ -809,12 +809,12 @@ fn map_openai_message(
             })?;
 
         let mut audio_part = crate::AudioPart {
-            audio_data: audio_data.data,
+            data: data.data,
             format: audio_format,
             sample_rate: None,
             channels: None,
-            transcript: Some(audio_data.transcript),
-            id: Some(audio_data.id),
+            transcript: Some(data.transcript),
+            id: Some(data.id),
         };
 
         if audio_part.format == AudioFormat::Linear16 {
@@ -912,7 +912,7 @@ fn map_openai_delta(
 
     if let Some(audio) = delta.audio {
         let mut audio_part = crate::AudioPartDelta {
-            audio_data: audio.data,
+            data: audio.data,
             format: audio_params.map(|params| map_openai_audio_format(&params.format)),
             sample_rate: None,
             channels: None,

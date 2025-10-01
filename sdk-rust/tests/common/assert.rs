@@ -90,7 +90,7 @@ impl AudioPartAssertion {
     pub fn assert(&self, content: &[Part]) -> Result<(), String> {
         let found_part = content.iter().find(|part| {
             if let Part::Audio(audio_part) = part {
-                if audio_part.audio_data.is_empty() {
+                if audio_part.data.is_empty() {
                     return false; // Audio data must be present
                 }
                 if self.id && audio_part.id.is_none() {

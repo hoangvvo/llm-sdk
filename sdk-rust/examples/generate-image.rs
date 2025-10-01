@@ -36,7 +36,7 @@ async fn main() {
         let file_name = format!("image.{ext}");
 
         let image_bytes = BASE64_STANDARD
-            .decode(&image_part.image_data)
+            .decode(&image_part.data)
             .expect("invalid base64 image data");
 
         fs::write(&file_name, image_bytes).expect("failed to write image file");

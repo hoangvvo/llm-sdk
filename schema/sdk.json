@@ -97,7 +97,7 @@
           "type": "string",
           "description": "The MIME type of the image. E.g. \"image/jpeg\", \"image/png\"."
         },
-        "image_data": {
+        "data": {
           "type": "string",
           "description": "The base64-encoded image data."
         },
@@ -110,7 +110,7 @@
           "description": "The height of the image in pixels."
         }
       },
-      "required": ["type", "mime_type", "image_data"],
+      "required": ["type", "mime_type", "data"],
       "additionalProperties": false
     },
     "AudioPart": {
@@ -118,7 +118,7 @@
       "description": "A part of the message that contains an audio.",
       "properties": {
         "type": { "const": "audio" },
-        "audio_data": {
+        "data": {
           "type": "string",
           "description": "The base64-encoded audio data."
         },
@@ -140,7 +140,7 @@
           "description": "ID of the audio part, if applicable"
         }
       },
-      "required": ["type", "audio_data", "format"],
+      "required": ["type", "data", "format"],
       "additionalProperties": false
     },
     "SourcePart": {
@@ -383,7 +383,7 @@
           "type": "string",
           "description": "The MIME type of the image. E.g. \"image/jpeg\", \"image/png\"."
         },
-        "image_data": {
+        "data": {
           "type": "string",
           "description": "The base64-encoded image data."
         },
@@ -404,7 +404,7 @@
       "description": "A delta update for an audio part, used in streaming of an audio message.",
       "properties": {
         "type": { "const": "audio" },
-        "audio_data": {
+        "data": {
           "type": "string",
           "description": "The base64-encoded audio data."
         },
