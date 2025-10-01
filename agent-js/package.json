@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@hoangvvo/llm-agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The agent library to build LLM applications that work with any LLM providers.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
