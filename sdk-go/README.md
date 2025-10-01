@@ -132,6 +132,12 @@ Find examples in the [examples](./examples/) folder to learn how to:
 go run ./examples/generate-text
 ```
 
+## Migration
+
+### To 0.2.0
+
+- `ImageData` and `AudioData` have been renamed to just `Data` in `ImagePart` and `AudioPart`.
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)
