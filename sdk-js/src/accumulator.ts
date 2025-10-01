@@ -76,7 +76,7 @@ function createDelta(delta: ContentDelta): AccumulatedData {
     case "audio": {
       const audioData: AccumulatedAudioData = {
         type: "audio",
-        audioDataChunks: delta.part.audio_data ? [delta.part.audio_data] : [],
+        audioDataChunks: delta.part.data ? [delta.part.data] : [],
       };
       if (delta.part.format) {
         audioData.format = delta.part.format;
@@ -146,9 +146,8 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
 
     case "image": {
       const existingPart = existing as ImagePartDelta;
-      if (delta.part.image_data) {
-        existingPart.image_data =
-          (existingPart.image_data ?? "") + delta.part.image_data;
+      if (delta.part.data) {
+        existingPart.data = (existingPart.data ?? "") + delta.part.data;
       }
       if (delta.part.mime_type) {
         existingPart.mime_type = delta.part.mime_type;
@@ -167,8 +166,8 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
 
     case "audio": {
       const existingPart = existing as AccumulatedAudioData;
-      if (delta.part.audio_data) {
-        existingPart.audioDataChunks.push(delta.part.audio_data);
+      if (delta.part.data) {
+        existingPart.audioDataChunks.push(delta.part.data);
       }
       if (delta.part.format) {
         existingPart.format = delta.part.format;
@@ -279,16 +278,16 @@ function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
 }
 
 function createImagePart(data: ImagePartDelta, index: number): Part {
-  if (!data.image_data || !data.mime_type) {
+  if (!data.data || !data.mime_type) {
     throw new Error(
       `Missing required fields at index ${String(index)}: ` +
-        `image_data=${String(data.image_data)}, mime_type=${String(data.mime_type)}`,
+        `data=${String(data.data)}, mime_type=${String(data.mime_type)}`,
     );
   }
 
   const imagePart: ImagePart = {
     type: "image",
-    image_data: data.image_data,
+    data: data.data,
     mime_type: data.mime_type,
   };
   if (typeof data.width === "number") {
@@ -320,7 +319,7 @@ function createAudioPart(data: AccumulatedAudioData): Part {
 
   const audioPart: AudioPart = {
     type: "audio",
-    audio_data: audioData,
+    data: audioData,
     format: data.format,
   };
   if (typeof data.sampleRate === "number") {

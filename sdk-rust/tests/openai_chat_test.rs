@@ -58,6 +58,22 @@ test_set!(openai_model(), structured_response_format);
 test_set!(openai_model(), source_part_input);
 
 test_set!(
+    ignore = "chat completion api does not support image generation",
+    openai_model(),
+    generate_image
+);
+
+test_set!(
+    ignore = "chat completion api does not support image generation",
+    openai_model(),
+    stream_image
+);
+
+test_set!(openai_model(), generate_image_input);
+
+test_set!(openai_model(), stream_image_input);
+
+test_set!(
     openai_audio_model(),
     generate_audio,
     Some(RunTestCaseOptions {

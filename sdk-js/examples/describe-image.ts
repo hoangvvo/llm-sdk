@@ -18,7 +18,7 @@ const response = await model.generate({
         },
         {
           type: "image",
-          image_data: Buffer.from(image).toString("base64"),
+          data: Buffer.from(image).toString("base64"),
           mime_type: imageRes.headers.get("content-type") ?? "image/jpeg",
         },
       ],

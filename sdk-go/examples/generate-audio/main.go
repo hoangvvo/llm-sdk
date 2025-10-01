@@ -39,7 +39,7 @@ func main() {
 			continue
 		}
 
-		audioData, err := base64.StdEncoding.DecodeString(part.AudioPart.AudioData)
+		audioData, err := base64.StdEncoding.DecodeString(part.AudioPart.Data)
 		if err != nil {
 			log.Fatalf("Failed to decode audio data: %v", err)
 		}

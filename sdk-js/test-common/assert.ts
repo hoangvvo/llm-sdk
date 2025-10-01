@@ -14,7 +14,8 @@ export type PartAssertion =
   | TextPartAssertion
   | ToolCallPartAssertion
   | ReasoningPartAssertion
-  | AudioPartAssertion;
+  | AudioPartAssertion
+  | ImagePartAssertion;
 
 export interface ToolCallPartAssertion {
   type: "tool_call";
@@ -26,6 +27,11 @@ export interface AudioPartAssertion {
   type: "audio";
   id?: boolean;
   transcript?: RegExp | undefined;
+}
+
+export interface ImagePartAssertion {
+  type: "image";
+  id?: boolean;
 }
 
 export interface ReasoningPartAssertion {
@@ -50,6 +56,10 @@ export function assertContentPart(
       }
       case "audio": {
         assertAudioPart(t, content, assertion);
+        break;
+      }
+      case "image": {
+        assertImagePart(t, content, assertion);
         break;
       }
       case "reasoning": {
@@ -106,7 +116,7 @@ export function assertAudioPart(
     if (part.type !== "audio") {
       return false;
     }
-    if (!part.audio_data) {
+    if (!part.data) {
       return false;
     }
     if (assertion.id && !part.id) {
@@ -123,6 +133,29 @@ export function assertAudioPart(
 Expected: ${JSON.stringify(assertion)}
 Received:
 ${JSON.stringify(content, null, 2)}`,
+  );
+}
+
+export function assertImagePart(
+  t: TestContext,
+  content: Part[],
+  assertion: ImagePartAssertion,
+) {
+  const foundPart = content.find((part) => {
+    if (part.type !== "image") {
+      return false;
+    }
+    if (!part.data) {
+      return false;
+    }
+    if (assertion.id && !part.id) {
+      return false;
+    }
+    return true;
+  });
+  t.assert.ok(
+    foundPart,
+    `Expected matching image part:\nExpected: ${JSON.stringify(assertion)}\nReceived:\n${JSON.stringify(content, null, 2)}`,
   );
 }
 

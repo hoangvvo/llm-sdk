@@ -256,7 +256,7 @@ export function useAgent<Context>(
 
           if (parsed.event === "partial") {
             const deltaPart = parsed.delta?.part;
-            if (deltaPart?.type === "audio" && deltaPart.audio_data) {
+            if (deltaPart?.type === "audio" && deltaPart.data) {
               try {
                 await onAudioDelta?.(deltaPart);
               } catch (err) {
@@ -488,12 +488,12 @@ function reduceContentDelta(
           : {
               type: "image",
               mime_type: "image/png",
-              image_data: "",
+              data: "",
             };
       next[index] = {
         ...previousImage,
         mime_type: part.mime_type ?? previousImage.mime_type,
-        image_data: previousImage.image_data + (part.image_data ?? ""),
+        data: previousImage.data + (part.data ?? ""),
         width: part.width ?? previousImage.width,
         height: part.height ?? previousImage.height,
         id: part.id ?? previousImage.id,
@@ -507,12 +507,12 @@ function reduceContentDelta(
           : {
               type: "audio",
               format: part.format ?? "wav",
-              audio_data: "",
+              data: "",
             };
       next[index] = {
         ...previousAudio,
         format: part.format ?? previousAudio.format,
-        audio_data: "",
+        data: "",
         sample_rate: part.sample_rate ?? previousAudio.sample_rate,
         channels: part.channels ?? previousAudio.channels,
         transcript: `${previousAudio.transcript ?? ""}${part.transcript ?? ""}`,
@@ -568,10 +568,7 @@ function sanitizePayload(value: unknown): unknown {
     for (const [key, entry] of Object.entries(
       value as Record<string, unknown>,
     )) {
-      if (
-        (key === "audio_data" || key === "image_data") &&
-        typeof entry === "string"
-      ) {
+      if ((key === "data" || key === "data") && typeof entry === "string") {
         result[key] = `[${String(entry.length)} bytes base64]`;
       } else {
         result[key] = sanitizePayload(entry);

@@ -1,6 +1,6 @@
 use crate::common::assert::{
-    AudioPartAssertion, OutputAssertion, PartAssertion, ReasoningPartAssertion, TextPartAssertion,
-    ToolCallPartAssertion, ToolCallpartAssertionArgPropValue,
+    AudioPartAssertion, ImagePartAssertion, OutputAssertion, PartAssertion, ReasoningPartAssertion,
+    TextPartAssertion, ToolCallPartAssertion, ToolCallpartAssertionArgPropValue,
 };
 use futures::stream::StreamExt;
 use llm_sdk::*;
@@ -158,6 +158,13 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
                         });
                     assertions.push(PartAssertion::Audio(AudioPartAssertion { id, transcript }));
                 }
+                "image" => {
+                    let id = part_obj
+                        .get("id")
+                        .and_then(serde_json::Value::as_bool)
+                        .unwrap_or(false);
+                    assertions.push(PartAssertion::Image(ImagePartAssertion { id }));
+                }
                 "reasoning" => {
                     if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {
                         assertions.push(PartAssertion::Reasoning(ReasoningPartAssertion {
@@ -308,6 +315,34 @@ pub async fn test_source_part_input(
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     run_test_case(model, "source_part_input", options).await
+}
+
+pub async fn test_generate_image(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "generate_image", options).await
+}
+
+pub async fn test_stream_image(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "stream_image", options).await
+}
+
+pub async fn test_generate_image_input(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "generate_image_input", options).await
+}
+
+pub async fn test_stream_image_input(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "stream_image_input", options).await
 }
 
 pub async fn test_generate_audio(

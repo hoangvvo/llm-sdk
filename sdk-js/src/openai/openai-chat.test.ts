@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
-
 import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
@@ -7,13 +5,10 @@ import { OpenAIChatModel } from "./openai-chat.ts";
 
 suite("OpenAIChatModel", () => {
   assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
-  const model = new OpenAIChatModel(
-    {
-      apiKey: process.env["OPENAI_API_KEY"],
-      modelId: "gpt-4o",
-    },
-    { capabilities: ["function-calling", "image-input", "structured-output"] },
-  );
+  const model = new OpenAIChatModel({
+    apiKey: process.env["OPENAI_API_KEY"],
+    modelId: "gpt-4o",
+  });
 
   const audioModel = new OpenAIChatModel({
     modelId: "gpt-4o-audio-preview",
@@ -74,6 +69,30 @@ suite("OpenAIChatModel", () => {
 
   test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
+  });
+
+  test(
+    TEST_CASE_NAMES.GENERATE_IMAGE,
+    { skip: "chat completion does not support image generation" },
+    (t) => {
+      return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE);
+    },
+  );
+
+  test(
+    TEST_CASE_NAMES.STREAM_IMAGE,
+    { skip: "chat completion does not support image generation" },
+    (t) => {
+      return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE);
+    },
+  );
+
+  test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
   });
 
   test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {

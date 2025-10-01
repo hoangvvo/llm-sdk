@@ -52,10 +52,10 @@ export function ChatApp() {
 
   const handleAudioDelta = useCallback(
     (delta: AudioPartDelta) => {
-      if (!delta.audio_data || delta.audio_data.length === 0) {
+      if (!delta.data || delta.data.length === 0) {
         return;
       }
-      const buffer = base64ToArrayBuffer(delta.audio_data);
+      const buffer = base64ToArrayBuffer(delta.data);
       void add16BitPCM(buffer, delta.id ?? "default");
     },
     [add16BitPCM],

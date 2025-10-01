@@ -74,7 +74,7 @@ type ImagePart struct {
 	// The MIME type of the image. E.g. "image/jpeg", "image/png".
 	MimeType string `json:"mime_type"`
 	// The base64-encoded image data.
-	ImageData string `json:"image_data"`
+	Data string `json:"data"`
 	// The width of the image in pixels.
 	Width *int `json:"width,omitempty"`
 	// The height of the image in pixels.
@@ -86,8 +86,8 @@ type ImagePart struct {
 // AudioPart represents a part of the message that contains an audio.
 type AudioPart struct {
 	// The base64-encoded audio data.
-	AudioData string      `json:"audio_data"`
-	Format    AudioFormat `json:"format"`
+	Data   string      `json:"data"`
+	Format AudioFormat `json:"format"`
 	// The sample rate of the audio. E.g. 44100, 48000.
 	SampleRate *int `json:"sample_rate,omitempty"`
 	// The number of channels of the audio. E.g. 1, 2.
@@ -331,8 +331,8 @@ type ToolCallPartDelta struct {
 type ImagePartDelta struct {
 	// MimeType is the MIME type of the image. E.g. "image/jpeg", "image/png".
 	MimeType *string `json:"mime_type,omitempty"`
-	// ImageData is the base64-encoded image data.
-	ImageData *string `json:"image_data,omitempty"`
+	// Data is the base64-encoded image data.
+	Data *string `json:"data,omitempty"`
 	// Width is the width of the image in pixels.
 	Width *int `json:"width,omitempty"`
 	// Height is the height of the image in pixels.
@@ -343,7 +343,8 @@ type ImagePartDelta struct {
 
 // AudioPartDelta represents a delta update for an audio part, used in streaming of an audio message.
 type AudioPartDelta struct {
-	AudioData  *string      `json:"audio_data,omitempty"`
+	// Data is the base64-encoded audio data.
+	Data       *string      `json:"data,omitempty"`
 	Format     *AudioFormat `json:"format,omitempty"`
 	SampleRate *int         `json:"sample_rate,omitempty"`
 	Channels   *int         `json:"channels,omitempty"`

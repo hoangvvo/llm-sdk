@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
 import test, { type TestContext } from "node:test";
 import { Type } from "typebox";
 import type { AgentTool } from "../tool.ts";

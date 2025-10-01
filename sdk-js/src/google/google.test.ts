@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
-
 import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
@@ -15,6 +13,11 @@ suite("GoogleModel", () => {
   const audioModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
     modelId: "gemini-2.5-flash-preview-tts",
+  });
+
+  const imageModel = new GoogleModel({
+    apiKey: process.env["GOOGLE_API_KEY"],
+    modelId: "gemini-2.5-flash-image-preview",
   });
 
   const thinkingModel = new GoogleModel({
@@ -76,6 +79,22 @@ suite("GoogleModel", () => {
 
   test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.GENERATE_IMAGE, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, imageModel, TEST_CASE_NAMES.GENERATE_IMAGE);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_IMAGE, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, imageModel, TEST_CASE_NAMES.STREAM_IMAGE);
+  });
+
+  test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, imageModel, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, imageModel, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
   });
 
   test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {

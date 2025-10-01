@@ -141,6 +141,8 @@ func convertOutputAssertions(content []interface{}) []PartAssertion {
 				partMap["id"].(bool),
 				transcript,
 			))
+		case "image":
+			assertions = append(assertions, NewImageAssertion(partMap["id"].(bool)))
 		case "reasoning":
 			assertions = append(assertions, NewReasoningAssertion(partMap["text"].(string)))
 		}

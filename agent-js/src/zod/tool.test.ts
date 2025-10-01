@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
 import test, { type TestContext } from "node:test";
 import z from "zod";
 import { zodTool } from "./tool.ts";

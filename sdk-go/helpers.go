@@ -26,10 +26,10 @@ func WithTextCitations(citations []Citation) TextPartOption {
 }
 
 // NewImagePart creates a new image part
-func NewImagePart(imageData, mimeType string, opts ...ImagePartOption) Part {
+func NewImagePart(data, mimeType string, opts ...ImagePartOption) Part {
 	imagePart := &ImagePart{
-		ImageData: imageData,
-		MimeType:  mimeType,
+		Data:     data,
+		MimeType: mimeType,
 	}
 
 	for _, opt := range opts {
@@ -62,10 +62,10 @@ func WithImageID(imageID string) ImagePartOption {
 }
 
 // NewAudioPart creates a new audio part
-func NewAudioPart(audioData string, format AudioFormat, opts ...AudioPartOption) Part {
+func NewAudioPart(data string, format AudioFormat, opts ...AudioPartOption) Part {
 	audioPart := &AudioPart{
-		AudioData: audioData,
-		Format:    format,
+		Data:   data,
+		Format: format,
 	}
 
 	for _, opt := range opts {
@@ -181,14 +181,25 @@ func WithToolCallPartID(id string) ToolCallPartOption {
 }
 
 // NewToolResultPart creates a new tool result part
-func NewToolResultPart(toolCallID, toolName string, content []Part, isError bool) Part {
-	return Part{
+func NewToolResultPart(toolCallID, toolName string, content []Part, opts ...ToolResultPartOption) Part {
+	toolResultPart := Part{
 		ToolResultPart: &ToolResultPart{
 			ToolCallID: toolCallID,
 			ToolName:   toolName,
 			Content:    content,
-			IsError:    isError,
 		},
+	}
+	for _, opt := range opts {
+		opt(toolResultPart.ToolResultPart)
+	}
+	return toolResultPart
+}
+
+type ToolResultPartOption func(*ToolResultPart)
+
+func WithToolResultIsError(isError bool) ToolResultPartOption {
+	return func(p *ToolResultPart) {
+		p.IsError = isError
 	}
 }
 
@@ -310,9 +321,9 @@ func WithImagePartDeltaMimeType(mimeType string) ImagePartDeltaOption {
 	}
 }
 
-func WithImagePartDeltaData(imageData string) ImagePartDeltaOption {
+func WithImagePartDeltaData(data string) ImagePartDeltaOption {
 	return func(p *ImagePartDelta) {
-		p.ImageData = &imageData
+		p.Data = &data
 	}
 }
 
@@ -347,9 +358,9 @@ func NewAudioPartDelta(opts ...AudioPartDeltaOption) PartDelta {
 
 type AudioPartDeltaOption func(*AudioPartDelta)
 
-func WithAudioPartDeltaData(audioData string) AudioPartDeltaOption {
+func WithAudioPartDeltaData(data string) AudioPartDeltaOption {
 	return func(p *AudioPartDelta) {
-		p.AudioData = &audioData
+		p.Data = &data
 	}
 }
 

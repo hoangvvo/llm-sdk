@@ -258,7 +258,7 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 
 	if input.MaxTokens != nil {
 		maxTokens := int(*input.MaxTokens)
-		params.MaxTokens = &maxTokens
+		params.MaxCompletionTokens = &maxTokens
 	}
 
 	if len(input.Modalities) > 0 {
@@ -401,7 +401,7 @@ func convertUserMessageToOpenAIChatMessage(message *llmsdk.UserMessage) (openaic
 						Detail *string `json:"detail,omitempty"`
 						Url    string  `json:"url"`
 					}{
-						Url: fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.ImageData),
+						Url: fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data),
 					},
 				},
 			})
@@ -417,7 +417,7 @@ func convertUserMessageToOpenAIChatMessage(message *llmsdk.UserMessage) (openaic
 						Data   string `json:"data"`
 						Format string `json:"format"`
 					}{
-						Data:   part.AudioPart.AudioData,
+						Data:   part.AudioPart.Data,
 						Format: format,
 					},
 				},
@@ -637,7 +637,7 @@ func mapOpenAIChatDelta(delta openaichatapi.ChatCompletionStreamResponseDelta, e
 			if err != nil {
 				return nil, err
 			}
-			audioDelta.AudioData = delta.Audio.Data
+			audioDelta.Data = delta.Audio.Data
 			audioDelta.Format = ptr.To(format)
 			if format == llmsdk.AudioFormatLinear16 {
 				audioDelta.SampleRate = ptr.To(OpenAIAudioSampleRate)

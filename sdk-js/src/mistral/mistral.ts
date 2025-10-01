@@ -322,13 +322,13 @@ function convertToMistralContentChunk(
       return {
         type: "image_url",
         imageUrl: {
-          url: `data:${part.mime_type};base64,${part.image_data}`,
+          url: `data:${part.mime_type};base64,${part.data}`,
         },
       };
     case "audio":
       return {
         type: "input_audio",
-        inputAudio: part.audio_data,
+        inputAudio: part.data,
       };
     case "reasoning":
       return {

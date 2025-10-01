@@ -13,7 +13,6 @@ var chatModel *openai.OpenAIChatModel
 var audioChatModel *openai.OpenAIChatModel
 
 var model *openai.OpenAIModel
-var reasoningModel *openai.OpenAIModel
 
 func TestMain(m *testing.M) {
 	godotenv.Load("../../.env")
@@ -22,10 +21,7 @@ func TestMain(m *testing.M) {
 		panic("OPENAI_API_KEY must be set")
 	}
 
-	model = openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{
-		APIKey: apiKey,
-	})
-	reasoningModel = openai.NewOpenAIModel("o1", openai.OpenAIModelOptions{
+	model = openai.NewOpenAIModel("gpt-5", openai.OpenAIModelOptions{
 		APIKey: apiKey,
 	})
 
@@ -86,6 +82,21 @@ func TestStructuredResponseFormat(t *testing.T) {
 func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
 }
+func TestGenerateImage(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_image")
+}
+
+func TestStreamImage(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_image")
+}
+
+func TestGenerateImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_image_input")
+}
+
+func TestStreamImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_image_input")
+}
 
 func TestGenerateAudio(t *testing.T) {
 	t.Skip("audio not supported in responses api")
@@ -98,9 +109,9 @@ func TestStreamAudio(t *testing.T) {
 }
 
 func TestGenerateReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, "generate_reasoning")
+	testcommon.RunTestCase(t, model, "generate_reasoning")
 }
 
 func TestStreamReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
+	testcommon.RunTestCase(t, model, "stream_reasoning")
 }

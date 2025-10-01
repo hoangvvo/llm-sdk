@@ -100,14 +100,14 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             citation: None,
         }),
         Part::Image(image_part) => PartDelta::Image(ImagePartDelta {
-            image_data: Some(image_part.image_data),
+            data: Some(image_part.data),
             mime_type: Some(image_part.mime_type),
             width: image_part.width,
             height: image_part.height,
             id: image_part.id,
         }),
         Part::Audio(audio_part) => PartDelta::Audio(AudioPartDelta {
-            audio_data: Some(audio_part.audio_data),
+            data: Some(audio_part.data),
             format: Some(audio_part.format),
             sample_rate: audio_part.sample_rate,
             channels: audio_part.channels,

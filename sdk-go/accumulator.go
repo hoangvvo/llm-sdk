@@ -16,21 +16,21 @@ type accumulatedTextData struct {
 
 // accumulatedImageData represents accumulated image data
 type accumulatedImageData struct {
-	MimeType  *string
-	ImageData string
-	Width     *int
-	Height    *int
-	ID        *string
+	MimeType *string
+	Data     string
+	Width    *int
+	Height   *int
+	ID       *string
 }
 
 // accumulatedAudioData represents accumulated audio data
 type accumulatedAudioData struct {
-	AudioDataChunks []string
-	Format          *AudioFormat
-	SampleRate      *int
-	Channels        *int
-	Transcript      string
-	ID              *string
+	DataChunks []string
+	Format     *AudioFormat
+	SampleRate *int
+	Channels   *int
+	Transcript string
+	ID         *string
 }
 
 // accumulatedData represents accumulated data for different part types
@@ -63,22 +63,22 @@ func newDelta(delta ContentDelta) *accumulatedData {
 		}
 	case delta.Part.ImagePartDelta != nil:
 		imageData := ""
-		if delta.Part.ImagePartDelta.ImageData != nil {
-			imageData = *delta.Part.ImagePartDelta.ImageData
+		if delta.Part.ImagePartDelta.Data != nil {
+			imageData = *delta.Part.ImagePartDelta.Data
 		}
 		return &accumulatedData{
 			Image: &accumulatedImageData{
-				ImageData: imageData,
-				Width:     delta.Part.ImagePartDelta.Width,
-				Height:    delta.Part.ImagePartDelta.Height,
-				MimeType:  delta.Part.ImagePartDelta.MimeType,
-				ID:        delta.Part.ImagePartDelta.ID,
+				Data:     imageData,
+				Width:    delta.Part.ImagePartDelta.Width,
+				Height:   delta.Part.ImagePartDelta.Height,
+				MimeType: delta.Part.ImagePartDelta.MimeType,
+				ID:       delta.Part.ImagePartDelta.ID,
 			},
 		}
 	case delta.Part.AudioPartDelta != nil:
-		var audioDataChunks []string
-		if delta.Part.AudioPartDelta.AudioData != nil {
-			audioDataChunks = []string{*delta.Part.AudioPartDelta.AudioData}
+		var dataChunks []string
+		if delta.Part.AudioPartDelta.Data != nil {
+			dataChunks = []string{*delta.Part.AudioPartDelta.Data}
 		}
 		transcript := ""
 		if delta.Part.AudioPartDelta.Transcript != nil {
@@ -86,12 +86,12 @@ func newDelta(delta ContentDelta) *accumulatedData {
 		}
 		return &accumulatedData{
 			Audio: &accumulatedAudioData{
-				AudioDataChunks: audioDataChunks,
-				Format:          delta.Part.AudioPartDelta.Format,
-				SampleRate:      delta.Part.AudioPartDelta.SampleRate,
-				Channels:        delta.Part.AudioPartDelta.Channels,
-				Transcript:      transcript,
-				ID:              delta.Part.AudioPartDelta.ID,
+				DataChunks: dataChunks,
+				Format:     delta.Part.AudioPartDelta.Format,
+				SampleRate: delta.Part.AudioPartDelta.SampleRate,
+				Channels:   delta.Part.AudioPartDelta.Channels,
+				Transcript: transcript,
+				ID:         delta.Part.AudioPartDelta.ID,
 			},
 		}
 	case delta.Part.ReasoningPartDelta != nil:
@@ -150,8 +150,8 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 			return fmt.Errorf("type mismatch at index %d: existing type is image, incoming type is not image", delta.Index)
 		}
 		existingData := existing.Image
-		if imagePartDelta.ImageData != nil {
-			existingData.ImageData += *imagePartDelta.ImageData
+		if imagePartDelta.Data != nil {
+			existingData.Data += *imagePartDelta.Data
 		}
 		if imagePartDelta.Width != nil {
 			existingData.Width = imagePartDelta.Width
@@ -172,8 +172,8 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 			return fmt.Errorf("type mismatch at index %d: existing type is audio, incoming type is not audio", delta.Index)
 		}
 		existingData := existing.Audio
-		if audioPartDelta.AudioData != nil {
-			existingData.AudioDataChunks = append(existingData.AudioDataChunks, *audioPartDelta.AudioData)
+		if audioPartDelta.Data != nil {
+			existingData.DataChunks = append(existingData.DataChunks, *audioPartDelta.Data)
 		}
 		if audioPartDelta.Format != nil {
 			existingData.Format = audioPartDelta.Format
@@ -301,8 +301,8 @@ func createToolCallPart(data *ToolCallPartDelta, index int) (Part, error) {
 
 // createImagePart creates an image part from accumulated image data
 func createImagePart(data *accumulatedImageData, index int) (Part, error) {
-	if data.MimeType == nil || data.ImageData == "" {
-		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required fields at index %d: ImageData=%v, MimeType=%v", index, data.ImageData, data.MimeType))
+	if data.MimeType == nil || data.Data == "" {
+		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required fields at index %d: Data=%v, MimeType=%v", index, data.Data, data.MimeType))
 	}
 
 	var opts []ImagePartOption
@@ -316,7 +316,7 @@ func createImagePart(data *accumulatedImageData, index int) (Part, error) {
 		opts = append(opts, WithImageID(*data.ID))
 	}
 
-	return NewImagePart(data.ImageData, *data.MimeType, opts...), nil
+	return NewImagePart(data.Data, *data.MimeType, opts...), nil
 }
 
 // createAudioPart creates an audio part from accumulated audio data
@@ -329,7 +329,7 @@ func createAudioPart(data *accumulatedAudioData) (Part, error) {
 		return Part{}, NewNotImplementedError("", fmt.Sprintf("Only linear16 format is supported for audio concatenation. Received: %s", *data.Format))
 	}
 
-	concatenatedAudio, err := audioutil.ConcatenateB64AudioChunks(data.AudioDataChunks)
+	concatenatedAudio, err := audioutil.ConcatenateB64AudioChunks(data.DataChunks)
 	if err != nil {
 		return Part{}, err
 	}

@@ -319,14 +319,14 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 	case part.ImagePart != nil:
 		return []googleapi.Part{{
 			InlineData: &googleapi.Blob2{
-				Data:     &part.ImagePart.ImageData,
+				Data:     &part.ImagePart.Data,
 				MimeType: &part.ImagePart.MimeType,
 			},
 		}}, nil
 	case part.AudioPart != nil:
 		return []googleapi.Part{{
 			InlineData: &googleapi.Blob2{
-				Data:     &part.AudioPart.AudioData,
+				Data:     &part.AudioPart.Data,
 				MimeType: ptr.To(partutil.MapAudioFormatToMimeType(part.AudioPart.Format)),
 			},
 		}}, nil

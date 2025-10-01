@@ -371,7 +371,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 		source := map[string]any{
 			"type":       "base64",
 			"media_type": part.ImagePart.MimeType,
-			"data":       part.ImagePart.ImageData,
+			"data":       part.ImagePart.Data,
 		}
 		return anthropicapi.InputContentBlock{
 			RequestImageBlock: &anthropicapi.RequestImageBlock{

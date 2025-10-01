@@ -408,7 +408,7 @@ fn convert_to_google_parts(part: Part) -> Vec<GooglePart> {
         }],
         Part::Image(image_part) => vec![GooglePart {
             inline_data: Some(super::api::Blob2 {
-                data: Some(image_part.image_data),
+                data: Some(image_part.data),
                 mime_type: Some(image_part.mime_type),
                 display_name: None,
             }),
@@ -416,7 +416,7 @@ fn convert_to_google_parts(part: Part) -> Vec<GooglePart> {
         }],
         Part::Audio(audio_part) => vec![GooglePart {
             inline_data: Some(super::api::Blob2 {
-                data: Some(audio_part.audio_data),
+                data: Some(audio_part.data),
                 mime_type: Some(audio_part_utils::map_audio_format_to_mime_type(
                     &audio_part.format,
                 )),
@@ -543,7 +543,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                 if let (Some(data), Some(mime_type)) = (inline_data.data, inline_data.mime_type) {
                     if mime_type.starts_with("image/") {
                         Some(Ok(Part::Image(ImagePart {
-                            image_data: data,
+                            data,
                             mime_type,
                             width: None,
                             height: None,
@@ -554,7 +554,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                             audio_part_utils::map_mime_type_to_audio_format(&mime_type)
                         {
                             Some(Ok(Part::Audio(AudioPart {
-                                audio_data: data,
+                                data,
                                 format,
                                 sample_rate: None,
                                 channels: None,

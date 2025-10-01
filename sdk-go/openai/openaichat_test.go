@@ -56,6 +56,24 @@ func TestChatSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, chatModel, "source_part_input")
 }
 
+func TestChatGenerateImage(t *testing.T) {
+	t.Skip("chat completion api does not support image generation")
+	testcommon.RunTestCase(t, chatModel, "generate_image")
+}
+
+func TestChatStreamImage(t *testing.T) {
+	t.Skip("chat completion api does not support image generation")
+	testcommon.RunTestCase(t, chatModel, "stream_image")
+}
+
+func TestChatGenerateImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, chatModel, "generate_image_input")
+}
+
+func TestChatStreamImageInput(t *testing.T) {
+	testcommon.RunTestCase(t, chatModel, "stream_image_input")
+}
+
 func TestChatGenerateAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioChatModel, "generate_audio", testcommon.WithAdditionalInput(
 		func(input *llmsdk.LanguageModelInput) {
@@ -78,10 +96,10 @@ func TestChatStreamAudio(t *testing.T) {
 
 func TestChatGenerateReasoning(t *testing.T) {
 	t.Skip("reasoning not supported in chat completion api")
-	testcommon.RunTestCase(t, reasoningModel, "generate_reasoning")
+	testcommon.RunTestCase(t, model, "generate_reasoning")
 }
 
 func TestChatStreamReasoning(t *testing.T) {
 	t.Skip("reasoning not supported in chat completion api")
-	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
+	testcommon.RunTestCase(t, model, "stream_reasoning")
 }

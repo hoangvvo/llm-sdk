@@ -33,6 +33,16 @@ fn google_audio_model() -> GoogleModel {
     )
 }
 
+fn google_image_model() -> GoogleModel {
+    GoogleModel::new(
+        "gemini-2.5-flash-image-preview".to_string(),
+        GoogleModelOptions {
+            api_key: google_api_key().clone(),
+            ..Default::default()
+        },
+    )
+}
+
 fn google_reasoning_model() -> GoogleModel {
     GoogleModel::new(
         "gemini-2.0-flash-thinking-exp-01-21".to_string(),
@@ -66,6 +76,14 @@ test_set!(google_model(), stream_parallel_tool_calls_same_name);
 test_set!(google_model(), structured_response_format);
 
 test_set!(google_model(), source_part_input);
+
+test_set!(google_image_model(), generate_image);
+
+test_set!(google_image_model(), stream_image);
+
+test_set!(google_image_model(), generate_image_input);
+
+test_set!(google_image_model(), stream_image_input);
 
 test_set!(
     google_audio_model(),

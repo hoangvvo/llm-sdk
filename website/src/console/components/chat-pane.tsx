@@ -149,7 +149,7 @@ function PartView({ part }: { part: Part }) {
     case "image":
       return (
         <img
-          src={`data:${part.mime_type};base64,${part.image_data}`}
+          src={`data:${part.mime_type};base64,${part.data}`}
           alt="Shared"
           className="max-h-64 w-auto rounded-md border border-slate-200"
         />
@@ -232,7 +232,7 @@ function useAudioSource(part: AudioPart): string | null {
   const [source, setSource] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!part.audio_data) {
+    if (!part.data) {
       setSource(null);
       return () => {
         /* noop */
@@ -245,7 +245,7 @@ function useAudioSource(part: AudioPart): string | null {
     const assignSource = () => {
       try {
         if (part.format === "linear16") {
-          const buffer = base64ToArrayBuffer(part.audio_data);
+          const buffer = base64ToArrayBuffer(part.data);
           const int16 = new Int16Array(buffer);
           const floatChannel = new Float32Array(int16.length);
           for (let i = 0; i < int16.length; i += 1) {
@@ -262,7 +262,7 @@ function useAudioSource(part: AudioPart): string | null {
             setSource(wav.url);
           }
         } else {
-          const dataUrl = `data:${audioFormatToMime(part.format)};base64,${part.audio_data}`;
+          const dataUrl = `data:${audioFormatToMime(part.format)};base64,${part.data}`;
           if (!cancelled) {
             setSource(dataUrl);
           }
@@ -283,7 +283,7 @@ function useAudioSource(part: AudioPart): string | null {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [part.audio_data, part.format, part.sample_rate]);
+  }, [part.data, part.format, part.sample_rate]);
 
   return source;
 }

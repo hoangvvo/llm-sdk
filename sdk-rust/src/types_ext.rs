@@ -38,10 +38,10 @@ impl From<String> for TextPart {
 }
 
 impl ImagePart {
-    pub fn new(image_data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn new(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self {
             mime_type: mime_type.into(),
-            image_data: image_data.into(),
+            data: data.into(),
             width: None,
             height: None,
             id: None,
@@ -68,9 +68,9 @@ impl ImagePart {
 }
 
 impl AudioPart {
-    pub fn new(audio_data: impl Into<String>, format: crate::AudioFormat) -> Self {
+    pub fn new(data: impl Into<String>, format: crate::AudioFormat) -> Self {
         Self {
-            audio_data: audio_data.into(),
+            data: data.into(),
             format,
             sample_rate: None,
             channels: None,
@@ -225,12 +225,12 @@ impl Part {
         Self::Text(TextPart::new(text))
     }
 
-    pub fn image(image_data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        Self::Image(ImagePart::new(image_data, mime_type))
+    pub fn image(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Image(ImagePart::new(data, mime_type))
     }
 
-    pub fn audio(audio_data: impl Into<String>, format: crate::AudioFormat) -> Self {
-        Self::Audio(AudioPart::new(audio_data, format))
+    pub fn audio(data: impl Into<String>, format: crate::AudioFormat) -> Self {
+        Self::Audio(AudioPart::new(data, format))
     }
 
     pub fn source(source: impl Into<String>, title: impl Into<String>, content: Vec<Self>) -> Self {
@@ -418,8 +418,8 @@ impl ImagePartDelta {
     }
 
     #[must_use]
-    pub fn with_data(mut self, image_data: impl Into<String>) -> Self {
-        self.image_data = Some(image_data.into());
+    pub fn with_data(mut self, data: impl Into<String>) -> Self {
+        self.data = Some(data.into());
         self
     }
 
@@ -450,8 +450,8 @@ impl AudioPartDelta {
     }
 
     #[must_use]
-    pub fn with_data(mut self, audio_data: impl Into<String>) -> Self {
-        self.audio_data = Some(audio_data.into());
+    pub fn with_data(mut self, data: impl Into<String>) -> Self {
+        self.data = Some(data.into());
         self
     }
 

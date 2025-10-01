@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
-
 import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
@@ -7,21 +5,13 @@ import { OpenAIModel } from "./openai.ts";
 
 suite("OpenAIModel", () => {
   assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
-  const model = new OpenAIModel(
-    {
-      apiKey: process.env["OPENAI_API_KEY"],
-      modelId: "gpt-4o",
-    },
-    { capabilities: ["function-calling", "image-input", "structured-output"] },
-  );
+  const model = new OpenAIModel({
+    apiKey: process.env["OPENAI_API_KEY"],
+    modelId: "gpt-5",
+  });
 
   const audioModel = new OpenAIModel({
     modelId: "gpt-4o-audio-preview",
-    apiKey: process.env["OPENAI_API_KEY"],
-  });
-
-  const reasoningModel = new OpenAIModel({
-    modelId: "o1",
     apiKey: process.env["OPENAI_API_KEY"],
   });
 
@@ -81,6 +71,22 @@ suite("OpenAIModel", () => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
   });
 
+  test(TEST_CASE_NAMES.GENERATE_IMAGE, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_IMAGE, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE);
+  });
+
+  test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, { timeout: 60 * 1000 }, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
+  });
+
   test(
     TEST_CASE_NAMES.GENERATE_AUDIO,
     { skip: "responses api does not support audio" },
@@ -114,10 +120,10 @@ suite("OpenAIModel", () => {
   );
 
   test(TEST_CASE_NAMES.GENERATE_REASONING, (t) => {
-    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.GENERATE_REASONING);
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_REASONING);
   });
 
   test(TEST_CASE_NAMES.STREAM_REASONING, (t) => {
-    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.STREAM_REASONING);
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_REASONING);
   });
 });

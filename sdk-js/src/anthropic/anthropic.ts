@@ -241,7 +241,7 @@ function convertToAnthropicImageBlockParam(
   return {
     type: "image",
     source: {
-      data: part.image_data,
+      data: part.data,
       type: "base64",
       media_type:
         part.mime_type as Anthropic.Messages.Base64ImageSource["media_type"],

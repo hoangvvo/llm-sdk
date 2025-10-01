@@ -49,7 +49,7 @@ func main() {
 			}
 			fileName := fmt.Sprintf("image.%s", ext)
 
-			data, err := base64.StdEncoding.DecodeString(part.ImagePart.ImageData)
+			data, err := base64.StdEncoding.DecodeString(part.ImagePart.Data)
 			if err != nil {
 				log.Fatalf("Failed to decode image data: %v", err)
 			}

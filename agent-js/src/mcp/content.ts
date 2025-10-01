@@ -23,14 +23,14 @@ export function convertMCPContentToParts(contents: MCPContent[]): Part[] {
       case "image":
         parts.push({
           type: "image",
-          image_data: content.data,
+          data: content.data,
           mime_type: content.mimeType,
         });
         break;
       case "audio":
         parts.push({
           type: "audio",
-          audio_data: content.data,
+          data: content.data,
           format: mapMimeTypeToAudioFormat(content.mimeType),
         });
         break;

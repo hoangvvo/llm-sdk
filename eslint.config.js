@@ -54,5 +54,11 @@ export default [
     ...tseslint.configs.disableTypeChecked,
     files: ["**/*.js"],
   },
+  {
+    rules: {
+      "@typescript-eslint/no-floating-promises": "off",
+    },
+    files: ["**/*.test.ts"],
+  },
   eslintPluginPrettierRecommended,
 ];

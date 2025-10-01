@@ -492,7 +492,7 @@ fn create_request_image_block(image_part: ImagePart) -> RequestImageBlock {
     RequestImageBlock {
         cache_control: None,
         source: ImageSource::Base64(Base64ImageSource {
-            data: image_part.image_data,
+            data: image_part.data,
             media_type: image_part.mime_type,
         }),
     }
