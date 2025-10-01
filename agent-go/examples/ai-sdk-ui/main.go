@@ -902,13 +902,13 @@ func convertToolPart(part *toolUIPart) []llmsdk.Part {
 		call := llmsdk.NewToolCallPart(part.ToolCallID, name, part.Input)
 		result := llmsdk.NewToolResultPart(part.ToolCallID, name, []llmsdk.Part{
 			llmsdk.NewTextPart(safeJSONMarshal(part.Output)),
-		}, false)
+		})
 		return []llmsdk.Part{call, result}
 	case "output-error":
 		call := llmsdk.NewToolCallPart(part.ToolCallID, name, part.Input)
 		result := llmsdk.NewToolResultPart(part.ToolCallID, name, []llmsdk.Part{
 			llmsdk.NewTextPart(part.ErrorText),
-		}, true)
+		})
 		return []llmsdk.Part{call, result}
 	default:
 		return nil

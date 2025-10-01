@@ -608,7 +608,7 @@ func (s *RunState) getTurnMessages() []llmsdk.Message {
 				tool.ToolCallID,
 				tool.ToolName,
 				tool.Output,
-				tool.IsError,
+				llmsdk.WithToolResultIsError(tool.IsError),
 			)
 
 			if len(messages) == 0 || messages[len(messages)-1].ToolMessage == nil {

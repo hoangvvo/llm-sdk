@@ -611,8 +611,7 @@ func TestRun_ResumesToolProcessingFromToolMessageWithPartialResults(t *testing.T
 
 	call1Args := json.RawMessage(`{"step": 1}`)
 	call2Args := json.RawMessage(`{"step": 2}`)
-	isError := false
-	toolResult := llmsdk.NewToolResultPart("call_1", "resume_tool", []llmsdk.Part{llmsdk.NewTextPart("already done")}, isError)
+	toolResult := llmsdk.NewToolResultPart("call_1", "resume_tool", []llmsdk.Part{llmsdk.NewTextPart("already done")})
 
 	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
@@ -741,7 +740,6 @@ func TestRun_ReturnsErrorWhenToolResultsLackPrecedingAssistantContent(t *testing
 		map[string]interface{}{},
 	)
 
-	isError := false
 	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
 		Input: []llmagent.AgentItem{
 			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Resume"))),
@@ -749,7 +747,6 @@ func TestRun_ReturnsErrorWhenToolResultsLackPrecedingAssistantContent(t *testing
 				"call_1",
 				"resume_tool",
 				[]llmsdk.Part{llmsdk.NewTextPart("orphan")},
-				isError,
 			))),
 		},
 	})

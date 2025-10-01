@@ -181,14 +181,25 @@ func WithToolCallPartID(id string) ToolCallPartOption {
 }
 
 // NewToolResultPart creates a new tool result part
-func NewToolResultPart(toolCallID, toolName string, content []Part, isError bool) Part {
-	return Part{
+func NewToolResultPart(toolCallID, toolName string, content []Part, opts ...ToolResultPartOption) Part {
+	toolResultPart := Part{
 		ToolResultPart: &ToolResultPart{
 			ToolCallID: toolCallID,
 			ToolName:   toolName,
 			Content:    content,
-			IsError:    isError,
 		},
+	}
+	for _, opt := range opts {
+		opt(toolResultPart.ToolResultPart)
+	}
+	return toolResultPart
+}
+
+type ToolResultPartOption func(*ToolResultPart)
+
+func WithToolResultIsError(isError bool) ToolResultPartOption {
+	return func(p *ToolResultPart) {
+		p.IsError = isError
 	}
 }
 
