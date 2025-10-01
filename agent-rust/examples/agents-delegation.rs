@@ -73,8 +73,8 @@ where
             let result = self
                 .agent
                 .run(AgentRequest {
-                    input: vec![AgentItem::Message(Message::user(vec![Part::Text(
-                        params.task.into(),
+                    input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                        params.task,
                     )]))],
                     context: (*context).clone(),
                 })
@@ -157,10 +157,8 @@ impl AgentTool<MyContext> for CreateOrderTool {
                 })
                 .await;
             Ok(AgentToolResult {
-                content: vec![Part::Text(
-                    serde_json::json!({ "status": "creating" })
-                        .to_string()
-                        .into(),
+                content: vec![Part::text(
+                    serde_json::json!({ "status": "creating" }).to_string(),
                 )],
                 is_error: false,
             })
@@ -228,7 +226,7 @@ impl AgentTool<MyContext> for GetOrdersTool {
             context.prune_orders().await;
 
             Ok(AgentToolResult {
-                content: vec![Part::Text(serde_json::to_string(&result)?.into())],
+                content: vec![Part::text(serde_json::to_string(&result)?)],
                 is_error: false,
             })
         }

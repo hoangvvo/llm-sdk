@@ -9,9 +9,8 @@ use llm_agent::{
 };
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
-    AssistantMessage, ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse,
-    ModelUsage, Part, PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta,
-    ToolMessage, UserMessage,
+    ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
+    PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta,
 };
 use serde_json::{json, Value};
 
@@ -290,9 +289,9 @@ async fn run_returns_response_when_no_tool_call() {
 
     let response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hello!")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Hello!",
+            )]))],
         })
         .await
         .expect("run succeeds");
@@ -343,9 +342,9 @@ async fn run_executes_single_tool_call_and_returns_response() {
 
     let response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Use the tool")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Use the tool",
+            )]))],
         })
         .await
         .expect("run succeeds");
@@ -426,9 +425,9 @@ async fn run_executes_multiple_tool_calls_in_parallel() {
 
     let response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Use both tools")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Use both tools",
+            )]))],
         })
         .await
         .expect("run succeeds");
@@ -480,12 +479,8 @@ async fn run_returns_existing_assistant_response_without_new_model_output() {
     let response = session
         .run(RunSessionRequest {
             input: vec![
-                AgentItem::Message(Message::User(UserMessage {
-                    content: vec![Part::text("What did I say?")],
-                })),
-                AgentItem::Message(Message::Assistant(AssistantMessage {
-                    content: vec![Part::text("Cached answer")],
-                })),
+                AgentItem::Message(Message::user(vec![Part::text("What did I say?")])),
+                AgentItem::Message(Message::assistant(vec![Part::text("Cached answer")])),
             ],
         })
         .await
@@ -534,9 +529,7 @@ async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
     let response = session
         .run(RunSessionRequest {
             input: vec![
-                AgentItem::Message(Message::User(UserMessage {
-                    content: vec![Part::text("Continue")],
-                })),
+                AgentItem::Message(Message::user(vec![Part::text("Continue")])),
                 AgentItem::Model(ModelResponse {
                     content: vec![
                         Part::tool_call("call_1", "resume_tool", json!({"step": 1})),
@@ -544,13 +537,11 @@ async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
                     ],
                     ..Default::default()
                 }),
-                AgentItem::Message(Message::Tool(ToolMessage {
-                    content: vec![Part::tool_result(
-                        "call_1",
-                        "resume_tool",
-                        vec![Part::text("already done")],
-                    )],
-                })),
+                AgentItem::Message(Message::tool(vec![Part::tool_result(
+                    "call_1",
+                    "resume_tool",
+                    vec![Part::text("already done")],
+                )])),
             ],
         })
         .await
@@ -614,9 +605,7 @@ async fn run_resumes_tool_processing_when_trailing_items_are_tool_entries() {
     let response = session
         .run(RunSessionRequest {
             input: vec![
-                AgentItem::Message(Message::User(UserMessage {
-                    content: vec![Part::text("Continue")],
-                })),
+                AgentItem::Message(Message::user(vec![Part::text("Continue")])),
                 AgentItem::Model(ModelResponse {
                     content: vec![
                         Part::tool_call("call_1", "resume_tool", json!({"stage": 1})),
@@ -682,16 +671,12 @@ async fn run_errors_when_tool_results_lack_preceding_assistant_content() {
     let err = session
         .run(RunSessionRequest {
             input: vec![
-                AgentItem::Message(Message::User(UserMessage {
-                    content: vec![Part::text("Resume")],
-                })),
-                AgentItem::Message(Message::Tool(ToolMessage {
-                    content: vec![Part::tool_result(
-                        "call_1",
-                        "resume_tool",
-                        vec![Part::text("orphan")],
-                    )],
-                })),
+                AgentItem::Message(Message::user(vec![Part::text("Resume")])),
+                AgentItem::Message(Message::tool(vec![Part::tool_result(
+                    "call_1",
+                    "resume_tool",
+                    vec![Part::text("orphan")],
+                )])),
             ],
         })
         .await
@@ -747,9 +732,9 @@ async fn run_handles_multiple_turns_with_tool_calls() {
 
     let response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Calculate some numbers")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Calculate some numbers",
+            )]))],
         })
         .await
         .expect("run succeeds");
@@ -840,9 +825,9 @@ async fn run_throws_max_turns_exceeded_error() {
 
     let result = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Keep using tools")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Keep using tools",
+            )]))],
         })
         .await;
 
@@ -864,9 +849,9 @@ async fn run_throws_invariant_error_when_tool_not_found() {
 
     let result = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Use a tool")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Use a tool",
+            )]))],
         })
         .await;
 
@@ -903,9 +888,9 @@ async fn run_throws_tool_execution_error() {
 
     let result = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Use the tool")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Use the tool",
+            )]))],
         })
         .await;
 
@@ -944,9 +929,9 @@ async fn run_handles_tool_returning_error_result() {
 
     let response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Use the tool")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Use the tool",
+            )]))],
         })
         .await
         .expect("run succeeds");
@@ -1003,9 +988,7 @@ async fn run_passes_sampling_parameters_to_model() {
 
     session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hello")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
         })
         .await
         .expect("run succeeds");
@@ -1031,9 +1014,7 @@ async fn run_throws_language_model_error_when_generation_fails() {
 
     let result = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hello")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
         })
         .await;
 
@@ -1078,9 +1059,7 @@ async fn run_includes_string_and_dynamic_function_instructions() {
 
     session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hello")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
         })
         .await
         .expect("run succeeds");
@@ -1131,9 +1110,9 @@ async fn run_merges_toolkit_prompts_and_tools() {
 
     let response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Status?")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Status?",
+            )]))],
         })
         .await
         .expect("run succeeds");
@@ -1197,30 +1176,21 @@ async fn run_stream_streams_response_when_no_tool_call() {
         PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "Hel".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("Hel".to_string())),
             }),
             ..Default::default()
         },
         PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "lo".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("lo".to_string())),
             }),
             ..Default::default()
         },
         PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "!".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("!".to_string())),
             }),
             ..Default::default()
         },
@@ -1232,9 +1202,7 @@ async fn run_stream_streams_response_when_no_tool_call() {
     let stream = session
         .clone()
         .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hi")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hi")]))],
         })
         .expect("run_stream succeeds");
 
@@ -1248,30 +1216,21 @@ async fn run_stream_streams_response_when_no_tool_call() {
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "Hel".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("Hel".to_string())),
             }),
             ..Default::default()
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "lo".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("lo".to_string())),
             }),
             ..Default::default()
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "!".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("!".to_string())),
             }),
             ..Default::default()
         }),
@@ -1302,10 +1261,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
     model.enqueue_stream(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::Text(TextPartDelta {
-                text: "Done".to_string(),
-                citation: None,
-            }),
+            part: PartDelta::Text(TextPartDelta::new("Done".to_string())),
         }),
         ..Default::default()
     }]);
@@ -1331,9 +1287,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
     let stream = session
         .clone()
         .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hello")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
         })
         .expect("run_stream succeeds");
 
@@ -1347,10 +1301,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "Done".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("Done".to_string())),
             }),
             ..Default::default()
         }),
@@ -1406,12 +1357,12 @@ async fn run_stream_streams_tool_call_execution_and_response() {
     model.enqueue_stream(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::ToolCall(ToolCallPartDelta {
-                tool_call_id: Some("call_1".to_string()),
-                tool_name: Some("test_tool".to_string()),
-                args: Some(tool_args.to_string()),
-                id: None,
-            }),
+            part: PartDelta::ToolCall(
+                ToolCallPartDelta::default()
+                    .with_tool_call_id("call_1".to_string())
+                    .with_tool_name("test_tool".to_string())
+                    .with_args(tool_args.to_string()),
+            ),
         }),
         ..Default::default()
     }]);
@@ -1419,20 +1370,14 @@ async fn run_stream_streams_tool_call_execution_and_response() {
         PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "Final".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("Final".to_string())),
             }),
             ..Default::default()
         },
         PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: " response".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new(" response".to_string())),
             }),
             ..Default::default()
         },
@@ -1447,9 +1392,9 @@ async fn run_stream_streams_tool_call_execution_and_response() {
     let stream = session
         .clone()
         .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Use tool")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Use tool",
+            )]))],
         })
         .expect("run_stream succeeds");
 
@@ -1463,12 +1408,12 @@ async fn run_stream_streams_tool_call_execution_and_response() {
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::ToolCall(ToolCallPartDelta {
-                    tool_call_id: Some("call_1".to_string()),
-                    tool_name: Some("test_tool".to_string()),
-                    args: Some(tool_args.to_string()),
-                    id: None,
-                }),
+                part: PartDelta::ToolCall(
+                    ToolCallPartDelta::default()
+                        .with_tool_call_id("call_1".to_string())
+                        .with_tool_name("test_tool".to_string())
+                        .with_args(tool_args.to_string()),
+                ),
             }),
             ..Default::default()
         }),
@@ -1492,20 +1437,14 @@ async fn run_stream_streams_tool_call_execution_and_response() {
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "Final".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("Final".to_string())),
             }),
             ..Default::default()
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: " response".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new(" response".to_string())),
             }),
             ..Default::default()
         }),
@@ -1561,34 +1500,31 @@ async fn run_stream_handles_multiple_turns() {
     model.enqueue_stream(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::ToolCall(ToolCallPartDelta {
-                tool_call_id: Some("call_1".to_string()),
-                tool_name: Some("calculator".to_string()),
-                args: Some(first_args.to_string()),
-                id: None,
-            }),
+            part: PartDelta::ToolCall(
+                ToolCallPartDelta::default()
+                    .with_tool_call_id("call_1".to_string())
+                    .with_tool_name("calculator".to_string())
+                    .with_args(first_args.to_string()),
+            ),
         }),
         ..Default::default()
     }]);
     model.enqueue_stream(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::ToolCall(ToolCallPartDelta {
-                tool_call_id: Some("call_2".to_string()),
-                tool_name: Some("calculator".to_string()),
-                args: Some(second_args.to_string()),
-                id: None,
-            }),
+            part: PartDelta::ToolCall(
+                ToolCallPartDelta::default()
+                    .with_tool_call_id("call_2".to_string())
+                    .with_tool_name("calculator".to_string())
+                    .with_args(second_args.to_string()),
+            ),
         }),
         ..Default::default()
     }]);
     model.enqueue_stream(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::Text(TextPartDelta {
-                text: "All done".to_string(),
-                citation: None,
-            }),
+            part: PartDelta::Text(TextPartDelta::new("All done".to_string())),
         }),
         ..Default::default()
     }]);
@@ -1602,9 +1538,9 @@ async fn run_stream_handles_multiple_turns() {
     let stream = session
         .clone()
         .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Calculate")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Calculate",
+            )]))],
         })
         .expect("run_stream succeeds");
 
@@ -1618,12 +1554,12 @@ async fn run_stream_handles_multiple_turns() {
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::ToolCall(ToolCallPartDelta {
-                    tool_call_id: Some("call_1".to_string()),
-                    tool_name: Some("calculator".to_string()),
-                    args: Some(first_args.to_string()),
-                    id: None,
-                }),
+                part: PartDelta::ToolCall(
+                    ToolCallPartDelta::default()
+                        .with_tool_call_id("call_1".to_string())
+                        .with_tool_name("calculator".to_string())
+                        .with_args(first_args.to_string()),
+                ),
             }),
             ..Default::default()
         }),
@@ -1647,12 +1583,12 @@ async fn run_stream_handles_multiple_turns() {
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::ToolCall(ToolCallPartDelta {
-                    tool_call_id: Some("call_2".to_string()),
-                    tool_name: Some("calculator".to_string()),
-                    args: Some(second_args.to_string()),
-                    id: None,
-                }),
+                part: PartDelta::ToolCall(
+                    ToolCallPartDelta::default()
+                        .with_tool_call_id("call_2".to_string())
+                        .with_tool_name("calculator".to_string())
+                        .with_args(second_args.to_string()),
+                ),
             }),
             ..Default::default()
         }),
@@ -1676,10 +1612,7 @@ async fn run_stream_handles_multiple_turns() {
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "All done".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("All done".to_string())),
             }),
             ..Default::default()
         }),
@@ -1744,36 +1677,36 @@ async fn run_stream_throws_max_turns_exceeded_error() {
     model.enqueue_stream(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::ToolCall(ToolCallPartDelta {
-                tool_call_id: Some("call_1".to_string()),
-                tool_name: Some("test_tool".to_string()),
-                args: Some(args.to_string()),
-                id: None,
-            }),
+            part: PartDelta::ToolCall(
+                ToolCallPartDelta::default()
+                    .with_tool_call_id("call_1".to_string())
+                    .with_tool_name("test_tool".to_string())
+                    .with_args(args.to_string()),
+            ),
         }),
         ..Default::default()
     }]);
     model.enqueue_stream(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::ToolCall(ToolCallPartDelta {
-                tool_call_id: Some("call_2".to_string()),
-                tool_name: Some("test_tool".to_string()),
-                args: Some(args.to_string()),
-                id: None,
-            }),
+            part: PartDelta::ToolCall(
+                ToolCallPartDelta::default()
+                    .with_tool_call_id("call_2".to_string())
+                    .with_tool_name("test_tool".to_string())
+                    .with_args(args.to_string()),
+            ),
         }),
         ..Default::default()
     }]);
     model.enqueue_stream(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::ToolCall(ToolCallPartDelta {
-                tool_call_id: Some("call_3".to_string()),
-                tool_name: Some("test_tool".to_string()),
-                args: Some(args.to_string()),
-                id: None,
-            }),
+            part: PartDelta::ToolCall(
+                ToolCallPartDelta::default()
+                    .with_tool_call_id("call_3".to_string())
+                    .with_tool_name("test_tool".to_string())
+                    .with_args(args.to_string()),
+            ),
         }),
         ..Default::default()
     }]);
@@ -1789,9 +1722,9 @@ async fn run_stream_throws_max_turns_exceeded_error() {
     .await;
 
     let result = session.clone().run_stream(RunSessionRequest {
-        input: vec![AgentItem::Message(Message::User(UserMessage {
-            content: vec![Part::text("Keep using tools")],
-        }))],
+        input: vec![AgentItem::Message(Message::user(vec![Part::text(
+            "Keep using tools",
+        )]))],
     });
 
     match result {
@@ -1825,9 +1758,7 @@ async fn run_stream_throws_language_model_error() {
     let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
     let result = session.clone().run_stream(RunSessionRequest {
-        input: vec![AgentItem::Message(Message::User(UserMessage {
-            content: vec![Part::text("Hello")],
-        }))],
+        input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
     });
 
     match result {

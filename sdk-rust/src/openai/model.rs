@@ -622,18 +622,23 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                     (None, None)
                 };
 
-                let part = Part::Image(ImagePart {
-                    image_data: image_gen_call.result.ok_or_else(|| {
+                let mut image_part = ImagePart::new(
+                    image_gen_call.result.ok_or_else(|| {
                         LanguageModelError::Invariant(
                             PROVIDER,
                             "Image generation call did not return a result".to_string(),
                         )
                     })?,
-                    width,
-                    height,
-                    mime_type: format!("image/{}", image_gen_call.output_format),
-                    id: Some(image_gen_call.id),
-                });
+                    format!("image/{}", image_gen_call.output_format),
+                )
+                .with_id(image_gen_call.id);
+                if let Some(width) = width {
+                    image_part = image_part.with_width(width);
+                }
+                if let Some(height) = height {
+                    image_part = image_part.with_height(height);
+                }
+                let part: Part = image_part.into();
 
                 acc.push(part);
                 Ok(acc)
@@ -650,11 +655,12 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                     .collect::<Vec<_>>()
                     .join("\n");
 
-                let part = Part::Reasoning(ReasoningPart {
-                    text: summary_text,
-                    signature: reasoning_item.encrypted_content,
-                    id: Some(reasoning_item.id),
-                });
+                let mut reasoning_part =
+                    ReasoningPart::new(summary_text).with_id(reasoning_item.id);
+                if let Some(signature) = reasoning_item.encrypted_content {
+                    reasoning_part = reasoning_part.with_signature(signature);
+                }
+                let part: Part = reasoning_part.into();
 
                 acc.push(part);
                 Ok(acc)

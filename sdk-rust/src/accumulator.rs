@@ -330,11 +330,14 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
 }
 
 fn create_reasoning_part(data: ReasoningPartDelta) -> Part {
-    Part::Reasoning(ReasoningPart {
-        text: data.text.unwrap_or_default(),
-        signature: data.signature,
-        id: data.id,
-    })
+    let mut reasoning_part = ReasoningPart::new(data.text.unwrap_or_default());
+    if let Some(signature) = data.signature {
+        reasoning_part = reasoning_part.with_signature(signature);
+    }
+    if let Some(id) = data.id {
+        reasoning_part = reasoning_part.with_id(id);
+    }
+    reasoning_part.into()
 }
 
 /// Creates a final Part from accumulated data

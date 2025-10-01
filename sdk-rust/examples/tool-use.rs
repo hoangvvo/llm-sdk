@@ -124,12 +124,12 @@ async fn main() {
             let result_str = result_json.to_string();
 
             tool_results.push(
-                ToolResultPart {
-                    tool_name: call.tool_name.clone(),
-                    tool_call_id: call.tool_call_id.clone(),
-                    content: vec![Part::text(result_str)],
-                    is_error: Some(false),
-                }
+                ToolResultPart::new(
+                    call.tool_call_id.clone(),
+                    call.tool_name.clone(),
+                    vec![Part::text(result_str)],
+                )
+                .with_is_error(false)
                 .into(),
             );
         }

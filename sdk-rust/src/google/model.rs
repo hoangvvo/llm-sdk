@@ -531,11 +531,11 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
         .filter_map(|part| {
             if let Some(text) = part.text {
                 if part.thought.unwrap_or(false) {
-                    Some(Ok(Part::Reasoning(ReasoningPart {
-                        text,
-                        signature: part.thought_signature,
-                        id: None,
-                    })))
+                    let mut reasoning_part = ReasoningPart::new(text);
+                    if let Some(signature) = part.thought_signature {
+                        reasoning_part = reasoning_part.with_signature(signature);
+                    }
+                    Some(Ok(reasoning_part.into()))
                 } else {
                     Some(Ok(Part::text(text)))
                 }

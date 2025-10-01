@@ -3,9 +3,7 @@ use llm_agent::{
     mcp::{MCPParams, MCPStreamableHTTPParams, MCPToolkit},
     Agent, AgentItem, AgentParams, AgentResponse, BoxedError, RunSessionRequest,
 };
-use llm_sdk::{
-    llm_sdk_test::MockLanguageModel, AudioFormat, Message, ModelResponse, Part, UserMessage,
-};
+use llm_sdk::{llm_sdk_test::MockLanguageModel, AudioFormat, Message, ModelResponse, Part};
 use rmcp::{
     handler::server::ServerHandler,
     model::{
@@ -72,9 +70,9 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
 
     let response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage::new(vec![
-                Part::text("What's running tonight?"),
-            ])))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "What's running tonight?",
+            )]))],
         })
         .await
         .map_err(|err| format!("Failed to run agent: {err}"))?;
@@ -172,9 +170,9 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
 
     let first_response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage::new(vec![
-                Part::text("What's running tonight?"),
-            ])))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "What's running tonight?",
+            )]))],
         })
         .await
         .map_err(|err| format!("Failed to run session: {err}"))?;
@@ -226,9 +224,9 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
 
     let second_response = session
         .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::User(UserMessage::new(vec![
-                Part::text("How about now?"),
-            ])))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "How about now?",
+            )]))],
         })
         .await
         .map_err(|err| format!("Failed to run session: {err}"))?;

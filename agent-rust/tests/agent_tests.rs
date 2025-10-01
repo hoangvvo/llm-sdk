@@ -6,7 +6,6 @@ use llm_agent::{
 use llm_sdk::{
     llm_sdk_test::{MockLanguageModel, MockStreamResult},
     ContentDelta, Message, ModelResponse, Part, PartDelta, PartialModelResponse, TextPartDelta,
-    UserMessage,
 };
 use std::sync::Arc;
 
@@ -23,9 +22,7 @@ async fn agent_run_creates_session_runs_and_finishes() {
     let response = agent
         .run(AgentRequest {
             context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hello")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
         })
         .await
         .expect("agent run succeeds");
@@ -47,10 +44,7 @@ async fn agent_run_stream_creates_session_streams_and_finishes() {
     model.enqueue_stream(MockStreamResult::partials(vec![PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::Text(TextPartDelta {
-                text: "Mock".to_string(),
-                citation: None,
-            }),
+            part: PartDelta::Text(TextPartDelta::new("Mock")),
         }),
         ..Default::default()
     }]));
@@ -60,9 +54,7 @@ async fn agent_run_stream_creates_session_streams_and_finishes() {
     let stream = agent
         .run_stream(AgentRequest {
             context: (),
-            input: vec![AgentItem::Message(Message::User(UserMessage {
-                content: vec![Part::text("Hello")],
-            }))],
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
         })
         .await
         .expect("agent run_stream succeeds");
@@ -77,10 +69,7 @@ async fn agent_run_stream_creates_session_streams_and_finishes() {
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 0,
-                part: PartDelta::Text(TextPartDelta {
-                    text: "Mock".to_string(),
-                    citation: None,
-                }),
+                part: PartDelta::Text(TextPartDelta::new("Mock")),
             }),
             ..Default::default()
         }),

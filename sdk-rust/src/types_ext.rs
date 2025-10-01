@@ -1,6 +1,7 @@
 use crate::{
-    AssistantMessage, AudioPart, ImagePart, Message, Part, SourcePart, TextPart, ToolCallPart,
-    ToolMessage, ToolResultPart, UserMessage,
+    AssistantMessage, AudioPart, AudioPartDelta, CitationDelta, ImagePart, ImagePartDelta, Message,
+    Part, ReasoningPart, ReasoningPartDelta, SourcePart, TextPart, TextPartDelta, ToolCallPart,
+    ToolCallPartDelta, ToolMessage, ToolResultPart, UserMessage,
 };
 
 impl TextPart {
@@ -103,6 +104,38 @@ impl AudioPart {
     }
 }
 
+impl SourcePart {
+    pub fn new(source: impl Into<String>, title: impl Into<String>, content: Vec<Part>) -> Self {
+        Self {
+            source: source.into(),
+            title: title.into(),
+            content,
+        }
+    }
+}
+
+impl ReasoningPart {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            id: None,
+            signature: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_signature(mut self, signature: impl Into<String>) -> Self {
+        self.signature = Some(signature.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+}
+
 impl ToolCallPart {
     pub fn new(
         tool_call_id: impl Into<String>,
@@ -145,16 +178,6 @@ impl ToolResultPart {
     }
 }
 
-impl SourcePart {
-    pub fn new(source: impl Into<String>, title: impl Into<String>, content: Vec<Part>) -> Self {
-        Self {
-            source: source.into(),
-            title: title.into(),
-            content,
-        }
-    }
-}
-
 impl From<TextPart> for Part {
     fn from(value: TextPart) -> Self {
         Self::Text(value)
@@ -191,6 +214,12 @@ impl From<SourcePart> for Part {
     }
 }
 
+impl From<ReasoningPart> for Part {
+    fn from(value: ReasoningPart) -> Self {
+        Self::Reasoning(value)
+    }
+}
+
 impl Part {
     pub fn text(text: impl Into<String>) -> Self {
         Self::Text(TextPart::new(text))
@@ -202,6 +231,14 @@ impl Part {
 
     pub fn audio(audio_data: impl Into<String>, format: crate::AudioFormat) -> Self {
         Self::Audio(AudioPart::new(audio_data, format))
+    }
+
+    pub fn source(source: impl Into<String>, title: impl Into<String>, content: Vec<Self>) -> Self {
+        Self::Source(SourcePart::new(source, title, content))
+    }
+
+    pub fn reasoning(text: impl Into<String>) -> Self {
+        Self::Reasoning(ReasoningPart::new(text))
     }
 
     pub fn tool_call(
@@ -218,10 +255,6 @@ impl Part {
         content: Vec<Self>,
     ) -> Self {
         Self::ToolResult(ToolResultPart::new(tool_call_id, tool_name, content))
-    }
-
-    pub fn source(source: impl Into<String>, title: impl Into<String>, content: Vec<Self>) -> Self {
-        Self::Source(SourcePart::new(source, title, content))
     }
 }
 
@@ -301,5 +334,168 @@ impl From<AssistantMessage> for Message {
 impl From<ToolMessage> for Message {
     fn from(value: ToolMessage) -> Self {
         Self::Tool(value)
+    }
+}
+
+impl TextPartDelta {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            citation: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_citation_delta(mut self, citation: CitationDelta) -> Self {
+        self.citation = Some(citation);
+        self
+    }
+}
+
+impl CitationDelta {
+    #[must_use]
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_cited_text(mut self, cited_text: impl Into<String>) -> Self {
+        self.cited_text = Some(cited_text.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_start_index(mut self, start_index: usize) -> Self {
+        self.start_index = Some(start_index);
+        self
+    }
+
+    #[must_use]
+    pub fn with_end_index(mut self, end_index: usize) -> Self {
+        self.end_index = Some(end_index);
+        self
+    }
+}
+
+impl ToolCallPartDelta {
+    #[must_use]
+    pub fn with_tool_call_id(mut self, tool_call_id: impl Into<String>) -> Self {
+        self.tool_call_id = Some(tool_call_id.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_tool_name(mut self, tool_name: impl Into<String>) -> Self {
+        self.tool_name = Some(tool_name.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_args(mut self, args: impl Into<String>) -> Self {
+        self.args = Some(args.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+}
+
+impl ImagePartDelta {
+    #[must_use]
+    pub fn with_mime_type(mut self, mime_type: impl Into<String>) -> Self {
+        self.mime_type = Some(mime_type.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_data(mut self, image_data: impl Into<String>) -> Self {
+        self.image_data = Some(image_data.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_width(mut self, width: u32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    #[must_use]
+    pub fn with_height(mut self, height: u32) -> Self {
+        self.height = Some(height);
+        self
+    }
+
+    #[must_use]
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+}
+
+impl AudioPartDelta {
+    #[must_use]
+    pub fn with_format(mut self, format: crate::AudioFormat) -> Self {
+        self.format = Some(format);
+        self
+    }
+
+    #[must_use]
+    pub fn with_data(mut self, audio_data: impl Into<String>) -> Self {
+        self.audio_data = Some(audio_data.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_sample_rate(mut self, sample_rate: u32) -> Self {
+        self.sample_rate = Some(sample_rate);
+        self
+    }
+
+    #[must_use]
+    pub fn with_channels(mut self, channels: u32) -> Self {
+        self.channels = Some(channels);
+        self
+    }
+
+    #[must_use]
+    pub fn with_transcript(mut self, transcript: impl Into<String>) -> Self {
+        self.transcript = Some(transcript.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+}
+
+impl ReasoningPartDelta {
+    #[must_use]
+    pub fn with_text(mut self, text: impl Into<String>) -> Self {
+        self.text = Some(text.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_signature(mut self, signature: impl Into<String>) -> Self {
+        self.signature = Some(signature.into());
+        self
     }
 }

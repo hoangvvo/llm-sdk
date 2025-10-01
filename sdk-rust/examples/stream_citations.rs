@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::stream::StreamExt;
-use llm_sdk::{LanguageModelInput, Message, Part, StreamAccumulator, UserMessage};
+use llm_sdk::{LanguageModelInput, Message, Part, StreamAccumulator};
 use serde_json::json;
 
 mod common;
@@ -12,21 +12,19 @@ async fn main() {
     let mut stream = common::get_model("anthropic", "claude-opus-4-20250514")
         .stream(LanguageModelInput {
             messages: vec![
-                Message::User(UserMessage {
-                    content: vec![
-                        // Provide sources as part of the user message
-                        Part::source(
-                            "https://health-site.example/articles/coffee-benefits",
-                            "Coffee Health Benefits: What the Research Shows",
-                            vec![Part::text(
-                                "Coffee contains over 1,000 bioactive compounds, with caffeine being the most studied. A typical 8-ounce cup contains 80-100mg of caffeine. Research shows moderate coffee consumption (3-4 cups daily) is associated with reduced risk of type 2 diabetes, Parkinson's disease, and liver disease. The antioxidants in coffee, particularly chlorogenic acid, may contribute to these protective effects beyond just the caffeine content.",
-                            )],
-                        ),
-                        Part::text(
-                            "Based on what you know about coffee's health benefits and caffeine content, what would be the optimal daily coffee consumption for someone who wants the health benefits but is sensitive to caffeine? Consider timing and metabolism.",
-                        ),
-                    ],
-                }),
+                Message::user(vec![
+                    // Provide sources as part of the user message
+                    Part::source(
+                        "https://health-site.example/articles/coffee-benefits",
+                        "Coffee Health Benefits: What the Research Shows",
+                        vec![Part::text(
+                            "Coffee contains over 1,000 bioactive compounds, with caffeine being the most studied. A typical 8-ounce cup contains 80-100mg of caffeine. Research shows moderate coffee consumption (3-4 cups daily) is associated with reduced risk of type 2 diabetes, Parkinson's disease, and liver disease. The antioxidants in coffee, particularly chlorogenic acid, may contribute to these protective effects beyond just the caffeine content.",
+                        )],
+                    ),
+                    Part::text(
+                        "Based on what you know about coffee's health benefits and caffeine content, what would be the optimal daily coffee consumption for someone who wants the health benefits but is sensitive to caffeine? Consider timing and metabolism.",
+                    ),
+                ]),
                 Message::assistant(vec![
                     // The model requests a tool call to get more data, which includes sources
                     Part::tool_call(

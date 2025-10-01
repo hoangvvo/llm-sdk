@@ -13,7 +13,7 @@ use futures::{
 };
 use llm_sdk::{
     boxed_stream::BoxedStream, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
-    ToolCallPart, ToolMessage, ToolResultPart,
+    ToolCallPart, ToolResultPart,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -553,21 +553,17 @@ impl RunState {
                     messages.push(Message::assistant(model_response.content));
                 }
                 AgentItem::Tool(tool) => {
-                    let tool_part = Part::ToolResult(ToolResultPart {
-                        tool_call_id: tool.tool_call_id,
-                        tool_name: tool.tool_name,
-                        content: tool.output,
-                        is_error: Some(tool.is_error),
-                    });
+                    let tool_part: Part =
+                        ToolResultPart::new(tool.tool_call_id, tool.tool_name, tool.output)
+                            .with_is_error(tool.is_error)
+                            .into();
 
                     match messages.last_mut() {
                         Some(Message::Tool(last_tool_message)) => {
                             last_tool_message.content.push(tool_part);
                         }
                         _ => {
-                            messages.push(Message::Tool(ToolMessage {
-                                content: vec![tool_part],
-                            }));
+                            messages.push(Message::tool(vec![tool_part]));
                         }
                     }
                 }

@@ -3,14 +3,12 @@ use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelResult,
     LanguageModelStream, Message, ModelResponse, Part, PartDelta, PartialModelResponse,
-    TextPartDelta, UserMessage,
+    TextPartDelta,
 };
 
 fn user_input(text: &str) -> LanguageModelInput {
     LanguageModelInput {
-        messages: vec![Message::User(UserMessage {
-            content: vec![Part::text(text)],
-        })],
+        messages: vec![Message::user(vec![Part::text(text)])],
         ..LanguageModelInput::default()
     }
 }
@@ -19,10 +17,7 @@ fn text_partial(text: &str) -> PartialModelResponse {
     PartialModelResponse {
         delta: Some(ContentDelta {
             index: 0,
-            part: PartDelta::Text(TextPartDelta {
-                text: text.to_string(),
-                citation: None,
-            }),
+            part: PartDelta::Text(TextPartDelta::new(text)),
         }),
         ..PartialModelResponse::default()
     }

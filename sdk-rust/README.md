@@ -63,7 +63,7 @@ Below is an example to generate text:
 
 ```rust
 use dotenvy::dotenv;
-use llm_sdk::{LanguageModelInput, Message, Part, UserMessage};
+use llm_sdk::{LanguageModelInput, Message, Part};
 
 mod common;
 
@@ -76,14 +76,11 @@ async fn main() {
     let response = model
         .generate(LanguageModelInput {
             messages: vec![
-                Message::User(UserMessage {
-                    content: vec![Part::Text("Tell me a story.".into())],
-                }),
-                // Or use the convenient function to create a user message
+                Message::user(vec![Part::text("Tell me a story.")]),
                 Message::assistant(vec![Part::text(
                     "Sure! What kind of story would you like to hear?",
                 )]),
-                Message::user(vec![Part::Text("a fairy tale".into())]),
+                Message::user(vec![Part::text("a fairy tale")]),
             ],
             ..Default::default()
         })

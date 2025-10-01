@@ -13,7 +13,7 @@ use futures::{future::BoxFuture, StreamExt};
 use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, BoxedError, RunState};
 use llm_sdk::{
     AudioFormat, LanguageModelMetadata, Message, Part, PartDelta, PartialModelResponse,
-    ReasoningPart, ToolResultPart,
+    ToolResultPart,
 };
 use serde::{de, Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -700,11 +700,12 @@ fn convert_tool_part(part: &ToolUIPart) -> Result<Vec<Part>, String> {
             );
             let output_text =
                 serde_json::to_string(&part.output).unwrap_or_else(|_| "null".to_string());
-            let result = Part::ToolResult(ToolResultPart::new(
+            let result: Part = ToolResultPart::new(
                 &part.tool_call_id,
                 &tool_name,
                 vec![Part::text(output_text)],
-            ));
+            )
+            .into();
             Ok(vec![call, result])
         }
         "output-error" => {
@@ -713,14 +714,13 @@ fn convert_tool_part(part: &ToolUIPart) -> Result<Vec<Part>, String> {
                 &tool_name,
                 part.input.clone().unwrap_or(Value::Null),
             );
-            let result = Part::ToolResult(
-                ToolResultPart::new(
-                    &part.tool_call_id,
-                    &tool_name,
-                    vec![Part::text(part.error_text.clone().unwrap_or_default())],
-                )
-                .with_is_error(true),
-            );
+            let result: Part = ToolResultPart::new(
+                &part.tool_call_id,
+                &tool_name,
+                vec![Part::text(part.error_text.clone().unwrap_or_default())],
+            )
+            .with_is_error(true)
+            .into();
             Ok(vec![call, result])
         }
         _ => Ok(Vec::new()),
@@ -730,10 +730,7 @@ fn convert_tool_part(part: &ToolUIPart) -> Result<Vec<Part>, String> {
 fn ui_message_part_to_parts(part: &UIMessagePart) -> Result<Vec<Part>, String> {
     match part {
         UIMessagePart::Text(part) => Ok(vec![Part::text(&part.text)]),
-        UIMessagePart::Reasoning(part) => Ok(vec![Part::Reasoning(ReasoningPart {
-            text: part.text.clone(),
-            ..Default::default()
-        })]),
+        UIMessagePart::Reasoning(part) => Ok(vec![Part::reasoning(part.text.clone())]),
         UIMessagePart::DynamicTool(part) => Ok(vec![Part::tool_call(
             &part.tool_call_id,
             &part.tool_name,
