@@ -174,7 +174,6 @@ function convertToOpenAICreateParams(
     modalities,
     audio,
     reasoning,
-    extra,
   } = input;
   const params: Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> = {
     model: modelId,
@@ -185,7 +184,6 @@ function convertToOpenAICreateParams(
     frequency_penalty: frequency_penalty ?? null,
     seed: seed ?? null,
     modalities: modalities?.map(convertToOpenAIModality) ?? null,
-    ...extra,
   };
   if (typeof max_tokens === "number") {
     params.max_completion_tokens = max_tokens;

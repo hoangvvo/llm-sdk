@@ -243,7 +243,6 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 		Reasoning: &openaiapi.Reasoning{
 			Summary: ptr.To("auto"),
 		},
-		Extra: input.Extra,
 	}
 
 	if input.Tools != nil {
@@ -491,21 +490,29 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.ResponseI
 
 // MARK: - To Provider Tools
 
-func convertToOpenAIResponseToolChoice(toolChoice llmsdk.ToolChoiceOption) any {
+func convertToOpenAIResponseToolChoice(toolChoice llmsdk.ToolChoiceOption) *openaiapi.ToolChoice {
+	choice := &openaiapi.ToolChoice{}
 	if toolChoice.Auto != nil {
-		return "auto"
+		opt := openaiapi.ToolChoiceOptionsAuto
+		choice.Options = &opt
+		return choice
 	}
 	if toolChoice.None != nil {
-		return "none"
+		opt := openaiapi.ToolChoiceOptionsNone
+		choice.Options = &opt
+		return choice
 	}
 	if toolChoice.Required != nil {
-		return "required"
+		opt := openaiapi.ToolChoiceOptionsRequired
+		choice.Options = &opt
+		return choice
 	}
 	if toolChoice.Tool != nil {
-		return map[string]any{
-			"type": "function",
-			"name": toolChoice.Tool.ToolName,
+		choice.Function = &openaiapi.ToolChoiceFunction{
+			Type: "function",
+			Name: toolChoice.Tool.ToolName,
 		}
+		return choice
 	}
 	return nil
 }

@@ -1,5 +1,4 @@
 #![allow(clippy::pedantic, dead_code)]
-use crate::LanguageModelInputExtra;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -117,7 +116,7 @@ pub struct ResponseCreateParams {
     /// a response. See the `tools` parameter to see how to specify which
     /// tools the model can call.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<serde_json::Value>,
+    pub tool_choice: Option<ToolChoice>,
 
     /// An array of tools the model may call while generating a response. You
     /// can specify which tool to use by setting the `tool_choice`
@@ -161,9 +160,6 @@ pub struct ResponseCreateParams {
     ///   window size for a model, the request will fail with a 400 error.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truncation: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none", flatten)]
-    pub extra: Option<LanguageModelInputExtra>,
 }
 
 /// Specify additional output data to include in the model response. Currently
@@ -796,7 +792,7 @@ pub struct ToolChoiceAllowed {
     /// generate a message.
     ///
     /// `required` requires the model to call one or more of the allowed tools.
-    pub mode: String,
+    pub mode: ToolChoiceOptions,
 
     /// A list of tool definitions that the model should be allowed to call.
     ///
@@ -810,6 +806,10 @@ pub struct ToolChoiceAllowed {
     /// ]
     /// ```
     pub tools: Vec<HashMap<String, serde_json::Value>>,
+
+    /// Allowed tool configuration type. Always `allowed_tools`.
+    #[serde(rename = "type")]
+    pub choice_type: String,
 }
 
 /// Indicates that the model should use a built-in tool to generate a response.
@@ -851,6 +851,34 @@ pub struct ToolChoiceCustom {
     /// For custom tool calling, the type is always `custom`.
     #[serde(rename = "type")]
     pub choice_type: String,
+}
+
+/// Use this option to force the model to call a specific tool on a remote MCP
+/// server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolChoiceMCP {
+    /// For MCP tools, the type is always `mcp`.
+    #[serde(rename = "type")]
+    pub choice_type: String,
+
+    /// The label of the MCP server to use.
+    pub server_label: String,
+
+    /// The name of the tool to call on the server.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// Union of supported tool choice options for the Responses API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ToolChoice {
+    Option(ToolChoiceOptions),
+    Allowed(ToolChoiceAllowed),
+    Types(ToolChoiceTypes),
+    Function(ToolChoiceFunction),
+    Mcp(ToolChoiceMCP),
+    Custom(ToolChoiceCustom),
 }
 
 /// A tool that can be used to generate a response.

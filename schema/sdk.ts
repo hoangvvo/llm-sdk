@@ -598,10 +598,6 @@ export interface LanguageModelInput {
    * A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.
    */
   metadata?: Record<string, string>;
-  /**
-   * Extra options that the model may support.
-   */
-  extra?: Record<string, unknown>;
 }
 /**
  * A metadata property that describes the pricing of the model.
