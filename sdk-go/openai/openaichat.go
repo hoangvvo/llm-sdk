@@ -100,14 +100,9 @@ func (m *OpenAIChatModel) Generate(ctx context.Context, input *llmsdk.LanguageMo
 			return nil, err
 		}
 
-		body, err := buildChatCompletionRequestBody(params, input.Extra)
-		if err != nil {
-			return nil, err
-		}
-
 		response, err := clientutils.DoJSON[openaichatapi.CreateChatCompletionResponse](ctx, m.client, clientutils.JSONRequestConfig{
 			URL:     fmt.Sprintf("%s/chat/completions", m.baseURL),
-			Body:    body,
+			Body:    params,
 			Headers: m.requestHeaders(),
 		})
 		if err != nil {
@@ -159,14 +154,9 @@ func (m *OpenAIChatModel) Stream(ctx context.Context, input *llmsdk.LanguageMode
 			IncludeUsage: ptr.To(true),
 		}
 
-		body, err := buildChatCompletionRequestBody(params, input.Extra)
-		if err != nil {
-			return nil, err
-		}
-
 		sseStream, err := clientutils.DoSSE[openaichatapi.CreateChatCompletionStreamResponse](ctx, m.client, clientutils.SSERequestConfig{
 			URL:     fmt.Sprintf("%s/chat/completions", m.baseURL),
-			Body:    body,
+			Body:    params,
 			Headers: m.requestHeaders(),
 		})
 		if err != nil {
@@ -526,24 +516,6 @@ func convertToolMessageToOpenAIChatMessages(message *llmsdk.ToolMessage) ([]open
 	}
 
 	return result, nil
-}
-
-func buildChatCompletionRequestBody(params *openaichatapi.CreateChatCompletionRequest, extra map[string]any) (map[string]any, error) {
-	data, err := json.Marshal(params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal chat completion params: %w", err)
-	}
-
-	body := map[string]any{}
-	if err := json.Unmarshal(data, &body); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal chat completion params: %w", err)
-	}
-
-	for k, v := range extra {
-		body[k] = v
-	}
-
-	return body, nil
 }
 
 func mapOpenAIChatMessage(message openaichatapi.ChatCompletionResponseMessage, params *openaichatapi.CreateChatCompletionRequest) ([]llmsdk.Part, error) {

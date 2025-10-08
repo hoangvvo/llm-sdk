@@ -143,14 +143,14 @@ impl LanguageModel for AnthropicModel {
                 &self.model_id,
                 input,
                 |input| async move {
-                    let payload = convert_to_anthropic_create_params(input, &self.model_id, false)?;
+                    let params = convert_to_anthropic_create_params(input, &self.model_id, false)?;
 
                     let headers = self.request_headers()?;
 
                     let response: AnthropicMessage = client_utils::send_json(
                         &self.client,
                         &format!("{}/v1/messages", self.base_url),
-                        &payload,
+                        &params,
                         headers,
                     )
                     .await?;
@@ -189,13 +189,13 @@ impl LanguageModel for AnthropicModel {
                 &self.model_id,
                 input,
                 |input| async move {
-                    let payload = convert_to_anthropic_create_params(input, &self.model_id, true)?;
+                    let params = convert_to_anthropic_create_params(input, &self.model_id, true)?;
 
                     let headers = self.request_headers()?;
                     let mut chunk_stream = client_utils::send_sse_stream::<_, MessageStreamEvent>(
                         &self.client,
                         &format!("{}/v1/messages", self.base_url),
-                        &payload,
+                        &params,
                         headers,
                         self.provider(),
                     )
@@ -266,7 +266,7 @@ fn convert_to_anthropic_create_params(
     input: LanguageModelInput,
     model_id: &str,
     stream: bool,
-) -> LanguageModelResult<Value> {
+) -> LanguageModelResult<CreateMessageParams> {
     let LanguageModelInput {
         system_prompt,
         messages,
@@ -284,7 +284,6 @@ fn convert_to_anthropic_create_params(
         metadata: _,
         audio: _,
         reasoning,
-        extra,
     } = input;
 
     let max_tokens = max_tokens.unwrap_or(4096);
@@ -323,33 +322,7 @@ fn convert_to_anthropic_create_params(
         top_p,
     };
 
-    let mut value = serde_json::to_value(&params).map_err(|error| {
-        LanguageModelError::Invariant(
-            PROVIDER,
-            format!("Failed to serialize Anthropic request: {error}"),
-        )
-    })?;
-
-    if let Value::Object(ref mut map) = value {
-        if let Some(extra) = extra {
-            let Value::Object(extra_object) = extra else {
-                return Err(LanguageModelError::InvalidInput(
-                    "Anthropic extra field must be a JSON object".to_string(),
-                ));
-            };
-
-            for (key, val) in extra_object {
-                map.insert(key, val);
-            }
-        }
-    } else {
-        return Err(LanguageModelError::Invariant(
-            PROVIDER,
-            "Anthropic request serialization did not produce an object".to_string(),
-        ));
-    }
-
-    Ok(value)
+    Ok(params)
 }
 
 fn convert_tool(tool: SdkTool) -> Tool {

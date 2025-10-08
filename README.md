@@ -27,7 +27,7 @@ The accompanying [Console app](https://llm-sdk.hoangvvo.com/console/chat/) demon
 - Supports multi-modality function calling (image/audio returned from tools).
 - Supports citations (RAG) and reasoning for supported models.
 - Reports token usage and calculates the cost of a request when provided with the model’s pricing information.
-- Unified serialization across programming languages (systems in different languages can work together).
+- Unified serialization across JS, Rust, and Go (systems in different languages can work together).
 - Integrates OpenTelemetry for tracing.
 - _Zero abstraction_: the agent library is a thin for-loop around the SDK. No overcomplex abstractions like chains, graphs, or hidden prompt templates.
 
@@ -116,9 +116,19 @@ This philosophy is inspired by this [blog post](https://hamel.dev/blog/posts/pro
 
 The initial version of `llm-sdk` was developed internally at my company, prior to the existence or knowledge of similar libraries like the [Vercel AI SDK](https://github.com/vercel/ai) or [OpenAI Swarm](https://github.com/openai/swarm). As a result, it was never intended to compete with or address the limitations of those libraries. As these other libraries matured, `llm-sdk` continued to evolve independently, focusing on its unique features and use cases, which were designed to be sufficient for its intended applications.
 
-This section is designed to outline the differences for those considering migration to or from `llm-sdk` or to assert compatibility.
+This section is designed to outline the differences for those considering migration to or from `llm-sdk` or to assert compatibility. It is not meant to promote one library over another, as each has its own strengths and weaknesses.
 
-TBD.
+### Vercel AI SDK
+
+| Feature       | llm-sdk                                                                                                                  | Vercel AI SDK                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Providers     | OpenAI, Anthropic, Google, Cohere, Mistral. Supports providers with OpenAI chat completions-compatible APIs              | ✅ 25 providers + many community-supported ones                                                                                               |
+| Modality      | `TextPart`, `ImagePart` (with height, width metadata), `AudioPart` (with `channels`, `sample_rate`, `encoding` metadata) | `TextPart`, `ImagePart`, `FilePart` (no content-specific metadata)                                                                            |
+| APIs          | Single method for text, image, and audio inputs/outputs via the completions API.                                         | `generateText` for text (via completions API), `generateImage` for images (via image generation API), `generateAudio` for audio (via TTS API) |
+| Language      | ✅ JavaScript/TypeScript, Rust, Go with consistent wire formats                                                          | JavaScript/TypeScript                                                                                                                         |
+| Function Call | ✅ Allows text, image, source (citation) tool results                                                                    | Only JSON object tool results                                                                                                                 |
+| Citations     | ✅ Supported via `SourcePart` and `Citation`                                                                             | Not supported                                                                                                                                 |
+| Ease of Use   | Primitive APIs                                                                                                           | ✅ Includes framework integrations, type-safe utilities                                                                                       |
 
 ## License
 

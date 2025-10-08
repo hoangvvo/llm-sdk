@@ -131,7 +131,6 @@ function convertToCohereChatRequest(
     tools,
     tool_choice,
     response_format,
-    extra,
     reasoning,
   } = input;
 
@@ -141,7 +140,6 @@ function convertToCohereChatRequest(
   const request: Cohere.V2ChatRequest = {
     model: modelId,
     messages: cohereMessages,
-    ...extra,
   };
   if (cohereDocuments.length > 0) {
     request.documents = cohereDocuments;

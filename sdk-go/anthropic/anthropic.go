@@ -231,7 +231,7 @@ func (m *AnthropicModel) requestHeaders() map[string]string {
 	return headers
 }
 
-func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID string, stream bool) (map[string]any, error) {
+func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID string, stream bool) (*anthropicapi.CreateMessageParams, error) {
 	maxTokens := 4096
 	if input.MaxTokens != nil {
 		maxTokens = int(*input.MaxTokens)
@@ -242,7 +242,7 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 		return nil, err
 	}
 
-	params := anthropicapi.CreateMessageParams{
+	params := &anthropicapi.CreateMessageParams{
 		Model:       anthropicapi.Model(modelID),
 		Messages:    messages,
 		MaxTokens:   maxTokens,
@@ -289,23 +289,7 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 		}
 	}
 
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal anthropic params: %w", err)
-	}
-
-	var paramsMap map[string]any
-	if err := json.Unmarshal(paramsJSON, &paramsMap); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal anthropic params: %w", err)
-	}
-
-	if input.Extra != nil {
-		for k, v := range input.Extra {
-			paramsMap[k] = v
-		}
-	}
-
-	return paramsMap, nil
+	return params, nil
 }
 
 func convertToAnthropicMessages(messages []llmsdk.Message) ([]anthropicapi.InputMessage, error) {

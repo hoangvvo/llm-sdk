@@ -142,14 +142,12 @@ function convertToMistralRequest(
     response_format,
     tools,
     tool_choice,
-    extra,
     reasoning,
   } = input;
 
   const request: MistralComponents.ChatCompletionRequest = {
     model: modelId,
     messages: convertToMistralMessages(messages, system_prompt),
-    ...extra,
   };
   if (typeof max_tokens === "number") {
     request.maxTokens = max_tokens;

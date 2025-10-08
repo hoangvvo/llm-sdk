@@ -157,18 +157,14 @@ function convertToGenerateContentParameters(
     seed,
     modalities,
     audio,
-    extra,
     reasoning,
   } = input;
 
   const params: GenerateContentParameters = {
     contents: convertToGoogleContents(messages),
     model: modelId,
-    ...extra,
   };
-  const config: GenerateContentConfig = {
-    ...(extra?.["config"] as object),
-  };
+  const config: GenerateContentConfig = {};
   if (system_prompt) {
     config.systemInstruction = system_prompt;
   }

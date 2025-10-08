@@ -571,12 +571,7 @@ pub struct LanguageModelInput {
     pub audio: Option<AudioOptions>,
     /// Options for reasoning generation.
     pub reasoning: Option<ReasoningOptions>,
-    /// Extra options that the model may support.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extra: Option<LanguageModelInputExtra>,
 }
-
-pub type LanguageModelInputExtra = Value;
 
 /// A metadata property that describes the pricing of the model.
 #[derive(Debug, Clone, Serialize, Deserialize)]

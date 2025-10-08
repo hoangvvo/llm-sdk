@@ -139,14 +139,13 @@ impl LanguageModel for OpenAIChatModel {
                 &self.model_id(),
                 input,
                 |input| async move {
-                    let (request, payload) =
-                        convert_to_openai_create_params(input, &self.model_id(), false)?;
+                    let request = convert_to_openai_create_params(input, &self.model_id(), false)?;
                     let headers = self.request_headers()?;
 
                     let response: CreateChatCompletionResponse = client_utils::send_json(
                         &self.client,
                         &format!("{}/chat/completions", self.base_url),
-                        &payload,
+                        &request,
                         headers,
                     )
                     .await?;
@@ -166,7 +165,7 @@ impl LanguageModel for OpenAIChatModel {
                         }
                     }
 
-                    let content = map_openai_message(message, request.audio)?;
+                    let content = map_openai_message(message, request.audio.clone())?;
 
                     let usage = response.usage.map(map_openai_usage).transpose()?;
 
@@ -201,16 +200,18 @@ impl LanguageModel for OpenAIChatModel {
                 input,
                 |input| async move {
                     let metadata = self.metadata.clone();
-                    let (request, payload) =
+                    let request =
                         convert_to_openai_create_params(input, &self.model_id(), true)?;
-                    let CreateChatCompletionRequest { audio: audio_params, .. } = request;
+                    let audio_params = request.audio.clone();
                     let headers = self.request_headers()?;
 
-                    let mut stream =
-                        client_utils::send_sse_stream::<Value, CreateChatCompletionStreamResponse>(
+                    let mut stream = client_utils::send_sse_stream::<
+                        CreateChatCompletionRequest,
+                        CreateChatCompletionStreamResponse,
+                    >(
                             &self.client,
                             &format!("{}/chat/completions", self.base_url),
-                            &payload,
+                            &request,
                             headers,
                             PROVIDER,
                         )
@@ -277,7 +278,7 @@ fn convert_to_openai_create_params(
     input: LanguageModelInput,
     model_id: &str,
     stream: bool,
-) -> LanguageModelResult<(CreateChatCompletionRequest, Value)> {
+) -> LanguageModelResult<CreateChatCompletionRequest> {
     let messages = convert_to_openai_messages(input.messages, input.system_prompt)?;
 
     let modalities = input
@@ -367,9 +368,7 @@ fn convert_to_openai_create_params(
         web_search_options: None,
     };
 
-    let payload = merge_extra(&request, input.extra)?;
-
-    Ok((request, payload))
+    Ok(request)
 }
 
 fn convert_to_openai_messages(
@@ -752,34 +751,6 @@ fn convert_to_openai_reasoning_effort(budget_tokens: u32) -> LanguageModelResult
     };
 
     Ok(ReasoningEffort::Enum(effort))
-}
-
-fn merge_extra(
-    request: &CreateChatCompletionRequest,
-    extra: Option<Value>,
-) -> LanguageModelResult<Value> {
-    let mut payload = serde_json::to_value(request).map_err(|error| {
-        LanguageModelError::InvalidInput(format!("Failed to serialize OpenAI request: {error}"))
-    })?;
-
-    if let Some(extra) = extra {
-        if let Value::Object(extra_map) = extra {
-            let map = payload.as_object_mut().ok_or_else(|| {
-                LanguageModelError::InvalidInput(
-                    "Serialized OpenAI request is not an object".to_string(),
-                )
-            })?;
-            for (key, value) in extra_map {
-                map.insert(key, value);
-            }
-        } else if !extra.is_null() {
-            return Err(LanguageModelError::InvalidInput(
-                "OpenAI extra must be a JSON object".to_string(),
-            ));
-        }
-    }
-
-    Ok(payload)
 }
 
 fn map_openai_message(

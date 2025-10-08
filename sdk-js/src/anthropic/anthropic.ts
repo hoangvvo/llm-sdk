@@ -139,7 +139,6 @@ function convertToAnthropicCreateParams(
     top_k,
     tools,
     tool_choice,
-    extra,
     reasoning,
   } = input;
 
@@ -149,7 +148,6 @@ function convertToAnthropicCreateParams(
     model: modelId,
     messages: convertToAnthropicMessages(messages),
     max_tokens: maxTokens,
-    ...extra,
   };
   if (system_prompt) {
     params.system = system_prompt;

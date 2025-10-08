@@ -814,8 +814,6 @@ type LanguageModelInput struct {
 	Audio *AudioOptions `json:"audio,omitempty"`
 	// Options for reasoning generation.
 	Reasoning *ReasoningOptions `json:"reasoning,omitempty"`
-	// Extra options that the model may support.
-	Extra map[string]any `json:"extra,omitempty"`
 }
 
 // LanguageModelPricing represents a metadata property that describes the pricing of the model.
