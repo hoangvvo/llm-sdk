@@ -260,9 +260,7 @@ fn convert_to_response_create_params(
         temperature,
         top_p,
         tools: tools.map(|ts| ts.into_iter().map(Into::into).collect()),
-        tool_choice: tool_choice
-            .map(convert_to_openai_response_tool_choice)
-            .transpose()?,
+        tool_choice: tool_choice.map(convert_to_openai_response_tool_choice),
         text: response_format.map(Into::into),
         include: if reasoning.as_ref().is_some_and(|r| r.enabled) {
             Some(vec![ResponseIncludable::ReasoningEncryptedContent])
@@ -507,10 +505,8 @@ impl From<Tool> for responses_api::Tool {
     }
 }
 
-fn convert_to_openai_response_tool_choice(
-    tool_choice: ToolChoiceOption,
-) -> LanguageModelResult<ToolChoice> {
-    Ok(match tool_choice {
+fn convert_to_openai_response_tool_choice(tool_choice: ToolChoiceOption) -> ToolChoice {
+    match tool_choice {
         ToolChoiceOption::None => ToolChoice::Option(ToolChoiceOptions::None),
         ToolChoiceOption::Auto => ToolChoice::Option(ToolChoiceOptions::Auto),
         ToolChoiceOption::Required => ToolChoice::Option(ToolChoiceOptions::Required),
@@ -518,7 +514,7 @@ fn convert_to_openai_response_tool_choice(
             choice_type: "function".into(),
             name: tool.tool_name,
         }),
-    })
+    }
 }
 
 impl From<ResponseFormatOption> for ResponseTextConfig {
