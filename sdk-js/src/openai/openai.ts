@@ -150,7 +150,6 @@ function convertToOpenAICreateParams(
     response_format,
     tools,
     tool_choice,
-    extra,
     modalities,
     reasoning,
   } = input;
@@ -186,7 +185,7 @@ function convertToOpenAICreateParams(
     params.reasoning = convertToOpenAIReasoning(reasoning);
   }
 
-  return { ...params, ...extra };
+  return params;
 }
 
 // MARK: To Provider Messages

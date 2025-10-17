@@ -54,20 +54,21 @@ jobs:
         run: npm run build
       - name: Version
         run: npm version ${{ github.event.inputs.version }} --workspace=${{ github.event.inputs.module }} --no-git-tag-version
-      - name: Commit version for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+      - name: Commit version
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           if [[ -n $(git status --porcelain) ]]; then
-            echo "Changes detected, committing..."
+            echo "Changes detected, committing locally..."
             git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
-            git push
           else
             echo "No changes detected, skipping commit"
           fi
       - name: Publish to npm
         run: npm publish --workspace=${{ github.event.inputs.module }}
+      - name: Push version commit
+        run: git push
 
   publish-crates:
     needs: validate
@@ -80,23 +81,26 @@ jobs:
           token: ${{ secrets.PAT }}
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
-      - name: Set and commit version for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+      - name: Set version for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
         run: |
           sed -i 's/^version = ".*"/version = "${{ github.event.inputs.version }}"/' ./${{ github.event.inputs.module }}/Cargo.toml
-
+      - name: Commit version
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           if [[ -n $(git status --porcelain) ]]; then
-            echo "Changes detected, committing..."
+            echo "Changes detected, committing locally..."
             git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
-            git push
           else
             echo "No changes detected, skipping commit"
           fi
-      - run: cargo publish --manifest-path ./${{ github.event.inputs.module }}/Cargo.toml --token ${{ steps.auth.outputs.token }}
+      - name: Publish to crates.io
+        run: cargo publish --manifest-path ./${{ github.event.inputs.module }}/Cargo.toml --token ${{ steps.auth.outputs.token }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - name: Push version commit
+        run: git push
 
   release:
     needs: [validate, publish-npm, publish-crates]

@@ -8,8 +8,8 @@ use crate::{
         ResponseInputItemMessage, ResponseInputText, ResponseOutputContent, ResponseOutputItem,
         ResponseOutputItemImageGenerationCall, ResponseOutputMessage, ResponseOutputText,
         ResponseReasoningItem, ResponseReasoningItemSummary, ResponseReasoningItemSummaryUnion,
-        ResponseStreamEvent, ResponseTextConfig, ResponseUsage, ToolChoiceFunction,
-        ToolImageGeneration,
+        ResponseStreamEvent, ResponseTextConfig, ResponseUsage, ToolChoice, ToolChoiceFunction,
+        ToolChoiceOptions, ToolImageGeneration,
     },
     source_part_utils, AssistantMessage, AudioFormat, ContentDelta, ImagePart, ImagePartDelta,
     LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
@@ -246,7 +246,6 @@ fn convert_to_response_create_params(
         response_format,
         tools,
         tool_choice,
-        extra,
         modalities,
         reasoning,
         ..
@@ -261,9 +260,7 @@ fn convert_to_response_create_params(
         temperature,
         top_p,
         tools: tools.map(|ts| ts.into_iter().map(Into::into).collect()),
-        tool_choice: tool_choice
-            .map(convert_to_openai_response_tool_choice)
-            .transpose()?,
+        tool_choice: tool_choice.map(convert_to_openai_response_tool_choice),
         text: response_format.map(Into::into),
         include: if reasoning.as_ref().is_some_and(|r| r.enabled) {
             Some(vec![ResponseIncludable::ReasoningEncryptedContent])
@@ -271,7 +268,6 @@ fn convert_to_response_create_params(
             None
         },
         reasoning: reasoning.map(TryInto::try_into).transpose()?,
-        extra,
         ..Default::default()
     };
 
@@ -509,21 +505,14 @@ impl From<Tool> for responses_api::Tool {
     }
 }
 
-fn convert_to_openai_response_tool_choice(
-    tool_choice: ToolChoiceOption,
-) -> LanguageModelResult<serde_json::Value> {
+fn convert_to_openai_response_tool_choice(tool_choice: ToolChoiceOption) -> ToolChoice {
     match tool_choice {
-        ToolChoiceOption::None => Ok("none".into()),
-        ToolChoiceOption::Auto => Ok("auto".into()),
-        ToolChoiceOption::Required => Ok("required".into()),
-        ToolChoiceOption::Tool(tool) => serde_json::to_value(ToolChoiceFunction {
+        ToolChoiceOption::None => ToolChoice::Option(ToolChoiceOptions::None),
+        ToolChoiceOption::Auto => ToolChoice::Option(ToolChoiceOptions::Auto),
+        ToolChoiceOption::Required => ToolChoice::Option(ToolChoiceOptions::Required),
+        ToolChoiceOption::Tool(tool) => ToolChoice::Function(ToolChoiceFunction {
             choice_type: "function".into(),
             name: tool.tool_name,
-        })
-        .map_err(|e| {
-            LanguageModelError::InvalidInput(format!(
-                "Failed to convert tool choice to OpenAI format: {e}"
-            ))
         }),
     }
 }

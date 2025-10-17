@@ -100,7 +100,7 @@ type ResponseCreateParams struct {
 	// How the model should select which tool (or tools) to use when generating a
 	// response. See the `tools` parameter to see how to specify which tools the model
 	// can call.
-	ToolChoice any `json:"tool_choice,omitempty"`
+	ToolChoice *ToolChoice `json:"tool_choice,omitempty"`
 
 	// An array of tools the model may call while generating a response. You can
 	// specify which tool to use by setting the `tool_choice` parameter.
@@ -138,9 +138,6 @@ type ResponseCreateParams struct {
 	// - `disabled` (default): If a model response will exceed the context window size
 	//   for a model, the request will fail with a 400 error.
 	Truncation *string `json:"truncation,omitempty"`
-
-	// to be flatten
-	Extra map[string]any `json:"-"`
 }
 
 // Specify additional output data to include in the model response. Currently
@@ -979,13 +976,14 @@ const (
 
 // Constrains the tools available to the model to a pre-defined set.
 type ToolChoiceAllowed struct {
+	Type string `json:"type"`
 	// Constrains the tools available to the model to a pre-defined set.
 	//
 	// `auto` allows the model to pick from among the allowed tools and generate a
 	// message.
 	//
 	// `required` requires the model to call one or more of the allowed tools.
-	Mode string `json:"mode"`
+	Mode ToolChoiceOptions `json:"mode"`
 
 	// A list of tool definitions that the model should be allowed to call.
 	//
@@ -1022,12 +1020,109 @@ type ToolChoiceTypes struct {
 type ToolChoiceFunction struct {
 	// The name of the function to call.
 	Name string `json:"name"`
+
+	Type string `json:"type"`
 }
 
 // Use this option to force the model to call a specific custom tool.
 type ToolChoiceCustom struct {
 	// The name of the custom tool to call.
 	Name string `json:"name"`
+
+	Type string `json:"type"`
+}
+
+// Use this option to force the model to call a specific tool on a remote MCP
+// server.
+type ToolChoiceMCP struct {
+	Type string `json:"type"`
+
+	ServerLabel string `json:"server_label"`
+
+	Name *string `json:"name,omitempty"`
+}
+
+// ToolChoice captures the union of supported tool choice options for the
+// Responses API.
+type ToolChoice struct {
+	Options  *ToolChoiceOptions
+	Allowed  *ToolChoiceAllowed
+	Types    *ToolChoiceTypes
+	Function *ToolChoiceFunction
+	MCP      *ToolChoiceMCP
+	Custom   *ToolChoiceCustom
+}
+
+func (t ToolChoice) MarshalJSON() ([]byte, error) {
+	switch {
+	case t.Options != nil:
+		return json.Marshal(t.Options)
+	case t.Allowed != nil:
+		return json.Marshal(t.Allowed)
+	case t.Types != nil:
+		return json.Marshal(t.Types)
+	case t.Function != nil:
+		return json.Marshal(t.Function)
+	case t.MCP != nil:
+		return json.Marshal(t.MCP)
+	case t.Custom != nil:
+		return json.Marshal(t.Custom)
+	default:
+		return []byte("null"), nil
+	}
+}
+
+func (t *ToolChoice) UnmarshalJSON(data []byte) error {
+	var option ToolChoiceOptions
+	if err := json.Unmarshal(data, &option); err == nil {
+		switch option {
+		case ToolChoiceOptionsAuto, ToolChoiceOptionsNone, ToolChoiceOptionsRequired:
+			*t = ToolChoice{Options: &option}
+			return nil
+		}
+	}
+
+	var discriminator struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &discriminator); err != nil {
+		return err
+	}
+
+	switch discriminator.Type {
+	case "allowed_tools":
+		var value ToolChoiceAllowed
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		*t = ToolChoice{Allowed: &value}
+	case "function":
+		var value ToolChoiceFunction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		*t = ToolChoice{Function: &value}
+	case "mcp":
+		var value ToolChoiceMCP
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		*t = ToolChoice{MCP: &value}
+	case "custom":
+		var value ToolChoiceCustom
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		*t = ToolChoice{Custom: &value}
+	default:
+		var value ToolChoiceTypes
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		*t = ToolChoice{Types: &value}
+	}
+
+	return nil
 }
 
 // A tool that can be used to generate a response.
