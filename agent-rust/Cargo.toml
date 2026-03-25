@@ -27,11 +27,10 @@ use_self = "warn"
 
 [dependencies]
 async-stream = "0.3.6"
-base64 = "0.22"
 futures = "0.3"
 llm-sdk-rs = { version = "0.2", path = "../sdk-rust" }
-opentelemetry = "0.30"
-rmcp = { version = "0.7", features = [
+opentelemetry = "0.31"
+rmcp = { version = "1.2", features = [
   "client",
   "transport-child-process",
   "transport-streamable-http-client-reqwest",
@@ -43,24 +42,25 @@ thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt", "process"] }
 tracing = "0.1"
 tracing-futures = { version = "0.2", features = ["std", "futures-03"] }
-tracing-opentelemetry = "0.31"
+tracing-opentelemetry = "0.32"
 
 [dev-dependencies]
-axum = "0.8.1"
+axum = "0.8.8"
+base64 = "0.22"
 chrono = "0.4"
 dotenvy = { version = "0.15.7" }
-opentelemetry-otlp = { version = "0.30", features = [
+opentelemetry-otlp = { version = "0.31", features = [
   "http-proto",
   "trace",
   "reqwest-client",
 ] }
-opentelemetry_sdk = { version = "0.30", features = ["rt-tokio", "trace"] }
-rand = { version = "0.8" }
-reqwest = { version = "0.12.9", features = ["json"] }
-schemars = "1.0.4"
+opentelemetry_sdk = { version = "0.31", features = ["rt-tokio", "trace"] }
+rand = { version = "0.10" }
+reqwest = { version = "0.12.28", features = ["json"] }
+schemars = "1.2.1"
 similar = "2"
-tokio = { version = "1.42.0", features = ["full"] }
-tower = "0.5.1"
-tower-http = { version = "0.6.2", features = ["cors"] }
+tokio = { version = "1.50.0", features = ["full"] }
+tower = "0.5.3"
+tower-http = { version = "0.6.8", features = ["cors"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 urlencoding = "2.1.3"

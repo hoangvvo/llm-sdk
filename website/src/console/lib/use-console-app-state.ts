@@ -85,6 +85,63 @@ function getProviderApiKeyStorageKey(provider: string): string {
   return `${STORAGE_KEY_PROVIDER_PREFIX}${provider}`;
 }
 
+function resolveStateUpdate<T>(update: SetStateAction<T>, current: T): T {
+  return typeof update === "function"
+    ? (update as (previous: T) => T)(current)
+    : update;
+}
+
+function readProviderApiKeys(modelOptions: ModelOption[]): ApiKeys {
+  const next: ApiKeys = {};
+  if (typeof window === "undefined") {
+    return next;
+  }
+  for (const option of modelOptions) {
+    const storageKey = getProviderApiKeyStorageKey(option.provider);
+    next[option.provider] =
+      window.localStorage.getItem(storageKey) ?? undefined;
+  }
+  return next;
+}
+
+function getModelSelectionKey(
+  selection: ModelSelection | null | undefined,
+): string | null {
+  if (!selection) {
+    return null;
+  }
+  return `${selection.provider}:${selection.modelId}`;
+}
+
+function normalizeModelSelection(
+  selection: ModelSelection | null,
+  modelOptions: ModelOption[],
+): ModelSelection | null {
+  if (modelOptions.length === 0) {
+    return null;
+  }
+  if (
+    selection &&
+    modelOptions.some(
+      (option) =>
+        option.provider === selection.provider &&
+        option.modelId === selection.modelId,
+    )
+  ) {
+    return selection;
+  }
+  return modelOptions[0];
+}
+
+function createModelFeatureState(selectedModelOption: ModelOption | undefined) {
+  return {
+    modelKey: getModelSelectionKey(selectedModelOption),
+    audio: selectedModelOption?.audio,
+    reasoning: selectedModelOption?.reasoning,
+    modalities: selectedModelOption?.modalities,
+  };
+}
+
 export interface ConsoleAppState<Context> {
   serverOptions: string[];
   serverUrl: string;
@@ -151,46 +208,20 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
   const toolsUrl = `${effectiveApiBaseUrl}/tools`;
 
   const modelOptions = MODEL_OPTIONS;
-  const [modelSelection, setModelSelection] =
+  const [storedModelSelection, setStoredModelSelection] =
     useLocalStorageState<ModelSelection | null>(STORAGE_KEY_MODEL, null);
+  const modelSelection = useMemo(
+    () => normalizeModelSelection(storedModelSelection, modelOptions),
+    [modelOptions, storedModelSelection],
+  );
 
-  const [providerApiKeys, setProviderApiKeys] = useState<ApiKeys>({});
-  useEffect(() => {
-    setProviderApiKeys((prev) => {
-      const next = { ...prev };
-      for (const option of modelOptions) {
-        const storageKey = getProviderApiKeyStorageKey(option.provider);
-        const storedValue = localStorage.getItem(storageKey);
-        next[option.provider] = storedValue ?? undefined;
-      }
-      return next;
-    });
-
-    if (modelOptions.length > 0) {
-      setModelSelection((current) => {
-        if (current) {
-          const stillValid = modelOptions.some(
-            (option) =>
-              option.provider === current.provider &&
-              option.modelId === current.modelId,
-          );
-          if (stillValid) {
-            return current;
-          }
-        }
-        return modelOptions[0];
-      });
-    } else {
-      setModelSelection(null);
-    }
-  }, [modelOptions, setModelSelection]);
-
-  const [toolOptions, setToolOptions] = useState<ToolInfo[]>([]);
+  const [providerApiKeys, setProviderApiKeys] = useState<ApiKeys>(() =>
+    readProviderApiKeys(modelOptions),
+  );
   const [enabledTools, setEnabledTools] = useLocalStorageState<string[]>(
     STORAGE_KEY_ENABLED_TOOLS,
     () => [],
   );
-  const [toolsInitialized, setToolsInitialized] = useState(false);
   const [agentBehavior, setAgentBehavior] =
     useLocalStorageState<AgentBehaviorSettings>(
       STORAGE_KEY_AGENT_BEHAVIOR,
@@ -204,15 +235,6 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     STORAGE_KEY_MCP_SERVERS,
     () => [],
   );
-  const [modelAudio, setModelAudio] = useState<AudioOptions | undefined>(
-    undefined,
-  );
-  const [modelReasoning, setModelReasoning] = useState<
-    ReasoningOptions | undefined
-  >(undefined);
-  const [modelModalities, setModelModalities] = useState<
-    Modality[] | undefined
-  >(undefined);
 
   const [hasStoredToolPreference] = useState(() => {
     if (typeof window === "undefined") {
@@ -242,34 +264,6 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     refetchTools();
   }, [refetchTools, toolsUrl]);
 
-  useEffect(() => {
-    if (!toolsData) {
-      return;
-    }
-
-    setToolOptions(toolsData);
-
-    const toolNames = toolsData.map((tool) => tool.name);
-
-    setEnabledTools((previous) => {
-      const baseSelection =
-        previous.length > 0 || hasStoredToolPreference ? previous : toolNames;
-      const baseSet = new Set(baseSelection);
-      const normalized = toolNames.filter((name) => baseSet.has(name));
-      return normalized;
-    });
-
-    setToolsInitialized(true);
-  }, [hasStoredToolPreference, setEnabledTools, toolsData]);
-
-  useEffect(() => {
-    if (!toolsError) {
-      return;
-    }
-    setToolOptions([]);
-    setToolsInitialized(true);
-  }, [toolsError]);
-
   const handleSaveProviderApiKey = useCallback(
     (provider: string, apiKey: string) => {
       const trimmed = apiKey.trim();
@@ -288,6 +282,9 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     },
     [],
   );
+
+  const toolOptions = useMemo(() => toolsData ?? [], [toolsData]);
+  const toolsInitialized = toolsData !== null || toolsError !== null;
 
   const handleEnabledToolsChange = useCallback(
     (next: string[]) => {
@@ -311,6 +308,20 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     [setMcpServers],
   );
 
+  const setModelSelection = useCallback<
+    Dispatch<SetStateAction<ModelSelection | null>>
+  >(
+    (update) => {
+      setStoredModelSelection((current) =>
+        normalizeModelSelection(
+          resolveStateUpdate(update, current),
+          modelOptions,
+        ),
+      );
+    },
+    [modelOptions, setStoredModelSelection],
+  );
+
   const selectedModelOption = useMemo(() => {
     if (!modelSelection) {
       return undefined;
@@ -322,17 +333,56 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     );
   }, [modelOptions, modelSelection]);
 
-  useEffect(() => {
-    if (selectedModelOption) {
-      setModelAudio(selectedModelOption.audio);
-      setModelReasoning(selectedModelOption.reasoning);
-      setModelModalities(selectedModelOption.modalities);
-    } else {
-      setModelAudio(undefined);
-      setModelReasoning(undefined);
-      setModelModalities(undefined);
+  const [modelFeatureState, setModelFeatureState] = useState(() =>
+    createModelFeatureState(selectedModelOption),
+  );
+  const selectedModelKey = getModelSelectionKey(modelSelection);
+
+  if (modelFeatureState.modelKey !== selectedModelKey) {
+    setModelFeatureState(createModelFeatureState(selectedModelOption));
+  }
+  const normalizedEnabledTools = useMemo(() => {
+    const toolNames = toolOptions.map((tool) => tool.name);
+    if (toolNames.length === 0) {
+      return [];
     }
-  }, [selectedModelOption]);
+
+    const baseSelection =
+      enabledTools.length > 0 || hasStoredToolPreference
+        ? enabledTools
+        : toolNames;
+    const allowed = new Set(
+      baseSelection.filter((name) => toolNames.includes(name)),
+    );
+    return toolNames.filter((name) => allowed.has(name));
+  }, [enabledTools, hasStoredToolPreference, toolOptions]);
+
+  const setModelAudio = useCallback<
+    Dispatch<SetStateAction<AudioOptions | undefined>>
+  >((update) => {
+    setModelFeatureState((current) => ({
+      ...current,
+      audio: resolveStateUpdate(update, current.audio),
+    }));
+  }, []);
+
+  const setModelReasoning = useCallback<
+    Dispatch<SetStateAction<ReasoningOptions | undefined>>
+  >((update) => {
+    setModelFeatureState((current) => ({
+      ...current,
+      reasoning: resolveStateUpdate(update, current.reasoning),
+    }));
+  }, []);
+
+  const setModelModalities = useCallback<
+    Dispatch<SetStateAction<Modality[] | undefined>>
+  >((update) => {
+    setModelFeatureState((current) => ({
+      ...current,
+      modalities: resolveStateUpdate(update, current.modalities),
+    }));
+  }, []);
 
   return {
     serverOptions,
@@ -348,7 +398,7 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     toolOptions,
     toolsError,
     toolsInitialized,
-    enabledTools,
+    enabledTools: normalizedEnabledTools,
     handleEnabledToolsChange,
     mcpServers,
     handleMcpServersChange,
@@ -356,11 +406,11 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     setAgentBehavior,
     userContext,
     setUserContext,
-    modelAudio,
+    modelAudio: modelFeatureState.audio,
     setModelAudio,
-    modelReasoning,
+    modelReasoning: modelFeatureState.reasoning,
     setModelReasoning,
-    modelModalities,
+    modelModalities: modelFeatureState.modalities,
     setModelModalities,
   };
 }

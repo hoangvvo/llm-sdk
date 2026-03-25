@@ -1,5 +1,5 @@
 import { Mistral } from "@mistralai/mistralai";
-import type * as MistralComponents from "@mistralai/mistralai/models/components/index.ts";
+import type * as MistralComponents from "@mistralai/mistralai/models/components";
 import {
   InvalidInputError,
   InvariantError,
@@ -458,8 +458,8 @@ function mapMistralContentChunk(chunk: MistralComponents.ContentChunk): Part {
       return {
         type: "reasoning",
         text: chunk.thinking
-          .map((item) => item.type === "text" && item.text)
-          .filter((text) => text)
+          .map((item) => (item.type === "text" ? item.text : null))
+          .filter((text) => !!text)
           .join("\n"),
       };
     }

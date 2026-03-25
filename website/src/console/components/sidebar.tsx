@@ -5,7 +5,7 @@ import type {
   ReasoningOptions,
 } from "@hoangvvo/llm-sdk";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type {
   ModelOption,
   ModelSelection,
@@ -536,19 +536,6 @@ function ModelSelectionSection({
   const [showApiKeyManager, setShowApiKeyManager] = useState(false);
   const [apiKeyDrafts, setApiKeyDrafts] = useState<ApiKeys>({});
 
-  useEffect(() => {
-    if (!showApiKeyManager) {
-      return;
-    }
-    setApiKeyDrafts((prev) => {
-      const next: Record<string, string> = {};
-      for (const provider of providers) {
-        next[provider] = prev[provider] ?? apiKeys[provider] ?? "";
-      }
-      return next;
-    });
-  }, [apiKeys, providers, showApiKeyManager]);
-
   const handleToggleApiKeyManager = () => {
     if (!showApiKeyManager) {
       const drafts: Record<string, string> = {};
@@ -627,7 +614,7 @@ function ModelSelectionSection({
             <div className="mt-3 space-y-3">
               {providers.map((provider) => {
                 const savedValue = apiKeys[provider];
-                const draftValue = apiKeyDrafts[provider] ?? "";
+                const draftValue = apiKeyDrafts[provider] ?? savedValue ?? "";
                 return (
                   <div key={provider} className="console-surface p-3">
                     <div className="console-microcaps flex items-center justify-between text-slate-500">

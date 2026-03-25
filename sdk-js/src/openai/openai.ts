@@ -218,7 +218,7 @@ function convertUserMessageToResponseInputItem(
   return {
     type: "message",
     role: "user",
-    content: messageParts.map((part) => {
+    content: messageParts.map((part): OpenAI.Responses.ResponseInputContent => {
       switch (part.type) {
         case "text":
           return { type: "input_text", text: part.text };
@@ -243,13 +243,14 @@ function convertUserMessageToResponseInputItem(
                 `Cannot convert audio format to OpenAI InputAudio format for format ${part.format}`,
               );
           }
+          // FIXME: fix in the next PR to update schema
           return {
             type: "input_audio",
             input_audio: {
               data: part.data,
               format,
             },
-          };
+          } as unknown as OpenAI.Responses.ResponseInputContent;
         }
         default:
           throw new UnsupportedError(

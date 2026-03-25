@@ -1,5 +1,5 @@
 import { diffWordsWithSpace, type Change } from "diff";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Artifact } from "../types.ts";
 import { Markdown } from "./markdown.tsx";
 
@@ -11,36 +11,53 @@ export function ArtifactsPane({
   onDelete?: (id: string) => void;
 }) {
   const list = useMemo(() => artifacts ?? [], [artifacts]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectionState, setSelectionState] = useState<{
+    list: Artifact[];
+    selectedId: string | null;
+    contentById: Map<string, string>;
+  }>({
+    list,
+    selectedId: list[0]?.id ?? null,
+    contentById: new Map(
+      list.map((artifact) => [artifact.id, artifact.content]),
+    ),
+  });
+
+  if (selectionState.list !== list) {
+    let updatedId: string | null = null;
+    for (const artifact of list) {
+      const previousContent = selectionState.contentById.get(artifact.id);
+      if (
+        previousContent === undefined ||
+        previousContent !== artifact.content
+      ) {
+        updatedId = artifact.id;
+      }
+    }
+
+    let nextSelectedId = selectionState.selectedId;
+    if (list.length === 0) {
+      nextSelectedId = null;
+    } else if (!nextSelectedId) {
+      nextSelectedId = list[0].id;
+    } else if (updatedId && updatedId !== nextSelectedId) {
+      nextSelectedId = updatedId;
+    }
+
+    setSelectionState({
+      list,
+      selectedId: nextSelectedId,
+      contentById: new Map(
+        list.map((artifact) => [artifact.id, artifact.content]),
+      ),
+    });
+  }
+
+  const selectedId = selectionState.selectedId;
   const selected = useMemo(
     () => list.find((a) => a.id === selectedId) ?? list[0],
     [list, selectedId],
   );
-  const prevMapRef = useRef<Map<string, string>>(new Map());
-
-  // auto-select updated or newly created document, and prime prev map
-  useEffect(() => {
-    const prevMap = prevMapRef.current;
-    let updatedId: string | null = null;
-    for (const a of list) {
-      const prev = prevMap.get(a.id);
-      if (prev === undefined) {
-        // Newly created
-        updatedId = a.id;
-      } else if (prev !== a.content) {
-        updatedId = a.id;
-      }
-    }
-    if (!selectedId && list.length > 0) {
-      setSelectedId(list[0].id);
-    } else if (updatedId && updatedId !== selectedId) {
-      setSelectedId(updatedId);
-    }
-    // update map
-    const next = new Map<string, string>();
-    for (const a of list) next.set(a.id, a.content);
-    prevMapRef.current = next;
-  }, [list, selectedId]);
 
   if (list.length === 0) {
     return (
@@ -75,7 +92,10 @@ export function ArtifactsPane({
                     : "border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200"
                 } mr-1 border px-3 py-1 text-xs`}
                 onClick={() => {
-                  setSelectedId(a.id);
+                  setSelectionState((prev) => ({
+                    ...prev,
+                    selectedId: a.id,
+                  }));
                 }}
                 title={a.id}
               >
@@ -98,25 +118,57 @@ function ArtifactViewer({
   onDelete?: (id: string) => void;
 }) {
   const [showDiff, setShowDiff] = useState(false);
-  const prevContentMapRef = useRef<Map<string, string>>(new Map());
-  const [lastDiffTokensMap, setLastDiffTokensMap] = useState<
-    Record<string, Change[] | null>
-  >({});
-  const lastDiffTokens = lastDiffTokensMap[artifact?.id ?? ""] ?? null;
+  const [diffState, setDiffState] = useState<{
+    artifactId: string | null;
+    artifactContent: string;
+    contentById: Record<string, string>;
+    lastDiffTokensMap: Record<string, Change[] | null>;
+  }>({
+    artifactId: null,
+    artifactContent: "",
+    contentById: {},
+    lastDiffTokensMap: {},
+  });
 
-  useEffect(() => {
-    if (!artifact?.id) return;
-    const curr = artifact?.content ?? "";
-    const prev = prevContentMapRef.current.get(artifact.id) ?? "";
-    if (curr !== prev) {
-      const tokens = diffWordsWithSpace(prev, curr);
-      setLastDiffTokensMap((prev) => ({
-        ...prev,
-        [artifact.id]: tokens,
-      }));
-      prevContentMapRef.current.set(artifact.id, curr);
-    }
-  }, [artifact?.content, artifact?.id]);
+  if (
+    artifact?.id &&
+    (diffState.artifactId !== artifact.id ||
+      diffState.artifactContent !== artifact.content)
+  ) {
+    const previousContent = diffState.contentById[artifact.id] ?? "";
+    const nextContentById = {
+      ...diffState.contentById,
+      [artifact.id]: artifact.content,
+    };
+    const nextLastDiffTokensMap =
+      artifact.content !== previousContent
+        ? {
+            ...diffState.lastDiffTokensMap,
+            [artifact.id]: diffWordsWithSpace(
+              previousContent,
+              artifact.content,
+            ),
+          }
+        : diffState.lastDiffTokensMap;
+
+    setDiffState({
+      artifactId: artifact.id,
+      artifactContent: artifact.content,
+      contentById: nextContentById,
+      lastDiffTokensMap: nextLastDiffTokensMap,
+    });
+  }
+
+  if (!artifact?.id && diffState.artifactId !== null) {
+    setDiffState((prev) => ({
+      ...prev,
+      artifactId: null,
+      artifactContent: "",
+    }));
+  }
+
+  const lastDiffTokensMap = diffState.lastDiffTokensMap;
+  const lastDiffTokens = lastDiffTokensMap[artifact?.id ?? ""] ?? null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col border border-slate-200 bg-white px-3 py-1">

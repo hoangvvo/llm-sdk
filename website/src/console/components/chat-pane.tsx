@@ -233,10 +233,7 @@ function useAudioSource(part: AudioPart): string | null {
 
   useEffect(() => {
     if (!part.data) {
-      setSource(null);
-      return () => {
-        /* noop */
-      };
+      return;
     }
 
     let objectUrl: string | null = null;
@@ -285,7 +282,7 @@ function useAudioSource(part: AudioPart): string | null {
     };
   }, [part.data, part.format, part.sample_rate]);
 
-  return source;
+  return part.data ? source : null;
 }
 
 function audioFormatToMime(format: AudioPart["format"]): string {

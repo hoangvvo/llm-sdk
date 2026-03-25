@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useEffectEvent,
+} from "react";
 
 interface UseFetchInitialDataResult<T> {
   data: T | null;
@@ -11,13 +17,8 @@ export function useFetchInitialData<T>(
 ): UseFetchInitialDataResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fetcherRef = useRef(fetcher);
   const fetchIdRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    fetcherRef.current = fetcher;
-  }, [fetcher]);
 
   const runFetch = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -29,8 +30,7 @@ export function useFetchInitialData<T>(
     setError(null);
     setData(null);
 
-    fetcherRef
-      .current(abortController.signal)
+    fetcher(abortController.signal)
       .then((result) => {
         if (fetchIdRef.current !== fetchId) {
           return;
@@ -46,14 +46,18 @@ export function useFetchInitialData<T>(
         }
         setError(error instanceof Error ? error.message : "Request failed");
       });
-  }, []);
+  }, [fetcher]);
+
+  const onInitialFetch = useEffectEvent(() => {
+    runFetch();
+  });
 
   useEffect(() => {
-    runFetch();
+    onInitialFetch();
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [runFetch]);
+  }, []);
 
   return { data, error, refetch: runFetch };
 }
