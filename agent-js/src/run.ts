@@ -703,7 +703,7 @@ export class RunState {
           };
 
           const lastMessage = messages[messages.length - 1];
-          if (!lastMessage || lastMessage.role !== "tool") {
+          if (lastMessage?.role !== "tool") {
             messages.push({
               role: "tool",
               content: [toolResultPart],

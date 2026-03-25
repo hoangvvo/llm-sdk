@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 
 const isBrowser = typeof window !== "undefined";
 
@@ -17,29 +17,21 @@ export function useLocalStorageState<T>(
 ): [T, Dispatch<SetStateAction<T>>] {
   const serialize = defaultSerialize as (value: T) => string;
   const deserialize = defaultDeserialize as (value: string) => T;
-
-  const initialRef = useRef(initialValue);
-
-  const readStoredValue = useCallback((): T => {
+  const [value, setValue] = useState<T>(() => {
+    const fallback = resolveInitialValue(initialValue);
     if (!isBrowser) {
-      return resolveInitialValue(initialRef.current);
+      return fallback;
     }
     try {
       const stored = window.localStorage.getItem(key);
       if (stored === null) {
-        return resolveInitialValue(initialRef.current);
+        return fallback;
       }
       return deserialize(stored);
     } catch {
-      return resolveInitialValue(initialRef.current);
+      return fallback;
     }
-  }, [deserialize, key]);
-
-  const [value, setValue] = useState<T>(initialRef.current);
-
-  useEffect(() => {
-    setValue(readStoredValue());
-  }, [readStoredValue]);
+  });
 
   const setStoredValue = useCallback<Dispatch<SetStateAction<T>>>(
     (update) => {

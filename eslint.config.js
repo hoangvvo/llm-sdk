@@ -32,7 +32,7 @@ export default [
   })),
   {
     files: ["./website/**/*.{ts,tsx}"],
-    ...reactHooks.configs["recommended-latest"],
+    ...reactHooks.configs.flat["recommended-latest"],
   },
   {
     files: ["./website/**/*.{ts,tsx}"],

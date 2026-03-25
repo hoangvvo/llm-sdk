@@ -11,32 +11,32 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^12.6.9",
-    "@astrojs/react": "^4.3.1",
-    "@astrojs/starlight": "^0.35.2",
-    "@ricky0123/vad-react": "^0.0.33",
-    "@ricky0123/vad-web": "^0.0.27",
-    "@tailwindcss/vite": "^4.1.1",
-    "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
-    "astro": "^5.6.1",
-    "astro-mermaid": "^1.0.0",
+    "@astrojs/cloudflare": "^13.1.3",
+    "@astrojs/react": "^5.0.1",
+    "@astrojs/starlight": "^0.38.2",
+    "@ricky0123/vad-react": "^0.0.36",
+    "@ricky0123/vad-web": "^0.0.30",
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "astro": "^6.0.8",
+    "astro-mermaid": "^2.0.1",
     "diff": "^5.2.0",
-    "fetch-event-stream": "^0.1.5",
-    "mermaid": "^11.0.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "fetch-event-stream": "^0.1.6",
+    "mermaid": "^11.13.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
-    "sharp": "^0.34.2",
-    "starlight-ion-theme": "^2.2.3",
-    "tailwindcss": "^4.1.0",
-    "vite-plugin-static-copy": "^3.1.2"
+    "sharp": "^0.34.5",
+    "starlight-ion-theme": "^2.4.0",
+    "tailwindcss": "^4.2.2",
+    "vite-plugin-static-copy": "^4.0.0"
   },
   "devDependencies": {
     "tree-sitter": "^0.21.1",
     "tree-sitter-go": "^0.23.4",
     "tree-sitter-rust": "^0.21.0",
     "tree-sitter-typescript": "^0.23.0",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.77.0"
   }
 }
