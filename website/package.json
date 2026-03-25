@@ -38,5 +38,8 @@
     "tree-sitter-rust": "^0.21.0",
     "tree-sitter-typescript": "^0.23.0",
     "wrangler": "^4.77.0"
+  },
+  "overrides": {
+    "astro": "^6"
   }
 }
