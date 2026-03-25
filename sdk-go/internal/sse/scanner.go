@@ -74,8 +74,8 @@ func ParseEvent(lines []string) *Event {
 // IsDataLine checks if a line is a data line and returns the data content
 func IsDataLine(line string) (string, bool) {
 	line = strings.TrimSpace(line)
-	if data, ok := strings.CutPrefix(line, "data: "); ok {
-		return data, true
+	if data, ok := strings.CutPrefix(line, "data:"); ok {
+		return strings.TrimPrefix(data, " "), true
 	}
 	return "", false
 }
