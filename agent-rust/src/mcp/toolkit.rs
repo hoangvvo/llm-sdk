@@ -11,7 +11,7 @@ use futures::future::BoxFuture;
 use llm_sdk;
 use rmcp::{
     handler::client::ClientHandler,
-    model::{CallToolRequestParam, CallToolResult, Tool},
+    model::{CallToolRequestParams, CallToolResult, Tool},
     service::{serve_client, NotificationContext, RoleClient, RunningService},
     transport::{
         child_process::TokioChildProcess,
@@ -196,9 +196,11 @@ where
                 }
             };
 
-            let request = CallToolRequestParam {
-                name: self.name.clone().into(),
-                arguments,
+            let request = match arguments {
+                Some(arguments) => {
+                    CallToolRequestParams::new(self.name.clone()).with_arguments(arguments)
+                }
+                None => CallToolRequestParams::new(self.name.clone()),
             };
 
             let Some(service) = self.service.upgrade() else {

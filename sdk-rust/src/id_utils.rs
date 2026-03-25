@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 use std::iter;
 
 pub fn generate_string(len: usize) -> String {

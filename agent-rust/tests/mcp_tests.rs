@@ -7,8 +7,8 @@ use llm_sdk::{llm_sdk_test::MockLanguageModel, AudioFormat, Message, ModelRespon
 use rmcp::{
     handler::server::ServerHandler,
     model::{
-        CallToolRequestParam, CallToolResult, Implementation, InitializeRequestParam, JsonObject,
-        ListToolsResult, ServerCapabilities, ServerInfo, Tool,
+        CallToolRequestParams, CallToolResult, Implementation, InitializeRequestParams, JsonObject,
+        ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool,
     },
     transport::streamable_http_server::{
         session::local::LocalSessionManager, tower::StreamableHttpServerConfig,
@@ -387,7 +387,7 @@ impl StubMcpService {
 impl ServerHandler for StubMcpService {
     fn initialize(
         &self,
-        request: InitializeRequestParam,
+        request: InitializeRequestParams,
         context: rmcp::service::RequestContext<RoleServer>,
     ) -> impl std::future::Future<Output = Result<ServerInfo, ErrorData>> + Send + '_ {
         let state = self.state.clone();
@@ -404,7 +404,7 @@ impl ServerHandler for StubMcpService {
 
     fn list_tools(
         &self,
-        _request: Option<rmcp::model::PaginatedRequestParam>,
+        _request: Option<PaginatedRequestParams>,
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> impl std::future::Future<Output = Result<ListToolsResult, ErrorData>> + Send + '_ {
         let state = self.state.clone();
@@ -418,7 +418,7 @@ impl ServerHandler for StubMcpService {
 
     fn call_tool(
         &self,
-        request: CallToolRequestParam,
+        request: CallToolRequestParams,
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> impl std::future::Future<Output = Result<CallToolResult, ErrorData>> + Send + '_ {
         let state = self.state.clone();
@@ -442,20 +442,13 @@ impl ServerHandler for StubMcpService {
 
 impl SharedState {
     fn server_info() -> ServerInfo {
-        ServerInfo {
-            server_info: Implementation {
-                name: "stub-mcp".to_string(),
-                version: "1.0.0".to_string(),
-                title: None,
-                icons: None,
-                website_url: None,
-            },
-            capabilities: ServerCapabilities::builder()
+        ServerInfo::new(
+            ServerCapabilities::builder()
                 .enable_tools()
                 .enable_tool_list_changed()
                 .build(),
-            ..Default::default()
-        }
+        )
+        .with_server_info(Implementation::new("stub-mcp", "1.0.0"))
     }
 }
 
@@ -495,6 +488,7 @@ fn audio_content(data: impl Into<String>, mime_type: impl Into<String>) -> rmcp:
 fn resource_link_content(uri: impl Into<String>, name: impl Into<String>) -> rmcp::model::Content {
     rmcp::model::Content {
         raw: rmcp::model::RawContent::ResourceLink(rmcp::model::RawResource {
+            meta: None,
             uri: uri.into(),
             name: name.into(),
             title: None,

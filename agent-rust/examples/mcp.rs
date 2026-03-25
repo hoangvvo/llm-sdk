@@ -17,7 +17,7 @@ use llm_sdk::{
 };
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{ServerCapabilities, ServerInfo},
+    model::{Implementation, ServerCapabilities, ServerInfo},
     schemars, tool, tool_handler, tool_router,
     transport::streamable_http_server::{
         session::local::LocalSessionManager,
@@ -207,18 +207,12 @@ impl ShuttleServer {
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for ShuttleServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            server_info: rmcp::model::Implementation {
-                name: "shuttle-scheduler".into(),
-                title: Some("Transit hub shuttle coordinator".into()),
-                ..Default::default()
-            },
-            instructions: Some(
-                "Authenticate with the shuttle control token before calling tools.".into(),
-            ),
-            ..Default::default()
-        }
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(
+                Implementation::new("shuttle-scheduler", "0.1.0")
+                    .with_title("Transit hub shuttle coordinator"),
+            )
+            .with_instructions("Authenticate with the shuttle control token before calling tools.")
     }
 }
 

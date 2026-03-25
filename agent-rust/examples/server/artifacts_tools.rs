@@ -3,13 +3,13 @@ use chrono::Utc;
 use futures::future::BoxFuture;
 use llm_agent::{AgentTool, AgentToolResult};
 use llm_sdk::{JSONSchema, Part};
-use rand::RngCore;
+use rand::RngExt;
 use serde::Deserialize;
 use serde_json::Value;
 
 fn rand_id(n_bytes: usize) -> String {
     let mut b = vec![0u8; n_bytes];
-    rand::thread_rng().fill_bytes(&mut b);
+    rand::rng().fill(&mut b[..]);
     // hex encode
     b.iter().map(|x| format!("{x:02x}")).collect::<String>()
 }
