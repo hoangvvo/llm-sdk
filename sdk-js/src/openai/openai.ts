@@ -352,19 +352,33 @@ function convertToolMessageToResponseInputItems(
         (
           toolResultPartPart,
         ): OpenAI.Responses.ResponseInputItem.FunctionCallOutput => {
+          let output: OpenAI.Responses.ResponseInputItem.FunctionCallOutput["output"];
+
           switch (toolResultPartPart.type) {
             case "text":
-              return {
-                type: "function_call_output",
-                call_id: part.tool_call_id,
-                output: toolResultPartPart.text,
-              };
+              output = toolResultPartPart.text;
+              break;
+            case "image":
+              output = [
+                {
+                  type: "input_image",
+                  image_url: `data:${toolResultPartPart.mime_type};base64,${toolResultPartPart.data}`,
+                  detail: "auto",
+                },
+              ];
+              break;
             default:
               throw new UnsupportedError(
                 PROVIDER,
                 `Cannot convert tool result part to OpenAI ResponseInputItem.FunctionCallOutput for type ${toolResultPartPart.type}`,
               );
           }
+
+          return {
+            type: "function_call_output",
+            call_id: part.tool_call_id,
+            output,
+          };
         },
       );
     })

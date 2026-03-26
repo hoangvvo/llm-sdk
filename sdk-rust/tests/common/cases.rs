@@ -282,6 +282,14 @@ pub async fn test_stream_text_from_tool_result(
     run_test_case(model, "stream_text_from_tool_result", options).await
 }
 
+#[allow(dead_code)]
+pub async fn test_generate_text_from_image_tool_result(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "generate_text_from_image_tool_result", options).await
+}
+
 pub async fn test_generate_parallel_tool_calls(
     model: &dyn LanguageModel,
     options: Option<RunTestCaseOptions>,

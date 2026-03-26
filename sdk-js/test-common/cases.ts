@@ -135,6 +135,7 @@ export const TEST_CASE_NAMES = {
   STREAM_TOOL_CALL: "stream_tool_call",
   GENERATE_TEXT_FROM_TOOL_RESULT: "generate_text_from_tool_result",
   STREAM_TEXT_FROM_TOOL_RESULT: "stream_text_from_tool_result",
+  GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT: "generate_text_from_image_tool_result",
   GENERATE_PARALLEL_TOOL_CALLS: "generate_parallel_tool_calls",
   STREAM_PARALLEL_TOOL_CALLS: "stream_parallel_tool_calls",
   STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME:

@@ -43,18 +43,7 @@ Each implements the TypeScript reference specification in [`schema/sdk.ts`](./sc
 
 ### Supported providers
 
-| Provider                     | Sampling Params                                                   | Function Calling | Structured Output | Reasoning | Citation [^source-as-text]                                                              | Text Input | Image Input | Audio Input | Text Output | Image Output | Audio Output |
-| ---------------------------- | ----------------------------------------------------------------- | ---------------- | ----------------- | --------- | --------------------------------------------------------------------------------------- | ---------- | ----------- | ----------- | ----------- | ------------ | ------------ |
-| **OpenAI (Responses)**       | ✅ except `top_k`,`frequency_penalty`, `presence_penalty`, `seed` | ✅               | ✅                | ✅        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ✅           | ➖           |
-| **OpenAI (Chat Completion)** | ✅ except `top_k`                                                 | ✅               | ✅                | ➖        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ➖           | ✅           |
-| **Anthropic**                | ✅ except `frequency_penalty`, `presence_penalty`, `seed`         | ✅               | ➖                | ✅        | ✅ ([Search results](https://docs.claude.com/en/docs/build-with-claude/search-results)) | ✅         | ✅          | ➖          | ✅          | ➖           | ➖           |
-| **Google**                   | ✅                                                                | ✅               | ✅                | ✅        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ✅           | ✅           |
-| **Cohere**                   | ✅                                                                | ✅               | ✅                | ✅        | ✅ ([Document](https://docs.cohere.com/v2/docs/retrieval-augmented-generation-rag))     | ✅         | ✅          | ➖          | ✅          | ➖           | ➖           |
-| **Mistral**                  | ✅ except `top_k`                                                 | ✅               | ✅                | ✅        | 🚧                                                                                      | ✅         | ✅          | ✅          | ✅          | ➖           | ➖           |
-
-Keys: ✅ supported · 🚧 planned · ➖ not available from provider.
-
-[^source-as-text]: Source Input (citation) is not supported by all providers and may be converted to compatible inputs instead.
+See [Supported providers](./website/src/content/docs/sdk/providers.mdx).
 
 ### Core interfaces
 

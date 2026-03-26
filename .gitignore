@@ -142,6 +142,6 @@ target/
 
 .gocache*/
 
-secret.md
+secret*.md
 
 .astro

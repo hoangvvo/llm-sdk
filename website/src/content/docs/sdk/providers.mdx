@@ -2,22 +2,18 @@
 title: Supported providers
 ---
 
-We support multiple LLM providers under a unified interface. 
+We support multiple LLM providers under a unified interface.
 Besides the table below, other providers can be used as an OpenAI-compatible API by specifying the `baseUrl` option in the `OpenAIChatModel` configuration.
 
 | Provider                     | Sampling Params                                                   | Function Calling | Structured Output | Reasoning | Citation [^source-as-text]                                                              | Text Input | Image Input | Audio Input | Text Output | Image Output | Audio Output |
 | ---------------------------- | ----------------------------------------------------------------- | ---------------- | ----------------- | --------- | --------------------------------------------------------------------------------------- | ---------- | ----------- | ----------- | ----------- | ------------ | ------------ |
-| **OpenAI (Responses)**       | ✅ except `top_k`,`frequency_penalty`, `presence_penalty`, `seed` | ✅               | ✅                | ✅        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ✅           | ➖           |
-| **OpenAI (Chat Completion)** | ✅ except `top_k`                                                 | ✅               | ✅                | ➖        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ➖           | ✅           |
-| **Anthropic**                | ✅ except `frequency_penalty`, `presence_penalty`, `seed`         | ✅               | ➖                | ✅        | ✅ ([Search results](https://docs.claude.com/en/docs/build-with-claude/search-results)) | ✅         | ✅          | ➖          | ✅          | ➖           | ➖           |
-| **Google**                   | ✅                                                                | ✅               | ✅                | ✅        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ✅           | ✅           |
-| **Cohere**                   | ✅                                                                | ✅               | ✅                | ✅        | ✅ ([Document](https://docs.cohere.com/v2/docs/retrieval-augmented-generation-rag))     | ✅         | ✅          | ➖          | ✅          | ➖           | ➖           |
-| **Mistral**                  | ✅ except `top_k`                                                 | ✅               | ✅                | ✅        | 🚧                                                                                      | ✅         | ✅          | ✅          | ✅          | ➖           | ➖           |
+| **OpenAI (Responses)**       | ✅ except `top_k`,`frequency_penalty`, `presence_penalty`, `seed` | ✅ text, image   | ✅                | ✅        | ➖                                                                                      | ✅         | ✅          | ➖          | ✅          | ✅           | ➖           |
+| **OpenAI (Chat Completion)** | ✅ except `top_k`                                                 | ✅ text          | ✅                | ➖        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ➖           | ✅           |
+| **Anthropic**                | ✅ except `frequency_penalty`, `presence_penalty`, `seed`         | ✅ text, image   | ➖                | ✅        | ✅ ([Search results](https://docs.claude.com/en/docs/build-with-claude/search-results)) | ✅         | ✅          | ➖          | ✅          | ➖           | ➖           |
+| **Google**                   | ✅                                                                | ✅ text          | ✅                | ✅        | ➖                                                                                      | ✅         | ✅          | ✅          | ✅          | ✅           | ✅           |
+| **Cohere**                   | ✅                                                                | ✅ text          | ✅                | ✅        | ✅ ([Document](https://docs.cohere.com/v2/docs/retrieval-augmented-generation-rag))     | ✅         | ✅          | ➖          | ✅          | ➖           | ➖           |
+| **Mistral**                  | ✅ except `top_k`                                                 | ✅ text          | ✅                | ✅        | 🚧                                                                                      | ✅         | ✅          | ✅          | ✅          | ➖           | ➖           |
 
-Keys:
-
-- ✅: Supported
-- 🚧: Not yet implemented
-- ➖: Not available from provider
+Keys: ✅ supported · 🚧 planned · ➖ not available from provider.
 
 [^source-as-text]: Source Input (citation) is not supported by all providers and may be converted to compatible inputs instead.

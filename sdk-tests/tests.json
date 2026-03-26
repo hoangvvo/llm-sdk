@@ -41,6 +41,15 @@
         "properties": {},
         "additionalProperties": false
       }
+    },
+    {
+      "name": "get_color_sample",
+      "description": "Get a color sample image",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     }
   ],
   "test_cases": [
@@ -284,6 +293,60 @@
           {
             "type": "text",
             "text": "70.*sunny|sunny.*70|70.*Sunny|Sunny.*70"
+          }
+        ]
+      }
+    },
+    {
+      "name": "generate_text_from_image_tool_result",
+      "type": "generate",
+      "input": {
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "What color is the image returned by the tool? Answer with one word."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "tool-call",
+                "tool_call_id": "8r3n4x2qp",
+                "tool_name": "get_color_sample",
+                "args": {}
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": [
+              {
+                "type": "tool-result",
+                "tool_call_id": "8r3n4x2qp",
+                "tool_name": "get_color_sample",
+                "content": [
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "input_tools": ["get_color_sample"],
+      "output": {
+        "content": [
+          {
+            "type": "text",
+            "text": "red|Red"
           }
         ]
       }
@@ -541,15 +604,17 @@
             ]
           }
         ],
-        "tools": [{
-          "name": "get_first_secret_number",
-          "description": "Get the first secret number",
-          "parameters": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": false
+        "tools": [
+          {
+            "name": "get_first_secret_number",
+            "description": "Get the first secret number",
+            "parameters": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
           }
-        }]
+        ]
       },
       "output": {
         "content": [
@@ -725,7 +790,7 @@
         "content": [
           {
             "type": "text",
-            "text": "red"
+            "text": "red|Red"
           }
         ]
       }

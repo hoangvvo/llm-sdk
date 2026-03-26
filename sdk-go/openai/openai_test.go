@@ -63,6 +63,10 @@ func TestStreamTextWithToolResult(t *testing.T) {
 	testcommon.RunTestCase(t, model, "stream_text_from_tool_result")
 }
 
+func TestGenerateTextWithImageToolResult(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_text_from_image_tool_result")
+}
+
 func TestGenerateParallelToolCalls(t *testing.T) {
 	testcommon.RunTestCase(t, model, "generate_parallel_tool_calls")
 }
