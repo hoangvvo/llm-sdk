@@ -636,7 +636,7 @@ func mapOpenAIOutputItems(items []openaiapi.ResponseOutputItem) ([]llmsdk.Part, 
 				}
 			}
 
-			reasoningOpts := []llmsdk.ReasoingPartOption{}
+			reasoningOpts := []llmsdk.ReasoningPartOption{}
 			if item.ResponseReasoningItem.EncryptedContent != nil {
 				reasoningOpts = append(reasoningOpts, llmsdk.WithReasoningSignature(*item.ResponseReasoningItem.EncryptedContent))
 			}

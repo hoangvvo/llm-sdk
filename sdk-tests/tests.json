@@ -201,7 +201,8 @@
                 "tool_name": "get_weather",
                 "args": {
                   "location": "Boston"
-                }
+                },
+                "thought_signature": "skip_thought_signature_validator"
               }
             ]
           },
@@ -256,7 +257,8 @@
                 "tool_name": "get_weather",
                 "args": {
                   "location": "Boston"
-                }
+                },
+                "thought_signature": "skip_thought_signature_validator"
               }
             ]
           },
@@ -484,7 +486,8 @@
                 "type": "tool-call",
                 "tool_call_id": "0mbnj08nt",
                 "tool_name": "get_first_secret_number",
-                "args": {}
+                "args": {},
+                "thought_signature": "skip_thought_signature_validator"
               }
             ]
           },

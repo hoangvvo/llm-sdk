@@ -1,9 +1,11 @@
 package google
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -20,42 +22,61 @@ import (
 
 const Provider = "google"
 
+type ProviderType string
+
+const (
+	ProviderTypeGoogleAI ProviderType = "google-ai"
+	ProviderTypeVertexAI ProviderType = "vertex-ai"
+)
+
 type GoogleModelOptions struct {
-	BaseURL    string
-	APIKey     string
-	APIVersion string
-	Headers    map[string]string
-	HTTPClient *http.Client
+	BaseURL      string
+	APIKey       string
+	APIVersion   string
+	Headers      map[string]string
+	HTTPClient   *http.Client
+	ProviderType ProviderType
+	AccessToken  string
+	ProjectID    string
+	Location     string
 }
 
 type GoogleModel struct {
-	baseURL    string
-	apiKey     string
-	apiVersion string
-	modelID    string
-	client     *http.Client
-	metadata   *llmsdk.LanguageModelMetadata
-	headers    map[string]string
+	baseURL      string
+	apiKey       string
+	apiVersion   string
+	modelID      string
+	client       *http.Client
+	metadata     *llmsdk.LanguageModelMetadata
+	headers      map[string]string
+	providerType ProviderType
+	accessToken  string
+	projectID    string
+	location     string
 }
 
 func NewGoogleModel(modelID string, options GoogleModelOptions) *GoogleModel {
-	baseURL := "https://generativelanguage.googleapis.com"
-	if options.BaseURL != "" {
-		baseURL = options.BaseURL
-	}
-	apiVersion := "v1beta"
-	if options.APIVersion != "" {
-		apiVersion = options.APIVersion
+	providerType := cmp.Or(options.ProviderType, ProviderTypeGoogleAI)
+
+	baseURL := options.BaseURL
+	if baseURL == "" {
+		baseURL = "https://generativelanguage.googleapis.com"
+		if providerType == ProviderTypeVertexAI {
+			if options.Location == "" || options.Location == "global" {
+				baseURL = "https://aiplatform.googleapis.com"
+			} else {
+				baseURL = "https://" + options.Location + "-aiplatform.googleapis.com"
+			}
+		}
 	}
 
-	client := options.HTTPClient
-	if client == nil {
-		client = &http.Client{}
-	}
-
-	headers := map[string]string{}
-	for k, v := range options.Headers {
-		headers[k] = v
+	apiVersion := options.APIVersion
+	if apiVersion == "" {
+		if providerType == ProviderTypeVertexAI {
+			apiVersion = "v1beta1"
+		} else {
+			apiVersion = "v1beta"
+		}
 	}
 
 	return &GoogleModel{
@@ -63,8 +84,13 @@ func NewGoogleModel(modelID string, options GoogleModelOptions) *GoogleModel {
 		apiKey:     options.APIKey,
 		apiVersion: apiVersion,
 		modelID:    modelID,
-		client:     client,
-		headers:    headers,
+		client:     cmp.Or(options.HTTPClient, &http.Client{}),
+		headers:    maps.Clone(options.Headers),
+
+		providerType: providerType,
+		accessToken:  options.AccessToken,
+		projectID:    options.ProjectID,
+		location:     options.Location,
 	}
 }
 
@@ -86,15 +112,42 @@ func (m *GoogleModel) Metadata() *llmsdk.LanguageModelMetadata {
 }
 
 func (m *GoogleModel) requestHeaders() map[string]string {
-	headers := map[string]string{
-		"x-goog-api-key": m.apiKey,
+	headers := maps.Clone(m.headers)
+	if headers == nil {
+		headers = make(map[string]string, 1)
 	}
 
-	for k, v := range m.headers {
-		headers[k] = v
+	if m.accessToken != "" {
+		headers["Authorization"] = "Bearer " + m.accessToken
+	} else if m.apiKey != "" {
+		headers["x-goog-api-key"] = m.apiKey
 	}
 
 	return headers
+}
+
+func (m *GoogleModel) buildEndpointURL(action string) string {
+	var b strings.Builder
+	b.WriteString(m.baseURL)
+	b.WriteByte('/')
+	b.WriteString(m.apiVersion)
+
+	if m.providerType == ProviderTypeVertexAI {
+		if m.projectID != "" {
+			b.WriteString("/projects/")
+			b.WriteString(m.projectID)
+			b.WriteString("/locations/")
+			b.WriteString(cmp.Or(m.location, "global"))
+		}
+		b.WriteString("/publishers/google")
+	}
+
+	b.WriteString("/models/")
+	b.WriteString(m.modelID)
+	b.WriteByte(':')
+	b.WriteString(action)
+
+	return b.String()
 }
 
 func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
@@ -105,7 +158,7 @@ func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		}
 
 		response, err := clientutils.DoJSON[googleapi.GenerateContentResponse](ctx, m.client, clientutils.JSONRequestConfig{
-			URL:     fmt.Sprintf("%s/%s/models/%s:generateContent", m.baseURL, m.apiVersion, m.modelID),
+			URL:     m.buildEndpointURL("generateContent"),
 			Headers: m.requestHeaders(),
 			Body:    params,
 		})
@@ -149,7 +202,7 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 		}
 
 		sseStream, err := clientutils.DoSSE[googleapi.GenerateContentResponse](ctx, m.client, clientutils.SSERequestConfig{
-			URL:     fmt.Sprintf("%s/%s/models/%s:streamGenerateContent?alt=sse", m.baseURL, m.apiVersion, m.modelID),
+			URL:     m.buildEndpointURL("streamGenerateContent?alt=sse"),
 			Headers: m.requestHeaders(),
 			Body:    params,
 		})
@@ -345,13 +398,17 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 			parts,
 		), nil
 	case part.ToolCallPart != nil:
-		return []googleapi.Part{{
+		googlePart := googleapi.Part{
 			FunctionCall: &googleapi.FunctionCall{
 				Name: &part.ToolCallPart.ToolName,
 				Args: part.ToolCallPart.Args,
 				Id:   &part.ToolCallPart.ToolCallID,
 			},
-		}}, nil
+		}
+		if part.ToolCallPart.ThoughtSignature != nil {
+			googlePart.ThoughtSignature = part.ToolCallPart.ThoughtSignature
+		}
+		return []googleapi.Part{googlePart}, nil
 	case part.ToolResultPart != nil:
 		response, err := convertToGoogleFunctionResponseResponse(part.ToolResultPart.Content, part.ToolResultPart.IsError)
 		if err != nil {
@@ -493,7 +550,7 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 			if part.Text != nil {
 				text = *part.Text
 			}
-			opts := []llmsdk.ReasoingPartOption{}
+			opts := []llmsdk.ReasoningPartOption{}
 			if part.ThoughtSignature != nil {
 				opts = append(opts, llmsdk.WithReasoningSignature(*part.ThoughtSignature))
 			}
@@ -534,7 +591,11 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 			} else {
 				toolCallID = fmt.Sprintf("call_%s", randutil.String(10))
 			}
-			toolCallPart := llmsdk.NewToolCallPart(toolCallID, *part.FunctionCall.Name, json.RawMessage(part.FunctionCall.Args))
+			opts := []llmsdk.ToolCallPartOption{}
+			if part.ThoughtSignature != nil {
+				opts = append(opts, llmsdk.WithToolCallThoughtSignature(*part.ThoughtSignature))
+			}
+			toolCallPart := llmsdk.NewToolCallPart(toolCallID, *part.FunctionCall.Name, json.RawMessage(part.FunctionCall.Args), opts...)
 			toolCallPart.ToolCallPart.Args = part.FunctionCall.Args
 			result = append(result, toolCallPart)
 			continue

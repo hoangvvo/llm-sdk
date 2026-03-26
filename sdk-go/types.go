@@ -120,6 +120,8 @@ type ToolCallPart struct {
 	// The ID of the part, if applicable.
 	// This is different from ToolCallID which is used to match tool results.
 	ID *string `json:"id,omitempty"`
+	// ThoughtSignature is an encrypted representation of the model's internal thought process - used for Gemini 3 models during function calling.
+	ThoughtSignature *string `json:"thought_signature,omitempty"`
 }
 
 // ToolResultPart represents a part of the message that represents the result of a tool call.
@@ -321,10 +323,11 @@ func (c CitationDelta) MarshalJSON() ([]byte, error) {
 
 // ToolCallPartDelta represents a delta update for a tool call part, used in streaming of a tool invocation.
 type ToolCallPartDelta struct {
-	ToolCallID *string `json:"tool_call_id,omitempty"`
-	ToolName   *string `json:"tool_name,omitempty"`
-	Args       *string `json:"args,omitempty"`
-	ID         *string `json:"id,omitempty"`
+	ToolCallID       *string `json:"tool_call_id,omitempty"`
+	ToolName         *string `json:"tool_name,omitempty"`
+	Args             *string `json:"args,omitempty"`
+	ID               *string `json:"id,omitempty"`
+	ThoughtSignature *string `json:"thought_signature,omitempty"`
 }
 
 // ImagePartDelta represents a delta update for an image part, used in streaming of an image message.

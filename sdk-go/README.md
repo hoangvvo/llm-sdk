@@ -64,6 +64,10 @@ func GetModel(provider, modelID string) llmsdk.LanguageModel {
 		}
 		return google.NewGoogleModel(modelID, google.GoogleModelOptions{
 			APIKey: apiKey,
+			// ProviderType: google.ProviderTypeVertexAI,
+			// AccessToken: "your-access-token",
+			// Location: "us-central1",
+			// ProjectID: "your-project-id",
 		})
 	default:
 		panic(fmt.Sprintf("Unsupported provider: %s", provider))

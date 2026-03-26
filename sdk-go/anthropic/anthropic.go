@@ -519,7 +519,7 @@ func mapAnthropicContentBlock(block anthropicapi.ContentBlock) (*llmsdk.Part, er
 		return &part, nil
 
 	case block.ResponseThinkingBlock != nil:
-		opts := []llmsdk.ReasoingPartOption{}
+		opts := []llmsdk.ReasoningPartOption{}
 		if block.ResponseThinkingBlock.Signature != "" {
 			opts = append(opts, llmsdk.WithReasoningSignature(block.ResponseThinkingBlock.Signature))
 		}

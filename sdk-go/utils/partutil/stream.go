@@ -106,10 +106,11 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 		argsStr := string(part.ToolCallPart.Args)
 		return llmsdk.PartDelta{
 			ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-				ToolCallID: &part.ToolCallPart.ToolCallID,
-				ToolName:   &part.ToolCallPart.ToolName,
-				Args:       &argsStr,
-				ID:         part.ToolCallPart.ID,
+				ToolCallID:       &part.ToolCallPart.ToolCallID,
+				ToolName:         &part.ToolCallPart.ToolName,
+				Args:             &argsStr,
+				ID:               part.ToolCallPart.ID,
+				ThoughtSignature: part.ToolCallPart.ThoughtSignature,
 			},
 		}
 	case part.ReasoningPart != nil:

@@ -144,6 +144,9 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 		if toolCallPartDelta.ID != nil {
 			existingData.ID = toolCallPartDelta.ID
 		}
+		if toolCallPartDelta.ThoughtSignature != nil {
+			existingData.ThoughtSignature = toolCallPartDelta.ThoughtSignature
+		}
 	case existing.Image != nil:
 		imagePartDelta := delta.Part.ImagePartDelta
 		if imagePartDelta == nil {
@@ -294,6 +297,9 @@ func createToolCallPart(data *ToolCallPartDelta, index int) (Part, error) {
 	if data.ID != nil {
 		opts = append(opts, WithToolCallPartID(*data.ID))
 	}
+	if data.ThoughtSignature != nil {
+		opts = append(opts, WithToolCallThoughtSignature(*data.ThoughtSignature))
+	}
 
 	toolCallPart := NewToolCallPart(*data.ToolCallID, *data.ToolName, args, opts...)
 	return toolCallPart, nil
@@ -353,7 +359,7 @@ func createAudioPart(data *accumulatedAudioData) (Part, error) {
 
 // createReasoningPart creates a reasoning part from accumulated reasoning data
 func createReasoningPart(data *ReasoningPartDelta) Part {
-	var opts []ReasoingPartOption
+	var opts []ReasoningPartOption
 	if data.Signature != nil {
 		opts = append(opts, WithReasoningSignature(*data.Signature))
 	}
