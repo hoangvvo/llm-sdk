@@ -12,6 +12,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
     "checkJs": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -21,5 +22,5 @@
     "module": "NodeNext",
     "noEmit": true
   },
-  "include": ["*.ts", "providers/*.ts"]
+  "include": ["scripts/*.ts", "schema/**/*.ts"]
 }
