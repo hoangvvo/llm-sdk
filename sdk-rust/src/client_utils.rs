@@ -75,13 +75,12 @@ pub async fn send_sse_stream<T: Serialize + 'static, R: DeserializeOwned + Send 
                         break; // End of stream
                     }
 
-                    let chunk: R = serde_json::from_str(&event.data)
-                        .map_err(|e| {
-                            LanguageModelError::Invariant(
-                                provider,
-                                format!("Failed to parse stream chunk: {e}")
-                            )
-                        })?;
+                    let chunk: R = serde_json::from_str(&event.data).map_err(|e| {
+                        LanguageModelError::Invariant(
+                            provider,
+                            format!("Failed to parse stream chunk: {e}"),
+                        )
+                    })?;
 
                     yield chunk;
                 }

@@ -235,16 +235,19 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 		return nil, err
 	}
 
-	params := &openaichatapi.CreateChatCompletionRequest{
-		Model:    openaichatapi.ModelIdsShared(modelID),
-		Messages: messages,
-	}
+	params := &openaichatapi.CreateChatCompletionRequest{}
+	model := openaichatapi.ModelIdsShared(ptr.To(modelID))
+	params.Model = model
+	params.Messages = messages
 
 	params.Temperature = input.Temperature
 	params.TopP = input.TopP
 	params.PresencePenalty = input.PresencePenalty
 	params.FrequencyPenalty = input.FrequencyPenalty
-	params.Seed = input.Seed
+	if input.Seed != nil {
+		seed := int(*input.Seed)
+		params.Seed = &seed
+	}
 
 	if input.MaxTokens != nil {
 		maxTokens := int(*input.MaxTokens)
@@ -260,7 +263,7 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 			}
 			modalities = append(modalities, openaiModality)
 		}
-		params.Modalities = modalities
+		params.Modalities = &modalities
 	}
 
 	if input.Audio != nil {
@@ -272,10 +275,9 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 	}
 
 	if input.Tools != nil {
-		var tools []interface{}
+		var tools []openaichatapi.CreateChatCompletionRequestAllOf2ToolsItem
 		for _, tool := range input.Tools {
 			openAITool := openaichatapi.ChatCompletionTool{
-				Type: "function",
 				Function: openaichatapi.FunctionObject{
 					Name: tool.Name,
 				},
@@ -284,12 +286,14 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 				openAITool.Function.Description = &tool.Description
 			}
 			if tool.Parameters != nil {
-				paramsCopy := openaichatapi.FunctionParameters(tool.Parameters)
-				openAITool.Function.Parameters = &paramsCopy
+				parameters := openaichatapi.FunctionParameters(tool.Parameters)
+				openAITool.Function.Parameters = &parameters
 			}
 			strict := true
 			openAITool.Function.Strict = &strict
-			tools = append(tools, openAITool)
+			tools = append(tools, openaichatapi.CreateChatCompletionRequestAllOf2ToolsItem{
+				Function: &openAITool,
+			})
 		}
 		params.Tools = tools
 	}
@@ -333,10 +337,13 @@ func convertToOpenAIChatMessages(messages []llmsdk.Message, systemPrompt *string
 	var result []openaichatapi.ChatCompletionRequestMessage
 
 	if systemPrompt != nil && *systemPrompt != "" {
+		contentString := openaichatapi.ChatCompletionRequestSystemMessageContentString(ptr.To(*systemPrompt))
+		content := openaichatapi.ChatCompletionRequestSystemMessageContent{
+			ChatCompletionRequestSystemMessageContentString: &contentString,
+		}
 		result = append(result, openaichatapi.ChatCompletionRequestMessage{
 			System: &openaichatapi.ChatCompletionRequestSystemMessage{
-				Role:    "system",
-				Content: *systemPrompt,
+				Content: content,
 			},
 		})
 	}
@@ -371,26 +378,20 @@ func convertToOpenAIChatMessages(messages []llmsdk.Message, systemPrompt *string
 
 func convertUserMessageToOpenAIChatMessage(message *llmsdk.UserMessage) (openaichatapi.ChatCompletionRequestMessage, error) {
 	contentParts := partutil.GetCompatiblePartsWithoutSourceParts(message.Content)
-
-	var openAIContent []openaichatapi.ChatCompletionRequestUserMessageContentPart
+	openAIContent := make(openaichatapi.ChatCompletionRequestUserMessageContentArray, 0, len(contentParts))
 
 	for _, part := range contentParts {
 		switch {
 		case part.TextPart != nil:
 			openAIContent = append(openAIContent, openaichatapi.ChatCompletionRequestUserMessageContentPart{
 				Text: &openaichatapi.ChatCompletionRequestMessageContentPartText{
-					Type: "text",
 					Text: part.TextPart.Text,
 				},
 			})
 		case part.ImagePart != nil:
 			openAIContent = append(openAIContent, openaichatapi.ChatCompletionRequestUserMessageContentPart{
-				Image: &openaichatapi.ChatCompletionRequestMessageContentPartImage{
-					Type: "image_url",
-					ImageUrl: struct {
-						Detail *string `json:"detail,omitempty"`
-						Url    string  `json:"url"`
-					}{
+				ImageUrl: &openaichatapi.ChatCompletionRequestMessageContentPartImage{
+					ImageUrl: openaichatapi.ChatCompletionRequestMessageContentPartImageImageUrl{
 						Url: fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data),
 					},
 				},
@@ -401,12 +402,8 @@ func convertUserMessageToOpenAIChatMessage(message *llmsdk.UserMessage) (openaic
 				return openaichatapi.ChatCompletionRequestMessage{}, err
 			}
 			openAIContent = append(openAIContent, openaichatapi.ChatCompletionRequestUserMessageContentPart{
-				Audio: &openaichatapi.ChatCompletionRequestMessageContentPartAudio{
-					Type: "input_audio",
-					InputAudio: struct {
-						Data   string `json:"data"`
-						Format string `json:"format"`
-					}{
+				InputAudio: &openaichatapi.ChatCompletionRequestMessageContentPartAudio{
+					InputAudio: openaichatapi.ChatCompletionRequestMessageContentPartAudioInputAudio{
 						Data:   part.AudioPart.Data,
 						Format: format,
 					},
@@ -419,8 +416,9 @@ func convertUserMessageToOpenAIChatMessage(message *llmsdk.UserMessage) (openaic
 
 	return openaichatapi.ChatCompletionRequestMessage{
 		User: &openaichatapi.ChatCompletionRequestUserMessage{
-			Role:    "user",
-			Content: openAIContent,
+			Content: openaichatapi.ChatCompletionRequestUserMessageContent{
+				ChatCompletionRequestUserMessageContentArray: &openAIContent,
+			},
 		},
 	}, nil
 }
@@ -429,11 +427,10 @@ func convertAssistantMessageToOpenAIChatMessages(message *llmsdk.AssistantMessag
 	parts := partutil.GetCompatiblePartsWithoutSourceParts(message.Content)
 
 	assistantMessage := openaichatapi.ChatCompletionRequestAssistantMessage{
-		Role:    "assistant",
 		Content: nil,
 	}
 
-	var contentParts []openaichatapi.ChatCompletionRequestAssistantMessageContentPart
+	var contentParts openaichatapi.ChatCompletionRequestAssistantMessageContentArray
 	var toolCalls openaichatapi.ChatCompletionMessageToolCalls
 
 	for _, part := range parts {
@@ -441,7 +438,6 @@ func convertAssistantMessageToOpenAIChatMessages(message *llmsdk.AssistantMessag
 		case part.TextPart != nil:
 			contentParts = append(contentParts, openaichatapi.ChatCompletionRequestAssistantMessageContentPart{
 				Text: &openaichatapi.ChatCompletionRequestMessageContentPartText{
-					Type: "text",
 					Text: part.TextPart.Text,
 				},
 			})
@@ -450,20 +446,19 @@ func convertAssistantMessageToOpenAIChatMessages(message *llmsdk.AssistantMessag
 				continue
 			}
 			toolCall := openaichatapi.ChatCompletionMessageToolCall{
-				ID:   part.ToolCallPart.ToolCallID,
-				Type: "function",
+				Id: part.ToolCallPart.ToolCallID,
 			}
 			toolCall.Function.Name = part.ToolCallPart.ToolName
 			toolCall.Function.Arguments = string(part.ToolCallPart.Args)
-			toolCalls = append(toolCalls, toolCall)
+			toolCalls = append(toolCalls, openaichatapi.ChatCompletionMessageToolCallsItem{
+				Function: &toolCall,
+			})
 		case part.AudioPart != nil:
 			if part.AudioPart.ID == nil {
 				return nil, llmsdk.NewUnsupportedError(Provider, "assistant audio parts must include an ID for OpenAI chat API")
 			}
-			assistantMessage.Audio = &struct {
-				ID string `json:"id"`
-			}{
-				ID: *part.AudioPart.ID,
+			assistantMessage.Audio = &openaichatapi.ChatCompletionRequestAssistantMessageAudio{
+				Id: *part.AudioPart.ID,
 			}
 		default:
 			return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert assistant part of type %s to OpenAI chat message", part.Type()))
@@ -471,10 +466,12 @@ func convertAssistantMessageToOpenAIChatMessages(message *llmsdk.AssistantMessag
 	}
 
 	if len(contentParts) > 0 {
-		assistantMessage.Content = contentParts
+		assistantMessage.Content = &openaichatapi.ChatCompletionRequestAssistantMessageContent{
+			ChatCompletionRequestAssistantMessageContentArray: &contentParts,
+		}
 	}
 	if len(toolCalls) > 0 {
-		assistantMessage.ToolCalls = toolCalls
+		assistantMessage.ToolCalls = &toolCalls
 	}
 
 	return []openaichatapi.ChatCompletionRequestMessage{{
@@ -495,22 +492,24 @@ func convertToolMessageToOpenAIChatMessages(message *llmsdk.ToolMessage) ([]open
 			continue
 		}
 
-		var contentParts []openaichatapi.ChatCompletionRequestMessageContentPartText
+		var contentParts openaichatapi.ChatCompletionRequestToolMessageContentArray
 		for _, toolResultPart := range toolResultParts {
 			if toolResultPart.TextPart == nil {
 				return nil, llmsdk.NewInvalidInputError("tool result parts must contain only text parts for OpenAI chat API")
 			}
-			contentParts = append(contentParts, openaichatapi.ChatCompletionRequestMessageContentPartText{
-				Type: "text",
-				Text: toolResultPart.TextPart.Text,
+			contentParts = append(contentParts, openaichatapi.ChatCompletionRequestToolMessageContentPart{
+				Text: &openaichatapi.ChatCompletionRequestMessageContentPartText{
+					Text: toolResultPart.TextPart.Text,
+				},
 			})
 		}
 
 		result = append(result, openaichatapi.ChatCompletionRequestMessage{
 			Tool: &openaichatapi.ChatCompletionRequestToolMessage{
-				Role:       "tool",
-				ToolCallID: part.ToolResultPart.ToolCallID,
-				Content:    contentParts,
+				ToolCallId: part.ToolResultPart.ToolCallID,
+				Content: openaichatapi.ChatCompletionRequestToolMessageContent{
+					ChatCompletionRequestToolMessageContentArray: &contentParts,
+				},
 			},
 		})
 	}
@@ -525,7 +524,7 @@ func mapOpenAIChatMessage(message openaichatapi.ChatCompletionResponseMessage, p
 		parts = append(parts, llmsdk.NewTextPart(*message.Content))
 	}
 
-	if message.Audio != nil {
+	if message.Audio != nil && message.Audio.Id != "" {
 		if params.Audio == nil {
 			return nil, llmsdk.NewInvariantError(Provider, "audio returned from OpenAI API but no audio parameter was provided")
 		}
@@ -535,7 +534,7 @@ func mapOpenAIChatMessage(message openaichatapi.ChatCompletionResponseMessage, p
 			return nil, err
 		}
 
-		audioOpts := []llmsdk.AudioPartOption{llmsdk.WithAudioID(message.Audio.ID)}
+		audioOpts := []llmsdk.AudioPartOption{llmsdk.WithAudioID(message.Audio.Id)}
 		if message.Audio.Transcript != "" {
 			audioOpts = append(audioOpts, llmsdk.WithAudioTranscript(message.Audio.Transcript))
 		}
@@ -549,27 +548,18 @@ func mapOpenAIChatMessage(message openaichatapi.ChatCompletionResponseMessage, p
 	}
 
 	if message.ToolCalls != nil {
-		for _, call := range message.ToolCalls {
-			raw, err := json.Marshal(call)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal tool call: %w", err)
+		for _, call := range *message.ToolCalls {
+			if call.Function == nil {
+				return nil, llmsdk.NewNotImplementedError(Provider, "cannot map OpenAI custom tool call")
 			}
-
-			var toolCall openaichatapi.ChatCompletionMessageToolCall
-			if err := json.Unmarshal(raw, &toolCall); err != nil {
-				return nil, fmt.Errorf("failed to parse tool call: %w", err)
-			}
-
-			if toolCall.Type != "function" {
-				return nil, llmsdk.NewNotImplementedError(Provider, fmt.Sprintf("cannot map OpenAI tool call of type %s", toolCall.Type))
-			}
+			toolCall := call.Function
 
 			var args map[string]any
 			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 				return nil, fmt.Errorf("failed to parse tool call arguments: %w", err)
 			}
 
-			toolPart := llmsdk.NewToolCallPart(toolCall.ID, toolCall.Function.Name, args)
+			toolPart := llmsdk.NewToolCallPart(toolCall.Id, toolCall.Function.Name, args)
 			parts = append(parts, toolPart)
 		}
 	}
@@ -597,42 +587,38 @@ func mapOpenAIChatDelta(delta openaichatapi.ChatCompletionStreamResponseDelta, e
 
 	if delta.Audio != nil {
 		if params.Audio == nil {
-			return nil, llmsdk.NewInvariantError(Provider, "audio delta received without audio request params")
+			return nil, llmsdk.NewInvariantError(Provider, "audio delta returned from OpenAI API but no audio parameter was provided")
 		}
 
-		audioDelta := llmsdk.AudioPartDelta{}
-		if delta.Audio.ID != nil {
-			audioDelta.ID = delta.Audio.ID
-		}
-		if delta.Audio.Data != nil {
-			format, err := mapOpenAIChatAudioFormat(params.Audio.Format)
-			if err != nil {
-				return nil, err
-			}
-			audioDelta.Data = delta.Audio.Data
-			audioDelta.Format = ptr.To(format)
-			if format == llmsdk.AudioFormatLinear16 {
-				audioDelta.SampleRate = ptr.To(OpenAIAudioSampleRate)
-				audioDelta.Channels = ptr.To(OpenAIAudioChannels)
-			}
-		}
-		if delta.Audio.Transcript != nil {
-			audioDelta.Transcript = delta.Audio.Transcript
+		format, err := mapOpenAIChatAudioFormat(params.Audio.Format)
+		if err != nil {
+			return nil, err
 		}
 
-		part := llmsdk.PartDelta{AudioPartDelta: &audioDelta}
+		audioDelta := &llmsdk.AudioPartDelta{
+			Data:       delta.Audio.Data,
+			Format:     ptr.To(format),
+			Transcript: delta.Audio.Transcript,
+			ID:         delta.Audio.Id,
+		}
+		if format == llmsdk.AudioFormatLinear16 {
+			audioDelta.SampleRate = ptr.To(OpenAIAudioSampleRate)
+			audioDelta.Channels = ptr.To(OpenAIAudioChannels)
+		}
+
+		part := llmsdk.PartDelta{AudioPartDelta: audioDelta}
 		index := partutil.GuessDeltaIndex(part, append(existing, result...), nil)
 		result = append(result, llmsdk.ContentDelta{Index: index, Part: part})
 	}
 
 	for _, toolCall := range delta.ToolCalls {
-		if toolCall.Type != nil && *toolCall.Type != "function" {
+		if toolCall.Type != nil && *toolCall.Type != openaichatapi.ChatCompletionMessageToolCallChunkTypeFunction {
 			return nil, llmsdk.NewNotImplementedError(Provider, fmt.Sprintf("cannot map OpenAI tool call delta of type %s", *toolCall.Type))
 		}
 
 		toolCallDelta := llmsdk.ToolCallPartDelta{}
-		if toolCall.ID != nil {
-			toolCallDelta.ToolCallID = toolCall.ID
+		if toolCall.Id != nil {
+			toolCallDelta.ToolCallID = toolCall.Id
 		}
 		if toolCall.Function != nil {
 			if toolCall.Function.Name != nil {
@@ -673,29 +659,15 @@ func mapOpenAIChatUsage(usage openaichatapi.CompletionUsage, input *llmsdk.Langu
 		details := usage.PromptTokensDetails
 		tokensDetails := &llmsdk.ModelTokensDetails{}
 
-		if details.TextTokens != nil {
-			tokensDetails.TextTokens = ptr.To(*details.TextTokens)
+		if details.AudioTokens != nil {
+			tokensDetails.AudioTokens = ptr.To(*details.AudioTokens)
 		}
-		if details.AudioTokens > 0 {
-			tokensDetails.AudioTokens = ptr.To(details.AudioTokens)
-		}
-		if details.ImageTokens != nil {
-			tokensDetails.ImageTokens = ptr.To(*details.ImageTokens)
-		}
-
-		if details.CachedTokensDetails != nil {
-			if details.CachedTokensDetails.TextTokens != nil {
-				tokensDetails.CachedTextTokens = ptr.To(*details.CachedTokensDetails.TextTokens)
-			}
-			if details.CachedTokensDetails.AudioTokens != nil {
-				tokensDetails.CachedAudioTokens = ptr.To(*details.CachedTokensDetails.AudioTokens)
-			}
-		} else if details.CachedTokens > 0 {
+		if details.CachedTokens != nil {
 			if hasUserTextPart(input.Messages) {
-				tokensDetails.CachedTextTokens = ptr.To(details.CachedTokens)
+				tokensDetails.CachedTextTokens = ptr.To(*details.CachedTokens)
 			}
 			if hasUserAudioPart(input.Messages) {
-				tokensDetails.CachedAudioTokens = ptr.To(details.CachedTokens)
+				tokensDetails.CachedAudioTokens = ptr.To(*details.CachedTokens)
 			}
 		}
 
@@ -708,11 +680,8 @@ func mapOpenAIChatUsage(usage openaichatapi.CompletionUsage, input *llmsdk.Langu
 	if usage.CompletionTokensDetails != nil {
 		details := usage.CompletionTokensDetails
 		tokensDetails := &llmsdk.ModelTokensDetails{}
-		if details.TextTokens != nil {
-			tokensDetails.TextTokens = ptr.To(*details.TextTokens)
-		}
-		if details.AudioTokens > 0 {
-			tokensDetails.AudioTokens = ptr.To(details.AudioTokens)
+		if details.AudioTokens != nil {
+			tokensDetails.AudioTokens = ptr.To(*details.AudioTokens)
 		}
 		if isModelTokensDetailsEmpty(tokensDetails) {
 			tokensDetails = nil
@@ -723,7 +692,7 @@ func mapOpenAIChatUsage(usage openaichatapi.CompletionUsage, input *llmsdk.Langu
 	return result
 }
 
-func convertToOpenAIChatModality(modality llmsdk.Modality) (string, error) {
+func convertToOpenAIChatModality(modality llmsdk.Modality) (openaichatapi.ResponseModalitiesItem, error) {
 	switch modality {
 	case llmsdk.ModalityText:
 		return "text", nil
@@ -734,10 +703,7 @@ func convertToOpenAIChatModality(modality llmsdk.Modality) (string, error) {
 	}
 }
 
-func convertToOpenAIChatAudio(options llmsdk.AudioOptions) (*struct {
-	Format string                       `json:"format"`
-	Voice  openaichatapi.VoiceIdsShared `json:"voice"`
-}, error) {
+func convertToOpenAIChatAudio(options llmsdk.AudioOptions) (*openaichatapi.CreateChatCompletionRequestAllOf2Audio, error) {
 	if options.Voice == nil || *options.Voice == "" {
 		return nil, llmsdk.NewInvalidInputError("audio voice is required for OpenAI audio")
 	}
@@ -751,79 +717,90 @@ func convertToOpenAIChatAudio(options llmsdk.AudioOptions) (*struct {
 		return nil, err
 	}
 
-	return &struct {
-		Format string                       `json:"format"`
-		Voice  openaichatapi.VoiceIdsShared `json:"voice"`
-	}{
+	return &openaichatapi.CreateChatCompletionRequestAllOf2Audio{
 		Format: format,
-		Voice:  openaichatapi.VoiceIdsShared(*options.Voice),
+		Voice: openaichatapi.VoiceIdsOrCustomVoice{
+			VoiceIdsShared: func() *openaichatapi.VoiceIdsShared {
+				voice := openaichatapi.VoiceIdsShared(ptr.To(*options.Voice))
+				return &voice
+			}(),
+		},
 	}, nil
 }
 
-func convertToOpenAIChatAudioFormat(format llmsdk.AudioFormat) (string, error) {
+func convertToOpenAIChatAudioFormat(format llmsdk.AudioFormat) (openaichatapi.CreateChatCompletionRequestAllOf2AudioFormat, error) {
 	switch format {
 	case llmsdk.AudioFormatWav:
-		return "wav", nil
+		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatWav, nil
 	case llmsdk.AudioFormatMP3:
-		return "mp3", nil
+		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatMp3, nil
 	case llmsdk.AudioFormatFLAC:
-		return "flac", nil
+		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatFlac, nil
 	case llmsdk.AudioFormatOpus:
-		return "opus", nil
+		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatOpus, nil
 	case llmsdk.AudioFormatLinear16:
-		return "pcm16", nil
+		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatPcm16, nil
 	case llmsdk.AudioFormatAAC:
-		return "aac", nil
+		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatAac, nil
 	default:
 		return "", llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert audio format %s to OpenAI audio format", format))
 	}
 }
 
-func convertUserAudioFormat(format llmsdk.AudioFormat) (string, error) {
+func convertUserAudioFormat(format llmsdk.AudioFormat) (openaichatapi.ChatCompletionRequestMessageContentPartAudioInputAudioFormat, error) {
 	switch format {
 	case llmsdk.AudioFormatMP3:
-		return "mp3", nil
+		return openaichatapi.ChatCompletionRequestMessageContentPartAudioInputAudioFormatMp3, nil
 	case llmsdk.AudioFormatWav:
-		return "wav", nil
+		return openaichatapi.ChatCompletionRequestMessageContentPartAudioInputAudioFormatWav, nil
 	default:
 		return "", llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert audio format %s to OpenAI input audio format", format))
 	}
 }
 
-func mapOpenAIChatAudioFormat(format string) (llmsdk.AudioFormat, error) {
+func mapOpenAIChatAudioFormat(format openaichatapi.CreateChatCompletionRequestAllOf2AudioFormat) (llmsdk.AudioFormat, error) {
 	switch format {
-	case "wav":
+	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatWav:
 		return llmsdk.AudioFormatWav, nil
-	case "mp3":
+	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatMp3:
 		return llmsdk.AudioFormatMP3, nil
-	case "flac":
+	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatFlac:
 		return llmsdk.AudioFormatFLAC, nil
-	case "opus":
+	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatOpus:
 		return llmsdk.AudioFormatOpus, nil
-	case "pcm16":
+	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatPcm16:
 		return llmsdk.AudioFormatLinear16, nil
-	case "aac":
+	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatAac:
 		return llmsdk.AudioFormatAAC, nil
 	default:
 		return "", llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("unknown OpenAI audio format %s", format))
 	}
 }
 
-func convertToOpenAIChatToolChoice(choice llmsdk.ToolChoiceOption) (interface{}, error) {
+func convertToOpenAIChatToolChoice(choice llmsdk.ToolChoiceOption) (*openaichatapi.ChatCompletionToolChoiceOption, error) {
 	switch {
 	case choice.Auto != nil:
-		return "auto", nil
+		value := openaichatapi.ChatCompletionToolChoiceOptionString(ptr.To("auto"))
+		return &openaichatapi.ChatCompletionToolChoiceOption{
+			ChatCompletionToolChoiceOptionString: &value,
+		}, nil
 	case choice.None != nil:
-		return "none", nil
+		value := openaichatapi.ChatCompletionToolChoiceOptionString(ptr.To("none"))
+		return &openaichatapi.ChatCompletionToolChoiceOption{
+			ChatCompletionToolChoiceOptionString: &value,
+		}, nil
 	case choice.Required != nil:
-		return "required", nil
+		value := openaichatapi.ChatCompletionToolChoiceOptionString(ptr.To("required"))
+		return &openaichatapi.ChatCompletionToolChoiceOption{
+			ChatCompletionToolChoiceOptionString: &value,
+		}, nil
 	case choice.Tool != nil:
-		return openaichatapi.ChatCompletionNamedToolChoice{
-			Type: "function",
-			Function: struct {
-				Name string `json:"name"`
-			}{
-				Name: choice.Tool.ToolName,
+		return &openaichatapi.ChatCompletionToolChoiceOption{
+			ChatCompletionNamedToolChoice: &openaichatapi.ChatCompletionNamedToolChoice{
+				Function: openaichatapi.ChatCompletionNamedToolChoiceFunction{
+					Name: choice.Tool.ToolName,
+				},
+				Type: openaichatapi.ChatCompletionNamedToolChoiceTypeFunction,
 			},
 		}, nil
 	default:
@@ -831,25 +808,30 @@ func convertToOpenAIChatToolChoice(choice llmsdk.ToolChoiceOption) (interface{},
 	}
 }
 
-func convertToOpenAIChatResponseFormat(option llmsdk.ResponseFormatOption) (interface{}, error) {
+func convertToOpenAIChatResponseFormat(option llmsdk.ResponseFormatOption) (*openaichatapi.CreateChatCompletionRequestAllOf2ResponseFormat, error) {
 	switch {
 	case option.Text != nil:
-		return openaichatapi.ResponseFormatText{Type: "text"}, nil
+		return &openaichatapi.CreateChatCompletionRequestAllOf2ResponseFormat{
+			Text: &openaichatapi.ResponseFormatText{},
+		}, nil
 	case option.JSON != nil:
 		if option.JSON.Schema != nil {
 			schema := openaichatapi.ResponseFormatJsonSchemaSchema(*option.JSON.Schema)
 			strict := true
 			jsonSchema := openaichatapi.ResponseFormatJsonSchema{}
-			jsonSchema.Type = "json_schema"
 			jsonSchema.JsonSchema.Name = option.JSON.Name
 			jsonSchema.JsonSchema.Schema = &schema
 			jsonSchema.JsonSchema.Strict = &strict
 			if option.JSON.Description != nil {
 				jsonSchema.JsonSchema.Description = option.JSON.Description
 			}
-			return jsonSchema, nil
+			return &openaichatapi.CreateChatCompletionRequestAllOf2ResponseFormat{
+				JsonSchema: &jsonSchema,
+			}, nil
 		}
-		return openaichatapi.ResponseFormatJsonObject{Type: "json_object"}, nil
+		return &openaichatapi.CreateChatCompletionRequestAllOf2ResponseFormat{
+			JsonObject: &openaichatapi.ResponseFormatJsonObject{},
+		}, nil
 	default:
 		return nil, llmsdk.NewInvalidInputError("response format has no content")
 	}
