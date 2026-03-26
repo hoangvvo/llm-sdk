@@ -1,18 +1,22 @@
 use crate::{
     anthropic::api::{
-        self, Base64ImageSource, ContentBlock, ContentBlockDelta, ContentBlockDeltaEvent,
-        ContentBlockStartEvent, CreateMessageParams, ImageSource, InputContentBlock, InputMessage,
-        InputMessageContent, Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage,
-        MessageStartEvent, MessageStreamEvent, RequestCitationsConfig, RequestImageBlock,
-        RequestSearchResultBlock, RequestTextBlock, RequestThinkingBlock, RequestToolResultBlock,
-        RequestToolUseBlock, SystemPrompt, ThinkingConfigDisabled, ThinkingConfigEnabled,
-        ThinkingConfigParam, Tool, ToolResultContent, ToolResultContentBlock, Usage,
+        self, Base64ImageSource, Base64ImageSourceMediaType, ContentBlock, ContentBlockDeltaEvent,
+        ContentBlockDeltaEventDelta, ContentBlockStartEvent, ContentBlockStartEventContentBlock,
+        CreateMessageParams, CreateMessageParamsSystem, CreateMessageParamsToolsItem,
+        InputContentBlock, InputMessage, InputMessageContent, InputMessageRole,
+        Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage, MessageStartEvent,
+        MessageStreamEvent, OutputConfig, RequestCitationsConfig, RequestImageBlock,
+        RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock, RequestThinkingBlock,
+        RequestToolResultBlock, RequestToolResultBlockContent,
+        RequestToolResultBlockContentArrayItem, RequestToolUseBlock, ThinkingConfigDisabled,
+        ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage,
     },
     client_utils, stream_utils, Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
     LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    ReasoningOptions, ReasoningPart, ReasoningPartDelta, TextPart, TextPartDelta, Tool as SdkTool,
-    ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolResultPart,
+    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption,
+    TextPart, TextPartDelta, Tool as SdkTool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
+    ToolResultPart,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -233,7 +237,17 @@ impl LanguageModel for AnthropicModel {
                                     };
                                 }
                                 MessageStreamEvent::ContentBlockStart(ContentBlockStartEvent { content_block, index }) => {
-                                    let deltas = map_anthropic_content_block_start_event(content_block, index)?;
+                                    let deltas = map_anthropic_content_block_start_event(
+                                        content_block,
+                                        usize::try_from(index).map_err(|_| {
+                                            LanguageModelError::Invariant(
+                                                PROVIDER,
+                                                format!(
+                                                    "Anthropic stream content block index out of range: {index}"
+                                                ),
+                                            )
+                                        })?,
+                                    )?;
                                     for delta in deltas {
                                         yield PartialModelResponse {
                                             delta: Some(delta),
@@ -242,7 +256,17 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::ContentBlockDelta(ContentBlockDeltaEvent { delta, index }) => {
-                                    if let Some(delta) = map_anthropic_content_block_delta_event(delta, index) {
+                                    if let Some(delta) = map_anthropic_content_block_delta_event(
+                                        delta,
+                                        usize::try_from(index).map_err(|_| {
+                                            LanguageModelError::Invariant(
+                                                PROVIDER,
+                                                format!(
+                                                    "Anthropic stream content block index out of range: {index}"
+                                                ),
+                                            )
+                                        })?,
+                                    ) {
                                         yield PartialModelResponse {
                                             delta: Some(delta),
                                             ..Default::default()
@@ -272,7 +296,7 @@ fn convert_to_anthropic_create_params(
         messages,
         tools,
         tool_choice,
-        response_format: _,
+        response_format,
         max_tokens,
         temperature,
         top_p,
@@ -286,19 +310,24 @@ fn convert_to_anthropic_create_params(
         reasoning,
     } = input;
 
-    let max_tokens = max_tokens.unwrap_or(4096);
+    let max_tokens = i64::from(max_tokens.unwrap_or(4096));
 
     let message_params = convert_to_anthropic_messages(messages)?;
 
     let params = CreateMessageParams {
+        cache_control: None,
+        container: None,
+        inference_geo: None,
         max_tokens,
         messages: message_params,
         metadata: None,
-        model: api::Model::String(model_id.to_string()),
+        model: Some(model_id.to_string()),
+        output_config: response_format.and_then(convert_to_anthropic_output_config),
         service_tier: None,
         stop_sequences: None,
         stream: Some(stream),
-        system: system_prompt.map(SystemPrompt::String),
+        system: system_prompt
+            .map(|prompt| CreateMessageParamsSystem::CreateMessageParamsSystemString(Some(prompt))),
         temperature,
         thinking: reasoning
             .map(|options| convert_to_anthropic_thinking_config(&options, max_tokens)),
@@ -307,12 +336,12 @@ fn convert_to_anthropic_create_params(
             tool_list
                 .into_iter()
                 .map(convert_tool)
-                .map(api::ToolUnion::Tool)
+                .map(CreateMessageParamsToolsItem::Tool)
                 .collect()
         }),
         top_k: top_k
             .map(|value| {
-                u32::try_from(value).map_err(|_| {
+                i64::try_from(value).map_err(|_| {
                     LanguageModelError::InvalidInput(
                         "Anthropic top_k must be a non-negative integer".to_string(),
                     )
@@ -327,11 +356,34 @@ fn convert_to_anthropic_create_params(
 
 fn convert_tool(tool: SdkTool) -> Tool {
     Tool {
+        allowed_callers: None,
         name: tool.name,
         description: Some(tool.description),
         input_schema: tool.parameters,
         cache_control: None,
-        type_field: None,
+        defer_loading: None,
+        eager_input_streaming: None,
+        input_examples: None,
+        strict: Some(true),
+        r#type: None,
+    }
+}
+
+fn convert_to_anthropic_output_config(
+    response_format: ResponseFormatOption,
+) -> Option<OutputConfig> {
+    match response_format {
+        ResponseFormatOption::Text => None,
+        ResponseFormatOption::Json(ResponseFormatJson { schema, .. }) => match schema {
+            Some(schema) => Some(OutputConfig {
+                effort: None,
+                format: Some(api::JsonOutputFormat {
+                    schema,
+                    r#type: "json_schema".to_string(),
+                }),
+            }),
+            None => None,
+        },
     }
 }
 
@@ -354,8 +406,16 @@ fn convert_message_parts_to_input_message(
 ) -> LanguageModelResult<InputMessage> {
     let content_blocks = convert_parts_to_content_blocks(parts)?;
     Ok(InputMessage {
-        content: InputMessageContent::Blocks(content_blocks),
-        role: role.to_string(),
+        content: InputMessageContent::InputMessageContentArray(Some(content_blocks)),
+        role: match role {
+            "user" => InputMessageRole::User,
+            "assistant" => InputMessageRole::Assistant,
+            _ => {
+                return Err(LanguageModelError::InvalidInput(format!(
+                    "Unsupported Anthropic message role: {role}"
+                )))
+            }
+        },
     })
 }
 
@@ -375,12 +435,13 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
         ))),
         Part::Image(image_part) => Ok(InputContentBlock::Image(create_request_image_block(
             image_part,
-        ))),
+        )?)),
         Part::Source(source_part) => Ok(InputContentBlock::SearchResult(convert_source_part(
             source_part,
         )?)),
         Part::ToolCall(tool_call) => Ok(InputContentBlock::ToolUse(RequestToolUseBlock {
             cache_control: None,
+            caller: None,
             id: tool_call.tool_call_id,
             input: normalize_tool_args(tool_call.args)?,
             name: tool_call.tool_name,
@@ -421,7 +482,9 @@ fn convert_tool_result_part(
     let content = if content_blocks.is_empty() {
         None
     } else {
-        Some(ToolResultContent::Blocks(content_blocks))
+        Some(
+            RequestToolResultBlockContent::RequestToolResultBlockContentArray(Some(content_blocks)),
+        )
     };
 
     Ok(RequestToolResultBlock {
@@ -434,17 +497,17 @@ fn convert_tool_result_part(
 
 fn convert_part_to_tool_result_content_block(
     part: Part,
-) -> LanguageModelResult<ToolResultContentBlock> {
+) -> LanguageModelResult<RequestToolResultBlockContentArrayItem> {
     match part {
-        Part::Text(text_part) => Ok(ToolResultContentBlock::Text(create_request_text_block(
-            text_part.text,
-        ))),
-        Part::Image(image_part) => Ok(ToolResultContentBlock::Image(create_request_image_block(
-            image_part,
-        ))),
-        Part::Source(source_part) => Ok(ToolResultContentBlock::SearchResult(convert_source_part(
-            source_part,
-        )?)),
+        Part::Text(text_part) => Ok(RequestToolResultBlockContentArrayItem::Text(
+            create_request_text_block(text_part.text),
+        )),
+        Part::Image(image_part) => Ok(RequestToolResultBlockContentArrayItem::Image(
+            create_request_image_block(image_part)?,
+        )),
+        Part::Source(source_part) => Ok(RequestToolResultBlockContentArrayItem::SearchResult(
+            convert_source_part(source_part)?,
+        )),
         _ => Err(LanguageModelError::Unsupported(
             PROVIDER,
             "Cannot convert tool result part to Anthropic content".to_string(),
@@ -457,18 +520,18 @@ fn create_request_text_block(text: String) -> RequestTextBlock {
         cache_control: None,
         citations: None,
         text,
-        type_field: "text".to_string(),
+        r#type: "text".to_string(),
     }
 }
 
-fn create_request_image_block(image_part: ImagePart) -> RequestImageBlock {
-    RequestImageBlock {
+fn create_request_image_block(image_part: ImagePart) -> LanguageModelResult<RequestImageBlock> {
+    Ok(RequestImageBlock {
         cache_control: None,
-        source: ImageSource::Base64(Base64ImageSource {
+        source: RequestImageBlockSource::Base64(Base64ImageSource {
             data: image_part.data,
-            media_type: image_part.mime_type,
+            media_type: map_anthropic_image_media_type(&image_part.mime_type)?,
         }),
-    }
+    })
 }
 
 fn convert_source_part(
@@ -526,19 +589,20 @@ fn convert_to_anthropic_tool_choice(choice: ToolChoiceOption) -> api::ToolChoice
 
 fn convert_to_anthropic_thinking_config(
     reasoning: &ReasoningOptions,
-    max_tokens: u32,
+    max_tokens: i64,
 ) -> ThinkingConfigParam {
     if !reasoning.enabled {
         return ThinkingConfigParam::Disabled(ThinkingConfigDisabled {});
     }
 
-    let fallback = max_tokens.saturating_sub(1).max(1);
+    let fallback = (max_tokens - 1).max(1);
     let budget = reasoning
         .budget_tokens
-        .map_or(fallback, |value| value.max(1));
+        .map_or(fallback, |value| i64::from(value.max(1)));
 
     ThinkingConfigParam::Enabled(ThinkingConfigEnabled {
         budget_tokens: budget,
+        display: None,
     })
 }
 
@@ -574,13 +638,15 @@ fn map_text_block(block: api::ResponseTextBlock) -> TextPart {
     }
 }
 
-fn map_text_citations(citations: Option<Vec<api::ResponseCitation>>) -> Option<Vec<Citation>> {
+fn map_text_citations(
+    citations: Option<Vec<api::ResponseTextBlockCitationsItem>>,
+) -> Option<Vec<Citation>> {
     let citations = citations?;
 
     let mut results = Vec::new();
 
     for citation in citations {
-        if let api::ResponseCitation::SearchResultLocation(
+        if let api::ResponseTextBlockCitationsItem::SearchResultLocation(
             api::ResponseSearchResultLocationCitation {
                 cited_text,
                 end_block_index,
@@ -603,8 +669,8 @@ fn map_text_citations(citations: Option<Vec<api::ResponseCitation>>) -> Option<V
                 } else {
                     Some(cited_text)
                 },
-                start_index: start_block_index,
-                end_index: end_block_index,
+                start_index: usize::try_from(start_block_index).ok()?,
+                end_index: usize::try_from(end_block_index).ok()?,
             };
 
             results.push(mapped);
@@ -649,25 +715,28 @@ fn map_tool_use_block(block: api::ResponseToolUseBlock) -> ToolCallPart {
 
 fn map_anthropic_usage(usage: &Usage) -> ModelUsage {
     ModelUsage {
-        input_tokens: usage.input_tokens,
-        output_tokens: usage.output_tokens,
+        input_tokens: u32::try_from(usage.input_tokens).unwrap_or(0),
+        output_tokens: u32::try_from(usage.output_tokens).unwrap_or(0),
         ..Default::default()
     }
 }
 
 fn map_anthropic_message_delta_usage(usage: &MessageDeltaUsage) -> ModelUsage {
     ModelUsage {
-        input_tokens: usage.input_tokens.unwrap_or(0),
-        output_tokens: usage.output_tokens,
+        input_tokens: usage
+            .input_tokens
+            .and_then(|value| u32::try_from(value).ok())
+            .unwrap_or(0),
+        output_tokens: u32::try_from(usage.output_tokens).unwrap_or(0),
         ..Default::default()
     }
 }
 
 fn map_anthropic_content_block_start_event(
-    content_block: ContentBlock,
+    content_block: ContentBlockStartEventContentBlock,
     index: usize,
 ) -> LanguageModelResult<Vec<ContentDelta>> {
-    if let Some(part) = map_content_block(content_block) {
+    if let Some(part) = map_content_block(map_start_content_block(content_block)) {
         let mut delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
         if let PartDelta::ToolCall(tool_call_delta) = &mut delta {
             tool_call_delta.args = Some(String::new());
@@ -679,31 +748,37 @@ fn map_anthropic_content_block_start_event(
 }
 
 fn map_anthropic_content_block_delta_event(
-    delta: ContentBlockDelta,
+    delta: ContentBlockDeltaEventDelta,
     index: usize,
 ) -> Option<ContentDelta> {
     let part_delta = match delta {
-        ContentBlockDelta::TextDelta(delta) => PartDelta::Text(TextPartDelta {
+        ContentBlockDeltaEventDelta::TextDelta(delta) => PartDelta::Text(TextPartDelta {
             text: delta.text,
             citation: None,
         }),
-        ContentBlockDelta::InputJsonDelta(delta) => PartDelta::ToolCall(ToolCallPartDelta {
-            tool_name: None,
-            args: Some(delta.partial_json),
-            tool_call_id: None,
-            id: None,
-        }),
-        ContentBlockDelta::ThinkingDelta(delta) => PartDelta::Reasoning(ReasoningPartDelta {
-            text: Some(delta.thinking),
-            signature: None,
-            id: None,
-        }),
-        ContentBlockDelta::SignatureDelta(delta) => PartDelta::Reasoning(ReasoningPartDelta {
-            text: None,
-            signature: Some(delta.signature),
-            id: None,
-        }),
-        ContentBlockDelta::CitationsDelta(delta) => {
+        ContentBlockDeltaEventDelta::InputJsonDelta(delta) => {
+            PartDelta::ToolCall(ToolCallPartDelta {
+                tool_name: None,
+                args: Some(delta.partial_json),
+                tool_call_id: None,
+                id: None,
+            })
+        }
+        ContentBlockDeltaEventDelta::ThinkingDelta(delta) => {
+            PartDelta::Reasoning(ReasoningPartDelta {
+                text: Some(delta.thinking),
+                signature: None,
+                id: None,
+            })
+        }
+        ContentBlockDeltaEventDelta::SignatureDelta(delta) => {
+            PartDelta::Reasoning(ReasoningPartDelta {
+                text: None,
+                signature: Some(delta.signature),
+                id: None,
+            })
+        }
+        ContentBlockDeltaEventDelta::CitationsDelta(delta) => {
             if let Some(citation) = map_citation_delta(delta.citation) {
                 PartDelta::Text(TextPartDelta {
                     text: String::new(),
@@ -721,15 +796,17 @@ fn map_anthropic_content_block_delta_event(
     })
 }
 
-fn map_citation_delta(citation: api::ResponseCitation) -> Option<CitationDelta> {
-    let api::ResponseCitation::SearchResultLocation(api::ResponseSearchResultLocationCitation {
-        cited_text,
-        end_block_index,
-        search_result_index: _,
-        source,
-        start_block_index,
-        title,
-    }) = citation
+fn map_citation_delta(citation: api::CitationsDeltaCitation) -> Option<CitationDelta> {
+    let api::CitationsDeltaCitation::SearchResultLocation(
+        api::ResponseSearchResultLocationCitation {
+            cited_text,
+            end_block_index,
+            search_result_index: _,
+            source,
+            start_block_index,
+            title,
+        },
+    ) = citation
     else {
         return None;
     };
@@ -743,9 +820,59 @@ fn map_citation_delta(citation: api::ResponseCitation) -> Option<CitationDelta> 
         } else {
             Some(cited_text)
         },
-        start_index: Some(start_block_index),
-        end_index: Some(end_block_index),
+        start_index: usize::try_from(start_block_index).ok(),
+        end_index: usize::try_from(end_block_index).ok(),
     };
 
     Some(result)
+}
+
+fn map_anthropic_image_media_type(
+    mime_type: &str,
+) -> LanguageModelResult<Base64ImageSourceMediaType> {
+    match mime_type {
+        "image/jpeg" => Ok(Base64ImageSourceMediaType::ImageJpeg),
+        "image/png" => Ok(Base64ImageSourceMediaType::ImagePng),
+        "image/gif" => Ok(Base64ImageSourceMediaType::ImageGif),
+        "image/webp" => Ok(Base64ImageSourceMediaType::ImageWebp),
+        _ => Err(LanguageModelError::Unsupported(
+            PROVIDER,
+            format!("Unsupported Anthropic image mime type: {mime_type}"),
+        )),
+    }
+}
+
+fn map_start_content_block(content_block: ContentBlockStartEventContentBlock) -> ContentBlock {
+    match content_block {
+        ContentBlockStartEventContentBlock::Text(block) => ContentBlock::Text(block),
+        ContentBlockStartEventContentBlock::Thinking(block) => ContentBlock::Thinking(block),
+        ContentBlockStartEventContentBlock::RedactedThinking(block) => {
+            ContentBlock::RedactedThinking(block)
+        }
+        ContentBlockStartEventContentBlock::ToolUse(block) => ContentBlock::ToolUse(block),
+        ContentBlockStartEventContentBlock::ServerToolUse(block) => {
+            ContentBlock::ServerToolUse(block)
+        }
+        ContentBlockStartEventContentBlock::WebSearchToolResult(block) => {
+            ContentBlock::WebSearchToolResult(block)
+        }
+        ContentBlockStartEventContentBlock::WebFetchToolResult(block) => {
+            ContentBlock::WebFetchToolResult(block)
+        }
+        ContentBlockStartEventContentBlock::CodeExecutionToolResult(block) => {
+            ContentBlock::CodeExecutionToolResult(block)
+        }
+        ContentBlockStartEventContentBlock::BashCodeExecutionToolResult(block) => {
+            ContentBlock::BashCodeExecutionToolResult(block)
+        }
+        ContentBlockStartEventContentBlock::TextEditorCodeExecutionToolResult(block) => {
+            ContentBlock::TextEditorCodeExecutionToolResult(block)
+        }
+        ContentBlockStartEventContentBlock::ToolSearchToolResult(block) => {
+            ContentBlock::ToolSearchToolResult(block)
+        }
+        ContentBlockStartEventContentBlock::ContainerUpload(block) => {
+            ContentBlock::ContainerUpload(block)
+        }
+    }
 }

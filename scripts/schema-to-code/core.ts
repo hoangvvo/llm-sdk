@@ -1467,10 +1467,6 @@ class SchemaDocumentBuilder {
         `Objects with both named properties and typed additionalProperties are not supported at ${formatPath(path)}`,
       );
     }
-    if (properties.length > 0 && schema.additionalProperties === true) {
-      return undefined;
-    }
-
     if (schema.additionalProperties === true) {
       this.usesJsonValue = true;
       return {

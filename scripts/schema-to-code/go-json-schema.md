@@ -33,7 +33,7 @@ Primitive definitions become named type aliases.
 - An object with named `properties` lowers to a struct.
 - Every field must have a `json` tag using the original property name.
 - Complex property schemas must lower to named types. Do not inline nested structs, unions, enums, arrays, or maps inside a parent struct.
-- If `additionalProperties: true` appears together with named properties, generate only the named fields and ignore extra keys.
+- Any object with `additionalProperties: true` lowers to `any`, even if it also defines named properties.
 
 ## Maps
 

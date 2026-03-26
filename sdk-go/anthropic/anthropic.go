@@ -160,8 +160,8 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 					continue
 				}
 
-				if event.MessageStartEvent != nil {
-					usage := mapAnthropicUsage(event.MessageStartEvent.Message.Usage)
+				if event.MessageStart != nil {
+					usage := mapAnthropicUsage(event.MessageStart.Message.Usage)
 					partial := &llmsdk.PartialModelResponse{Usage: usage}
 					if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
 						cost := usage.CalculateCost(m.metadata.Pricing)
@@ -171,8 +171,8 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 					continue
 				}
 
-				if event.MessageDeltaEvent != nil {
-					usage := mapAnthropicMessageDeltaUsage(event.MessageDeltaEvent.Usage)
+				if event.MessageDelta != nil {
+					usage := mapAnthropicMessageDeltaUsage(event.MessageDelta.Usage)
 					partial := &llmsdk.PartialModelResponse{Usage: usage}
 					if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
 						cost := usage.CalculateCost(m.metadata.Pricing)
@@ -182,8 +182,8 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 					continue
 				}
 
-				if event.ContentBlockStartEvent != nil {
-					deltas, err := mapAnthropicRawContentBlockStartEvent(*event.ContentBlockStartEvent)
+				if event.ContentBlockStart != nil {
+					deltas, err := mapAnthropicRawContentBlockStartEvent(*event.ContentBlockStart)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content block start: %w", err)
 						return
@@ -195,8 +195,8 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 					continue
 				}
 
-				if event.ContentBlockDeltaEvent != nil {
-					deltas, err := mapAnthropicRawContentBlockDeltaEvent(*event.ContentBlockDeltaEvent)
+				if event.ContentBlockDelta != nil {
+					deltas, err := mapAnthropicRawContentBlockDeltaEvent(*event.ContentBlockDelta)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content block delta: %w", err)
 						return
@@ -243,16 +243,20 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 	}
 
 	params := &anthropicapi.CreateMessageParams{
-		Model:       anthropicapi.Model(modelID),
 		Messages:    messages,
 		MaxTokens:   maxTokens,
 		Stream:      ptr.To(stream),
 		Temperature: input.Temperature,
 		TopP:        input.TopP,
 	}
+	model := anthropicapi.Model(ptr.To(modelID))
+	params.Model = model
 
 	if input.SystemPrompt != nil {
-		params.System = *input.SystemPrompt
+		systemPrompt := anthropicapi.CreateMessageParamsSystemString(input.SystemPrompt)
+		params.System = &anthropicapi.CreateMessageParamsSystem{
+			CreateMessageParamsSystemString: &systemPrompt,
+		}
 	}
 
 	if input.TopK != nil {
@@ -264,17 +268,25 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 		params.ToolChoice = convertToAnthropicToolChoice(*input.ToolChoice)
 	}
 
+	if input.ResponseFormat != nil {
+		params.OutputConfig = convertToAnthropicOutputConfig(*input.ResponseFormat)
+	}
+
 	if len(input.Tools) > 0 {
-		tools := make([]interface{}, 0, len(input.Tools))
+		tools := make([]anthropicapi.CreateMessageParamsToolsItem, 0, len(input.Tools))
 		for _, tool := range input.Tools {
-			toolMap := map[string]any{
-				"name":         tool.Name,
-				"input_schema": tool.Parameters,
+			strict := true
+			anthropicTool := anthropicapi.Tool{
+				Name:        tool.Name,
+				InputSchema: anthropicapi.InputSchema(tool.Parameters),
+				Strict:      &strict,
 			}
 			if tool.Description != "" {
-				toolMap["description"] = tool.Description
+				anthropicTool.Description = ptr.To(tool.Description)
 			}
-			tools = append(tools, toolMap)
+			tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{
+				Tool: &anthropicTool,
+			})
 		}
 		params.Tools = tools
 	}
@@ -285,11 +297,27 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 
 	if len(input.Metadata) > 0 {
 		if userID, ok := input.Metadata["user_id"]; ok {
-			params.Metadata = &anthropicapi.Metadata{UserID: ptr.To(userID)}
+			params.Metadata = &anthropicapi.Metadata{UserId: ptr.To(userID)}
 		}
 	}
 
 	return params, nil
+}
+
+func convertToAnthropicOutputConfig(option llmsdk.ResponseFormatOption) *anthropicapi.OutputConfig {
+	switch {
+	case option.Text != nil:
+		return nil
+	case option.JSON != nil && option.JSON.Schema != nil:
+		return &anthropicapi.OutputConfig{
+			Format: &anthropicapi.JsonOutputFormat{
+				Type:   "json_schema",
+				Schema: option.JSON.Schema,
+			},
+		}
+	default:
+		return nil
+	}
 }
 
 func convertToAnthropicMessages(messages []llmsdk.Message) ([]anthropicapi.InputMessage, error) {
@@ -297,18 +325,18 @@ func convertToAnthropicMessages(messages []llmsdk.Message) ([]anthropicapi.Input
 
 	for _, message := range messages {
 		var parts []llmsdk.Part
-		var role anthropicapi.Role
+		var role anthropicapi.InputMessageRole
 
 		switch {
 		case message.UserMessage != nil:
 			parts = message.UserMessage.Content
-			role = anthropicapi.RoleUser
+			role = anthropicapi.InputMessageRoleUser
 		case message.AssistantMessage != nil:
 			parts = message.AssistantMessage.Content
-			role = anthropicapi.RoleAssistant
+			role = anthropicapi.InputMessageRoleAssistant
 		case message.ToolMessage != nil:
 			parts = message.ToolMessage.Content
-			role = anthropicapi.RoleUser
+			role = anthropicapi.InputMessageRoleUser
 		default:
 			continue
 		}
@@ -319,8 +347,10 @@ func convertToAnthropicMessages(messages []llmsdk.Message) ([]anthropicapi.Input
 		}
 
 		result = append(result, anthropicapi.InputMessage{
-			Role:    role,
-			Content: contentBlocks,
+			Role: role,
+			Content: anthropicapi.InputMessageContent{
+				InputMessageContentArray: (*anthropicapi.InputMessageContentArray)(&contentBlocks),
+			},
 		})
 	}
 
@@ -345,21 +375,21 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 	switch {
 	case part.TextPart != nil:
 		return anthropicapi.InputContentBlock{
-			RequestTextBlock: &anthropicapi.RequestTextBlock{
+			Text: &anthropicapi.RequestTextBlock{
 				Type: "text",
 				Text: part.TextPart.Text,
 			},
 		}, nil
 
 	case part.ImagePart != nil:
-		source := map[string]any{
-			"type":       "base64",
-			"media_type": part.ImagePart.MimeType,
-			"data":       part.ImagePart.Data,
-		}
 		return anthropicapi.InputContentBlock{
-			RequestImageBlock: &anthropicapi.RequestImageBlock{
-				Source: source,
+			Image: &anthropicapi.RequestImageBlock{
+				Source: anthropicapi.RequestImageBlockSource{
+					Base64: &anthropicapi.Base64ImageSource{
+						Data:      part.ImagePart.Data,
+						MediaType: anthropicapi.Base64ImageSourceMediaType(part.ImagePart.MimeType),
+					},
+				},
 			},
 		}, nil
 
@@ -372,7 +402,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			textBlocks = append(textBlocks, anthropicapi.RequestTextBlock{Type: "text", Text: subPart.TextPart.Text})
 		}
 		return anthropicapi.InputContentBlock{
-			RequestSearchResultBlock: &anthropicapi.RequestSearchResultBlock{
+			SearchResult: &anthropicapi.RequestSearchResultBlock{
 				Source:  part.SourcePart.Source,
 				Title:   part.SourcePart.Title,
 				Content: textBlocks,
@@ -393,8 +423,8 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			inputMap = map[string]any{}
 		}
 		return anthropicapi.InputContentBlock{
-			RequestToolUseBlock: &anthropicapi.RequestToolUseBlock{
-				ID:    part.ToolCallPart.ToolCallID,
+			ToolUse: &anthropicapi.RequestToolUseBlock{
+				Id:    part.ToolCallPart.ToolCallID,
 				Name:  part.ToolCallPart.ToolName,
 				Input: inputMap,
 			},
@@ -407,26 +437,36 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			if err != nil {
 				return anthropicapi.InputContentBlock{}, err
 			}
-			if block.RequestTextBlock == nil && block.RequestImageBlock == nil && block.RequestSearchResultBlock == nil {
+			if block.Text == nil && block.Image == nil && block.SearchResult == nil {
 				return anthropicapi.InputContentBlock{}, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert tool result part to anthropic content for type %s", subPart.Type()))
 			}
 			contentBlocks = append(contentBlocks, block)
 		}
+		content := make(anthropicapi.RequestToolResultBlockContentArray, 0, len(contentBlocks))
+		for _, block := range contentBlocks {
+			content = append(content, anthropicapi.RequestToolResultBlockContentArrayItem{
+				Text:         block.Text,
+				Image:        block.Image,
+				SearchResult: block.SearchResult,
+			})
+		}
 		toolResult := anthropicapi.RequestToolResultBlock{
-			ToolUseID: part.ToolResultPart.ToolCallID,
-			Content:   contentBlocks,
+			ToolUseId: part.ToolResultPart.ToolCallID,
+			Content: &anthropicapi.RequestToolResultBlockContent{
+				RequestToolResultBlockContentArray: &content,
+			},
 		}
 		if part.ToolResultPart.IsError {
 			toolResult.IsError = ptr.To(true)
 		}
 		return anthropicapi.InputContentBlock{
-			RequestToolResultBlock: &toolResult,
+			ToolResult: &toolResult,
 		}, nil
 
 	case part.ReasoningPart != nil:
 		if part.ReasoningPart.Text == "" && part.ReasoningPart.Signature != nil {
 			return anthropicapi.InputContentBlock{
-				RequestRedactedThinkingBlock: &anthropicapi.RequestRedactedThinkingBlock{
+				RedactedThinking: &anthropicapi.RequestRedactedThinkingBlock{
 					Data: *part.ReasoningPart.Signature,
 				},
 			}, nil
@@ -436,7 +476,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			block.Signature = *part.ReasoningPart.Signature
 		}
 		return anthropicapi.InputContentBlock{
-			RequestThinkingBlock: &block,
+			Thinking: &block,
 		}, nil
 	}
 
@@ -497,8 +537,8 @@ func mapAnthropicMessage(content []anthropicapi.ContentBlock) ([]llmsdk.Part, er
 
 func mapAnthropicContentBlock(block anthropicapi.ContentBlock) (*llmsdk.Part, error) {
 	switch {
-	case block.ResponseTextBlock != nil:
-		citations, err := mapAnthropicTextCitations(block.ResponseTextBlock.Citations)
+	case block.Text != nil:
+		citations, err := mapAnthropicTextCitations(block.Text.Citations)
 		if err != nil {
 			return nil, err
 		}
@@ -506,64 +546,56 @@ func mapAnthropicContentBlock(block anthropicapi.ContentBlock) (*llmsdk.Part, er
 		if len(citations) > 0 {
 			opts = append(opts, llmsdk.WithTextCitations(citations))
 		}
-		part := llmsdk.NewTextPart(block.ResponseTextBlock.Text, opts...)
+		part := llmsdk.NewTextPart(block.Text.Text, opts...)
 		return &part, nil
 
-	case block.ResponseToolUseBlock != nil:
-		args, err := json.Marshal(block.ResponseToolUseBlock.Input)
+	case block.ToolUse != nil:
+		args, err := json.Marshal(block.ToolUse.Input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal tool use input: %w", err)
 		}
-		part := llmsdk.NewToolCallPart(block.ResponseToolUseBlock.ID, block.ResponseToolUseBlock.Name, json.RawMessage(args))
+		part := llmsdk.NewToolCallPart(block.ToolUse.Id, block.ToolUse.Name, json.RawMessage(args))
 		part.ToolCallPart.Args = args
 		return &part, nil
 
-	case block.ResponseThinkingBlock != nil:
+	case block.Thinking != nil:
 		opts := []llmsdk.ReasoingPartOption{}
-		if block.ResponseThinkingBlock.Signature != "" {
-			opts = append(opts, llmsdk.WithReasoningSignature(block.ResponseThinkingBlock.Signature))
+		if block.Thinking.Signature != "" {
+			opts = append(opts, llmsdk.WithReasoningSignature(block.Thinking.Signature))
 		}
-		part := llmsdk.NewReasoningPart(block.ResponseThinkingBlock.Thinking, opts...)
+		part := llmsdk.NewReasoningPart(block.Thinking.Thinking, opts...)
 		return &part, nil
 
-	case block.ResponseRedactedThinkingBlock != nil:
-		part := llmsdk.NewReasoningPart("", llmsdk.WithReasoningSignature(block.ResponseRedactedThinkingBlock.Data))
+	case block.RedactedThinking != nil:
+		part := llmsdk.NewReasoningPart("", llmsdk.WithReasoningSignature(block.RedactedThinking.Data))
 		return &part, nil
 	}
 
 	return nil, nil
 }
 
-func mapAnthropicTextCitations(raw []interface{}) ([]llmsdk.Citation, error) {
+func mapAnthropicTextCitations(raw []anthropicapi.ResponseTextBlockCitationsItem) ([]llmsdk.Citation, error) {
 	citations := make([]llmsdk.Citation, 0, len(raw))
 
 	for _, item := range raw {
-		citationMap, ok := item.(map[string]any)
-		if !ok {
+		if item.SearchResultLocation == nil {
 			continue
 		}
-		cType, _ := citationMap["type"].(string)
-		if cType != "search_result_location" {
-			continue
-		}
-
-		source, _ := citationMap["source"].(string)
-		startIdx, okStart := toInt(citationMap["start_block_index"])
-		endIdx, okEnd := toInt(citationMap["end_block_index"])
-		if !okStart || !okEnd || source == "" {
+		source := item.SearchResultLocation.Source
+		if source == "" {
 			continue
 		}
 
 		citation := llmsdk.Citation{
 			Source:     source,
-			StartIndex: startIdx,
-			EndIndex:   endIdx,
+			StartIndex: item.SearchResultLocation.StartBlockIndex,
+			EndIndex:   item.SearchResultLocation.EndBlockIndex,
 		}
-		if citedText, ok := citationMap["cited_text"].(string); ok && citedText != "" {
-			citation.CitedText = ptr.To(citedText)
+		if item.SearchResultLocation.CitedText != "" {
+			citation.CitedText = ptr.To(item.SearchResultLocation.CitedText)
 		}
-		if title, ok := citationMap["title"].(string); ok && title != "" {
-			citation.Title = ptr.To(title)
+		if item.SearchResultLocation.Title != nil && *item.SearchResultLocation.Title != "" {
+			citation.Title = item.SearchResultLocation.Title
 		}
 		citations = append(citations, citation)
 	}
@@ -572,7 +604,13 @@ func mapAnthropicTextCitations(raw []interface{}) ([]llmsdk.Citation, error) {
 }
 
 func mapAnthropicRawContentBlockStartEvent(event anthropicapi.ContentBlockStartEvent) ([]llmsdk.ContentDelta, error) {
-	part, err := mapAnthropicRawContentBlock(event.ContentBlock)
+	part, err := mapAnthropicContentBlock(anthropicapi.ContentBlock{
+		Text:             event.ContentBlock.Text,
+		Thinking:         event.ContentBlock.Thinking,
+		RedactedThinking: event.ContentBlock.RedactedThinking,
+		ToolUse:          event.ContentBlock.ToolUse,
+		ServerToolUse:    event.ContentBlock.ServerToolUse,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -600,71 +638,26 @@ func mapAnthropicRawContentBlockDeltaEvent(event anthropicapi.ContentBlockDeltaE
 	return []llmsdk.ContentDelta{{Index: event.Index, Part: *partDelta}}, nil
 }
 
-func mapAnthropicRawContentBlock(raw interface{}) (*llmsdk.Part, error) {
-	if raw == nil {
-		return nil, nil
-	}
-
-	switch value := raw.(type) {
-	case anthropicapi.ContentBlock:
-		return mapAnthropicContentBlock(value)
-	case *anthropicapi.ContentBlock:
-		if value == nil {
-			return nil, nil
-		}
-		return mapAnthropicContentBlock(*value)
-	default:
-		data, err := json.Marshal(value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal raw content block: %w", err)
-		}
-		var block anthropicapi.ContentBlock
-		if err := json.Unmarshal(data, &block); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal raw content block: %w", err)
-		}
-		return mapAnthropicContentBlock(block)
-	}
-}
-
-func mapAnthropicRawContentBlockDelta(raw interface{}) (*llmsdk.PartDelta, error) {
-	if raw == nil {
-		return nil, nil
-	}
-
-	deltaMap, ok := raw.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("unexpected delta type %T", raw)
-	}
-
-	deltaType, _ := deltaMap["type"].(string)
-
-	switch deltaType {
-	case "text_delta":
-		text, _ := deltaMap["text"].(string)
-		part := llmsdk.NewTextPartDelta(text)
+func mapAnthropicRawContentBlockDelta(raw anthropicapi.ContentBlockDeltaEventDelta) (*llmsdk.PartDelta, error) {
+	switch {
+	case raw.TextDelta != nil:
+		part := llmsdk.NewTextPartDelta(raw.TextDelta.Text)
 		return &part, nil
 
-	case "input_json_delta":
-		partial, _ := deltaMap["partial_json"].(string)
-		part := llmsdk.NewToolCallPartDelta(llmsdk.WithToolCallPartDeltaArgs(partial))
+	case raw.InputJsonDelta != nil:
+		part := llmsdk.NewToolCallPartDelta(llmsdk.WithToolCallPartDeltaArgs(raw.InputJsonDelta.PartialJson))
 		return &part, nil
 
-	case "thinking_delta":
-		thinking, _ := deltaMap["thinking"].(string)
-		part := llmsdk.NewReasoningPartDelta(thinking)
+	case raw.ThinkingDelta != nil:
+		part := llmsdk.NewReasoningPartDelta(raw.ThinkingDelta.Thinking)
 		return &part, nil
 
-	case "signature_delta":
-		signature, _ := deltaMap["signature"].(string)
-		part := llmsdk.NewReasoningPartDelta("", llmsdk.WithReasoningPartDeltaSignature(signature))
+	case raw.SignatureDelta != nil:
+		part := llmsdk.NewReasoningPartDelta("", llmsdk.WithReasoningPartDeltaSignature(raw.SignatureDelta.Signature))
 		return &part, nil
 
-	case "citations_delta":
-		rawCitation, ok := deltaMap["citation"].(map[string]any)
-		if !ok {
-			return nil, nil
-		}
-		citationDelta, err := mapAnthropicCitationDelta(rawCitation)
+	case raw.CitationsDelta != nil:
+		citationDelta, err := mapAnthropicCitationDelta(raw.CitationsDelta.Citation)
 		if err != nil || citationDelta == nil {
 			return nil, err
 		}
@@ -675,28 +668,20 @@ func mapAnthropicRawContentBlockDelta(raw interface{}) (*llmsdk.PartDelta, error
 	return nil, nil
 }
 
-func mapAnthropicCitationDelta(raw map[string]any) (*llmsdk.CitationDelta, error) {
-	cType, _ := raw["type"].(string)
-	if cType != "search_result_location" {
-		return nil, nil
-	}
-
+func mapAnthropicCitationDelta(raw anthropicapi.CitationsDeltaCitation) (*llmsdk.CitationDelta, error) {
 	citation := &llmsdk.CitationDelta{}
-
-	if source, ok := raw["source"].(string); ok && source != "" {
-		citation.Source = ptr.To(source)
-	}
-	if title, ok := raw["title"].(string); ok && title != "" {
-		citation.Title = ptr.To(title)
-	}
-	if citedText, ok := raw["cited_text"].(string); ok && citedText != "" {
-		citation.CitedText = ptr.To(citedText)
-	}
-	if start, ok := toInt(raw["start_block_index"]); ok {
-		citation.StartIndex = ptr.To(start)
-	}
-	if end, ok := toInt(raw["end_block_index"]); ok {
-		citation.EndIndex = ptr.To(end)
+	if raw.SearchResultLocation != nil {
+		if raw.SearchResultLocation.Source != "" {
+			citation.Source = ptr.To(raw.SearchResultLocation.Source)
+		}
+		if raw.SearchResultLocation.Title != nil && *raw.SearchResultLocation.Title != "" {
+			citation.Title = raw.SearchResultLocation.Title
+		}
+		if raw.SearchResultLocation.CitedText != "" {
+			citation.CitedText = ptr.To(raw.SearchResultLocation.CitedText)
+		}
+		citation.StartIndex = ptr.To(raw.SearchResultLocation.StartBlockIndex)
+		citation.EndIndex = ptr.To(raw.SearchResultLocation.EndBlockIndex)
 	}
 
 	return citation, nil

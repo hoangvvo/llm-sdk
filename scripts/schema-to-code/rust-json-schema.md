@@ -34,7 +34,7 @@ Primitive definitions become named type aliases.
 - An object with named `properties` lowers to a struct.
 - Add serde rename attributes when the Rust field name differs from the JSON property name.
 - Complex property schemas must lower to named types. Do not inline nested structs, unions, enums, arrays, or maps inside a parent struct.
-- If `additionalProperties: true` appears together with named properties, generate only the named fields and ignore extra keys.
+- Any object with `additionalProperties: true` lowers to `serde_json::Value`, even if it also defines named properties.
 
 ## Maps
 
