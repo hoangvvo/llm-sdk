@@ -15,7 +15,7 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai-chat-completion", "gpt-4o-audio-preview");
+    let model = common::get_model("openai-chat-completion", "gpt-audio-1.5");
 
     let mut stream = model
         .stream(LanguageModelInput {

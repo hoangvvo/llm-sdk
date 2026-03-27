@@ -26,7 +26,7 @@ interface SessionContext {
 async function main(): Promise<void> {
   const stopServer = await startStubMcpServer();
   try {
-    const model = getModel("openai", "gpt-4o-mini");
+    const model = getModel("openai", "gpt-5.4-mini");
 
     const agent = new Agent<SessionContext>({
       name: "Sage",

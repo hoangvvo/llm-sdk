@@ -65,7 +65,7 @@ async fn run_agent_demo() -> Result<(), BoxedError> {
     let api_key = env::var("OPENAI_API_KEY").map_err(|_| missing_env("OPENAI_API_KEY"))?;
 
     let model = Arc::new(OpenAIModel::new(
-        "gpt-4o-mini",
+        "gpt-5.4-mini",
         OpenAIModelOptions {
             api_key,
             ..Default::default()

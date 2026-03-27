@@ -24,19 +24,19 @@ func TestMain(m *testing.M) {
 		panic("GOOGLE_API_KEY must be set")
 	}
 
-	model = google.NewGoogleModel("gemini-2.5-flash", google.GoogleModelOptions{
+	model = google.NewGoogleModel("gemini-3.1-flash-lite-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	audioModel = google.NewGoogleModel("gemini-2.5-flash-preview-tts", google.GoogleModelOptions{
+	audioModel = google.NewGoogleModel("gemini-3.1-flash-lite-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	imageModel = google.NewGoogleModel("gemini-2.5-flash-image", google.GoogleModelOptions{
+	imageModel = google.NewGoogleModel("gemini-3.1-flash-image-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	multimodalToolModel = google.NewGoogleModel("gemini-3-flash-preview", google.GoogleModelOptions{
+	multimodalToolModel = google.NewGoogleModel("gemini-3.1-pro-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	reasoningModel = google.NewGoogleModel("gemini-2.5-flash", google.GoogleModelOptions{
+	reasoningModel = google.NewGoogleModel("gemini-3.1-pro-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
 

@@ -843,7 +843,7 @@ async fn chat_handler(
     Json(body): Json<ChatRequestBody>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     let provider = body.provider.unwrap_or_else(|| "openai".to_string());
-    let model_id = body.model_id.unwrap_or_else(|| "gpt-4o-mini".to_string());
+    let model_id = body.model_id.unwrap_or_else(|| "gpt-5.4-mini".to_string());
     let metadata = body.metadata.unwrap_or_default();
 
     let agent = create_agent(&provider, &model_id, metadata)

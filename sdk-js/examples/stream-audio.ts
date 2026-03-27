@@ -3,7 +3,7 @@ import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type Stream from "node:stream";
 import { getModel } from "./get-model.ts";
 
-const model = getModel("openai-chat-completion", "gpt-4o-audio-preview");
+const model = getModel("openai-chat-completion", "gpt-audio-1.5");
 
 const stream = model.stream({
   modalities: ["text", "audio"],

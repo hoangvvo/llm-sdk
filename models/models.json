@@ -3,34 +3,33 @@
   "models": [
     {
       "provider": "openai",
-      "model_id": "gpt-5",
+      "model_id": "gpt-5.4",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 1.25e-6,
-          "output_cost_per_text_token": 10.0e-6
+          "input_cost_per_text_token": 2.5e-6,
+          "output_cost_per_text_token": 15.0e-6
         },
         "capabilities": [
           "text-input",
           "text-output",
           "image-input",
-          "image-output",
           "function-calling",
           "structured-output",
           "reasoning"
         ]
       },
-      "default_modalities": ["text", "image"],
+      "default_modalities": ["text"],
       "default_reasoning": {
         "enabled": true
       }
     },
     {
       "provider": "openai",
-      "model_id": "gpt-5-mini",
+      "model_id": "gpt-5.4-mini",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.25e-6,
-          "output_cost_per_text_token": 2.0e-6
+          "input_cost_per_text_token": 0.75e-6,
+          "output_cost_per_text_token": 4.5e-6
         },
         "capabilities": [
           "text-input",
@@ -46,24 +45,27 @@
       }
     },
     {
-      "provider": "openai",
-      "model_id": "gpt-5-nano",
+      "provider": "openai-chat-completion",
+      "model_id": "gpt-audio-1.5",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.05e-6,
-          "output_cost_per_text_token": 0.4e-6
+          "input_cost_per_text_token": 2.5e-6,
+          "output_cost_per_text_token": 10.0e-6,
+          "input_cost_per_audio_token": 32e-6,
+          "output_cost_per_audio_token": 64e-6
         },
         "capabilities": [
           "text-input",
           "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output",
-          "reasoning"
+          "audio-input",
+          "audio-output",
+          "function-calling"
         ]
       },
-      "default_reasoning": {
-        "enabled": true
+      "default_modalities": ["text", "audio"],
+      "default_audio": {
+        "format": "linear16",
+        "voice": "alloy"
       }
     },
     {
@@ -81,29 +83,6 @@
           "function-calling",
           "structured-output"
         ]
-      }
-    },
-    {
-      "provider": "openai-chat-completion",
-      "model_id": "gpt-audio",
-      "metadata": {
-        "pricing": {
-          "input_cost_per_text_token": 2.5e-6,
-          "output_cost_per_text_token": 10.0e-6,
-          "input_cost_per_audio_token": 40e-6,
-          "output_cost_per_audio_token": 80e-6
-        },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "audio-input",
-          "audio-output"
-        ]
-      },
-      "default_modalities": ["text", "audio"],
-      "default_audio": {
-        "format": "linear16",
-        "voice": "alloy"
       }
     },
     {
@@ -125,11 +104,11 @@
     },
     {
       "provider": "anthropic",
-      "model_id": "claude-opus-4-1",
+      "model_id": "claude-opus-4-6",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 15e-6,
-          "output_cost_per_text_token": 75e-6
+          "input_cost_per_text_token": 5e-6,
+          "output_cost_per_text_token": 25e-6
         },
         "capabilities": [
           "text-input",
@@ -148,7 +127,7 @@
     },
     {
       "provider": "anthropic",
-      "model_id": "claude-sonnet-4-0",
+      "model_id": "claude-sonnet-4-6",
       "metadata": {
         "pricing": {
           "input_cost_per_text_token": 3e-6,
@@ -170,12 +149,35 @@
       }
     },
     {
-      "provider": "google",
-      "model_id": "gemini-2.5-pro",
+      "provider": "anthropic",
+      "model_id": "claude-haiku-4-5",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 1.25e-6,
-          "output_cost_per_text_token": 10.0e-6
+          "input_cost_per_text_token": 1e-6,
+          "output_cost_per_text_token": 5e-6
+        },
+        "capabilities": [
+          "text-input",
+          "text-output",
+          "image-input",
+          "function-calling",
+          "structured-output",
+          "reasoning",
+          "citation"
+        ]
+      },
+      "default_reasoning": {
+        "enabled": true,
+        "budget_tokens": 3000
+      }
+    },
+    {
+      "provider": "google",
+      "model_id": "gemini-3.1-pro-preview",
+      "metadata": {
+        "pricing": {
+          "input_cost_per_text_token": 2e-6,
+          "output_cost_per_text_token": 12.0e-6
         },
         "capabilities": [
           "text-input",
@@ -193,12 +195,12 @@
     },
     {
       "provider": "google",
-      "model_id": "gemini-2.5-flash",
+      "model_id": "gemini-3.1-flash-lite-preview",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.3e-6,
-          "output_cost_per_text_token": 2.5e-6,
-          "input_cost_per_audio_token": 1.0e-6
+          "input_cost_per_text_token": 0.25e-6,
+          "output_cost_per_text_token": 1.5e-6,
+          "input_cost_per_audio_token": 0.5e-6
         },
         "capabilities": [
           "text-input",
@@ -216,13 +218,13 @@
     },
     {
       "provider": "google",
-      "model_id": "gemini-2.5-flash-image-preview",
+      "model_id": "gemini-3.1-flash-image-preview",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.3e-6,
-          "input_cost_per_image_token": 0.3e-6,
-          "output_cost_per_text_token":  2.5e-6,
-          "output_cost_per_image_token": 30e-6
+          "input_cost_per_text_token": 0.5e-6,
+          "input_cost_per_image_token": 0.5e-6,
+          "output_cost_per_text_token": 3e-6,
+          "output_cost_per_image_token": 60e-6
         },
         "capabilities": [
           "text-input",
@@ -233,26 +235,6 @@
         ]
       },
       "default_modalities": ["text", "image"]
-    },
-    {
-      "provider": "google",
-      "model_id": "gemini-2.5-flash-lite",
-      "metadata": {
-        "pricing": {
-          "input_cost_per_text_token": 0.1e-6,
-          "output_cost_per_text_token": 0.4e-6,
-          "input_cost_per_audio_token": 0.3e-6
-        },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "audio-input",
-          "function-calling",
-          "structured-output",
-          "reasoning"
-        ]
-      }
     },
     {
       "provider": "cohere",

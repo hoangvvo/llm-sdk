@@ -2,7 +2,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { getModel } from "./get-model.ts";
 
-const model = getModel("openai-chat-completion", "gpt-4o-audio-preview");
+const model = getModel("openai-chat-completion", "gpt-audio-1.5");
 
 const response = await model.generate({
   modalities: ["text", "audio"],

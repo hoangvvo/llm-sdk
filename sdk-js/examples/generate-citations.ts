@@ -1,6 +1,6 @@
 import { getModel } from "./get-model.ts";
 
-const model = getModel("anthropic", "claude-opus-4-20250514");
+const model = getModel("anthropic", "claude-opus-4-6");
 
 const response = await model.generate({
   messages: [

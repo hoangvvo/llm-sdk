@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("anthropic", "claude-opus-4-20250514")
+	model := examples.GetModel("anthropic", "claude-opus-4-6")
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{

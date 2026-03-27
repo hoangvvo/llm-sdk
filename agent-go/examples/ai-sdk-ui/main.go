@@ -1015,7 +1015,7 @@ func handleChatRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	modelID := body.ModelID
 	if modelID == "" {
-		modelID = "gpt-4o-mini"
+		modelID = "gpt-5.4-mini"
 	}
 
 	var metadata llmsdk.LanguageModelMetadata

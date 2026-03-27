@@ -15,7 +15,7 @@ fn google_api_key() -> &'static String {
 
 fn google_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-2.5-flash".to_string(),
+        "gemini-3.1-flash-lite-preview".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()
@@ -25,7 +25,7 @@ fn google_model() -> GoogleModel {
 
 fn google_audio_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-2.5-flash-preview-tts".to_string(),
+        "gemini-3.1-flash-lite-preview".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()
@@ -35,7 +35,7 @@ fn google_audio_model() -> GoogleModel {
 
 fn google_image_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-2.5-flash-image".to_string(),
+        "gemini-3.1-flash-image-preview".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()
@@ -45,7 +45,7 @@ fn google_image_model() -> GoogleModel {
 
 fn google_multimodal_tool_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-3-flash-preview".to_string(),
+        "gemini-3.1-pro-preview".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()
@@ -55,7 +55,7 @@ fn google_multimodal_tool_model() -> GoogleModel {
 
 fn google_reasoning_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-2.5-flash".to_string(),
+        "gemini-3.1-pro-preview".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()

@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("openai-chat-completion", "gpt-4o-audio-preview")
+	model := examples.GetModel("openai-chat-completion", "gpt-audio-1.5")
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},

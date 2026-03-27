@@ -531,7 +531,7 @@ const instructions: InstructionParam<RiftContext>[] = [
 const archivist = new Agent<RiftContext>({
   name: "WaypointArchivist",
   instructions,
-  model: getModel("openai", "gpt-4o-mini"),
+  model: getModel("openai", "gpt-5.4-mini"),
   tools: [pageSecurityTool],
   toolkits: [new LostAndFoundToolkit()],
 });

@@ -603,7 +603,7 @@ func main() {
 		log.Fatal("OPENAI_API_KEY is required")
 	}
 
-	model := openai.NewOpenAIModel("gpt-4o-mini", openai.OpenAIModelOptions{APIKey: apiKey})
+	model := openai.NewOpenAIModel("gpt-5.4-mini", openai.OpenAIModelOptions{APIKey: apiKey})
 
 	agent := llmagent.NewAgent(
 		"WaypointArchivist",

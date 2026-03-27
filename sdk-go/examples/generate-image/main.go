@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("google", "gemini-2.5-flash-image")
+	model := examples.GetModel("google", "gemini-3.1-flash-image-preview")
 
 	log.Println("Requesting image generation...")
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{

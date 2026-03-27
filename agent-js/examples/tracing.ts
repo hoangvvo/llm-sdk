@@ -28,7 +28,7 @@ interface AgentContext {
   customer_name: string;
 }
 
-const model = getModel("openai", "gpt-4o-mini");
+const model = getModel("openai", "gpt-5.4-mini");
 
 const getWeatherTool = tool({
   name: "get_weather",
