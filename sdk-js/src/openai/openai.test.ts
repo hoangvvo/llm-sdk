@@ -9,6 +9,10 @@ suite("OpenAIModel", () => {
     apiKey: process.env["OPENAI_API_KEY"],
     modelId: "gpt-5.4",
   });
+  const reasoningModel = new OpenAIModel({
+    apiKey: process.env["OPENAI_API_KEY"],
+    modelId: "o1",
+  });
 
   const audioModel = new OpenAIModel({
     modelId: "gpt-audio-1.5",
@@ -128,10 +132,10 @@ suite("OpenAIModel", () => {
   );
 
   test(TEST_CASE_NAMES.GENERATE_REASONING, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_REASONING);
+    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.GENERATE_REASONING);
   });
 
   test(TEST_CASE_NAMES.STREAM_REASONING, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_REASONING);
+    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.STREAM_REASONING);
   });
 });

@@ -139,7 +139,14 @@ function renderRustUnion(declaration: UnionDeclaration): string {
   if (comments) {
     lines.push(comments);
   }
-  lines.push("#[derive(Serialize, Deserialize)]");
+  const usesPlaceholderDeserialize =
+    declaration.representation === "untagged" &&
+    declaration.untaggedDeserializeStrategy === "placeholder";
+  if (declaration.representation === "tagged" || !usesPlaceholderDeserialize) {
+    lines.push("#[derive(Serialize, Deserialize)]");
+  } else {
+    lines.push("#[derive(Serialize)]");
+  }
   if (declaration.representation === "tagged") {
     lines.push(
       `#[serde(tag = ${JSON.stringify(
@@ -163,6 +170,20 @@ function renderRustUnion(declaration: UnionDeclaration): string {
     lines.push(`    ${variant.name}(${variant.typeName}),`);
   }
   lines.push("}");
+  if (usesPlaceholderDeserialize) {
+    lines.push("");
+    lines.push(`impl<'de> Deserialize<'de> for ${declaration.name} {`);
+    lines.push(
+      "    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>",
+    );
+    lines.push("    where");
+    lines.push("        D: serde::Deserializer<'de>,");
+    lines.push("    {");
+    lines.push("        let _ = deserializer;");
+    lines.push('        todo!("fill in untagged union deserialization");');
+    lines.push("    }");
+    lines.push("}");
+  }
   return lines.join("\n");
 }
 

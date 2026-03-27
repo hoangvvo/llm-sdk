@@ -12,7 +12,7 @@ suite("GoogleModel", () => {
 
   const audioModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-3.1-flash-lite-preview",
+    modelId: "gemini-2.5-flash-preview-tts",
   });
 
   const imageModel = new GoogleModel({

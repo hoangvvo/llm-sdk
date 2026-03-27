@@ -237,6 +237,22 @@
       "default_modalities": ["text", "image"]
     },
     {
+      "provider": "google",
+      "model_id": "gemini-2.5-flash-preview-tts",
+      "metadata": {
+        "pricing": {
+          "input_cost_per_text_token": 0.5e-6,
+          "output_cost_per_audio_token": 10e-6
+        },
+        "capabilities": ["text-input", "audio-output"]
+      },
+      "default_modalities": ["audio"],
+      "default_audio": {
+        "format": "linear16",
+        "voice": "Zephyr"
+      }
+    },
+    {
       "provider": "cohere",
       "model_id": "command-a-03-2025",
       "metadata": {

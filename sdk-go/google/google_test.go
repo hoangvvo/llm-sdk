@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 	model = google.NewGoogleModel("gemini-3.1-flash-lite-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	audioModel = google.NewGoogleModel("gemini-3.1-flash-lite-preview", google.GoogleModelOptions{
+	audioModel = google.NewGoogleModel("gemini-2.5-flash-preview-tts", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
 	imageModel = google.NewGoogleModel("gemini-3.1-flash-image-preview", google.GoogleModelOptions{

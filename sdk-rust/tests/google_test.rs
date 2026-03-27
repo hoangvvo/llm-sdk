@@ -25,7 +25,7 @@ fn google_model() -> GoogleModel {
 
 fn google_audio_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-3.1-flash-lite-preview".to_string(),
+        "gemini-2.5-flash-preview-tts".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()

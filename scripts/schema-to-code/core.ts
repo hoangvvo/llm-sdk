@@ -69,6 +69,7 @@ export interface UnionDeclaration {
   name: string;
   description: string | undefined;
   discriminator: string | undefined;
+  untaggedDeserializeStrategy?: "derive" | "placeholder";
   variants: UnionVariant[];
 }
 
@@ -998,9 +999,77 @@ class SchemaDocumentBuilder {
         name: ownerTypeName,
         description: schema.description,
         discriminator: undefined,
+        untaggedDeserializeStrategy:
+          this.shouldUsePlaceholderDeserializeForUntaggedUnion(
+            schema,
+            path,
+            ownerTypeName,
+          )
+            ? "placeholder"
+            : "derive",
         variants,
       },
     ];
+  }
+
+  private shouldUsePlaceholderDeserializeForUntaggedUnion(
+    schema: JSONSchema7,
+    path: string[],
+    ownerTypeName: string,
+  ): boolean {
+    const options = schema.oneOf ?? schema.anyOf;
+    if (!options) {
+      return false;
+    }
+
+    const analyzedOptions = options.map((option, index) => {
+      const optionPath = [
+        ...path,
+        schema.oneOf ? `.oneOf[${index}]` : `.anyOf[${index}]`,
+      ];
+      const optionSchema = assertSchemaObject(option, formatPath(optionPath));
+      const resolvedSchema = optionSchema.$ref
+        ? this.resolveDefinitionSchema(
+            optionSchema.$ref,
+            formatPath(optionPath),
+          )
+        : optionSchema;
+      return {
+        optionPath,
+        optionSchema,
+        resolvedSchema,
+      };
+    });
+
+    const discriminatorName = this.determineDiscriminatorName(
+      schema,
+      analyzedOptions,
+    );
+    if (!discriminatorName) {
+      return false;
+    }
+
+    try {
+      const discriminatorValues = new Set<string>();
+      for (const option of analyzedOptions) {
+        const variant = this.analyzeUnionVariant(
+          ownerTypeName,
+          option.optionSchema,
+          option.resolvedSchema,
+          formatPath(option.optionPath),
+          discriminatorName,
+          getDiscriminator(schema)?.mapping,
+        );
+        if (discriminatorValues.has(variant.discriminatorValue)) {
+          return true;
+        }
+        discriminatorValues.add(variant.discriminatorValue);
+      }
+    } catch {
+      return false;
+    }
+
+    return false;
   }
 
   private analyzeUntaggedVariant(

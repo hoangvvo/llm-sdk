@@ -336,7 +336,8 @@ pub struct CreateChatCompletionResponseChoicesItem {
     /// reached, `content_filter` if content was omitted due to a flag from
     /// our content filters, `tool_calls` if the model called a tool, or
     /// `function_call` (deprecated) if the model called a function.
-    pub finish_reason: CreateChatCompletionResponseChoicesItemFinishReason,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish_reason: Option<CreateChatCompletionResponseChoicesItemFinishReason>,
     /// The index of the choice in the list of choices.
     pub index: i64,
     /// Log probability information for the choice.
@@ -554,6 +555,9 @@ pub type ResponseModalities = Option<Option<Vec<ResponseModalitiesValueItem>>>;
 
 pub type ModelIdsShared = Option<String>;
 
+/// Whether to enable [parallel function
+/// calling](/docs/guides/function-calling#
+/// configuring-parallel-function-calling) during tool use.
 pub type ParallelToolCalls = Option<bool>;
 
 /// Static predicted output content, such as the content of a text file that is

@@ -23,7 +23,7 @@ export function renderGoDocument(
   );
   const importLines: string[] = [];
   if (needsUnionHelpers) {
-    importLines.push('"encoding/json"', '"errors"');
+    importLines.push('"encoding/json"', '"errors"', '"fmt"');
   }
 
   const parts: string[] = [`package ${packageName}`];
@@ -196,7 +196,7 @@ function renderTaggedGoUnion(declaration: UnionDeclaration): string {
   }
   lines.push("\tdefault:");
   lines.push(
-    `\t\treturn errors.New("invalid ${discriminator} field in ${declaration.name}")`,
+    `\t\treturn fmt.Errorf("invalid ${discriminator} field in ${declaration.name}: %q", discriminator)`,
   );
   lines.push("\t}");
   lines.push("\treturn nil");
