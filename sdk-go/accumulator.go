@@ -141,6 +141,9 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 			}
 			*existingData.Args += *toolCallPartDelta.Args
 		}
+		if toolCallPartDelta.Signature != nil {
+			existingData.Signature = toolCallPartDelta.Signature
+		}
 		if toolCallPartDelta.ID != nil {
 			existingData.ID = toolCallPartDelta.ID
 		}
@@ -291,6 +294,9 @@ func createToolCallPart(data *ToolCallPartDelta, index int) (Part, error) {
 	}
 
 	var opts []ToolCallPartOption
+	if data.Signature != nil {
+		opts = append(opts, WithToolCallPartSignature(*data.Signature))
+	}
 	if data.ID != nil {
 		opts = append(opts, WithToolCallPartID(*data.ID))
 	}

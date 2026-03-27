@@ -300,6 +300,28 @@
     {
       "name": "generate_text_from_image_tool_result",
       "type": "generate",
+      "setup": {
+        "generate_assistant": {
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What color is the image returned by the tool? Answer with one word."
+                  }
+                ]
+              }
+            ],
+            "tool_choice": {
+              "type": "required"
+            }
+          },
+          "input_tools": ["get_color_sample"],
+          "target_message_index": 1
+        }
+      },
       "input": {
         "messages": [
           {
@@ -313,14 +335,7 @@
           },
           {
             "role": "assistant",
-            "content": [
-              {
-                "type": "tool-call",
-                "tool_call_id": "8r3n4x2qp",
-                "tool_name": "get_color_sample",
-                "args": {}
-              }
-            ]
+            "content": []
           },
           {
             "role": "tool",

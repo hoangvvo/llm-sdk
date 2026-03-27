@@ -10,7 +10,7 @@ import type {
 } from "./core.ts";
 
 export function renderRustDocument(document: CodegenDocument): string {
-  const imports = ['use serde::{Deserialize, Serialize};'];
+  const imports = ["use serde::{Deserialize, Serialize};"];
   if (document.usesJsonValue) {
     imports.push("use serde_json::Value;");
   }
@@ -84,7 +84,7 @@ function renderRustStruct(declaration: StructDeclaration): string {
 function renderRustStructField(field: StructField): string[] {
   if (field.kind === "flatten") {
     return [
-      '    #[serde(flatten)]',
+      "    #[serde(flatten)]",
       `    pub ${field.name}: ${field.typeName},`,
     ];
   }
@@ -120,7 +120,8 @@ function renderRustUnion(declaration: UnionDeclaration): string {
   if (declaration.representation === "tagged") {
     lines.push(
       `#[serde(tag = ${JSON.stringify(
-        declaration.discriminator ?? fail(`Missing discriminator for ${declaration.name}`),
+        declaration.discriminator ??
+          fail(`Missing discriminator for ${declaration.name}`),
       )})]`,
     );
   } else {
@@ -131,7 +132,8 @@ function renderRustUnion(declaration: UnionDeclaration): string {
     if (declaration.representation === "tagged") {
       lines.push(
         `    #[serde(rename = ${JSON.stringify(
-          variant.discriminatorValue ?? fail(`Missing variant discriminator for ${declaration.name}`),
+          variant.discriminatorValue ??
+            fail(`Missing variant discriminator for ${declaration.name}`),
         )})]`,
       );
     }
@@ -161,7 +163,9 @@ function renderRustType(
       case "optional":
         return `Option<${renderRustType(type.item, true, false)}>`;
       default:
-        return fail(`Unsupported Rust type expression: ${JSON.stringify(type)}`);
+        return fail(
+          `Unsupported Rust type expression: ${JSON.stringify(type)}`,
+        );
     }
   })();
 

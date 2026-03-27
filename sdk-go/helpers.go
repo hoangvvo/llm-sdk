@@ -180,6 +180,12 @@ func WithToolCallPartID(id string) ToolCallPartOption {
 	}
 }
 
+func WithToolCallPartSignature(signature string) ToolCallPartOption {
+	return func(p *ToolCallPart) {
+		p.Signature = &signature
+	}
+}
+
 // NewToolResultPart creates a new tool result part
 func NewToolResultPart(toolCallID, toolName string, content []Part, opts ...ToolResultPartOption) Part {
 	toolResultPart := Part{
@@ -293,6 +299,12 @@ func WithToolCallPartDeltaToolName(toolName string) ToolCallPartDeltaOption {
 func WithToolCallPartDeltaArgs(args string) ToolCallPartDeltaOption {
 	return func(p *ToolCallPartDelta) {
 		p.Args = &args
+	}
+}
+
+func WithToolCallPartDeltaSignature(signature string) ToolCallPartDeltaOption {
+	return func(p *ToolCallPartDelta) {
+		p.Signature = &signature
 	}
 }
 

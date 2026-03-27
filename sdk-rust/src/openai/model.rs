@@ -728,6 +728,7 @@ fn map_openai_stream_event(
                         args: Some(function_tool_call.arguments),
                         tool_name: Some(function_tool_call.name),
                         tool_call_id: Some(function_tool_call.call_id),
+                        signature: None,
                         id: function_tool_call.id,
                     });
                     Ok(Some(ContentDelta {

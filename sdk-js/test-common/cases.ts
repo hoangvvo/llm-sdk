@@ -10,8 +10,17 @@ export interface TestCase {
   name: string;
   input: LanguageModelInput;
   type: "generate" | "stream";
+  setup?: TestCaseSetup;
   output: {
     content: PartAssertion[];
+  };
+}
+
+interface TestCaseSetup {
+  generate_assistant?: {
+    input: LanguageModelInput;
+    input_tools?: string[];
+    target_message_index: number;
   };
 }
 
@@ -26,6 +35,7 @@ interface TestCaseJSON {
   type: "generate" | "stream";
   input: LanguageModelInput;
   input_tools?: string[];
+  setup?: TestCaseSetup;
   output: {
     content: {
       type: "text" | "tool_call" | "audio" | "image" | "reasoning";
@@ -119,6 +129,7 @@ function jsonToTestCase(jsonCase: TestCaseJSON): TestCase {
     name: jsonCase.name,
     input,
     type: jsonCase.type,
+    setup: jsonCase.setup,
     output,
   };
 }
@@ -172,13 +183,30 @@ export async function runTestCase(
   }
 
   const { input, type, output } = testCase;
+  const modelInputBase = structuredClone(input);
   const modelInput = options?.additionalInputs
-    ? options.additionalInputs(input)
-    : input;
+    ? options.additionalInputs(modelInputBase)
+    : modelInputBase;
 
   const content = options?.customOutputContent
     ? options.customOutputContent(output.content)
     : output.content;
+
+  if (testCase.setup?.generate_assistant) {
+    const setupInput = structuredClone(testCase.setup.generate_assistant.input);
+    if (testCase.setup.generate_assistant.input_tools) {
+      setupInput.tools = resolveTools(
+        testCase.setup.generate_assistant.input_tools,
+      );
+    }
+    const setupResponse = await model.generate(setupInput);
+    modelInput.messages[
+      testCase.setup.generate_assistant.target_message_index
+    ] = {
+      role: "assistant",
+      content: setupResponse.content,
+    };
+  }
 
   if (type === "generate") {
     const result = await model.generate(modelInput);

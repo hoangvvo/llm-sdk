@@ -138,6 +138,9 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
       if (delta.part.args) {
         existingPart.args = (existingPart.args ?? "") + delta.part.args;
       }
+      if (delta.part.signature) {
+        existingPart.signature = delta.part.signature;
+      }
       if (delta.part.id) {
         existingPart.id = delta.part.id;
       }
@@ -265,6 +268,9 @@ function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
       tool_name: data.tool_name,
       args: JSON.parse(data.args ?? "{}") as Record<string, unknown>,
     };
+    if (data.signature) {
+      toolCalPart.signature = data.signature;
+    }
     if (data.id) {
       toolCalPart.id = data.id;
     }

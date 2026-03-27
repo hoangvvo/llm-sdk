@@ -18,7 +18,18 @@ type TestCase struct {
 	Input           llmsdk.LanguageModelInput
 	Method          TestMethod
 	Output          OutputAssertion
+	Setup           *TestCaseSetup
 	AdditionalInput func(*llmsdk.LanguageModelInput)
+}
+
+type TestCaseSetup struct {
+	GenerateAssistant *GenerateAssistantSetup `json:"generate_assistant,omitempty"`
+}
+
+type GenerateAssistantSetup struct {
+	Input              llmsdk.LanguageModelInput `json:"input"`
+	InputTools         []string                  `json:"input_tools,omitempty"`
+	TargetMessageIndex int                       `json:"target_message_index"`
 }
 
 // TestDataJSON represents the structure of the JSON test data
@@ -33,6 +44,7 @@ type TestCaseJSON struct {
 	Type       string                    `json:"type"`
 	Input      llmsdk.LanguageModelInput `json:"input"`
 	InputTools []string                  `json:"input_tools,omitempty"`
+	Setup      *TestCaseSetup            `json:"setup,omitempty"`
 	Output     map[string]interface{}    `json:"output"`
 }
 
@@ -106,6 +118,7 @@ func convertJSONToTestCase(tc TestCaseJSON) TestCase {
 		Input:  input,
 		Method: method,
 		Output: output,
+		Setup:  tc.Setup,
 	}
 }
 
@@ -170,6 +183,23 @@ func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCaseName string, 
 	input := &testCase.Input
 	if testCase.AdditionalInput != nil {
 		testCase.AdditionalInput(input)
+	}
+
+	if testCase.Setup != nil && testCase.Setup.GenerateAssistant != nil {
+		setupInput := testCase.Setup.GenerateAssistant.Input
+		if len(testCase.Setup.GenerateAssistant.InputTools) > 0 {
+			setupInput.Tools = []llmsdk.Tool{}
+			for _, toolName := range testCase.Setup.GenerateAssistant.InputTools {
+				if tool, exists := toolsMap[toolName]; exists {
+					setupInput.Tools = append(setupInput.Tools, tool)
+				}
+			}
+		}
+		setupResult, err := model.Generate(ctx, &setupInput)
+		if err != nil {
+			t.Fatalf("Setup generate failed: %v", err)
+		}
+		input.Messages[testCase.Setup.GenerateAssistant.TargetMessageIndex] = llmsdk.NewAssistantMessage(setupResult.Content...)
 	}
 
 	switch testCase.Method {

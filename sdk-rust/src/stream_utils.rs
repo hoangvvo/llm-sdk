@@ -118,6 +118,7 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             tool_name: Some(tool_call_part.tool_name),
             args: Some(tool_call_part.args.to_string()),
             tool_call_id: Some(tool_call_part.tool_call_id),
+            signature: tool_call_part.signature,
             id: tool_call_part.id,
         }),
         Part::Reasoning(reasoning_part) => PartDelta::Reasoning(ReasoningPartDelta {

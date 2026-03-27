@@ -102,6 +102,9 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             if let Some(args) = tool_delta.args {
                 existing_tool.args.get_or_insert_default().push_str(&args);
             }
+            if tool_delta.signature.is_some() {
+                existing_tool.signature = tool_delta.signature;
+            }
             if tool_delta.id.is_some() {
                 existing_tool.id = tool_delta.id;
             }
@@ -263,6 +266,7 @@ fn create_tool_call_part(data: ToolCallPartDelta, index: usize) -> LanguageModel
         tool_call_id,
         tool_name,
         args: parse_tool_call_args(&args)?,
+        signature: data.signature,
         id: data.id,
     }))
 }

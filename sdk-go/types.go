@@ -117,6 +117,8 @@ type ToolCallPart struct {
 	ToolName string `json:"tool_name"`
 	// The arguments to pass to the tool.
 	Args json.RawMessage `json:"args"`
+	// The provider-specific signature used to preserve reasoning/tool continuity.
+	Signature *string `json:"signature,omitempty"`
 	// The ID of the part, if applicable.
 	// This is different from ToolCallID which is used to match tool results.
 	ID *string `json:"id,omitempty"`
@@ -324,6 +326,7 @@ type ToolCallPartDelta struct {
 	ToolCallID *string `json:"tool_call_id,omitempty"`
 	ToolName   *string `json:"tool_name,omitempty"`
 	Args       *string `json:"args,omitempty"`
+	Signature  *string `json:"signature,omitempty"`
 	ID         *string `json:"id,omitempty"`
 }
 

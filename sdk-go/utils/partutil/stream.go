@@ -109,6 +109,7 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 				ToolCallID: &part.ToolCallPart.ToolCallID,
 				ToolName:   &part.ToolCallPart.ToolName,
 				Args:       &argsStr,
+				Signature:  part.ToolCallPart.Signature,
 				ID:         part.ToolCallPart.ID,
 			},
 		}

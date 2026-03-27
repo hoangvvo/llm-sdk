@@ -1,6 +1,7 @@
 import type {
   FunctionCallingConfig,
   FunctionDeclaration,
+  FunctionResponsePart,
   GenerateContentConfig,
   Part as GooglePart,
   ModalityTokenCount,
@@ -280,55 +281,96 @@ function convertToGoogleParts(part: Part): GooglePart[] {
     }
     case "source":
       return part.content.map(convertToGoogleParts).flat();
-    case "tool-call":
+    case "tool-call": {
+      const googleToolCallPart: GooglePart = {
+        functionCall: {
+          name: part.tool_name,
+          args: part.args,
+          id: part.tool_call_id,
+        },
+      };
+      if (part.signature) {
+        googleToolCallPart.thoughtSignature = part.signature;
+      }
+      return [googleToolCallPart];
+    }
+    case "tool-result": {
+      const functionResponse = convertToGoogleFunctionResponse(
+        part.content,
+        Boolean(part.is_error),
+      );
+      const googleFunctionResponse: GooglePart["functionResponse"] = {
+        id: part.tool_call_id,
+        name: part.tool_name,
+        response: functionResponse.response,
+      };
+      if (functionResponse.parts) {
+        googleFunctionResponse.parts = functionResponse.parts;
+      }
       return [
         {
-          functionCall: {
-            name: part.tool_name,
-            args: part.args,
-            id: part.tool_call_id,
-          },
+          functionResponse: googleFunctionResponse,
         },
       ];
-    case "tool-result":
-      return [
-        {
-          functionResponse: {
-            id: part.tool_call_id,
-            name: part.tool_name,
-            response: convertToGoogleFunctionResponseResponse(
-              part.content,
-              Boolean(part.is_error),
-            ),
-          },
-        },
-      ];
+    }
   }
 }
 
-function convertToGoogleFunctionResponseResponse(
+function convertToGoogleFunctionResponse(
   parts: Part[],
   isError: boolean,
-): Record<string, unknown> {
+): {
+  response: Record<string, unknown>;
+  parts?: FunctionResponsePart[];
+} {
   const compatibleParts = getCompatiblePartsWithoutSourceParts(parts);
   const textParts: TextPart[] = [];
+  const functionResponseParts: FunctionResponsePart[] = [];
   for (const part of compatibleParts) {
-    if (part.type === "text") {
-      textParts.push(part);
+    switch (part.type) {
+      case "text":
+        textParts.push(part);
+        break;
+      case "image":
+      case "audio":
+        functionResponseParts.push({
+          inlineData: {
+            data: part.data,
+            mimeType:
+              part.type === "image"
+                ? part.mime_type
+                : mapAudioFormatToMimeType(part.format),
+          },
+        });
+        break;
+      default:
+        throw new InvalidInputError(
+          `Google model tool result does not support part type ${part.type}`,
+        );
     }
   }
 
   const responses = textParts.map((part) => maybeParseJSON(part.text));
-  if (responses.length === 0) {
-    throw new InvalidInputError(
-      "Google model tool result must have at least one text part",
-    );
-  }
-
   // Use "output" key to specify function output and "error" key to specify error details,
   // as per Google API specification
   const key = isError ? "error" : "output";
-  return { [key]: responses.length === 1 ? responses[0] : responses };
+  const functionResponse: {
+    response: Record<string, unknown>;
+    parts?: FunctionResponsePart[];
+  } = {
+    response: {
+      [key]:
+        responses.length === 0
+          ? {}
+          : responses.length === 1
+            ? responses[0]
+            : responses,
+    },
+  };
+  if (functionResponseParts.length > 0) {
+    functionResponse.parts = functionResponseParts;
+  }
+  return functionResponse;
 }
 
 function maybeParseJSON(text: string) {
@@ -458,12 +500,16 @@ function mapGoogleContent(parts: GooglePart[]): Part[] {
         if (!googlePart.functionCall.name) {
           throw new InvariantError(PROVIDER, "Function call name is missing");
         }
-        return {
+        const toolCallPart: Extract<Part, { type: "tool-call" }> = {
           type: "tool-call",
           tool_call_id: googlePart.functionCall.id ?? generateString(10),
           tool_name: googlePart.functionCall.name,
           args: googlePart.functionCall.args ?? {},
         };
+        if (googlePart.thoughtSignature) {
+          toolCallPart.signature = googlePart.thoughtSignature;
+        }
+        return toolCallPart;
       }
       return null;
     })

@@ -709,6 +709,7 @@ fn map_tool_use_block(block: api::ResponseToolUseBlock) -> ToolCallPart {
         tool_call_id: block.id,
         tool_name: block.name,
         args: block.input,
+        signature: None,
         id: None,
     }
 }
@@ -761,6 +762,7 @@ fn map_anthropic_content_block_delta_event(
                 tool_name: None,
                 args: Some(delta.partial_json),
                 tool_call_id: None,
+                signature: None,
                 id: None,
             })
         }

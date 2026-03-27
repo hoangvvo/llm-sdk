@@ -1073,10 +1073,6 @@ func (u *ResponseStreamEvent) UnmarshalJSON(data []byte) error {
 }
 
 type CreateModelResponsePropertiesAllOf2 struct {
-	// An integer between 0 and 20 specifying the number of most likely tokens to
-	// return at each token position, each with an associated log probability.
-	//
-	TopLogprobs *int `json:"top_logprobs,omitempty"`
 }
 
 type CreateModelResponseProperties struct {

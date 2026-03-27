@@ -20,6 +20,20 @@ pub struct TestCase {
     pub input: LanguageModelInput,
     pub method: TestMethod,
     pub output: OutputAssertion,
+    pub setup: Option<TestCaseSetup>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TestCaseSetup {
+    pub generate_assistant: Option<GenerateAssistantSetup>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GenerateAssistantSetup {
+    pub input: LanguageModelInput,
+    #[serde(default)]
+    pub input_tools: Vec<String>,
+    pub target_message_index: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +50,7 @@ struct TestCaseJSON {
     input: LanguageModelInput,
     #[serde(default)]
     input_tools: Vec<String>,
+    setup: Option<TestCaseSetup>,
     output: Value,
 }
 
@@ -100,6 +115,7 @@ fn convert_json_to_test_case(tc: &TestCaseJSON) -> TestCase {
         input,
         method,
         output,
+        setup: tc.setup.clone(),
     }
 }
 
@@ -198,6 +214,26 @@ pub async fn run_test_case(
         }
         if let Some(f) = opts.custom_output_content {
             output.content = f(&mut output.content);
+        }
+    }
+
+    if let Some(setup) = test_case.setup {
+        if let Some(generate_assistant) = setup.generate_assistant {
+            let mut setup_input = generate_assistant.input;
+            if !generate_assistant.input_tools.is_empty() {
+                let mut resolved_tools = Vec::new();
+                for tool_name in generate_assistant.input_tools {
+                    if let Some(tool) = TOOLS_MAP.get(&tool_name) {
+                        resolved_tools.push(tool.clone());
+                    }
+                }
+                if !resolved_tools.is_empty() {
+                    setup_input.tools = Some(resolved_tools);
+                }
+            }
+            let setup_result = model.generate(setup_input).await?;
+            input.messages[generate_assistant.target_message_index] =
+                Message::assistant(setup_result.content);
         }
     }
 

@@ -148,6 +148,55 @@ pub struct FunctionResponse {
     /// "response" is treated as function output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response: Option<HashMap<String, Value>>,
+    /// List of parts that constitute a function response. Each part may have a
+    /// different IANA MIME type.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parts: Option<Vec<FunctionResponsePart>>,
+}
+
+/// Raw media bytes for function response.
+///
+/// Text should not be sent as raw bytes, use the [`FunctionResponse::response`]
+/// field.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FunctionResponseBlob {
+    /// Required. The IANA standard MIME type of the source data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+    /// Required. Inline media bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// Optional. Display name of the blob.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+}
+
+/// URI based data for function response.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FunctionResponseFileData {
+    /// Required. URI.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_uri: Option<String>,
+    /// Required. The IANA standard MIME type of the source data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+    /// Optional. Display name of the file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+}
+
+/// A datatype containing media that is part of a [`FunctionResponse`] message.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FunctionResponsePart {
+    /// Optional. Inline media bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inline_data: Option<FunctionResponseBlob>,
+    /// Optional. URI based data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_data: Option<FunctionResponseFileData>,
 }
 
 /// Optional model configuration parameters.

@@ -146,8 +146,15 @@ impl ToolCallPart {
             tool_call_id: tool_call_id.into(),
             tool_name: tool_name.into(),
             args,
+            signature: None,
             id: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_signature(mut self, signature: impl Into<String>) -> Self {
+        self.signature = Some(signature.into());
+        self
     }
 
     #[must_use]
@@ -400,6 +407,12 @@ impl ToolCallPartDelta {
     #[must_use]
     pub fn with_args(mut self, args: impl Into<String>) -> Self {
         self.args = Some(args.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_signature(mut self, signature: impl Into<String>) -> Self {
+        self.signature = Some(signature.into());
         self
     }
 

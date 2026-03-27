@@ -636,6 +636,7 @@ fn convert_to_openai_tool_call(
         tool_call_id,
         tool_name,
         args,
+        signature: _,
         id,
     } = part;
 
@@ -870,6 +871,7 @@ fn map_openai_function_tool_call(
         tool_call_id: tool_call.id,
         tool_name: tool_call.function.name,
         args,
+        signature: None,
         id: None,
     })
 }
@@ -926,6 +928,7 @@ fn map_openai_delta(
                 tool_call_id: tool_call.id,
                 tool_name: None,
                 args: None,
+                signature: None,
                 id: None,
             };
 

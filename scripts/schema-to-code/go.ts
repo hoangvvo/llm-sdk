@@ -23,7 +23,9 @@ export function renderGoDocument(
 
   const parts: string[] = [`package ${packageName}`];
   if (importLines.length > 0) {
-    parts.push(`import (\n${importLines.map((line) => `\t${line}`).join("\n")}\n)`);
+    parts.push(
+      `import (\n${importLines.map((line) => `\t${line}`).join("\n")}\n)`,
+    );
   }
 
   for (const declaration of document.declarations) {
@@ -54,7 +56,9 @@ function renderGoAlias(declaration: AliasDeclaration): string {
 
 function renderGoEnum(declaration: EnumDeclaration): string {
   if (declaration.primitive !== "string") {
-    throw new Error(`Go enum ${declaration.name} uses unsupported primitive ${declaration.primitive}`);
+    throw new Error(
+      `Go enum ${declaration.name} uses unsupported primitive ${declaration.primitive}`,
+    );
   }
 
   const lines: string[] = [];
@@ -116,7 +120,8 @@ function renderGoUnion(declaration: UnionDeclaration): string {
 
 function renderTaggedGoUnion(declaration: UnionDeclaration): string {
   const discriminator =
-    declaration.discriminator ?? fail(`Missing discriminator for ${declaration.name}`);
+    declaration.discriminator ??
+    fail(`Missing discriminator for ${declaration.name}`);
   const lines: string[] = [];
   const comments = renderGoComment(declaration.description);
   if (comments) {
@@ -132,7 +137,9 @@ function renderTaggedGoUnion(declaration: UnionDeclaration): string {
   for (const variant of declaration.variants) {
     lines.push(`\tif u.${variant.name} != nil {`);
     lines.push("\t\treturn json.Marshal(struct {");
-    lines.push(`\t\t\t${toGoFieldName(discriminator)} string \`json:"${discriminator}"\``);
+    lines.push(
+      `\t\t\t${toGoFieldName(discriminator)} string \`json:"${discriminator}"\``,
+    );
     lines.push(`\t\t\t*${variant.typeName}`);
     lines.push("\t\t}{");
     lines.push(
@@ -147,7 +154,9 @@ function renderTaggedGoUnion(declaration: UnionDeclaration): string {
   );
   lines.push("}");
   lines.push("");
-  lines.push(`func (u *${declaration.name}) UnmarshalJSON(data []byte) error {`);
+  lines.push(
+    `func (u *${declaration.name}) UnmarshalJSON(data []byte) error {`,
+  );
   lines.push("\tvar raw map[string]json.RawMessage");
   lines.push("\tif err := json.Unmarshal(data, &raw); err != nil {");
   lines.push("\t\treturn err");
@@ -207,16 +216,22 @@ function renderUntaggedGoUnion(declaration: UnionDeclaration): string {
     lines.push(`\t\treturn json.Marshal(u.${variant.name})`);
     lines.push("\t}");
   }
-  lines.push(`\treturn nil, errors.New("invalid ${declaration.name}: all variants are nil")`);
+  lines.push(
+    `\treturn nil, errors.New("invalid ${declaration.name}: all variants are nil")`,
+  );
   lines.push("}");
   lines.push("");
-  lines.push(`func (u *${declaration.name}) UnmarshalJSON(data []byte) error {`);
+  lines.push(
+    `func (u *${declaration.name}) UnmarshalJSON(data []byte) error {`,
+  );
   lines.push("\tvar raw interface{}");
   lines.push("\tif err := json.Unmarshal(data, &raw); err != nil {");
   lines.push("\t\treturn err");
   lines.push("\t}");
   lines.push(`\t*u = ${declaration.name}{}`);
-  const objectVariants = declaration.variants.filter((variant) => variant.match.kind === "object");
+  const objectVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "object",
+  );
   const needsObjectValue = objectVariants.some((variant) => {
     const match = variant.match;
     return (
@@ -227,32 +242,52 @@ function renderUntaggedGoUnion(declaration: UnionDeclaration): string {
     );
   });
   lines.push(
-    needsObjectValue ? "\tswitch value := raw.(type) {" : "\tswitch raw.(type) {",
+    needsObjectValue
+      ? "\tswitch value := raw.(type) {"
+      : "\tswitch raw.(type) {",
   );
 
-  const stringVariants = declaration.variants.filter((variant) => variant.match.kind === "string");
+  const stringVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "string",
+  );
   if (stringVariants.length > 0) {
     lines.push("\tcase string:");
-    lines.push(...renderGoUntaggedCaseBody(stringVariants, declaration.name, "string"));
+    lines.push(
+      ...renderGoUntaggedCaseBody(stringVariants, declaration.name, "string"),
+    );
   }
-  const numberVariants = declaration.variants.filter((variant) => variant.match.kind === "number");
+  const numberVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "number",
+  );
   if (numberVariants.length > 0) {
     lines.push("\tcase float64:");
-    lines.push(...renderGoUntaggedCaseBody(numberVariants, declaration.name, "number"));
+    lines.push(
+      ...renderGoUntaggedCaseBody(numberVariants, declaration.name, "number"),
+    );
   }
-  const booleanVariants = declaration.variants.filter((variant) => variant.match.kind === "boolean");
+  const booleanVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "boolean",
+  );
   if (booleanVariants.length > 0) {
     lines.push("\tcase bool:");
-    lines.push(...renderGoUntaggedCaseBody(booleanVariants, declaration.name, "boolean"));
+    lines.push(
+      ...renderGoUntaggedCaseBody(booleanVariants, declaration.name, "boolean"),
+    );
   }
-  const arrayVariants = declaration.variants.filter((variant) => variant.match.kind === "array");
+  const arrayVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "array",
+  );
   if (arrayVariants.length > 0) {
     lines.push("\tcase []interface{}:");
-    lines.push(...renderGoUntaggedCaseBody(arrayVariants, declaration.name, "array"));
+    lines.push(
+      ...renderGoUntaggedCaseBody(arrayVariants, declaration.name, "array"),
+    );
   }
   if (objectVariants.length > 0) {
     lines.push("\tcase map[string]interface{}:");
-    lines.push(...renderGoObjectUntaggedCaseBody(objectVariants, declaration.name));
+    lines.push(
+      ...renderGoObjectUntaggedCaseBody(objectVariants, declaration.name),
+    );
   }
   lines.push("\t}");
   lines.push(`\treturn errors.New("invalid ${declaration.name}")`);
@@ -267,7 +302,7 @@ function renderGoUntaggedCaseBody(
 ): string[] {
   if (variants.length !== 1) {
     throw new Error(
-      `Untagged Go union ${unionName} has multiple indistinguishable variants`,
+      `Untagged Go union ${unionName} (${_kind}) has multiple indistinguishable variants`,
     );
   }
   const variant = variants[0] ?? fail(`Missing variant for ${unionName}`);
@@ -286,8 +321,14 @@ function renderGoObjectUntaggedCaseBody(
   unionName: string,
 ): string[] {
   const rankedVariants = [...variants].sort((left, right) => {
-    const leftMatch = left.match.kind === "object" ? left.match : fail(`Expected object match for ${unionName}`);
-    const rightMatch = right.match.kind === "object" ? right.match : fail(`Expected object match for ${unionName}`);
+    const leftMatch =
+      left.match.kind === "object"
+        ? left.match
+        : fail(`Expected object match for ${unionName}`);
+    const rightMatch =
+      right.match.kind === "object"
+        ? right.match
+        : fail(`Expected object match for ${unionName}`);
     const leftScore =
       (leftMatch.nestedTaggedUnion ? 100 : 0) +
       (leftMatch.discriminator ? 10 : 0) +
@@ -310,11 +351,11 @@ function renderGoObjectUntaggedCaseBody(
     if (match.nestedTaggedUnion) {
       hasNestedTaggedUnion = true;
       const field = toGoFieldName(match.nestedTaggedUnion.property);
-      lines.push(`\t\tif raw${field}, ok := value[${JSON.stringify(match.nestedTaggedUnion.property)}]; ok {`);
-      lines.push(`\t\t\tif discriminator, ok := raw${field}.(string); ok {`);
       lines.push(
-        `\t\t\t\tswitch discriminator {`,
+        `\t\tif raw${field}, ok := value[${JSON.stringify(match.nestedTaggedUnion.property)}]; ok {`,
       );
+      lines.push(`\t\t\tif discriminator, ok := raw${field}.(string); ok {`);
+      lines.push(`\t\t\t\tswitch discriminator {`);
       for (const allowedValue of match.nestedTaggedUnion.values) {
         lines.push(`\t\t\t\tcase ${JSON.stringify(allowedValue)}:`);
       }
@@ -378,7 +419,12 @@ function renderGoType(
 ): string {
   switch (type.kind) {
     case "primitive":
-      return wrapOptionalGoType(renderGoPrimitive(type.primitive), required, nullable, type);
+      return wrapOptionalGoType(
+        renderGoPrimitive(type.primitive),
+        required,
+        nullable,
+        type,
+      );
     case "named":
       return wrapOptionalGoType(type.name, required, nullable, type);
     case "array":
@@ -446,7 +492,9 @@ function toGoFieldName(value: string): string {
     .split(/\s+/)
     .filter(Boolean);
   const identifier = words
-    .flatMap((word) => word.match(/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/g) ?? [])
+    .flatMap(
+      (word) => word.match(/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/g) ?? [],
+    )
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join("");
   return /^[0-9]/.test(identifier) ? `N${identifier}` : identifier;
