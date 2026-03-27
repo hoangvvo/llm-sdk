@@ -283,7 +283,10 @@ fn convert_to_response_create_params(
             model: Some(Some(model_id.to_string())),
             previous_response_id: None,
             prompt: None,
-            reasoning: reasoning.map(convert_to_openai_reasoning).transpose()?,
+            reasoning: reasoning
+                .as_ref()
+                .map(convert_to_openai_reasoning)
+                .transpose()?,
             text: response_format.map(Into::into),
             tool_choice: tool_choice.map(convert_to_openai_response_tool_choice),
             tools: tools
@@ -391,8 +394,9 @@ impl TryFrom<UserMessage> for InputItem {
                                 _ => Err(LanguageModelError::Unsupported(
                                     PROVIDER,
                                     format!(
-                                    "Cannot convert part to OpenAI input content for part {part:?}"
-                                ),
+                                        "Cannot convert part to OpenAI input content for part \
+                                         {part:?}"
+                                    ),
                                 ))?,
                             })
                         })
@@ -617,7 +621,7 @@ impl From<ResponseFormatOption> for ResponseTextParam {
     }
 }
 
-fn convert_to_openai_reasoning(value: ReasoningOptions) -> LanguageModelResult<Reasoning> {
+fn convert_to_openai_reasoning(value: &ReasoningOptions) -> LanguageModelResult<Reasoning> {
     Ok(Reasoning {
         effort: value
             .budget_tokens
@@ -704,7 +708,6 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                 acc.push(part);
                 Ok(acc)
             }
-            OutputItem::WebSearchCall(_) => Ok(acc),
             _ => Ok(acc),
         })
 }
@@ -814,7 +817,7 @@ fn map_openai_stream_event(
 }
 
 fn openai_image_format_to_mime_type(format: Option<&String>) -> String {
-    format!("image/{}", format.map(String::as_str).unwrap_or("png"))
+    format!("image/{}", format.map_or("png", String::as_str))
 }
 
 fn parse_openai_image_size(size: Option<&String>) -> Option<(u32, u32)> {

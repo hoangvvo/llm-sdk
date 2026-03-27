@@ -1,31 +1,47 @@
+#![allow(clippy::enum_variant_names)]
+#![allow(clippy::struct_field_names)]
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateMessageParams {
-    /// Top-level cache control automatically applies a cache_control marker to the last cacheable block in the request.
+    /// Top-level cache control automatically applies a `cache_control` marker
+    /// to the last cacheable block in the request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CreateMessageParamsCacheControl>,
     /// Container identifier for reuse across requests.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub container: Option<String>,
-    /// Specifies the geographic region for inference processing. If not specified, the workspace's `default_inference_geo` is used.
+    /// Specifies the geographic region for inference processing. If not
+    /// specified, the workspace's `default_inference_geo` is used.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inference_geo: Option<String>,
     /// The maximum number of tokens to generate before stopping.
     ///
-    /// Note that our models may stop _before_ reaching this maximum. This parameter only specifies the absolute maximum number of tokens to generate.
+    /// Note that our models may stop _before_ reaching this maximum. This
+    /// parameter only specifies the absolute maximum number of tokens to
+    /// generate.
     ///
     /// Different models have different maximum values for this parameter.  See [models](https://docs.claude.com/en/docs/models-overview) for details.
     pub max_tokens: i64,
     /// Input messages.
     ///
-    /// Our models are trained to operate on alternating `user` and `assistant` conversational turns. When creating a new `Message`, you specify the prior conversational turns with the `messages` parameter, and the model then generates the next `Message` in the conversation. Consecutive `user` or `assistant` turns in your request will be combined into a single turn.
+    /// Our models are trained to operate on alternating `user` and `assistant`
+    /// conversational turns. When creating a new `Message`, you specify the
+    /// prior conversational turns with the `messages` parameter, and the model
+    /// then generates the next `Message` in the conversation. Consecutive
+    /// `user` or `assistant` turns in your request will be combined into a
+    /// single turn.
     ///
-    /// Each input message must be an object with a `role` and `content`. You can specify a single `user`-role message, or you can include multiple `user` and `assistant` messages.
+    /// Each input message must be an object with a `role` and `content`. You
+    /// can specify a single `user`-role message, or you can include multiple
+    /// `user` and `assistant` messages.
     ///
-    /// If the final message uses the `assistant` role, the response content will continue immediately from the content in that message. This can be used to constrain part of the model's response.
+    /// If the final message uses the `assistant` role, the response content
+    /// will continue immediately from the content in that message. This can be
+    /// used to constrain part of the model's response.
     ///
     /// Example with a single `user` message:
     ///
@@ -52,7 +68,10 @@ pub struct CreateMessageParams {
     /// ]
     /// ```
     ///
-    /// Each input message `content` may be either a single `string` or an array of content blocks, where each block has a specific `type`. Using a `string` for `content` is shorthand for an array of one content block of type `"text"`. The following input messages are equivalent:
+    /// Each input message `content` may be either a single `string` or an array
+    /// of content blocks, where each block has a specific `type`. Using a
+    /// `string` for `content` is shorthand for an array of one content block of
+    /// type `"text"`. The following input messages are equivalent:
     ///
     /// ```json
     /// {"role": "user", "content": "Hello, Claude"}
@@ -75,16 +94,22 @@ pub struct CreateMessageParams {
     /// Configuration options for the model's output, such as the output format.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_config: Option<OutputConfig>,
-    /// Determines whether to use priority capacity (if available) or standard capacity for this request.
+    /// Determines whether to use priority capacity (if available) or standard
+    /// capacity for this request.
     ///
     /// Anthropic offers different levels of service for your API requests. See [service-tiers](https://docs.claude.com/en/api/service-tiers) for details.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<CreateMessageParamsServiceTier>,
     /// Custom text sequences that will cause the model to stop generating.
     ///
-    /// Our models will normally stop when they have naturally completed their turn, which will result in a response `stop_reason` of `"end_turn"`.
+    /// Our models will normally stop when they have naturally completed their
+    /// turn, which will result in a response `stop_reason` of `"end_turn"`.
     ///
-    /// If you want the model to stop generating when it encounters custom strings of text, you can use the `stop_sequences` parameter. If the model encounters one of the custom sequences, the response `stop_reason` value will be `"stop_sequence"` and the response `stop_sequence` value will contain the matched stop sequence.
+    /// If you want the model to stop generating when it encounters custom
+    /// strings of text, you can use the `stop_sequences` parameter. If the
+    /// model encounters one of the custom sequences, the response `stop_reason`
+    /// value will be `"stop_sequence"` and the response `stop_sequence` value
+    /// will contain the matched stop sequence.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_sequences: Option<Vec<String>>,
     /// Whether to incrementally stream the response using server-sent events.
@@ -99,9 +124,12 @@ pub struct CreateMessageParams {
     pub system: Option<CreateMessageParamsSystem>,
     /// Amount of randomness injected into the response.
     ///
-    /// Defaults to `1.0`. Ranges from `0.0` to `1.0`. Use `temperature` closer to `0.0` for analytical / multiple choice, and closer to `1.0` for creative and generative tasks.
+    /// Defaults to `1.0`. Ranges from `0.0` to `1.0`. Use `temperature` closer
+    /// to `0.0` for analytical / multiple choice, and closer to `1.0` for
+    /// creative and generative tasks.
     ///
-    /// Note that even with `temperature` of `0.0`, the results will not be fully deterministic.
+    /// Note that even with `temperature` of `0.0`, the results will not be
+    /// fully deterministic.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -110,15 +138,22 @@ pub struct CreateMessageParams {
     pub tool_choice: Option<ToolChoice>,
     /// Definitions of tools that the model may use.
     ///
-    /// If you include `tools` in your API request, the model may return `tool_use` content blocks that represent the model's use of those tools. You can then run those tools using the tool input generated by the model and then optionally return results back to the model using `tool_result` content blocks.
+    /// If you include `tools` in your API request, the model may return
+    /// `tool_use` content blocks that represent the model's use of those tools.
+    /// You can then run those tools using the tool input generated by the model
+    /// and then optionally return results back to the model using `tool_result`
+    /// content blocks.
     ///
     /// There are two types of tools: **client tools** and **server tools**. The behavior described below applies to client tools. For [server tools](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview\#server-tools), see their individual documentation as each has its own behavior (e.g., the [web search tool](https://docs.claude.com/en/docs/agents-and-tools/tool-use/web-search-tool)).
     ///
     /// Each tool definition includes:
     ///
     /// * `name`: Name of the tool.
-    /// * `description`: Optional, but strongly-recommended description of the tool.
-    /// * `input_schema`: [JSON schema](https://json-schema.org/draft/2020-12) for the tool `input` shape that the model will produce in `tool_use` output content blocks.
+    /// * `description`: Optional, but strongly-recommended description of the
+    ///   tool.
+    /// * `input_schema`: [JSON schema](https://json-schema.org/draft/2020-12)
+    ///   for the tool `input` shape that the model will produce in `tool_use`
+    ///   output content blocks.
     ///
     /// For example, if you defined `tools` as:
     ///
@@ -141,7 +176,8 @@ pub struct CreateMessageParams {
     /// ]
     /// ```
     ///
-    /// And then asked the model "What's the S&P 500 at today?", the model might produce `tool_use` content blocks in the response like this:
+    /// And then asked the model "What's the S&P 500 at today?", the model might
+    /// produce `tool_use` content blocks in the response like this:
     ///
     /// ```json
     /// [
@@ -154,7 +190,9 @@ pub struct CreateMessageParams {
     /// ]
     /// ```
     ///
-    /// You might then run your `get_stock_price` tool with `{"ticker": "^GSPC"}` as an input, and return the following back to the model in a subsequent `user` message:
+    /// You might then run your `get_stock_price` tool with `{"ticker":
+    /// "^GSPC"}` as an input, and return the following back to the model in a
+    /// subsequent `user` message:
     ///
     /// ```json
     /// [
@@ -166,7 +204,9 @@ pub struct CreateMessageParams {
     /// ]
     /// ```
     ///
-    /// Tools can be used for workflows that include running client-side tools and functions, or more generally whenever you want the model to produce a particular JSON structure of output.
+    /// Tools can be used for workflows that include running client-side tools
+    /// and functions, or more generally whenever you want the model to produce
+    /// a particular JSON structure of output.
     ///
     /// See our [guide](https://docs.claude.com/en/docs/tool-use) for more details.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -175,19 +215,25 @@ pub struct CreateMessageParams {
     ///
     /// Used to remove "long tail" low probability responses. [Learn more technical details here](https://towardsdatascience.com/how-to-sample-from-language-models-682bceb97277).
     ///
-    /// Recommended for advanced use cases only. You usually only need to use `temperature`.
+    /// Recommended for advanced use cases only. You usually only need to use
+    /// `temperature`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<i64>,
     /// Use nucleus sampling.
     ///
-    /// In nucleus sampling, we compute the cumulative distribution over all the options for each subsequent token in decreasing probability order and cut it off once it reaches a particular probability specified by `top_p`. You should either alter `temperature` or `top_p`, but not both.
+    /// In nucleus sampling, we compute the cumulative distribution over all the
+    /// options for each subsequent token in decreasing probability order and
+    /// cut it off once it reaches a particular probability specified by
+    /// `top_p`. You should either alter `temperature` or `top_p`, but not both.
     ///
-    /// Recommended for advanced use cases only. You usually only need to use `temperature`.
+    /// Recommended for advanced use cases only. You usually only need to use
+    /// `temperature`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
 }
 
-/// Top-level cache control automatically applies a cache_control marker to the last cacheable block in the request.
+/// Top-level cache control automatically applies a `cache_control` marker to
+/// the last cacheable block in the request.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CreateMessageParamsCacheControl {
@@ -195,7 +241,8 @@ pub enum CreateMessageParamsCacheControl {
     Ephemeral(CacheControlEphemeral),
 }
 
-/// Determines whether to use priority capacity (if available) or standard capacity for this request.
+/// Determines whether to use priority capacity (if available) or standard
+/// capacity for this request.
 ///
 /// Anthropic offers different levels of service for your API requests. See [service-tiers](https://docs.claude.com/en/api/service-tiers) for details.
 #[derive(Serialize, Deserialize)]
@@ -245,11 +292,13 @@ pub enum CreateMessageParamsToolsItem {
 pub struct Message {
     /// Information about the container used in this request.
     ///
-    /// This will be non-null if a container tool (e.g. code execution) was used.
+    /// This will be non-null if a container tool (e.g. code execution) was
+    /// used.
     pub container: Option<Container>,
     /// Content generated by the model.
     ///
-    /// This is an array of content blocks, each of which has a `type` that determines its shape.
+    /// This is an array of content blocks, each of which has a `type` that
+    /// determines its shape.
     ///
     /// Example:
     ///
@@ -257,7 +306,9 @@ pub struct Message {
     /// [{"type": "text", "text": "Hi, I'm Claude."}]
     /// ```
     ///
-    /// If the request input `messages` ended with an `assistant` turn, then the response `content` will continue directly from that last turn. You can use this to constrain the model's output.
+    /// If the request input `messages` ended with an `assistant` turn, then the
+    /// response `content` will continue directly from that last turn. You can
+    /// use this to constrain the model's output.
     ///
     /// For example, if the input `messages` were:
     /// ```json
@@ -286,17 +337,23 @@ pub struct Message {
     ///
     /// This may be one the following values:
     /// * `"end_turn"`: the model reached a natural stopping point
-    /// * `"max_tokens"`: we exceeded the requested `max_tokens` or the model's maximum
-    /// * `"stop_sequence"`: one of your provided custom `stop_sequences` was generated
+    /// * `"max_tokens"`: we exceeded the requested `max_tokens` or the model's
+    ///   maximum
+    /// * `"stop_sequence"`: one of your provided custom `stop_sequences` was
+    ///   generated
     /// * `"tool_use"`: the model invoked one or more tools
-    /// * `"pause_turn"`: we paused a long-running turn. You may provide the response back as-is in a subsequent request to let the model continue.
-    /// * `"refusal"`: when streaming classifiers intervene to handle potential policy violations
+    /// * `"pause_turn"`: we paused a long-running turn. You may provide the
+    ///   response back as-is in a subsequent request to let the model continue.
+    /// * `"refusal"`: when streaming classifiers intervene to handle potential
+    ///   policy violations
     ///
-    /// In non-streaming mode this value is always non-null. In streaming mode, it is null in the `message_start` event and non-null otherwise.
+    /// In non-streaming mode this value is always non-null. In streaming mode,
+    /// it is null in the `message_start` event and non-null otherwise.
     pub stop_reason: Option<StopReason>,
     /// Which custom stop sequence was generated, if any.
     ///
-    /// This value will be a non-null string if one of your custom stop sequences was generated.
+    /// This value will be a non-null string if one of your custom stop
+    /// sequences was generated.
     pub stop_sequence: Option<String>,
     /// Object type.
     ///
@@ -304,13 +361,20 @@ pub struct Message {
     pub r#type: String,
     /// Billing and rate-limit usage.
     ///
-    /// Anthropic's API bills and rate-limits by token counts, as tokens represent the underlying cost to our systems.
+    /// Anthropic's API bills and rate-limits by token counts, as tokens
+    /// represent the underlying cost to our systems.
     ///
-    /// Under the hood, the API transforms requests into a format suitable for the model. The model's output then goes through a parsing stage before becoming an API response. As a result, the token counts in `usage` will not match one-to-one with the exact visible content of an API request or response.
+    /// Under the hood, the API transforms requests into a format suitable for
+    /// the model. The model's output then goes through a parsing stage before
+    /// becoming an API response. As a result, the token counts in `usage` will
+    /// not match one-to-one with the exact visible content of an API request or
+    /// response.
     ///
-    /// For example, `output_tokens` will be non-zero, even for an empty string response from Claude.
+    /// For example, `output_tokens` will be non-zero, even for an empty string
+    /// response from Claude.
     ///
-    /// Total input tokens in a request is the summation of `input_tokens`, `cache_creation_input_tokens`, and `cache_read_input_tokens`.
+    /// Total input tokens in a request is the summation of `input_tokens`,
+    /// `cache_creation_input_tokens`, and `cache_read_input_tokens`.
     pub usage: Usage,
 }
 
@@ -393,7 +457,9 @@ pub enum InputMessageRole {
 pub struct Metadata {
     /// An external identifier for the user who is associated with the request.
     ///
-    /// This should be a uuid, hash value, or other opaque identifier. Anthropic may use this id to help detect abuse. Do not include any identifying information such as name, email address, or phone number.
+    /// This should be a uuid, hash value, or other opaque identifier. Anthropic
+    /// may use this id to help detect abuse. Do not include any identifying
+    /// information such as name, email address, or phone number.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
 }
@@ -403,7 +469,8 @@ pub type Model = Option<String>;
 
 #[derive(Serialize, Deserialize)]
 pub struct OutputConfig {
-    /// How much effort the model should put into its response. Higher effort levels may result in more thorough analysis but take longer.
+    /// How much effort the model should put into its response. Higher effort
+    /// levels may result in more thorough analysis but take longer.
     ///
     /// Valid values are `low`, `medium`, `high`, or `max`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -450,7 +517,9 @@ pub enum RequestTextBlockCitationsItem {
 
 /// Configuration for enabling Claude's extended thinking.
 ///
-/// When enabled, responses include `thinking` content blocks showing Claude's thinking process before the final answer. Requires a minimum budget of 1,024 tokens and counts towards your `max_tokens` limit.
+/// When enabled, responses include `thinking` content blocks showing Claude's
+/// thinking process before the final answer. Requires a minimum budget of 1,024
+/// tokens and counts towards your `max_tokens` limit.
 ///
 /// See [extended thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking) for details.
 #[derive(Serialize, Deserialize)]
@@ -464,7 +533,8 @@ pub enum ThinkingConfigParam {
     Adaptive(ThinkingConfigAdaptive),
 }
 
-/// How the model should use the provided tools. The model can use a specific tool, any available tool, decide by itself, or not use tools at all.
+/// How the model should use the provided tools. The model can use a specific
+/// tool, any available tool, decide by itself, or not use tools at all.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ToolChoice {
@@ -485,26 +555,37 @@ pub struct Tool {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<ToolCacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Description of what this tool does.
     ///
-    /// Tool descriptions should be as detailed as possible. The more information that the model has about what the tool is and how to use it, the better it will perform. You can use natural language descriptions to reinforce important aspects of the tool input JSON schema.
+    /// Tool descriptions should be as detailed as possible. The more
+    /// information that the model has about what the tool is and how to use it,
+    /// the better it will perform. You can use natural language descriptions to
+    /// reinforce important aspects of the tool input JSON schema.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// Enable eager input streaming for this tool. When true, tool input parameters will be streamed incrementally as they are generated, and types will be inferred on-the-fly rather than buffering the full JSON output. When false, streaming is disabled for this tool even if the fine-grained-tool-streaming beta is active. When null (default), uses the default behavior based on beta headers.
+    /// Enable eager input streaming for this tool. When true, tool input
+    /// parameters will be streamed incrementally as they are generated, and
+    /// types will be inferred on-the-fly rather than buffering the full JSON
+    /// output. When false, streaming is disabled for this tool even if the
+    /// fine-grained-tool-streaming beta is active. When null (default), uses
+    /// the default behavior based on beta headers.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eager_input_streaming: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_examples: Option<Vec<HashMap<String, JsonValue>>>,
     /// [JSON schema](https://json-schema.org/draft/2020-12) for this tool's input.
     ///
-    /// This defines the shape of the `input` that your tool accepts and that the model will produce.
+    /// This defines the shape of the `input` that your tool accepts and that
+    /// the model will produce.
     pub input_schema: InputSchema,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -528,14 +609,16 @@ pub struct BashTool20250124 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<BashTool20250124CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_examples: Option<Vec<HashMap<String, JsonValue>>>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -558,12 +641,14 @@ pub struct CodeExecutionTool20250522 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CodeExecutionTool20250522CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -586,12 +671,14 @@ pub struct CodeExecutionTool20250825 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CodeExecutionTool20250825CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -607,7 +694,8 @@ pub enum CodeExecutionTool20250825CacheControl {
     Ephemeral(CacheControlEphemeral),
 }
 
-/// Code execution tool with REPL state persistence (daemon mode + gVisor checkpoint).
+/// Code execution tool with REPL state persistence (daemon mode + gVisor
+/// checkpoint).
 #[derive(Serialize, Deserialize)]
 pub struct CodeExecutionTool20260120 {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -615,12 +703,14 @@ pub struct CodeExecutionTool20260120 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CodeExecutionTool20260120CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -643,14 +733,16 @@ pub struct MemoryTool20250818 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<MemoryTool20250818CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_examples: Option<Vec<HashMap<String, JsonValue>>>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -673,14 +765,16 @@ pub struct TextEditor20250124 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<TextEditor20250124CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_examples: Option<Vec<HashMap<String, JsonValue>>>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -703,14 +797,16 @@ pub struct TextEditor20250429 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<TextEditor20250429CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_examples: Option<Vec<HashMap<String, JsonValue>>>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -733,17 +829,20 @@ pub struct TextEditor20250728 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<TextEditor20250728CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_examples: Option<Vec<HashMap<String, JsonValue>>>,
-    /// Maximum number of characters to display when viewing a file. If not specified, defaults to displaying the full file.
+    /// Maximum number of characters to display when viewing a file. If not
+    /// specified, defaults to displaying the full file.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_characters: Option<i64>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -763,16 +862,19 @@ pub enum TextEditor20250728CacheControl {
 pub struct WebSearchTool20250305 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
-    /// If provided, only these domains will be included in results. Cannot be used alongside `blocked_domains`.
+    /// If provided, only these domains will be included in results. Cannot be
+    /// used alongside `blocked_domains`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_domains: Option<Vec<String>>,
-    /// If provided, these domains will never appear in results. Cannot be used alongside `allowed_domains`.
+    /// If provided, these domains will never appear in results. Cannot be used
+    /// alongside `allowed_domains`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blocked_domains: Option<Vec<String>>,
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<WebSearchTool20250305CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Maximum number of times the tool can be used in the API request.
@@ -780,13 +882,15 @@ pub struct WebSearchTool20250305 {
     pub max_uses: Option<i64>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
     pub strict: Option<bool>,
     pub r#type: String,
-    /// Parameters for the user's location. Used to provide more relevant search results.
+    /// Parameters for the user's location. Used to provide more relevant search
+    /// results.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_location: Option<UserLocation>,
 }
@@ -812,13 +916,17 @@ pub struct WebFetchTool20250910 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<WebFetchTool20250910CacheControl>,
-    /// Citations configuration for fetched documents. Citations are disabled by default.
+    /// Citations configuration for fetched documents. Citations are disabled by
+    /// default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<RequestCitationsConfig>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
-    /// Maximum number of tokens used by including web page text content in the context. The limit is approximate and does not apply to binary content such as PDFs.
+    /// Maximum number of tokens used by including web page text content in the
+    /// context. The limit is approximate and does not apply to binary content
+    /// such as PDFs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_content_tokens: Option<i64>,
     /// Maximum number of times the tool can be used in the API request.
@@ -826,7 +934,8 @@ pub struct WebFetchTool20250910 {
     pub max_uses: Option<i64>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -846,16 +955,19 @@ pub enum WebFetchTool20250910CacheControl {
 pub struct WebSearchTool20260209 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
-    /// If provided, only these domains will be included in results. Cannot be used alongside `blocked_domains`.
+    /// If provided, only these domains will be included in results. Cannot be
+    /// used alongside `blocked_domains`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_domains: Option<Vec<String>>,
-    /// If provided, these domains will never appear in results. Cannot be used alongside `allowed_domains`.
+    /// If provided, these domains will never appear in results. Cannot be used
+    /// alongside `allowed_domains`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blocked_domains: Option<Vec<String>>,
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<WebSearchTool20260209CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Maximum number of times the tool can be used in the API request.
@@ -863,13 +975,15 @@ pub struct WebSearchTool20260209 {
     pub max_uses: Option<i64>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
     pub strict: Option<bool>,
     pub r#type: String,
-    /// Parameters for the user's location. Used to provide more relevant search results.
+    /// Parameters for the user's location. Used to provide more relevant search
+    /// results.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_location: Option<UserLocation>,
 }
@@ -895,13 +1009,17 @@ pub struct WebFetchTool20260209 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<WebFetchTool20260209CacheControl>,
-    /// Citations configuration for fetched documents. Citations are disabled by default.
+    /// Citations configuration for fetched documents. Citations are disabled by
+    /// default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<RequestCitationsConfig>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
-    /// Maximum number of tokens used by including web page text content in the context. The limit is approximate and does not apply to binary content such as PDFs.
+    /// Maximum number of tokens used by including web page text content in the
+    /// context. The limit is approximate and does not apply to binary content
+    /// such as PDFs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_content_tokens: Option<i64>,
     /// Maximum number of times the tool can be used in the API request.
@@ -909,7 +1027,8 @@ pub struct WebFetchTool20260209 {
     pub max_uses: Option<i64>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -925,7 +1044,7 @@ pub enum WebFetchTool20260209CacheControl {
     Ephemeral(CacheControlEphemeral),
 }
 
-/// Web fetch tool with use_cache parameter for bypassing cached content.
+/// Web fetch tool with `use_cache` parameter for bypassing cached content.
 #[derive(Serialize, Deserialize)]
 pub struct WebFetchTool20260309 {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -939,13 +1058,17 @@ pub struct WebFetchTool20260309 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<WebFetchTool20260309CacheControl>,
-    /// Citations configuration for fetched documents. Citations are disabled by default.
+    /// Citations configuration for fetched documents. Citations are disabled by
+    /// default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<RequestCitationsConfig>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
-    /// Maximum number of tokens used by including web page text content in the context. The limit is approximate and does not apply to binary content such as PDFs.
+    /// Maximum number of tokens used by including web page text content in the
+    /// context. The limit is approximate and does not apply to binary content
+    /// such as PDFs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_content_tokens: Option<i64>,
     /// Maximum number of times the tool can be used in the API request.
@@ -953,13 +1076,16 @@ pub struct WebFetchTool20260309 {
     pub max_uses: Option<i64>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
     pub strict: Option<bool>,
     pub r#type: String,
-    /// Whether to use cached content. Set to false to bypass the cache and fetch fresh content. Only set to false when the user explicitly requests fresh content or when fetching rapidly-changing sources.
+    /// Whether to use cached content. Set to false to bypass the cache and
+    /// fetch fresh content. Only set to false when the user explicitly requests
+    /// fresh content or when fetching rapidly-changing sources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub use_cache: Option<bool>,
 }
@@ -979,12 +1105,14 @@ pub struct ToolSearchToolBM2520251119 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<ToolSearchToolBM2520251119CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1015,12 +1143,14 @@ pub struct ToolSearchToolRegex20251119 {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<ToolSearchToolRegex20251119CacheControl>,
-    /// If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.
+    /// If true, tool will not be included in initial system prompt. Only loaded
+    /// when returned via `tool_reference` from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
     ///
-    /// This is how the tool will be called by the model and in `tool_use` blocks.
+    /// This is how the tool will be called by the model and in `tool_use`
+    /// blocks.
     pub name: String,
     /// When true, guarantees schema validation on tool names and inputs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1044,7 +1174,8 @@ pub enum ToolSearchToolRegex20251119Type {
     ToolSearchToolRegex,
 }
 
-/// Information about the container used in the request (for the code execution tool)
+/// Information about the container used in the request (for the code execution
+/// tool)
 #[derive(Serialize, Deserialize)]
 pub struct Container {
     /// The time at which the container will expire.
@@ -1195,13 +1326,20 @@ pub struct MessageDeltaEvent {
     pub delta: MessageDelta,
     /// Billing and rate-limit usage.
     ///
-    /// Anthropic's API bills and rate-limits by token counts, as tokens represent the underlying cost to our systems.
+    /// Anthropic's API bills and rate-limits by token counts, as tokens
+    /// represent the underlying cost to our systems.
     ///
-    /// Under the hood, the API transforms requests into a format suitable for the model. The model's output then goes through a parsing stage before becoming an API response. As a result, the token counts in `usage` will not match one-to-one with the exact visible content of an API request or response.
+    /// Under the hood, the API transforms requests into a format suitable for
+    /// the model. The model's output then goes through a parsing stage before
+    /// becoming an API response. As a result, the token counts in `usage` will
+    /// not match one-to-one with the exact visible content of an API request or
+    /// response.
     ///
-    /// For example, `output_tokens` will be non-zero, even for an empty string response from Claude.
+    /// For example, `output_tokens` will be non-zero, even for an empty string
+    /// response from Claude.
     ///
-    /// Total input tokens in a request is the summation of `input_tokens`, `cache_creation_input_tokens`, and `cache_read_input_tokens`.
+    /// Total input tokens in a request is the summation of `input_tokens`,
+    /// `cache_creation_input_tokens`, and `cache_read_input_tokens`.
     pub usage: MessageDeltaUsage,
 }
 
@@ -1317,7 +1455,10 @@ pub struct RequestWebSearchResultLocationCitation {
 
 #[derive(Serialize, Deserialize)]
 pub struct ThinkingConfigAdaptive {
-    /// Controls how thinking content appears in the response. When set to `summarized`, thinking is returned normally. When set to `omitted`, thinking content is redacted but a signature is returned for multi-turn continuity. Defaults to `summarized`.
+    /// Controls how thinking content appears in the response. When set to
+    /// `summarized`, thinking is returned normally. When set to `omitted`,
+    /// thinking content is redacted but a signature is returned for multi-turn
+    /// continuity. Defaults to `summarized`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display: Option<ThinkingDisplayMode>,
 }
@@ -1327,13 +1468,18 @@ pub struct ThinkingConfigDisabled {}
 
 #[derive(Serialize, Deserialize)]
 pub struct ThinkingConfigEnabled {
-    /// Determines how many tokens Claude can use for its internal reasoning process. Larger budgets can enable more thorough analysis for complex problems, improving response quality.
+    /// Determines how many tokens Claude can use for its internal reasoning
+    /// process. Larger budgets can enable more thorough analysis for complex
+    /// problems, improving response quality.
     ///
     /// Must be ≥1024 and less than `max_tokens`.
     ///
     /// See [extended thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking) for details.
     pub budget_tokens: i64,
-    /// Controls how thinking content appears in the response. When set to `summarized`, thinking is returned normally. When set to `omitted`, thinking content is redacted but a signature is returned for multi-turn continuity. Defaults to `summarized`.
+    /// Controls how thinking content appears in the response. When set to
+    /// `summarized`, thinking is returned normally. When set to `omitted`,
+    /// thinking content is redacted but a signature is returned for multi-turn
+    /// continuity. Defaults to `summarized`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display: Option<ThinkingDisplayMode>,
 }
@@ -1343,7 +1489,8 @@ pub struct ThinkingConfigEnabled {
 pub struct ToolChoiceAny {
     /// Whether to disable parallel tool use.
     ///
-    /// Defaults to `false`. If set to `true`, the model will output exactly one tool use.
+    /// Defaults to `false`. If set to `true`, the model will output exactly one
+    /// tool use.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disable_parallel_tool_use: Option<bool>,
 }
@@ -1353,7 +1500,8 @@ pub struct ToolChoiceAny {
 pub struct ToolChoiceAuto {
     /// Whether to disable parallel tool use.
     ///
-    /// Defaults to `false`. If set to `true`, the model will output at most one tool use.
+    /// Defaults to `false`. If set to `true`, the model will output at most one
+    /// tool use.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disable_parallel_tool_use: Option<bool>,
 }
@@ -1367,7 +1515,8 @@ pub struct ToolChoiceNone {}
 pub struct ToolChoiceTool {
     /// Whether to disable parallel tool use.
     ///
-    /// Defaults to `false`. If set to `true`, the model will output exactly one tool use.
+    /// Defaults to `false`. If set to `true`, the model will output exactly one
+    /// tool use.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disable_parallel_tool_use: Option<bool>,
     /// The name of the tool to use.
@@ -1378,8 +1527,9 @@ pub struct ToolChoiceTool {
 ///
 /// Values:
 ///     direct: The model can call this tool directly.
-///     code_execution_20250825: The tool can be called from the code execution environment (v1).
-///     code_execution_20260120: The tool can be called from the code execution environment (v2 with persistence).
+///     `code_execution_20250825`: The tool can be called from the code
+/// execution environment (v1).     `code_execution_20260120`: The tool can be
+/// called from the code execution environment (v2 with persistence).
 #[derive(Serialize, Deserialize)]
 pub enum AllowedCaller {
     #[serde(rename = "direct")]
@@ -1500,7 +1650,10 @@ pub enum ResponseServerToolUseBlockName {
 pub struct ResponseTextBlock {
     /// Citations supporting the text block.
     ///
-    /// The type of citation returned will depend on the type of document being cited. Citing a PDF results in `page_location`, plain text results in `char_location`, and content document results in `content_block_location`.
+    /// The type of citation returned will depend on the type of document being
+    /// cited. Citing a PDF results in `page_location`, plain text results in
+    /// `char_location`, and content document results in
+    /// `content_block_location`.
     pub citations: Option<Vec<ResponseTextBlockCitationsItem>>,
     pub text: String,
 }
@@ -1695,7 +1848,8 @@ pub struct ThinkingContentBlockDelta {
 pub struct MessageDelta {
     /// Information about the container used in this request.
     ///
-    /// This will be non-null if a container tool (e.g. code execution) was used.
+    /// This will be non-null if a container tool (e.g. code execution) was
+    /// used.
     pub container: Option<Container>,
     pub stop_reason: Option<StopReason>,
     pub stop_sequence: Option<String>,
@@ -1770,7 +1924,8 @@ pub enum RequestCodeExecutionToolResultBlockContent {
 }
 
 /// A content block that represents a file to be uploaded to the container
-/// Files uploaded via this block will be available in the container's input directory.
+/// Files uploaded via this block will be available in the container's input
+/// directory.
 #[derive(Serialize, Deserialize)]
 pub struct RequestContainerUploadBlock {
     /// Create a cache control breakpoint at this content block.
@@ -2172,7 +2327,7 @@ pub struct ResponseCodeExecutionResultBlock {
     pub stdout: String,
 }
 
-/// Code execution result with encrypted stdout for PFC + web_search results.
+/// Code execution result with encrypted stdout for PFC + `web_search` results.
 #[derive(Serialize, Deserialize)]
 pub struct ResponseEncryptedCodeExecutionResultBlock {
     pub content: Vec<ResponseCodeExecutionOutputBlock>,
@@ -2349,7 +2504,7 @@ pub struct RequestCodeExecutionResultBlock {
     pub stdout: String,
 }
 
-/// Code execution result with encrypted stdout for PFC + web_search results.
+/// Code execution result with encrypted stdout for PFC + `web_search` results.
 #[derive(Serialize, Deserialize)]
 pub struct RequestEncryptedCodeExecutionResultBlock {
     pub content: Vec<RequestCodeExecutionOutputBlock>,
@@ -2471,7 +2626,7 @@ pub struct RequestTextEditorCodeExecutionStrReplaceResultBlock {
     pub old_start: Option<i64>,
 }
 
-/// Tool reference block that can be included in tool_result content.
+/// Tool reference block that can be included in `tool_result` content.
 #[derive(Serialize, Deserialize)]
 pub struct RequestToolReferenceBlock {
     /// Create a cache control breakpoint at this content block.

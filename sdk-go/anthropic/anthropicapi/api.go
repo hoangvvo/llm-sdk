@@ -798,7 +798,7 @@ type RequestTextBlock struct {
 	CacheControl *RequestTextBlockCacheControl   `json:"cache_control,omitempty"`
 	Citations    []RequestTextBlockCitationsItem `json:"citations,omitempty"`
 	Text         string                          `json:"text"`
-	Type         string                          `json:"type,omitempty"`
+	Type         string                          `json:"type"`
 }
 
 // Create a cache control breakpoint at this content block.

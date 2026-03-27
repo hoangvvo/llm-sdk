@@ -985,7 +985,7 @@ fn map_openai_usage(usage: CompletionUsage) -> LanguageModelResult<ModelUsage> {
     };
 
     if let Some(details) = usage.prompt_tokens_details {
-        result.input_tokens_details = Some(map_openai_prompt_tokens_details(details)?);
+        result.input_tokens_details = Some(map_openai_prompt_tokens_details(&details)?);
     }
 
     if let Some(details) = &usage.completion_tokens_details {
@@ -996,7 +996,7 @@ fn map_openai_usage(usage: CompletionUsage) -> LanguageModelResult<ModelUsage> {
 }
 
 fn map_openai_prompt_tokens_details(
-    details: CompletionUsagePromptTokensDetails,
+    details: &CompletionUsagePromptTokensDetails,
 ) -> LanguageModelResult<crate::ModelTokensDetails> {
     let mut result = crate::ModelTokensDetails::default();
 

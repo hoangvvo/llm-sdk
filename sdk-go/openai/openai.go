@@ -701,17 +701,15 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 		}
 
 		if item.Reasoning != nil {
-			if item.Reasoning.EncryptedContent != nil {
-				return &llmsdk.ContentDelta{
-					Index: event.ResponseOutputItemAdded.OutputIndex,
-					Part: llmsdk.PartDelta{
-						ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
-							Signature: item.Reasoning.EncryptedContent,
-							ID:        ptr.To(item.Reasoning.Id),
-						},
+			return &llmsdk.ContentDelta{
+				Index: event.ResponseOutputItemAdded.OutputIndex,
+				Part: llmsdk.PartDelta{
+					ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
+						Signature: item.Reasoning.EncryptedContent,
+						ID:        ptr.To(item.Reasoning.Id),
 					},
-				}, nil
-			}
+				},
+			}, nil
 		}
 
 		return nil, nil

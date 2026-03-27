@@ -339,15 +339,7 @@ fn convert_to_anthropic_create_params(
                 .map(CreateMessageParamsToolsItem::Tool)
                 .collect()
         }),
-        top_k: top_k
-            .map(|value| {
-                i64::try_from(value).map_err(|_| {
-                    LanguageModelError::InvalidInput(
-                        "Anthropic top_k must be a non-negative integer".to_string(),
-                    )
-                })
-            })
-            .transpose()?,
+        top_k: top_k.map(i64::from),
         top_p,
     };
 
@@ -374,16 +366,15 @@ fn convert_to_anthropic_output_config(
 ) -> Option<OutputConfig> {
     match response_format {
         ResponseFormatOption::Text => None,
-        ResponseFormatOption::Json(ResponseFormatJson { schema, .. }) => match schema {
-            Some(schema) => Some(OutputConfig {
+        ResponseFormatOption::Json(ResponseFormatJson { schema, .. }) => {
+            schema.map(|schema| OutputConfig {
                 effort: None,
                 format: Some(api::JsonOutputFormat {
                     schema,
                     r#type: "json_schema".to_string(),
                 }),
-            }),
-            None => None,
-        },
+            })
+        }
     }
 }
 

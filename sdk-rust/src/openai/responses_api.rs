@@ -1,3 +1,6 @@
+#![allow(clippy::enum_variant_names)]
+#![allow(clippy::struct_field_names)]
+
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -5,45 +8,53 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize)]
 pub struct CreateResponseAllOf3 {
     /// Context management configuration for this request.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_management: Option<Vec<ContextManagementParam>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ConversationParam>,
-    /// Specify additional output data to include in the model response. Currently supported values are:
-    /// - `web_search_call.action.sources`: Include the sources of the web search tool call.
-    /// - `code_interpreter_call.outputs`: Includes the outputs of python code execution in code interpreter tool call items.
-    /// - `computer_call_output.output.image_url`: Include image urls from the computer call output.
-    /// - `file_search_call.results`: Include the search results of the file search tool call.
-    /// - `message.input_image.image_url`: Include image urls from the input message.
-    /// - `message.output_text.logprobs`: Include logprobs with assistant messages.
-    /// - `reasoning.encrypted_content`: Includes an encrypted version of reasoning tokens in reasoning item outputs. This enables reasoning items to be used in multi-turn conversations when using the Responses API statelessly (like when the `store` parameter is set to `false`, or when an organization is enrolled in the zero data retention program).
+    /// Specify additional output data to include in the model response.
+    /// Currently supported values are:
+    /// - `web_search_call.action.sources`: Include the sources of the web
+    ///   search tool call.
+    /// - `code_interpreter_call.outputs`: Includes the outputs of python code
+    ///   execution in code interpreter tool call items.
+    /// - `computer_call_output.output.image_url`: Include image urls from the
+    ///   computer call output.
+    /// - `file_search_call.results`: Include the search results of the file
+    ///   search tool call.
+    /// - `message.input_image.image_url`: Include image urls from the input
+    ///   message.
+    /// - `message.output_text.logprobs`: Include logprobs with assistant
+    ///   messages.
+    /// - `reasoning.encrypted_content`: Includes an encrypted version of
+    ///   reasoning tokens in reasoning item outputs. This enables reasoning
+    ///   items to be used in multi-turn conversations when using the Responses
+    ///   API statelessly (like when the `store` parameter is set to `false`, or
+    ///   when an organization is enrolled in the zero data retention program).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<IncludeEnum>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<InputParam>,
     /// A system (or developer) message inserted into the model's context.
     ///
-    /// When using along with `previous_response_id`, the instructions from a previous
-    /// response will not be carried over to the next response. This makes it simple
-    /// to swap out system (or developer) messages in new responses.
-    ///
+    /// When using along with `previous_response_id`, the instructions from a
+    /// previous response will not be carried over to the next response.
+    /// This makes it simple to swap out system (or developer) messages in
+    /// new responses.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     /// Whether to allow the model to run tool calls in parallel.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     /// Whether to store the generated model response for later retrieval via
     /// API.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
     /// If set to true, the model response data will be streamed to the client
     /// as it is generated using [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
-    /// See the [Streaming section below](/docs/api-reference/responses-streaming)
+    /// See the [Streaming section
+    /// below](/docs/api-reference/responses-streaming)
     /// for more information.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -64,53 +75,44 @@ pub struct CreateResponse {
 pub struct ResponseAllOf3 {
     /// Unix timestamp (in seconds) of when this Response was completed.
     /// Only present when the status is `completed`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation: Option<Conversation2>,
     /// Unix timestamp (in seconds) of when this Response was created.
-    ///
     pub created_at: f64,
     pub error: ResponseError,
     /// Unique identifier for this Response.
-    ///
     pub id: String,
     /// Details about why the response is incomplete.
-    ///
     pub incomplete_details: Option<ResponseAllOf3IncompleteDetails>,
     /// A system (or developer) message inserted into the model's context.
     ///
-    /// When using along with `previous_response_id`, the instructions from a previous
-    /// response will not be carried over to the next response. This makes it simple
-    /// to swap out system (or developer) messages in new responses.
-    ///
+    /// When using along with `previous_response_id`, the instructions from a
+    /// previous response will not be carried over to the next response.
+    /// This makes it simple to swap out system (or developer) messages in
+    /// new responses.
     pub instructions: Option<ResponseAllOf3Instructions>,
     /// The object type of this resource - always set to `response`.
-    ///
     pub object: ResponseAllOf3Object,
     /// An array of content items generated by the model.
     ///
-    /// - The length and order of items in the `output` array is dependent
-    ///   on the model's response.
+    /// - The length and order of items in the `output` array is dependent on
+    ///   the model's response.
     /// - Rather than accessing the first item in the `output` array and
-    ///   assuming it's an `assistant` message with the content generated by
-    ///   the model, you might consider using the `output_text` property where
+    ///   assuming it's an `assistant` message with the content generated by the
+    ///   model, you might consider using the `output_text` property where
     ///   supported in SDKs.
-    ///
     pub output: Vec<OutputItem>,
     /// SDK-only convenience property that contains the aggregated text output
     /// from all `output_text` items in the `output` array, if any are present.
     /// Supported in the Python and JavaScript SDKs.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_text: Option<String>,
     /// Whether to allow the model to run tool calls in parallel.
-    ///
     pub parallel_tool_calls: bool,
     /// The status of the response generation. One of `completed`, `failed`,
     /// `in_progress`, `cancelled`, `queued`, or `incomplete`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ResponseAllOf3Status>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,7 +120,6 @@ pub struct ResponseAllOf3 {
 }
 
 /// Details about why the response is incomplete.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseAllOf3IncompleteDetails {
     /// The reason why the response is incomplete.
@@ -137,20 +138,17 @@ pub enum ResponseAllOf3IncompleteDetailsReason {
 
 /// A text input to the model, equivalent to a text input with the
 /// `developer` role.
-///
 pub type ResponseAllOf3InstructionsString = Option<String>;
 
 /// A list of one or many input items to the model, containing
 /// different content types.
-///
 pub type ResponseAllOf3InstructionsArray = Option<Vec<InputItem>>;
 
 /// A system (or developer) message inserted into the model's context.
 ///
-/// When using along with `previous_response_id`, the instructions from a previous
-/// response will not be carried over to the next response. This makes it simple
-/// to swap out system (or developer) messages in new responses.
-///
+/// When using along with `previous_response_id`, the instructions from a
+/// previous response will not be carried over to the next response. This makes
+/// it simple to swap out system (or developer) messages in new responses.
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ResponseAllOf3Instructions {
@@ -159,7 +157,6 @@ pub enum ResponseAllOf3Instructions {
 }
 
 /// The object type of this resource - always set to `response`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ResponseAllOf3Object {
     #[serde(rename = "response")]
@@ -168,7 +165,6 @@ pub enum ResponseAllOf3Object {
 
 /// The status of the response generation. One of `completed`, `failed`,
 /// `in_progress`, `cancelled`, `queued`, or `incomplete`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ResponseAllOf3Status {
     #[serde(rename = "completed")]
@@ -308,9 +304,9 @@ pub enum ResponseStreamEvent {
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateModelResponsePropertiesAllOf2 {
-    /// An integer between 0 and 20 specifying the number of most likely tokens to
-    /// return at each token position, each with an associated log probability.
-    ///
+    /// An integer between 0 and 20 specifying the number of most likely tokens
+    /// to return at each token position, each with an associated log
+    /// probability.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<i64>,
 }
@@ -327,28 +323,29 @@ pub struct CreateModelResponseProperties {
 pub struct ResponseProperties {
     /// Whether to run the model response in the background.
     /// [Learn more](/docs/guides/background).
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<bool>,
-    /// An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).
-    ///
+    /// An upper bound for the number of tokens that can be generated for a
+    /// response, including visible output tokens and [reasoning
+    /// tokens](/docs/guides/reasoning).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<i64>,
-    /// The maximum number of total calls to built-in tools that can be processed in a response. This maximum number applies across all built-in tool calls, not per individual tool. Any further attempts to call a tool by the model will be ignored.
-    ///
+    /// The maximum number of total calls to built-in tools that can be
+    /// processed in a response. This maximum number applies across all built-in
+    /// tool calls, not per individual tool. Any further attempts to call a tool
+    /// by the model will be ignored.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tool_calls: Option<i64>,
-    /// Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI
+    /// Model ID used to generate the response, like `gpt-4o` or `o3`. `OpenAI`
     /// offers a wide range of models with different capabilities, performance
-    /// characteristics, and price points. Refer to the [model guide](/docs/models)
-    /// to browse and compare available models.
-    ///
+    /// characteristics, and price points. Refer to the [model
+    /// guide](/docs/models) to browse and compare available models.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelIdsResponses>,
     /// The unique ID of the previous response to the model. Use this to
     /// create multi-turn conversations. Learn more about
-    /// [conversation state](/docs/guides/conversation-state). Cannot be used in conjunction with `conversation`.
-    ///
+    /// [conversation state](/docs/guides/conversation-state). Cannot be used in
+    /// conjunction with `conversation`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -362,23 +359,21 @@ pub struct ResponseProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<ToolsArray>,
     /// The truncation strategy to use for the model response.
-    /// - `auto`: If the input to this Response exceeds
-    ///   the model's context window size, the model will truncate the
-    ///   response to fit the context window by dropping items from the beginning of the conversation.
+    /// - `auto`: If the input to this Response exceeds the model's context
+    ///   window size, the model will truncate the response to fit the context
+    ///   window by dropping items from the beginning of the conversation.
     /// - `disabled` (default): If the input size will exceed the context window
     ///   size for a model, the request will fail with a 400 error.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truncation: Option<ResponsePropertiesTruncation>,
 }
 
 /// The truncation strategy to use for the model response.
-/// - `auto`: If the input to this Response exceeds
-///   the model's context window size, the model will truncate the
-///   response to fit the context window by dropping items from the beginning of the conversation.
+/// - `auto`: If the input to this Response exceeds the model's context window
+///   size, the model will truncate the response to fit the context window by
+///   dropping items from the beginning of the conversation.
 /// - `disabled` (default): If the input size will exceed the context window
 ///   size for a model, the request will fail with a 400 error.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ResponsePropertiesTruncation {
     #[serde(rename = "auto")]
@@ -392,17 +387,18 @@ pub struct ContextManagementParam {
     /// Token threshold at which compaction should be triggered for this entry.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compact_threshold: Option<i64>,
-    /// The context management entry type. Currently only 'compaction' is supported.
+    /// The context management entry type. Currently only 'compaction' is
+    /// supported.
     pub r#type: String,
 }
 
 /// The unique ID of the conversation.
-///
 pub type ConversationParamString = Option<String>;
 
-/// The conversation that this response belongs to. Items from this conversation are prepended to `input_items` for this response request.
-/// Input items and output items from this response are automatically added to this conversation after this response completes.
-///
+/// The conversation that this response belongs to. Items from this conversation
+/// are prepended to `input_items` for this response request. Input items and
+/// output items from this response are automatically added to this conversation
+/// after this response completes.
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ConversationParam {
@@ -410,14 +406,24 @@ pub enum ConversationParam {
     ConversationParam2(ConversationParam2),
 }
 
-/// Specify additional output data to include in the model response. Currently supported values are:
-/// - `web_search_call.action.sources`: Include the sources of the web search tool call.
-/// - `code_interpreter_call.outputs`: Includes the outputs of python code execution in code interpreter tool call items.
-/// - `computer_call_output.output.image_url`: Include image urls from the computer call output.
-/// - `file_search_call.results`: Include the search results of the file search tool call.
-/// - `message.input_image.image_url`: Include image urls from the input message.
+/// Specify additional output data to include in the model response. Currently
+/// supported values are:
+/// - `web_search_call.action.sources`: Include the sources of the web search
+///   tool call.
+/// - `code_interpreter_call.outputs`: Includes the outputs of python code
+///   execution in code interpreter tool call items.
+/// - `computer_call_output.output.image_url`: Include image urls from the
+///   computer call output.
+/// - `file_search_call.results`: Include the search results of the file search
+///   tool call.
+/// - `message.input_image.image_url`: Include image urls from the input
+///   message.
 /// - `message.output_text.logprobs`: Include logprobs with assistant messages.
-/// - `reasoning.encrypted_content`: Includes an encrypted version of reasoning tokens in reasoning item outputs. This enables reasoning items to be used in multi-turn conversations when using the Responses API statelessly (like when the `store` parameter is set to `false`, or when an organization is enrolled in the zero data retention program).
+/// - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
+///   tokens in reasoning item outputs. This enables reasoning items to be used
+///   in multi-turn conversations when using the Responses API statelessly (like
+///   when the `store` parameter is set to `false`, or when an organization is
+///   enrolled in the zero data retention program).
 #[derive(Serialize, Deserialize)]
 pub enum IncludeEnum {
     #[serde(rename = "file_search_call.results")]
@@ -440,12 +446,10 @@ pub enum IncludeEnum {
 
 /// A text input to the model, equivalent to a text input with the
 /// `user` role.
-///
 pub type InputParamString = Option<String>;
 
 /// A list of one or many input items to the model, containing
 /// different content types.
-///
 pub type InputParamArray = Option<Vec<InputItem>>;
 
 /// Text, image, or file inputs to the model, used to generate a response.
@@ -456,7 +460,6 @@ pub type InputParamArray = Option<Vec<InputItem>>;
 /// - [File inputs](/docs/guides/pdf-files)
 /// - [Conversation state](/docs/guides/conversation-state)
 /// - [Function calling](/docs/guides/function-calling)
-///
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum InputParam {
@@ -465,7 +468,6 @@ pub enum InputParam {
 }
 
 /// Options for streaming responses. Only set this when you set `stream: true`.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseStreamOptionsValue {
     /// When true, stream obfuscation will be enabled. Stream obfuscation adds
@@ -474,8 +476,7 @@ pub struct ResponseStreamOptionsValue {
     /// These obfuscation fields are included by default, but add a small amount
     /// of overhead to the data stream. You can set `include_obfuscation` to
     /// false to optimize for bandwidth if you trust the network links between
-    /// your application and the OpenAI API.
-    ///
+    /// your application and the `OpenAI` API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_obfuscation: Option<bool>,
 }
@@ -486,50 +487,60 @@ pub type ResponseStreamOptions = Option<Option<ResponseStreamOptionsValue>>;
 pub struct ModelResponseProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
-    /// Used by OpenAI to cache responses for similar requests to optimize your cache hit rates. Replaces the `user` field. [Learn more](/docs/guides/prompt-caching).
-    ///
+    /// Used by `OpenAI` to cache responses for similar requests to optimize
+    /// your cache hit rates. Replaces the `user` field. [Learn
+    /// more](/docs/guides/prompt-caching).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
-    /// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
-    ///
+    /// The retention policy for the prompt cache. Set to `24h` to enable
+    /// extended prompt caching, which keeps cached prefixes active for longer,
+    /// up to a maximum of 24 hours. [Learn
+    /// more](/docs/guides/prompt-caching#prompt-cache-retention).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_retention: Option<ModelResponsePropertiesPromptCacheRetention>,
-    /// A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
-    /// The IDs should be a string that uniquely identifies each user, with a maximum length of 64 characters. We recommend hashing their username or email address, in order to avoid sending us any identifying information. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
-    ///
+    /// A stable identifier used to help detect users of your application that
+    /// may be violating `OpenAI`'s usage policies. The IDs should be a
+    /// string that uniquely identifies each user, with a maximum length of 64
+    /// characters. We recommend hashing their username or email address, in
+    /// order to avoid sending us any identifying information. [Learn
+    /// more](/docs/guides/safety-best-practices#safety-identifiers).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub safety_identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<ServiceTier>,
-    /// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
-    /// We generally recommend altering this or `top_p` but not both.
-    ///
+    /// What sampling temperature to use, between 0 and 2. Higher values like
+    /// 0.8 will make the output more random, while lower values like 0.2 will
+    /// make it more focused and deterministic. We generally recommend
+    /// altering this or `top_p` but not both.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
-    /// An integer between 0 and 20 specifying the number of most likely tokens to
-    /// return at each token position, each with an associated log probability.
-    ///
+    /// An integer between 0 and 20 specifying the number of most likely tokens
+    /// to return at each token position, each with an associated log
+    /// probability.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<i64>,
     /// An alternative to sampling with temperature, called nucleus sampling,
-    /// where the model considers the results of the tokens with top_p probability
-    /// mass. So 0.1 means only the tokens comprising the top 10% probability mass
-    /// are considered.
+    /// where the model considers the results of the tokens with `top_p`
+    /// probability mass. So 0.1 means only the tokens comprising the top
+    /// 10% probability mass are considered.
     ///
     /// We generally recommend altering this or `temperature` but not both.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
-    /// This field is being replaced by `safety_identifier` and `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching optimizations.
-    /// A stable identifier for your end-users.
-    /// Used to boost cache hit rates by better bucketing similar requests and  to help OpenAI detect and prevent abuse. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
-    ///
+    /// This field is being replaced by `safety_identifier` and
+    /// `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+    /// optimizations. A stable identifier for your end-users.
+    /// Used to boost cache hit rates by better bucketing similar requests and
+    /// to help `OpenAI` detect and prevent abuse. [Learn
+    /// more](/docs/guides/safety-best-practices#safety-identifiers).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
 }
 
-/// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
-///
+/// The retention policy for the prompt cache. Set to `24h` to enable extended
+/// prompt caching, which keeps cached prefixes active for longer, up to a
+/// maximum of 24 hours. [Learn
+/// more](/docs/guides/prompt-caching#prompt-cache-retention).
 #[derive(Serialize, Deserialize)]
 pub enum ModelResponsePropertiesPromptCacheRetention {
     #[serde(rename = "in-memory")]
@@ -538,20 +549,20 @@ pub enum ModelResponsePropertiesPromptCacheRetention {
     N24H,
 }
 
-/// The conversation that this response belonged to. Input items and output items from this response were automatically added to this conversation.
+/// The conversation that this response belonged to. Input items and output
+/// items from this response were automatically added to this conversation.
 #[derive(Serialize, Deserialize)]
 pub struct Conversation2 {
-    /// The unique ID of the conversation that this response was associated with.
+    /// The unique ID of the conversation that this response was associated
+    /// with.
     pub id: String,
 }
 
 /// An error object returned when the model fails to generate a Response.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseErrorValue {
     pub code: ResponseErrorCode,
     /// A human-readable description of the error.
-    ///
     pub message: String,
 }
 
@@ -612,7 +623,6 @@ pub enum OutputItem {
 
 /// Represents token usage details including input tokens, output tokens,
 /// a breakdown of output tokens, and the total tokens used.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseUsage {
     /// The number of input tokens.
@@ -632,7 +642,6 @@ pub struct ResponseUsage {
 pub struct ResponseUsageInputTokensDetails {
     /// The number of tokens that were retrieved from the cache.
     /// [More on prompt caching](/docs/guides/prompt-caching).
-    ///
     pub cached_tokens: i64,
 }
 
@@ -647,10 +656,8 @@ pub struct ResponseUsageOutputTokensDetails {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseAudioDeltaEvent {
     /// A chunk of Base64 encoded response audio bytes.
-    ///
     pub delta: String,
     /// A sequence number for this chunk of the stream response.
-    ///
     pub sequence_number: i64,
 }
 
@@ -658,7 +665,6 @@ pub struct ResponseAudioDeltaEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseAudioDoneEvent {
     /// The sequence number of the delta.
-    ///
     pub sequence_number: i64,
 }
 
@@ -666,7 +672,6 @@ pub struct ResponseAudioDoneEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseAudioTranscriptDeltaEvent {
     /// The partial transcript of the audio response.
-    ///
     pub delta: String,
     /// The sequence number of this event.
     pub sequence_number: i64,
@@ -686,7 +691,8 @@ pub struct ResponseCodeInterpreterCallCodeDeltaEvent {
     pub delta: String,
     /// The unique identifier of the code interpreter tool call item.
     pub item_id: String,
-    /// The index of the output item in the response for which the code is being streamed.
+    /// The index of the output item in the response for which the code is being
+    /// streamed.
     pub output_index: i64,
     /// The sequence number of this event, used to order streaming events.
     pub sequence_number: i64,
@@ -699,7 +705,8 @@ pub struct ResponseCodeInterpreterCallCodeDoneEvent {
     pub code: String,
     /// The unique identifier of the code interpreter tool call item.
     pub item_id: String,
-    /// The index of the output item in the response for which the code is finalized.
+    /// The index of the output item in the response for which the code is
+    /// finalized.
     pub output_index: i64,
     /// The sequence number of this event, used to order streaming events.
     pub sequence_number: i64,
@@ -710,7 +717,8 @@ pub struct ResponseCodeInterpreterCallCodeDoneEvent {
 pub struct ResponseCodeInterpreterCallCompletedEvent {
     /// The unique identifier of the code interpreter tool call item.
     pub item_id: String,
-    /// The index of the output item in the response for which the code interpreter call is completed.
+    /// The index of the output item in the response for which the code
+    /// interpreter call is completed.
     pub output_index: i64,
     /// The sequence number of this event, used to order streaming events.
     pub sequence_number: i64,
@@ -721,7 +729,8 @@ pub struct ResponseCodeInterpreterCallCompletedEvent {
 pub struct ResponseCodeInterpreterCallInProgressEvent {
     /// The unique identifier of the code interpreter tool call item.
     pub item_id: String,
-    /// The index of the output item in the response for which the code interpreter call is in progress.
+    /// The index of the output item in the response for which the code
+    /// interpreter call is in progress.
     pub output_index: i64,
     /// The sequence number of this event, used to order streaming events.
     pub sequence_number: i64,
@@ -732,7 +741,8 @@ pub struct ResponseCodeInterpreterCallInProgressEvent {
 pub struct ResponseCodeInterpreterCallInterpretingEvent {
     /// The unique identifier of the code interpreter tool call item.
     pub item_id: String,
-    /// The index of the output item in the response for which the code interpreter is interpreting code.
+    /// The index of the output item in the response for which the code
+    /// interpreter is interpreting code.
     pub output_index: i64,
     /// The sequence number of this event, used to order streaming events.
     pub sequence_number: i64,
@@ -742,7 +752,6 @@ pub struct ResponseCodeInterpreterCallInterpretingEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseCompletedEvent {
     /// Properties of the completed response.
-    ///
     pub response: Response,
     /// The sequence number for this event.
     pub sequence_number: i64,
@@ -752,16 +761,12 @@ pub struct ResponseCompletedEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseContentPartAddedEvent {
     /// The index of the content part that was added.
-    ///
     pub content_index: i64,
     /// The ID of the output item that the content part was added to.
-    ///
     pub item_id: String,
     /// The index of the output item that the content part was added to.
-    ///
     pub output_index: i64,
     /// The content part that was added.
-    ///
     pub part: OutputContent,
     /// The sequence number of this event.
     pub sequence_number: i64,
@@ -771,27 +776,21 @@ pub struct ResponseContentPartAddedEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseContentPartDoneEvent {
     /// The index of the content part that is done.
-    ///
     pub content_index: i64,
     /// The ID of the output item that the content part was added to.
-    ///
     pub item_id: String,
     /// The index of the output item that the content part was added to.
-    ///
     pub output_index: i64,
     /// The content part that is done.
-    ///
     pub part: OutputContent,
     /// The sequence number of this event.
     pub sequence_number: i64,
 }
 
 /// An event that is emitted when a response is created.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseCreatedEvent {
     /// The response that was created.
-    ///
     pub response: Response,
     /// The sequence number for this event.
     pub sequence_number: i64,
@@ -801,13 +800,10 @@ pub struct ResponseCreatedEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseErrorEvent {
     /// The error code.
-    ///
     pub code: Option<String>,
     /// The error message.
-    ///
     pub message: String,
     /// The error parameter.
-    ///
     pub param: Option<String>,
     /// The sequence number of this event.
     pub sequence_number: i64,
@@ -817,10 +813,8 @@ pub struct ResponseErrorEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseFileSearchCallCompletedEvent {
     /// The ID of the output item that the file search call is initiated.
-    ///
     pub item_id: String,
     /// The index of the output item that the file search call is initiated.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
     pub sequence_number: i64,
@@ -830,10 +824,8 @@ pub struct ResponseFileSearchCallCompletedEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseFileSearchCallInProgressEvent {
     /// The ID of the output item that the file search call is initiated.
-    ///
     pub item_id: String,
     /// The index of the output item that the file search call is initiated.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
     pub sequence_number: i64,
@@ -843,10 +835,8 @@ pub struct ResponseFileSearchCallInProgressEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseFileSearchCallSearchingEvent {
     /// The ID of the output item that the file search call is initiated.
-    ///
     pub item_id: String,
     /// The index of the output item that the file search call is searching.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
     pub sequence_number: i64,
@@ -856,13 +846,12 @@ pub struct ResponseFileSearchCallSearchingEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseFunctionCallArgumentsDeltaEvent {
     /// The function-call arguments delta that is added.
-    ///
     pub delta: String,
-    /// The ID of the output item that the function-call arguments delta is added to.
-    ///
+    /// The ID of the output item that the function-call arguments delta is
+    /// added to.
     pub item_id: String,
-    /// The index of the output item that the function-call arguments delta is added to.
-    ///
+    /// The index of the output item that the function-call arguments delta is
+    /// added to.
     pub output_index: i64,
     /// The sequence number of this event.
     pub sequence_number: i64,
@@ -888,29 +877,24 @@ pub struct ResponseFunctionCallArgumentsDoneEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseInProgressEvent {
     /// The response that is in progress.
-    ///
     pub response: Response,
     /// The sequence number of this event.
     pub sequence_number: i64,
 }
 
 /// An event that is emitted when a response fails.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseFailedEvent {
     /// The response that failed.
-    ///
     pub response: Response,
     /// The sequence number of this event.
     pub sequence_number: i64,
 }
 
 /// An event that is emitted when a response finishes as incomplete.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseIncompleteEvent {
     /// The response that was incomplete.
-    ///
     pub response: Response,
     /// The sequence number of this event.
     pub sequence_number: i64,
@@ -920,13 +904,10 @@ pub struct ResponseIncompleteEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseOutputItemAddedEvent {
     /// The output item that was added.
-    ///
     pub item: OutputItem,
     /// The index of the output item that was added.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
 }
 
@@ -934,13 +915,10 @@ pub struct ResponseOutputItemAddedEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseOutputItemDoneEvent {
     /// The output item that was marked done.
-    ///
     pub item: OutputItem,
     /// The index of the output item that was marked done.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
 }
 
@@ -948,24 +926,18 @@ pub struct ResponseOutputItemDoneEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseReasoningSummaryPartAddedEvent {
     /// The ID of the item this summary part is associated with.
-    ///
     pub item_id: String,
     /// The index of the output item this summary part is associated with.
-    ///
     pub output_index: i64,
     /// The summary part that was added.
-    ///
     pub part: ResponseReasoningSummaryPartAddedEventPart,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
     /// The index of the summary part within the reasoning summary.
-    ///
     pub summary_index: i64,
 }
 
 /// The summary part that was added.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseReasoningSummaryPartAddedEventPart {
     /// The text of the summary part.
@@ -985,24 +957,18 @@ pub enum ResponseReasoningSummaryPartAddedEventPartType {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseReasoningSummaryPartDoneEvent {
     /// The ID of the item this summary part is associated with.
-    ///
     pub item_id: String,
     /// The index of the output item this summary part is associated with.
-    ///
     pub output_index: i64,
     /// The completed summary part.
-    ///
     pub part: ResponseReasoningSummaryPartDoneEventPart,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
     /// The index of the summary part within the reasoning summary.
-    ///
     pub summary_index: i64,
 }
 
 /// The completed summary part.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseReasoningSummaryPartDoneEventPart {
     /// The text of the summary part.
@@ -1022,19 +988,14 @@ pub enum ResponseReasoningSummaryPartDoneEventPartType {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseReasoningSummaryTextDeltaEvent {
     /// The text delta that was added to the summary.
-    ///
     pub delta: String,
     /// The ID of the item this summary text delta is associated with.
-    ///
     pub item_id: String,
     /// The index of the output item this summary text delta is associated with.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
     /// The index of the summary part within the reasoning summary.
-    ///
     pub summary_index: i64,
 }
 
@@ -1042,19 +1003,14 @@ pub struct ResponseReasoningSummaryTextDeltaEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseReasoningSummaryTextDoneEvent {
     /// The ID of the item this summary text is associated with.
-    ///
     pub item_id: String,
     /// The index of the output item this summary text is associated with.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
     /// The index of the summary part within the reasoning summary.
-    ///
     pub summary_index: i64,
     /// The full text of the completed reasoning summary.
-    ///
     pub text: String,
 }
 
@@ -1062,19 +1018,15 @@ pub struct ResponseReasoningSummaryTextDoneEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseReasoningTextDeltaEvent {
     /// The index of the reasoning content part this delta is associated with.
-    ///
     pub content_index: i64,
     /// The text delta that was added to the reasoning content.
-    ///
     pub delta: String,
     /// The ID of the item this reasoning text delta is associated with.
-    ///
     pub item_id: String,
-    /// The index of the output item this reasoning text delta is associated with.
-    ///
+    /// The index of the output item this reasoning text delta is associated
+    /// with.
     pub output_index: i64,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
 }
 
@@ -1082,19 +1034,14 @@ pub struct ResponseReasoningTextDeltaEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseReasoningTextDoneEvent {
     /// The index of the reasoning content part.
-    ///
     pub content_index: i64,
     /// The ID of the item this reasoning text is associated with.
-    ///
     pub item_id: String,
     /// The index of the output item this reasoning text is associated with.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
     /// The full text of the completed reasoning content.
-    ///
     pub text: String,
 }
 
@@ -1102,19 +1049,14 @@ pub struct ResponseReasoningTextDoneEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseRefusalDeltaEvent {
     /// The index of the content part that the refusal text is added to.
-    ///
     pub content_index: i64,
     /// The refusal text that is added.
-    ///
     pub delta: String,
     /// The ID of the output item that the refusal text is added to.
-    ///
     pub item_id: String,
     /// The index of the output item that the refusal text is added to.
-    ///
     pub output_index: i64,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
 }
 
@@ -1122,19 +1064,14 @@ pub struct ResponseRefusalDeltaEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseRefusalDoneEvent {
     /// The index of the content part that the refusal text is finalized.
-    ///
     pub content_index: i64,
     /// The ID of the output item that the refusal text is finalized.
-    ///
     pub item_id: String,
     /// The index of the output item that the refusal text is finalized.
-    ///
     pub output_index: i64,
     /// The refusal text that is finalized.
-    ///
     pub refusal: String,
     /// The sequence number of this event.
-    ///
     pub sequence_number: i64,
 }
 
@@ -1142,19 +1079,14 @@ pub struct ResponseRefusalDoneEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseTextDeltaEvent {
     /// The index of the content part that the text delta was added to.
-    ///
     pub content_index: i64,
     /// The text delta that was added.
-    ///
     pub delta: String,
     /// The ID of the output item that the text delta was added to.
-    ///
     pub item_id: String,
     /// The log probabilities of the tokens in the delta.
-    ///
     pub logprobs: Vec<ResponseLogProb>,
     /// The index of the output item that the text delta was added to.
-    ///
     pub output_index: i64,
     /// The sequence number for this event.
     pub sequence_number: i64,
@@ -1164,21 +1096,16 @@ pub struct ResponseTextDeltaEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseTextDoneEvent {
     /// The index of the content part that the text content is finalized.
-    ///
     pub content_index: i64,
     /// The ID of the output item that the text content is finalized.
-    ///
     pub item_id: String,
     /// The log probabilities of the tokens in the delta.
-    ///
     pub logprobs: Vec<ResponseLogProb>,
     /// The index of the output item that the text content is finalized.
-    ///
     pub output_index: i64,
     /// The sequence number for this event.
     pub sequence_number: i64,
     /// The text content that is finalized.
-    ///
     pub text: String,
 }
 
@@ -1186,10 +1113,9 @@ pub struct ResponseTextDoneEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseWebSearchCallCompletedEvent {
     /// Unique ID for the output item associated with the web search call.
-    ///
     pub item_id: String,
-    /// The index of the output item that the web search call is associated with.
-    ///
+    /// The index of the output item that the web search call is associated
+    /// with.
     pub output_index: i64,
     /// The sequence number of the web search call being processed.
     pub sequence_number: i64,
@@ -1199,10 +1125,9 @@ pub struct ResponseWebSearchCallCompletedEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseWebSearchCallInProgressEvent {
     /// Unique ID for the output item associated with the web search call.
-    ///
     pub item_id: String,
-    /// The index of the output item that the web search call is associated with.
-    ///
+    /// The index of the output item that the web search call is associated
+    /// with.
     pub output_index: i64,
     /// The sequence number of the web search call being processed.
     pub sequence_number: i64,
@@ -1212,17 +1137,16 @@ pub struct ResponseWebSearchCallInProgressEvent {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseWebSearchCallSearchingEvent {
     /// Unique ID for the output item associated with the web search call.
-    ///
     pub item_id: String,
-    /// The index of the output item that the web search call is associated with.
-    ///
+    /// The index of the output item that the web search call is associated
+    /// with.
     pub output_index: i64,
     /// The sequence number of the web search call being processed.
     pub sequence_number: i64,
 }
 
-/// Emitted when an image generation tool call has completed and the final image is available.
-///
+/// Emitted when an image generation tool call has completed and the final image
+/// is available.
 #[derive(Serialize, Deserialize)]
 pub struct ResponseImageGenCallCompletedEvent {
     /// The unique identifier of the image generation item being processed.
@@ -1233,8 +1157,8 @@ pub struct ResponseImageGenCallCompletedEvent {
     pub sequence_number: i64,
 }
 
-/// Emitted when an image generation tool call is actively generating an image (intermediate state).
-///
+/// Emitted when an image generation tool call is actively generating an image
+/// (intermediate state).
 #[derive(Serialize, Deserialize)]
 pub struct ResponseImageGenCallGeneratingEvent {
     /// The unique identifier of the image generation item being processed.
@@ -1246,7 +1170,6 @@ pub struct ResponseImageGenCallGeneratingEvent {
 }
 
 /// Emitted when an image generation tool call is in progress.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseImageGenCallInProgressEvent {
     /// The unique identifier of the image generation item being processed.
@@ -1258,17 +1181,14 @@ pub struct ResponseImageGenCallInProgressEvent {
 }
 
 /// Emitted when a partial image is available during image generation streaming.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseImageGenCallPartialImageEvent {
     /// The background setting used for the generated image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<ResponseImageGenCallPartialImageEventBackground>,
     /// The unique identifier of the image generation item being processed.
     pub item_id: String,
     /// The output format of the generated image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<String>,
     /// The index of the output item in the response's output array.
@@ -1276,22 +1196,20 @@ pub struct ResponseImageGenCallPartialImageEvent {
     /// Base64-encoded partial image data, suitable for rendering as an image.
     #[serde(rename = "partial_image_b64")]
     pub partial_image_b_64: String,
-    /// 0-based index for the partial image (backend is 1-based, but this is 0-based for the user).
+    /// 0-based index for the partial image (backend is 1-based, but this is
+    /// 0-based for the user).
     pub partial_image_index: i64,
     /// The quality of the generated image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quality: Option<ResponseImageGenCallPartialImageEventQuality>,
     /// The sequence number of the image generation item being processed.
     pub sequence_number: i64,
     /// The size of the generated image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<String>,
 }
 
 /// The background setting used for the generated image.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ResponseImageGenCallPartialImageEventBackground {
     #[serde(rename = "transparent")]
@@ -1303,7 +1221,6 @@ pub enum ResponseImageGenCallPartialImageEventBackground {
 }
 
 /// The quality of the generated image.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ResponseImageGenCallPartialImageEventQuality {
     #[serde(rename = "low")]
@@ -1316,12 +1233,12 @@ pub enum ResponseImageGenCallPartialImageEventQuality {
     Auto,
 }
 
-/// Emitted when there is a delta (partial update) to the arguments of an MCP tool call.
-///
+/// Emitted when there is a delta (partial update) to the arguments of an MCP
+/// tool call.
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMCPCallArgumentsDeltaEvent {
-    /// A JSON string containing the partial update to the arguments for the MCP tool call.
-    ///
+    /// A JSON string containing the partial update to the arguments for the MCP
+    /// tool call.
     pub delta: String,
     /// The unique identifier of the MCP tool call item being processed.
     pub item_id: String,
@@ -1332,11 +1249,9 @@ pub struct ResponseMCPCallArgumentsDeltaEvent {
 }
 
 /// Emitted when the arguments for an MCP tool call are finalized.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMCPCallArgumentsDoneEvent {
     /// A JSON string containing the finalized arguments for the MCP tool call.
-    ///
     pub arguments: String,
     /// The unique identifier of the MCP tool call item being processed.
     pub item_id: String,
@@ -1347,7 +1262,6 @@ pub struct ResponseMCPCallArgumentsDoneEvent {
 }
 
 /// Emitted when an MCP  tool call has completed successfully.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMCPCallCompletedEvent {
     /// The ID of the MCP tool call item that completed.
@@ -1359,7 +1273,6 @@ pub struct ResponseMCPCallCompletedEvent {
 }
 
 /// Emitted when an MCP  tool call has failed.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMCPCallFailedEvent {
     /// The ID of the MCP tool call item that failed.
@@ -1371,7 +1284,6 @@ pub struct ResponseMCPCallFailedEvent {
 }
 
 /// Emitted when an MCP  tool call is in progress.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMCPCallInProgressEvent {
     /// The unique identifier of the MCP tool call item being processed.
@@ -1382,8 +1294,8 @@ pub struct ResponseMCPCallInProgressEvent {
     pub sequence_number: i64,
 }
 
-/// Emitted when the list of available MCP tools has been successfully retrieved.
-///
+/// Emitted when the list of available MCP tools has been successfully
+/// retrieved.
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMCPListToolsCompletedEvent {
     /// The ID of the MCP tool call item that produced this output.
@@ -1395,7 +1307,6 @@ pub struct ResponseMCPListToolsCompletedEvent {
 }
 
 /// Emitted when the attempt to list available MCP tools has failed.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMCPListToolsFailedEvent {
     /// The ID of the MCP tool call item that failed.
@@ -1406,8 +1317,8 @@ pub struct ResponseMCPListToolsFailedEvent {
     pub sequence_number: i64,
 }
 
-/// Emitted when the system is in the process of retrieving the list of available MCP tools.
-///
+/// Emitted when the system is in the process of retrieving the list of
+/// available MCP tools.
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMCPListToolsInProgressEvent {
     /// The ID of the MCP tool call item that is being processed.
@@ -1419,7 +1330,6 @@ pub struct ResponseMCPListToolsInProgressEvent {
 }
 
 /// Emitted when an annotation is added to output text content.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseOutputTextAnnotationAddedEvent {
     /// The annotation object being added. (See annotation schema for details.)
@@ -1428,7 +1338,8 @@ pub struct ResponseOutputTextAnnotationAddedEvent {
     pub annotation_index: i64,
     /// The index of the content part within the output item.
     pub content_index: i64,
-    /// The unique identifier of the item to which the annotation is being added.
+    /// The unique identifier of the item to which the annotation is being
+    /// added.
     pub item_id: String,
     /// The index of the output item in the response's output array.
     pub output_index: i64,
@@ -1437,7 +1348,6 @@ pub struct ResponseOutputTextAnnotationAddedEvent {
 }
 
 /// Emitted when a response is queued and waiting to be processed.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseQueuedEvent {
     /// The full response object that is queued.
@@ -1446,8 +1356,8 @@ pub struct ResponseQueuedEvent {
     pub sequence_number: i64,
 }
 
-/// Event representing a delta (partial update) to the input of a custom tool call.
-///
+/// Event representing a delta (partial update) to the input of a custom tool
+/// call.
 #[derive(Serialize, Deserialize)]
 pub struct ResponseCustomToolCallInputDeltaEvent {
     /// The incremental input data (delta) for the custom tool call.
@@ -1461,7 +1371,6 @@ pub struct ResponseCustomToolCallInputDeltaEvent {
 }
 
 /// Event indicating that input for a custom tool call is complete.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseCustomToolCallInputDoneEvent {
     /// The complete input data for the custom tool call.
@@ -1478,7 +1387,6 @@ pub type ModelIdsResponses = Option<String>;
 
 /// Reference to a prompt template and its variables.
 /// [Learn more](/docs/guides/text?api-mode=responses#reusable-prompts).
-///
 #[derive(Serialize, Deserialize)]
 pub struct PromptValue {
     /// The unique identifier of the prompt template to use.
@@ -1496,7 +1404,6 @@ pub type Prompt = Option<Option<PromptValue>>;
 ///
 /// Configuration options for
 /// [reasoning models](https://platform.openai.com/docs/guides/reasoning).
-///
 #[derive(Serialize, Deserialize)]
 pub struct Reasoning {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1506,15 +1413,14 @@ pub struct Reasoning {
     /// A summary of the reasoning performed by the model. This can be
     /// useful for debugging and understanding the model's reasoning process.
     /// One of `auto`, `concise`, or `detailed`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generate_summary: Option<ReasoningGenerateSummary>,
     /// A summary of the reasoning performed by the model. This can be
     /// useful for debugging and understanding the model's reasoning process.
     /// One of `auto`, `concise`, or `detailed`.
     ///
-    /// `concise` is supported for `computer-use-preview` models and all reasoning models after `gpt-5`.
-    ///
+    /// `concise` is supported for `computer-use-preview` models and all
+    /// reasoning models after `gpt-5`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<ReasoningSummary>,
 }
@@ -1524,7 +1430,6 @@ pub struct Reasoning {
 /// A summary of the reasoning performed by the model. This can be
 /// useful for debugging and understanding the model's reasoning process.
 /// One of `auto`, `concise`, or `detailed`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ReasoningGenerateSummary {
     #[serde(rename = "auto")]
@@ -1539,8 +1444,8 @@ pub enum ReasoningGenerateSummary {
 /// useful for debugging and understanding the model's reasoning process.
 /// One of `auto`, `concise`, or `detailed`.
 ///
-/// `concise` is supported for `computer-use-preview` models and all reasoning models after `gpt-5`.
-///
+/// `concise` is supported for `computer-use-preview` models and all reasoning
+/// models after `gpt-5`.
 #[derive(Serialize, Deserialize)]
 pub enum ReasoningSummary {
     #[serde(rename = "auto")]
@@ -1555,7 +1460,6 @@ pub enum ReasoningSummary {
 /// text or structured JSON data. Learn more:
 /// - [Text inputs and outputs](/docs/guides/text)
 /// - [Structured Outputs](/docs/guides/structured-outputs)
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseTextParam {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1567,7 +1471,6 @@ pub struct ResponseTextParam {
 /// How the model should select which tool (or tools) to use when generating
 /// a response. See the `tools` parameter to see how to specify which tools
 /// the model can call.
-///
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ToolChoiceParam {
@@ -1585,19 +1488,18 @@ pub enum ToolChoiceParam {
 /// can specify which tool to use by setting the `tool_choice` parameter.
 ///
 /// We support the following categories of tools:
-/// - **Built-in tools**: Tools that are provided by OpenAI that extend the
-///   model's capabilities, like [web search](/docs/guides/tools-web-search)
-///   or [file search](/docs/guides/tools-file-search). Learn more about
-///   [built-in tools](/docs/guides/tools).
-/// - **MCP Tools**: Integrations with third-party systems via custom MCP servers
-///   or predefined connectors such as Google Drive and SharePoint. Learn more about
-///   [MCP Tools](/docs/guides/tools-connectors-mcp).
+/// - **Built-in tools**: Tools that are provided by `OpenAI` that extend the
+///   model's capabilities, like [web search](/docs/guides/tools-web-search) or
+///   [file search](/docs/guides/tools-file-search). Learn more about [built-in
+///   tools](/docs/guides/tools).
+/// - **MCP Tools**: Integrations with third-party systems via custom MCP
+///   servers or predefined connectors such as Google Drive and `SharePoint`.
+///   Learn more about [MCP Tools](/docs/guides/tools-connectors-mcp).
 /// - **Function calls (custom tools)**: Functions that are defined by you,
-///   enabling the model to call your own code with strongly typed arguments
-///   and outputs. Learn more about
-///   [function calling](/docs/guides/function-calling). You can also use
-///   custom tools to call your own code.
-///
+///   enabling the model to call your own code with strongly typed arguments and
+///   outputs. Learn more about [function
+///   calling](/docs/guides/function-calling). You can also use custom tools to
+///   call your own code.
 pub type ToolsArray = Option<Vec<Tool>>;
 
 /// The conversation that this response belongs to.
@@ -1610,13 +1512,19 @@ pub struct ConversationParam2 {
 pub type Metadata = Option<Option<HashMap<String, String>>>;
 
 /// Specifies the processing type used for serving the request.
-///   - If set to 'auto', then the request will be processed with the service tier configured in the Project settings. Unless otherwise configured, the Project will use 'default'.
-///   - If set to 'default', then the request will be processed with the standard pricing and performance for the selected model.
-///   - If set to '[flex](/docs/guides/flex-processing)' or '[priority](https://openai.com/api-priority-processing/)', then the request will be processed with the corresponding service tier.
+///   - If set to 'auto', then the request will be processed with the service
+///     tier configured in the Project settings. Unless otherwise configured,
+///     the Project will use 'default'.
+///   - If set to 'default', then the request will be processed with the
+///     standard pricing and performance for the selected model.
+///   - If set to '[flex](/docs/guides/flex-processing)' or '[priority](https://openai.com/api-priority-processing/)',
+///     then the request will be processed with the corresponding service tier.
 ///   - When not set, the default behavior is 'auto'.
 ///
-///   When the `service_tier` parameter is set, the response body will include the `service_tier` value based on the processing mode actually used to serve the request. This response value may be different from the value set in the parameter.
-///
+///   When the `service_tier` parameter is set, the response body will include
+/// the `service_tier` value based on the processing mode actually used to serve
+/// the request. This response value may be different from the value set in the
+/// parameter.
 #[derive(Serialize, Deserialize)]
 pub enum ServiceTierValue {
     #[serde(rename = "auto")]
@@ -1634,7 +1542,6 @@ pub enum ServiceTierValue {
 pub type ServiceTier = Option<Option<ServiceTierValue>>;
 
 /// The error code for the response.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ResponseErrorCode {
     #[serde(rename = "server_error")]
@@ -1678,34 +1585,28 @@ pub enum ResponseErrorCode {
 /// A message input to the model with a role indicating instruction following
 /// hierarchy. Instructions given with the `developer` or `system` role take
 /// precedence over instructions given with the `user` role. Messages with the
-/// `assistant` role are presumed to have been generated by the model in previous
-/// interactions.
-///
+/// `assistant` role are presumed to have been generated by the model in
+/// previous interactions.
 #[derive(Serialize, Deserialize)]
 pub struct EasyInputMessage {
     /// Text, image, or audio input to the model, used to generate a response.
     /// Can also contain previous assistant responses.
-    ///
     pub content: EasyInputMessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phase: Option<MessagePhase>,
     /// The role of the message input. One of `user`, `assistant`, `system`, or
     /// `developer`.
-    ///
     pub role: EasyInputMessageRole,
     /// The type of the message input. Always `message`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<EasyInputMessageType>,
 }
 
 /// A text input to the model.
-///
 pub type EasyInputMessageContentString = Option<String>;
 
 /// Text, image, or audio input to the model, used to generate a response.
 /// Can also contain previous assistant responses.
-///
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum EasyInputMessageContent {
@@ -1715,7 +1616,6 @@ pub enum EasyInputMessageContent {
 
 /// The role of the message input. One of `user`, `assistant`, `system`, or
 /// `developer`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum EasyInputMessageRole {
     #[serde(rename = "user")]
@@ -1729,7 +1629,6 @@ pub enum EasyInputMessageRole {
 }
 
 /// The type of the message input. Always `message`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum EasyInputMessageType {
     #[serde(rename = "message")]
@@ -1737,7 +1636,6 @@ pub enum EasyInputMessageType {
 }
 
 /// Content item used to generate a response.
-///
 #[derive(Deserialize)]
 #[serde(untagged)]
 pub enum Item {
@@ -1875,28 +1773,22 @@ pub enum ItemReferenceParamType {
 }
 
 /// An output message from the model.
-///
 #[derive(Serialize, Deserialize)]
 pub struct OutputMessage {
     /// The content of the output message.
-    ///
     pub content: Vec<OutputMessageContent>,
     /// The unique ID of the output message.
-    ///
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phase: Option<MessagePhase>,
     /// The role of the output message. Always `assistant`.
-    ///
     pub role: OutputMessageRole,
     /// The status of the message input. One of `in_progress`, `completed`, or
     /// `incomplete`. Populated when input items are returned via API.
-    ///
     pub status: OutputMessageStatus,
 }
 
 /// The role of the output message. Always `assistant`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum OutputMessageRole {
     #[serde(rename = "assistant")]
@@ -1905,7 +1797,6 @@ pub enum OutputMessageRole {
 
 /// The status of the message input. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when input items are returned via API.
-///
 #[derive(Serialize, Deserialize)]
 pub enum OutputMessageStatus {
     #[serde(rename = "in_progress")]
@@ -1918,22 +1809,17 @@ pub enum OutputMessageStatus {
 
 /// The results of a file search tool call. See the
 /// [file search guide](/docs/guides/tools-file-search) for more information.
-///
 #[derive(Serialize, Deserialize)]
 pub struct FileSearchToolCall {
     /// The unique ID of the file search tool call.
-    ///
     pub id: String,
     /// The queries used to search for files.
-    ///
     pub queries: Vec<String>,
     /// The results of the file search tool call.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub results: Option<Vec<FileSearchToolCallResultsItem>>,
     /// The status of the file search tool call. One of `in_progress`,
     /// `searching`, `incomplete` or `failed`,
-    ///
     pub status: FileSearchToolCallStatus,
 }
 
@@ -1942,26 +1828,21 @@ pub struct FileSearchToolCallResultsItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<VectorStoreFileAttributes>,
     /// The unique ID of the file.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
     /// The name of the file.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
     /// The relevance score of the file - a value between 0 and 1.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score: Option<f64>,
     /// The text that was retrieved from the file.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
 }
 
 /// The status of the file search tool call. One of `in_progress`,
 /// `searching`, `incomplete` or `failed`,
-///
 #[derive(Serialize, Deserialize)]
 pub enum FileSearchToolCallStatus {
     #[serde(rename = "in_progress")]
@@ -1977,37 +1858,30 @@ pub enum FileSearchToolCallStatus {
 }
 
 /// A tool call to run a function. See the
-/// [function calling guide](/docs/guides/function-calling) for more information.
-///
+/// [function calling guide](/docs/guides/function-calling) for more
+/// information.
 #[derive(Serialize, Deserialize)]
 pub struct FunctionToolCall {
     /// A JSON string of the arguments to pass to the function.
-    ///
     pub arguments: String,
     /// The unique ID of the function tool call generated by the model.
-    ///
     pub call_id: String,
     /// The unique ID of the function tool call.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// The name of the function to run.
-    ///
     pub name: String,
     /// The namespace of the function to run.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
     /// The status of the item. One of `in_progress`, `completed`, or
     /// `incomplete`. Populated when items are returned via API.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<FunctionToolCallStatus>,
 }
 
 /// The status of the item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
-///
 #[derive(Serialize, Deserialize)]
 pub enum FunctionToolCallStatus {
     #[serde(rename = "in_progress")]
@@ -2020,24 +1894,21 @@ pub enum FunctionToolCallStatus {
 
 /// The results of a web search tool call. See the
 /// [web search guide](/docs/guides/tools-web-search) for more information.
-///
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchToolCall {
     /// An object describing the specific action taken in this web search call.
-    /// Includes details on how the model used the web (search, open_page, find_in_page).
-    ///
+    /// Includes details on how the model used the web (search, `open_page`,
+    /// `find_in_page`).
     pub action: WebSearchToolCallAction,
     /// The unique ID of the web search tool call.
-    ///
     pub id: String,
     /// The status of the web search tool call.
-    ///
     pub status: WebSearchToolCallStatus,
 }
 
 /// An object describing the specific action taken in this web search call.
-/// Includes details on how the model used the web (search, open_page, find_in_page).
-///
+/// Includes details on how the model used the web (search, `open_page`,
+/// `find_in_page`).
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum WebSearchToolCallAction {
@@ -2050,7 +1921,6 @@ pub enum WebSearchToolCallAction {
 }
 
 /// The status of the web search tool call.
-///
 #[derive(Serialize, Deserialize)]
 pub enum WebSearchToolCallStatus {
     #[serde(rename = "in_progress")]
@@ -2065,7 +1935,6 @@ pub enum WebSearchToolCallStatus {
 
 /// A tool call to a computer use tool. See the
 /// [computer use guide](/docs/guides/tools-computer-use) for more information.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ComputerToolCall {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2073,22 +1942,18 @@ pub struct ComputerToolCall {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actions: Option<ComputerActionList>,
     /// An identifier used when responding to the tool call with output.
-    ///
     pub call_id: String,
     /// The unique ID of the computer call.
     pub id: String,
     /// The pending safety checks for the computer call.
-    ///
     pub pending_safety_checks: Vec<ComputerCallSafetyCheckParam>,
     /// The status of the item. One of `in_progress`, `completed`, or
     /// `incomplete`. Populated when items are returned via API.
-    ///
     pub status: ComputerToolCallStatus,
 }
 
 /// The status of the item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ComputerToolCallStatus {
     #[serde(rename = "in_progress")]
@@ -2099,38 +1964,32 @@ pub enum ComputerToolCallStatus {
     Incomplete,
 }
 
-/// A description of the chain of thought used by a reasoning model while generating
-/// a response. Be sure to include these items in your `input` to the Responses API
-/// for subsequent turns of a conversation if you are manually
+/// A description of the chain of thought used by a reasoning model while
+/// generating a response. Be sure to include these items in your `input` to the
+/// Responses API for subsequent turns of a conversation if you are manually
 /// [managing context](/docs/guides/conversation-state).
-///
 #[derive(Serialize, Deserialize)]
 pub struct ReasoningItem {
     /// Reasoning text content.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<Vec<ReasoningTextContent>>,
-    /// The encrypted content of the reasoning item - populated when a response is
-    /// generated with `reasoning.encrypted_content` in the `include` parameter.
-    ///
+    /// The encrypted content of the reasoning item - populated when a response
+    /// is generated with `reasoning.encrypted_content` in the `include`
+    /// parameter.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encrypted_content: Option<String>,
     /// The unique identifier of the reasoning content.
-    ///
     pub id: String,
     /// The status of the item. One of `in_progress`, `completed`, or
     /// `incomplete`. Populated when items are returned via API.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ReasoningItemStatus>,
     /// Reasoning summary content.
-    ///
     pub summary: Vec<SummaryTextContent>,
 }
 
 /// The status of the item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ReasoningItemStatus {
     #[serde(rename = "in_progress")]
@@ -2175,7 +2034,8 @@ pub struct ToolSearchOutput {
     pub tools: Vec<Tool>,
 }
 
-/// A compaction item generated by the [`v1/responses/compact` API](/docs/api-reference/responses/compact).
+/// A compaction item generated by the [`v1/responses/compact`
+/// API](/docs/api-reference/responses/compact).
 #[derive(Serialize, Deserialize)]
 pub struct CompactionBody {
     /// The identifier of the actor that created the item.
@@ -2188,46 +2048,35 @@ pub struct CompactionBody {
 }
 
 /// An image generation request made by the model.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ImageGenToolCall {
     /// The image generation action performed by the model.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<ImageGenToolCallAction>,
     /// The background setting used for the generated image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<ImageGenToolCallBackground>,
     /// The unique ID of the image generation call.
-    ///
     pub id: String,
     /// The output format of the generated image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<String>,
     /// The quality of the generated image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quality: Option<ImageGenToolCallQuality>,
     /// The generated image encoded in base64.
-    ///
     pub result: Option<String>,
     /// The revised prompt used to generate the image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revised_prompt: Option<String>,
     /// The size of the generated image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<String>,
     /// The status of the image generation call.
-    ///
     pub status: ImageGenToolCallStatus,
 }
 
 /// The image generation action performed by the model.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolCallAction {
     #[serde(rename = "generate")]
@@ -2237,7 +2086,6 @@ pub enum ImageGenToolCallAction {
 }
 
 /// The background setting used for the generated image.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolCallBackground {
     #[serde(rename = "transparent")]
@@ -2249,7 +2097,6 @@ pub enum ImageGenToolCallBackground {
 }
 
 /// The quality of the generated image.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolCallQuality {
     #[serde(rename = "low")]
@@ -2263,7 +2110,6 @@ pub enum ImageGenToolCallQuality {
 }
 
 /// The status of the image generation call.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolCallStatus {
     #[serde(rename = "in_progress")]
@@ -2277,24 +2123,19 @@ pub enum ImageGenToolCallStatus {
 }
 
 /// A tool call to run code.
-///
 #[derive(Serialize, Deserialize)]
 pub struct CodeInterpreterToolCall {
     /// The code to run, or null if not available.
-    ///
     pub code: Option<String>,
     /// The ID of the container used to run the code.
-    ///
     pub container_id: String,
     /// The unique ID of the code interpreter tool call.
-    ///
     pub id: String,
     /// The outputs generated by the code interpreter, such as logs or images.
     /// Can be null if no outputs are available.
-    ///
     pub outputs: Option<Vec<CodeInterpreterToolCallOutputsItem>>,
-    /// The status of the code interpreter tool call. Valid values are `in_progress`, `completed`, `incomplete`, `interpreting`, and `failed`.
-    ///
+    /// The status of the code interpreter tool call. Valid values are
+    /// `in_progress`, `completed`, `incomplete`, `interpreting`, and `failed`.
     pub status: CodeInterpreterToolCallStatus,
 }
 
@@ -2307,8 +2148,8 @@ pub enum CodeInterpreterToolCallOutputsItem {
     Image(CodeInterpreterOutputImage),
 }
 
-/// The status of the code interpreter tool call. Valid values are `in_progress`, `completed`, `incomplete`, `interpreting`, and `failed`.
-///
+/// The status of the code interpreter tool call. Valid values are
+/// `in_progress`, `completed`, `incomplete`, `interpreting`, and `failed`.
 #[derive(Serialize, Deserialize)]
 pub enum CodeInterpreterToolCallStatus {
     #[serde(rename = "in_progress")]
@@ -2324,23 +2165,18 @@ pub enum CodeInterpreterToolCallStatus {
 }
 
 /// A tool call to run a command on the local shell.
-///
 #[derive(Serialize, Deserialize)]
 pub struct LocalShellToolCall {
     pub action: LocalShellExecAction,
     /// The unique ID of the local shell tool call generated by the model.
-    ///
     pub call_id: String,
     /// The unique ID of the local shell call.
-    ///
     pub id: String,
     /// The status of the local shell call.
-    ///
     pub status: LocalShellToolCallStatus,
 }
 
 /// The status of the local shell call.
-///
 #[derive(Serialize, Deserialize)]
 pub enum LocalShellToolCallStatus {
     #[serde(rename = "in_progress")]
@@ -2351,7 +2187,8 @@ pub enum LocalShellToolCallStatus {
     Incomplete,
 }
 
-/// A tool call that executes one or more shell commands in a managed environment.
+/// A tool call that executes one or more shell commands in a managed
+/// environment.
 #[derive(Serialize, Deserialize)]
 pub struct FunctionShellCall {
     /// The shell commands and limits that describe how to run the tool call.
@@ -2362,9 +2199,11 @@ pub struct FunctionShellCall {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_by: Option<String>,
     pub environment: Option<FunctionShellCallEnvironment>,
-    /// The unique ID of the shell tool call. Populated when this item is returned via API.
+    /// The unique ID of the shell tool call. Populated when this item is
+    /// returned via API.
     pub id: String,
-    /// The status of the shell call. One of `in_progress`, `completed`, or `incomplete`.
+    /// The status of the shell call. One of `in_progress`, `completed`, or
+    /// `incomplete`.
     pub status: LocalShellCallStatus,
 }
 
@@ -2385,17 +2224,21 @@ pub struct FunctionShellCallOutput {
     /// The identifier of the actor that created the item.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_by: Option<String>,
-    /// The unique ID of the shell call output. Populated when this item is returned via API.
+    /// The unique ID of the shell call output. Populated when this item is
+    /// returned via API.
     pub id: String,
-    /// The maximum length of the shell command output. This is generated by the model and should be passed back with the raw output.
+    /// The maximum length of the shell command output. This is generated by the
+    /// model and should be passed back with the raw output.
     pub max_output_length: Option<i64>,
     /// An array of shell call output contents
     pub output: Vec<FunctionShellCallOutputContent>,
-    /// The status of the shell call output. One of `in_progress`, `completed`, or `incomplete`.
+    /// The status of the shell call output. One of `in_progress`, `completed`,
+    /// or `incomplete`.
     pub status: LocalShellCallOutputStatusEnum,
 }
 
-/// A tool call that applies file diffs by creating, deleting, or updating files.
+/// A tool call that applies file diffs by creating, deleting, or updating
+/// files.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchToolCall {
     /// The unique ID of the apply patch tool call generated by the model.
@@ -2403,15 +2246,19 @@ pub struct ApplyPatchToolCall {
     /// The ID of the entity that created this tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_by: Option<String>,
-    /// The unique ID of the apply patch tool call. Populated when this item is returned via API.
+    /// The unique ID of the apply patch tool call. Populated when this item is
+    /// returned via API.
     pub id: String,
-    /// One of the create_file, delete_file, or update_file operations applied via apply_patch.
+    /// One of the `create_file`, `delete_file`, or `update_file` operations
+    /// applied via `apply_patch`.
     pub operation: ApplyPatchToolCallOperation,
-    /// The status of the apply patch tool call. One of `in_progress` or `completed`.
+    /// The status of the apply patch tool call. One of `in_progress` or
+    /// `completed`.
     pub status: ApplyPatchCallStatus,
 }
 
-/// One of the create_file, delete_file, or update_file operations applied via apply_patch.
+/// One of the `create_file`, `delete_file`, or `update_file` operations applied
+/// via `apply_patch`.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ApplyPatchToolCallOperation {
@@ -2431,106 +2278,85 @@ pub struct ApplyPatchToolCallOutput {
     /// The ID of the entity that created this tool call output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_by: Option<String>,
-    /// The unique ID of the apply patch tool call output. Populated when this item is returned via API.
+    /// The unique ID of the apply patch tool call output. Populated when this
+    /// item is returned via API.
     pub id: String,
     /// Optional textual output returned by the apply patch tool.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
-    /// The status of the apply patch tool call output. One of `completed` or `failed`.
+    /// The status of the apply patch tool call output. One of `completed` or
+    /// `failed`.
     pub status: ApplyPatchCallOutputStatus,
 }
 
 /// An invocation of a tool on an MCP server.
-///
 #[derive(Serialize, Deserialize)]
 pub struct MCPToolCall {
     /// Unique identifier for the MCP tool call approval request.
-    /// Include this value in a subsequent `mcp_approval_response` input to approve or reject the corresponding tool call.
-    ///
+    /// Include this value in a subsequent `mcp_approval_response` input to
+    /// approve or reject the corresponding tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval_request_id: Option<String>,
     /// A JSON string of the arguments passed to the tool.
-    ///
     pub arguments: String,
     /// The error from the tool call, if any.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// The unique ID of the tool call.
-    ///
     pub id: String,
     /// The name of the tool that was run.
-    ///
     pub name: String,
     /// The output from the tool call.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
     /// The label of the MCP server running the tool.
-    ///
     pub server_label: String,
-    /// The status of the tool call. One of `in_progress`, `completed`, `incomplete`, `calling`, or `failed`.
-    ///
+    /// The status of the tool call. One of `in_progress`, `completed`,
+    /// `incomplete`, `calling`, or `failed`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<MCPToolCallStatus>,
 }
 
 /// A list of tools available on an MCP server.
-///
 #[derive(Serialize, Deserialize)]
 pub struct MCPListTools {
     /// Error message if the server could not list tools.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// The unique ID of the list.
-    ///
     pub id: String,
     /// The label of the MCP server.
-    ///
     pub server_label: String,
     /// The tools available on the server.
-    ///
     pub tools: Vec<MCPListToolsTool>,
 }
 
 /// A request for human approval of a tool invocation.
-///
 #[derive(Serialize, Deserialize)]
 pub struct MCPApprovalRequest {
     /// A JSON string of arguments for the tool.
-    ///
     pub arguments: String,
     /// The unique ID of the approval request.
-    ///
     pub id: String,
     /// The name of the tool to run.
-    ///
     pub name: String,
     /// The label of the MCP server making the request.
-    ///
     pub server_label: String,
 }
 
 /// A call to a custom tool created by the model.
-///
 #[derive(Serialize, Deserialize)]
 pub struct CustomToolCall {
     /// An identifier used to map this custom tool call to a tool call output.
-    ///
     pub call_id: String,
-    /// The unique ID of the custom tool call in the OpenAI platform.
-    ///
+    /// The unique ID of the custom tool call in the `OpenAI` platform.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// The input for the custom tool call generated by the model.
-    ///
     pub input: String,
     /// The name of the custom tool being called.
-    ///
     pub name: String,
     /// The namespace of the custom tool being called.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
 }
@@ -2547,18 +2373,16 @@ pub enum OutputContent {
 }
 
 /// A logprob is the logarithmic probability that the model assigns to producing
-/// a particular token at a given position in the sequence. Less-negative (higher)
-/// logprob values indicate greater model confidence in that token choice.
-///
+/// a particular token at a given position in the sequence. Less-negative
+/// (higher) logprob values indicate greater model confidence in that token
+/// choice.
 #[derive(Serialize, Deserialize)]
 pub struct ResponseLogProb {
     /// The log probability of this token.
-    ///
     pub logprob: f64,
     /// A possible text token.
     pub token: String,
     /// The log probability of the top 20 most likely tokens.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<Vec<ResponseLogProbTopLogprobsItem>>,
 }
@@ -2589,15 +2413,18 @@ pub type ResponsePromptVariables =
 
 /// Constrains effort on reasoning for
 /// [reasoning models](https://platform.openai.com/docs/guides/reasoning).
-/// Currently supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Reducing
-/// reasoning effort can result in faster responses and fewer tokens used
-/// on reasoning in a response.
+/// Currently supported values are `none`, `minimal`, `low`, `medium`, `high`,
+/// and `xhigh`. Reducing reasoning effort can result in faster responses and
+/// fewer tokens used on reasoning in a response.
 ///
-/// - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool calls are supported for all reasoning values in gpt-5.1.
-/// - All models before `gpt-5.1` default to `medium` reasoning effort, and do not support `none`.
-/// - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+/// - `gpt-5.1` defaults to `none`, which does not perform reasoning. The
+///   supported reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and
+///   `high`. Tool calls are supported for all reasoning values in gpt-5.1.
+/// - All models before `gpt-5.1` default to `medium` reasoning effort, and do
+///   not support `none`.
+/// - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning
+///   effort.
 /// - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ReasoningEffortValue {
     #[serde(rename = "none")]
@@ -2619,8 +2446,8 @@ pub type ReasoningEffort = Option<Option<ReasoningEffortValue>>;
 /// An object specifying the format that the model must output.
 ///
 /// Configuring `{ "type": "json_schema" }` enables Structured Outputs,
-/// which ensures the model will match your supplied JSON schema. Learn more in the
-/// [Structured Outputs guide](/docs/guides/structured-outputs).
+/// which ensures the model will match your supplied JSON schema. Learn more in
+/// the [Structured Outputs guide](/docs/guides/structured-outputs).
 ///
 /// The default format is `{ "type": "text" }` with no additional options.
 ///
@@ -2629,7 +2456,6 @@ pub type ReasoningEffort = Option<Option<ReasoningEffortValue>>;
 /// Setting to `{ "type": "json_object" }` enables the older JSON mode, which
 /// ensures the message the model generates is valid JSON. Using `json_schema`
 /// is preferred for models that support it.
-///
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum TextResponseFormatConfiguration {
@@ -2641,10 +2467,9 @@ pub enum TextResponseFormatConfiguration {
     JsonObject(ResponseFormatJsonObject),
 }
 
-/// Constrains the verbosity of the model's response. Lower values will result in
-/// more concise responses, while higher values will result in more verbose responses.
-/// Currently supported values are `low`, `medium`, and `high`.
-///
+/// Constrains the verbosity of the model's response. Lower values will result
+/// in more concise responses, while higher values will result in more verbose
+/// responses. Currently supported values are `low`, `medium`, and `high`.
 #[derive(Serialize, Deserialize)]
 pub enum VerbosityValue {
     #[serde(rename = "low")]
@@ -2659,13 +2484,13 @@ pub type Verbosity = Option<Option<VerbosityValue>>;
 
 /// Controls which (if any) tool is called by the model.
 ///
-/// `none` means the model will not call any tool and instead generates a message.
+/// `none` means the model will not call any tool and instead generates a
+/// message.
 ///
-/// `auto` means the model can pick between generating a message or calling one or
-/// more tools.
+/// `auto` means the model can pick between generating a message or calling one
+/// or more tools.
 ///
 /// `required` means the model must call one or more tools.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ToolChoiceOptions {
     #[serde(rename = "none")]
@@ -2677,16 +2502,14 @@ pub enum ToolChoiceOptions {
 }
 
 /// Constrains the tools available to the model to a pre-defined set.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ToolChoiceAllowed {
     /// Constrains the tools available to the model to a pre-defined set.
     ///
-    /// `auto` allows the model to pick from among the allowed tools and generate a
-    /// message.
+    /// `auto` allows the model to pick from among the allowed tools and
+    /// generate a message.
     ///
     /// `required` requires the model to call one or more of the allowed tools.
-    ///
     pub mode: ToolChoiceAllowedMode,
     /// A list of tool definitions that the model should be allowed to call.
     ///
@@ -2698,7 +2521,6 @@ pub struct ToolChoiceAllowed {
     ///   { "type": "image_generation" }
     /// ]
     /// ```
-    ///
     pub tools: Vec<Value>,
     /// Allowed tool configuration type. Always `allowed_tools`.
     pub r#type: ToolChoiceAllowedType,
@@ -2710,7 +2532,6 @@ pub struct ToolChoiceAllowed {
 /// message.
 ///
 /// `required` requires the model to call one or more of the allowed tools.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ToolChoiceAllowedMode {
     #[serde(rename = "auto")]
@@ -2728,7 +2549,6 @@ pub enum ToolChoiceAllowedType {
 
 /// Indicates that the model should use a built-in tool to generate a response.
 /// [Learn more about built-in tools](/docs/guides/tools).
-///
 #[derive(Serialize, Deserialize)]
 pub struct ToolChoiceTypes {
     /// The type of hosted tool the model should to use. Learn more about
@@ -2742,7 +2562,6 @@ pub struct ToolChoiceTypes {
     /// - `computer_use`
     /// - `code_interpreter`
     /// - `image_generation`
-    ///
     pub r#type: ToolChoiceTypesType,
 }
 
@@ -2757,7 +2576,6 @@ pub struct ToolChoiceTypes {
 /// - `computer_use`
 /// - `code_interpreter`
 /// - `image_generation`
-///
 #[derive(Serialize, Deserialize)]
 pub enum ToolChoiceTypesType {
     #[serde(rename = "file_search")]
@@ -2779,7 +2597,6 @@ pub enum ToolChoiceTypesType {
 }
 
 /// Use this option to force the model to call a specific function.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ToolChoiceFunction {
     /// The name of the function to call.
@@ -2795,16 +2612,14 @@ pub enum ToolChoiceFunctionType {
     Function,
 }
 
-/// Use this option to force the model to call a specific tool on a remote MCP server.
-///
+/// Use this option to force the model to call a specific tool on a remote MCP
+/// server.
 #[derive(Serialize, Deserialize)]
 pub struct ToolChoiceMCP {
     /// The name of the tool to call on the server.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// The label of the MCP server to use.
-    ///
     pub server_label: String,
     /// For MCP tools, the type is always `mcp`.
     pub r#type: ToolChoiceMCPType,
@@ -2818,7 +2633,6 @@ pub enum ToolChoiceMCPType {
 }
 
 /// Use this option to force the model to call a specific custom tool.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ToolChoiceCustom {
     /// The name of the custom tool to call.
@@ -2834,7 +2648,7 @@ pub enum ToolChoiceCustomType {
     Custom,
 }
 
-/// Forces the model to call the apply_patch tool when executing a tool call.
+/// Forces the model to call the `apply_patch` tool when executing a tool call.
 #[derive(Serialize, Deserialize)]
 pub struct SpecificApplyPatchParam {
     /// The tool to call. Always `apply_patch`.
@@ -2863,7 +2677,6 @@ pub enum SpecificFunctionShellParamType {
 }
 
 /// A tool that can be used to generate a response.
-///
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Tool {
@@ -2886,13 +2699,13 @@ pub enum Tool {
 
 /// A list of one or many input items to the model, containing different content
 /// types.
-///
 pub type InputMessageContentList = Option<Vec<InputContent>>;
 
-/// Labels an `assistant` message as intermediate commentary (`commentary`) or the final answer (`final_answer`).
-/// For models like `gpt-5.3-codex` and beyond, when sending follow-up requests, preserve and resend
-/// phase on all assistant messages — dropping it can degrade performance. Not used for user messages.
-///
+/// Labels an `assistant` message as intermediate commentary (`commentary`) or
+/// the final answer (`final_answer`). For models like `gpt-5.3-codex` and
+/// beyond, when sending follow-up requests, preserve and resend phase on all
+/// assistant messages — dropping it can degrade performance. Not used for user
+/// messages.
 #[derive(Serialize, Deserialize)]
 pub enum MessagePhase {
     #[serde(rename = "commentary")]
@@ -2904,26 +2717,21 @@ pub enum MessagePhase {
 /// A message input to the model with a role indicating instruction following
 /// hierarchy. Instructions given with the `developer` or `system` role take
 /// precedence over instructions given with the `user` role.
-///
 #[derive(Serialize, Deserialize)]
 pub struct InputMessage {
     pub content: InputMessageContentList,
     /// The role of the message input. One of `user`, `system`, or `developer`.
-    ///
     pub role: InputMessageRole,
     /// The status of item. One of `in_progress`, `completed`, or
     /// `incomplete`. Populated when items are returned via API.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<InputMessageStatus>,
     /// The type of the message input. Always set to `message`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<InputMessageType>,
 }
 
 /// The role of the message input. One of `user`, `system`, or `developer`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum InputMessageRole {
     #[serde(rename = "user")]
@@ -2936,7 +2744,6 @@ pub enum InputMessageRole {
 
 /// The status of item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
-///
 #[derive(Serialize, Deserialize)]
 pub enum InputMessageStatus {
     #[serde(rename = "in_progress")]
@@ -2948,7 +2755,6 @@ pub enum InputMessageStatus {
 }
 
 /// The type of the message input. Always set to `message`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum InputMessageType {
     #[serde(rename = "message")]
@@ -2958,7 +2764,8 @@ pub enum InputMessageType {
 /// The output of a computer tool call.
 #[derive(Serialize, Deserialize)]
 pub struct ComputerCallOutputItemParam {
-    /// The safety checks reported by the API that have been acknowledged by the developer.
+    /// The safety checks reported by the API that have been acknowledged by the
+    /// developer.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acknowledged_safety_checks: Option<Vec<ComputerCallSafetyCheckParam>>,
     /// The ID of the computer tool call that produced the output.
@@ -2967,10 +2774,12 @@ pub struct ComputerCallOutputItemParam {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     pub output: ComputerScreenshotImage,
-    /// The status of the message input. One of `in_progress`, `completed`, or `incomplete`. Populated when input items are returned via API.
+    /// The status of the message input. One of `in_progress`, `completed`, or
+    /// `incomplete`. Populated when input items are returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<FunctionCallItemStatus>,
-    /// The type of the computer tool call output. Always `computer_call_output`.
+    /// The type of the computer tool call output. Always
+    /// `computer_call_output`.
     pub r#type: ComputerCallOutputItemParamType,
 }
 
@@ -2986,15 +2795,18 @@ pub enum ComputerCallOutputItemParamType {
 pub struct FunctionCallOutputItemParam {
     /// The unique ID of the function tool call generated by the model.
     pub call_id: String,
-    /// The unique ID of the function tool call output. Populated when this item is returned via API.
+    /// The unique ID of the function tool call output. Populated when this item
+    /// is returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// Text, image, or file output of the function tool call.
     pub output: FunctionCallOutputItemParamOutput,
-    /// The status of the item. One of `in_progress`, `completed`, or `incomplete`. Populated when items are returned via API.
+    /// The status of the item. One of `in_progress`, `completed`, or
+    /// `incomplete`. Populated when items are returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<FunctionCallItemStatus>,
-    /// The type of the function tool call output. Always `function_call_output`.
+    /// The type of the function tool call output. Always
+    /// `function_call_output`.
     pub r#type: FunctionCallOutputItemParamType,
 }
 
@@ -3086,7 +2898,8 @@ pub enum ToolSearchOutputItemParamType {
     ToolSearchOutput,
 }
 
-/// A compaction item generated by the [`v1/responses/compact` API](/docs/api-reference/responses/compact).
+/// A compaction item generated by the [`v1/responses/compact`
+/// API](/docs/api-reference/responses/compact).
 #[derive(Serialize, Deserialize)]
 pub struct CompactionSummaryItemParam {
     /// The encrypted content of the compaction summary.
@@ -3106,26 +2919,22 @@ pub enum CompactionSummaryItemParamType {
 }
 
 /// The output of a local shell tool call.
-///
 #[derive(Serialize, Deserialize)]
 pub struct LocalShellToolCallOutput {
     /// The unique ID of the local shell tool call generated by the model.
-    ///
     pub id: String,
     /// A JSON string of the output of the local shell tool call.
-    ///
     pub output: String,
-    /// The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-    ///
+    /// The status of the item. One of `in_progress`, `completed`, or
+    /// `incomplete`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<LocalShellToolCallOutputStatus>,
-    /// The type of the local shell tool call output. Always `local_shell_call_output`.
-    ///
+    /// The type of the local shell tool call output. Always
+    /// `local_shell_call_output`.
     pub r#type: LocalShellToolCallOutputType,
 }
 
 /// The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum LocalShellToolCallOutputStatus {
     #[serde(rename = "in_progress")]
@@ -3136,8 +2945,8 @@ pub enum LocalShellToolCallOutputStatus {
     Incomplete,
 }
 
-/// The type of the local shell tool call output. Always `local_shell_call_output`.
-///
+/// The type of the local shell tool call output. Always
+/// `local_shell_call_output`.
 #[derive(Serialize, Deserialize)]
 pub enum LocalShellToolCallOutputType {
     #[serde(rename = "local_shell_call_output")]
@@ -3154,10 +2963,12 @@ pub struct FunctionShellCallItemParam {
     /// The environment to execute the shell commands in.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<FunctionShellCallItemParamEnvironment>,
-    /// The unique ID of the shell tool call. Populated when this item is returned via API.
+    /// The unique ID of the shell tool call. Populated when this item is
+    /// returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// The status of the shell call. One of `in_progress`, `completed`, or `incomplete`.
+    /// The status of the shell call. One of `in_progress`, `completed`, or
+    /// `incomplete`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<FunctionShellCallItemStatus>,
     /// The type of the item. Always `shell_call`.
@@ -3186,13 +2997,16 @@ pub enum FunctionShellCallItemParamType {
 pub struct FunctionShellCallOutputItemParam {
     /// The unique ID of the shell tool call generated by the model.
     pub call_id: String,
-    /// The unique ID of the shell tool call output. Populated when this item is returned via API.
+    /// The unique ID of the shell tool call output. Populated when this item is
+    /// returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// The maximum number of UTF-8 characters captured for this shell call's combined output.
+    /// The maximum number of UTF-8 characters captured for this shell call's
+    /// combined output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_output_length: Option<i64>,
-    /// Captured chunks of stdout and stderr output, along with their associated outcomes.
+    /// Captured chunks of stdout and stderr output, along with their associated
+    /// outcomes.
     pub output: Vec<FunctionShellCallOutputContentParam>,
     /// The status of the shell call output.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3208,17 +3022,21 @@ pub enum FunctionShellCallOutputItemParamType {
     ShellCallOutput,
 }
 
-/// A tool call representing a request to create, delete, or update files using diff patches.
+/// A tool call representing a request to create, delete, or update files using
+/// diff patches.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchToolCallItemParam {
     /// The unique ID of the apply patch tool call generated by the model.
     pub call_id: String,
-    /// The unique ID of the apply patch tool call. Populated when this item is returned via API.
+    /// The unique ID of the apply patch tool call. Populated when this item is
+    /// returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// The specific create, delete, or update instruction for the apply_patch tool call.
+    /// The specific create, delete, or update instruction for the `apply_patch`
+    /// tool call.
     pub operation: ApplyPatchOperationParam,
-    /// The status of the apply patch tool call. One of `in_progress` or `completed`.
+    /// The status of the apply patch tool call. One of `in_progress` or
+    /// `completed`.
     pub status: ApplyPatchCallStatusParam,
     /// The type of the item. Always `apply_patch_call`.
     pub r#type: ApplyPatchToolCallItemParamType,
@@ -3236,13 +3054,16 @@ pub enum ApplyPatchToolCallItemParamType {
 pub struct ApplyPatchToolCallOutputItemParam {
     /// The unique ID of the apply patch tool call generated by the model.
     pub call_id: String,
-    /// The unique ID of the apply patch tool call output. Populated when this item is returned via API.
+    /// The unique ID of the apply patch tool call output. Populated when this
+    /// item is returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// Optional human-readable log text from the apply patch tool (e.g., patch results or errors).
+    /// Optional human-readable log text from the apply patch tool (e.g., patch
+    /// results or errors).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
-    /// The status of the apply patch tool call output. One of `completed` or `failed`.
+    /// The status of the apply patch tool call output. One of `completed` or
+    /// `failed`.
     pub status: ApplyPatchCallOutputStatusParam,
     /// The type of the item. Always `apply_patch_call_output`.
     pub r#type: ApplyPatchToolCallOutputItemParamType,
@@ -3256,67 +3077,55 @@ pub enum ApplyPatchToolCallOutputItemParamType {
 }
 
 /// A response to an MCP approval request.
-///
 #[derive(Serialize, Deserialize)]
 pub struct MCPApprovalResponse {
     /// The ID of the approval request being answered.
-    ///
     pub approval_request_id: String,
     /// Whether the request was approved.
-    ///
     pub approve: bool,
     /// The unique ID of the approval response
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// Optional reason for the decision.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     /// The type of the item. Always `mcp_approval_response`.
-    ///
     pub r#type: MCPApprovalResponseType,
 }
 
 /// The type of the item. Always `mcp_approval_response`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum MCPApprovalResponseType {
     #[serde(rename = "mcp_approval_response")]
     McpApprovalResponse,
 }
 
-/// The output of a custom tool call from your code, being sent back to the model.
-///
+/// The output of a custom tool call from your code, being sent back to the
+/// model.
 #[derive(Serialize, Deserialize)]
 pub struct CustomToolCallOutput {
-    /// The call ID, used to map this custom tool call output to a custom tool call.
-    ///
+    /// The call ID, used to map this custom tool call output to a custom tool
+    /// call.
     pub call_id: String,
-    /// The unique ID of the custom tool call output in the OpenAI platform.
-    ///
+    /// The unique ID of the custom tool call output in the `OpenAI` platform.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// The output from the custom tool call generated by your code.
     /// Can be a string or an list of output content.
-    ///
     pub output: CustomToolCallOutputOutput,
-    /// The type of the custom tool call output. Always `custom_tool_call_output`.
-    ///
+    /// The type of the custom tool call output. Always
+    /// `custom_tool_call_output`.
     pub r#type: CustomToolCallOutputType,
 }
 
 /// A string of the output of the custom tool call.
-///
 pub type CustomToolCallOutputOutputString = Option<String>;
 
 /// Text, image, or file output of the custom tool call.
-///
 pub type CustomToolCallOutputOutputArray = Option<Vec<FunctionAndCustomToolCallOutput>>;
 
 /// The output from the custom tool call generated by your code.
 /// Can be a string or an list of output content.
-///
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CustomToolCallOutputOutput {
@@ -3325,7 +3134,6 @@ pub enum CustomToolCallOutputOutput {
 }
 
 /// The type of the custom tool call output. Always `custom_tool_call_output`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum CustomToolCallOutputType {
     #[serde(rename = "custom_tool_call_output")]
@@ -3359,61 +3167,48 @@ pub type VectorStoreFileAttributes =
     Option<Option<HashMap<String, VectorStoreFileAttributesValueValue>>>;
 
 /// Action type "search" - Performs a web search query.
-///
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchActionSearch {
     /// The search queries.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub queries: Option<Vec<String>>,
     /// [DEPRECATED] The search query.
-    ///
     pub query: String,
     /// The sources used in the search.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sources: Option<Vec<WebSearchActionSearchSourcesItem>>,
 }
 
 /// A source used in the search.
-///
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchActionSearchSourcesItem {
     /// The type of source. Always `url`.
-    ///
     pub r#type: WebSearchActionSearchSourcesItemType,
     /// The URL of the source.
-    ///
     pub url: String,
 }
 
 /// The type of source. Always `url`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum WebSearchActionSearchSourcesItemType {
     #[serde(rename = "url")]
     Url,
 }
 
-/// Action type "open_page" - Opens a specific URL from search results.
-///
+/// Action type "`open_page`" - Opens a specific URL from search results.
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchActionOpenPage {
     /// The URL opened by the model.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
 
-/// Action type "find_in_page": Searches for a pattern within a loaded page.
-///
+/// Action type "`find_in_page"`: Searches for a pattern within a loaded page.
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchActionFind {
     /// The pattern or text to search for within the page.
-    ///
     pub pattern: String,
     /// The URL of the page searched for the pattern.
-    ///
     pub url: String,
 }
 
@@ -3442,7 +3237,6 @@ pub enum ComputerAction {
 
 /// Flattened batched actions for `computer_use`. Each action includes an
 /// `type` discriminator and action-specific fields.
-///
 pub type ComputerActionList = Option<Vec<ComputerAction>>;
 
 /// A pending safety check for the computer call.
@@ -3586,7 +3380,8 @@ pub struct FunctionShellCallOutputContent {
     /// The identifier of the actor that created the item.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_by: Option<String>,
-    /// Represents either an exit outcome (with an exit code) or a timeout outcome for a shell call output chunk.
+    /// Represents either an exit outcome (with an exit code) or a timeout
+    /// outcome for a shell call output chunk.
     pub outcome: FunctionShellCallOutputContentOutcome,
     /// The standard error output that was captured.
     pub stderr: String,
@@ -3594,7 +3389,8 @@ pub struct FunctionShellCallOutputContent {
     pub stdout: String,
 }
 
-/// Represents either an exit outcome (with an exit code) or a timeout outcome for a shell call output chunk.
+/// Represents either an exit outcome (with an exit code) or a timeout outcome
+/// for a shell call output chunk.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FunctionShellCallOutputContentOutcome {
@@ -3614,7 +3410,7 @@ pub enum LocalShellCallOutputStatusEnum {
     Incomplete,
 }
 
-/// Instruction describing how to create a file via the apply_patch tool.
+/// Instruction describing how to create a file via the `apply_patch` tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchCreateFileOperation {
     /// Diff to apply.
@@ -3623,14 +3419,14 @@ pub struct ApplyPatchCreateFileOperation {
     pub path: String,
 }
 
-/// Instruction describing how to delete a file via the apply_patch tool.
+/// Instruction describing how to delete a file via the `apply_patch` tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchDeleteFileOperation {
     /// Path of the file to delete.
     pub path: String,
 }
 
-/// Instruction describing how to update a file via the apply_patch tool.
+/// Instruction describing how to update a file via the `apply_patch` tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchUpdateFileOperation {
     /// Diff to apply.
@@ -3670,22 +3466,17 @@ pub enum MCPToolCallStatus {
 }
 
 /// A tool available on an MCP server.
-///
 #[derive(Serialize, Deserialize)]
 pub struct MCPListToolsTool {
     /// Additional annotations about the tool.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Value>,
     /// The description of the tool.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// The JSON schema describing the tool's input.
-    ///
     pub input_schema: Value,
     /// The name of the tool.
-    ///
     pub name: String,
 }
 
@@ -3713,15 +3504,18 @@ pub struct InputTextContent {
     pub text: String,
 }
 
-/// An image input to the model. Learn about [image inputs](/docs/guides/vision).
+/// An image input to the model. Learn about [image
+/// inputs](/docs/guides/vision).
 #[derive(Serialize, Deserialize)]
 pub struct InputImageContent {
-    /// The detail level of the image to be sent to the model. One of `high`, `low`, `auto`, or `original`. Defaults to `auto`.
+    /// The detail level of the image to be sent to the model. One of `high`,
+    /// `low`, `auto`, or `original`. Defaults to `auto`.
     pub detail: ImageDetail,
     /// The ID of the file to be sent to the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
-    /// The URL of the image to be sent to the model. A fully qualified URL or base64 encoded image in a data URL.
+    /// The URL of the image to be sent to the model. A fully qualified URL or
+    /// base64 encoded image in a data URL.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image_url: Option<String>,
 }
@@ -3730,7 +3524,6 @@ pub struct InputImageContent {
 #[derive(Serialize, Deserialize)]
 pub struct InputFileContent {
     /// The content of the file to be sent to the model.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_data: Option<String>,
     /// The ID of the file to be sent to the model.
@@ -3745,23 +3538,19 @@ pub struct InputFileContent {
 }
 
 /// Default response format. Used to generate text responses.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseFormatText {}
 
 /// JSON Schema response format. Used to generate structured JSON responses.
 /// Learn more about [Structured Outputs](/docs/guides/structured-outputs).
-///
 #[derive(Serialize, Deserialize)]
 pub struct TextResponseFormatJsonSchema {
     /// A description of what the response format is for, used by the model to
     /// determine how to respond in the format.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// The name of the response format. Must be a-z, A-Z, 0-9, or contain
     /// underscores and dashes, with a maximum length of 64.
-    ///
     pub name: String,
     pub schema: ResponseFormatJsonSchemaSchema,
     /// Whether to enable strict schema adherence when generating the output.
@@ -3769,7 +3558,6 @@ pub struct TextResponseFormatJsonSchema {
     /// in the `schema` field. Only a subset of JSON Schema is supported when
     /// `strict` is `true`. To learn more, read the [Structured Outputs
     /// guide](/docs/guides/structured-outputs).
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub strict: Option<bool>,
 }
@@ -3778,7 +3566,6 @@ pub struct TextResponseFormatJsonSchema {
 /// Using `json_schema` is recommended for models that support it. Note that the
 /// model will not generate JSON without a system or user message instructing it
 /// to do so.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ResponseFormatJsonObject {}
 
@@ -3788,7 +3575,8 @@ pub struct FunctionTool {
     /// Whether this function is deferred and loaded via tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
-    /// A description of the function. Used by the model to determine whether or not to call the function.
+    /// A description of the function. Used by the model to determine whether or
+    /// not to call the function.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// The name of the function to call.
@@ -3814,7 +3602,8 @@ pub struct FileSearchTool {
     /// A filter to apply.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<Filters>,
-    /// The maximum number of results to return. This number should be between 1 and 50 inclusive.
+    /// The maximum number of results to return. This number should be between 1
+    /// and 50 inclusive.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_num_results: Option<i64>,
     /// Ranking options for search.
@@ -3869,36 +3658,35 @@ pub enum ComputerUsePreviewToolType {
 
 /// Search the Internet for sources related to the prompt. Learn more about the
 /// [web search tool](/docs/guides/tools-web-search).
-///
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchTool {
     /// Filters for the search.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<WebSearchToolFilters>,
-    /// High level guidance for the amount of context window space to use for the search. One of `low`, `medium`, or `high`. `medium` is the default.
+    /// High level guidance for the amount of context window space to use for
+    /// the search. One of `low`, `medium`, or `high`. `medium` is the default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_context_size: Option<WebSearchToolSearchContextSize>,
-    /// The type of the web search tool. One of `web_search` or `web_search_2025_08_26`.
+    /// The type of the web search tool. One of `web_search` or
+    /// `web_search_2025_08_26`.
     pub r#type: WebSearchToolType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_location: Option<WebSearchApproximateLocation>,
 }
 
 /// Filters for the search.
-///
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchToolFilters {
-    /// Allowed domains for the search. If not provided, all domains are allowed.
-    /// Subdomains of the provided domains are allowed as well.
+    /// Allowed domains for the search. If not provided, all domains are
+    /// allowed. Subdomains of the provided domains are allowed as well.
     ///
     /// Example: `["pubmed.ncbi.nlm.nih.gov"]`
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_domains: Option<Vec<String>>,
 }
 
-/// High level guidance for the amount of context window space to use for the search. One of `low`, `medium`, or `high`. `medium` is the default.
+/// High level guidance for the amount of context window space to use for the
+/// search. One of `low`, `medium`, or `high`. `medium` is the default.
 #[derive(Serialize, Deserialize)]
 pub enum WebSearchToolSearchContextSize {
     #[serde(rename = "low")]
@@ -3909,7 +3697,8 @@ pub enum WebSearchToolSearchContextSize {
     High,
 }
 
-/// The type of the web search tool. One of `web_search` or `web_search_2025_08_26`.
+/// The type of the web search tool. One of `web_search` or
+/// `web_search_2025_08_26`.
 #[derive(Serialize, Deserialize)]
 pub enum WebSearchToolType {
     #[serde(rename = "web_search")]
@@ -3920,22 +3709,20 @@ pub enum WebSearchToolType {
 
 /// Give the model access to additional tools via remote Model Context Protocol
 /// (MCP) servers. [Learn more about MCP](/docs/guides/tools-remote-mcp).
-///
 #[derive(Serialize, Deserialize)]
 pub struct MCPTool {
     /// List of allowed tool names or a filter object.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_tools: Option<MCPToolAllowedTools>,
     /// An OAuth access token that can be used with a remote MCP server, either
     /// with a custom MCP server URL or a service connector. Your application
     /// must handle the OAuth authorization flow and provide the token here.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorization: Option<String>,
-    /// Identifier for service connectors, like those available in ChatGPT. One of
-    /// `server_url` or `connector_id` must be provided. Learn more about service
-    /// connectors [here](/docs/guides/tools-remote-mcp#connectors).
+    /// Identifier for service connectors, like those available in `ChatGPT`.
+    /// One of `server_url` or `connector_id` must be provided. Learn more
+    /// about service connectors
+    /// [here](/docs/guides/tools-remote-mcp#connectors).
     ///
     /// Currently supported `connector_id` values are:
     ///
@@ -3946,32 +3733,26 @@ pub struct MCPTool {
     /// - Microsoft Teams: `connector_microsoftteams`
     /// - Outlook Calendar: `connector_outlookcalendar`
     /// - Outlook Email: `connector_outlookemail`
-    /// - SharePoint: `connector_sharepoint`
-    ///
+    /// - `SharePoint`: `connector_sharepoint`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connector_id: Option<MCPToolConnectorId>,
     /// Whether this MCP tool is deferred and discovered via tool search.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Optional HTTP headers to send to the MCP server. Use for authentication
     /// or other purposes.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     /// Specify which of the MCP server's tools require approval.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub require_approval: Option<MCPToolRequireApproval>,
     /// Optional description of the MCP server, used to provide more context.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server_description: Option<String>,
     /// A label for this MCP server, used to identify it in tool calls.
-    ///
     pub server_label: String,
-    /// The URL for the MCP server. One of `server_url` or `connector_id` must be
-    /// provided.
-    ///
+    /// The URL for the MCP server. One of `server_url` or `connector_id` must
+    /// be provided.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server_url: Option<String>,
     /// The type of the MCP tool. Always `mcp`.
@@ -3982,7 +3763,6 @@ pub struct MCPTool {
 pub type MCPToolAllowedToolsArray = Option<Vec<String>>;
 
 /// List of allowed tool names or a filter object.
-///
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum MCPToolAllowedTools {
@@ -3990,7 +3770,7 @@ pub enum MCPToolAllowedTools {
     MCPToolFilter(MCPToolFilter),
 }
 
-/// Identifier for service connectors, like those available in ChatGPT. One of
+/// Identifier for service connectors, like those available in `ChatGPT`. One of
 /// `server_url` or `connector_id` must be provided. Learn more about service
 /// connectors [here](/docs/guides/tools-remote-mcp#connectors).
 ///
@@ -4003,8 +3783,7 @@ pub enum MCPToolAllowedTools {
 /// - Microsoft Teams: `connector_microsoftteams`
 /// - Outlook Calendar: `connector_outlookcalendar`
 /// - Outlook Email: `connector_outlookemail`
-/// - SharePoint: `connector_sharepoint`
-///
+/// - `SharePoint`: `connector_sharepoint`
 #[derive(Serialize, Deserialize)]
 pub enum MCPToolConnectorId {
     #[serde(rename = "connector_dropbox")]
@@ -4028,7 +3807,6 @@ pub enum MCPToolConnectorId {
 /// Specify which of the MCP server's tools require approval. Can be
 /// `always`, `never`, or a filter object associated with tools
 /// that require approval.
-///
 #[derive(Serialize, Deserialize)]
 pub struct MCPToolRequireApprovalVariant1 {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4040,7 +3818,6 @@ pub struct MCPToolRequireApprovalVariant1 {
 /// Specify a single approval policy for all tools. One of `always` or
 /// `never`. When set to `always`, all tools will require approval. When
 /// set to `never`, all tools will not require approval.
-///
 pub type MCPToolRequireApprovalString = Option<String>;
 
 /// Specify which of the MCP server's tools require approval.
@@ -4059,16 +3836,13 @@ pub enum MCPToolType {
 }
 
 /// A tool that runs Python code to help generate a response to a prompt.
-///
 #[derive(Serialize, Deserialize)]
 pub struct CodeInterpreterTool {
     /// The code interpreter container. Can be a container ID or an object that
-    /// specifies uploaded file IDs to make available to your code, along with an
-    /// optional `memory_limit` setting.
-    ///
+    /// specifies uploaded file IDs to make available to your code, along with
+    /// an optional `memory_limit` setting.
     pub container: CodeInterpreterToolContainer,
     /// The type of the code interpreter tool. Always `code_interpreter`.
-    ///
     pub r#type: CodeInterpreterToolType,
 }
 
@@ -4078,7 +3852,6 @@ pub type CodeInterpreterToolContainerString = Option<String>;
 /// The code interpreter container. Can be a container ID or an object that
 /// specifies uploaded file IDs to make available to your code, along with an
 /// optional `memory_limit` setting.
-///
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CodeInterpreterToolContainer {
@@ -4087,7 +3860,6 @@ pub enum CodeInterpreterToolContainer {
 }
 
 /// The type of the code interpreter tool. Always `code_interpreter`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum CodeInterpreterToolType {
     #[serde(rename = "code_interpreter")]
@@ -4095,62 +3867,52 @@ pub enum CodeInterpreterToolType {
 }
 
 /// A tool that generates images using the GPT image models.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ImageGenTool {
-    /// Whether to generate a new image or edit an existing image. Default: `auto`.
-    ///
+    /// Whether to generate a new image or edit an existing image. Default:
+    /// `auto`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<ImageGenActionEnum>,
     /// Background type for the generated image. One of `transparent`,
     /// `opaque`, or `auto`. Default: `auto`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<ImageGenToolBackground>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_fidelity: Option<InputFidelity>,
     /// Optional mask for inpainting. Contains `image_url`
     /// (string, optional) and `file_id` (string, optional).
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_image_mask: Option<ImageGenToolInputImageMask>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// Moderation level for the generated image. Default: `auto`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub moderation: Option<ImageGenToolModeration>,
     /// Compression level for the output image. Default: 100.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_compression: Option<i64>,
     /// The output format of the generated image. One of `png`, `webp`, or
     /// `jpeg`. Default: `png`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<ImageGenToolOutputFormat>,
-    /// Number of partial images to generate in streaming mode, from 0 (default value) to 3.
-    ///
+    /// Number of partial images to generate in streaming mode, from 0 (default
+    /// value) to 3.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub partial_images: Option<i64>,
     /// The quality of the generated image. One of `low`, `medium`, `high`,
     /// or `auto`. Default: `auto`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quality: Option<ImageGenToolQuality>,
     /// The size of the generated image. One of `1024x1024`, `1024x1536`,
     /// `1536x1024`, or `auto`. Default: `auto`.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<ImageGenToolSize>,
     /// The type of the image generation tool. Always `image_generation`.
-    ///
     pub r#type: ImageGenToolType,
 }
 
 /// Background type for the generated image. One of `transparent`,
 /// `opaque`, or `auto`. Default: `auto`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolBackground {
     #[serde(rename = "transparent")]
@@ -4163,21 +3925,17 @@ pub enum ImageGenToolBackground {
 
 /// Optional mask for inpainting. Contains `image_url`
 /// (string, optional) and `file_id` (string, optional).
-///
 #[derive(Serialize, Deserialize)]
 pub struct ImageGenToolInputImageMask {
     /// File ID for the mask image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
     /// Base64-encoded mask image.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image_url: Option<String>,
 }
 
 /// Moderation level for the generated image. Default: `auto`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolModeration {
     #[serde(rename = "auto")]
@@ -4188,7 +3946,6 @@ pub enum ImageGenToolModeration {
 
 /// The output format of the generated image. One of `png`, `webp`, or
 /// `jpeg`. Default: `png`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolOutputFormat {
     #[serde(rename = "png")]
@@ -4201,7 +3958,6 @@ pub enum ImageGenToolOutputFormat {
 
 /// The quality of the generated image. One of `low`, `medium`, `high`,
 /// or `auto`. Default: `auto`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolQuality {
     #[serde(rename = "low")]
@@ -4216,7 +3972,6 @@ pub enum ImageGenToolQuality {
 
 /// The size of the generated image. One of `1024x1024`, `1024x1536`,
 /// `1536x1024`, or `auto`. Default: `auto`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolSize {
     #[serde(rename = "1024x1024")]
@@ -4230,14 +3985,14 @@ pub enum ImageGenToolSize {
 }
 
 /// The type of the image generation tool. Always `image_generation`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ImageGenToolType {
     #[serde(rename = "image_generation")]
     ImageGeneration,
 }
 
-/// A tool that allows the model to execute shell commands in a local environment.
+/// A tool that allows the model to execute shell commands in a local
+/// environment.
 #[derive(Serialize, Deserialize)]
 pub struct LocalShellToolParam {
     /// The type of the local shell tool. Always `local_shell`.
@@ -4278,7 +4033,8 @@ pub enum FunctionShellToolParamType {
     Shell,
 }
 
-/// A custom tool that processes input using a specified format. Learn more about   [custom tools](/docs/guides/function-calling#custom-tools)
+/// A custom tool that processes input using a specified format. Learn more
+/// about   [custom tools](/docs/guides/function-calling#custom-tools)
 #[derive(Serialize, Deserialize)]
 pub struct CustomToolParam {
     /// Whether this tool should be deferred and discovered via tool search.
@@ -4362,17 +4118,20 @@ pub enum ToolSearchToolParamType {
 pub struct WebSearchPreviewTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_content_types: Option<Vec<SearchContentType>>,
-    /// High level guidance for the amount of context window space to use for the search. One of `low`, `medium`, or `high`. `medium` is the default.
+    /// High level guidance for the amount of context window space to use for
+    /// the search. One of `low`, `medium`, or `high`. `medium` is the default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_context_size: Option<SearchContextSize>,
-    /// The type of the web search tool. One of `web_search_preview` or `web_search_preview_2025_03_11`.
+    /// The type of the web search tool. One of `web_search_preview` or
+    /// `web_search_preview_2025_03_11`.
     pub r#type: WebSearchPreviewToolType,
     /// The user's location.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_location: Option<ApproximateLocation>,
 }
 
-/// The type of the web search tool. One of `web_search_preview` or `web_search_preview_2025_03_11`.
+/// The type of the web search tool. One of `web_search_preview` or
+/// `web_search_preview_2025_03_11`.
 #[derive(Serialize, Deserialize)]
 pub enum WebSearchPreviewToolType {
     #[serde(rename = "web_search_preview")]
@@ -4407,7 +4166,6 @@ pub enum InputContent {
 }
 
 /// A computer screenshot image used with the computer use tool.
-///
 #[derive(Serialize, Deserialize)]
 pub struct ComputerScreenshotImage {
     /// The identifier of an uploaded file that contains the screenshot.
@@ -4418,13 +4176,11 @@ pub struct ComputerScreenshotImage {
     pub image_url: Option<String>,
     /// Specifies the event type. For a computer screenshot, this property is
     /// always set to `computer_screenshot`.
-    ///
     pub r#type: ComputerScreenshotImageType,
 }
 
 /// Specifies the event type. For a computer screenshot, this property is
 /// always set to `computer_screenshot`.
-///
 #[derive(Serialize, Deserialize)]
 pub enum ComputerScreenshotImageType {
     #[serde(rename = "computer_screenshot")]
@@ -4451,13 +4207,15 @@ pub struct InputTextContentParam {
 /// An image input to the model. Learn about [image inputs](/docs/guides/vision)
 #[derive(Serialize, Deserialize)]
 pub struct InputImageContentParamAutoParam {
-    /// The detail level of the image to be sent to the model. One of `high`, `low`, `auto`, or `original`. Defaults to `auto`.
+    /// The detail level of the image to be sent to the model. One of `high`,
+    /// `low`, `auto`, or `original`. Defaults to `auto`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<DetailEnum>,
     /// The ID of the file to be sent to the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
-    /// The URL of the image to be sent to the model. A fully qualified URL or base64 encoded image in a data URL.
+    /// The URL of the image to be sent to the model. A fully qualified URL or
+    /// base64 encoded image in a data URL.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image_url: Option<String>,
 }
@@ -4486,10 +4244,12 @@ pub type EmptyModelParam = Option<Value>;
 pub struct FunctionShellActionParam {
     /// Ordered shell commands for the execution environment to run.
     pub commands: Vec<String>,
-    /// Maximum number of UTF-8 characters to capture from combined stdout and stderr output.
+    /// Maximum number of UTF-8 characters to capture from combined stdout and
+    /// stderr output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_output_length: Option<i64>,
-    /// Maximum wall-clock time in milliseconds to allow the shell commands to run.
+    /// Maximum wall-clock time in milliseconds to allow the shell commands to
+    /// run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout_ms: Option<i64>,
 }
@@ -4529,7 +4289,8 @@ pub struct FunctionShellCallOutputContentParam {
     pub stdout: String,
 }
 
-/// One of the create_file, delete_file, or update_file operations supplied to the apply_patch tool.
+/// One of the `create_file`, `delete_file`, or `update_file` operations
+/// supplied to the `apply_patch` tool.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ApplyPatchOperationParam {
@@ -4541,7 +4302,7 @@ pub enum ApplyPatchOperationParam {
     UpdateFile(ApplyPatchUpdateFileOperationParam),
 }
 
-/// Status values reported for apply_patch tool calls.
+/// Status values reported for `apply_patch` tool calls.
 #[derive(Serialize, Deserialize)]
 pub enum ApplyPatchCallStatusParam {
     #[serde(rename = "in_progress")]
@@ -4550,7 +4311,7 @@ pub enum ApplyPatchCallStatusParam {
     Completed,
 }
 
-/// Outcome values reported for apply_patch tool call outputs.
+/// Outcome values reported for `apply_patch` tool call outputs.
 #[derive(Serialize, Deserialize)]
 pub enum ApplyPatchCallOutputStatusParam {
     #[serde(rename = "completed")]
@@ -4573,7 +4334,8 @@ pub enum FunctionAndCustomToolCallOutput {
 /// A click action.
 #[derive(Serialize, Deserialize)]
 pub struct ClickParam {
-    /// Indicates which mouse button was pressed during the click. One of `left`, `right`, `wheel`, `back`, or `forward`.
+    /// Indicates which mouse button was pressed during the click. One of
+    /// `left`, `right`, `wheel`, `back`, or `forward`.
     pub button: ClickButtonType,
     /// The keys being held while clicking.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4601,8 +4363,9 @@ pub struct DragParam {
     /// The keys being held while dragging the mouse.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keys: Option<Vec<String>>,
-    /// An array of coordinates representing the path of the drag action. Coordinates will appear as an array of objects, eg
-    /// ```json
+    /// An array of coordinates representing the path of the drag action.
+    /// Coordinates will appear as an array of objects, eg 
+    /// ```
     /// [
     ///   { x: 100, y: 200 },
     ///   { x: 200, y: 300 }
@@ -4614,7 +4377,8 @@ pub struct DragParam {
 /// A collection of keypresses the model would like to perform.
 #[derive(Serialize, Deserialize)]
 pub struct KeyPressAction {
-    /// The combination of keys the model is requesting to be pressed. This is an array of strings, each representing a key.
+    /// The combination of keys the model is requesting to be pressed. This is
+    /// an array of strings, each representing a key.
     pub keys: Vec<String>,
 }
 
@@ -4709,7 +4473,6 @@ pub enum ImageDetail {
 
 /// The schema for the response format, described as a JSON Schema object.
 /// Learn how to build JSON schemas [here](https://json-schema.org/).
-///
 pub type ResponseFormatJsonSchemaSchema = Option<Value>;
 
 #[derive(Serialize, Deserialize)]
@@ -4721,13 +4484,17 @@ pub enum Filters {
 
 #[derive(Serialize, Deserialize)]
 pub struct RankingOptions {
-    /// Weights that control how reciprocal rank fusion balances semantic embedding matches versus sparse keyword matches when hybrid search is enabled.
+    /// Weights that control how reciprocal rank fusion balances semantic
+    /// embedding matches versus sparse keyword matches when hybrid search is
+    /// enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hybrid_search: Option<HybridSearchOptions>,
     /// The ranker to use for the file search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ranker: Option<RankerVersionType>,
-    /// The score threshold for the file search, a number between 0 and 1. Numbers closer to 1 will attempt to return only the most relevant results, but may return fewer results.
+    /// The score threshold for the file search, a number between 0 and 1.
+    /// Numbers closer to 1 will attempt to return only the most relevant
+    /// results, but may return fewer results.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score_threshold: Option<f64>,
 }
@@ -4747,7 +4514,6 @@ pub enum ComputerEnvironment {
 }
 
 /// The approximate location of the user.
-///
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchApproximateLocationValue {
     /// Free text input for the city of the user, e.g. `San Francisco`.
@@ -4777,13 +4543,11 @@ pub enum WebSearchApproximateLocationValueType {
 pub type WebSearchApproximateLocation = Option<Option<WebSearchApproximateLocationValue>>;
 
 /// A filter object to specify which tools are allowed.
-///
 #[derive(Serialize, Deserialize)]
 pub struct MCPToolFilter {
     /// Indicates whether or not a tool modifies data or is read-only. If an
     /// MCP server is [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
     /// it will match this filter.
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_only: Option<bool>,
     /// List of allowed tool names.
@@ -4791,7 +4555,8 @@ pub struct MCPToolFilter {
     pub tool_names: Option<Vec<String>>,
 }
 
-/// Configuration for a code interpreter container. Optionally specify the IDs of the files to run the code on.
+/// Configuration for a code interpreter container. Optionally specify the IDs
+/// of the files to run the code on.
 #[derive(Serialize, Deserialize)]
 pub struct AutoCodeInterpreterToolParam {
     /// An optional list of uploaded files to make available to your code.
@@ -4834,7 +4599,11 @@ pub enum ImageGenActionEnum {
     Auto,
 }
 
-/// Control how much effort the model will exert to match the style and features, especially facial features, of input images. This parameter is only supported for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
+/// Control how much effort the model will exert to match the style and
+/// features, especially facial features, of input images. This parameter is
+/// only supported for `gpt-image-1` and `gpt-image-1.5` and later models,
+/// unsupported for `gpt-image-1-mini`. Supports `high` and `low`. Defaults to
+/// `low`.
 #[derive(Serialize, Deserialize)]
 pub enum InputFidelity {
     #[serde(rename = "high")]
@@ -4980,7 +4749,7 @@ pub enum FunctionShellCallOutputOutcomeParam {
     Exit(FunctionShellCallOutputExitOutcomeParam),
 }
 
-/// Instruction for creating a new file via the apply_patch tool.
+/// Instruction for creating a new file via the `apply_patch` tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchCreateFileOperationParam {
     /// Unified diff content to apply when creating the file.
@@ -4989,14 +4758,14 @@ pub struct ApplyPatchCreateFileOperationParam {
     pub path: String,
 }
 
-/// Instruction for deleting an existing file via the apply_patch tool.
+/// Instruction for deleting an existing file via the `apply_patch` tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchDeleteFileOperationParam {
     /// Path of the file to delete relative to the workspace root.
     pub path: String,
 }
 
-/// Instruction for updating an existing file via the apply_patch tool.
+/// Instruction for updating an existing file via the `apply_patch` tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchUpdateFileOperationParam {
     /// Unified diff content to apply to the existing file.
@@ -5057,25 +4826,24 @@ pub struct UrlCitationBody {
 pub struct ContainerFileCitationBody {
     /// The ID of the container file.
     pub container_id: String,
-    /// The index of the last character of the container file citation in the message.
+    /// The index of the last character of the container file citation in the
+    /// message.
     pub end_index: i64,
     /// The ID of the file.
     pub file_id: String,
     /// The filename of the container file cited.
     pub filename: String,
-    /// The index of the first character of the container file citation in the message.
+    /// The index of the first character of the container file citation in the
+    /// message.
     pub start_index: i64,
 }
 
 /// A path to a file.
-///
 #[derive(Serialize, Deserialize)]
 pub struct FilePath {
     /// The ID of the file.
-    ///
     pub file_id: String,
     /// The index of the file in the list of files.
-    ///
     pub index: i64,
 }
 
@@ -5087,13 +4855,14 @@ pub struct TopLogProb {
     pub token: String,
 }
 
-/// A filter used to compare a specified attribute key to a given value using a defined comparison operation.
-///
+/// A filter used to compare a specified attribute key to a given value using a
+/// defined comparison operation.
 #[derive(Serialize, Deserialize)]
 pub struct ComparisonFilter {
     /// The key to compare against the value.
     pub key: String,
-    /// Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`.
+    /// Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`,
+    /// `in`, `nin`.
     /// - `eq`: equals
     /// - `ne`: not equal
     /// - `gt`: greater than
@@ -5102,13 +4871,14 @@ pub struct ComparisonFilter {
     /// - `lte`: less than or equal
     /// - `in`: in
     /// - `nin`: not in
-    ///
     pub r#type: ComparisonFilterType,
-    /// The value to compare against the attribute key; supports string, number, or boolean types.
+    /// The value to compare against the attribute key; supports string, number,
+    /// or boolean types.
     pub value: ComparisonFilterValue,
 }
 
-/// Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`.
+/// Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`,
+/// `in`, `nin`.
 /// - `eq`: equals
 /// - `ne`: not equal
 /// - `gt`: greater than
@@ -5117,7 +4887,6 @@ pub struct ComparisonFilter {
 /// - `lte`: less than or equal
 /// - `in`: in
 /// - `nin`: not in
-///
 #[derive(Serialize, Deserialize)]
 pub enum ComparisonFilterType {
     #[serde(rename = "eq")]
@@ -5157,7 +4926,8 @@ pub enum ComparisonFilterValueArrayItem {
 
 pub type ComparisonFilterValueArray = Option<Vec<ComparisonFilterValueArrayItem>>;
 
-/// The value to compare against the attribute key; supports string, number, or boolean types.
+/// The value to compare against the attribute key; supports string, number, or
+/// boolean types.
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ComparisonFilterValue {
@@ -5170,7 +4940,8 @@ pub enum ComparisonFilterValue {
 /// Combine multiple filters using `and` or `or`.
 #[derive(Serialize, Deserialize)]
 pub struct CompoundFilter {
-    /// Array of filters to combine. Items can be `ComparisonFilter` or `CompoundFilter`.
+    /// Array of filters to combine. Items can be `ComparisonFilter` or
+    /// `CompoundFilter`.
     pub filters: Vec<CompoundFilterFiltersItem>,
     /// Type of operation: `and` or `or`.
     pub r#type: CompoundFilterType,
@@ -5236,7 +5007,8 @@ pub struct ContainerNetworkPolicyAllowlistParam {
 pub struct SkillReferenceParam {
     /// The ID of the referenced skill.
     pub skill_id: String,
-    /// Optional skill version. Use a positive integer or 'latest'. Omit for default.
+    /// Optional skill version. Use a positive integer or 'latest'. Omit for
+    /// default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }

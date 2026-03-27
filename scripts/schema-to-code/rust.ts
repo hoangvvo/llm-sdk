@@ -10,6 +10,10 @@ import type {
 } from "./core.ts";
 
 export function renderRustDocument(document: CodegenDocument): string {
+  const attributes = [
+    "#![allow(clippy::enum_variant_names)]",
+    "#![allow(clippy::struct_field_names)]",
+  ];
   const imports = ["use serde::{Deserialize, Serialize};"];
   if (document.usesJsonValue) {
     imports.push("use serde_json::Value;");
@@ -18,7 +22,7 @@ export function renderRustDocument(document: CodegenDocument): string {
     imports.push("use std::collections::HashMap;");
   }
 
-  const parts: string[] = [imports.join("\n")];
+  const parts: string[] = [attributes.join("\n"), imports.join("\n")];
   for (const declaration of document.declarations) {
     parts.push(renderRustDeclaration(declaration));
   }

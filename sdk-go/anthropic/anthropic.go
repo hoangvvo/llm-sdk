@@ -393,7 +393,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			if subPart.TextPart == nil {
 				return anthropicapi.InputContentBlock{}, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert source part content to anthropic search result for type %s", subPart.Type()))
 			}
-			textBlocks = append(textBlocks, anthropicapi.RequestTextBlock{Type: "text", Text: subPart.TextPart.Text})
+			textBlocks = append(textBlocks, anthropicapi.RequestTextBlock{Text: subPart.TextPart.Text, Type: "text"})
 		}
 		return anthropicapi.InputContentBlock{
 			SearchResult: &anthropicapi.RequestSearchResultBlock{

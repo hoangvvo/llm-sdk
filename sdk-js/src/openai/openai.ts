@@ -595,7 +595,6 @@ function mapOpenAIStreamEvent(
             id: event.item.id,
             signature: event.item.encrypted_content,
           };
-
           const index = event.output_index;
           return {
             index,
