@@ -1,21 +1,30 @@
 use super::chat_api::{
-    self, AssistantAudioData, AssistantAudioDataInner, AssistantMessageContent,
-    AssistantMessageContentInner, ChatCompletionAudioParams, ChatCompletionMessageToolCall,
-    ChatCompletionMessageToolCallUnion, ChatCompletionNamedToolChoice,
-    ChatCompletionRequestAssistantMessage, ChatCompletionRequestMessage,
-    ChatCompletionRequestMessageContentPartAudio, ChatCompletionRequestMessageContentPartImage,
-    ChatCompletionRequestMessageContentPartText, ChatCompletionRequestSystemMessage,
-    ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContentPart,
-    ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContentPart,
-    ChatCompletionStreamOptions, ChatCompletionStreamOptionsInner,
-    ChatCompletionStreamResponseDelta, ChatCompletionTool, ChatCompletionToolChoiceOption,
-    ChatCompletionToolUnion, CompletionUsage, CreateChatCompletionRequest,
-    CreateChatCompletionResponse, CreateChatCompletionStreamResponse,
-    CreateModelResponseProperties, FunctionObject, JsonSchemaConfig, ModelIdsShared,
-    ModelResponseProperties, NamedToolFunction, ReasoningEffort, ReasoningEffortEnum,
-    ResponseFormat, ResponseFormatJsonObject, ResponseFormatJsonSchema,
-    ResponseFormatJsonSchemaSchema, ResponseFormatText, ResponseModalities, ResponseModalityEnum,
-    ToolCallFunction, ToolChoiceString, ToolMessageContent, VoiceIdsShared,
+    self, ChatCompletionMessageToolCall, ChatCompletionMessageToolCallsItem,
+    ChatCompletionNamedToolChoice, ChatCompletionNamedToolChoiceFunction,
+    ChatCompletionNamedToolChoiceType, ChatCompletionRequestAssistantMessage,
+    ChatCompletionRequestAssistantMessageAudio, ChatCompletionRequestAssistantMessageContent,
+    ChatCompletionRequestAssistantMessageContentPart, ChatCompletionRequestMessage,
+    ChatCompletionRequestMessageContentPartAudio,
+    ChatCompletionRequestMessageContentPartAudioInputAudio,
+    ChatCompletionRequestMessageContentPartAudioInputAudioFormat,
+    ChatCompletionRequestMessageContentPartImage,
+    ChatCompletionRequestMessageContentPartImageImageUrl,
+    ChatCompletionRequestMessageContentPartText, ChatCompletionRequestMessageContentPartTextType,
+    ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageContent,
+    ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContent,
+    ChatCompletionRequestToolMessageContentPart, ChatCompletionRequestUserMessage,
+    ChatCompletionRequestUserMessageContent, ChatCompletionRequestUserMessageContentPart,
+    ChatCompletionStreamOptionsValue, ChatCompletionStreamResponseDelta, ChatCompletionTool,
+    ChatCompletionToolChoiceOption, CompletionUsage, CompletionUsageCompletionTokensDetails,
+    CompletionUsagePromptTokensDetails, CreateChatCompletionRequest,
+    CreateChatCompletionRequestAllOf2, CreateChatCompletionRequestAllOf2Audio,
+    CreateChatCompletionRequestAllOf2AudioFormat, CreateChatCompletionRequestAllOf2ResponseFormat,
+    CreateChatCompletionRequestAllOf2ToolsItem, CreateChatCompletionResponse,
+    CreateChatCompletionStreamResponse, CreateModelResponseProperties,
+    CreateModelResponsePropertiesAllOf2, FunctionObject, ModelResponseProperties, ReasoningEffort,
+    ReasoningEffortValue, ResponseFormatJsonObject, ResponseFormatJsonSchema,
+    ResponseFormatJsonSchemaJsonSchema, ResponseFormatJsonSchemaSchema, ResponseFormatText,
+    ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
 };
 use crate::{
     client_utils, source_part_utils, stream_utils, AssistantMessage, AudioFormat, AudioOptions,
@@ -165,7 +174,14 @@ impl LanguageModel for OpenAIChatModel {
                         }
                     }
 
-                    let content = map_openai_message(message, request.audio.clone())?;
+                    let content = map_openai_message(
+                        message,
+                        request
+                            .create_chat_completion_request_all_of_2
+                            .audio
+                            .as_ref()
+                            .map(|audio| map_openai_audio_format(&audio.format)),
+                    )?;
 
                     let usage = response.usage.map(map_openai_usage).transpose()?;
 
@@ -200,22 +216,25 @@ impl LanguageModel for OpenAIChatModel {
                 input,
                 |input| async move {
                     let metadata = self.metadata.clone();
-                    let request =
-                        convert_to_openai_create_params(input, &self.model_id(), true)?;
-                    let audio_params = request.audio.clone();
+                    let request = convert_to_openai_create_params(input, &self.model_id(), true)?;
+                    let audio_format = request
+                        .create_chat_completion_request_all_of_2
+                        .audio
+                        .as_ref()
+                        .map(|audio| map_openai_audio_format(&audio.format));
                     let headers = self.request_headers()?;
 
                     let mut stream = client_utils::send_sse_stream::<
                         CreateChatCompletionRequest,
                         CreateChatCompletionStreamResponse,
                     >(
-                            &self.client,
-                            &format!("{}/chat/completions", self.base_url),
-                            &request,
-                            headers,
-                            PROVIDER,
-                        )
-                        .await?;
+                        &self.client,
+                        &format!("{}/chat/completions", self.base_url),
+                        &request,
+                        headers,
+                        PROVIDER,
+                    )
+                    .await?;
 
                     let mut refusal = String::new();
                     let mut content_deltas: Vec<ContentDelta> = Vec::new();
@@ -224,25 +243,27 @@ impl LanguageModel for OpenAIChatModel {
                         while let Some(chunk) = stream.next().await {
                             let chunk = chunk?;
 
-                            if let Some(choice) = chunk.choices.unwrap_or_default().into_iter().next() {
-                                let mut delta = choice.delta;
+                            if let Some(choices) = chunk.choices {
+                                if let Some(choice) = choices.into_iter().next() {
+                                    let mut delta = choice.delta;
 
-                                if let Some(delta_refusal) = delta.refusal.take() {
-                                    refusal.push_str(&delta_refusal);
-                                }
+                                    if let Some(delta_refusal) = delta.refusal.take() {
+                                        refusal.push_str(&delta_refusal);
+                                    }
 
-                                let deltas = map_openai_delta(
-                                    delta,
-                                    &content_deltas,
-                                    audio_params.as_ref(),
-                                )?;
+                                    let deltas = map_openai_delta(
+                                        delta,
+                                        &content_deltas,
+                                        audio_format.clone(),
+                                    )?;
 
-                                for delta in deltas {
-                                    content_deltas.push(delta.clone());
-                                    yield PartialModelResponse {
-                                        delta: Some(delta),
-                                        ..Default::default()
-                                    };
+                                    for delta in deltas {
+                                        content_deltas.push(delta.clone());
+                                        yield PartialModelResponse {
+                                            delta: Some(delta),
+                                            ..Default::default()
+                                        };
+                                    }
                                 }
                             }
 
@@ -281,34 +302,17 @@ fn convert_to_openai_create_params(
 ) -> LanguageModelResult<CreateChatCompletionRequest> {
     let messages = convert_to_openai_messages(input.messages, input.system_prompt)?;
 
-    let modalities = input
-        .modalities
-        .as_ref()
-        .map(|modalities| -> LanguageModelResult<ResponseModalities> {
-            if modalities.is_empty() {
-                Ok(ResponseModalities::Null)
-            } else {
-                let converted = modalities
-                    .iter()
-                    .map(convert_to_openai_modality)
-                    .collect::<LanguageModelResult<Vec<_>>>()?;
-                Ok(ResponseModalities::Array(converted))
-            }
-        })
-        .transpose()?;
-
-    let create_model_response_properties = CreateModelResponseProperties {
-        model_response_properties: ModelResponseProperties {
-            prompt_cache_key: None,
-            safety_identifier: None,
-            service_tier: None,
-            temperature: input.temperature,
-            top_logprobs: None,
-            top_p: input.top_p,
-            ..Default::default()
-        },
-        top_logprobs: None,
-    };
+    let modalities = input.modalities.as_ref().map_or(Ok(None), |modalities| {
+        if modalities.is_empty() {
+            Ok(None)
+        } else {
+            modalities
+                .iter()
+                .map(convert_to_openai_modality)
+                .collect::<LanguageModelResult<Vec<_>>>()
+                .map(|items| Some(Some(items)))
+        }
+    })?;
 
     let audio = input.audio.map(convert_to_openai_audio).transpose()?;
 
@@ -319,56 +323,62 @@ fn convert_to_openai_create_params(
         .map(convert_to_openai_reasoning_effort)
         .transpose()?;
 
-    let request = CreateChatCompletionRequest {
-        create_model_response_properties,
-        audio,
-        frequency_penalty: input.frequency_penalty,
-        logit_bias: None,
-        logprobs: None,
-        max_completion_tokens: input
-            .max_tokens
-            .map(|value| {
-                i32::try_from(value).map_err(|_| {
-                    LanguageModelError::InvalidInput(
-                        "max_tokens exceeds supported range for OpenAI chat completions"
-                            .to_string(),
-                    )
-                })
-            })
-            .transpose()?,
-        messages,
-        modalities,
-        model: ModelIdsShared::String(model_id.to_string()),
-        n: None,
-        parallel_tool_calls: None,
-        prediction: None,
-        presence_penalty: input.presence_penalty,
-        reasoning_effort,
-        response_format: input.response_format.map(convert_to_openai_response_format),
-        seed: input.seed,
-        stop: None,
-        store: None,
-        stream: Some(stream),
-        stream_options: if stream {
-            Some(ChatCompletionStreamOptions::Options(
-                ChatCompletionStreamOptionsInner {
+    Ok(CreateChatCompletionRequest {
+        create_model_response_properties: CreateModelResponseProperties {
+            model_response_properties: ModelResponseProperties {
+                metadata: None,
+                prompt_cache_key: None,
+                prompt_cache_retention: None,
+                safety_identifier: None,
+                service_tier: None,
+                temperature: input.temperature,
+                top_logprobs: None,
+                top_p: input.top_p,
+                user: None,
+            },
+            create_model_response_properties_all_of_2: CreateModelResponsePropertiesAllOf2 {
+                top_logprobs: None,
+            },
+        },
+        create_chat_completion_request_all_of_2: CreateChatCompletionRequestAllOf2 {
+            audio,
+            frequency_penalty: input.frequency_penalty,
+            function_call: None,
+            functions: None,
+            logit_bias: None,
+            logprobs: None,
+            max_completion_tokens: input.max_tokens.map(i64::from),
+            max_tokens: None,
+            messages,
+            modalities: modalities.map(Some),
+            model: Some(model_id.to_string()),
+            n: None,
+            parallel_tool_calls: None,
+            prediction: None,
+            presence_penalty: input.presence_penalty,
+            reasoning_effort,
+            response_format: input.response_format.map(convert_to_openai_response_format),
+            seed: input.seed,
+            stop: None,
+            store: None,
+            stream: Some(stream),
+            stream_options: if stream {
+                Some(Some(Some(ChatCompletionStreamOptionsValue {
                     include_obfuscation: None,
                     include_usage: Some(true),
-                },
-            ))
-        } else {
-            None
+                })))
+            } else {
+                None
+            },
+            tool_choice: input.tool_choice.map(convert_to_openai_tool_choice),
+            tools: input
+                .tools
+                .map(|tools| tools.into_iter().map(convert_to_openai_tool).collect()),
+            top_logprobs: None,
+            verbosity: None,
+            web_search_options: None,
         },
-        tool_choice: input.tool_choice.map(convert_to_openai_tool_choice),
-        tools: input
-            .tools
-            .map(|tools| tools.into_iter().map(convert_to_openai_tool).collect()),
-        top_logprobs: None,
-        verbosity: None,
-        web_search_options: None,
-    };
-
-    Ok(request)
+    })
 }
 
 fn convert_to_openai_messages(
@@ -378,12 +388,15 @@ fn convert_to_openai_messages(
     let mut openai_messages = Vec::new();
 
     if let Some(prompt) = system_prompt {
-        openai_messages.push(ChatCompletionRequestMessage::System(
-            ChatCompletionRequestSystemMessage {
-                content: chat_api::SystemMessageContent::Text(prompt),
+        openai_messages.push(
+            ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                content:
+                    ChatCompletionRequestSystemMessageContent::ChatCompletionRequestSystemMessageContentString(
+                        Some(prompt),
+                    ),
                 name: None,
-            },
-        ));
+            }),
+        );
     }
 
     for message in messages {
@@ -424,14 +437,14 @@ fn convert_user_message(
                 content_parts.push(ChatCompletionRequestUserMessageContentPart::Text(
                     ChatCompletionRequestMessageContentPartText {
                         text: text_part.text,
-                        type_field: "text".to_string(),
+                        r#type: ChatCompletionRequestMessageContentPartTextType::Text,
                     },
                 ));
             }
             Part::Image(image_part) => {
-                content_parts.push(ChatCompletionRequestUserMessageContentPart::Image(
+                content_parts.push(ChatCompletionRequestUserMessageContentPart::ImageUrl(
                     ChatCompletionRequestMessageContentPartImage {
-                        image_url: chat_api::ImageUrl {
+                        image_url: ChatCompletionRequestMessageContentPartImageImageUrl {
                             detail: None,
                             url: format!(
                                 "data:{};base64,{}",
@@ -443,8 +456,12 @@ fn convert_user_message(
             }
             Part::Audio(audio_part) => {
                 let format = match audio_part.format {
-                    AudioFormat::Mp3 => chat_api::InputAudioFormat::Mp3,
-                    AudioFormat::Wav => chat_api::InputAudioFormat::Wav,
+                    AudioFormat::Mp3 => {
+                        ChatCompletionRequestMessageContentPartAudioInputAudioFormat::Mp3
+                    }
+                    AudioFormat::Wav => {
+                        ChatCompletionRequestMessageContentPartAudioInputAudioFormat::Wav
+                    }
                     _ => {
                         return Err(LanguageModelError::Unsupported(
                             PROVIDER,
@@ -455,9 +472,9 @@ fn convert_user_message(
                         ))
                     }
                 };
-                content_parts.push(ChatCompletionRequestUserMessageContentPart::Audio(
+                content_parts.push(ChatCompletionRequestUserMessageContentPart::InputAudio(
                     ChatCompletionRequestMessageContentPartAudio {
-                        input_audio: chat_api::InputAudio {
+                        input_audio: ChatCompletionRequestMessageContentPartAudioInputAudio {
                             data: audio_part.data,
                             format,
                         },
@@ -480,7 +497,10 @@ fn convert_user_message(
     }
 
     Ok(ChatCompletionRequestUserMessage {
-        content: chat_api::UserMessageContent::Array(content_parts),
+        content:
+            ChatCompletionRequestUserMessageContent::ChatCompletionRequestUserMessageContentArray(
+                Some(content_parts),
+            ),
         name: None,
     })
 }
@@ -491,25 +511,22 @@ fn convert_assistant_message(
     let parts =
         source_part_utils::get_compatible_parts_without_source_parts(assistant_message.content);
 
-    let mut content_parts: Vec<chat_api::ChatCompletionRequestAssistantMessageContentPart> =
-        Vec::new();
-    let mut tool_calls: Vec<ChatCompletionMessageToolCallUnion> = Vec::new();
-    let mut audio: Option<AssistantAudioData> = None;
+    let mut content_parts: Vec<ChatCompletionRequestAssistantMessageContentPart> = Vec::new();
+    let mut tool_calls = Vec::new();
+    let mut audio: Option<ChatCompletionRequestAssistantMessageAudio> = None;
 
     for part in parts {
         match part {
             Part::Text(text_part) => {
-                content_parts.push(
-                    chat_api::ChatCompletionRequestAssistantMessageContentPart::Text(
-                        ChatCompletionRequestMessageContentPartText {
-                            text: text_part.text,
-                            type_field: "text".to_string(),
-                        },
-                    ),
-                );
+                content_parts.push(ChatCompletionRequestAssistantMessageContentPart::Text(
+                    ChatCompletionRequestMessageContentPartText {
+                        text: text_part.text,
+                        r#type: ChatCompletionRequestMessageContentPartTextType::Text,
+                    },
+                ));
             }
             Part::ToolCall(tool_call_part) => {
-                tool_calls.push(ChatCompletionMessageToolCallUnion::Function(
+                tool_calls.push(ChatCompletionMessageToolCallsItem::Function(
                     convert_to_openai_tool_call(tool_call_part)?,
                 ));
             }
@@ -521,7 +538,7 @@ fn convert_assistant_message(
                             .to_string(),
                     )
                 })?;
-                audio = Some(AssistantAudioData::Audio(AssistantAudioDataInner { id }));
+                audio = Some(ChatCompletionRequestAssistantMessageAudio { id });
             }
             unsupported => {
                 return Err(LanguageModelError::Unsupported(
@@ -537,19 +554,23 @@ fn convert_assistant_message(
     let content = if content_parts.is_empty() {
         None
     } else {
-        Some(AssistantMessageContent::Content(
-            AssistantMessageContentInner::Array(content_parts),
-        ))
+        Some(
+            ChatCompletionRequestAssistantMessageContent::ChatCompletionRequestAssistantMessageContentArray(
+                Some(content_parts),
+            ),
+        )
     };
 
     Ok(ChatCompletionRequestAssistantMessage {
         audio,
         content,
+        function_call: None,
+        name: None,
         refusal: None,
         tool_calls: if tool_calls.is_empty() {
             None
         } else {
-            Some(tool_calls)
+            Some(Some(tool_calls))
         },
     })
 }
@@ -572,7 +593,7 @@ fn convert_tool_message(
                             content_parts.push(ChatCompletionRequestToolMessageContentPart::Text(
                                 ChatCompletionRequestMessageContentPartText {
                                     text: text_part.text,
-                                    type_field: "text".to_string(),
+                                    r#type: ChatCompletionRequestMessageContentPartTextType::Text,
                                 },
                             ));
                         }
@@ -589,7 +610,7 @@ fn convert_tool_message(
                 }
 
                 result.push(ChatCompletionRequestToolMessage {
-                    content: ToolMessageContent::Array(content_parts),
+                    content: ChatCompletionRequestToolMessageContent::ChatCompletionRequestToolMessageContentArray(Some(content_parts)),
                     tool_call_id: tool_result_part.tool_call_id,
                 });
             }
@@ -604,17 +625,14 @@ fn convert_tool_message(
     Ok(result)
 }
 
-fn convert_to_openai_tool(tool: Tool) -> ChatCompletionToolUnion {
+fn convert_to_openai_tool(tool: Tool) -> CreateChatCompletionRequestAllOf2ToolsItem {
     let function = FunctionObject {
         description: Some(tool.description),
         name: tool.name,
-        parameters: Some(tool.parameters),
+        parameters: Some(Some(tool.parameters)),
         strict: Some(true),
     };
-    ChatCompletionToolUnion::Function(ChatCompletionTool {
-        function,
-        type_field: "function".to_string(),
-    })
+    CreateChatCompletionRequestAllOf2ToolsItem::Function(ChatCompletionTool { function })
 }
 
 fn convert_to_openai_tool_call(
@@ -624,6 +642,7 @@ fn convert_to_openai_tool_call(
         tool_call_id,
         tool_name,
         args,
+        signature: _,
         id,
     } = part;
 
@@ -634,55 +653,69 @@ fn convert_to_openai_tool_call(
     })?;
 
     Ok(ChatCompletionMessageToolCall {
-        function: ToolCallFunction {
+        function: chat_api::ChatCompletionMessageToolCallFunction {
             arguments,
             name: tool_name,
         },
         id: id.unwrap_or(tool_call_id),
-        type_field: "function".to_string(),
     })
 }
 
 fn convert_to_openai_tool_choice(tool_choice: ToolChoiceOption) -> ChatCompletionToolChoiceOption {
     match tool_choice {
-        ToolChoiceOption::Auto => ChatCompletionToolChoiceOption::String(ToolChoiceString::Auto),
-        ToolChoiceOption::None => ChatCompletionToolChoiceOption::String(ToolChoiceString::None),
+        ToolChoiceOption::Auto => {
+            ChatCompletionToolChoiceOption::ChatCompletionToolChoiceOptionString(Some(
+                "auto".to_string(),
+            ))
+        }
+        ToolChoiceOption::None => {
+            ChatCompletionToolChoiceOption::ChatCompletionToolChoiceOptionString(Some(
+                "none".to_string(),
+            ))
+        }
         ToolChoiceOption::Required => {
-            ChatCompletionToolChoiceOption::String(ToolChoiceString::Required)
+            ChatCompletionToolChoiceOption::ChatCompletionToolChoiceOptionString(Some(
+                "required".to_string(),
+            ))
         }
         ToolChoiceOption::Tool(ToolChoiceTool { tool_name }) => {
-            ChatCompletionToolChoiceOption::NamedTool(ChatCompletionNamedToolChoice {
-                function: NamedToolFunction { name: tool_name },
-                type_field: "function".to_string(),
-            })
+            ChatCompletionToolChoiceOption::ChatCompletionNamedToolChoice(
+                ChatCompletionNamedToolChoice {
+                    function: ChatCompletionNamedToolChoiceFunction { name: tool_name },
+                    r#type: ChatCompletionNamedToolChoiceType::Function,
+                },
+            )
         }
     }
 }
 
-fn convert_to_openai_response_format(response_format: ResponseFormatOption) -> ResponseFormat {
+fn convert_to_openai_response_format(
+    response_format: ResponseFormatOption,
+) -> CreateChatCompletionRequestAllOf2ResponseFormat {
     match response_format {
-        ResponseFormatOption::Text => ResponseFormat::Text(ResponseFormatText {
-            type_field: "text".to_string(),
-        }),
+        ResponseFormatOption::Text => {
+            CreateChatCompletionRequestAllOf2ResponseFormat::Text(ResponseFormatText {})
+        }
         ResponseFormatOption::Json(ResponseFormatJson {
             name,
             description,
             schema,
         }) => {
             if let Some(schema) = schema {
-                ResponseFormat::JsonSchema(ResponseFormatJsonSchema {
-                    json_schema: JsonSchemaConfig {
-                        description,
-                        name,
-                        schema: Some(ResponseFormatJsonSchemaSchema::from(schema)),
-                        strict: Some(true),
+                CreateChatCompletionRequestAllOf2ResponseFormat::JsonSchema(
+                    ResponseFormatJsonSchema {
+                        json_schema: ResponseFormatJsonSchemaJsonSchema {
+                            description,
+                            name,
+                            schema: Some(ResponseFormatJsonSchemaSchema::from(schema)),
+                            strict: Some(true),
+                        },
                     },
-                    type_field: "json_schema".to_string(),
-                })
+                )
             } else {
-                ResponseFormat::JsonObject(ResponseFormatJsonObject {
-                    type_field: "json_object".to_string(),
-                })
+                CreateChatCompletionRequestAllOf2ResponseFormat::JsonObject(
+                    ResponseFormatJsonObject {},
+                )
             }
         }
     }
@@ -690,10 +723,10 @@ fn convert_to_openai_response_format(response_format: ResponseFormatOption) -> R
 
 fn convert_to_openai_modality(
     modality: &crate::Modality,
-) -> LanguageModelResult<ResponseModalityEnum> {
+) -> LanguageModelResult<ResponseModalitiesValueItem> {
     Ok(match modality {
-        crate::Modality::Text => ResponseModalityEnum::Text,
-        crate::Modality::Audio => ResponseModalityEnum::Audio,
+        crate::Modality::Text => ResponseModalitiesValueItem::Text,
+        crate::Modality::Audio => ResponseModalitiesValueItem::Audio,
         crate::Modality::Image => {
             return Err(LanguageModelError::Unsupported(
                 PROVIDER,
@@ -703,18 +736,20 @@ fn convert_to_openai_modality(
     })
 }
 
-fn convert_to_openai_audio(audio: AudioOptions) -> LanguageModelResult<ChatCompletionAudioParams> {
+fn convert_to_openai_audio(
+    audio: AudioOptions,
+) -> LanguageModelResult<CreateChatCompletionRequestAllOf2Audio> {
     let voice = audio.voice.ok_or_else(|| {
         LanguageModelError::InvalidInput("Audio voice is required for OpenAI audio".to_string())
     })?;
 
     let format = match audio.format {
-        Some(AudioFormat::Wav) => chat_api::AudioFormat::Wav,
-        Some(AudioFormat::Mp3) => chat_api::AudioFormat::Mp3,
-        Some(AudioFormat::Flac) => chat_api::AudioFormat::Flac,
-        Some(AudioFormat::Aac) => chat_api::AudioFormat::Aac,
-        Some(AudioFormat::Opus) => chat_api::AudioFormat::Opus,
-        Some(AudioFormat::Linear16) => chat_api::AudioFormat::Pcm16,
+        Some(AudioFormat::Wav) => CreateChatCompletionRequestAllOf2AudioFormat::Wav,
+        Some(AudioFormat::Mp3) => CreateChatCompletionRequestAllOf2AudioFormat::Mp3,
+        Some(AudioFormat::Flac) => CreateChatCompletionRequestAllOf2AudioFormat::Flac,
+        Some(AudioFormat::Aac) => CreateChatCompletionRequestAllOf2AudioFormat::Aac,
+        Some(AudioFormat::Opus) => CreateChatCompletionRequestAllOf2AudioFormat::Opus,
+        Some(AudioFormat::Linear16) => CreateChatCompletionRequestAllOf2AudioFormat::Pcm16,
         None => {
             return Err(LanguageModelError::InvalidInput(
                 "Audio format is required for OpenAI audio".to_string(),
@@ -728,18 +763,18 @@ fn convert_to_openai_audio(audio: AudioOptions) -> LanguageModelResult<ChatCompl
         }
     };
 
-    Ok(ChatCompletionAudioParams {
+    Ok(CreateChatCompletionRequestAllOf2Audio {
         format,
-        voice: VoiceIdsShared::String(voice),
+        voice: VoiceIdsOrCustomVoice::VoiceIdsShared(Some(voice)),
     })
 }
 
 fn convert_to_openai_reasoning_effort(budget_tokens: u32) -> LanguageModelResult<ReasoningEffort> {
     let effort = match budget_tokens {
-        crate::openai::types::OPENAI_REASONING_EFFORT_MINIMAL => ReasoningEffortEnum::Minimal,
-        crate::openai::types::OPENAI_REASONING_EFFORT_LOW => ReasoningEffortEnum::Low,
-        crate::openai::types::OPENAI_REASONING_EFFORT_MEDIUM => ReasoningEffortEnum::Medium,
-        crate::openai::types::OPENAI_REASONING_EFFORT_HIGH => ReasoningEffortEnum::High,
+        crate::openai::types::OPENAI_REASONING_EFFORT_MINIMAL => ReasoningEffortValue::Minimal,
+        crate::openai::types::OPENAI_REASONING_EFFORT_LOW => ReasoningEffortValue::Low,
+        crate::openai::types::OPENAI_REASONING_EFFORT_MEDIUM => ReasoningEffortValue::Medium,
+        crate::openai::types::OPENAI_REASONING_EFFORT_HIGH => ReasoningEffortValue::High,
         _ => {
             return Err(LanguageModelError::Unsupported(
                 PROVIDER,
@@ -750,12 +785,12 @@ fn convert_to_openai_reasoning_effort(budget_tokens: u32) -> LanguageModelResult
         }
     };
 
-    Ok(ReasoningEffort::Enum(effort))
+    Ok(Some(Some(effort)))
 }
 
 fn map_openai_message(
     message: chat_api::ChatCompletionResponseMessage,
-    audio_params: Option<ChatCompletionAudioParams>,
+    audio_format: Option<AudioFormat>,
 ) -> LanguageModelResult<Vec<Part>> {
     let mut parts = Vec::new();
 
@@ -768,16 +803,13 @@ fn map_openai_message(
         }
     }
 
-    if let Some(chat_api::AudioResponseData::Audio(data)) = message.audio {
-        let audio_format = audio_params
-            .map(|params| map_openai_audio_format(&params.format))
-            .ok_or_else(|| {
-                LanguageModelError::Invariant(
-                    PROVIDER,
-                    "Audio returned from OpenAI API but no audio parameter was provided"
-                        .to_string(),
-                )
-            })?;
+    if let Some(data) = message.audio {
+        let audio_format = audio_format.ok_or_else(|| {
+            LanguageModelError::Invariant(
+                PROVIDER,
+                "Audio returned from OpenAI API but no audio parameter was provided".to_string(),
+            )
+        })?;
 
         let mut audio_part = crate::AudioPart {
             data: data.data,
@@ -796,20 +828,20 @@ fn map_openai_message(
         parts.push(Part::Audio(audio_part));
     }
 
-    if let Some(tool_calls) = message.tool_calls {
+    if let Some(tool_calls) = message.tool_calls.flatten() {
         for tool_call in tool_calls {
             match tool_call {
-                ChatCompletionMessageToolCallUnion::Function(function_tool_call) => {
+                ChatCompletionMessageToolCallsItem::Function(function_tool_call) => {
                     parts.push(Part::ToolCall(map_openai_function_tool_call(
                         function_tool_call,
                     )?));
                 }
-                ChatCompletionMessageToolCallUnion::Custom(custom_tool_call) => {
+                ChatCompletionMessageToolCallsItem::Custom(custom_tool_call) => {
                     return Err(LanguageModelError::NotImplemented(
                         PROVIDER,
                         format!(
-                            "Cannot map OpenAI tool call of type {} to ToolCallPart",
-                            custom_tool_call.type_field
+                            "Cannot map OpenAI tool call of custom tool '{}' to ToolCallPart",
+                            custom_tool_call.custom.name
                         ),
                     ));
                 }
@@ -820,30 +852,20 @@ fn map_openai_message(
     Ok(parts)
 }
 
-fn map_openai_audio_format(format: &chat_api::AudioFormat) -> AudioFormat {
+fn map_openai_audio_format(format: &CreateChatCompletionRequestAllOf2AudioFormat) -> AudioFormat {
     match format {
-        chat_api::AudioFormat::Wav => AudioFormat::Wav,
-        chat_api::AudioFormat::Mp3 => AudioFormat::Mp3,
-        chat_api::AudioFormat::Flac => AudioFormat::Flac,
-        chat_api::AudioFormat::Opus => AudioFormat::Opus,
-        chat_api::AudioFormat::Pcm16 => AudioFormat::Linear16,
-        chat_api::AudioFormat::Aac => AudioFormat::Aac,
+        CreateChatCompletionRequestAllOf2AudioFormat::Wav => AudioFormat::Wav,
+        CreateChatCompletionRequestAllOf2AudioFormat::Mp3 => AudioFormat::Mp3,
+        CreateChatCompletionRequestAllOf2AudioFormat::Flac => AudioFormat::Flac,
+        CreateChatCompletionRequestAllOf2AudioFormat::Opus => AudioFormat::Opus,
+        CreateChatCompletionRequestAllOf2AudioFormat::Pcm16 => AudioFormat::Linear16,
+        CreateChatCompletionRequestAllOf2AudioFormat::Aac => AudioFormat::Aac,
     }
 }
 
 fn map_openai_function_tool_call(
     tool_call: ChatCompletionMessageToolCall,
 ) -> LanguageModelResult<ToolCallPart> {
-    if tool_call.type_field != "function" {
-        return Err(LanguageModelError::NotImplemented(
-            PROVIDER,
-            format!(
-                "Cannot map OpenAI tool call of type {} to ToolCallPart",
-                tool_call.type_field
-            ),
-        ));
-    }
-
     let args: Value = serde_json::from_str(&tool_call.function.arguments).map_err(|error| {
         LanguageModelError::Invariant(
             PROVIDER,
@@ -855,6 +877,7 @@ fn map_openai_function_tool_call(
         tool_call_id: tool_call.id,
         tool_name: tool_call.function.name,
         args,
+        signature: None,
         id: None,
     })
 }
@@ -862,7 +885,7 @@ fn map_openai_function_tool_call(
 fn map_openai_delta(
     delta: ChatCompletionStreamResponseDelta,
     existing_content_deltas: &[ContentDelta],
-    audio_params: Option<&ChatCompletionAudioParams>,
+    audio_format: Option<AudioFormat>,
 ) -> LanguageModelResult<Vec<ContentDelta>> {
     let mut content_deltas = Vec::new();
 
@@ -884,7 +907,7 @@ fn map_openai_delta(
     if let Some(audio) = delta.audio {
         let mut audio_part = crate::AudioPartDelta {
             data: audio.data,
-            format: audio_params.map(|params| map_openai_audio_format(&params.format)),
+            format: audio_format,
             sample_rate: None,
             channels: None,
             transcript: audio.transcript,
@@ -911,6 +934,7 @@ fn map_openai_delta(
                 tool_call_id: tool_call.id,
                 tool_name: None,
                 args: None,
+                signature: None,
                 id: None,
             };
 
@@ -924,7 +948,6 @@ fn map_openai_delta(
             }
 
             let part = PartDelta::ToolCall(part);
-
             let combined = existing_content_deltas
                 .iter()
                 .chain(content_deltas.iter())
@@ -968,7 +991,7 @@ fn map_openai_usage(usage: CompletionUsage) -> LanguageModelResult<ModelUsage> {
     };
 
     if let Some(details) = usage.prompt_tokens_details {
-        result.input_tokens_details = Some(map_openai_prompt_tokens_details(details)?);
+        result.input_tokens_details = Some(map_openai_prompt_tokens_details(&details)?);
     }
 
     if let Some(details) = &usage.completion_tokens_details {
@@ -979,18 +1002,9 @@ fn map_openai_usage(usage: CompletionUsage) -> LanguageModelResult<ModelUsage> {
 }
 
 fn map_openai_prompt_tokens_details(
-    details: chat_api::PromptTokensDetails,
+    details: &CompletionUsagePromptTokensDetails,
 ) -> LanguageModelResult<crate::ModelTokensDetails> {
     let mut result = crate::ModelTokensDetails::default();
-
-    if let Some(text_tokens) = details.text_tokens {
-        result.text_tokens = Some(u32::try_from(text_tokens).map_err(|_| {
-            LanguageModelError::Invariant(
-                PROVIDER,
-                "OpenAI text prompt tokens exceeded u32 range".to_string(),
-            )
-        })?);
-    }
 
     if let Some(audio_tokens) = details.audio_tokens {
         result.audio_tokens = Some(u32::try_from(audio_tokens).map_err(|_| {
@@ -1001,50 +1015,22 @@ fn map_openai_prompt_tokens_details(
         })?);
     }
 
-    if let Some(image_tokens) = details.image_tokens {
-        result.image_tokens = Some(u32::try_from(image_tokens).map_err(|_| {
+    if let Some(cached_tokens) = details.cached_tokens {
+        result.cached_text_tokens = Some(u32::try_from(cached_tokens).map_err(|_| {
             LanguageModelError::Invariant(
                 PROVIDER,
-                "OpenAI image prompt tokens exceeded u32 range".to_string(),
+                "OpenAI cached prompt tokens exceeded u32 range".to_string(),
             )
         })?);
-    }
-
-    if let Some(cached_details) = details.cached_tokens_details {
-        if let Some(text_tokens) = cached_details.text_tokens {
-            result.cached_text_tokens = Some(u32::try_from(text_tokens).map_err(|_| {
-                LanguageModelError::Invariant(
-                    PROVIDER,
-                    "OpenAI cached text prompt tokens exceeded u32 range".to_string(),
-                )
-            })?);
-        }
-        if let Some(audio_tokens) = cached_details.audio_tokens {
-            result.cached_audio_tokens = Some(u32::try_from(audio_tokens).map_err(|_| {
-                LanguageModelError::Invariant(
-                    PROVIDER,
-                    "OpenAI cached audio prompt tokens exceeded u32 range".to_string(),
-                )
-            })?);
-        }
     }
 
     Ok(result)
 }
 
 fn map_openai_completion_tokens_details(
-    details: &chat_api::CompletionTokensDetails,
+    details: &CompletionUsageCompletionTokensDetails,
 ) -> LanguageModelResult<crate::ModelTokensDetails> {
     let mut result = crate::ModelTokensDetails::default();
-
-    if let Some(text_tokens) = details.text_tokens {
-        result.text_tokens = Some(u32::try_from(text_tokens).map_err(|_| {
-            LanguageModelError::Invariant(
-                PROVIDER,
-                "OpenAI text completion tokens exceeded u32 range".to_string(),
-            )
-        })?);
-    }
 
     if let Some(audio_tokens) = details.audio_tokens {
         result.audio_tokens = Some(u32::try_from(audio_tokens).map_err(|_| {

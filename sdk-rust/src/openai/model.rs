@@ -1,22 +1,28 @@
 use crate::{
     client_utils, id_utils,
     openai::responses_api::{
-        self, FunctionTool, ResponseCreateParams, ResponseFormatJSONObject, ResponseFormatText,
-        ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig, ResponseFunctionToolCall,
-        ResponseIncludable, ResponseInputAudio, ResponseInputAudioInputAudio, ResponseInputContent,
-        ResponseInputImage, ResponseInputItem, ResponseInputItemFunctionCallOutput,
-        ResponseInputItemMessage, ResponseInputText, ResponseOutputContent, ResponseOutputItem,
-        ResponseOutputItemImageGenerationCall, ResponseOutputMessage, ResponseOutputText,
-        ResponseReasoningItem, ResponseReasoningItemSummary, ResponseReasoningItemSummaryUnion,
-        ResponseStreamEvent, ResponseTextConfig, ResponseUsage, ToolChoice, ToolChoiceFunction,
-        ToolChoiceOptions, ToolImageGeneration,
+        self, CreateModelResponseProperties, CreateModelResponsePropertiesAllOf2, CreateResponse,
+        CreateResponseAllOf3, DetailEnum, FunctionCallOutputItemParam,
+        FunctionCallOutputItemParamOutput, FunctionCallOutputItemParamOutputArrayItem,
+        FunctionCallOutputItemParamType, FunctionTool, FunctionToolCall, FunctionToolCallType,
+        FunctionToolType, ImageDetail, ImageGenTool, ImageGenToolCall, ImageGenToolCallType,
+        ImageGenToolType, IncludeEnum, InputContent, InputImageContent,
+        InputImageContentParamAutoParam, InputImageContentType, InputItem, InputMessage,
+        InputMessageRole, InputMessageType, InputTextContent, InputTextContentParam,
+        InputTextContentType, ModelResponseProperties, OutputItem, OutputMessage,
+        OutputMessageContent, OutputMessageRole, OutputMessageStatus, OutputMessageType,
+        OutputTextContent, Reasoning, ReasoningItem, ReasoningItemType, ReasoningSummary, Response,
+        ResponseFormatJsonObject, ResponseFormatText, ResponseProperties, ResponseStreamEvent,
+        ResponseTextParam, ResponseUsage, SummaryTextContent, SummaryTextContentType,
+        TextResponseFormatConfiguration, TextResponseFormatJsonSchema, Tool as OpenAITool,
+        ToolChoiceFunction, ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam,
     },
-    source_part_utils, AssistantMessage, AudioFormat, ContentDelta, ImagePart, ImagePartDelta,
-    LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
-    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta,
-    PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
-    ResponseFormatOption, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
-    ToolMessage, ToolResultPart, UserMessage,
+    source_part_utils, AssistantMessage, ContentDelta, ImagePart, ImagePartDelta, LanguageModel,
+    LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
+    LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
+    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption,
+    TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
+    ToolResultPart, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -24,6 +30,7 @@ use reqwest::{
     header::{self, HeaderMap, HeaderName, HeaderValue},
     Client,
 };
+use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
 
 const PROVIDER: &str = "openai";
@@ -133,18 +140,18 @@ impl LanguageModel for OpenAIModel {
                     let params = convert_to_response_create_params(input, &self.model_id())?;
                     let header_map = self.request_headers()?;
 
-                    let json: responses_api::Response = client_utils::send_json(
+                    let json: Response = client_utils::send_json(
                         &self.client,
                         &format!("{}/responses", self.base_url),
                         &params,
                         header_map,
                     )
                     .await?;
-
-                    let responses_api::Response { output, usage, .. } = json;
+                    let output = json.response_all_of_3.output;
+                    let usage = json.response_all_of_3.usage;
 
                     let content = map_openai_output_items(output)?;
-                    let usage = usage.map(ModelUsage::from);
+                    let usage = usage.map(|usage| map_openai_response_usage(&usage));
 
                     let cost = if let (Some(usage), Some(pricing)) = (
                         usage.as_ref(),
@@ -178,7 +185,7 @@ impl LanguageModel for OpenAIModel {
                 |input| async move {
                     let metadata = self.metadata.clone();
                     let mut params = convert_to_response_create_params(input, &self.model_id())?;
-                    params.stream = Some(true);
+                    params.create_response_all_of_3.stream = Some(true);
                     let header_map = self.request_headers()?;
 
                     let mut chunk_stream = client_utils::send_sse_stream::<_, ResponseStreamEvent>(
@@ -196,9 +203,9 @@ impl LanguageModel for OpenAIModel {
                         while let Some(event) = chunk_stream.next().await {
                             let event = event?;
 
-                            if let ResponseStreamEvent::Completed(ref completed_event) = event {
-                                if let Some(usage) = &completed_event.response.usage {
-                                    let usage = ModelUsage::from(usage.clone());
+                            if let ResponseStreamEvent::ResponseCompleted(ref completed_event) = event {
+                                if let Some(usage) = &completed_event.response.response_all_of_3.usage {
+                                    let usage = map_openai_response_usage(usage);
                                     yield PartialModelResponse {
                                         delta: None,
                                         cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing)),
@@ -207,7 +214,7 @@ impl LanguageModel for OpenAIModel {
                                 }
                             }
 
-                            if let ResponseStreamEvent::RefusalDelta(ref refusal_delta_event) = event {
+                            if let ResponseStreamEvent::ResponseRefusalDelta(ref refusal_delta_event) = event {
                                 refusal.push_str(&refusal_delta_event.delta);
                             }
 
@@ -236,7 +243,7 @@ impl LanguageModel for OpenAIModel {
 fn convert_to_response_create_params(
     input: LanguageModelInput,
     model_id: &str,
-) -> LanguageModelResult<ResponseCreateParams> {
+) -> LanguageModelResult<CreateResponse> {
     let LanguageModelInput {
         messages,
         system_prompt,
@@ -251,39 +258,93 @@ fn convert_to_response_create_params(
         ..
     } = input;
 
-    let mut params = ResponseCreateParams {
-        store: Some(false),
-        model: Some(model_id.to_string()),
-        input: Some(convert_to_openai_inputs(messages)?),
-        instructions: system_prompt,
-        max_output_tokens: max_tokens,
-        temperature,
-        top_p,
-        tools: tools.map(|ts| ts.into_iter().map(Into::into).collect()),
-        tool_choice: tool_choice.map(convert_to_openai_response_tool_choice),
-        text: response_format.map(Into::into),
-        include: if reasoning.as_ref().is_some_and(|r| r.enabled) {
-            Some(vec![ResponseIncludable::ReasoningEncryptedContent])
-        } else {
-            None
+    let include_reasoning_encrypted = reasoning.as_ref().is_some_and(|r| r.enabled);
+
+    let mut params = CreateResponse {
+        create_model_response_properties: CreateModelResponseProperties {
+            model_response_properties: ModelResponseProperties {
+                metadata: None,
+                prompt_cache_key: None,
+                prompt_cache_retention: None,
+                safety_identifier: None,
+                service_tier: None,
+                temperature,
+                top_logprobs: None,
+                top_p,
+                user: None,
+            },
+            create_model_response_properties_all_of_2: CreateModelResponsePropertiesAllOf2 {
+                top_logprobs: None,
+            },
         },
-        reasoning: reasoning.map(TryInto::try_into).transpose()?,
-        ..Default::default()
+        response_properties: ResponseProperties {
+            background: None,
+            max_output_tokens: max_tokens.map(i64::from),
+            max_tool_calls: None,
+            model: Some(Some(model_id.to_string())),
+            previous_response_id: None,
+            prompt: None,
+            reasoning: reasoning
+                .as_ref()
+                .map(convert_to_openai_reasoning)
+                .transpose()?,
+            text: response_format.map(Into::into),
+            tool_choice: tool_choice.map(convert_to_openai_response_tool_choice),
+            tools: tools
+                .map(|ts| {
+                    ts.into_iter()
+                        .map(convert_to_openai_tool)
+                        .collect::<LanguageModelResult<Vec<_>>>()
+                })
+                .transpose()?
+                .map(Some),
+            truncation: None,
+        },
+        create_response_all_of_3: CreateResponseAllOf3 {
+            context_management: None,
+            conversation: None,
+            include: if include_reasoning_encrypted {
+                Some(vec![IncludeEnum::ReasoningEncryptedContent])
+            } else {
+                None
+            },
+            input: Some(responses_api::InputParam::InputParamArray(Some(
+                convert_to_openai_inputs(messages)?,
+            ))),
+            instructions: system_prompt,
+            parallel_tool_calls: None,
+            store: Some(false),
+            stream: None,
+            stream_options: None,
+        },
     };
 
     if modalities.is_some_and(|m| m.contains(&crate::Modality::Image)) {
         params
+            .response_properties
             .tools
+            .get_or_insert_with(|| Some(Vec::new()))
             .get_or_insert_with(Vec::new)
-            .push(responses_api::Tool::ImageGeneration(ToolImageGeneration {
-                ..Default::default()
+            .push(OpenAITool::ImageGenTool(ImageGenTool {
+                action: None,
+                background: None,
+                input_fidelity: None,
+                input_image_mask: None,
+                model: None,
+                moderation: None,
+                output_compression: None,
+                output_format: None,
+                partial_images: None,
+                quality: None,
+                size: None,
+                r#type: ImageGenToolType::ImageGeneration,
             }));
     }
 
     Ok(params)
 }
 
-fn convert_to_openai_inputs(messages: Vec<Message>) -> LanguageModelResult<Vec<ResponseInputItem>> {
+fn convert_to_openai_inputs(messages: Vec<Message>) -> LanguageModelResult<Vec<InputItem>> {
     messages
         .into_iter()
         .try_fold(Vec::new(), |mut acc, message| {
@@ -301,152 +362,142 @@ fn convert_to_openai_inputs(messages: Vec<Message>) -> LanguageModelResult<Vec<R
         })
 }
 
-impl TryFrom<UserMessage> for ResponseInputItem {
+impl TryFrom<UserMessage> for InputItem {
     type Error = LanguageModelError;
     fn try_from(user_message: UserMessage) -> Result<Self, Self::Error> {
         let message_parts =
             source_part_utils::get_compatible_parts_without_source_parts(user_message.content);
-        Ok(Self::Message(ResponseInputItemMessage {
-            role: "user".to_string(),
-            content: message_parts
-                .into_iter()
-                .map(|part| {
-                    Ok(match part {
-                        Part::Text(text_part) => {
-                            ResponseInputContent::InputText(ResponseInputText {
-                                text: text_part.text,
-                            })
-                        }
-                        Part::Image(image_part) => {
-                            ResponseInputContent::InputImage(ResponseInputImage {
-                                file_id: None,
-                                image_url: format!(
-                                    "data:{};base64,{}",
-                                    image_part.mime_type, image_part.data
-                                )
-                                .into(),
-                                detail: "auto".to_string(),
-                            })
-                        }
-                        Part::Audio(audio_part) => {
-                            let format = match audio_part.format {
-                                AudioFormat::Mp3 => Ok("mp3"),
-                                AudioFormat::Wav => Ok("wav"),
+        Ok(Self::Item(responses_api::Item::InputMessage(
+            InputMessage {
+                role: InputMessageRole::User,
+                status: None,
+                r#type: Some(InputMessageType::Message),
+                content: Some(
+                    message_parts
+                        .into_iter()
+                        .map(|part| {
+                            Ok(match part {
+                                Part::Text(text_part) => {
+                                    InputContent::InputText(InputTextContent {
+                                        text: text_part.text,
+                                        r#type: InputTextContentType::InputText,
+                                    })
+                                }
+                                Part::Image(image_part) => {
+                                    InputContent::InputImage(InputImageContent {
+                                        detail: ImageDetail::Auto,
+                                        file_id: None,
+                                        image_url: Some(format!(
+                                            "data:{};base64,{}",
+                                            image_part.mime_type, image_part.data
+                                        )),
+                                        r#type: InputImageContentType::InputImage,
+                                    })
+                                }
                                 _ => Err(LanguageModelError::Unsupported(
                                     PROVIDER,
                                     format!(
-                                        "Cannot convert audio format to OpenAI InputAudio format \
-                                         for format {:?}",
-                                        audio_part.format
+                                        "Cannot convert part to OpenAI input content for part \
+                                         {part:?}"
                                     ),
-                                )),
-                            }?;
-
-                            ResponseInputContent::InputAudio(ResponseInputAudio {
-                                input_audio: ResponseInputAudioInputAudio {
-                                    data: audio_part.data,
-                                    format: format.to_string(),
-                                },
+                                ))?,
                             })
-                        }
-                        _ => Err(LanguageModelError::Unsupported(
-                            PROVIDER,
-                            format!(
-                                "Cannot convert part to OpenAI input content for part {part:?}"
-                            ),
-                        ))?,
-                    })
-                })
-                .collect::<LanguageModelResult<Vec<_>>>()?,
-            status: None,
-        }))
+                        })
+                        .collect::<LanguageModelResult<Vec<_>>>()?,
+                ),
+            },
+        )))
     }
 }
 
 fn convert_assistant_message_to_response_input_items(
     assistant_message: AssistantMessage,
-) -> LanguageModelResult<Vec<ResponseInputItem>> {
+) -> LanguageModelResult<Vec<InputItem>> {
     let message_parts =
         source_part_utils::get_compatible_parts_without_source_parts(assistant_message.content);
 
     message_parts
         .into_iter()
-        .map(|part| {
-            Ok(match part {
+        .try_fold(Vec::new(), |mut acc, part| {
+            let item = match part {
                 Part::Text(text_part) => {
-                    ResponseInputItem::OutputMessage(ResponseOutputMessage {
-                        // Response output item requires an ID.
-                        // This usually applies if we enable OpenAI "store".
-                        // or that we propogate the message ID in output.
-                        // For compatibility, we want to avoid doing that, so we use a generated
-                        // ID to avoid the API from returning an
-                        // error.
-                        id: format!("msg_{}", id_utils::generate_string(15)),
-                        role: "assistant".to_string(),
-                        content: vec![ResponseOutputContent::OutputText(ResponseOutputText {
-                            text: text_part.text,
-                            annotations: vec![],
-                        })],
-                        status: "completed".to_string(),
-                    })
+                    Some(InputItem::Item(responses_api::Item::OutputMessage(
+                        OutputMessage {
+                            // Response output item requires an ID.
+                            // This usually applies if we enable OpenAI "store".
+                            // or that we propogate the message ID in output.
+                            // For compatibility, we want to avoid doing that, so we use a generated
+                            // ID to avoid the API from returning an
+                            // error.
+                            id: format!("msg_{}", id_utils::generate_string(15)),
+                            role: OutputMessageRole::Assistant,
+                            content: vec![OutputMessageContent::OutputText(OutputTextContent {
+                                text: text_part.text,
+                                annotations: vec![],
+                                logprobs: vec![],
+                            })],
+                            phase: None,
+                            status: OutputMessageStatus::Completed,
+                            r#type: OutputMessageType::Message,
+                        },
+                    )))
                 }
-                Part::Reasoning(reasoning_part) => {
-                    ResponseInputItem::Reasoning(ResponseReasoningItem {
+                Part::Reasoning(reasoning_part) => Some(InputItem::Item(
+                    responses_api::Item::ReasoningItem(ReasoningItem {
                         id: reasoning_part.id.unwrap_or_default(),
-                        summary: vec![ResponseReasoningItemSummaryUnion::SummaryText(
-                            ResponseReasoningItemSummary {
-                                text: reasoning_part.text,
-                            },
-                        )],
-                        // ReasoningInputItem can not have content
+                        summary: vec![SummaryTextContent {
+                            text: reasoning_part.text,
+                            r#type: SummaryTextContentType::SummaryText,
+                        }],
                         content: None,
                         encrypted_content: reasoning_part.signature,
                         status: None,
-                    })
-                }
-                Part::Image(image_part) => {
-                    ResponseInputItem::ImageGenerationCall(ResponseOutputItemImageGenerationCall {
+                        r#type: ReasoningItemType::Reasoning,
+                    }),
+                )),
+                Part::Image(image_part) => Some(InputItem::Item(
+                    responses_api::Item::ImageGenToolCall(ImageGenToolCall {
+                        action: None,
+                        background: None,
                         id: image_part.id.unwrap_or_default(),
-                        status: "completed".to_string(),
+                        output_format: None,
+                        quality: None,
+                        status: responses_api::ImageGenToolCallStatus::Completed,
                         result: Some(format!(
                             "data:{};base64,{}",
                             image_part.mime_type, image_part.data
                         )),
-                        output_format: image_part
-                            .mime_type
-                            .strip_prefix("image/")
-                            .unwrap_or("png")
-                            .to_string(),
-                        size: if let (Some(width), Some(height)) =
-                            (image_part.width, image_part.height)
-                        {
-                            Some(format!("{width}x{height}"))
-                        } else {
-                            None
-                        },
-                    })
-                }
-                Part::ToolCall(tool_call_part) => {
-                    ResponseInputItem::FunctionCall(ResponseFunctionToolCall {
+                        revised_prompt: None,
+                        size: None,
+                        r#type: ImageGenToolCallType::ImageGenerationCall,
+                    }),
+                )),
+                Part::ToolCall(tool_call_part) => Some(InputItem::Item(
+                    responses_api::Item::FunctionToolCall(FunctionToolCall {
                         arguments: tool_call_part.args.to_string(),
                         call_id: tool_call_part.tool_call_id,
                         name: tool_call_part.tool_name,
                         id: tool_call_part.id,
+                        namespace: None,
                         status: None,
-                    })
-                }
+                        r#type: FunctionToolCallType::FunctionCall,
+                    }),
+                )),
                 _ => Err(LanguageModelError::Unsupported(
                     PROVIDER,
                     format!("Cannot convert part to OpenAI input item for part {part:?}"),
                 ))?,
-            })
+            };
+            if let Some(item) = item {
+                acc.push(item);
+            }
+            Ok(acc)
         })
-        .collect::<LanguageModelResult<_>>()
 }
 
 fn convert_tool_message_to_response_input_items(
     tool_message: ToolMessage,
-) -> LanguageModelResult<Vec<ResponseInputItem>> {
+) -> LanguageModelResult<Vec<InputItem>> {
     tool_message
         .content
         .into_iter()
@@ -463,15 +514,26 @@ fn convert_tool_message_to_response_input_items(
                 let items = tool_result_part_content
                     .into_iter()
                     .map(|tool_result_part_part| {
-                        Ok(match tool_result_part_part {
-                            Part::Text(text_part) => ResponseInputItem::FunctionCallOutput(
-                                ResponseInputItemFunctionCallOutput {
-                                    call_id: tool_call_id.clone(),
-                                    output: text_part.text,
-                                    id: None,
-                                    status: None,
-                                },
-                            ),
+                        let output = match tool_result_part_part {
+                            Part::Text(text_part) => FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputArray(Some(vec![
+                                FunctionCallOutputItemParamOutputArrayItem::InputText(
+                                    InputTextContentParam {
+                                        text: text_part.text,
+                                    },
+                                ),
+                            ])),
+                            Part::Image(image_part) => FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputArray(Some(vec![
+                                FunctionCallOutputItemParamOutputArrayItem::InputImage(
+                                    InputImageContentParamAutoParam {
+                                        detail: Some(DetailEnum::Auto),
+                                        file_id: None,
+                                        image_url: Some(format!(
+                                            "data:{};base64,{}",
+                                            image_part.mime_type, image_part.data
+                                        )),
+                                    },
+                                ),
+                            ])),
                             _ => Err(LanguageModelError::Unsupported(
                                 PROVIDER,
                                 format!(
@@ -479,7 +541,17 @@ fn convert_tool_message_to_response_input_items(
                                      part {tool_result_part_part:?}"
                                 ),
                             ))?,
-                        })
+                        };
+
+                        Ok(InputItem::Item(responses_api::Item::FunctionCallOutputItemParam(
+                            FunctionCallOutputItemParam {
+                                call_id: tool_call_id.clone(),
+                                output,
+                                id: None,
+                                status: None,
+                                r#type: FunctionCallOutputItemParamType::FunctionCallOutput,
+                            },
+                        )))
                     })
                     .collect::<LanguageModelResult<Vec<_>>>()?;
 
@@ -494,30 +566,32 @@ fn convert_tool_message_to_response_input_items(
         })
 }
 
-impl From<Tool> for responses_api::Tool {
-    fn from(tool: Tool) -> Self {
-        Self::Function(FunctionTool {
-            name: tool.name,
-            description: Some(tool.description),
-            parameters: Some(tool.parameters),
-            strict: Some(true),
-        })
-    }
+fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<OpenAITool> {
+    Ok(OpenAITool::FunctionTool(FunctionTool {
+        defer_loading: None,
+        description: Some(tool.description),
+        name: tool.name,
+        parameters: Some(convert_json_object(tool.parameters)?),
+        strict: Some(true),
+        r#type: FunctionToolType::Function,
+    }))
 }
 
-fn convert_to_openai_response_tool_choice(tool_choice: ToolChoiceOption) -> ToolChoice {
+fn convert_to_openai_response_tool_choice(tool_choice: ToolChoiceOption) -> ToolChoiceParam {
     match tool_choice {
-        ToolChoiceOption::None => ToolChoice::Option(ToolChoiceOptions::None),
-        ToolChoiceOption::Auto => ToolChoice::Option(ToolChoiceOptions::Auto),
-        ToolChoiceOption::Required => ToolChoice::Option(ToolChoiceOptions::Required),
-        ToolChoiceOption::Tool(tool) => ToolChoice::Function(ToolChoiceFunction {
-            choice_type: "function".into(),
+        ToolChoiceOption::None => ToolChoiceParam::ToolChoiceOptions(ToolChoiceOptions::None),
+        ToolChoiceOption::Auto => ToolChoiceParam::ToolChoiceOptions(ToolChoiceOptions::Auto),
+        ToolChoiceOption::Required => {
+            ToolChoiceParam::ToolChoiceOptions(ToolChoiceOptions::Required)
+        }
+        ToolChoiceOption::Tool(tool) => ToolChoiceParam::ToolChoiceFunction(ToolChoiceFunction {
             name: tool.tool_name,
+            r#type: ToolChoiceFunctionType::Function,
         }),
     }
 }
 
-impl From<ResponseFormatOption> for ResponseTextConfig {
+impl From<ResponseFormatOption> for ResponseTextParam {
     fn from(value: ResponseFormatOption) -> Self {
         match value {
             ResponseFormatOption::Json(ResponseFormatJson {
@@ -527,11 +601,11 @@ impl From<ResponseFormatOption> for ResponseTextConfig {
             }) => {
                 if let Some(schema) = schema {
                     Self {
-                        format: Some(ResponseFormatTextConfig::JsonSchema(
-                            ResponseFormatTextJSONSchemaConfig {
+                        format: Some(TextResponseFormatConfiguration::JsonSchema(
+                            TextResponseFormatJsonSchema {
                                 name,
                                 description,
-                                schema,
+                                schema: Some(schema),
                                 strict: Some(true),
                             },
                         )),
@@ -539,45 +613,45 @@ impl From<ResponseFormatOption> for ResponseTextConfig {
                     }
                 } else {
                     Self {
-                        format: Some(ResponseFormatTextConfig::JsonObject(
-                            ResponseFormatJSONObject {},
+                        format: Some(TextResponseFormatConfiguration::JsonObject(
+                            ResponseFormatJsonObject {},
                         )),
                         verbosity: None,
                     }
                 }
             }
             ResponseFormatOption::Text => Self {
-                format: Some(ResponseFormatTextConfig::Text(ResponseFormatText {})),
+                format: Some(TextResponseFormatConfiguration::Text(ResponseFormatText {})),
                 verbosity: None,
             },
         }
     }
 }
 
-impl TryFrom<ReasoningOptions> for responses_api::Reasoning {
-    type Error = LanguageModelError;
-
-    fn try_from(value: ReasoningOptions) -> Result<Self, Self::Error> {
-        Ok(Self {
-            summary: value.enabled.then(|| "auto".to_string()),
-            effort: value.budget_tokens.map(TryInto::try_into).transpose()?,
-        })
-    }
+fn convert_to_openai_reasoning(value: &ReasoningOptions) -> LanguageModelResult<Reasoning> {
+    Ok(Reasoning {
+        effort: value
+            .budget_tokens
+            .map(crate::openai::types::reasoning_effort_from_budget)
+            .transpose()?,
+        generate_summary: None,
+        summary: value.enabled.then_some(ReasoningSummary::Auto),
+    })
 }
 
-fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResult<Vec<Part>> {
+fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Part>> {
     items
         .into_iter()
         .try_fold(Vec::new(), |mut acc, item| match item {
-            ResponseOutputItem::Message(msg) => {
+            OutputItem::Message(msg) => {
                 let parts = msg
                     .content
                     .into_iter()
                     .map(|content| match content {
-                        ResponseOutputContent::OutputText(output_text) => {
+                        OutputMessageContent::OutputText(output_text) => {
                             Ok(Part::text(output_text.text))
                         }
-                        ResponseOutputContent::Refusal(refusal) => {
+                        OutputMessageContent::Refusal(refusal) => {
                             Err(LanguageModelError::Refusal(refusal.refusal))
                         }
                     })
@@ -586,7 +660,7 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                 acc.extend(parts);
                 Ok(acc)
             }
-            ResponseOutputItem::FunctionCall(function_tool_call) => {
+            OutputItem::FunctionCall(function_tool_call) => {
                 let args = serde_json::from_str(&function_tool_call.arguments).map_err(|e| {
                     LanguageModelError::Invariant(
                         PROVIDER,
@@ -596,21 +670,13 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                 let mut tool_call_part =
                     ToolCallPart::new(function_tool_call.call_id, function_tool_call.name, args);
 
-                if let Some(id) = function_tool_call.id {
-                    tool_call_part.id = Some(id);
-                }
+                tool_call_part.id = function_tool_call.id;
                 let part = Part::ToolCall(tool_call_part);
 
                 acc.push(part);
                 Ok(acc)
             }
-            ResponseOutputItem::ImageGenerationCall(image_gen_call) => {
-                let (width, height) = if let Some(size) = image_gen_call.size {
-                    parse_openai_image_size(&size)
-                } else {
-                    (None, None)
-                };
-
+            OutputItem::ImageGenerationCall(image_gen_call) => {
                 let mut image_part = ImagePart::new(
                     image_gen_call.result.ok_or_else(|| {
                         LanguageModelError::Invariant(
@@ -618,29 +684,24 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                             "Image generation call did not return a result".to_string(),
                         )
                     })?,
-                    format!("image/{}", image_gen_call.output_format),
+                    openai_image_format_to_mime_type(image_gen_call.output_format.as_ref()),
                 )
                 .with_id(image_gen_call.id);
-                if let Some(width) = width {
-                    image_part = image_part.with_width(width);
-                }
-                if let Some(height) = height {
-                    image_part = image_part.with_height(height);
+
+                if let Some((width, height)) = parse_openai_image_size(image_gen_call.size.as_ref())
+                {
+                    image_part = image_part.with_width(width).with_height(height);
                 }
                 let part: Part = image_part.into();
 
                 acc.push(part);
                 Ok(acc)
             }
-            ResponseOutputItem::Reasoning(reasoning_item) => {
+            OutputItem::Reasoning(reasoning_item) => {
                 let summary_text = reasoning_item
                     .summary
                     .into_iter()
-                    .map(|summary_union| match summary_union {
-                        ResponseReasoningItemSummaryUnion::SummaryText(summary_text) => {
-                            summary_text.text
-                        }
-                    })
+                    .map(|summary_text| summary_text.text)
                     .collect::<Vec<_>>()
                     .join("\n");
 
@@ -654,7 +715,7 @@ fn map_openai_output_items(items: Vec<ResponseOutputItem>) -> LanguageModelResul
                 acc.push(part);
                 Ok(acc)
             }
-            ResponseOutputItem::WebSearchCall(_) => Ok(acc),
+            _ => Ok(acc),
         })
 }
 
@@ -662,33 +723,36 @@ fn map_openai_stream_event(
     event: ResponseStreamEvent,
 ) -> LanguageModelResult<Option<ContentDelta>> {
     match event {
-        ResponseStreamEvent::Failed(_) => Err(LanguageModelError::Invariant(
+        ResponseStreamEvent::ResponseFailed(_) => Err(LanguageModelError::Invariant(
             PROVIDER,
             "OpenAI stream event failed".to_string(),
         )),
-        ResponseStreamEvent::OutputItemAdded(output_item_added_event) => {
+        ResponseStreamEvent::ResponseOutputItemAdded(output_item_added_event) => {
             match output_item_added_event.item {
-                ResponseOutputItem::FunctionCall(function_tool_call) => {
+                OutputItem::FunctionCall(function_tool_call) => {
                     let tool_call_part = PartDelta::ToolCall(ToolCallPartDelta {
                         args: Some(function_tool_call.arguments),
                         tool_name: Some(function_tool_call.name),
                         tool_call_id: Some(function_tool_call.call_id),
+                        signature: None,
                         id: function_tool_call.id,
                     });
                     Ok(Some(ContentDelta {
-                        index: output_item_added_event.output_index,
+                        index: usize::try_from(output_item_added_event.output_index).unwrap_or(0),
                         part: tool_call_part,
                     }))
                 }
-                ResponseOutputItem::Reasoning(reasoning_item) => {
+                OutputItem::Reasoning(reasoning_item) => {
                     if let Some(encrypted_content) = reasoning_item.encrypted_content {
-                        let reasoning_part = PartDelta::Reasoning(ReasoningPartDelta {
+                        let reasoning_part = ReasoningPartDelta {
                             signature: Some(encrypted_content),
                             text: None,
                             id: Some(reasoning_item.id),
-                        });
+                        };
+                        let reasoning_part = PartDelta::Reasoning(reasoning_part);
                         Ok(Some(ContentDelta {
-                            index: output_item_added_event.output_index,
+                            index: usize::try_from(output_item_added_event.output_index)
+                                .unwrap_or(0),
                             part: reasoning_part,
                         }))
                     } else {
@@ -698,54 +762,60 @@ fn map_openai_stream_event(
                 _ => Ok(None),
             }
         }
-        ResponseStreamEvent::TextDelta(text_delta_event) => {
+        ResponseStreamEvent::ResponseOutputTextDelta(text_delta_event) => {
             let text_part = PartDelta::Text(TextPartDelta {
                 text: text_delta_event.delta,
                 citation: None,
             });
             Ok(Some(ContentDelta {
-                index: text_delta_event.output_index,
+                index: usize::try_from(text_delta_event.output_index).unwrap_or(0),
                 part: text_part,
             }))
         }
-        ResponseStreamEvent::FunctionCallArgumentsDelta(function_call_arguments_delta_event) => {
+        ResponseStreamEvent::ResponseFunctionCallArgumentsDelta(
+            function_call_arguments_delta_event,
+        ) => {
             let tool_call_part = PartDelta::ToolCall(ToolCallPartDelta {
                 args: Some(function_call_arguments_delta_event.delta),
                 ..Default::default()
             });
 
             Ok(Some(ContentDelta {
-                index: function_call_arguments_delta_event.output_index,
+                index: usize::try_from(function_call_arguments_delta_event.output_index)
+                    .unwrap_or(0),
                 part: tool_call_part,
             }))
         }
-        ResponseStreamEvent::ImageGenCallPartialImage(partial_image_event) => {
-            let (width, height) = if let Some(size) = partial_image_event.size {
-                parse_openai_image_size(&size)
-            } else {
-                (None, None)
+        ResponseStreamEvent::ResponseImageGenerationCallPartialImage(partial_image_event) => {
+            let (width, height) = match parse_openai_image_size(partial_image_event.size.as_ref()) {
+                Some((width, height)) => (Some(width), Some(height)),
+                None => (None, None),
             };
-
             let image_part = PartDelta::Image(ImagePartDelta {
                 width,
                 height,
-                mime_type: Some(format!("image/{}", partial_image_event.output_format)),
-                data: Some(partial_image_event.partial_image_b64),
+                mime_type: Some(openai_image_format_to_mime_type(
+                    partial_image_event.output_format.as_ref(),
+                )),
+                data: Some(partial_image_event.partial_image_b_64),
                 id: Some(partial_image_event.item_id),
             });
 
             Ok(Some(ContentDelta {
-                index: partial_image_event.output_index,
+                index: usize::try_from(partial_image_event.output_index).unwrap_or(0),
                 part: image_part,
             }))
         }
-        ResponseStreamEvent::ReasoningSummaryTextDelta(reasoning_summary_text_delta_event) => {
+        ResponseStreamEvent::ResponseReasoningSummaryTextDelta(
+            reasoning_summary_text_delta_event,
+        ) => {
             let reasoning_part = PartDelta::Reasoning(ReasoningPartDelta {
                 text: Some(reasoning_summary_text_delta_event.delta),
                 ..Default::default()
             });
             Ok(Some(ContentDelta {
-                index: reasoning_summary_text_delta_event.output_index,
+                index: usize::try_from(reasoning_summary_text_delta_event.output_index)
+                    .unwrap_or(0),
                 part: reasoning_part,
             }))
         }
@@ -753,21 +823,40 @@ fn map_openai_stream_event(
     }
 }
 
-impl From<ResponseUsage> for ModelUsage {
-    fn from(value: ResponseUsage) -> Self {
-        Self {
-            input_tokens: value.input_tokens,
-            output_tokens: value.output_tokens,
+fn openai_image_format_to_mime_type(format: Option<&String>) -> String {
+    format!("image/{}", format.map_or("png", String::as_str))
+}
+
+fn parse_openai_image_size(size: Option<&String>) -> Option<(u32, u32)> {
+    let (width, height) = size?.split_once('x')?;
+    Some((width.parse().ok()?, height.parse().ok()?))
+}
+
+fn map_openai_response_usage(value: &ResponseUsage) -> ModelUsage {
+    ModelUsage {
+        input_tokens: u32::try_from(value.input_tokens).unwrap_or(0),
+        output_tokens: u32::try_from(value.output_tokens).unwrap_or(0),
+        input_tokens_details: Some(crate::ModelTokensDetails {
+            cached_text_tokens: u32::try_from(value.input_tokens_details.cached_tokens).ok(),
             ..Default::default()
-        }
+        }),
+        output_tokens_details: Some(crate::ModelTokensDetails {
+            text_tokens: Some(u32::try_from(value.output_tokens).unwrap_or(0)),
+            cached_text_tokens: None,
+            audio_tokens: None,
+            cached_audio_tokens: None,
+            image_tokens: None,
+            cached_image_tokens: None,
+        }),
     }
 }
 
-// image size from openai is in the format of {number}x{number}, we parse it
-// into width, height if available
-fn parse_openai_image_size(size_dim: &str) -> (Option<u32>, Option<u32>) {
-    let parts: Vec<&str> = size_dim.split('x').collect();
-    let width = parts.first().and_then(|w| w.parse().ok());
-    let height = parts.get(1).and_then(|h| h.parse().ok());
-    (width, height)
+fn convert_json_object(value: Value) -> LanguageModelResult<HashMap<String, Value>> {
+    match value {
+        Value::Object(map) => Ok(map.into_iter().collect()),
+        Value::Null => Ok(HashMap::new()),
+        _ => Err(LanguageModelError::InvalidInput(
+            "OpenAI function parameters must be a JSON object".to_string(),
+        )),
+    }
 }

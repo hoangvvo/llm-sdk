@@ -47,6 +47,14 @@ suite("OpenAIModel", () => {
     return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT);
   });
 
+  test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT, (t) => {
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT,
+    );
+  });
+
   test(TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS);
   });

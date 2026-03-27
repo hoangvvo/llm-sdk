@@ -189,6 +189,10 @@ pub struct ToolCallPart {
     pub tool_name: String,
     /// The arguments to pass to the tool.
     pub args: Value,
+    /// The provider-specific signature used to preserve reasoning/tool
+    /// continuity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
     /// The ID of the tool call, if applicable
     /// This is different from `tool_call_id`, which is the ID used to match the
     /// tool result with the tool call.
@@ -314,6 +318,10 @@ pub struct ToolCallPartDelta {
     /// The partial JSON string of the arguments to pass to the tool.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<String>,
+    /// The provider-specific signature used to preserve reasoning/tool
+    /// continuity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
     /// The ID of the tool call, if applicable
     /// This is different from `tool_call_id`, which is the ID used to match the
     /// tool result with the tool call.

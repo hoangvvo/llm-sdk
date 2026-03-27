@@ -1,0 +1,1558 @@
+{
+  "definitions": {
+    "ChatCompletionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "frequency_penalty": {
+          "default": 0,
+          "description": "The `frequency_penalty` penalizes the repetition of words based on their frequency in the generated text. A higher frequency penalty discourages the model from repeating words that have already appeared frequently in the output, promoting diversity and reducing repetition.",
+          "maximum": 2,
+          "minimum": -2,
+          "title": "Frequency Penalty",
+          "type": "number"
+        },
+        "guardrails": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/GuardrailConfig"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A list of guardrail configurations to apply to this request. Each guardrail specifies a moderation type, categories with thresholds to evaluate, and an action to take on violation.",
+          "title": "Guardrails"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The maximum number of tokens to generate in the completion. The token count of your prompt plus `max_tokens` cannot exceed the model's context length.",
+          "title": "Max Tokens"
+        },
+        "messages": {
+          "description": "The prompt(s) to generate completions for, encoded as a list of dict with role and content.",
+          "examples": [
+            [
+              {
+                "content": "Who is the best French painter? Answer in one short sentence.",
+                "role": "user"
+              }
+            ]
+          ],
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "assistant": "#/definitions/AssistantMessage",
+                "system": "#/definitions/SystemMessage",
+                "tool": "#/definitions/ToolMessage",
+                "user": "#/definitions/UserMessage"
+              },
+              "propertyName": "role"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/definitions/SystemMessage"
+              },
+              {
+                "$ref": "#/definitions/UserMessage"
+              },
+              {
+                "$ref": "#/definitions/AssistantMessage"
+              },
+              {
+                "$ref": "#/definitions/ToolMessage"
+              }
+            ]
+          },
+          "title": "Messages",
+          "type": "array"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Metadata"
+        },
+        "model": {
+          "description": "ID of the model to use. You can use the [List Available Models](/api/#tag/models/operation/list_models_v1_models_get) API to see all of your available models, or see our [Model overview](/models) for model descriptions.",
+          "examples": [
+            "mistral-large-latest"
+          ],
+          "title": "Model",
+          "type": "string"
+        },
+        "n": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Number of completions to return for each request, input tokens are only billed once.",
+          "title": "N"
+        },
+        "parallel_tool_calls": {
+          "default": true,
+          "description": "Whether to enable parallel function calling during tool use, when enabled the model can call multiple tools in parallel.",
+          "title": "Parallel Tool Calls",
+          "type": "boolean"
+        },
+        "prediction": {
+          "$ref": "#/definitions/Prediction",
+          "default": {
+            "content": "",
+            "type": "content"
+          },
+          "description": "Enable users to specify expected results, optimizing response times by leveraging known or predictable content. This approach is especially effective for updating text documents or code files with minimal changes, reducing latency while maintaining high-quality results."
+        },
+        "presence_penalty": {
+          "default": 0,
+          "description": "The `presence_penalty` determines how much the model penalizes the repetition of words or phrases. A higher presence penalty encourages the model to use a wider variety of words and phrases, making the output more diverse and creative.",
+          "maximum": 2,
+          "minimum": -2,
+          "title": "Presence Penalty",
+          "type": "number"
+        },
+        "prompt_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MistralPromptMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Allows toggling between the reasoning mode and no system prompt. When set to `reasoning` the system prompt for reasoning models will be used. **Deprecated for reasoning models - use `reasoning_effort` parameter instead.**"
+        },
+        "random_seed": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The seed to use for random sampling. If set, different calls will generate deterministic results.",
+          "title": "Random Seed"
+        },
+        "reasoning_effort": {
+          "description": "Controls the reasoning effort level for reasoning models. \"high\" enables comprehensive reasoning traces, \"none\" disables reasoning effort.",
+          "enum": [
+            "high",
+            "none"
+          ],
+          "type": "string"
+        },
+        "response_format": {
+          "$ref": "#/definitions/ResponseFormat"
+        },
+        "safe_prompt": {
+          "default": false,
+          "description": "Whether to inject a safety prompt before all conversations.",
+          "type": "boolean"
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "Stop generation if this token is detected. Or if one of these tokens is detected when providing an array",
+          "title": "Stop"
+        },
+        "stream": {
+          "default": false,
+          "description": "Whether to stream back partial progress. If set, tokens will be sent as data-only server-side events as they become available, with the stream terminated by a data: [DONE] message. Otherwise, the server will hold the request open until the timeout or until completion, with the response containing the full result as JSON.",
+          "title": "Stream",
+          "type": "boolean"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "maximum": 1.5,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What sampling temperature to use, we recommend between 0.0 and 0.7. Higher values like 0.7 will make the output more random, while lower values like 0.2 will make it more focused and deterministic. We generally recommend altering this or `top_p` but not both. The default value varies depending on the model you are targeting. Call the `/models` endpoint to retrieve the appropriate value.",
+          "title": "Temperature"
+        },
+        "tool_choice": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ToolChoice"
+            },
+            {
+              "$ref": "#/definitions/ToolChoiceEnum"
+            }
+          ],
+          "default": "auto",
+          "description": "Controls which (if any) tool is called by the model. `none` means the model will not call any tool and instead generates a message. `auto` means the model can pick between generating a message or calling one or more tools. `any` or `required` means the model must call one or more tools. Specifying a particular tool via `{\"type\": \"function\", \"function\": {\"name\": \"my_function\"}}` forces the model to call that tool.",
+          "title": "Tool Choice"
+        },
+        "tools": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/Tool"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A list of tools the model may call. Use this to provide a list of functions the model may generate JSON inputs for.",
+          "title": "Tools"
+        },
+        "top_p": {
+          "default": 1,
+          "description": "Nucleus sampling, where the model considers the results of the tokens with `top_p` probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered. We generally recommend altering this or `temperature` but not both.",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Top P",
+          "type": "number"
+        }
+      },
+      "required": [
+        "messages",
+        "model"
+      ],
+      "title": "ChatCompletionRequest",
+      "type": "object"
+    },
+    "CompletionEvent": {
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/CompletionChunk"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "CompletionEvent",
+      "type": "object"
+    },
+    "GuardrailConfig": {
+      "properties": {
+        "block_on_error": {
+          "default": false,
+          "description": "If true, return HTTP 403 and block request in the event of a server-side error",
+          "title": "Block On Error",
+          "type": "boolean"
+        },
+        "moderation_llm_v1": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModerationLLMV1Config"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "moderation_llm_v2": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModerationLLMV2Config"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "title": "GuardrailConfig",
+      "type": "object"
+    },
+    "AssistantMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ContentChunk"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Content"
+        },
+        "prefix": {
+          "default": false,
+          "description": "Set this to `true` when adding an assistant message as prefix to condition the model response. The role of the prefix message is to force the model to start its answer by the content of the message.",
+          "title": "Prefix",
+          "type": "boolean"
+        },
+        "role": {
+          "const": "assistant",
+          "default": "assistant",
+          "title": "Role",
+          "type": "string"
+        },
+        "tool_calls": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/ToolCall"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tool Calls"
+        }
+      },
+      "title": "AssistantMessage",
+      "type": "object"
+    },
+    "SystemMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/SystemMessageContentChunks"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Content"
+        },
+        "role": {
+          "const": "system",
+          "default": "system",
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "title": "SystemMessage",
+      "type": "object"
+    },
+    "ToolMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ContentChunk"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Content"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "role": {
+          "const": "tool",
+          "default": "tool",
+          "title": "Role",
+          "type": "string"
+        },
+        "tool_call_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tool Call Id"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "title": "ToolMessage",
+      "type": "object"
+    },
+    "UserMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ContentChunk"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Content"
+        },
+        "role": {
+          "const": "user",
+          "default": "user",
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "title": "UserMessage",
+      "type": "object"
+    },
+    "Prediction": {
+      "additionalProperties": false,
+      "description": "Enable users to specify an expected completion, optimizing response times by leveraging known or predictable content.",
+      "properties": {
+        "content": {
+          "default": "",
+          "title": "Content",
+          "type": "string"
+        },
+        "type": {
+          "const": "content",
+          "default": "content",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "Prediction",
+      "type": "object"
+    },
+    "MistralPromptMode": {
+      "description": "Available options to the prompt_mode argument on the chat completion endpoint.\nValues represent high-level intent. Assignment to actual SPs is handled internally.\nSystem prompt may include knowledge cutoff date, model capabilities, tone to use, safety guidelines, etc.",
+      "enum": [
+        "reasoning"
+      ],
+      "title": "MistralPromptMode",
+      "type": "string"
+    },
+    "ResponseFormat": {
+      "additionalProperties": false,
+      "description": "Specify the format that the model must output. By default it will use `{ \"type\": \"text\" }`. Setting to `{ \"type\": \"json_object\" }` enables JSON mode, which guarantees the message the model generates is in JSON. When using JSON mode you MUST also instruct the model to produce JSON yourself with a system or a user message. Setting to `{ \"type\": \"json_schema\" }` enables JSON schema mode, which guarantees the message the model generates is in JSON and follows the schema you provide.",
+      "examples": [
+        {
+          "type": "text"
+        },
+        {
+          "type": "json_object"
+        },
+        {
+          "json_schema": {
+            "name": "book",
+            "schema": {
+              "additionalProperties": false,
+              "properties": {
+                "authors": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Authors",
+                  "type": "array"
+                },
+                "name": {
+                  "title": "Name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "authors"
+              ],
+              "title": "Book",
+              "type": "object"
+            },
+            "strict": true
+          },
+          "type": "json_schema"
+        }
+      ],
+      "properties": {
+        "json_schema": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/JsonSchema"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "$ref": "#/definitions/ResponseFormats",
+          "default": "text"
+        }
+      },
+      "title": "ResponseFormat",
+      "type": "object"
+    },
+    "ToolChoice": {
+      "additionalProperties": false,
+      "description": "ToolChoice is either a ToolChoiceEnum or a ToolChoice",
+      "properties": {
+        "function": {
+          "$ref": "#/definitions/FunctionName"
+        },
+        "type": {
+          "$ref": "#/definitions/ToolTypes",
+          "default": "function"
+        }
+      },
+      "required": [
+        "function"
+      ],
+      "title": "ToolChoice",
+      "type": "object"
+    },
+    "ToolChoiceEnum": {
+      "enum": [
+        "auto",
+        "none",
+        "any",
+        "required"
+      ],
+      "title": "ToolChoiceEnum",
+      "type": "string"
+    },
+    "Tool": {
+      "additionalProperties": false,
+      "properties": {
+        "function": {
+          "$ref": "#/definitions/Function"
+        },
+        "type": {
+          "$ref": "#/definitions/ToolTypes",
+          "default": "function"
+        }
+      },
+      "required": [
+        "function"
+      ],
+      "title": "Tool",
+      "type": "object"
+    },
+    "CompletionChunk": {
+      "properties": {
+        "choices": {
+          "items": {
+            "$ref": "#/definitions/CompletionResponseStreamChoice"
+          },
+          "type": "array"
+        },
+        "created": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/definitions/UsageInfo"
+        }
+      },
+      "required": [
+        "id",
+        "model",
+        "choices"
+      ],
+      "title": "CompletionChunk",
+      "type": "object"
+    },
+    "ModerationLLMV1Config": {
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/ModerationLLMAction",
+          "default": "none",
+          "description": "Action to take if any score is above the threshold for any category."
+        },
+        "custom_category_thresholds": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModerationLLMV1CategoryThresholds"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ignore_other_categories": {
+          "default": false,
+          "description": "If true, only evaluate categories in custom_category_thresholds; others are ignored.",
+          "title": "Ignore Other Categories",
+          "type": "boolean"
+        },
+        "model_name": {
+          "default": "mistral-moderation-2411",
+          "description": "Override model name. Should be omitted in general.",
+          "title": "Model Name",
+          "type": "string"
+        }
+      },
+      "title": "ModerationLLMV1Config",
+      "type": "object"
+    },
+    "ModerationLLMV2Config": {
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/ModerationLLMAction",
+          "default": "none",
+          "description": "Action to take if any score is above the threshold for any category."
+        },
+        "custom_category_thresholds": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModerationLLMV2CategoryThresholds"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ignore_other_categories": {
+          "default": false,
+          "description": "If true, only evaluate categories in custom_category_thresholds; others are ignored.",
+          "title": "Ignore Other Categories",
+          "type": "boolean"
+        },
+        "model_name": {
+          "default": "mistral-moderation-2603",
+          "description": "Override model name. Should be omitted in general.",
+          "title": "Model Name",
+          "type": "string"
+        }
+      },
+      "title": "ModerationLLMV2Config",
+      "type": "object"
+    },
+    "ContentChunk": {
+      "discriminator": {
+        "mapping": {
+          "document_url": "#/definitions/DocumentURLChunk",
+          "file": "#/definitions/FileChunk",
+          "image_url": "#/definitions/ImageURLChunk",
+          "input_audio": "#/definitions/AudioChunk",
+          "reference": "#/definitions/ReferenceChunk",
+          "text": "#/definitions/TextChunk",
+          "thinking": "#/definitions/ThinkChunk"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TextChunk"
+        },
+        {
+          "$ref": "#/definitions/ImageURLChunk"
+        },
+        {
+          "$ref": "#/definitions/DocumentURLChunk"
+        },
+        {
+          "$ref": "#/definitions/ReferenceChunk"
+        },
+        {
+          "$ref": "#/definitions/FileChunk"
+        },
+        {
+          "$ref": "#/definitions/ThinkChunk"
+        },
+        {
+          "$ref": "#/definitions/AudioChunk"
+        }
+      ],
+      "title": "ContentChunk"
+    },
+    "ToolCall": {
+      "additionalProperties": false,
+      "properties": {
+        "function": {
+          "$ref": "#/definitions/FunctionCall"
+        },
+        "id": {
+          "default": "null",
+          "title": "Id",
+          "type": "string"
+        },
+        "index": {
+          "default": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/definitions/ToolTypes",
+          "default": "function"
+        }
+      },
+      "required": [
+        "function"
+      ],
+      "title": "ToolCall",
+      "type": "object"
+    },
+    "SystemMessageContentChunks": {
+      "discriminator": {
+        "mapping": {
+          "text": "#/definitions/TextChunk",
+          "thinking": "#/definitions/ThinkChunk"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TextChunk"
+        },
+        {
+          "$ref": "#/definitions/ThinkChunk"
+        }
+      ],
+      "title": "SystemMessageContentChunks"
+    },
+    "JsonSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Description"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "schema": {
+          "additionalProperties": true,
+          "title": "Schema",
+          "type": "object",
+          "x-speakeasy-name-override": "schema_definition"
+        },
+        "strict": {
+          "default": false,
+          "title": "Strict",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "schema"
+      ],
+      "title": "JsonSchema",
+      "type": "object"
+    },
+    "ResponseFormats": {
+      "enum": [
+        "text",
+        "json_object",
+        "json_schema"
+      ],
+      "title": "ResponseFormats",
+      "type": "string"
+    },
+    "FunctionName": {
+      "additionalProperties": false,
+      "description": "this restriction of `Function` is used to select a specific function to call",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "FunctionName",
+      "type": "object"
+    },
+    "ToolTypes": {
+      "enum": [
+        "function"
+      ],
+      "title": "ToolTypes",
+      "type": "string"
+    },
+    "Function": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "strict": {
+          "default": false,
+          "title": "Strict",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "parameters"
+      ],
+      "title": "Function",
+      "type": "object"
+    },
+    "CompletionResponseStreamChoice": {
+      "properties": {
+        "delta": {
+          "$ref": "#/definitions/DeltaMessage"
+        },
+        "finish_reason": {
+          "enum": [
+            "stop",
+            "length",
+            "error",
+            "tool_calls",
+            null
+          ],
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "index": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index",
+        "delta",
+        "finish_reason"
+      ],
+      "title": "CompletionResponseStreamChoice",
+      "type": "object"
+    },
+    "UsageInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "completion_tokens": {
+          "default": 0,
+          "title": "Completion Tokens",
+          "type": "integer"
+        },
+        "prompt_audio_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prompt Audio Seconds"
+        },
+        "prompt_tokens": {
+          "default": 0,
+          "title": "Prompt Tokens",
+          "type": "integer"
+        },
+        "total_tokens": {
+          "default": 0,
+          "title": "Total Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens"
+      ],
+      "title": "UsageInfo",
+      "type": "object"
+    },
+    "ModerationLLMAction": {
+      "enum": [
+        "none",
+        "block"
+      ],
+      "title": "ModerationLLMAction",
+      "type": "string"
+    },
+    "ModerationLLMV1CategoryThresholds": {
+      "properties": {
+        "dangerous_and_criminal_content": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dangerous And Criminal Content"
+        },
+        "financial": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Financial"
+        },
+        "hate_and_discrimination": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Hate And Discrimination"
+        },
+        "health": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Health"
+        },
+        "law": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Law"
+        },
+        "pii": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pii"
+        },
+        "selfharm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selfharm"
+        },
+        "sexual": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sexual"
+        },
+        "violence_and_threats": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Violence And Threats"
+        }
+      },
+      "title": "ModerationLLMV1CategoryThresholds",
+      "type": "object"
+    },
+    "ModerationLLMV2CategoryThresholds": {
+      "properties": {
+        "criminal": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Criminal"
+        },
+        "dangerous": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dangerous"
+        },
+        "financial": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Financial"
+        },
+        "hate_and_discrimination": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Hate And Discrimination"
+        },
+        "health": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Health"
+        },
+        "jailbreaking": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jailbreaking"
+        },
+        "law": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Law"
+        },
+        "pii": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pii"
+        },
+        "selfharm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selfharm"
+        },
+        "sexual": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sexual"
+        },
+        "violence_and_threats": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Violence And Threats"
+        }
+      },
+      "title": "ModerationLLMV2CategoryThresholds",
+      "type": "object"
+    },
+    "DocumentURLChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "document_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The filename of the document",
+          "title": "Document Name"
+        },
+        "document_url": {
+          "title": "Document Url",
+          "type": "string"
+        },
+        "type": {
+          "const": "document_url",
+          "default": "document_url",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_url"
+      ],
+      "title": "DocumentURLChunk",
+      "type": "object"
+    },
+    "FileChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "file_id": {
+          "format": "uuid",
+          "title": "File Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "file",
+          "default": "file",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id"
+      ],
+      "title": "FileChunk",
+      "type": "object"
+    },
+    "ImageURLChunk": {
+      "additionalProperties": false,
+      "description": "{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/png;base64,iVBORw0",
+      "properties": {
+        "image_url": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImageURL"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Image Url"
+        },
+        "type": {
+          "const": "image_url",
+          "default": "image_url",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image_url"
+      ],
+      "title": "ImageURLChunk",
+      "type": "object"
+    },
+    "AudioChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "input_audio": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "format": "binary",
+              "type": "string"
+            }
+          ],
+          "title": "Input Audio"
+        },
+        "type": {
+          "const": "input_audio",
+          "default": "input_audio",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "input_audio"
+      ],
+      "title": "AudioChunk",
+      "type": "object"
+    },
+    "ReferenceChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "reference_ids": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Reference Ids",
+          "type": "array"
+        },
+        "type": {
+          "const": "reference",
+          "default": "reference",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference_ids"
+      ],
+      "title": "ReferenceChunk",
+      "type": "object"
+    },
+    "TextChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "text",
+          "default": "text",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TextChunk",
+      "type": "object"
+    },
+    "ThinkChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "closed": {
+          "default": true,
+          "description": "Whether the thinking chunk is closed or not. Currently only used for prefixing.",
+          "title": "Closed",
+          "type": "boolean"
+        },
+        "thinking": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/TextChunk"
+              },
+              {
+                "$ref": "#/definitions/ToolReferenceChunk"
+              },
+              {
+                "$ref": "#/definitions/ReferenceChunk"
+              }
+            ]
+          },
+          "title": "Thinking",
+          "type": "array"
+        },
+        "type": {
+          "const": "thinking",
+          "default": "thinking",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thinking"
+      ],
+      "title": "ThinkChunk",
+      "type": "object"
+    },
+    "FunctionCall": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Arguments"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "arguments"
+      ],
+      "title": "FunctionCall",
+      "type": "object"
+    },
+    "DeltaMessage": {
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ContentChunk"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tool_calls": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ToolCall"
+              },
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "title": "DeltaMessage",
+      "type": "object"
+    },
+    "ImageURL": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImageDetail"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "ImageURL",
+      "type": "object"
+    },
+    "ToolReferenceChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Description"
+        },
+        "favicon": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Favicon"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BuiltInConnectors"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Tool"
+        },
+        "type": {
+          "const": "tool_reference",
+          "default": "tool_reference",
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Url"
+        }
+      },
+      "required": [
+        "tool",
+        "title"
+      ],
+      "title": "ToolReferenceChunk",
+      "type": "object"
+    },
+    "ImageDetail": {
+      "enum": [
+        "low",
+        "auto",
+        "high"
+      ],
+      "title": "ImageDetail",
+      "type": "string"
+    },
+    "BuiltInConnectors": {
+      "enum": [
+        "web_search",
+        "web_search_premium",
+        "code_interpreter",
+        "image_generation",
+        "document_library"
+      ],
+      "title": "BuiltInConnectors",
+      "type": "string"
+    }
+  }
+}

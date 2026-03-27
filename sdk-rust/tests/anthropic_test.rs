@@ -1,5 +1,4 @@
 mod common;
-use crate::common::cases::RunTestCaseOptions;
 use llm_sdk::{anthropic::*, *};
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
@@ -15,7 +14,7 @@ fn anthropic_api_key() -> &'static String {
 
 fn anthropic_model() -> AnthropicModel {
     AnthropicModel::new(
-        "claude-sonnet-4-20250514".to_string(),
+        "claude-sonnet-4-5".to_string(),
         AnthropicModelOptions {
             api_key: anthropic_api_key().clone(),
             ..Default::default()
@@ -36,6 +35,8 @@ test_set!(anthropic_model(), stream_tool_call);
 test_set!(anthropic_model(), generate_text_from_tool_result);
 
 test_set!(anthropic_model(), stream_text_from_tool_result);
+
+test_set!(anthropic_model(), generate_text_from_image_tool_result);
 
 test_set!(anthropic_model(), generate_parallel_tool_calls);
 
@@ -78,7 +79,7 @@ test_set!(
 test_set!(
     anthropic_model(),
     generate_reasoning,
-    Some(RunTestCaseOptions {
+    Some(crate::common::cases::RunTestCaseOptions {
         additional_input: Some(|input| {
             input.reasoning = Some(ReasoningOptions {
                 enabled: true,
@@ -92,7 +93,7 @@ test_set!(
 test_set!(
     anthropic_model(),
     stream_reasoning,
-    Some(RunTestCaseOptions {
+    Some(crate::common::cases::RunTestCaseOptions {
         additional_input: Some(|input| {
             input.reasoning = Some(ReasoningOptions {
                 enabled: true,

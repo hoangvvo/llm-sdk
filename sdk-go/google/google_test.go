@@ -14,6 +14,7 @@ import (
 var model *google.GoogleModel
 var audioModel *google.GoogleModel
 var imageModel *google.GoogleModel
+var multimodalToolModel *google.GoogleModel
 var reasoningModel *google.GoogleModel
 
 func TestMain(m *testing.M) {
@@ -29,10 +30,13 @@ func TestMain(m *testing.M) {
 	audioModel = google.NewGoogleModel("gemini-2.5-flash-preview-tts", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	imageModel = google.NewGoogleModel("gemini-2.5-flash-image-preview", google.GoogleModelOptions{
+	imageModel = google.NewGoogleModel("gemini-2.5-flash-image", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	reasoningModel = google.NewGoogleModel("gemini-2.0-flash-thinking-exp-01-21", google.GoogleModelOptions{
+	multimodalToolModel = google.NewGoogleModel("gemini-3-flash-preview", google.GoogleModelOptions{
+		APIKey: apiKey,
+	})
+	reasoningModel = google.NewGoogleModel("gemini-2.5-flash", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
 
@@ -65,6 +69,10 @@ func TestGenerateTextWithToolResult(t *testing.T) {
 
 func TestStreamTextWithToolResult(t *testing.T) {
 	testcommon.RunTestCase(t, model, "stream_text_from_tool_result")
+}
+
+func TestGenerateTextWithImageToolResult(t *testing.T) {
+	testcommon.RunTestCase(t, multimodalToolModel, "generate_text_from_image_tool_result")
 }
 
 func TestGenerateParallelToolCalls(t *testing.T) {

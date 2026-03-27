@@ -45,6 +45,7 @@ utoipa = { version = "5", optional = true }
 
 [dev-dependencies]
 dotenvy = { version = "0.15.7" }
+json_dotpath = "1.1.0"
 paste = "1.0.15"
 regex = "1.12.3"
 tokio = { version = "1.50.0", features = ["full"] }

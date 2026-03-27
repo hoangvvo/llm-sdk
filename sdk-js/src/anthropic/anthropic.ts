@@ -20,6 +20,7 @@ import type {
   PartialModelResponse,
   ReasoningOptions,
   ReasoningPart,
+  ResponseFormatOption,
   SourcePart,
   TextPart,
   Tool,
@@ -137,6 +138,7 @@ function convertToAnthropicCreateParams(
     temperature,
     top_p,
     top_k,
+    response_format,
     tools,
     tool_choice,
     reasoning,
@@ -160,6 +162,12 @@ function convertToAnthropicCreateParams(
   }
   if (typeof top_k === "number") {
     params.top_k = top_k;
+  }
+  if (response_format) {
+    const outputConfig = convertToAnthropicOutputConfig(response_format);
+    if (outputConfig) {
+      params.output_config = outputConfig;
+    }
   }
   if (tools) {
     params.tools = tools.map(convertToAnthropicTool);
@@ -330,6 +338,7 @@ function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
     name: tool.name,
     description: tool.description,
     input_schema: tool.parameters as Anthropic.Tool.InputSchema,
+    strict: true,
   };
 }
 
@@ -356,6 +365,25 @@ function convertToAnthropicToolChoice(
         type: "none",
       };
     }
+  }
+}
+
+function convertToAnthropicOutputConfig(
+  responseFormat: ResponseFormatOption,
+): Anthropic.Messages.OutputConfig | null {
+  switch (responseFormat.type) {
+    case "text":
+      return null;
+    case "json":
+      if (!responseFormat.schema) {
+        return null;
+      }
+      return {
+        format: {
+          type: "json_schema",
+          schema: responseFormat.schema,
+        },
+      };
   }
 }
 

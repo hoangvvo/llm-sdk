@@ -10,11 +10,57 @@
             "role": "user"
           }
         ],
-        "model": "claude-sonnet-4-20250514"
+        "model": "claude-opus-4-6"
       },
       "properties": {
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Top-level cache control automatically applies a cache_control marker to the last cacheable block in the request.",
+          "title": "Cache Control"
+        },
+        "container": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Container identifier for reuse across requests.",
+          "title": "Container"
+        },
+        "inference_geo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Specifies the geographic region for inference processing. If not specified, the workspace's `default_inference_geo` is used.",
+          "title": "Inference Geo"
+        },
         "max_tokens": {
-          "description": "The maximum number of tokens to generate before stopping.\n\nNote that our models may stop _before_ reaching this maximum. This parameter only specifies the absolute maximum number of tokens to generate.\n\nDifferent models have different maximum values for this parameter.  See [models](https://docs.anthropic.com/en/docs/models-overview) for details.",
+          "description": "The maximum number of tokens to generate before stopping.\n\nNote that our models may stop _before_ reaching this maximum. This parameter only specifies the absolute maximum number of tokens to generate.\n\nDifferent models have different maximum values for this parameter.  See [models](https://docs.claude.com/en/docs/models-overview) for details.",
           "examples": [
             1024
           ],
@@ -23,7 +69,7 @@
           "type": "integer"
         },
         "messages": {
-          "description": "Input messages.\n\nOur models are trained to operate on alternating `user` and `assistant` conversational turns. When creating a new `Message`, you specify the prior conversational turns with the `messages` parameter, and the model then generates the next `Message` in the conversation. Consecutive `user` or `assistant` turns in your request will be combined into a single turn.\n\nEach input message must be an object with a `role` and `content`. You can specify a single `user`-role message, or you can include multiple `user` and `assistant` messages.\n\nIf the final message uses the `assistant` role, the response content will continue immediately from the content in that message. This can be used to constrain part of the model's response.\n\nExample with a single `user` message:\n\n```json\n[{\"role\": \"user\", \"content\": \"Hello, Claude\"}]\n```\n\nExample with multiple conversational turns:\n\n```json\n[\n  {\"role\": \"user\", \"content\": \"Hello there.\"},\n  {\"role\": \"assistant\", \"content\": \"Hi, I'm Claude. How can I help you?\"},\n  {\"role\": \"user\", \"content\": \"Can you explain LLMs in plain English?\"},\n]\n```\n\nExample with a partially-filled response from Claude:\n\n```json\n[\n  {\"role\": \"user\", \"content\": \"What's the Greek name for Sun? (A) Sol (B) Helios (C) Sun\"},\n  {\"role\": \"assistant\", \"content\": \"The best answer is (\"},\n]\n```\n\nEach input message `content` may be either a single `string` or an array of content blocks, where each block has a specific `type`. Using a `string` for `content` is shorthand for an array of one content block of type `\"text\"`. The following input messages are equivalent:\n\n```json\n{\"role\": \"user\", \"content\": \"Hello, Claude\"}\n```\n\n```json\n{\"role\": \"user\", \"content\": [{\"type\": \"text\", \"text\": \"Hello, Claude\"}]}\n```\n\nSee [input examples](https://docs.anthropic.com/en/api/messages-examples).\n\nNote that if you want to include a [system prompt](https://docs.anthropic.com/en/docs/system-prompts), you can use the top-level `system` parameter — there is no `\"system\"` role for input messages in the Messages API.\n\nThere is a limit of 100,000 messages in a single request.",
+          "description": "Input messages.\n\nOur models are trained to operate on alternating `user` and `assistant` conversational turns. When creating a new `Message`, you specify the prior conversational turns with the `messages` parameter, and the model then generates the next `Message` in the conversation. Consecutive `user` or `assistant` turns in your request will be combined into a single turn.\n\nEach input message must be an object with a `role` and `content`. You can specify a single `user`-role message, or you can include multiple `user` and `assistant` messages.\n\nIf the final message uses the `assistant` role, the response content will continue immediately from the content in that message. This can be used to constrain part of the model's response.\n\nExample with a single `user` message:\n\n```json\n[{\"role\": \"user\", \"content\": \"Hello, Claude\"}]\n```\n\nExample with multiple conversational turns:\n\n```json\n[\n  {\"role\": \"user\", \"content\": \"Hello there.\"},\n  {\"role\": \"assistant\", \"content\": \"Hi, I'm Claude. How can I help you?\"},\n  {\"role\": \"user\", \"content\": \"Can you explain LLMs in plain English?\"},\n]\n```\n\nExample with a partially-filled response from Claude:\n\n```json\n[\n  {\"role\": \"user\", \"content\": \"What's the Greek name for Sun? (A) Sol (B) Helios (C) Sun\"},\n  {\"role\": \"assistant\", \"content\": \"The best answer is (\"},\n]\n```\n\nEach input message `content` may be either a single `string` or an array of content blocks, where each block has a specific `type`. Using a `string` for `content` is shorthand for an array of one content block of type `\"text\"`. The following input messages are equivalent:\n\n```json\n{\"role\": \"user\", \"content\": \"Hello, Claude\"}\n```\n\n```json\n{\"role\": \"user\", \"content\": [{\"type\": \"text\", \"text\": \"Hello, Claude\"}]}\n```\n\nSee [input examples](https://docs.claude.com/en/api/messages-examples).\n\nNote that if you want to include a [system prompt](https://docs.claude.com/en/docs/system-prompts), you can use the top-level `system` parameter — there is no `\"system\"` role for input messages in the Messages API.\n\nThere is a limit of 100,000 messages in a single request.",
           "items": {
             "$ref": "#/definitions/InputMessage"
           },
@@ -37,8 +83,12 @@
         "model": {
           "$ref": "#/definitions/Model"
         },
+        "output_config": {
+          "$ref": "#/definitions/OutputConfig",
+          "description": "Configuration options for the model's output, such as the output format."
+        },
         "service_tier": {
-          "description": "Determines whether to use priority capacity (if available) or standard capacity for this request.\n\nAnthropic offers different levels of service for your API requests. See [service-tiers](https://docs.anthropic.com/en/api/service-tiers) for details.",
+          "description": "Determines whether to use priority capacity (if available) or standard capacity for this request.\n\nAnthropic offers different levels of service for your API requests. See [service-tiers](https://docs.claude.com/en/api/service-tiers) for details.",
           "enum": [
             "auto",
             "standard_only"
@@ -55,7 +105,7 @@
           "type": "array"
         },
         "stream": {
-          "description": "Whether to incrementally stream the response using server-sent events.\n\nSee [streaming](https://docs.anthropic.com/en/api/messages-streaming) for details.",
+          "description": "Whether to incrementally stream the response using server-sent events.\n\nSee [streaming](https://docs.claude.com/en/api/messages-streaming) for details.",
           "title": "Stream",
           "type": "boolean"
         },
@@ -64,8 +114,7 @@
             {
               "type": "string",
               "x-stainless-skip": [
-                "go",
-                "cli"
+                "go"
               ]
             },
             {
@@ -75,7 +124,7 @@
               "type": "array"
             }
           ],
-          "description": "System prompt.\n\nA system prompt is a way of providing context and instructions to Claude, such as specifying a particular goal or role. See our [guide to system prompts](https://docs.anthropic.com/en/docs/system-prompts).",
+          "description": "System prompt.\n\nA system prompt is a way of providing context and instructions to Claude, such as specifying a particular goal or role. See our [guide to system prompts](https://docs.claude.com/en/docs/system-prompts).",
           "examples": [
             [
               {
@@ -104,7 +153,7 @@
           "$ref": "#/definitions/ToolChoice"
         },
         "tools": {
-          "description": "Definitions of tools that the model may use.\n\nIf you include `tools` in your API request, the model may return `tool_use` content blocks that represent the model's use of those tools. You can then run those tools using the tool input generated by the model and then optionally return results back to the model using `tool_result` content blocks.\n\nThere are two types of tools: **client tools** and **server tools**. The behavior described below applies to client tools. For [server tools](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview\\#server-tools), see their individual documentation as each has its own behavior (e.g., the [web search tool](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/web-search-tool)).\n\nEach tool definition includes:\n\n* `name`: Name of the tool.\n* `description`: Optional, but strongly-recommended description of the tool.\n* `input_schema`: [JSON schema](https://json-schema.org/draft/2020-12) for the tool `input` shape that the model will produce in `tool_use` output content blocks.\n\nFor example, if you defined `tools` as:\n\n```json\n[\n  {\n    \"name\": \"get_stock_price\",\n    \"description\": \"Get the current stock price for a given ticker symbol.\",\n    \"input_schema\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"ticker\": {\n          \"type\": \"string\",\n          \"description\": \"The stock ticker symbol, e.g. AAPL for Apple Inc.\"\n        }\n      },\n      \"required\": [\"ticker\"]\n    }\n  }\n]\n```\n\nAnd then asked the model \"What's the S&P 500 at today?\", the model might produce `tool_use` content blocks in the response like this:\n\n```json\n[\n  {\n    \"type\": \"tool_use\",\n    \"id\": \"toolu_01D7FLrfh4GYq7yT1ULFeyMV\",\n    \"name\": \"get_stock_price\",\n    \"input\": { \"ticker\": \"^GSPC\" }\n  }\n]\n```\n\nYou might then run your `get_stock_price` tool with `{\"ticker\": \"^GSPC\"}` as an input, and return the following back to the model in a subsequent `user` message:\n\n```json\n[\n  {\n    \"type\": \"tool_result\",\n    \"tool_use_id\": \"toolu_01D7FLrfh4GYq7yT1ULFeyMV\",\n    \"content\": \"259.75 USD\"\n  }\n]\n```\n\nTools can be used for workflows that include running client-side tools and functions, or more generally whenever you want the model to produce a particular JSON structure of output.\n\nSee our [guide](https://docs.anthropic.com/en/docs/tool-use) for more details.",
+          "description": "Definitions of tools that the model may use.\n\nIf you include `tools` in your API request, the model may return `tool_use` content blocks that represent the model's use of those tools. You can then run those tools using the tool input generated by the model and then optionally return results back to the model using `tool_result` content blocks.\n\nThere are two types of tools: **client tools** and **server tools**. The behavior described below applies to client tools. For [server tools](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview\\#server-tools), see their individual documentation as each has its own behavior (e.g., the [web search tool](https://docs.claude.com/en/docs/agents-and-tools/tool-use/web-search-tool)).\n\nEach tool definition includes:\n\n* `name`: Name of the tool.\n* `description`: Optional, but strongly-recommended description of the tool.\n* `input_schema`: [JSON schema](https://json-schema.org/draft/2020-12) for the tool `input` shape that the model will produce in `tool_use` output content blocks.\n\nFor example, if you defined `tools` as:\n\n```json\n[\n  {\n    \"name\": \"get_stock_price\",\n    \"description\": \"Get the current stock price for a given ticker symbol.\",\n    \"input_schema\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"ticker\": {\n          \"type\": \"string\",\n          \"description\": \"The stock ticker symbol, e.g. AAPL for Apple Inc.\"\n        }\n      },\n      \"required\": [\"ticker\"]\n    }\n  }\n]\n```\n\nAnd then asked the model \"What's the S&P 500 at today?\", the model might produce `tool_use` content blocks in the response like this:\n\n```json\n[\n  {\n    \"type\": \"tool_use\",\n    \"id\": \"toolu_01D7FLrfh4GYq7yT1ULFeyMV\",\n    \"name\": \"get_stock_price\",\n    \"input\": { \"ticker\": \"^GSPC\" }\n  }\n]\n```\n\nYou might then run your `get_stock_price` tool with `{\"ticker\": \"^GSPC\"}` as an input, and return the following back to the model in a subsequent `user` message:\n\n```json\n[\n  {\n    \"type\": \"tool_result\",\n    \"tool_use_id\": \"toolu_01D7FLrfh4GYq7yT1ULFeyMV\",\n    \"content\": \"259.75 USD\"\n  }\n]\n```\n\nTools can be used for workflows that include running client-side tools and functions, or more generally whenever you want the model to produce a particular JSON structure of output.\n\nSee our [guide](https://docs.claude.com/en/docs/tool-use) for more details.",
           "examples": [
             {
               "description": "Get the current weather in a given location",
@@ -136,6 +185,18 @@
                 "$ref": "#/definitions/BashTool_20250124"
               },
               {
+                "$ref": "#/definitions/CodeExecutionTool_20250522"
+              },
+              {
+                "$ref": "#/definitions/CodeExecutionTool_20250825"
+              },
+              {
+                "$ref": "#/definitions/CodeExecutionTool_20260120"
+              },
+              {
+                "$ref": "#/definitions/MemoryTool_20250818"
+              },
+              {
                 "$ref": "#/definitions/TextEditor_20250124"
               },
               {
@@ -146,6 +207,24 @@
               },
               {
                 "$ref": "#/definitions/WebSearchTool_20250305"
+              },
+              {
+                "$ref": "#/definitions/WebFetchTool_20250910"
+              },
+              {
+                "$ref": "#/definitions/WebSearchTool_20260209"
+              },
+              {
+                "$ref": "#/definitions/WebFetchTool_20260209"
+              },
+              {
+                "$ref": "#/definitions/WebFetchTool_20260309"
+              },
+              {
+                "$ref": "#/definitions/ToolSearchToolBM25_20251119"
+              },
+              {
+                "$ref": "#/definitions/ToolSearchToolRegex_20251119"
               }
             ]
           },
@@ -191,7 +270,7 @@
             }
           ],
           "id": "msg_013Zva2CMHLNnXjNJJKqJ2EF",
-          "model": "claude-sonnet-4-20250514",
+          "model": "claude-opus-4-6",
           "role": "assistant",
           "stop_reason": "end_turn",
           "stop_sequence": null,
@@ -203,6 +282,18 @@
         }
       ],
       "properties": {
+        "container": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Container"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Information about the container used in this request.\n\nThis will be non-null if a container tool (e.g. code execution) was used."
+        },
         "content": {
           "description": "Content generated by the model.\n\nThis is an array of content blocks, each of which has a `type` that determines its shape.\n\nExample:\n\n```json\n[{\"type\": \"text\", \"text\": \"Hi, I'm Claude.\"}]\n```\n\nIf the request input `messages` ended with an `assistant` turn, then the response `content` will continue directly from that last turn. You can use this to constrain the model's output.\n\nFor example, if the input `messages` were:\n```json\n[\n  {\"role\": \"user\", \"content\": \"What's the Greek name for Sun? (A) Sol (B) Helios (C) Sun\"},\n  {\"role\": \"assistant\", \"content\": \"The best answer is (\"}\n]\n```\n\nThen the response `content` might be:\n\n```json\n[{\"type\": \"text\", \"text\": \"B)\"}]\n```",
           "examples": [
@@ -235,9 +326,6 @@
           "const": "assistant",
           "default": "assistant",
           "description": "Conversational role of the generated message.\n\nThis will always be `\"assistant\"`.",
-          "enum": [
-            "assistant"
-          ],
           "title": "Role",
           "type": "string"
         },
@@ -270,9 +358,6 @@
           "const": "message",
           "default": "message",
           "description": "Object type.\n\nFor Messages, this is always `\"message\"`.",
-          "enum": [
-            "message"
-          ],
           "title": "Type",
           "type": "string"
         },
@@ -295,7 +380,8 @@
         "model",
         "stop_reason",
         "stop_sequence",
-        "usage"
+        "usage",
+        "container"
       ],
       "title": "Message",
       "type": "object",
@@ -306,12 +392,12 @@
     "MessageStreamEvent": {
       "discriminator": {
         "mapping": {
-          "content_block_delta": "#/components/schemas/ContentBlockDeltaEvent",
-          "content_block_start": "#/components/schemas/ContentBlockStartEvent",
-          "content_block_stop": "#/components/schemas/ContentBlockStopEvent",
-          "message_delta": "#/components/schemas/MessageDeltaEvent",
-          "message_start": "#/components/schemas/MessageStartEvent",
-          "message_stop": "#/components/schemas/MessageStopEvent"
+          "content_block_delta": "#/definitions/ContentBlockDeltaEvent",
+          "content_block_start": "#/definitions/ContentBlockStartEvent",
+          "content_block_stop": "#/definitions/ContentBlockStopEvent",
+          "message_delta": "#/definitions/MessageDeltaEvent",
+          "message_start": "#/definitions/MessageStartEvent",
+          "message_stop": "#/definitions/MessageStopEvent"
         },
         "propertyName": "type"
       },
@@ -333,6 +419,9 @@
         },
         {
           "$ref": "#/definitions/ContentBlockStopEvent"
+        },
+        {
+          "$ref": "#/definitions/PingEvent"
         }
       ],
       "title": "MessageStreamEvent",
@@ -341,6 +430,50 @@
           "model_name": "MessageStreamEvent"
         }
       }
+    },
+    "PingEvent": {
+      "properties": {
+        "type": {
+          "const": "ping",
+          "description": "Event type.",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "PingEvent",
+      "type": "object"
+    },
+    "CacheControlEphemeral": {
+      "additionalProperties": false,
+      "properties": {
+        "ttl": {
+          "description": "The time-to-live for the cache control breakpoint.\n\nThis may be one the following values:\n- `5m`: 5 minutes\n- `1h`: 1 hour\n\nDefaults to `5m`.",
+          "enum": [
+            "5m",
+            "1h"
+          ],
+          "title": "Ttl",
+          "type": "string",
+          "x-stainless-renameMap": {
+            "ttl_1h": "1h",
+            "ttl_5m": "5m"
+          }
+        },
+        "type": {
+          "const": "ephemeral",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "CacheControlEphemeral",
+      "type": "object",
+      "x-stainless-go-constant-constructor": true
     },
     "InputMessage": {
       "additionalProperties": false,
@@ -394,7 +527,7 @@
         "user_id": {
           "anyOf": [
             {
-              "maxLength": 256,
+              "maxLength": 512,
               "type": "string"
             },
             {
@@ -417,28 +550,63 @@
           "type": "string"
         },
         {
-          "const": "claude-3-7-sonnet-latest",
-          "description": "High-performance model with early extended thinking",
+          "const": "claude-opus-4-6",
+          "description": "Most intelligent model for building agents and coding",
           "x-stainless-nominal": false
         },
         {
-          "const": "claude-3-7-sonnet-20250219",
-          "description": "High-performance model with early extended thinking",
+          "const": "claude-sonnet-4-6",
+          "description": "Best combination of speed and intelligence",
           "x-stainless-nominal": false
         },
         {
-          "const": "claude-3-5-haiku-latest",
-          "description": "Fastest and most compact model for near-instant responsiveness",
+          "const": "claude-haiku-4-5",
+          "description": "Fastest model with near-frontier intelligence",
           "x-stainless-nominal": false
         },
         {
-          "const": "claude-3-5-haiku-20241022",
-          "description": "Our fastest model",
+          "const": "claude-haiku-4-5-20251001",
+          "description": "Fastest model with near-frontier intelligence",
           "x-stainless-nominal": false
         },
         {
-          "const": "claude-sonnet-4-20250514",
-          "description": "High-performance model with extended thinking",
+          "const": "claude-opus-4-5",
+          "description": "Premium model combining maximum intelligence with practical performance",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-opus-4-5-20251101",
+          "description": "Premium model combining maximum intelligence with practical performance",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-sonnet-4-5",
+          "description": "High-performance model for agents and coding",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-sonnet-4-5-20250929",
+          "description": "High-performance model for agents and coding",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-opus-4-1",
+          "description": "Exceptional model for specialized complex tasks",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-opus-4-1-20250805",
+          "description": "Exceptional model for specialized complex tasks",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-opus-4-0",
+          "description": "Powerful model for complex tasks",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-opus-4-20250514",
+          "description": "Powerful model for complex tasks",
           "x-stainless-nominal": false
         },
         {
@@ -447,63 +615,49 @@
           "x-stainless-nominal": false
         },
         {
-          "const": "claude-4-sonnet-20250514",
+          "const": "claude-sonnet-4-20250514",
           "description": "High-performance model with extended thinking",
           "x-stainless-nominal": false
         },
         {
-          "const": "claude-3-5-sonnet-latest",
-          "description": "Our previous most intelligent model",
-          "x-stainless-nominal": false
-        },
-        {
-          "const": "claude-3-5-sonnet-20241022",
-          "description": "Our previous most intelligent model",
-          "x-stainless-nominal": false
-        },
-        {
-          "const": "claude-3-5-sonnet-20240620",
-          "x-stainless-nominal": false
-        },
-        {
-          "const": "claude-opus-4-0",
-          "description": "Our most capable model"
-        },
-        {
-          "const": "claude-opus-4-20250514",
-          "description": "Our most capable model"
-        },
-        {
-          "const": "claude-4-opus-20250514",
-          "description": "Our most capable model",
-          "x-stainless-nominal": false
-        },
-        {
-          "const": "claude-opus-4-1-20250805",
-          "description": "Our most capable model"
-        },
-        {
-          "const": "claude-3-opus-latest",
-          "deprecated": true,
-          "description": "Excels at writing and complex tasks",
-          "x-stainless-deprecation-message": "Will reach end-of-life on January 5th, 2026. Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.",
-          "x-stainless-nominal": false
-        },
-        {
-          "const": "claude-3-opus-20240229",
-          "deprecated": true,
-          "description": "Excels at writing and complex tasks",
-          "x-stainless-deprecation-message": "Will reach end-of-life on January 5th, 2026. Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.",
-          "x-stainless-nominal": false
-        },
-        {
           "const": "claude-3-haiku-20240307",
-          "description": "Our previous most fast and cost-effective",
+          "deprecated": true,
+          "description": "Fast and cost-effective model",
+          "x-stainless-deprecation-message": "Will reach end-of-life on April 20th, 2026. Please migrate to claude-haiku-4-5. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.",
           "x-stainless-nominal": false
         }
       ],
       "description": "The model that will complete your prompt.\\n\\nSee [models](https://docs.anthropic.com/en/docs/models-overview) for additional details and options.",
       "title": "Model"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How much effort the model should put into its response. Higher effort levels may result in more thorough analysis but take longer.\n\nValid values are `low`, `medium`, `high`, or `max`."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/JsonOutputFormat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A schema to specify Claude's output format in responses. See [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)"
+        }
+      },
+      "title": "OutputConfig",
+      "type": "object"
     },
     "RequestTextBlock": {
       "additionalProperties": false,
@@ -513,7 +667,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -536,11 +690,11 @@
               "items": {
                 "discriminator": {
                   "mapping": {
-                    "char_location": "#/components/schemas/RequestCharLocationCitation",
-                    "content_block_location": "#/components/schemas/RequestContentBlockLocationCitation",
-                    "page_location": "#/components/schemas/RequestPageLocationCitation",
-                    "search_result_location": "#/components/schemas/RequestSearchResultLocationCitation",
-                    "web_search_result_location": "#/components/schemas/RequestWebSearchResultLocationCitation"
+                    "char_location": "#/definitions/RequestCharLocationCitation",
+                    "content_block_location": "#/definitions/RequestContentBlockLocationCitation",
+                    "page_location": "#/definitions/RequestPageLocationCitation",
+                    "search_result_location": "#/definitions/RequestSearchResultLocationCitation",
+                    "web_search_result_location": "#/definitions/RequestWebSearchResultLocationCitation"
                   },
                   "propertyName": "type"
                 },
@@ -577,9 +731,6 @@
         },
         "type": {
           "const": "text",
-          "enum": [
-            "text"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -592,20 +743,29 @@
       "type": "object"
     },
     "ThinkingConfigParam": {
-      "description": "Configuration for enabling Claude's extended thinking. \n\nWhen enabled, responses include `thinking` content blocks showing Claude's thinking process before the final answer. Requires a minimum budget of 1,024 tokens and counts towards your `max_tokens` limit.\n\nSee [extended thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) for details.",
+      "description": "Configuration for enabling Claude's extended thinking.\n\nWhen enabled, responses include `thinking` content blocks showing Claude's thinking process before the final answer. Requires a minimum budget of 1,024 tokens and counts towards your `max_tokens` limit.\n\nSee [extended thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking) for details.",
       "discriminator": {
         "mapping": {
-          "disabled": "#/components/schemas/ThinkingConfigDisabled",
-          "enabled": "#/components/schemas/ThinkingConfigEnabled"
+          "adaptive": "#/definitions/ThinkingConfigAdaptive",
+          "disabled": "#/definitions/ThinkingConfigDisabled",
+          "enabled": "#/definitions/ThinkingConfigEnabled"
         },
         "propertyName": "type"
       },
+      "examples": [
+        {
+          "type": "adaptive"
+        }
+      ],
       "oneOf": [
         {
           "$ref": "#/definitions/ThinkingConfigEnabled"
         },
         {
           "$ref": "#/definitions/ThinkingConfigDisabled"
+        },
+        {
+          "$ref": "#/definitions/ThinkingConfigAdaptive"
         }
       ],
       "title": "Thinking"
@@ -614,10 +774,10 @@
       "description": "How the model should use the provided tools. The model can use a specific tool, any available tool, decide by itself, or not use tools at all.",
       "discriminator": {
         "mapping": {
-          "any": "#/components/schemas/ToolChoiceAny",
-          "auto": "#/components/schemas/ToolChoiceAuto",
-          "none": "#/components/schemas/ToolChoiceNone",
-          "tool": "#/components/schemas/ToolChoiceTool"
+          "any": "#/definitions/ToolChoiceAny",
+          "auto": "#/definitions/ToolChoiceAuto",
+          "none": "#/definitions/ToolChoiceNone",
+          "tool": "#/definitions/ToolChoiceTool"
         },
         "propertyName": "type"
       },
@@ -640,12 +800,19 @@
     "Tool": {
       "additionalProperties": false,
       "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
         "cache_control": {
           "anyOf": [
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -662,6 +829,11 @@
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
         },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
         "description": {
           "description": "Description of what this tool does.\n\nTool descriptions should be as detailed as possible. The more information that the model has about what the tool is and how to use it, the better it will perform. You can use natural language descriptions to reinforce important aspects of the tool input JSON schema.",
           "examples": [
@@ -669,6 +841,28 @@
           ],
           "title": "Description",
           "type": "string"
+        },
+        "eager_input_streaming": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Enable eager input streaming for this tool. When true, tool input parameters will be streamed incrementally as they are generated, and types will be inferred on-the-fly rather than buffering the full JSON output. When false, streaming is disabled for this tool even if the fine-grained-tool-streaming beta is active. When null (default), uses the default behavior based on beta headers.",
+          "title": "Eager Input Streaming"
+        },
+        "input_examples": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/definitions/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Input Examples",
+          "type": "array"
         },
         "input_schema": {
           "$ref": "#/definitions/InputSchema",
@@ -690,9 +884,6 @@
               ],
               "type": "object"
             }
-          ],
-          "x-stainless-skip": [
-            "cli"
           ]
         },
         "name": {
@@ -703,6 +894,11 @@
           "title": "Name",
           "type": "string"
         },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
         "type": {
           "anyOf": [
             {
@@ -710,9 +906,6 @@
             },
             {
               "const": "custom",
-              "enum": [
-                "custom"
-              ],
               "type": "string"
             }
           ],
@@ -729,12 +922,19 @@
     "BashTool_20250124": {
       "additionalProperties": false,
       "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
         "cache_control": {
           "anyOf": [
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -751,20 +951,34 @@
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
         },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "input_examples": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/definitions/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Input Examples",
+          "type": "array"
+        },
         "name": {
           "const": "bash",
           "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
-          "enum": [
-            "bash"
-          ],
           "title": "Name",
           "type": "string"
         },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
         "type": {
           "const": "bash_20250124",
-          "enum": [
-            "bash_20250124"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -776,15 +990,22 @@
       "title": "BashTool_20250124",
       "type": "object"
     },
-    "TextEditor_20250124": {
+    "CodeExecutionTool_20250522": {
       "additionalProperties": false,
       "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
         "cache_control": {
           "anyOf": [
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -801,20 +1022,289 @@
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
         },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
         "name": {
-          "const": "str_replace_editor",
+          "const": "code_execution",
           "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
-          "enum": [
-            "str_replace_editor"
-          ],
           "title": "Name",
           "type": "string"
         },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "code_execution_20250522",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "CodeExecutionTool_20250522",
+      "type": "object"
+    },
+    "CodeExecutionTool_20250825": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "name": {
+          "const": "code_execution",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "code_execution_20250825",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "CodeExecutionTool_20250825",
+      "type": "object"
+    },
+    "CodeExecutionTool_20260120": {
+      "additionalProperties": false,
+      "description": "Code execution tool with REPL state persistence (daemon mode + gVisor checkpoint).",
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "name": {
+          "const": "code_execution",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "code_execution_20260120",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "CodeExecutionTool_20260120",
+      "type": "object"
+    },
+    "MemoryTool_20250818": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "input_examples": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/definitions/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Input Examples",
+          "type": "array"
+        },
+        "name": {
+          "const": "memory",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "memory_20250818",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "MemoryTool_20250818",
+      "type": "object"
+    },
+    "TextEditor_20250124": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "input_examples": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/definitions/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Input Examples",
+          "type": "array"
+        },
+        "name": {
+          "const": "str_replace_editor",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
         "type": {
           "const": "text_editor_20250124",
-          "enum": [
-            "text_editor_20250124"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -829,12 +1319,19 @@
     "TextEditor_20250429": {
       "additionalProperties": false,
       "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
         "cache_control": {
           "anyOf": [
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -851,20 +1348,34 @@
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
         },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "input_examples": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/definitions/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Input Examples",
+          "type": "array"
+        },
         "name": {
           "const": "str_replace_based_edit_tool",
           "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
-          "enum": [
-            "str_replace_based_edit_tool"
-          ],
           "title": "Name",
           "type": "string"
         },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
         "type": {
           "const": "text_editor_20250429",
-          "enum": [
-            "text_editor_20250429"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -879,12 +1390,19 @@
     "TextEditor_20250728": {
       "additionalProperties": false,
       "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
         "cache_control": {
           "anyOf": [
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -900,6 +1418,21 @@
           ],
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "input_examples": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/definitions/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Input Examples",
+          "type": "array"
         },
         "max_characters": {
           "anyOf": [
@@ -917,17 +1450,16 @@
         "name": {
           "const": "str_replace_based_edit_tool",
           "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
-          "enum": [
-            "str_replace_based_edit_tool"
-          ],
           "title": "Name",
           "type": "string"
         },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
         "type": {
           "const": "text_editor_20250728",
-          "enum": [
-            "text_editor_20250728"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -942,6 +1474,13 @@
     "WebSearchTool_20250305": {
       "additionalProperties": false,
       "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
         "allowed_domains": {
           "anyOf": [
             {
@@ -977,7 +1516,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -993,6 +1532,11 @@
           ],
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
         },
         "max_uses": {
           "anyOf": [
@@ -1010,17 +1554,16 @@
         "name": {
           "const": "web_search",
           "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
-          "enum": [
-            "web_search"
-          ],
           "title": "Name",
           "type": "string"
         },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
         "type": {
           "const": "web_search_20250305",
-          "enum": [
-            "web_search_20250305"
-          ],
           "title": "Type",
           "type": "string"
         },
@@ -1043,15 +1586,676 @@
       "title": "WebSearchTool_20250305",
       "type": "object"
     },
+    "WebFetchTool_20250910": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "allowed_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "List of domains to allow fetching from",
+          "title": "Allowed Domains"
+        },
+        "blocked_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "List of domains to block fetching from",
+          "title": "Blocked Domains"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "citations": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestCitationsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Citations configuration for fetched documents. Citations are disabled by default."
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "max_content_tokens": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of tokens used by including web page text content in the context. The limit is approximate and does not apply to binary content such as PDFs.",
+          "title": "Max Content Tokens"
+        },
+        "max_uses": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of times the tool can be used in the API request.",
+          "title": "Max Uses"
+        },
+        "name": {
+          "const": "web_fetch",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "web_fetch_20250910",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "WebFetchTool_20250910",
+      "type": "object"
+    },
+    "WebSearchTool_20260209": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "allowed_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "If provided, only these domains will be included in results. Cannot be used alongside `blocked_domains`.",
+          "title": "Allowed Domains"
+        },
+        "blocked_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "If provided, these domains will never appear in results. Cannot be used alongside `allowed_domains`.",
+          "title": "Blocked Domains"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "max_uses": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of times the tool can be used in the API request.",
+          "title": "Max Uses"
+        },
+        "name": {
+          "const": "web_search",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "web_search_20260209",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_location": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/UserLocation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Parameters for the user's location. Used to provide more relevant search results."
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "WebSearchTool_20260209",
+      "type": "object"
+    },
+    "WebFetchTool_20260209": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "allowed_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "List of domains to allow fetching from",
+          "title": "Allowed Domains"
+        },
+        "blocked_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "List of domains to block fetching from",
+          "title": "Blocked Domains"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "citations": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestCitationsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Citations configuration for fetched documents. Citations are disabled by default."
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "max_content_tokens": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of tokens used by including web page text content in the context. The limit is approximate and does not apply to binary content such as PDFs.",
+          "title": "Max Content Tokens"
+        },
+        "max_uses": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of times the tool can be used in the API request.",
+          "title": "Max Uses"
+        },
+        "name": {
+          "const": "web_fetch",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "web_fetch_20260209",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "WebFetchTool_20260209",
+      "type": "object"
+    },
+    "WebFetchTool_20260309": {
+      "additionalProperties": false,
+      "description": "Web fetch tool with use_cache parameter for bypassing cached content.",
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "allowed_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "List of domains to allow fetching from",
+          "title": "Allowed Domains"
+        },
+        "blocked_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "List of domains to block fetching from",
+          "title": "Blocked Domains"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "citations": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestCitationsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Citations configuration for fetched documents. Citations are disabled by default."
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "max_content_tokens": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of tokens used by including web page text content in the context. The limit is approximate and does not apply to binary content such as PDFs.",
+          "title": "Max Content Tokens"
+        },
+        "max_uses": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of times the tool can be used in the API request.",
+          "title": "Max Uses"
+        },
+        "name": {
+          "const": "web_fetch",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "web_fetch_20260309",
+          "title": "Type",
+          "type": "string"
+        },
+        "use_cache": {
+          "description": "Whether to use cached content. Set to false to bypass the cache and fetch fresh content. Only set to false when the user explicitly requests fresh content or when fetching rapidly-changing sources.",
+          "title": "Use Cache",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "WebFetchTool_20260309",
+      "type": "object"
+    },
+    "ToolSearchToolBM25_20251119": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "name": {
+          "const": "tool_search_tool_bm25",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "enum": [
+            "tool_search_tool_bm25_20251119",
+            "tool_search_tool_bm25"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "ToolSearchToolBM25_20251119",
+      "type": "object"
+    },
+    "ToolSearchToolRegex_20251119": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_callers": {
+          "items": {
+            "$ref": "#/definitions/AllowedCaller"
+          },
+          "title": "Allowed Callers",
+          "type": "array"
+        },
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "defer_loading": {
+          "description": "If true, tool will not be included in initial system prompt. Only loaded when returned via tool_reference from tool search.",
+          "title": "Defer Loading",
+          "type": "boolean"
+        },
+        "name": {
+          "const": "tool_search_tool_regex",
+          "description": "Name of the tool.\n\nThis is how the tool will be called by the model and in `tool_use` blocks.",
+          "title": "Name",
+          "type": "string"
+        },
+        "strict": {
+          "description": "When true, guarantees schema validation on tool names and inputs",
+          "title": "Strict",
+          "type": "boolean"
+        },
+        "type": {
+          "enum": [
+            "tool_search_tool_regex_20251119",
+            "tool_search_tool_regex"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "ToolSearchToolRegex_20251119",
+      "type": "object"
+    },
+    "Container": {
+      "description": "Information about the container used in the request (for the code execution tool)",
+      "properties": {
+        "expires_at": {
+          "description": "The time at which the container will expire.",
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "id": {
+          "description": "Identifier for the container used in this request",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "expires_at",
+        "id"
+      ],
+      "title": "Container",
+      "type": "object"
+    },
     "ContentBlock": {
       "discriminator": {
         "mapping": {
-          "redacted_thinking": "#/components/schemas/ResponseRedactedThinkingBlock",
-          "server_tool_use": "#/components/schemas/ResponseServerToolUseBlock",
-          "text": "#/components/schemas/ResponseTextBlock",
-          "thinking": "#/components/schemas/ResponseThinkingBlock",
-          "tool_use": "#/components/schemas/ResponseToolUseBlock",
-          "web_search_tool_result": "#/components/schemas/ResponseWebSearchToolResultBlock"
+          "bash_code_execution_tool_result": "#/definitions/ResponseBashCodeExecutionToolResultBlock",
+          "code_execution_tool_result": "#/definitions/ResponseCodeExecutionToolResultBlock",
+          "container_upload": "#/definitions/ResponseContainerUploadBlock",
+          "redacted_thinking": "#/definitions/ResponseRedactedThinkingBlock",
+          "server_tool_use": "#/definitions/ResponseServerToolUseBlock",
+          "text": "#/definitions/ResponseTextBlock",
+          "text_editor_code_execution_tool_result": "#/definitions/ResponseTextEditorCodeExecutionToolResultBlock",
+          "thinking": "#/definitions/ResponseThinkingBlock",
+          "tool_search_tool_result": "#/definitions/ResponseToolSearchToolResultBlock",
+          "tool_use": "#/definitions/ResponseToolUseBlock",
+          "web_fetch_tool_result": "#/definitions/ResponseWebFetchToolResultBlock",
+          "web_search_tool_result": "#/definitions/ResponseWebSearchToolResultBlock"
         },
         "propertyName": "type"
       },
@@ -1073,6 +2277,24 @@
         },
         {
           "$ref": "#/definitions/ResponseWebSearchToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/ResponseWebFetchToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/ResponseCodeExecutionToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/ResponseBashCodeExecutionToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/ResponseTextEditorCodeExecutionToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/ResponseToolSearchToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/ResponseContainerUploadBlock"
         }
       ]
     },
@@ -1135,6 +2357,19 @@
           ],
           "title": "Cache Read Input Tokens"
         },
+        "inference_geo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The geographic region where inference was performed for this request.",
+          "title": "Inference Geo"
+        },
         "input_tokens": {
           "description": "The number of input tokens which were used.",
           "examples": [
@@ -1188,6 +2423,7 @@
         "cache_creation",
         "cache_creation_input_tokens",
         "cache_read_input_tokens",
+        "inference_geo",
         "input_tokens",
         "output_tokens",
         "server_tool_use",
@@ -1196,166 +2432,16 @@
       "title": "Usage",
       "type": "object"
     },
-    "MessageStartEvent": {
-      "properties": {
-        "message": {
-          "$ref": "#/definitions/Message"
-        },
-        "type": {
-          "const": "message_start",
-          "default": "message_start",
-          "enum": [
-            "message_start"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "message",
-        "type"
-      ],
-      "title": "MessageStartEvent",
-      "type": "object",
-      "x-stainless-naming": {
-        "go": {
-          "model_name": "MessageStartEvent"
-        }
-      }
-    },
-    "MessageDeltaEvent": {
-      "properties": {
-        "delta": {
-          "$ref": "#/definitions/MessageDelta"
-        },
-        "type": {
-          "const": "message_delta",
-          "default": "message_delta",
-          "enum": [
-            "message_delta"
-          ],
-          "title": "Type",
-          "type": "string"
-        },
-        "usage": {
-          "$ref": "#/definitions/MessageDeltaUsage",
-          "description": "Billing and rate-limit usage.\n\nAnthropic's API bills and rate-limits by token counts, as tokens represent the underlying cost to our systems.\n\nUnder the hood, the API transforms requests into a format suitable for the model. The model's output then goes through a parsing stage before becoming an API response. As a result, the token counts in `usage` will not match one-to-one with the exact visible content of an API request or response.\n\nFor example, `output_tokens` will be non-zero, even for an empty string response from Claude.\n\nTotal input tokens in a request is the summation of `input_tokens`, `cache_creation_input_tokens`, and `cache_read_input_tokens`.",
-          "examples": [
-            {
-              "output_tokens": 503
-            }
-          ]
-        }
-      },
-      "required": [
-        "delta",
-        "type",
-        "usage"
-      ],
-      "title": "MessageDeltaEvent",
-      "type": "object",
-      "x-stainless-naming": {
-        "go": {
-          "model_name": "MessageDeltaEvent"
-        }
-      }
-    },
-    "MessageStopEvent": {
-      "properties": {
-        "type": {
-          "const": "message_stop",
-          "default": "message_stop",
-          "enum": [
-            "message_stop"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type"
-      ],
-      "title": "MessageStopEvent",
-      "type": "object",
-      "x-stainless-naming": {
-        "go": {
-          "model_name": "MessageStopEvent"
-        }
-      }
-    },
-    "ContentBlockStartEvent": {
-      "properties": {
-        "content_block": {
-          "discriminator": {
-            "mapping": {
-              "redacted_thinking": "#/components/schemas/ResponseRedactedThinkingBlock",
-              "server_tool_use": "#/components/schemas/ResponseServerToolUseBlock",
-              "text": "#/components/schemas/ResponseTextBlock",
-              "thinking": "#/components/schemas/ResponseThinkingBlock",
-              "tool_use": "#/components/schemas/ResponseToolUseBlock",
-              "web_search_tool_result": "#/components/schemas/ResponseWebSearchToolResultBlock"
-            },
-            "propertyName": "type"
-          },
-          "oneOf": [
-            {
-              "$ref": "#/definitions/ResponseTextBlock"
-            },
-            {
-              "$ref": "#/definitions/ResponseThinkingBlock"
-            },
-            {
-              "$ref": "#/definitions/ResponseRedactedThinkingBlock"
-            },
-            {
-              "$ref": "#/definitions/ResponseToolUseBlock"
-            },
-            {
-              "$ref": "#/definitions/ResponseServerToolUseBlock"
-            },
-            {
-              "$ref": "#/definitions/ResponseWebSearchToolResultBlock"
-            }
-          ],
-          "title": "Content Block"
-        },
-        "index": {
-          "title": "Index",
-          "type": "integer"
-        },
-        "type": {
-          "const": "content_block_start",
-          "default": "content_block_start",
-          "enum": [
-            "content_block_start"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "content_block",
-        "index",
-        "type"
-      ],
-      "title": "ContentBlockStartEvent",
-      "type": "object",
-      "x-stainless-naming": {
-        "go": {
-          "model_name": "ContentBlockStartEvent"
-        }
-      }
-    },
     "ContentBlockDeltaEvent": {
       "properties": {
         "delta": {
           "discriminator": {
             "mapping": {
-              "citations_delta": "#/components/schemas/CitationsDelta",
-              "input_json_delta": "#/components/schemas/InputJsonContentBlockDelta",
-              "signature_delta": "#/components/schemas/SignatureContentBlockDelta",
-              "text_delta": "#/components/schemas/TextContentBlockDelta",
-              "thinking_delta": "#/components/schemas/ThinkingContentBlockDelta"
+              "citations_delta": "#/definitions/CitationsDelta",
+              "input_json_delta": "#/definitions/InputJsonContentBlockDelta",
+              "signature_delta": "#/definitions/SignatureContentBlockDelta",
+              "text_delta": "#/definitions/TextContentBlockDelta",
+              "thinking_delta": "#/definitions/ThinkingContentBlockDelta"
             },
             "propertyName": "type"
           },
@@ -1385,9 +2471,6 @@
         "type": {
           "const": "content_block_delta",
           "default": "content_block_delta",
-          "enum": [
-            "content_block_delta"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1405,6 +2488,90 @@
         }
       }
     },
+    "ContentBlockStartEvent": {
+      "properties": {
+        "content_block": {
+          "discriminator": {
+            "mapping": {
+              "bash_code_execution_tool_result": "#/definitions/ResponseBashCodeExecutionToolResultBlock",
+              "code_execution_tool_result": "#/definitions/ResponseCodeExecutionToolResultBlock",
+              "container_upload": "#/definitions/ResponseContainerUploadBlock",
+              "redacted_thinking": "#/definitions/ResponseRedactedThinkingBlock",
+              "server_tool_use": "#/definitions/ResponseServerToolUseBlock",
+              "text": "#/definitions/ResponseTextBlock",
+              "text_editor_code_execution_tool_result": "#/definitions/ResponseTextEditorCodeExecutionToolResultBlock",
+              "thinking": "#/definitions/ResponseThinkingBlock",
+              "tool_search_tool_result": "#/definitions/ResponseToolSearchToolResultBlock",
+              "tool_use": "#/definitions/ResponseToolUseBlock",
+              "web_fetch_tool_result": "#/definitions/ResponseWebFetchToolResultBlock",
+              "web_search_tool_result": "#/definitions/ResponseWebSearchToolResultBlock"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/ResponseTextBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseThinkingBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseRedactedThinkingBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseToolUseBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseServerToolUseBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseWebSearchToolResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseWebFetchToolResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseCodeExecutionToolResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseBashCodeExecutionToolResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseTextEditorCodeExecutionToolResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseToolSearchToolResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseContainerUploadBlock"
+            }
+          ],
+          "title": "Content Block"
+        },
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "type": {
+          "const": "content_block_start",
+          "default": "content_block_start",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content_block",
+        "index",
+        "type"
+      ],
+      "title": "ContentBlockStartEvent",
+      "type": "object",
+      "x-stainless-naming": {
+        "go": {
+          "model_name": "ContentBlockStartEvent"
+        }
+      }
+    },
     "ContentBlockStopEvent": {
       "properties": {
         "index": {
@@ -1414,9 +2581,6 @@
         "type": {
           "const": "content_block_stop",
           "default": "content_block_stop",
-          "enum": [
-            "content_block_stop"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1433,19 +2597,103 @@
         }
       }
     },
+    "MessageDeltaEvent": {
+      "properties": {
+        "delta": {
+          "$ref": "#/definitions/MessageDelta"
+        },
+        "type": {
+          "const": "message_delta",
+          "default": "message_delta",
+          "title": "Type",
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/definitions/MessageDeltaUsage",
+          "description": "Billing and rate-limit usage.\n\nAnthropic's API bills and rate-limits by token counts, as tokens represent the underlying cost to our systems.\n\nUnder the hood, the API transforms requests into a format suitable for the model. The model's output then goes through a parsing stage before becoming an API response. As a result, the token counts in `usage` will not match one-to-one with the exact visible content of an API request or response.\n\nFor example, `output_tokens` will be non-zero, even for an empty string response from Claude.\n\nTotal input tokens in a request is the summation of `input_tokens`, `cache_creation_input_tokens`, and `cache_read_input_tokens`.",
+          "examples": [
+            {
+              "output_tokens": 503
+            }
+          ]
+        }
+      },
+      "required": [
+        "delta",
+        "type",
+        "usage"
+      ],
+      "title": "MessageDeltaEvent",
+      "type": "object",
+      "x-stainless-naming": {
+        "go": {
+          "model_name": "MessageDeltaEvent"
+        }
+      }
+    },
+    "MessageStartEvent": {
+      "properties": {
+        "message": {
+          "$ref": "#/definitions/Message"
+        },
+        "type": {
+          "const": "message_start",
+          "default": "message_start",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message",
+        "type"
+      ],
+      "title": "MessageStartEvent",
+      "type": "object",
+      "x-stainless-naming": {
+        "go": {
+          "model_name": "MessageStartEvent"
+        }
+      }
+    },
+    "MessageStopEvent": {
+      "properties": {
+        "type": {
+          "const": "message_stop",
+          "default": "message_stop",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "MessageStopEvent",
+      "type": "object",
+      "x-stainless-naming": {
+        "go": {
+          "model_name": "MessageStopEvent"
+        }
+      }
+    },
     "InputContentBlock": {
       "discriminator": {
         "mapping": {
-          "document": "#/components/schemas/RequestDocumentBlock",
-          "image": "#/components/schemas/RequestImageBlock",
-          "redacted_thinking": "#/components/schemas/RequestRedactedThinkingBlock",
-          "search_result": "#/components/schemas/RequestSearchResultBlock",
-          "server_tool_use": "#/components/schemas/RequestServerToolUseBlock",
-          "text": "#/components/schemas/RequestTextBlock",
-          "thinking": "#/components/schemas/RequestThinkingBlock",
-          "tool_result": "#/components/schemas/RequestToolResultBlock",
-          "tool_use": "#/components/schemas/RequestToolUseBlock",
-          "web_search_tool_result": "#/components/schemas/RequestWebSearchToolResultBlock"
+          "bash_code_execution_tool_result": "#/definitions/RequestBashCodeExecutionToolResultBlock",
+          "code_execution_tool_result": "#/definitions/RequestCodeExecutionToolResultBlock",
+          "container_upload": "#/definitions/RequestContainerUploadBlock",
+          "document": "#/definitions/RequestDocumentBlock",
+          "image": "#/definitions/RequestImageBlock",
+          "redacted_thinking": "#/definitions/RequestRedactedThinkingBlock",
+          "search_result": "#/definitions/RequestSearchResultBlock",
+          "server_tool_use": "#/definitions/RequestServerToolUseBlock",
+          "text": "#/definitions/RequestTextBlock",
+          "text_editor_code_execution_tool_result": "#/definitions/RequestTextEditorCodeExecutionToolResultBlock",
+          "thinking": "#/definitions/RequestThinkingBlock",
+          "tool_result": "#/definitions/RequestToolResultBlock",
+          "tool_search_tool_result": "#/definitions/RequestToolSearchToolResultBlock",
+          "tool_use": "#/definitions/RequestToolUseBlock",
+          "web_fetch_tool_result": "#/definitions/RequestWebFetchToolResultBlock",
+          "web_search_tool_result": "#/definitions/RequestWebSearchToolResultBlock"
         },
         "propertyName": "type"
       },
@@ -1487,6 +2735,24 @@
         },
         {
           "$ref": "#/definitions/RequestWebSearchToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/RequestWebFetchToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/RequestCodeExecutionToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/RequestBashCodeExecutionToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/RequestTextEditorCodeExecutionToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/RequestToolSearchToolResultBlock"
+        },
+        {
+          "$ref": "#/definitions/RequestContainerUploadBlock"
         }
       ],
       "x-stainless-go-variant-constructor": {
@@ -1499,37 +2765,38 @@
         "from .content_block import ContentBlock"
       ]
     },
-    "CacheControlEphemeral": {
+    "EffortLevel": {
+      "description": "All possible effort levels.",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "title": "EffortLevel",
+      "type": "string"
+    },
+    "JsonOutputFormat": {
       "additionalProperties": false,
       "properties": {
-        "ttl": {
-          "description": "The time-to-live for the cache control breakpoint.\n\nThis may be one the following values:\n- `5m`: 5 minutes\n- `1h`: 1 hour\n\nDefaults to `5m`.",
-          "enum": [
-            "5m",
-            "1h"
-          ],
-          "title": "Ttl",
-          "type": "string",
-          "x-stainless-renameMap": {
-            "ttl_1h": "1h",
-            "ttl_5m": "5m"
-          }
+        "schema": {
+          "additionalProperties": true,
+          "description": "The JSON schema of the format",
+          "title": "Schema",
+          "type": "object"
         },
         "type": {
-          "const": "ephemeral",
-          "enum": [
-            "ephemeral"
-          ],
+          "const": "json_schema",
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
+        "schema",
         "type"
       ],
-      "title": "CacheControlEphemeral",
-      "type": "object",
-      "x-stainless-go-constant-constructor": true
+      "title": "JsonOutputFormat",
+      "type": "object"
     },
     "RequestCharLocationCitation": {
       "additionalProperties": false,
@@ -1567,9 +2834,6 @@
         },
         "type": {
           "const": "char_location",
-          "enum": [
-            "char_location"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1583,60 +2847,6 @@
         "type"
       ],
       "title": "RequestCharLocationCitation",
-      "type": "object"
-    },
-    "RequestPageLocationCitation": {
-      "additionalProperties": false,
-      "properties": {
-        "cited_text": {
-          "title": "Cited Text",
-          "type": "string"
-        },
-        "document_index": {
-          "minimum": 0,
-          "title": "Document Index",
-          "type": "integer"
-        },
-        "document_title": {
-          "anyOf": [
-            {
-              "maxLength": 255,
-              "minLength": 1,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Document Title"
-        },
-        "end_page_number": {
-          "title": "End Page Number",
-          "type": "integer"
-        },
-        "start_page_number": {
-          "minimum": 1,
-          "title": "Start Page Number",
-          "type": "integer"
-        },
-        "type": {
-          "const": "page_location",
-          "enum": [
-            "page_location"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "cited_text",
-        "document_index",
-        "document_title",
-        "end_page_number",
-        "start_page_number",
-        "type"
-      ],
-      "title": "RequestPageLocationCitation",
       "type": "object"
     },
     "RequestContentBlockLocationCitation": {
@@ -1675,9 +2885,6 @@
         },
         "type": {
           "const": "content_block_location",
-          "enum": [
-            "content_block_location"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1693,21 +2900,22 @@
       "title": "RequestContentBlockLocationCitation",
       "type": "object"
     },
-    "RequestWebSearchResultLocationCitation": {
+    "RequestPageLocationCitation": {
       "additionalProperties": false,
       "properties": {
         "cited_text": {
           "title": "Cited Text",
           "type": "string"
         },
-        "encrypted_index": {
-          "title": "Encrypted Index",
-          "type": "string"
+        "document_index": {
+          "minimum": 0,
+          "title": "Document Index",
+          "type": "integer"
         },
-        "title": {
+        "document_title": {
           "anyOf": [
             {
-              "maxLength": 512,
+              "maxLength": 255,
               "minLength": 1,
               "type": "string"
             },
@@ -1715,31 +2923,32 @@
               "type": "null"
             }
           ],
-          "title": "Title"
+          "title": "Document Title"
+        },
+        "end_page_number": {
+          "title": "End Page Number",
+          "type": "integer"
+        },
+        "start_page_number": {
+          "minimum": 1,
+          "title": "Start Page Number",
+          "type": "integer"
         },
         "type": {
-          "const": "web_search_result_location",
-          "enum": [
-            "web_search_result_location"
-          ],
+          "const": "page_location",
           "title": "Type",
-          "type": "string"
-        },
-        "url": {
-          "maxLength": 2048,
-          "minLength": 1,
-          "title": "Url",
           "type": "string"
         }
       },
       "required": [
         "cited_text",
-        "encrypted_index",
-        "title",
-        "type",
-        "url"
+        "document_index",
+        "document_title",
+        "end_page_number",
+        "start_page_number",
+        "type"
       ],
-      "title": "RequestWebSearchResultLocationCitation",
+      "title": "RequestPageLocationCitation",
       "type": "object"
     },
     "RequestSearchResultLocationCitation": {
@@ -1780,9 +2989,6 @@
         },
         "type": {
           "const": "search_result_location",
-          "enum": [
-            "search_result_location"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1799,29 +3005,76 @@
       "title": "RequestSearchResultLocationCitation",
       "type": "object"
     },
-    "ThinkingConfigEnabled": {
+    "RequestWebSearchResultLocationCitation": {
       "additionalProperties": false,
       "properties": {
-        "budget_tokens": {
-          "description": "Determines how many tokens Claude can use for its internal reasoning process. Larger budgets can enable more thorough analysis for complex problems, improving response quality. \n\nMust be ≥1024 and less than `max_tokens`.\n\nSee [extended thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) for details.",
-          "minimum": 1024,
-          "title": "Budget Tokens",
-          "type": "integer"
+        "cited_text": {
+          "title": "Cited Text",
+          "type": "string"
+        },
+        "encrypted_index": {
+          "title": "Encrypted Index",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Title"
         },
         "type": {
-          "const": "enabled",
-          "enum": [
-            "enabled"
+          "const": "web_search_result_location",
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cited_text",
+        "encrypted_index",
+        "title",
+        "type",
+        "url"
+      ],
+      "title": "RequestWebSearchResultLocationCitation",
+      "type": "object"
+    },
+    "ThinkingConfigAdaptive": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ThinkingDisplayMode"
+            },
+            {
+              "type": "null"
+            }
           ],
+          "description": "Controls how thinking content appears in the response. When set to `summarized`, thinking is returned normally. When set to `omitted`, thinking content is redacted but a signature is returned for multi-turn continuity. Defaults to `summarized`."
+        },
+        "type": {
+          "const": "adaptive",
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
-        "budget_tokens",
         "type"
       ],
-      "title": "ThinkingConfigEnabled",
+      "title": "ThinkingConfigAdaptive",
       "type": "object"
     },
     "ThinkingConfigDisabled": {
@@ -1829,9 +3082,6 @@
       "properties": {
         "type": {
           "const": "disabled",
-          "enum": [
-            "disabled"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1843,28 +3093,37 @@
       "type": "object",
       "x-stainless-go-constant-constructor": true
     },
-    "ToolChoiceAuto": {
+    "ThinkingConfigEnabled": {
       "additionalProperties": false,
-      "description": "The model will automatically decide whether to use tools.",
       "properties": {
-        "disable_parallel_tool_use": {
-          "description": "Whether to disable parallel tool use.\n\nDefaults to `false`. If set to `true`, the model will output at most one tool use.",
-          "title": "Disable Parallel Tool Use",
-          "type": "boolean"
+        "budget_tokens": {
+          "description": "Determines how many tokens Claude can use for its internal reasoning process. Larger budgets can enable more thorough analysis for complex problems, improving response quality.\n\nMust be ≥1024 and less than `max_tokens`.\n\nSee [extended thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking) for details.",
+          "minimum": 1024,
+          "title": "Budget Tokens",
+          "type": "integer"
+        },
+        "display": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ThinkingDisplayMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Controls how thinking content appears in the response. When set to `summarized`, thinking is returned normally. When set to `omitted`, thinking content is redacted but a signature is returned for multi-turn continuity. Defaults to `summarized`."
         },
         "type": {
-          "const": "auto",
-          "enum": [
-            "auto"
-          ],
+          "const": "enabled",
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
+        "budget_tokens",
         "type"
       ],
-      "title": "ToolChoiceAuto",
+      "title": "ThinkingConfigEnabled",
       "type": "object"
     },
     "ToolChoiceAny": {
@@ -1878,9 +3137,6 @@
         },
         "type": {
           "const": "any",
-          "enum": [
-            "any"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1890,6 +3146,44 @@
       ],
       "title": "ToolChoiceAny",
       "type": "object"
+    },
+    "ToolChoiceAuto": {
+      "additionalProperties": false,
+      "description": "The model will automatically decide whether to use tools.",
+      "properties": {
+        "disable_parallel_tool_use": {
+          "description": "Whether to disable parallel tool use.\n\nDefaults to `false`. If set to `true`, the model will output at most one tool use.",
+          "title": "Disable Parallel Tool Use",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "auto",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ToolChoiceAuto",
+      "type": "object"
+    },
+    "ToolChoiceNone": {
+      "additionalProperties": false,
+      "description": "The model will not be allowed to use tools.",
+      "properties": {
+        "type": {
+          "const": "none",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ToolChoiceNone",
+      "type": "object",
+      "x-stainless-go-constant-constructor": true
     },
     "ToolChoiceTool": {
       "additionalProperties": false,
@@ -1907,9 +3201,6 @@
         },
         "type": {
           "const": "tool",
-          "enum": [
-            "tool"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1921,32 +3212,24 @@
       "title": "ToolChoiceTool",
       "type": "object"
     },
-    "ToolChoiceNone": {
-      "additionalProperties": false,
-      "description": "The model will not be allowed to use tools.",
-      "properties": {
-        "type": {
-          "const": "none",
-          "enum": [
-            "none"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type"
+    "AllowedCaller": {
+      "description": "Specifies who can invoke a tool.\n\nValues:\n    direct: The model can call this tool directly.\n    code_execution_20250825: The tool can be called from the code execution environment (v1).\n    code_execution_20260120: The tool can be called from the code execution environment (v2 with persistence).",
+      "enum": [
+        "direct",
+        "code_execution_20250825",
+        "code_execution_20260120"
       ],
-      "title": "ToolChoiceNone",
-      "type": "object",
-      "x-stainless-go-constant-constructor": true
+      "title": "AllowedCaller",
+      "type": "string"
     },
+    "JsonValue": {},
     "InputSchema": {
       "additionalProperties": true,
       "properties": {
         "properties": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -1971,9 +3254,6 @@
         },
         "type": {
           "const": "object",
-          "enum": [
-            "object"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -2065,9 +3345,6 @@
         },
         "type": {
           "const": "approximate",
-          "enum": [
-            "approximate"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -2078,6 +3355,194 @@
       "title": "UserLocation",
       "type": "object"
     },
+    "RequestCitationsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "RequestCitationsConfig",
+      "type": "object"
+    },
+    "ResponseBashCodeExecutionToolResultBlock": {
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ResponseBashCodeExecutionToolResultError"
+            },
+            {
+              "$ref": "#/definitions/ResponseBashCodeExecutionResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "bash_code_execution_tool_result",
+          "default": "bash_code_execution_tool_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "tool_use_id",
+        "type"
+      ],
+      "title": "ResponseBashCodeExecutionToolResultBlock",
+      "type": "object"
+    },
+    "ResponseCodeExecutionToolResultBlock": {
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ResponseCodeExecutionToolResultError"
+            },
+            {
+              "$ref": "#/definitions/ResponseCodeExecutionResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseEncryptedCodeExecutionResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "code_execution_tool_result",
+          "default": "code_execution_tool_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "tool_use_id",
+        "type"
+      ],
+      "title": "ResponseCodeExecutionToolResultBlock",
+      "type": "object"
+    },
+    "ResponseContainerUploadBlock": {
+      "description": "Response model for a file uploaded to the container.",
+      "properties": {
+        "file_id": {
+          "title": "File Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "container_upload",
+          "default": "container_upload",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id",
+        "type"
+      ],
+      "title": "ResponseContainerUploadBlock",
+      "type": "object"
+    },
+    "ResponseRedactedThinkingBlock": {
+      "properties": {
+        "data": {
+          "title": "Data",
+          "type": "string"
+        },
+        "type": {
+          "const": "redacted_thinking",
+          "default": "redacted_thinking",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "type"
+      ],
+      "title": "ResponseRedactedThinkingBlock",
+      "type": "object"
+    },
+    "ResponseServerToolUseBlock": {
+      "properties": {
+        "caller": {
+          "default": {
+            "type": "direct"
+          },
+          "discriminator": {
+            "mapping": {
+              "code_execution_20250825": "#/definitions/ServerToolCaller",
+              "code_execution_20260120": "#/definitions/ServerToolCaller_20260120",
+              "direct": "#/definitions/DirectCaller"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/DirectCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller_20260120"
+            }
+          ],
+          "title": "Caller"
+        },
+        "id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "input": {
+          "additionalProperties": true,
+          "title": "Input",
+          "type": "object"
+        },
+        "name": {
+          "enum": [
+            "web_search",
+            "web_fetch",
+            "code_execution",
+            "bash_code_execution",
+            "text_editor_code_execution",
+            "tool_search_tool_regex",
+            "tool_search_tool_bm25"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "const": "server_tool_use",
+          "default": "server_tool_use",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "caller",
+        "id",
+        "input",
+        "name",
+        "type"
+      ],
+      "title": "ResponseServerToolUseBlock",
+      "type": "object"
+    },
     "ResponseTextBlock": {
       "properties": {
         "citations": {
@@ -2086,11 +3551,11 @@
               "items": {
                 "discriminator": {
                   "mapping": {
-                    "char_location": "#/components/schemas/ResponseCharLocationCitation",
-                    "content_block_location": "#/components/schemas/ResponseContentBlockLocationCitation",
-                    "page_location": "#/components/schemas/ResponsePageLocationCitation",
-                    "search_result_location": "#/components/schemas/ResponseSearchResultLocationCitation",
-                    "web_search_result_location": "#/components/schemas/ResponseWebSearchResultLocationCitation"
+                    "char_location": "#/definitions/ResponseCharLocationCitation",
+                    "content_block_location": "#/definitions/ResponseContentBlockLocationCitation",
+                    "page_location": "#/definitions/ResponsePageLocationCitation",
+                    "search_result_location": "#/definitions/ResponseSearchResultLocationCitation",
+                    "web_search_result_location": "#/definitions/ResponseWebSearchResultLocationCitation"
                   },
                   "propertyName": "type"
                 },
@@ -2131,9 +3596,6 @@
         "type": {
           "const": "text",
           "default": "text",
-          "enum": [
-            "text"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -2144,6 +3606,45 @@
         "type"
       ],
       "title": "ResponseTextBlock",
+      "type": "object"
+    },
+    "ResponseTextEditorCodeExecutionToolResultBlock": {
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ResponseTextEditorCodeExecutionToolResultError"
+            },
+            {
+              "$ref": "#/definitions/ResponseTextEditorCodeExecutionViewResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseTextEditorCodeExecutionCreateResultBlock"
+            },
+            {
+              "$ref": "#/definitions/ResponseTextEditorCodeExecutionStrReplaceResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "text_editor_code_execution_tool_result",
+          "default": "text_editor_code_execution_tool_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "tool_use_id",
+        "type"
+      ],
+      "title": "ResponseTextEditorCodeExecutionToolResultBlock",
       "type": "object"
     },
     "ResponseThinkingBlock": {
@@ -2159,9 +3660,6 @@
         "type": {
           "const": "thinking",
           "default": "thinking",
-          "enum": [
-            "thinking"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -2174,37 +3672,73 @@
       "title": "ResponseThinkingBlock",
       "type": "object"
     },
-    "ResponseRedactedThinkingBlock": {
+    "ResponseToolSearchToolResultBlock": {
       "properties": {
-        "data": {
-          "title": "Data",
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ResponseToolSearchToolResultError"
+            },
+            {
+              "$ref": "#/definitions/ResponseToolSearchToolSearchResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
           "type": "string"
         },
         "type": {
-          "const": "redacted_thinking",
-          "default": "redacted_thinking",
-          "enum": [
-            "redacted_thinking"
-          ],
+          "const": "tool_search_tool_result",
+          "default": "tool_search_tool_result",
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
-        "data",
+        "content",
+        "tool_use_id",
         "type"
       ],
-      "title": "ResponseRedactedThinkingBlock",
+      "title": "ResponseToolSearchToolResultBlock",
       "type": "object"
     },
     "ResponseToolUseBlock": {
       "properties": {
+        "caller": {
+          "default": {
+            "type": "direct"
+          },
+          "discriminator": {
+            "mapping": {
+              "code_execution_20250825": "#/definitions/ServerToolCaller",
+              "code_execution_20260120": "#/definitions/ServerToolCaller_20260120",
+              "direct": "#/definitions/DirectCaller"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/DirectCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller_20260120"
+            }
+          ],
+          "title": "Caller"
+        },
         "id": {
           "pattern": "^[a-zA-Z0-9_-]+$",
           "title": "Id",
           "type": "string"
         },
         "input": {
+          "additionalProperties": true,
           "title": "Input",
           "type": "object"
         },
@@ -2216,14 +3750,12 @@
         "type": {
           "const": "tool_use",
           "default": "tool_use",
-          "enum": [
-            "tool_use"
-          ],
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
+        "caller",
         "id",
         "input",
         "name",
@@ -2232,46 +3764,92 @@
       "title": "ResponseToolUseBlock",
       "type": "object"
     },
-    "ResponseServerToolUseBlock": {
+    "ResponseWebFetchToolResultBlock": {
       "properties": {
-        "id": {
-          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
-          "title": "Id",
-          "type": "string"
-        },
-        "input": {
-          "title": "Input",
-          "type": "object"
-        },
-        "name": {
-          "const": "web_search",
-          "enum": [
-            "web_search"
+        "caller": {
+          "default": {
+            "type": "direct"
+          },
+          "discriminator": {
+            "mapping": {
+              "code_execution_20250825": "#/definitions/ServerToolCaller",
+              "code_execution_20260120": "#/definitions/ServerToolCaller_20260120",
+              "direct": "#/definitions/DirectCaller"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/DirectCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller_20260120"
+            }
           ],
-          "title": "Name",
+          "title": "Caller"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ResponseWebFetchToolResultError"
+            },
+            {
+              "$ref": "#/definitions/ResponseWebFetchResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
           "type": "string"
         },
         "type": {
-          "const": "server_tool_use",
-          "default": "server_tool_use",
-          "enum": [
-            "server_tool_use"
-          ],
+          "const": "web_fetch_tool_result",
+          "default": "web_fetch_tool_result",
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
-        "id",
-        "input",
-        "name",
+        "caller",
+        "content",
+        "tool_use_id",
         "type"
       ],
-      "title": "ResponseServerToolUseBlock",
+      "title": "ResponseWebFetchToolResultBlock",
       "type": "object"
     },
     "ResponseWebSearchToolResultBlock": {
       "properties": {
+        "caller": {
+          "default": {
+            "type": "direct"
+          },
+          "discriminator": {
+            "mapping": {
+              "code_execution_20250825": "#/definitions/ServerToolCaller",
+              "code_execution_20260120": "#/definitions/ServerToolCaller_20260120",
+              "direct": "#/definitions/DirectCaller"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/DirectCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller_20260120"
+            }
+          ],
+          "title": "Caller"
+        },
         "content": {
           "anyOf": [
             {
@@ -2294,14 +3872,12 @@
         "type": {
           "const": "web_search_tool_result",
           "default": "web_search_tool_result",
-          "enum": [
-            "web_search_tool_result"
-          ],
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
+        "caller",
         "content",
         "tool_use_id",
         "type"
@@ -2335,6 +3911,16 @@
     },
     "ServerToolUsage": {
       "properties": {
+        "web_fetch_requests": {
+          "default": 0,
+          "description": "The number of web fetch tool requests.",
+          "examples": [
+            2
+          ],
+          "minimum": 0,
+          "title": "Web Fetch Requests",
+          "type": "integer"
+        },
         "web_search_requests": {
           "default": 0,
           "description": "The number of web search tool requests.",
@@ -2347,13 +3933,152 @@
         }
       },
       "required": [
+        "web_fetch_requests",
         "web_search_requests"
       ],
       "title": "ServerToolUsage",
       "type": "object"
     },
+    "CitationsDelta": {
+      "properties": {
+        "citation": {
+          "discriminator": {
+            "mapping": {
+              "char_location": "#/definitions/ResponseCharLocationCitation",
+              "content_block_location": "#/definitions/ResponseContentBlockLocationCitation",
+              "page_location": "#/definitions/ResponsePageLocationCitation",
+              "search_result_location": "#/definitions/ResponseSearchResultLocationCitation",
+              "web_search_result_location": "#/definitions/ResponseWebSearchResultLocationCitation"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/ResponseCharLocationCitation"
+            },
+            {
+              "$ref": "#/definitions/ResponsePageLocationCitation"
+            },
+            {
+              "$ref": "#/definitions/ResponseContentBlockLocationCitation"
+            },
+            {
+              "$ref": "#/definitions/ResponseWebSearchResultLocationCitation"
+            },
+            {
+              "$ref": "#/definitions/ResponseSearchResultLocationCitation"
+            }
+          ],
+          "title": "Citation"
+        },
+        "type": {
+          "const": "citations_delta",
+          "default": "citations_delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "citation",
+        "type"
+      ],
+      "title": "CitationsDelta",
+      "type": "object"
+    },
+    "InputJsonContentBlockDelta": {
+      "properties": {
+        "partial_json": {
+          "title": "Partial Json",
+          "type": "string"
+        },
+        "type": {
+          "const": "input_json_delta",
+          "default": "input_json_delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "partial_json",
+        "type"
+      ],
+      "title": "InputJsonContentBlockDelta",
+      "type": "object"
+    },
+    "SignatureContentBlockDelta": {
+      "properties": {
+        "signature": {
+          "title": "Signature",
+          "type": "string"
+        },
+        "type": {
+          "const": "signature_delta",
+          "default": "signature_delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "signature",
+        "type"
+      ],
+      "title": "SignatureContentBlockDelta",
+      "type": "object"
+    },
+    "TextContentBlockDelta": {
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "type": {
+          "const": "text_delta",
+          "default": "text_delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "type"
+      ],
+      "title": "TextContentBlockDelta",
+      "type": "object"
+    },
+    "ThinkingContentBlockDelta": {
+      "properties": {
+        "thinking": {
+          "title": "Thinking",
+          "type": "string"
+        },
+        "type": {
+          "const": "thinking_delta",
+          "default": "thinking_delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thinking",
+        "type"
+      ],
+      "title": "ThinkingContentBlockDelta",
+      "type": "object"
+    },
     "MessageDelta": {
       "properties": {
+        "container": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Container"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Information about the container used in this request.\n\nThis will be non-null if a container tool (e.g. code execution) was used."
+        },
         "stop_reason": {
           "anyOf": [
             {
@@ -2380,6 +4105,7 @@
         }
       },
       "required": [
+        "container",
         "stop_reason",
         "stop_sequence"
       ],
@@ -2470,148 +4196,7 @@
       "title": "MessageDeltaUsage",
       "type": "object"
     },
-    "TextContentBlockDelta": {
-      "properties": {
-        "text": {
-          "title": "Text",
-          "type": "string"
-        },
-        "type": {
-          "const": "text_delta",
-          "default": "text_delta",
-          "enum": [
-            "text_delta"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "text",
-        "type"
-      ],
-      "title": "TextContentBlockDelta",
-      "type": "object"
-    },
-    "InputJsonContentBlockDelta": {
-      "properties": {
-        "partial_json": {
-          "title": "Partial Json",
-          "type": "string"
-        },
-        "type": {
-          "const": "input_json_delta",
-          "default": "input_json_delta",
-          "enum": [
-            "input_json_delta"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "partial_json",
-        "type"
-      ],
-      "title": "InputJsonContentBlockDelta",
-      "type": "object"
-    },
-    "CitationsDelta": {
-      "properties": {
-        "citation": {
-          "discriminator": {
-            "mapping": {
-              "char_location": "#/components/schemas/ResponseCharLocationCitation",
-              "content_block_location": "#/components/schemas/ResponseContentBlockLocationCitation",
-              "page_location": "#/components/schemas/ResponsePageLocationCitation",
-              "search_result_location": "#/components/schemas/ResponseSearchResultLocationCitation",
-              "web_search_result_location": "#/components/schemas/ResponseWebSearchResultLocationCitation"
-            },
-            "propertyName": "type"
-          },
-          "oneOf": [
-            {
-              "$ref": "#/definitions/ResponseCharLocationCitation"
-            },
-            {
-              "$ref": "#/definitions/ResponsePageLocationCitation"
-            },
-            {
-              "$ref": "#/definitions/ResponseContentBlockLocationCitation"
-            },
-            {
-              "$ref": "#/definitions/ResponseWebSearchResultLocationCitation"
-            },
-            {
-              "$ref": "#/definitions/ResponseSearchResultLocationCitation"
-            }
-          ],
-          "title": "Citation"
-        },
-        "type": {
-          "const": "citations_delta",
-          "default": "citations_delta",
-          "enum": [
-            "citations_delta"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "citation",
-        "type"
-      ],
-      "title": "CitationsDelta",
-      "type": "object"
-    },
-    "ThinkingContentBlockDelta": {
-      "properties": {
-        "thinking": {
-          "title": "Thinking",
-          "type": "string"
-        },
-        "type": {
-          "const": "thinking_delta",
-          "default": "thinking_delta",
-          "enum": [
-            "thinking_delta"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "thinking",
-        "type"
-      ],
-      "title": "ThinkingContentBlockDelta",
-      "type": "object"
-    },
-    "SignatureContentBlockDelta": {
-      "properties": {
-        "signature": {
-          "title": "Signature",
-          "type": "string"
-        },
-        "type": {
-          "const": "signature_delta",
-          "default": "signature_delta",
-          "enum": [
-            "signature_delta"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "signature",
-        "type"
-      ],
-      "title": "SignatureContentBlockDelta",
-      "type": "object"
-    },
-    "RequestImageBlock": {
+    "RequestBashCodeExecutionToolResultBlock": {
       "additionalProperties": false,
       "properties": {
         "cache_control": {
@@ -2619,7 +4204,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -2636,38 +4221,135 @@
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
         },
-        "source": {
-          "discriminator": {
-            "mapping": {
-              "base64": "#/components/schemas/Base64ImageSource",
-              "url": "#/components/schemas/URLImageSource"
-            },
-            "propertyName": "type"
-          },
-          "oneOf": [
+        "content": {
+          "anyOf": [
             {
-              "$ref": "#/definitions/Base64ImageSource"
+              "$ref": "#/definitions/RequestBashCodeExecutionToolResultError"
             },
             {
-              "$ref": "#/definitions/URLImageSource"
+              "$ref": "#/definitions/RequestBashCodeExecutionResultBlock"
             }
           ],
-          "title": "Source"
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
+          "type": "string"
         },
         "type": {
-          "const": "image",
-          "enum": [
-            "image"
-          ],
+          "const": "bash_code_execution_tool_result",
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
-        "source",
+        "content",
+        "tool_use_id",
         "type"
       ],
-      "title": "RequestImageBlock",
+      "title": "RequestBashCodeExecutionToolResultBlock",
+      "type": "object"
+    },
+    "RequestCodeExecutionToolResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestCodeExecutionToolResultError"
+            },
+            {
+              "$ref": "#/definitions/RequestCodeExecutionResultBlock"
+            },
+            {
+              "$ref": "#/definitions/RequestEncryptedCodeExecutionResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "code_execution_tool_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "tool_use_id",
+        "type"
+      ],
+      "title": "RequestCodeExecutionToolResultBlock",
+      "type": "object"
+    },
+    "RequestContainerUploadBlock": {
+      "additionalProperties": false,
+      "description": "A content block that represents a file to be uploaded to the container\nFiles uploaded via this block will be available in the container's input directory.",
+      "properties": {
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "file_id": {
+          "title": "File Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "container_upload",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id",
+        "type"
+      ],
+      "title": "RequestContainerUploadBlock",
       "type": "object"
     },
     "RequestDocumentBlock": {
@@ -2678,7 +4360,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -2720,10 +4402,10 @@
         "source": {
           "discriminator": {
             "mapping": {
-              "base64": "#/components/schemas/Base64PDFSource",
-              "content": "#/components/schemas/ContentBlockSource",
-              "text": "#/components/schemas/PlainTextSource",
-              "url": "#/components/schemas/URLPDFSource"
+              "base64": "#/definitions/Base64PDFSource",
+              "content": "#/definitions/ContentBlockSource",
+              "text": "#/definitions/PlainTextSource",
+              "url": "#/definitions/URLPDFSource"
             },
             "propertyName": "type"
           },
@@ -2758,9 +4440,6 @@
         },
         "type": {
           "const": "document",
-          "enum": [
-            "document"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -2772,6 +4451,82 @@
       "title": "RequestDocumentBlock",
       "type": "object"
     },
+    "RequestImageBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "source": {
+          "discriminator": {
+            "mapping": {
+              "base64": "#/definitions/Base64ImageSource",
+              "url": "#/definitions/URLImageSource"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Base64ImageSource"
+            },
+            {
+              "$ref": "#/definitions/URLImageSource"
+            }
+          ],
+          "title": "Source"
+        },
+        "type": {
+          "const": "image",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "type"
+      ],
+      "title": "RequestImageBlock",
+      "type": "object"
+    },
+    "RequestRedactedThinkingBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "title": "Data",
+          "type": "string"
+        },
+        "type": {
+          "const": "redacted_thinking",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "type"
+      ],
+      "title": "RequestRedactedThinkingBlock",
+      "type": "object"
+    },
     "RequestSearchResultBlock": {
       "additionalProperties": false,
       "properties": {
@@ -2780,7 +4535,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -2817,9 +4572,6 @@
         },
         "type": {
           "const": "search_result",
-          "enum": [
-            "search_result"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -2833,58 +4585,7 @@
       "title": "RequestSearchResultBlock",
       "type": "object"
     },
-    "RequestThinkingBlock": {
-      "additionalProperties": false,
-      "properties": {
-        "signature": {
-          "title": "Signature",
-          "type": "string"
-        },
-        "thinking": {
-          "title": "Thinking",
-          "type": "string"
-        },
-        "type": {
-          "const": "thinking",
-          "enum": [
-            "thinking"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "signature",
-        "thinking",
-        "type"
-      ],
-      "title": "RequestThinkingBlock",
-      "type": "object"
-    },
-    "RequestRedactedThinkingBlock": {
-      "additionalProperties": false,
-      "properties": {
-        "data": {
-          "title": "Data",
-          "type": "string"
-        },
-        "type": {
-          "const": "redacted_thinking",
-          "enum": [
-            "redacted_thinking"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "data",
-        "type"
-      ],
-      "title": "RequestRedactedThinkingBlock",
-      "type": "object"
-    },
-    "RequestToolUseBlock": {
+    "RequestServerToolUseBlock": {
       "additionalProperties": false,
       "properties": {
         "cache_control": {
@@ -2892,7 +4593,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -2909,26 +4610,53 @@
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
         },
+        "caller": {
+          "discriminator": {
+            "mapping": {
+              "code_execution_20250825": "#/definitions/ServerToolCaller",
+              "code_execution_20260120": "#/definitions/ServerToolCaller_20260120",
+              "direct": "#/definitions/DirectCaller"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/DirectCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller_20260120"
+            }
+          ],
+          "title": "Caller"
+        },
         "id": {
-          "pattern": "^[a-zA-Z0-9_-]+$",
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
           "title": "Id",
           "type": "string"
         },
         "input": {
+          "additionalProperties": true,
           "title": "Input",
           "type": "object"
         },
         "name": {
-          "maxLength": 200,
-          "minLength": 1,
+          "enum": [
+            "web_search",
+            "web_fetch",
+            "code_execution",
+            "bash_code_execution",
+            "text_editor_code_execution",
+            "tool_search_tool_regex",
+            "tool_search_tool_bm25"
+          ],
           "title": "Name",
           "type": "string"
         },
         "type": {
-          "const": "tool_use",
-          "enum": [
-            "tool_use"
-          ],
+          "const": "server_tool_use",
           "title": "Type",
           "type": "string"
         }
@@ -2939,7 +4667,93 @@
         "name",
         "type"
       ],
-      "title": "RequestToolUseBlock",
+      "title": "RequestServerToolUseBlock",
+      "type": "object"
+    },
+    "RequestTextEditorCodeExecutionToolResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestTextEditorCodeExecutionToolResultError"
+            },
+            {
+              "$ref": "#/definitions/RequestTextEditorCodeExecutionViewResultBlock"
+            },
+            {
+              "$ref": "#/definitions/RequestTextEditorCodeExecutionCreateResultBlock"
+            },
+            {
+              "$ref": "#/definitions/RequestTextEditorCodeExecutionStrReplaceResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "text_editor_code_execution_tool_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "tool_use_id",
+        "type"
+      ],
+      "title": "RequestTextEditorCodeExecutionToolResultBlock",
+      "type": "object"
+    },
+    "RequestThinkingBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "signature": {
+          "title": "Signature",
+          "type": "string"
+        },
+        "thinking": {
+          "title": "Thinking",
+          "type": "string"
+        },
+        "type": {
+          "const": "thinking",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "signature",
+        "thinking",
+        "type"
+      ],
+      "title": "RequestThinkingBlock",
       "type": "object"
     },
     "RequestToolResultBlock": {
@@ -2950,7 +4764,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -2980,10 +4794,11 @@
               "items": {
                 "discriminator": {
                   "mapping": {
-                    "document": "#/components/schemas/RequestDocumentBlock",
-                    "image": "#/components/schemas/RequestImageBlock",
-                    "search_result": "#/components/schemas/RequestSearchResultBlock",
-                    "text": "#/components/schemas/RequestTextBlock"
+                    "document": "#/definitions/RequestDocumentBlock",
+                    "image": "#/definitions/RequestImageBlock",
+                    "search_result": "#/definitions/RequestSearchResultBlock",
+                    "text": "#/definitions/RequestTextBlock",
+                    "tool_reference": "#/definitions/RequestToolReferenceBlock"
                   },
                   "propertyName": "type"
                 },
@@ -2999,12 +4814,18 @@
                   },
                   {
                     "$ref": "#/definitions/RequestDocumentBlock"
+                  },
+                  {
+                    "$ref": "#/definitions/RequestToolReferenceBlock"
                   }
                 ],
                 "title": "Block"
               },
               "type": "array",
               "x-stainless-naming": {
+                "php": {
+                  "type_name": "Content"
+                },
                 "python": {
                   "type_name": "Content"
                 },
@@ -3027,9 +4848,6 @@
         },
         "type": {
           "const": "tool_result",
-          "enum": [
-            "tool_result"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3041,7 +4859,7 @@
       "title": "RequestToolResultBlock",
       "type": "object"
     },
-    "RequestServerToolUseBlock": {
+    "RequestToolSearchToolResultBlock": {
       "additionalProperties": false,
       "properties": {
         "cache_control": {
@@ -3049,7 +4867,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -3066,28 +4884,101 @@
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
         },
-        "id": {
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestToolSearchToolResultError"
+            },
+            {
+              "$ref": "#/definitions/RequestToolSearchToolSearchResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
           "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool_search_tool_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "tool_use_id",
+        "type"
+      ],
+      "title": "RequestToolSearchToolResultBlock",
+      "type": "object"
+    },
+    "RequestToolUseBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "caller": {
+          "discriminator": {
+            "mapping": {
+              "code_execution_20250825": "#/definitions/ServerToolCaller",
+              "code_execution_20260120": "#/definitions/ServerToolCaller_20260120",
+              "direct": "#/definitions/DirectCaller"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/DirectCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller_20260120"
+            }
+          ],
+          "title": "Caller"
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_-]+$",
           "title": "Id",
           "type": "string"
         },
         "input": {
+          "additionalProperties": true,
           "title": "Input",
           "type": "object"
         },
         "name": {
-          "const": "web_search",
-          "enum": [
-            "web_search"
-          ],
+          "maxLength": 200,
+          "minLength": 1,
           "title": "Name",
           "type": "string"
         },
         "type": {
-          "const": "server_tool_use",
-          "enum": [
-            "server_tool_use"
-          ],
+          "const": "tool_use",
           "title": "Type",
           "type": "string"
         }
@@ -3098,10 +4989,10 @@
         "name",
         "type"
       ],
-      "title": "RequestServerToolUseBlock",
+      "title": "RequestToolUseBlock",
       "type": "object"
     },
-    "RequestWebSearchToolResultBlock": {
+    "RequestWebFetchToolResultBlock": {
       "additionalProperties": false,
       "properties": {
         "cache_control": {
@@ -3109,7 +5000,7 @@
             {
               "discriminator": {
                 "mapping": {
-                  "ephemeral": "#/components/schemas/CacheControlEphemeral"
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
                 },
                 "propertyName": "type"
               },
@@ -3125,6 +5016,105 @@
           ],
           "description": "Create a cache control breakpoint at this content block.",
           "title": "Cache Control"
+        },
+        "caller": {
+          "discriminator": {
+            "mapping": {
+              "code_execution_20250825": "#/definitions/ServerToolCaller",
+              "code_execution_20260120": "#/definitions/ServerToolCaller_20260120",
+              "direct": "#/definitions/DirectCaller"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/DirectCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller_20260120"
+            }
+          ],
+          "title": "Caller"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RequestWebFetchToolResultError"
+            },
+            {
+              "$ref": "#/definitions/RequestWebFetchResultBlock"
+            }
+          ],
+          "title": "Content"
+        },
+        "tool_use_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Use Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "web_fetch_tool_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "tool_use_id",
+        "type"
+      ],
+      "title": "RequestWebFetchToolResultBlock",
+      "type": "object"
+    },
+    "RequestWebSearchToolResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "caller": {
+          "discriminator": {
+            "mapping": {
+              "code_execution_20250825": "#/definitions/ServerToolCaller",
+              "code_execution_20260120": "#/definitions/ServerToolCaller_20260120",
+              "direct": "#/definitions/DirectCaller"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/DirectCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller"
+            },
+            {
+              "$ref": "#/definitions/ServerToolCaller_20260120"
+            }
+          ],
+          "title": "Caller"
         },
         "content": {
           "anyOf": [
@@ -3153,9 +5143,6 @@
         },
         "type": {
           "const": "web_search_tool_result",
-          "enum": [
-            "web_search_tool_result"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3166,6 +5153,226 @@
         "type"
       ],
       "title": "RequestWebSearchToolResultBlock",
+      "type": "object"
+    },
+    "ThinkingDisplayMode": {
+      "enum": [
+        "summarized",
+        "omitted"
+      ],
+      "title": "ThinkingDisplayMode",
+      "type": "string"
+    },
+    "ResponseBashCodeExecutionToolResultError": {
+      "properties": {
+        "error_code": {
+          "$ref": "#/definitions/BashCodeExecutionToolResultErrorCode"
+        },
+        "type": {
+          "const": "bash_code_execution_tool_result_error",
+          "default": "bash_code_execution_tool_result_error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_code",
+        "type"
+      ],
+      "title": "ResponseBashCodeExecutionToolResultError",
+      "type": "object"
+    },
+    "ResponseBashCodeExecutionResultBlock": {
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/definitions/ResponseBashCodeExecutionOutputBlock"
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "return_code": {
+          "title": "Return Code",
+          "type": "integer"
+        },
+        "stderr": {
+          "title": "Stderr",
+          "type": "string"
+        },
+        "stdout": {
+          "title": "Stdout",
+          "type": "string"
+        },
+        "type": {
+          "const": "bash_code_execution_result",
+          "default": "bash_code_execution_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "return_code",
+        "stderr",
+        "stdout",
+        "type"
+      ],
+      "title": "ResponseBashCodeExecutionResultBlock",
+      "type": "object"
+    },
+    "ResponseCodeExecutionToolResultError": {
+      "properties": {
+        "error_code": {
+          "$ref": "#/definitions/CodeExecutionToolResultErrorCode"
+        },
+        "type": {
+          "const": "code_execution_tool_result_error",
+          "default": "code_execution_tool_result_error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_code",
+        "type"
+      ],
+      "title": "ResponseCodeExecutionToolResultError",
+      "type": "object"
+    },
+    "ResponseCodeExecutionResultBlock": {
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/definitions/ResponseCodeExecutionOutputBlock"
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "return_code": {
+          "title": "Return Code",
+          "type": "integer"
+        },
+        "stderr": {
+          "title": "Stderr",
+          "type": "string"
+        },
+        "stdout": {
+          "title": "Stdout",
+          "type": "string"
+        },
+        "type": {
+          "const": "code_execution_result",
+          "default": "code_execution_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "return_code",
+        "stderr",
+        "stdout",
+        "type"
+      ],
+      "title": "ResponseCodeExecutionResultBlock",
+      "type": "object"
+    },
+    "ResponseEncryptedCodeExecutionResultBlock": {
+      "description": "Code execution result with encrypted stdout for PFC + web_search results.",
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/definitions/ResponseCodeExecutionOutputBlock"
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "encrypted_stdout": {
+          "title": "Encrypted Stdout",
+          "type": "string"
+        },
+        "return_code": {
+          "title": "Return Code",
+          "type": "integer"
+        },
+        "stderr": {
+          "title": "Stderr",
+          "type": "string"
+        },
+        "type": {
+          "const": "encrypted_code_execution_result",
+          "default": "encrypted_code_execution_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "encrypted_stdout",
+        "return_code",
+        "stderr",
+        "type"
+      ],
+      "title": "ResponseEncryptedCodeExecutionResultBlock",
+      "type": "object"
+    },
+    "ServerToolCaller": {
+      "additionalProperties": false,
+      "description": "Tool invocation generated by a server-side tool.",
+      "properties": {
+        "tool_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "code_execution_20250825",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_id",
+        "type"
+      ],
+      "title": "ServerToolCaller",
+      "type": "object"
+    },
+    "ServerToolCaller_20260120": {
+      "additionalProperties": false,
+      "properties": {
+        "tool_id": {
+          "pattern": "^srvtoolu_[a-zA-Z0-9_]+$",
+          "title": "Tool Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "code_execution_20260120",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_id",
+        "type"
+      ],
+      "title": "ServerToolCaller_20260120",
+      "type": "object"
+    },
+    "DirectCaller": {
+      "additionalProperties": false,
+      "description": "Tool invocation directly from the model.",
+      "properties": {
+        "type": {
+          "const": "direct",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "DirectCaller",
       "type": "object"
     },
     "ResponseCharLocationCitation": {
@@ -3214,9 +5421,6 @@
         "type": {
           "const": "char_location",
           "default": "char_location",
-          "enum": [
-            "char_location"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3231,71 +5435,6 @@
         "type"
       ],
       "title": "ResponseCharLocationCitation",
-      "type": "object"
-    },
-    "ResponsePageLocationCitation": {
-      "properties": {
-        "cited_text": {
-          "title": "Cited Text",
-          "type": "string"
-        },
-        "document_index": {
-          "minimum": 0,
-          "title": "Document Index",
-          "type": "integer"
-        },
-        "document_title": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Document Title"
-        },
-        "end_page_number": {
-          "title": "End Page Number",
-          "type": "integer"
-        },
-        "file_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "File Id"
-        },
-        "start_page_number": {
-          "minimum": 1,
-          "title": "Start Page Number",
-          "type": "integer"
-        },
-        "type": {
-          "const": "page_location",
-          "default": "page_location",
-          "enum": [
-            "page_location"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "cited_text",
-        "document_index",
-        "document_title",
-        "end_page_number",
-        "file_id",
-        "start_page_number",
-        "type"
-      ],
-      "title": "ResponsePageLocationCitation",
       "type": "object"
     },
     "ResponseContentBlockLocationCitation": {
@@ -3344,9 +5483,6 @@
         "type": {
           "const": "content_block_location",
           "default": "content_block_location",
-          "enum": [
-            "content_block_location"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3363,50 +5499,66 @@
       "title": "ResponseContentBlockLocationCitation",
       "type": "object"
     },
-    "ResponseWebSearchResultLocationCitation": {
+    "ResponsePageLocationCitation": {
       "properties": {
         "cited_text": {
           "title": "Cited Text",
           "type": "string"
         },
-        "encrypted_index": {
-          "title": "Encrypted Index",
-          "type": "string"
+        "document_index": {
+          "minimum": 0,
+          "title": "Document Index",
+          "type": "integer"
         },
-        "title": {
+        "document_title": {
           "anyOf": [
             {
-              "maxLength": 512,
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "title": "Title"
+          "title": "Document Title"
+        },
+        "end_page_number": {
+          "title": "End Page Number",
+          "type": "integer"
+        },
+        "file_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File Id"
+        },
+        "start_page_number": {
+          "minimum": 1,
+          "title": "Start Page Number",
+          "type": "integer"
         },
         "type": {
-          "const": "web_search_result_location",
-          "default": "web_search_result_location",
-          "enum": [
-            "web_search_result_location"
-          ],
+          "const": "page_location",
+          "default": "page_location",
           "title": "Type",
-          "type": "string"
-        },
-        "url": {
-          "title": "Url",
           "type": "string"
         }
       },
       "required": [
         "cited_text",
-        "encrypted_index",
-        "title",
-        "type",
-        "url"
+        "document_index",
+        "document_title",
+        "end_page_number",
+        "file_id",
+        "start_page_number",
+        "type"
       ],
-      "title": "ResponseWebSearchResultLocationCitation",
+      "title": "ResponsePageLocationCitation",
       "type": "object"
     },
     "ResponseSearchResultLocationCitation": {
@@ -3447,9 +5599,6 @@
         "type": {
           "const": "search_result_location",
           "default": "search_result_location",
-          "enum": [
-            "search_result_location"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3466,6 +5615,366 @@
       "title": "ResponseSearchResultLocationCitation",
       "type": "object"
     },
+    "ResponseWebSearchResultLocationCitation": {
+      "properties": {
+        "cited_text": {
+          "title": "Cited Text",
+          "type": "string"
+        },
+        "encrypted_index": {
+          "title": "Encrypted Index",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Title"
+        },
+        "type": {
+          "const": "web_search_result_location",
+          "default": "web_search_result_location",
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cited_text",
+        "encrypted_index",
+        "title",
+        "type",
+        "url"
+      ],
+      "title": "ResponseWebSearchResultLocationCitation",
+      "type": "object"
+    },
+    "ResponseTextEditorCodeExecutionToolResultError": {
+      "properties": {
+        "error_code": {
+          "$ref": "#/definitions/TextEditorCodeExecutionToolResultErrorCode"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        },
+        "type": {
+          "const": "text_editor_code_execution_tool_result_error",
+          "default": "text_editor_code_execution_tool_result_error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_code",
+        "error_message",
+        "type"
+      ],
+      "title": "ResponseTextEditorCodeExecutionToolResultError",
+      "type": "object"
+    },
+    "ResponseTextEditorCodeExecutionViewResultBlock": {
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "file_type": {
+          "enum": [
+            "text",
+            "image",
+            "pdf"
+          ],
+          "title": "File Type",
+          "type": "string"
+        },
+        "num_lines": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Num Lines"
+        },
+        "start_line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Line"
+        },
+        "total_lines": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Lines"
+        },
+        "type": {
+          "const": "text_editor_code_execution_view_result",
+          "default": "text_editor_code_execution_view_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "file_type",
+        "num_lines",
+        "start_line",
+        "total_lines",
+        "type"
+      ],
+      "title": "ResponseTextEditorCodeExecutionViewResultBlock",
+      "type": "object"
+    },
+    "ResponseTextEditorCodeExecutionCreateResultBlock": {
+      "properties": {
+        "is_file_update": {
+          "title": "Is File Update",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "text_editor_code_execution_create_result",
+          "default": "text_editor_code_execution_create_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "is_file_update",
+        "type"
+      ],
+      "title": "ResponseTextEditorCodeExecutionCreateResultBlock",
+      "type": "object"
+    },
+    "ResponseTextEditorCodeExecutionStrReplaceResultBlock": {
+      "properties": {
+        "lines": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lines"
+        },
+        "new_lines": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "New Lines"
+        },
+        "new_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "New Start"
+        },
+        "old_lines": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Old Lines"
+        },
+        "old_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Old Start"
+        },
+        "type": {
+          "const": "text_editor_code_execution_str_replace_result",
+          "default": "text_editor_code_execution_str_replace_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "lines",
+        "new_lines",
+        "new_start",
+        "old_lines",
+        "old_start",
+        "type"
+      ],
+      "title": "ResponseTextEditorCodeExecutionStrReplaceResultBlock",
+      "type": "object"
+    },
+    "ResponseToolSearchToolResultError": {
+      "properties": {
+        "error_code": {
+          "$ref": "#/definitions/ToolSearchToolResultErrorCode"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        },
+        "type": {
+          "const": "tool_search_tool_result_error",
+          "default": "tool_search_tool_result_error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_code",
+        "error_message",
+        "type"
+      ],
+      "title": "ResponseToolSearchToolResultError",
+      "type": "object"
+    },
+    "ResponseToolSearchToolSearchResultBlock": {
+      "properties": {
+        "tool_references": {
+          "items": {
+            "$ref": "#/definitions/ResponseToolReferenceBlock"
+          },
+          "title": "Tool References",
+          "type": "array"
+        },
+        "type": {
+          "const": "tool_search_tool_search_result",
+          "default": "tool_search_tool_search_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_references",
+        "type"
+      ],
+      "title": "ResponseToolSearchToolSearchResultBlock",
+      "type": "object"
+    },
+    "ResponseWebFetchToolResultError": {
+      "properties": {
+        "error_code": {
+          "$ref": "#/definitions/WebFetchToolResultErrorCode"
+        },
+        "type": {
+          "const": "web_fetch_tool_result_error",
+          "default": "web_fetch_tool_result_error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_code",
+        "type"
+      ],
+      "title": "ResponseWebFetchToolResultError",
+      "type": "object"
+    },
+    "ResponseWebFetchResultBlock": {
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/ResponseDocumentBlock"
+        },
+        "retrieved_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 8601 timestamp when the content was retrieved",
+          "title": "Retrieved At"
+        },
+        "type": {
+          "const": "web_fetch_result",
+          "default": "web_fetch_result",
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "description": "Fetched content URL",
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "retrieved_at",
+        "type",
+        "url"
+      ],
+      "title": "ResponseWebFetchResultBlock",
+      "type": "object"
+    },
     "ResponseWebSearchToolResultError": {
       "properties": {
         "error_code": {
@@ -3474,9 +5983,6 @@
         "type": {
           "const": "web_search_tool_result_error",
           "default": "web_search_tool_result_error",
-          "enum": [
-            "web_search_tool_result_error"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3513,9 +6019,6 @@
         "type": {
           "const": "web_search_result",
           "default": "web_search_result",
-          "enum": [
-            "web_search_result"
-          ],
           "title": "Type",
           "type": "string"
         },
@@ -3534,73 +6037,157 @@
       "title": "ResponseWebSearchResultBlock",
       "type": "object"
     },
-    "Base64ImageSource": {
+    "RequestBashCodeExecutionToolResultError": {
       "additionalProperties": false,
       "properties": {
-        "data": {
-          "format": "byte",
-          "title": "Data",
-          "type": "string"
-        },
-        "media_type": {
-          "enum": [
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "image/webp"
-          ],
-          "title": "Media Type",
-          "type": "string"
+        "error_code": {
+          "$ref": "#/definitions/BashCodeExecutionToolResultErrorCode"
         },
         "type": {
-          "const": "base64",
-          "enum": [
-            "base64"
-          ],
+          "const": "bash_code_execution_tool_result_error",
           "title": "Type",
           "type": "string"
         }
       },
       "required": [
-        "data",
-        "media_type",
+        "error_code",
         "type"
       ],
-      "title": "Base64ImageSource",
+      "title": "RequestBashCodeExecutionToolResultError",
       "type": "object"
     },
-    "URLImageSource": {
+    "RequestBashCodeExecutionResultBlock": {
       "additionalProperties": false,
       "properties": {
-        "type": {
-          "const": "url",
-          "enum": [
-            "url"
-          ],
-          "title": "Type",
+        "content": {
+          "items": {
+            "$ref": "#/definitions/RequestBashCodeExecutionOutputBlock"
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "return_code": {
+          "title": "Return Code",
+          "type": "integer"
+        },
+        "stderr": {
+          "title": "Stderr",
           "type": "string"
         },
-        "url": {
-          "title": "Url",
+        "stdout": {
+          "title": "Stdout",
+          "type": "string"
+        },
+        "type": {
+          "const": "bash_code_execution_result",
+          "title": "Type",
           "type": "string"
         }
       },
       "required": [
-        "type",
-        "url"
+        "content",
+        "return_code",
+        "stderr",
+        "stdout",
+        "type"
       ],
-      "title": "URLImageSource",
+      "title": "RequestBashCodeExecutionResultBlock",
       "type": "object"
     },
-    "RequestCitationsConfig": {
+    "RequestCodeExecutionToolResultError": {
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "title": "Enabled",
-          "type": "boolean"
+        "error_code": {
+          "$ref": "#/definitions/CodeExecutionToolResultErrorCode"
+        },
+        "type": {
+          "const": "code_execution_tool_result_error",
+          "title": "Type",
+          "type": "string"
         }
       },
-      "title": "RequestCitationsConfig",
+      "required": [
+        "error_code",
+        "type"
+      ],
+      "title": "RequestCodeExecutionToolResultError",
+      "type": "object"
+    },
+    "RequestCodeExecutionResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/definitions/RequestCodeExecutionOutputBlock"
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "return_code": {
+          "title": "Return Code",
+          "type": "integer"
+        },
+        "stderr": {
+          "title": "Stderr",
+          "type": "string"
+        },
+        "stdout": {
+          "title": "Stdout",
+          "type": "string"
+        },
+        "type": {
+          "const": "code_execution_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "return_code",
+        "stderr",
+        "stdout",
+        "type"
+      ],
+      "title": "RequestCodeExecutionResultBlock",
+      "type": "object"
+    },
+    "RequestEncryptedCodeExecutionResultBlock": {
+      "additionalProperties": false,
+      "description": "Code execution result with encrypted stdout for PFC + web_search results.",
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/definitions/RequestCodeExecutionOutputBlock"
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "encrypted_stdout": {
+          "title": "Encrypted Stdout",
+          "type": "string"
+        },
+        "return_code": {
+          "title": "Return Code",
+          "type": "integer"
+        },
+        "stderr": {
+          "title": "Stderr",
+          "type": "string"
+        },
+        "type": {
+          "const": "encrypted_code_execution_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "encrypted_stdout",
+        "return_code",
+        "stderr",
+        "type"
+      ],
+      "title": "RequestEncryptedCodeExecutionResultBlock",
       "type": "object"
     },
     "Base64PDFSource": {
@@ -3613,17 +6200,11 @@
         },
         "media_type": {
           "const": "application/pdf",
-          "enum": [
-            "application/pdf"
-          ],
           "title": "Media Type",
           "type": "string"
         },
         "type": {
           "const": "base64",
-          "enum": [
-            "base64"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3634,38 +6215,6 @@
         "type"
       ],
       "title": "Base64PDFSource",
-      "type": "object"
-    },
-    "PlainTextSource": {
-      "additionalProperties": false,
-      "properties": {
-        "data": {
-          "title": "Data",
-          "type": "string"
-        },
-        "media_type": {
-          "const": "text/plain",
-          "enum": [
-            "text/plain"
-          ],
-          "title": "Media Type",
-          "type": "string"
-        },
-        "type": {
-          "const": "text",
-          "enum": [
-            "text"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "data",
-        "media_type",
-        "type"
-      ],
-      "title": "PlainTextSource",
       "type": "object"
     },
     "ContentBlockSource": {
@@ -3680,8 +6229,8 @@
               "items": {
                 "discriminator": {
                   "mapping": {
-                    "image": "#/components/schemas/RequestImageBlock",
-                    "text": "#/components/schemas/RequestTextBlock"
+                    "image": "#/definitions/RequestImageBlock",
+                    "text": "#/definitions/RequestTextBlock"
                   },
                   "propertyName": "type"
                 },
@@ -3708,9 +6257,6 @@
         },
         "type": {
           "const": "content",
-          "enum": [
-            "content"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3722,14 +6268,37 @@
       "title": "ContentBlockSource",
       "type": "object"
     },
+    "PlainTextSource": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "title": "Data",
+          "type": "string"
+        },
+        "media_type": {
+          "const": "text/plain",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "type": {
+          "const": "text",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "media_type",
+        "type"
+      ],
+      "title": "PlainTextSource",
+      "type": "object"
+    },
     "URLPDFSource": {
       "additionalProperties": false,
       "properties": {
         "type": {
           "const": "url",
-          "enum": [
-            "url"
-          ],
           "title": "Type",
           "type": "string"
         },
@@ -3743,6 +6312,388 @@
         "url"
       ],
       "title": "URLPDFSource",
+      "type": "object"
+    },
+    "Base64ImageSource": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "format": "byte",
+          "title": "Data",
+          "type": "string"
+        },
+        "media_type": {
+          "enum": [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "type": {
+          "const": "base64",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "media_type",
+        "type"
+      ],
+      "title": "Base64ImageSource",
+      "type": "object"
+    },
+    "URLImageSource": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "url",
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ],
+      "title": "URLImageSource",
+      "type": "object"
+    },
+    "RequestTextEditorCodeExecutionToolResultError": {
+      "additionalProperties": false,
+      "properties": {
+        "error_code": {
+          "$ref": "#/definitions/TextEditorCodeExecutionToolResultErrorCode"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error Message"
+        },
+        "type": {
+          "const": "text_editor_code_execution_tool_result_error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_code",
+        "type"
+      ],
+      "title": "RequestTextEditorCodeExecutionToolResultError",
+      "type": "object"
+    },
+    "RequestTextEditorCodeExecutionViewResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "file_type": {
+          "enum": [
+            "text",
+            "image",
+            "pdf"
+          ],
+          "title": "File Type",
+          "type": "string"
+        },
+        "num_lines": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Num Lines"
+        },
+        "start_line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Start Line"
+        },
+        "total_lines": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Total Lines"
+        },
+        "type": {
+          "const": "text_editor_code_execution_view_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "file_type",
+        "type"
+      ],
+      "title": "RequestTextEditorCodeExecutionViewResultBlock",
+      "type": "object"
+    },
+    "RequestTextEditorCodeExecutionCreateResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "is_file_update": {
+          "title": "Is File Update",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "text_editor_code_execution_create_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "is_file_update",
+        "type"
+      ],
+      "title": "RequestTextEditorCodeExecutionCreateResultBlock",
+      "type": "object"
+    },
+    "RequestTextEditorCodeExecutionStrReplaceResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lines"
+        },
+        "new_lines": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "New Lines"
+        },
+        "new_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "New Start"
+        },
+        "old_lines": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Old Lines"
+        },
+        "old_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Old Start"
+        },
+        "type": {
+          "const": "text_editor_code_execution_str_replace_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "RequestTextEditorCodeExecutionStrReplaceResultBlock",
+      "type": "object"
+    },
+    "RequestToolReferenceBlock": {
+      "additionalProperties": false,
+      "description": "Tool reference block that can be included in tool_result content.",
+      "properties": {
+        "cache_control": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "ephemeral": "#/definitions/CacheControlEphemeral"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/CacheControlEphemeral"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Create a cache control breakpoint at this content block.",
+          "title": "Cache Control"
+        },
+        "tool_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]{1,256}$",
+          "title": "Tool Name",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool_reference",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_name",
+        "type"
+      ],
+      "title": "RequestToolReferenceBlock",
+      "type": "object"
+    },
+    "RequestToolSearchToolResultError": {
+      "additionalProperties": false,
+      "properties": {
+        "error_code": {
+          "$ref": "#/definitions/ToolSearchToolResultErrorCode"
+        },
+        "type": {
+          "const": "tool_search_tool_result_error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_code",
+        "type"
+      ],
+      "title": "RequestToolSearchToolResultError",
+      "type": "object"
+    },
+    "RequestToolSearchToolSearchResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "tool_references": {
+          "items": {
+            "$ref": "#/definitions/RequestToolReferenceBlock"
+          },
+          "title": "Tool References",
+          "type": "array"
+        },
+        "type": {
+          "const": "tool_search_tool_search_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_references",
+        "type"
+      ],
+      "title": "RequestToolSearchToolSearchResultBlock",
+      "type": "object"
+    },
+    "RequestWebFetchToolResultError": {
+      "additionalProperties": false,
+      "properties": {
+        "error_code": {
+          "$ref": "#/definitions/WebFetchToolResultErrorCode"
+        },
+        "type": {
+          "const": "web_fetch_tool_result_error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_code",
+        "type"
+      ],
+      "title": "RequestWebFetchToolResultError",
+      "type": "object"
+    },
+    "RequestWebFetchResultBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/RequestDocumentBlock"
+        },
+        "retrieved_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ISO 8601 timestamp when the content was retrieved",
+          "title": "Retrieved At"
+        },
+        "type": {
+          "const": "web_fetch_result",
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "description": "Fetched content URL",
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "type",
+        "url"
+      ],
+      "title": "RequestWebFetchResultBlock",
       "type": "object"
     },
     "RequestWebSearchResultBlock": {
@@ -3769,9 +6720,6 @@
         },
         "type": {
           "const": "web_search_result",
-          "enum": [
-            "web_search_result"
-          ],
           "title": "Type",
           "type": "string"
         },
@@ -3797,9 +6745,6 @@
         },
         "type": {
           "const": "web_search_tool_result_error",
-          "enum": [
-            "web_search_tool_result_error"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3811,16 +6756,251 @@
       "title": "RequestWebSearchToolResultError",
       "type": "object"
     },
+    "BashCodeExecutionToolResultErrorCode": {
+      "enum": [
+        "invalid_tool_input",
+        "unavailable",
+        "too_many_requests",
+        "execution_time_exceeded",
+        "output_file_too_large"
+      ],
+      "title": "BashCodeExecutionToolResultErrorCode",
+      "type": "string"
+    },
+    "ResponseBashCodeExecutionOutputBlock": {
+      "properties": {
+        "file_id": {
+          "title": "File Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "bash_code_execution_output",
+          "default": "bash_code_execution_output",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id",
+        "type"
+      ],
+      "title": "ResponseBashCodeExecutionOutputBlock",
+      "type": "object"
+    },
+    "CodeExecutionToolResultErrorCode": {
+      "enum": [
+        "invalid_tool_input",
+        "unavailable",
+        "too_many_requests",
+        "execution_time_exceeded"
+      ],
+      "title": "CodeExecutionToolResultErrorCode",
+      "type": "string"
+    },
+    "ResponseCodeExecutionOutputBlock": {
+      "properties": {
+        "file_id": {
+          "title": "File Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "code_execution_output",
+          "default": "code_execution_output",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id",
+        "type"
+      ],
+      "title": "ResponseCodeExecutionOutputBlock",
+      "type": "object"
+    },
+    "TextEditorCodeExecutionToolResultErrorCode": {
+      "enum": [
+        "invalid_tool_input",
+        "unavailable",
+        "too_many_requests",
+        "execution_time_exceeded",
+        "file_not_found"
+      ],
+      "title": "TextEditorCodeExecutionToolResultErrorCode",
+      "type": "string"
+    },
+    "ToolSearchToolResultErrorCode": {
+      "enum": [
+        "invalid_tool_input",
+        "unavailable",
+        "too_many_requests",
+        "execution_time_exceeded"
+      ],
+      "title": "ToolSearchToolResultErrorCode",
+      "type": "string"
+    },
+    "ResponseToolReferenceBlock": {
+      "properties": {
+        "tool_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]{1,256}$",
+          "title": "Tool Name",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool_reference",
+          "default": "tool_reference",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_name",
+        "type"
+      ],
+      "title": "ResponseToolReferenceBlock",
+      "type": "object"
+    },
+    "WebFetchToolResultErrorCode": {
+      "enum": [
+        "invalid_tool_input",
+        "url_too_long",
+        "url_not_allowed",
+        "url_not_accessible",
+        "unsupported_content_type",
+        "too_many_requests",
+        "max_uses_exceeded",
+        "unavailable"
+      ],
+      "title": "WebFetchToolResultErrorCode",
+      "type": "string"
+    },
+    "ResponseDocumentBlock": {
+      "properties": {
+        "citations": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ResponseCitationsConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Citation configuration for the document"
+        },
+        "source": {
+          "discriminator": {
+            "mapping": {
+              "base64": "#/definitions/Base64PDFSource",
+              "text": "#/definitions/PlainTextSource"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Base64PDFSource"
+            },
+            {
+              "$ref": "#/definitions/PlainTextSource"
+            }
+          ],
+          "title": "Source"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The title of the document",
+          "title": "Title"
+        },
+        "type": {
+          "const": "document",
+          "default": "document",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "citations",
+        "source",
+        "title",
+        "type"
+      ],
+      "title": "ResponseDocumentBlock",
+      "type": "object"
+    },
     "WebSearchToolResultErrorCode": {
       "enum": [
         "invalid_tool_input",
         "unavailable",
         "max_uses_exceeded",
         "too_many_requests",
-        "query_too_long"
+        "query_too_long",
+        "request_too_large"
       ],
       "title": "WebSearchToolResultErrorCode",
       "type": "string"
+    },
+    "RequestBashCodeExecutionOutputBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "file_id": {
+          "title": "File Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "bash_code_execution_output",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id",
+        "type"
+      ],
+      "title": "RequestBashCodeExecutionOutputBlock",
+      "type": "object"
+    },
+    "RequestCodeExecutionOutputBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "file_id": {
+          "title": "File Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "code_execution_output",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_id",
+        "type"
+      ],
+      "title": "RequestCodeExecutionOutputBlock",
+      "type": "object"
+    },
+    "ResponseCitationsConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "title": "ResponseCitationsConfig",
+      "type": "object"
     }
   }
 }

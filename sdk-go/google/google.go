@@ -345,15 +345,19 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 			parts,
 		), nil
 	case part.ToolCallPart != nil:
-		return []googleapi.Part{{
+		googlePart := googleapi.Part{
 			FunctionCall: &googleapi.FunctionCall{
 				Name: &part.ToolCallPart.ToolName,
 				Args: part.ToolCallPart.Args,
 				Id:   &part.ToolCallPart.ToolCallID,
 			},
-		}}, nil
+		}
+		if part.ToolCallPart.Signature != nil {
+			googlePart.ThoughtSignature = part.ToolCallPart.Signature
+		}
+		return []googleapi.Part{googlePart}, nil
 	case part.ToolResultPart != nil:
-		response, err := convertToGoogleFunctionResponseResponse(part.ToolResultPart.Content, part.ToolResultPart.IsError)
+		functionResponse, err := convertToGoogleFunctionResponse(part.ToolResultPart.Content, part.ToolResultPart.IsError)
 		if err != nil {
 			return nil, err
 		}
@@ -361,19 +365,43 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 			FunctionResponse: &googleapi.FunctionResponse{
 				Id:       &part.ToolResultPart.ToolCallID,
 				Name:     &part.ToolResultPart.ToolName,
-				Response: response,
+				Response: functionResponse.Response,
+				Parts:    functionResponse.Parts,
 			},
 		}}, nil
 	}
 	return []googleapi.Part{}, nil
 }
 
-func convertToGoogleFunctionResponseResponse(parts []llmsdk.Part, isError bool) (map[string]any, error) {
+type googleFunctionResponse struct {
+	Response map[string]any
+	Parts    []googleapi.FunctionResponsePart
+}
+
+func convertToGoogleFunctionResponse(parts []llmsdk.Part, isError bool) (*googleFunctionResponse, error) {
 	compatibleParts := partutil.GetCompatiblePartsWithoutSourceParts(parts)
 	textParts := []llmsdk.TextPart{}
+	functionResponseParts := []googleapi.FunctionResponsePart{}
 	for _, part := range compatibleParts {
-		if part.TextPart != nil {
+		switch {
+		case part.TextPart != nil:
 			textParts = append(textParts, *part.TextPart)
+		case part.ImagePart != nil:
+			functionResponseParts = append(functionResponseParts, googleapi.FunctionResponsePart{
+				InlineData: &googleapi.FunctionResponseBlob{
+					Data:     &part.ImagePart.Data,
+					MimeType: &part.ImagePart.MimeType,
+				},
+			})
+		case part.AudioPart != nil:
+			functionResponseParts = append(functionResponseParts, googleapi.FunctionResponsePart{
+				InlineData: &googleapi.FunctionResponseBlob{
+					Data:     &part.AudioPart.Data,
+					MimeType: ptr.To(partutil.MapAudioFormatToMimeType(part.AudioPart.Format)),
+				},
+			})
+		default:
+			return nil, llmsdk.NewInvalidInputError(fmt.Sprintf("Google model tool result does not support part type %q", part.Type()))
 		}
 	}
 
@@ -388,23 +416,25 @@ func convertToGoogleFunctionResponseResponse(parts []llmsdk.Part, isError bool) 
 		}
 	}
 
-	if len(responses) == 0 {
-		return nil, llmsdk.NewInvalidInputError("Google model tool result must have at least one text part")
-	}
-
 	// Use "output" key to specify function output and "error" key to specify error details,
 	// as per Google API specification
 	key := "output"
 	if isError {
 		key = "error"
 	}
-	return map[string]any{
-		key: func() any {
-			if len(responses) == 1 {
-				return responses[0]
-			}
-			return responses
-		}(),
+	return &googleFunctionResponse{
+		Response: map[string]any{
+			key: func() any {
+				if len(responses) == 0 {
+					return map[string]any{}
+				}
+				if len(responses) == 1 {
+					return responses[0]
+				}
+				return responses
+			}(),
+		},
+		Parts: functionResponseParts,
 	}, nil
 }
 
@@ -493,7 +523,7 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 			if part.Text != nil {
 				text = *part.Text
 			}
-			opts := []llmsdk.ReasoingPartOption{}
+			opts := []llmsdk.ReasoningPartOption{}
 			if part.ThoughtSignature != nil {
 				opts = append(opts, llmsdk.WithReasoningSignature(*part.ThoughtSignature))
 			}
@@ -536,6 +566,7 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 			}
 			toolCallPart := llmsdk.NewToolCallPart(toolCallID, *part.FunctionCall.Name, json.RawMessage(part.FunctionCall.Args))
 			toolCallPart.ToolCallPart.Args = part.FunctionCall.Args
+			toolCallPart.ToolCallPart.Signature = part.ThoughtSignature
 			result = append(result, toolCallPart)
 			continue
 		}

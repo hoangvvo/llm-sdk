@@ -94,6 +94,38 @@ type FunctionResponse struct {
 	Name *string `json:"name,omitempty"`
 	// Required. The function response in JSON object format. Use "output" key to specify function output and "error" key to specify error details (if any). If "output" and "error" keys are not specified, then whole "response" is treated as function output.
 	Response map[string]interface{} `json:"response,omitempty"`
+	// List of parts that constitute a function response. Each part may have a different IANA MIME type.
+	Parts []FunctionResponsePart `json:"parts,omitempty"`
+}
+
+// Raw media bytes for function response.
+//
+// Text should not be sent as raw bytes, use the FunctionResponse.Response field.
+type FunctionResponseBlob struct {
+	// Required. The IANA standard MIME type of the source data.
+	MimeType *string `json:"mimeType,omitempty"`
+	// Required. Inline media bytes.
+	Data *string `json:"data,omitempty"`
+	// Optional. Display name of the blob.
+	DisplayName *string `json:"displayName,omitempty"`
+}
+
+// URI based data for function response.
+type FunctionResponseFileData struct {
+	// Required. URI.
+	FileUri *string `json:"fileUri,omitempty"`
+	// Required. The IANA standard MIME type of the source data.
+	MimeType *string `json:"mimeType,omitempty"`
+	// Optional. Display name of the file.
+	DisplayName *string `json:"displayName,omitempty"`
+}
+
+// A datatype containing media that is part of a FunctionResponse message.
+type FunctionResponsePart struct {
+	// Optional. Inline media bytes.
+	InlineData *FunctionResponseBlob `json:"inlineData,omitempty"`
+	// Optional. URI based data.
+	FileData *FunctionResponseFileData `json:"fileData,omitempty"`
 }
 
 // Optional model configuration parameters.

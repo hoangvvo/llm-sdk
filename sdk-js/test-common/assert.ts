@@ -6,10 +6,6 @@ interface TextPartAssertion {
   text: RegExp;
 }
 
-interface ToolCallPartAssertionArgProp {
-  [key: string]: RegExp | ToolCallPartAssertionArgProp;
-}
-
 export type PartAssertion =
   | TextPartAssertion
   | ToolCallPartAssertion
@@ -20,7 +16,7 @@ export type PartAssertion =
 export interface ToolCallPartAssertion {
   type: "tool_call";
   tool_name: string;
-  args: ToolCallPartAssertionArgProp;
+  args?: RegExp;
 }
 
 export interface AudioPartAssertion {
@@ -96,7 +92,7 @@ export function assertToolCallPart(
     (part) =>
       part.type === "tool-call" &&
       part.tool_name === assertion.tool_name &&
-      matchToolCallArgs(part.args, assertion.args),
+      (!assertion.args || assertion.args.test(JSON.stringify(part.args))),
   );
   t.assert.ok(
     foundPart,
@@ -174,43 +170,4 @@ Expected text ${String(assertion.text)}
 Received:
 ${JSON.stringify(content, null, 2)}`,
   );
-}
-
-function matchToolCallArgs(
-  actual: Record<string, unknown>,
-  expected: ToolCallPartAssertionArgProp,
-): boolean {
-  for (const expectedKey in expected) {
-    const expectedValue = expected[expectedKey]!;
-    const actualValue = actual[expectedKey];
-
-    if (actualValue === undefined) {
-      return false;
-    }
-
-    if (expectedValue instanceof RegExp) {
-      if (
-        !(
-          typeof actualValue !== "object" &&
-          expectedValue.test(String(actualValue))
-        )
-      ) {
-        return false;
-      }
-    } else {
-      if (
-        !(
-          typeof actualValue === "object" &&
-          matchToolCallArgs(
-            actualValue as Record<string, unknown>,
-            expectedValue,
-          )
-        )
-      ) {
-        return false;
-      }
-    }
-  }
-
-  return true;
 }

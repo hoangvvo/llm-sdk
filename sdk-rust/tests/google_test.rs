@@ -35,7 +35,17 @@ fn google_audio_model() -> GoogleModel {
 
 fn google_image_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-2.5-flash-image-preview".to_string(),
+        "gemini-2.5-flash-image".to_string(),
+        GoogleModelOptions {
+            api_key: google_api_key().clone(),
+            ..Default::default()
+        },
+    )
+}
+
+fn google_multimodal_tool_model() -> GoogleModel {
+    GoogleModel::new(
+        "gemini-3-flash-preview".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()
@@ -45,7 +55,7 @@ fn google_image_model() -> GoogleModel {
 
 fn google_reasoning_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-2.0-flash-thinking-exp-01-21".to_string(),
+        "gemini-2.5-flash".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()
@@ -66,6 +76,11 @@ test_set!(google_model(), stream_tool_call);
 test_set!(google_model(), generate_text_from_tool_result);
 
 test_set!(google_model(), stream_text_from_tool_result);
+
+test_set!(
+    google_multimodal_tool_model(),
+    generate_text_from_image_tool_result
+);
 
 test_set!(google_model(), generate_parallel_tool_calls);
 

@@ -114,7 +114,7 @@ func NewSourcePart(source string, title string, content []Part) Part {
 	}
 }
 
-func NewReasoningPart(text string, opts ...ReasoingPartOption) Part {
+func NewReasoningPart(text string, opts ...ReasoningPartOption) Part {
 	reasoningPart := &ReasoningPart{
 		Text: text,
 	}
@@ -128,15 +128,15 @@ func NewReasoningPart(text string, opts ...ReasoingPartOption) Part {
 	}
 }
 
-type ReasoingPartOption func(*ReasoningPart)
+type ReasoningPartOption func(*ReasoningPart)
 
-func WithReasoningSignature(signature string) ReasoingPartOption {
+func WithReasoningSignature(signature string) ReasoningPartOption {
 	return func(p *ReasoningPart) {
 		p.Signature = &signature
 	}
 }
 
-func WithReasoningID(id string) ReasoingPartOption {
+func WithReasoningID(id string) ReasoningPartOption {
 	return func(p *ReasoningPart) {
 		p.ID = &id
 	}
@@ -177,6 +177,12 @@ type ToolCallPartOption func(*ToolCallPart)
 func WithToolCallPartID(id string) ToolCallPartOption {
 	return func(p *ToolCallPart) {
 		p.ID = &id
+	}
+}
+
+func WithToolCallPartSignature(signature string) ToolCallPartOption {
+	return func(p *ToolCallPart) {
+		p.Signature = &signature
 	}
 }
 
@@ -293,6 +299,12 @@ func WithToolCallPartDeltaToolName(toolName string) ToolCallPartDeltaOption {
 func WithToolCallPartDeltaArgs(args string) ToolCallPartDeltaOption {
 	return func(p *ToolCallPartDelta) {
 		p.Args = &args
+	}
+}
+
+func WithToolCallPartDeltaSignature(signature string) ToolCallPartDeltaOption {
+	return func(p *ToolCallPartDelta) {
+		p.Signature = &signature
 	}
 }
 

@@ -3,8 +3,11 @@ title: Function calling
 ---
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goToolUseImageCode from "../../../../../sdk-go/examples/tool-use-image/main.go?raw";
 import goToolUseCode from "../../../../../sdk-go/examples/tool-use/main.go?raw";
+import jsToolUseImageCode from "../../../../../sdk-js/examples/tool-use-image.ts?raw";
 import jsToolUseCode from "../../../../../sdk-js/examples/tool-use.ts?raw";
+import rustToolUseImageCode from "../../../../../sdk-rust/examples/tool-use-image.rs?raw";
 import rustToolUseCode from "../../../../../sdk-rust/examples/tool-use.rs?raw";
 import {
   extractGoTypes,
@@ -45,18 +48,10 @@ Create one entry per callable function. The schema tells the model which argumen
     />
   </TabItem>
   <TabItem label="Rust">
-    <Code
-      code={extractRustTypes(["Tool"])}
-      lang="rust"
-      title="types.rs"
-    />
+    <Code code={extractRustTypes(["Tool"])} lang="rust" title="types.rs" />
   </TabItem>
   <TabItem label="Go">
-    <Code
-      code={extractGoTypes(["Tool"])}
-      lang="go"
-      title="types.go"
-    />
+    <Code code={extractGoTypes(["Tool"])} lang="go" title="types.go" />
   </TabItem>
 </Tabs>
 
@@ -82,11 +77,7 @@ When the model wants to call something, the assistant message carries one or mor
     />
   </TabItem>
   <TabItem label="Go">
-    <Code
-      code={extractGoTypes(["ToolCallPart"])}
-      lang="go"
-      title="types.go"
-    />
+    <Code code={extractGoTypes(["ToolCallPart"])} lang="go" title="types.go" />
   </TabItem>
 </Tabs>
 
@@ -121,6 +112,28 @@ After execution, respond with a single `ToolMessage` that contains one or more [
 </Tabs>
 
 Append both the assistant message that requested the tool and your tool message to the conversation, then call the model again. Repeat until you get a regular assistant response.
+
+## Return an image from a tool
+
+For supported models, each `ToolResultPart` can return image parts in addition to text.
+
+This pattern is useful when your application fetches, renders, or generates an image and you want the model to reason over it directly.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsToolUseImageCode}
+      lang="typescript"
+      title="tool-use-image.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustToolUseImageCode} lang="rust" title="tool-use-image.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goToolUseImageCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
 
 ## End-to-end example
 

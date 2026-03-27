@@ -17,12 +17,17 @@ suite("GoogleModel", () => {
 
   const imageModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-2.5-flash-image-preview",
+    modelId: "gemini-2.5-flash-image",
+  });
+
+  const multimodalToolModel = new GoogleModel({
+    apiKey: process.env["GOOGLE_API_KEY"],
+    modelId: "gemini-3-flash-preview",
   });
 
   const thinkingModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-2.0-flash-thinking-exp-01-21",
+    modelId: "gemini-2.5-flash",
   });
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
@@ -55,6 +60,14 @@ suite("GoogleModel", () => {
 
   test(TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT);
+  });
+
+  test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT, (t) => {
+    return runTestCase(
+      t,
+      multimodalToolModel,
+      TEST_CASE_NAMES.GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT,
+    );
   });
 
   test(TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, (t) => {

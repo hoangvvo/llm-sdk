@@ -94,6 +94,9 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
       if (typeof part.args === "object") {
         toolCall.args = JSON.stringify(part.args);
       }
+      if (part.signature) {
+        toolCall.signature = part.signature;
+      }
       if (part.id) {
         toolCall.id = part.id;
       }

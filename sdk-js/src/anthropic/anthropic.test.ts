@@ -11,7 +11,7 @@ suite("AnthropicModel", () => {
   assert(process.env["ANTHROPIC_API_KEY"], "ANTHROPIC_API_KEY must be set");
   const model = new AnthropicModel({
     apiKey: process.env["ANTHROPIC_API_KEY"],
-    modelId: "claude-sonnet-4-20250514",
+    modelId: "claude-sonnet-4-5",
   });
 
   const reasoningOptions: RunTestCaseOptions = {
@@ -36,7 +36,7 @@ suite("AnthropicModel", () => {
     return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_WITH_SYSTEM_PROMPT);
   });
 
-  test(TEST_CASE_NAMES.GENERATE_TOOL_CALL, (t) => {
+  test(TEST_CASE_NAMES.GENERATE_TOOL_CALL, { timeout: 60 * 1000 }, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TOOL_CALL);
   });
 
@@ -54,6 +54,14 @@ suite("AnthropicModel", () => {
 
   test(TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT);
+  });
+
+  test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT, (t) => {
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT,
+    );
   });
 
   test(TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, (t) => {

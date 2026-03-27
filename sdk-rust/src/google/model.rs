@@ -1,8 +1,9 @@
 use super::api::{
     Content, FunctionCall, FunctionCallingConfig, FunctionCallingConfigMode, FunctionDeclaration,
-    FunctionResponse, GenerateContentConfig, GenerateContentParameters, GenerateContentResponse,
-    MediaModality, ModalityTokenCount, Part as GooglePart, PrebuiltVoiceConfig, SpeechConfig,
-    ThinkingConfig, Tool, ToolConfig, VoiceConfig,
+    FunctionResponse, FunctionResponseBlob, FunctionResponsePart, GenerateContentConfig,
+    GenerateContentParameters, GenerateContentResponse, MediaModality, ModalityTokenCount,
+    Part as GooglePart, PrebuiltVoiceConfig, SpeechConfig, ThinkingConfig, Tool, ToolConfig,
+    VoiceConfig,
 };
 use crate::{
     audio_part_utils, client_utils, id_utils, source_part_utils, stream_utils, AudioPart,
@@ -366,40 +367,30 @@ fn convert_to_google_contents(messages: Vec<Message>) -> LanguageModelResult<Vec
         .map(|message| match message {
             Message::User(user_message) => Ok(Content {
                 role: Some("user".to_string()),
-                parts: Some(
-                    user_message
-                        .content
-                        .into_iter()
-                        .flat_map(convert_to_google_parts)
-                        .collect(),
-                ),
+                parts: Some(convert_parts_to_google_parts(user_message.content)?),
             }),
             Message::Assistant(assistant_message) => Ok(Content {
                 role: Some("model".to_string()),
-                parts: Some(
-                    assistant_message
-                        .content
-                        .into_iter()
-                        .flat_map(convert_to_google_parts)
-                        .collect(),
-                ),
+                parts: Some(convert_parts_to_google_parts(assistant_message.content)?),
             }),
             Message::Tool(tool_message) => Ok(Content {
                 role: Some("user".to_string()),
-                parts: Some(
-                    tool_message
-                        .content
-                        .into_iter()
-                        .flat_map(convert_to_google_parts)
-                        .collect(),
-                ),
+                parts: Some(convert_parts_to_google_parts(tool_message.content)?),
             }),
         })
         .collect()
 }
 
-fn convert_to_google_parts(part: Part) -> Vec<GooglePart> {
-    match part {
+fn convert_parts_to_google_parts(parts: Vec<Part>) -> LanguageModelResult<Vec<GooglePart>> {
+    parts
+        .into_iter()
+        .map(convert_to_google_parts)
+        .collect::<LanguageModelResult<Vec<Vec<GooglePart>>>>()
+        .map(|parts| parts.into_iter().flatten().collect())
+}
+
+fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
+    Ok(match part {
         Part::Text(text_part) => vec![GooglePart {
             text: Some(text_part.text),
             ..Default::default()
@@ -428,48 +419,79 @@ fn convert_to_google_parts(part: Part) -> Vec<GooglePart> {
             thought_signature: reasoning_part.signature,
             ..Default::default()
         }],
-        Part::Source(source_part) => source_part
-            .content
-            .into_iter()
-            .flat_map(convert_to_google_parts)
-            .collect(),
+        Part::Source(source_part) => convert_parts_to_google_parts(source_part.content)?,
         Part::ToolCall(tool_call_part) => vec![GooglePart {
             function_call: Some(FunctionCall {
                 name: Some(tool_call_part.tool_name),
                 args: Some(tool_call_part.args),
                 id: Some(tool_call_part.tool_call_id),
             }),
+            thought_signature: tool_call_part.signature,
             ..Default::default()
         }],
         Part::ToolResult(tool_result_part) => vec![GooglePart {
-            function_response: Some(FunctionResponse {
-                id: Some(tool_result_part.tool_call_id),
-                name: Some(tool_result_part.tool_name),
-                response: Some(convert_to_google_function_response(
-                    tool_result_part.content,
-                    tool_result_part.is_error.unwrap_or(false),
-                )),
-            }),
+            function_response: Some(convert_to_google_function_result(tool_result_part)?),
             ..Default::default()
         }],
-    }
+    })
+}
+
+fn convert_to_google_function_result(
+    tool_result_part: crate::ToolResultPart,
+) -> LanguageModelResult<FunctionResponse> {
+    let function_response = convert_to_google_function_response(
+        tool_result_part.content,
+        tool_result_part.is_error.unwrap_or(false),
+    )?;
+    Ok(FunctionResponse {
+        id: Some(tool_result_part.tool_call_id),
+        name: Some(tool_result_part.tool_name),
+        response: Some(function_response.response),
+        parts: function_response.parts,
+    })
+}
+
+struct GoogleFunctionResponse {
+    response: HashMap<String, serde_json::Value>,
+    parts: Option<Vec<FunctionResponsePart>>,
 }
 
 fn convert_to_google_function_response(
     parts: Vec<Part>,
     is_error: bool,
-) -> HashMap<String, serde_json::Value> {
+) -> LanguageModelResult<GoogleFunctionResponse> {
     let compatible_parts = source_part_utils::get_compatible_parts_without_source_parts(parts);
-    let text_parts: Vec<String> = compatible_parts
-        .into_iter()
-        .filter_map(|part| {
-            if let Part::Text(text_part) = part {
-                Some(text_part.text)
-            } else {
-                None
+    let mut text_parts: Vec<String> = Vec::new();
+    let mut function_response_parts: Vec<FunctionResponsePart> = Vec::new();
+
+    for part in compatible_parts {
+        match part {
+            Part::Text(text_part) => text_parts.push(text_part.text),
+            Part::Image(image_part) => function_response_parts.push(FunctionResponsePart {
+                inline_data: Some(FunctionResponseBlob {
+                    data: Some(image_part.data),
+                    mime_type: Some(image_part.mime_type),
+                    display_name: None,
+                }),
+                file_data: None,
+            }),
+            Part::Audio(audio_part) => function_response_parts.push(FunctionResponsePart {
+                inline_data: Some(FunctionResponseBlob {
+                    data: Some(audio_part.data),
+                    mime_type: Some(audio_part_utils::map_audio_format_to_mime_type(
+                        &audio_part.format,
+                    )),
+                    display_name: None,
+                }),
+                file_data: None,
+            }),
+            unsupported_part => {
+                return Err(LanguageModelError::InvalidInput(format!(
+                    "Google model tool result does not support part type {unsupported_part:?}"
+                )));
             }
-        })
-        .collect();
+        }
+    }
 
     let responses: Vec<serde_json::Value> = text_parts
         .into_iter()
@@ -482,11 +504,16 @@ fn convert_to_google_function_response(
     let key = if is_error { "error" } else { "output" };
     let value = if responses.len() == 1 {
         responses.into_iter().next().unwrap_or(json!({}))
+    } else if responses.is_empty() {
+        json!({})
     } else {
         json!(responses)
     };
     result.insert(key.to_string(), value);
-    result
+    Ok(GoogleFunctionResponse {
+        response: result,
+        parts: (!function_response_parts.is_empty()).then_some(function_response_parts),
+    })
 }
 
 fn convert_to_google_function_calling_config(
@@ -583,6 +610,7 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                             .unwrap_or_else(|| id_utils::generate_string(10)),
                         tool_name: name,
                         args: json!(function_call.args.unwrap_or_default()),
+                        signature: part.thought_signature,
                         id: None,
                     })))
                 } else {

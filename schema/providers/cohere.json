@@ -1,0 +1,1507 @@
+{
+  "definitions": {
+    "ChatRequestV2": {
+      "properties": {
+        "citation_options": {
+          "$ref": "#/definitions/CitationOptions",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "documents": {
+          "description": "A list of relevant documents that the model can cite to generate a more accurate reply. Each document is either a string or document object with content and metadata.\n",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/definitions/Document"
+              }
+            ]
+          },
+          "type": "array",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "frequency_penalty": {
+          "description": "Defaults to `0.0`, min value of `0.0`, max value of `1.0`.\nUsed to reduce repetitiveness of generated tokens. The higher the value, the stronger a penalty is applied to previously present tokens, proportional to how many times they have already appeared in the prompt or prior generation.\n",
+          "format": "float",
+          "type": "number",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "k": {
+          "default": 0,
+          "description": "Ensures that only the top `k` most likely tokens are considered for generation at each step. When `k` is set to `0`, k-sampling is disabled.\nDefaults to `0`, min value of `0`, max value of `500`.\n",
+          "maximum": 500,
+          "minimum": 0,
+          "type": "integer",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "logprobs": {
+          "description": "Defaults to `false`. When set to `true`, the log probabilities of the generated tokens will be included in the response.\n",
+          "type": "boolean",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "max_tokens": {
+          "description": "The maximum number of output tokens the model will generate in the response. If not set, `max_tokens` defaults to the model's maximum output token limit. You can find the maximum output token limits for each model in the [model documentation](https://docs.cohere.com/docs/models).\n\n**Note**: Setting a low value may result in incomplete generations. In such cases, the `finish_reason` field in the response will be set to `\"MAX_TOKENS\"`.\n\n**Note**: If `max_tokens` is set higher than the model's maximum output token limit, the generation will be capped at that model-specific maximum limit.\n",
+          "type": "integer",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "messages": {
+          "$ref": "#/definitions/ChatMessages",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "model": {
+          "description": "The name of a compatible [Cohere model](https://docs.cohere.com/v2/docs/models).",
+          "type": "string",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "p": {
+          "default": 0.75,
+          "description": "Ensures that only the most likely tokens, with total probability mass of `p`, are considered for generation at each step. If both `k` and `p` are enabled, `p` acts after `k`.\nDefaults to `0.75`. min value of `0.01`, max value of `0.99`.\n",
+          "format": "float",
+          "maximum": 0.99,
+          "minimum": 0.01,
+          "type": "number",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "presence_penalty": {
+          "description": "Defaults to `0.0`, min value of `0.0`, max value of `1.0`.\nUsed to reduce repetitiveness of generated tokens. Similar to `frequency_penalty`, except that this penalty is applied equally to all tokens that have already appeared, regardless of their exact frequencies.\n",
+          "format": "float",
+          "type": "number",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "priority": {
+          "default": 0,
+          "description": "Controls how early the request is handled. Lower numbers indicate higher priority (default: 0, the highest). When the system is under load, higher-priority requests are processed first and are the least likely to be dropped.",
+          "maximum": 999,
+          "minimum": 0,
+          "type": "integer",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "response_format": {
+          "$ref": "#/definitions/ResponseFormatV2",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "safety_mode": {
+          "description": "Used to select the [safety instruction](https://docs.cohere.com/v2/docs/safety-modes) inserted into the prompt. Defaults to `CONTEXTUAL`.\nWhen `OFF` is specified, the safety instruction will be omitted.\n\nSafety modes are not yet configurable in combination with `tools` and `documents` parameters.\n\n**Note**: This parameter is only compatible newer Cohere models, starting with [Command R 08-2024](https://docs.cohere.com/docs/command-r#august-2024-release) and [Command R+ 08-2024](https://docs.cohere.com/docs/command-r-plus#august-2024-release).\n\n**Note**: `command-r7b-12-2024` and newer models only support `\"CONTEXTUAL\"` and `\"STRICT\"` modes.\n",
+          "enum": [
+            "CONTEXTUAL",
+            "STRICT",
+            "OFF"
+          ],
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "seed": {
+          "description": "If specified, the backend will make a best effort to sample tokens\ndeterministically, such that repeated requests with the same\nseed and parameters should return the same result. However,\ndeterminism cannot be totally guaranteed.\n",
+          "maximum": 18446744073709552000,
+          "minimum": 0,
+          "type": "integer",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "stop_sequences": {
+          "description": "A list of up to 5 strings that the model will use to stop generation. If the model generates a string that matches any of the strings in the list, it will stop generating tokens and return the generated text up to that point not including the stop sequence.\n",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "stream": {
+          "description": "Defaults to `false`.\n\nWhen `true`, the response will be a SSE stream of events.\n\nStreaming is beneficial for user interfaces that render the contents of the response piece by piece, as it gets generated.\n",
+          "type": "boolean",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "strict_tools": {
+          "description": "When set to `true`, tool calls in the Assistant message will be forced to follow the tool definition strictly. Learn more in the [Structured Outputs (Tools) guide](https://docs.cohere.com/docs/structured-outputs-json#structured-outputs-tools).\n\n**Note**: The first few requests with a new set of tools will take longer to process.\n",
+          "type": "boolean",
+          "x-fern-audiences": [
+            "public"
+          ],
+          "x-fern-availability": "beta"
+        },
+        "temperature": {
+          "description": "Defaults to `0.3`.\n\nA non-negative float that tunes the degree of randomness in generation. Lower temperatures mean less random generations, and higher temperatures mean more random generations.\n\nRandomness can be further maximized by increasing the  value of the `p` parameter.\n",
+          "format": "float",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "thinking": {
+          "$ref": "#/definitions/Thinking",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "tool_choice": {
+          "description": "Used to control whether or not the model will be forced to use a tool when answering. When `REQUIRED` is specified, the model will be forced to use at least one of the user-defined tools, and the `tools` parameter must be passed in the request.\nWhen `NONE` is specified, the model will be forced **not** to use one of the specified tools, and give a direct response.\nIf tool_choice isn't specified, then the model is free to choose whether to use the specified tools or not.\n\n**Note**: This parameter is only compatible with models [Command-r7b](https://docs.cohere.com/v2/docs/command-r7b) and newer.\n",
+          "enum": [
+            "REQUIRED",
+            "NONE"
+          ],
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "tools": {
+          "description": "A list of tools (functions) available to the model. The model response may contain 'tool_calls' to the specified tools.\n\nLearn more in the [Tool Use guide](https://docs.cohere.com/docs/tools).\n",
+          "items": {
+            "$ref": "#/definitions/ToolV2"
+          },
+          "type": "array",
+          "x-fern-audiences": [
+            "public"
+          ]
+        }
+      },
+      "required": [
+        "messages",
+        "model"
+      ],
+      "type": "object"
+    },
+    "ChatResponseV2": {
+      "properties": {
+        "finish_reason": {
+          "$ref": "#/definitions/ChatFinishReason"
+        },
+        "id": {
+          "description": "Unique identifier for the generated reply. Useful for submitting feedback.",
+          "type": "string"
+        },
+        "logprobs": {
+          "items": {
+            "$ref": "#/definitions/LogprobItem"
+          },
+          "type": "array"
+        },
+        "message": {
+          "$ref": "#/definitions/AssistantMessageResponse"
+        },
+        "usage": {
+          "$ref": "#/definitions/Usage"
+        }
+      },
+      "required": [
+        "id",
+        "finish_reason",
+        "message"
+      ]
+    },
+    "StreamedChatResponseV2": {
+      "description": "StreamedChatResponse is returned in streaming mode (specified with `stream=True` in the request).",
+      "discriminator": {
+        "mapping": {
+          "citation-end": "#/definitions/CitationEndEvent",
+          "citation-start": "#/definitions/CitationStartEvent",
+          "content-delta": "#/definitions/ChatContentDeltaEvent",
+          "content-end": "#/definitions/ChatContentEndEvent",
+          "content-start": "#/definitions/ChatContentStartEvent",
+          "debug": "#/definitions/ChatDebugEvent",
+          "message-end": "#/definitions/ChatMessageEndEvent",
+          "message-start": "#/definitions/ChatMessageStartEvent",
+          "tool-call-delta": "#/definitions/ChatToolCallDeltaEvent",
+          "tool-call-end": "#/definitions/ChatToolCallEndEvent",
+          "tool-call-start": "#/definitions/ChatToolCallStartEvent",
+          "tool-plan-delta": "#/definitions/ChatToolPlanDeltaEvent"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ChatMessageStartEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatContentStartEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatContentDeltaEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatContentEndEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatToolPlanDeltaEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatToolCallStartEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatToolCallDeltaEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatToolCallEndEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatMessageEndEvent"
+        },
+        {
+          "$ref": "#/definitions/ChatDebugEvent"
+        }
+      ]
+    },
+    "CitationOptions": {
+      "description": "Options for controlling citation generation.",
+      "properties": {
+        "mode": {
+          "description": "Defaults to `\"enabled\"`.\nCitations are enabled by default for models that support it, but can be turned off by setting `\"type\": \"disabled\"`.\n",
+          "enum": [
+            "ENABLED",
+            "DISABLED",
+            "FAST",
+            "ACCURATE",
+            "OFF"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-fern-type-name": "CitationOptions"
+    },
+    "Document": {
+      "description": "Relevant information that could be used by the model to generate a more accurate reply.\nThe content of each document are generally short (should be under 300 words). Metadata should be used to provide additional information, both the key name and the value will be\npassed to the model.\n",
+      "properties": {
+        "data": {
+          "description": "A relevant document that the model can cite to generate a more accurate reply. Each document is a string-any dictionary.\n",
+          "type": "object",
+          "x-fern-type-name": "Document-qmvpd9"
+        },
+        "id": {
+          "description": "Unique identifier for this document which will be referenced in citations. If not provided an ID will be automatically generated.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "type": "object",
+      "x-fern-type-name": "Document"
+    },
+    "ChatMessages": {
+      "description": "A list of chat messages in chronological order, representing a conversation between the user and the model.\n\nMessages can be from `User`, `Assistant`, `Tool` and `System` roles. Learn more about messages and roles in [the Chat API guide](https://docs.cohere.com/v2/docs/chat-api).\n",
+      "items": {
+        "$ref": "#/definitions/ChatMessageV2"
+      },
+      "type": "array",
+      "x-fern-type-name": "ChatMessages"
+    },
+    "ResponseFormatV2": {
+      "description": "Configuration for forcing the model output to adhere to the specified format. Supported on [Command R](https://docs.cohere.com/v2/docs/command-r), [Command R+](https://docs.cohere.com/v2/docs/command-r-plus) and newer models.\n\nThe model can be forced into outputting JSON objects by setting `{ \"type\": \"json_object\" }`.\n\nA [JSON Schema](https://json-schema.org/) can optionally be provided, to ensure a specific structure.\n\n**Note**: When using  `{ \"type\": \"json_object\" }` your `message` should always explicitly instruct the model to generate a JSON (eg: _\"Generate a JSON ...\"_) . Otherwise the model may end up getting stuck generating an infinite stream of characters and eventually run out of context length.\n\n**Note**: When `json_schema` is not specified, the generated object can have up to 5 layers of nesting.\n\n**Limitation**: The parameter is not supported when used in combinations with the `documents` or `tools` parameters.\n",
+      "discriminator": {
+        "mapping": {
+          "json_object": "#/definitions/JsonResponseFormatV2",
+          "text": "#/definitions/ChatTextResponseFormatV2"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ChatTextResponseFormatV2"
+        },
+        {
+          "$ref": "#/definitions/JsonResponseFormatV2"
+        }
+      ],
+      "x-fern-type-name": "ResponseFormatV2"
+    },
+    "Thinking": {
+      "description": "Configuration for [reasoning features](https://docs.cohere.com/docs/reasoning).\n",
+      "properties": {
+        "token_budget": {
+          "description": "The maximum number of tokens the model can use for thinking, which must be set to a positive integer.\nThe model will stop thinking if it reaches the thinking token budget and will proceed with the response.\n",
+          "minimum": 1,
+          "type": "integer",
+          "x-fern-audiences": [
+            "public"
+          ]
+        },
+        "type": {
+          "description": "Reasoning is enabled by default for models that support it, but can be turned off by setting `\"type\": \"disabled\"`.\n",
+          "enum": [
+            "enabled",
+            "disabled"
+          ],
+          "type": "string",
+          "x-fern-audiences": [
+            "public"
+          ]
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object",
+      "x-fern-audiences": [
+        "public"
+      ]
+    },
+    "ToolV2": {
+      "properties": {
+        "function": {
+          "description": "The function to be executed.",
+          "properties": {
+            "description": {
+              "description": "The description of the function.",
+              "type": "string"
+            },
+            "name": {
+              "description": "The name of the function.",
+              "type": "string"
+            },
+            "parameters": {
+              "description": "The parameters of the function as a JSON schema.",
+              "type": "object",
+              "x-fern-type-name": "ToolV2-6eoehf"
+            }
+          },
+          "required": [
+            "name",
+            "parameters"
+          ],
+          "type": "object",
+          "x-fern-type-name": "ToolV2Function"
+        },
+        "type": {
+          "enum": [
+            "function"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object",
+      "x-fern-type-name": "ToolV2"
+    },
+    "ChatFinishReason": {
+      "description": "The reason a chat request has finished.\n\n- **complete**: The model finished sending a complete message.\n- **max_tokens**: The number of generated tokens exceeded the model's context length or the value specified via the `max_tokens` parameter.\n- **stop_sequence**: One of the provided `stop_sequence` entries was reached in the model's generation.\n- **tool_call**: The model generated a Tool Call and is expecting a Tool Message in return\n- **error**: The generation failed due to an internal error\n- **timeout**: The generation was stopped because it exceeded the allowed time limit.\n",
+      "enum": [
+        "COMPLETE",
+        "STOP_SEQUENCE",
+        "MAX_TOKENS",
+        "TOOL_CALL",
+        "ERROR",
+        "TIMEOUT"
+      ],
+      "type": "string",
+      "x-fern-type-name": "ChatFinishReason"
+    },
+    "LogprobItem": {
+      "properties": {
+        "logprobs": {
+          "description": "The log probability of each token used to construct the text chunk.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "text": {
+          "description": "The text chunk for which the log probabilities was calculated.",
+          "type": "string"
+        },
+        "token_ids": {
+          "description": "The token ids of each token used to construct the text chunk.",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "token",
+        "token_ids",
+        "logprob"
+      ],
+      "type": "object",
+      "x-fern-type-name": "LogprobItem"
+    },
+    "AssistantMessageResponse": {
+      "description": "A message from the assistant role can contain text and tool call information.",
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/definitions/Citation"
+          },
+          "type": "array"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "text": "#/definitions/ChatTextContent",
+                "thinking": "#/definitions/ChatThinkingContent"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/definitions/ChatTextContent"
+              },
+              {
+                "$ref": "#/definitions/ChatThinkingContent"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "role": {
+          "enum": [
+            "assistant"
+          ],
+          "type": "string"
+        },
+        "tool_calls": {
+          "items": {
+            "$ref": "#/definitions/ToolCallV2"
+          },
+          "type": "array"
+        },
+        "tool_plan": {
+          "description": "A chain-of-thought style reflection and plan that the model generates when working with Tools.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "type": "object",
+      "x-fern-type-name": "AssistantMessageResponse"
+    },
+    "Usage": {
+      "properties": {
+        "billed_units": {
+          "properties": {
+            "classifications": {
+              "description": "The number of billed classifications units.\n",
+              "type": "number"
+            },
+            "input_tokens": {
+              "description": "The number of billed input tokens.\n",
+              "type": "number"
+            },
+            "output_tokens": {
+              "description": "The number of billed output tokens.\n",
+              "type": "number"
+            },
+            "search_units": {
+              "description": "The number of billed search units.\n",
+              "type": "number"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "UsageBilledUnits"
+        },
+        "cached_tokens": {
+          "description": "The number of prompt tokens that hit the inference cache.\n",
+          "type": "number"
+        },
+        "tokens": {
+          "properties": {
+            "input_tokens": {
+              "description": "The number of tokens used as input to the model.\n",
+              "type": "number"
+            },
+            "output_tokens": {
+              "description": "The number of tokens produced by the model.\n",
+              "type": "number"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "UsageTokens"
+        }
+      },
+      "type": "object",
+      "x-fern-type-name": "Usage"
+    },
+    "CitationEndEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "index": {
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "CitationEndEvent-fs3igt"
+        }
+      ],
+      "description": "A streamed event which signifies a citation has finished streaming.",
+      "x-fern-type-name": "CitationEndEvent"
+    },
+    "CitationStartEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "delta": {
+              "properties": {
+                "message": {
+                  "properties": {
+                    "citations": {
+                      "$ref": "#/definitions/Citation"
+                    }
+                  },
+                  "type": "object",
+                  "x-fern-type-name": "CitationStartEventDeltaMessage"
+                }
+              },
+              "type": "object",
+              "x-fern-type-name": "CitationStartEventDelta"
+            },
+            "index": {
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "CitationStartEvent-t3df62"
+        }
+      ],
+      "description": "A streamed event which signifies a citation has been created.",
+      "x-fern-type-name": "CitationStartEvent"
+    },
+    "ChatContentDeltaEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "delta": {
+              "properties": {
+                "message": {
+                  "properties": {
+                    "content": {
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "thinking": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "x-fern-type-name": "ChatContentDeltaEventDeltaMessageContent"
+                    }
+                  },
+                  "type": "object",
+                  "x-fern-type-name": "ChatContentDeltaEventDeltaMessage"
+                }
+              },
+              "type": "object",
+              "x-fern-type-name": "ChatContentDeltaEventDelta"
+            },
+            "index": {
+              "type": "integer"
+            },
+            "logprobs": {
+              "$ref": "#/definitions/LogprobItem"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatContentDeltaEvent-3m0vqs"
+        }
+      ],
+      "description": "A streamed delta event which contains a delta of chat text content.",
+      "x-fern-type-name": "ChatContentDeltaEvent"
+    },
+    "ChatContentEndEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "index": {
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatContentEndEvent-ma278i"
+        }
+      ],
+      "description": "A streamed delta event which signifies that the content block has ended.",
+      "x-fern-type-name": "ChatContentEndEvent"
+    },
+    "ChatContentStartEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "delta": {
+              "properties": {
+                "message": {
+                  "properties": {
+                    "content": {
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "thinking": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "text",
+                            "thinking"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "x-fern-type-name": "ChatContentStartEventDeltaMessageContent"
+                    }
+                  },
+                  "type": "object",
+                  "x-fern-type-name": "ChatContentStartEventDeltaMessage"
+                }
+              },
+              "type": "object",
+              "x-fern-type-name": "ChatContentStartEventDelta"
+            },
+            "index": {
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatContentStartEvent-6xvlq1"
+        }
+      ],
+      "description": "A streamed delta event which signifies that a new content block has started.",
+      "x-fern-type-name": "ChatContentStartEvent"
+    },
+    "ChatDebugEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEvent"
+        },
+        {
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "x-fern-audiences": [
+                "public"
+              ]
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatDebugEvent-352j0t"
+        }
+      ],
+      "x-fern-type-name": "ChatDebugEvent"
+    },
+    "ChatMessageEndEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "delta": {
+              "properties": {
+                "error": {
+                  "description": "An error message if an error occurred during the generation.\n",
+                  "type": "string",
+                  "x-fern-audiences": [
+                    "public"
+                  ]
+                },
+                "finish_reason": {
+                  "$ref": "#/definitions/ChatFinishReason",
+                  "x-fern-audiences": [
+                    "public"
+                  ]
+                },
+                "usage": {
+                  "$ref": "#/definitions/Usage",
+                  "x-fern-audiences": [
+                    "public"
+                  ]
+                }
+              },
+              "type": "object",
+              "x-fern-type-name": "ChatMessageEndEventDelta"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatMessageEndEvent-u3fzny"
+        }
+      ],
+      "description": "A streamed event which signifies that the chat message has ended.",
+      "x-fern-type-name": "ChatMessageEndEvent"
+    },
+    "ChatMessageStartEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "delta": {
+              "properties": {
+                "message": {
+                  "properties": {
+                    "role": {
+                      "description": "The role of the message.",
+                      "enum": [
+                        "assistant"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "x-fern-type-name": "ChatMessageStartEventDeltaMessage"
+                }
+              },
+              "type": "object",
+              "x-fern-type-name": "ChatMessageStartEventDelta"
+            },
+            "id": {
+              "description": "Unique identifier for the generated reply.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatMessageStartEvent-lsegeq"
+        }
+      ],
+      "description": "A streamed event which signifies that a stream has started.",
+      "x-fern-type-name": "ChatMessageStartEvent"
+    },
+    "ChatToolCallDeltaEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "delta": {
+              "properties": {
+                "message": {
+                  "properties": {
+                    "tool_calls": {
+                      "properties": {
+                        "function": {
+                          "properties": {
+                            "arguments": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "x-fern-type-name": "ChatToolCallDeltaEventDeltaMessageToolCallsFunction"
+                        }
+                      },
+                      "type": "object",
+                      "x-fern-type-name": "ChatToolCallDeltaEventDeltaMessageToolCalls"
+                    }
+                  },
+                  "type": "object",
+                  "x-fern-type-name": "ChatToolCallDeltaEventDeltaMessage"
+                }
+              },
+              "type": "object",
+              "x-fern-type-name": "ChatToolCallDeltaEventDelta"
+            },
+            "index": {
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatToolCallDeltaEvent-2bxzoc"
+        }
+      ],
+      "description": "A streamed event delta which signifies a delta in tool call arguments.",
+      "x-fern-type-name": "ChatToolCallDeltaEvent"
+    },
+    "ChatToolCallEndEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "index": {
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatToolCallEndEvent-t6ph9s"
+        }
+      ],
+      "description": "A streamed event delta which signifies a tool call has finished streaming.",
+      "x-fern-type-name": "ChatToolCallEndEvent"
+    },
+    "ChatToolCallStartEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "delta": {
+              "properties": {
+                "message": {
+                  "properties": {
+                    "tool_calls": {
+                      "$ref": "#/definitions/ToolCallV2"
+                    }
+                  },
+                  "type": "object",
+                  "x-fern-type-name": "ChatToolCallStartEventDeltaMessage"
+                }
+              },
+              "type": "object",
+              "x-fern-type-name": "ChatToolCallStartEventDelta"
+            },
+            "index": {
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatToolCallStartEvent-lv559x"
+        }
+      ],
+      "description": "A streamed event delta which signifies a tool call has started streaming.",
+      "x-fern-type-name": "ChatToolCallStartEvent"
+    },
+    "ChatToolPlanDeltaEvent": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChatStreamEventType"
+        },
+        {
+          "properties": {
+            "delta": {
+              "properties": {
+                "message": {
+                  "properties": {
+                    "tool_plan": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "x-fern-type-name": "ChatToolPlanDeltaEventDeltaMessage"
+                }
+              },
+              "type": "object",
+              "x-fern-type-name": "ChatToolPlanDeltaEventDelta"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ChatToolPlanDeltaEvent-2obfex"
+        }
+      ],
+      "description": "A streamed event which contains a delta of tool plan text.",
+      "x-fern-type-name": "ChatToolPlanDeltaEvent"
+    },
+    "ChatMessageV2": {
+      "description": "Represents a single message in the chat history from a given role.",
+      "discriminator": {
+        "mapping": {
+          "assistant": "#/definitions/AssistantMessageV2",
+          "system": "#/definitions/SystemMessageV2",
+          "tool": "#/definitions/ToolMessageV2",
+          "user": "#/definitions/UserMessageV2"
+        },
+        "propertyName": "role"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/definitions/UserMessageV2"
+        },
+        {
+          "$ref": "#/definitions/AssistantMessageV2"
+        },
+        {
+          "$ref": "#/definitions/SystemMessageV2"
+        },
+        {
+          "$ref": "#/definitions/ToolMessageV2"
+        }
+      ],
+      "x-fern-type-name": "ChatMessageV2"
+    },
+    "JsonResponseFormatV2": {
+      "properties": {
+        "json_schema": {
+          "description": "A [JSON schema](https://json-schema.org/overview/what-is-jsonschema) object that the output will adhere to. There are some restrictions we have on the schema, refer to [our guide](https://docs.cohere.com/docs/structured-outputs-json#schema-constraints) for more information.\nExample (required name and age object):\n```json\n{\n  \"type\": \"object\",\n  \"properties\": {\n    \"name\": {\"type\": \"string\"},\n    \"age\": {\"type\": \"integer\"}\n  },\n  \"required\": [\"name\", \"age\"]\n}\n```\n\n**Note**: This field must not be specified when the `type` is set to `\"text\"`.\n",
+          "type": "object",
+          "x-fern-type-name": "JsonResponseFormatV2-uu9wid"
+        },
+        "type": {
+          "$ref": "#/definitions/ResponseFormatTypeV2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object",
+      "x-fern-audiences": [
+        "public"
+      ],
+      "x-fern-type-name": "JsonResponseFormatV2"
+    },
+    "ChatTextResponseFormatV2": {
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/ResponseFormatTypeV2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object",
+      "x-fern-audiences": [
+        "public"
+      ],
+      "x-fern-type-name": "ChatTextResponseFormatV2"
+    },
+    "Citation": {
+      "description": "Citation information containing sources and the text cited.",
+      "properties": {
+        "content_index": {
+          "description": "Index of the content block in which this citation appears.",
+          "type": "integer"
+        },
+        "end": {
+          "description": "End index of the cited snippet in the original source text.",
+          "type": "integer"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/definitions/Source"
+          },
+          "type": "array"
+        },
+        "start": {
+          "description": "Start index of the cited snippet in the original source text.",
+          "type": "integer"
+        },
+        "text": {
+          "description": "Text snippet that is being cited.",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/CitationType"
+        }
+      },
+      "type": "object",
+      "x-fern-type-name": "Citation"
+    },
+    "ChatTextContent": {
+      "description": "Text content of the message.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "text"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ],
+      "type": "object",
+      "x-fern-type-name": "ChatTextContent"
+    },
+    "ChatThinkingContent": {
+      "description": "Thinking content of the message. This will be present when `thinking` is enabled, and will contain the models internal reasoning.",
+      "properties": {
+        "thinking": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "thinking"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "thinking"
+      ],
+      "type": "object"
+    },
+    "ToolCallV2": {
+      "description": "An array of tool calls to be made.",
+      "properties": {
+        "function": {
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-fern-type-name": "ToolCallV2Function"
+        },
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "function"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "type": "object",
+      "x-fern-type-name": "ToolCallV2"
+    },
+    "ChatStreamEventType": {
+      "description": "The streamed event types",
+      "properties": {
+        "type": {
+          "enum": [
+            "message-start",
+            "content-start",
+            "content-delta",
+            "content-end",
+            "tool-call-start",
+            "tool-call-delta",
+            "tool-call-end",
+            "tool-plan-delta",
+            "citation-start",
+            "citation-end",
+            "message-end"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "x-fern-type-name": "ChatStreamEventType"
+    },
+    "ChatStreamEvent": {
+      "properties": {
+        "event_type": {
+          "enum": [
+            "stream-start",
+            "search-queries-generation",
+            "search-results",
+            "text-generation",
+            "citation-generation",
+            "stream-end",
+            "debug"
+          ],
+          "type": "string",
+          "x-fern-audiences": [
+            "public"
+          ]
+        }
+      },
+      "required": [
+        "event_type"
+      ],
+      "x-fern-type-name": "ChatStreamEvent"
+    },
+    "AssistantMessageV2": {
+      "description": "A message from the assistant role can contain text and tool call information.",
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/definitions/Citation"
+          },
+          "type": "array"
+        },
+        "content": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "discriminator": {
+                  "mapping": {
+                    "text": "#/definitions/ChatTextContent",
+                    "thinking": "#/definitions/ChatThinkingContent"
+                  },
+                  "propertyName": "type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/ChatTextContent"
+                  },
+                  {
+                    "$ref": "#/definitions/ChatThinkingContent"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "role": {
+          "enum": [
+            "assistant"
+          ],
+          "type": "string"
+        },
+        "tool_calls": {
+          "items": {
+            "$ref": "#/definitions/ToolCallV2"
+          },
+          "type": "array"
+        },
+        "tool_plan": {
+          "description": "A chain-of-thought style reflection and plan that the model generates when working with Tools.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "Assistant Message",
+      "type": "object",
+      "x-fern-type-name": "AssistantMessage"
+    },
+    "SystemMessageV2": {
+      "description": "A message from the system.",
+      "properties": {
+        "content": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "discriminator": {
+                  "mapping": {
+                    "text": "#/definitions/ChatTextContent"
+                  },
+                  "propertyName": "type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/ChatTextContent"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "role": {
+          "enum": [
+            "system"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "content"
+      ],
+      "title": "System Message",
+      "type": "object",
+      "x-fern-type-name": "SystemMessageV2"
+    },
+    "ToolMessageV2": {
+      "description": "A message with Tool outputs.",
+      "properties": {
+        "content": {
+          "description": "Outputs from a tool. The content should formatted as a JSON object string, or a list of tool content blocks",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ToolContent"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "role": {
+          "enum": [
+            "tool"
+          ],
+          "type": "string"
+        },
+        "tool_call_id": {
+          "description": "The id of the associated tool call that has provided the given content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "tool_call_id",
+        "content"
+      ],
+      "title": "Tool Message",
+      "type": "object",
+      "x-fern-type-name": "ToolMessageV2"
+    },
+    "UserMessageV2": {
+      "description": "A message from the user.",
+      "properties": {
+        "content": {
+          "description": "The content of the message. This can be a string or a list of content blocks.\nIf a string is provided, it will be treated as a text content block.\n",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/Content"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "role": {
+          "enum": [
+            "user"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "content"
+      ],
+      "title": "User Message",
+      "type": "object",
+      "x-fern-type-name": "UserMessageV2"
+    },
+    "ResponseFormatTypeV2": {
+      "description": "Defaults to `\"text\"`.\n\nWhen set to `\"json_object\"`, the model's output will be a valid JSON Object.\n",
+      "enum": [
+        "text",
+        "json_object"
+      ],
+      "type": "string",
+      "x-fern-audiences": [
+        "public"
+      ],
+      "x-fern-type-name": "ResponseFormatTypeV2"
+    },
+    "Source": {
+      "description": "A source object containing information about the source of the data cited.",
+      "discriminator": {
+        "mapping": {
+          "document": "#/definitions/ChatDocumentSource",
+          "tool": "#/definitions/ChatToolSource"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ChatToolSource"
+        },
+        {
+          "$ref": "#/definitions/ChatDocumentSource"
+        }
+      ],
+      "x-fern-type-name": "Source"
+    },
+    "CitationType": {
+      "description": "The type of citation which indicates what part of the response the citation is for.\n",
+      "enum": [
+        "TEXT_CONTENT",
+        "THINKING_CONTENT",
+        "PLAN"
+      ],
+      "type": "string",
+      "x-fern-type-name": "CitationType"
+    },
+    "ToolContent": {
+      "description": "A content block which contains information about the content of a tool result",
+      "discriminator": {
+        "mapping": {
+          "document": "#/definitions/DocumentContent",
+          "text": "#/definitions/ChatTextContent"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ChatTextContent"
+        },
+        {
+          "$ref": "#/definitions/DocumentContent"
+        }
+      ],
+      "x-fern-type-name": "ToolContent"
+    },
+    "Content": {
+      "description": "A Content block which contains information about the content type and the content itself.",
+      "discriminator": {
+        "mapping": {
+          "image_url": "#/definitions/ImageContent",
+          "text": "#/definitions/ChatTextContent"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/definitions/ChatTextContent"
+        },
+        {
+          "$ref": "#/definitions/ImageContent"
+        }
+      ],
+      "x-fern-type-name": "Content"
+    },
+    "ChatDocumentSource": {
+      "description": "A document source object containing the unique identifier of the document and the document itself.",
+      "properties": {
+        "document": {
+          "additionalProperties": true,
+          "type": "object",
+          "x-fern-type-name": "ChatDocumentSource-w70a62"
+        },
+        "id": {
+          "description": "The unique identifier of the document",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-fern-type-name": "ChatDocumentSource"
+    },
+    "ChatToolSource": {
+      "properties": {
+        "id": {
+          "description": "The unique identifier of the document",
+          "type": "string"
+        },
+        "tool_output": {
+          "additionalProperties": true,
+          "type": "object",
+          "x-fern-type-name": "ChatToolSource-z53ra6"
+        }
+      },
+      "title": "Tool Output",
+      "type": "object",
+      "x-fern-type-name": "ChatToolSource"
+    },
+    "DocumentContent": {
+      "description": "Document content.",
+      "properties": {
+        "document": {
+          "$ref": "#/definitions/Document"
+        },
+        "type": {
+          "enum": [
+            "document"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "document"
+      ],
+      "type": "object",
+      "x-fern-type-name": "DocumentContent"
+    },
+    "ImageContent": {
+      "description": "Image content of the message.",
+      "properties": {
+        "image_url": {
+          "$ref": "#/definitions/ImageUrl"
+        },
+        "type": {
+          "$ref": "#/definitions/ContentType"
+        }
+      },
+      "required": [
+        "type",
+        "image_url"
+      ],
+      "type": "object",
+      "x-fern-type-name": "ImageContent"
+    },
+    "ImageUrl": {
+      "properties": {
+        "detail": {
+          "description": "Controls the level of detail in image processing. `\"auto\"` is the default and lets the system choose, `\"low\"` is faster but less detailed, and `\"high\"` preserves maximum detail. You can save tokens and speed up responses by using detail: `\"low\"`.\n",
+          "enum": [
+            "auto",
+            "low",
+            "high"
+          ],
+          "type": "string"
+        },
+        "url": {
+          "description": "URL of an image. Can be either a base64 data URI or a web URL.\n",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object",
+      "x-fern-type-name": "ImageUrl"
+    },
+    "ContentType": {
+      "description": "Type of message content\n",
+      "enum": [
+        "text",
+        "image_url"
+      ],
+      "type": "string",
+      "x-fern-audiences": [
+        "public"
+      ],
+      "x-fern-type-name": "ContentType"
+    }
+  }
+}

@@ -167,6 +167,10 @@ export interface ToolCallPart {
    */
   args: Record<string, unknown>;
   /**
+   * The provider-specific signature used to preserve reasoning/tool continuity.
+   */
+  signature?: string;
+  /**
    * The ID of the tool call part, if applicable.
    * This is different from tool_call_id which is used to match tool results.
    */
@@ -187,6 +191,8 @@ export interface ToolResultPart {
   tool_name: string;
   /**
    * The content of the tool result.
+   * This may include non-text parts such as images or audio.
+   * Provider support varies by model API.
    */
   content: Part[];
   /**
@@ -280,6 +286,10 @@ export interface ToolCallPartDelta {
    * The partial JSON string of the arguments to pass to the tool.
    */
   args?: string;
+  /**
+   * The provider-specific signature used to preserve reasoning/tool continuity.
+   */
+  signature?: string;
   /**
    * The ID of the tool call part, if applicable.
    * This is different from tool_call_id which is used to match tool results.
