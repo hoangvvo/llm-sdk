@@ -8,14 +8,9 @@
         "properties": {
           "location": {
             "type": "string"
-          },
-          "preferred_unit": {
-            "type": ["string", "null"],
-            "enum": ["c", "f"],
-            "description": "The preferred unit for temperature. 'c' for Celsius, 'f' for Fahrenheit. If the user does not specify, use null instead of asking the user."
           }
         },
-        "required": ["location", "preferred_unit"],
+        "required": ["location"],
         "additionalProperties": false
       }
     },
@@ -55,61 +50,23 @@
   "test_cases": [
     {
       "name": "generate_text",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
               {
-                "type": "text",
-                "text": "Respond by saying \"Hello\""
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Respond by saying \"Hello\""
+                  }
+                ]
               }
             ]
-          }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "Hello"
-          }
-        ]
-      }
-    },
-    {
-      "name": "stream_text",
-      "type": "stream",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Respond by saying \"Hello\""
-              }
-            ]
-          }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "Hello"
-          }
-        ]
-      }
-    },
-    {
-      "name": "generate_with_system_prompt",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
+          },
+          "expect": {
             "content": [
               {
                 "type": "text",
@@ -117,191 +74,265 @@
               }
             ]
           }
-        ],
-        "system_prompt": "You must always start your message with \"🤖\""
-      },
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "^🤖"
+        }
+      ]
+    },
+    {
+      "name": "stream_text",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Respond by saying \"Hello\""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Hello"
+              }
+            ]
           }
-        ]
-      }
+        }
+      ]
+    },
+    {
+      "name": "generate_with_system_prompt",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello"
+                  }
+                ]
+              }
+            ],
+            "system_prompt": "You must always start your message with \"🤖\""
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^🤖"
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "generate_tool_call",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What's the weather like in Boston today?"
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
             "content": [
               {
-                "type": "text",
-                "text": "What's the weather like in Boston today?"
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": "Boston"
               }
             ]
           }
-        ]
-      },
-      "input_tools": ["get_weather"],
-      "output": {
-        "content": [
-          {
-            "type": "tool_call",
-            "tool_name": "get_weather",
-            "args": {
-              "location": "Boston"
-            }
-          }
-        ]
-      }
+        }
+      ]
     },
     {
       "name": "stream_tool_call",
-      "type": "stream",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What's the weather like in Boston today?"
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
             "content": [
               {
-                "type": "text",
-                "text": "What's the weather like in Boston today?"
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": "Boston"
               }
             ]
           }
-        ]
-      },
-      "input_tools": ["get_weather"],
-      "output": {
-        "content": [
-          {
-            "type": "tool_call",
-            "tool_name": "get_weather",
-            "args": {
-              "location": "Boston"
-            }
-          }
-        ]
-      }
+        }
+      ]
     },
     {
       "name": "generate_text_from_tool_result",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
               {
-                "type": "text",
-                "text": "What's the weather like in Boston today?"
-              }
-            ]
-          },
-          {
-            "role": "assistant",
-            "content": [
-              {
-                "type": "tool-call",
-                "tool_call_id": "0mbnj08nt",
-                "tool_name": "get_weather",
-                "args": {
-                  "location": "Boston"
-                }
-              }
-            ]
-          },
-          {
-            "role": "tool",
-            "content": [
-              {
-                "type": "tool-result",
-                "tool_call_id": "0mbnj08nt",
-                "tool_name": "get_weather",
+                "role": "user",
                 "content": [
                   {
                     "type": "text",
-                    "text": "{\"temperature\": 70, \"unit\": \"f\", \"description\": \"Sunny\"}"
+                    "text": "What's the weather like in Boston today?"
                   }
                 ]
               }
             ]
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
+            "content": [
+              {
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": "Boston"
+              }
+            ]
           }
-        ]
-      },
-      "input_tools": ["get_weather"],
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "70.*sunny|sunny.*70|70.*Sunny|Sunny.*70"
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": {
+                      "$ref": "stages.0.tool_calls.0.tool_call_id"
+                    },
+                    "tool_name": "get_weather",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "{\"temperature\": 70, \"unit\": \"f\", \"description\": \"Sunny\"}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "70.*sunny|sunny.*70|70.*Sunny|Sunny.*70"
+              }
+            ]
           }
-        ]
-      }
+        }
+      ]
     },
     {
       "name": "stream_text_from_tool_result",
-      "type": "stream",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
               {
-                "type": "text",
-                "text": "What's the weather like in Boston today?"
-              }
-            ]
-          },
-          {
-            "role": "assistant",
-            "content": [
-              {
-                "type": "tool-call",
-                "tool_call_id": "0mbnj08nt",
-                "tool_name": "get_weather",
-                "args": {
-                  "location": "Boston"
-                }
-              }
-            ]
-          },
-          {
-            "role": "tool",
-            "content": [
-              {
-                "type": "tool-result",
-                "tool_call_id": "0mbnj08nt",
-                "tool_name": "get_weather",
+                "role": "user",
                 "content": [
                   {
                     "type": "text",
-                    "text": "{\"temperature\": 70, \"unit\": \"f\", \"description\": \"Sunny\"}"
+                    "text": "What's the weather like in Boston today?"
                   }
                 ]
               }
             ]
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
+            "content": [
+              {
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": "Boston"
+              }
+            ]
           }
-        ]
-      },
-      "input_tools": ["get_weather"],
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "70.*sunny|sunny.*70|70.*Sunny|Sunny.*70"
+        },
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": {
+                      "$ref": "stages.0.tool_calls.0.tool_call_id"
+                    },
+                    "tool_name": "get_weather",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "{\"temperature\": 70, \"unit\": \"f\", \"description\": \"Sunny\"}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "70.*sunny|sunny.*70|70.*Sunny|Sunny.*70"
+              }
+            ]
           }
-        ]
-      }
+        }
+      ]
     },
     {
       "name": "generate_text_from_image_tool_result",
-      "type": "generate",
-      "setup": {
-        "generate_assistant": {
+      "stages": [
+        {
+          "type": "generate",
           "input": {
             "messages": [
               {
@@ -319,32 +350,533 @@
             }
           },
           "input_tools": ["get_color_sample"],
-          "target_message_index": 1
-        }
-      },
-      "input": {
-        "messages": [
-          {
-            "role": "user",
+          "expect": {
             "content": [
               {
-                "type": "text",
-                "text": "What color is the image returned by the tool? Answer with one word."
+                "type": "tool_call",
+                "tool_name": "get_color_sample"
+              }
+            ]
+          }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": {
+                      "$ref": "stages.0.tool_calls.0.tool_call_id"
+                    },
+                    "tool_name": "get_color_sample",
+                    "content": [
+                      {
+                        "type": "image",
+                        "mime_type": "image/png",
+                        "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4z8BAEmIY1TCqYfhqAACQ+f8B8u7oVwAAAABJRU5ErkJggg=="
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
-          {
-            "role": "assistant",
-            "content": []
-          },
-          {
-            "role": "tool",
+          "input_tools": ["get_color_sample"],
+          "expect": {
             "content": [
               {
-                "type": "tool-result",
-                "tool_call_id": "8r3n4x2qp",
-                "tool_name": "get_color_sample",
+                "type": "text",
+                "text": "red|Red"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_parallel_tool_calls",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
                 "content": [
+                  {
+                    "type": "text",
+                    "text": "Get me the weather in Boston and the stock price of AAPL. You call both of the tools in one go."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["get_weather", "get_stock_price"],
+          "expect": {
+            "content": [
+              {
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": "Boston"
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "get_stock_price",
+                "args": "AAPL"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stream_parallel_tool_calls",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Get me the weather in Boston and the stock price of AAPL. You must call both of the tools in one go."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["get_weather", "get_stock_price"],
+          "expect": {
+            "content": [
+              {
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": "Boston"
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "get_stock_price",
+                "args": "AAPL"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stream_parallel_tool_calls_of_same_name",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Get me the weather in Boston and the weather in New York."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
+            "content": [
+              {
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": "Boston"
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": "New York"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "structured_response_format",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Create a user with the id \"a1b2c3\", name \"John Doe\", email \"john.doe@example.com\", birthDate \"1990-05-15\", age 34, isActive true, role \"user\", accountBalance 500.75, phoneNumber \"+1234567890123\", tags [\"developer\", \"gamer\"], and lastLogin \"2024-11-09T10:30:00Z\"."
+                  }
+                ]
+              }
+            ],
+            "response_format": {
+              "type": "json",
+              "name": "user",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "birthDate": {
+                    "type": "string"
+                  },
+                  "age": {
+                    "type": "integer"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "accountBalance": {
+                    "type": "number"
+                  },
+                  "phoneNumber": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "lastLogin": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "email",
+                  "birthDate",
+                  "age",
+                  "isActive",
+                  "role",
+                  "accountBalance",
+                  "phoneNumber",
+                  "tags",
+                  "lastLogin"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "\"id\"\\s*:\\s*\"a1b2c3\""
+              },
+              {
+                "type": "text",
+                "text": "\"name\"\\s*:\\s*\"John Doe\""
+              },
+              {
+                "type": "text",
+                "text": "\"email\"\\s*:\\s*\"john\\.doe@example\\.com\""
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "source_part_input",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What is my first secret number?"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "get_first_secret_number",
+                "description": "Get the first secret number",
+                "parameters": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "tool_call",
+                "tool_name": "get_first_secret_number"
+              }
+            ]
+          }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": {
+                      "$ref": "stages.0.tool_calls.0.tool_call_id"
+                    },
+                    "tool_name": "get_first_secret_number",
+                    "content": [
+                      {
+                        "type": "source",
+                        "source": "doc1",
+                        "title": "my secret number",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "24"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "get_first_secret_number",
+                "description": "Get the first secret number",
+                "parameters": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "24"
+              }
+            ]
+          }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "source",
+                    "source": "doc2",
+                    "title": "my secret number",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Remember that my second secret number is \"42\"."
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "text": "What are my two secret numbers?"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "get_first_secret_number",
+                "description": "Get the first secret number",
+                "parameters": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "24"
+              },
+              {
+                "type": "text",
+                "text": "42"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_audio",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "modalities": ["text", "audio"],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Respond in audio saying 'Hello'"
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "audio",
+                "id": true,
+                "transcript": "Hello"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stream_audio",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "modalities": ["text", "audio"],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Respond in audio saying 'Hello'"
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "audio",
+                "id": true,
+                "transcript": "Hello"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_image",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "modalities": ["text", "image"],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Generate an image of a red apple on a white background."
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "image",
+                "id": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stream_image",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "modalities": ["text", "image"],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Generate an image of a red apple on a white background."
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "image",
+                "id": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_image_input",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What color is this?"
+                  },
                   {
                     "type": "image",
                     "mime_type": "image/png",
@@ -353,518 +885,115 @@
                 ]
               }
             ]
-          }
-        ]
-      },
-      "input_tools": ["get_color_sample"],
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "red|Red"
-          }
-        ]
-      }
-    },
-    {
-      "name": "generate_parallel_tool_calls",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Get me the weather in Boston and the stock price of AAPL. You call both of the tools in one go."
-              }
-            ]
-          }
-        ]
-      },
-      "input_tools": ["get_weather", "get_stock_price"],
-      "output": {
-        "content": [
-          {
-            "type": "tool_call",
-            "tool_name": "get_weather",
-            "args": {
-              "location": "Boston"
-            }
           },
-          {
-            "type": "tool_call",
-            "tool_name": "get_stock_price",
-            "args": {
-              "symbol": "AAPL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "stream_parallel_tool_calls",
-      "type": "stream",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
+          "expect": {
             "content": [
               {
                 "type": "text",
-                "text": "Get me the weather in Boston and the stock price of AAPL. You must call both of the tools in one go."
+                "text": "red|Red"
               }
             ]
-          }
-        ]
-      },
-      "input_tools": ["get_weather", "get_stock_price"],
-      "output": {
-        "content": [
-          {
-            "type": "tool_call",
-            "tool_name": "get_weather",
-            "args": {
-              "location": "Boston"
-            }
-          },
-          {
-            "type": "tool_call",
-            "tool_name": "get_stock_price",
-            "args": {
-              "symbol": "AAPL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "stream_parallel_tool_calls_of_same_name",
-      "type": "stream",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Get me the weather in Boston and the weather in New York."
-              }
-            ]
-          }
-        ]
-      },
-      "input_tools": ["get_weather"],
-      "output": {
-        "content": [
-          {
-            "type": "tool_call",
-            "tool_name": "get_weather",
-            "args": {
-              "location": "Boston"
-            }
-          },
-          {
-            "type": "tool_call",
-            "tool_name": "get_weather",
-            "args": {
-              "location": "New York"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "structured_response_format",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Create a user with the id \"a1b2c3\", name \"John Doe\", email \"john.doe@example.com\", birthDate \"1990-05-15\", age 34, isActive true, role \"user\", accountBalance 500.75, phoneNumber \"+1234567890123\", tags [\"developer\", \"gamer\"], and lastLogin \"2024-11-09T10:30:00Z\"."
-              }
-            ]
-          }
-        ],
-        "response_format": {
-          "type": "json",
-          "name": "user",
-          "schema": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string" },
-              "name": { "type": "string" },
-              "email": { "type": "string" },
-              "birthDate": { "type": "string" },
-              "age": { "type": "integer" },
-              "isActive": { "type": "boolean" },
-              "role": { "type": "string" },
-              "accountBalance": { "type": "number" },
-              "phoneNumber": { "type": "string" },
-              "tags": { "type": "array", "items": { "type": "string" } },
-              "lastLogin": { "type": "string" }
-            },
-            "required": [
-              "id",
-              "name",
-              "email",
-              "birthDate",
-              "age",
-              "isActive",
-              "role",
-              "accountBalance",
-              "phoneNumber",
-              "tags",
-              "lastLogin"
-            ],
-            "additionalProperties": false
           }
         }
-      },
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "\"id\"\\s*:\\s*\"a1b2c3\""
-          },
-          {
-            "type": "text",
-            "text": "\"name\"\\s*:\\s*\"John Doe\""
-          },
-          {
-            "type": "text",
-            "text": "\"email\"\\s*:\\s*\"john\\.doe@example\\.com\""
-          }
-        ]
-      }
-    },
-    {
-      "name": "source_part_input",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "What is my first secret number?"
-              }
-            ]
-          },
-          {
-            "role": "assistant",
-            "content": [
-              {
-                "type": "tool-call",
-                "tool_call_id": "0mbnj08nt",
-                "tool_name": "get_first_secret_number",
-                "args": {}
-              }
-            ]
-          },
-          {
-            "role": "tool",
-            "content": [
-              {
-                "type": "tool-result",
-                "tool_call_id": "0mbnj08nt",
-                "tool_name": "get_first_secret_number",
-                "content": [
-                  {
-                    "type": "source",
-                    "source": "doc1",
-                    "title": "my secret number",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "24"
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "role": "assistant",
-            "content": [
-              {
-                "type": "text",
-                "text": "Got it!"
-              }
-            ]
-          },
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "source",
-                "source": "doc2",
-                "title": "my secret number",
-                "content": [
-                  {
-                    "type": "text",
-                    "text": "Remember that my second secret number is \"42\"."
-                  }
-                ]
-              },
-              {
-                "type": "text",
-                "text": "What are my two secret numbers?"
-              }
-            ]
-          }
-        ],
-        "tools": [
-          {
-            "name": "get_first_secret_number",
-            "description": "Get the first secret number",
-            "parameters": {
-              "type": "object",
-              "properties": {},
-              "additionalProperties": false
-            }
-          }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "24"
-          },
-          {
-            "type": "text",
-            "text": "42"
-          }
-        ]
-      }
-    },
-    {
-      "name": "generate_audio",
-      "type": "generate",
-      "input": {
-        "modalities": ["text", "audio"],
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Respond in audio saying 'Hello'"
-              }
-            ]
-          }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "audio",
-            "id": true,
-            "transcript": "Hello"
-          }
-        ]
-      }
-    },
-    {
-      "name": "stream_audio",
-      "type": "stream",
-      "input": {
-        "modalities": ["text", "audio"],
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Respond in audio saying 'Hello'"
-              }
-            ]
-          }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "audio",
-            "id": true,
-            "transcript": "Hello"
-          }
-        ]
-      }
-    },
-    {
-      "name": "generate_image",
-      "type": "generate",
-      "input": {
-        "modalities": ["text", "image"],
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Generate an image of a red apple on a white background."
-              }
-            ]
-          }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "image",
-            "id": false
-          }
-        ]
-      }
-    },
-    {
-      "name": "stream_image",
-      "type": "stream",
-      "input": {
-        "modalities": ["text", "image"],
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "Generate an image of a red apple on a white background."
-              }
-            ]
-          }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "image",
-            "id": false
-          }
-        ]
-      }
-    },
-    {
-      "name": "generate_image_input",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
-            "content": [
-              {
-                "type": "text",
-                "text": "What color is this?"
-              },
-              {
-                "type": "image",
-                "mime_type": "image/png",
-                "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4z8BAEmIY1TCqYfhqAACQ+f8B8u7oVwAAAABJRU5ErkJggg=="
-              }
-            ]
-          }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "red|Red"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "stream_image_input",
-      "type": "stream",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What color is this?"
+                  },
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4z8BAEmIY1TCqYfhqAACQ+f8B8u7oVwAAAABJRU5ErkJggg=="
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
             "content": [
               {
                 "type": "text",
-                "text": "What color is this?"
-              },
-              {
-                "type": "image",
-                "mime_type": "image/png",
-                "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4z8BAEmIY1TCqYfhqAACQ+f8B8u7oVwAAAABJRU5ErkJggg=="
+                "text": "red|Red"
               }
             ]
           }
-        ]
-      },
-      "output": {
-        "content": [
-          {
-            "type": "text",
-            "text": "red|Red"
-          }
-        ]
-      }
+        }
+      ]
     },
     {
       "name": "generate_reasoning",
-      "type": "generate",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering."
+                  }
+                ]
+              }
+            ],
+            "reasoning": {
+              "enabled": true
+            }
+          },
+          "expect": {
             "content": [
               {
-                "type": "text",
-                "text": "John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering."
+                "type": "reasoning",
+                "text": "John"
               }
             ]
           }
-        ],
-        "reasoning": {
-          "enabled": true
         }
-      },
-      "output": {
-        "content": [
-          {
-            "type": "reasoning",
-            "text": "John"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "stream_reasoning",
-      "type": "stream",
-      "input": {
-        "messages": [
-          {
-            "role": "user",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering."
+                  }
+                ]
+              }
+            ],
+            "reasoning": {
+              "enabled": true
+            }
+          },
+          "expect": {
             "content": [
               {
-                "type": "text",
-                "text": "John is twice as old as his sister Jane. Four years ago, John was three times as old. What is John's current age? Make sure to reason and think through first before answering."
+                "type": "reasoning",
+                "text": "John"
               }
             ]
           }
-        ],
-        "reasoning": {
-          "enabled": true
         }
-      },
-      "output": {
-        "content": [
-          {
-            "type": "reasoning",
-            "text": "John"
-          }
-        ]
-      }
+      ]
     }
   ]
 }

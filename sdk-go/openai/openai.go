@@ -390,16 +390,14 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 			inputItems = append(inputItems, openaiapi.InputItem{
 				Item: &openaiapi.Item{
 					ReasoningItem: &openaiapi.ReasoningItem{
-						// Similar to assistant message parts, we generate a unique ID for each reasoning part.
 						Id: id,
 						Summary: []openaiapi.SummaryTextContent{
-							openaiapi.SummaryTextContent{
+							{
 								Text: part.ReasoningPart.Text,
 								Type: openaiapi.SummaryTextContentTypeSummaryText,
 							},
 						},
 						EncryptedContent: part.ReasoningPart.Signature,
-						Status:           ptr.To(openaiapi.ReasoningItemStatusCompleted),
 					},
 				},
 			})
@@ -428,7 +426,6 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 						CallId:    part.ToolCallPart.ToolCallID,
 						Name:      part.ToolCallPart.ToolName,
 						Id:        part.ToolCallPart.ID,
-						Status:    ptr.To(openaiapi.FunctionToolCallStatusCompleted),
 					},
 				},
 			})
@@ -512,26 +509,6 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.InputCont
 				ImageUrl: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data)),
 			},
 		}, nil
-
-	// case part.AudioPart != nil:
-	// var format string
-	// switch part.AudioPart.Format {
-	// case llmsdk.AudioFormatMP3:
-	// 	format = "mp3"
-	// case llmsdk.AudioFormatWav:
-	// 	format = "wav"
-	// default:
-	// 	return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert audio format to OpenAI InputAudio format for format %s", part.AudioPart.Format))
-	// }
-
-	// return &openaiapi.InputContent{
-	// 	ResponseInputAudio: &openaiapi.ResponseInputAudio{
-	// 		InputAudio: openaiapi.ResponseInputAudioInputAudio{
-	// 			Data:   part.AudioPart.Data,
-	// 			Format: format,
-	// 		},
-	// 	},
-	// }, nil
 
 	default:
 		return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert part to OpenAI content part for type %s", part.Type()))
@@ -686,7 +663,7 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 				summary += s.Text + "\n"
 			}
 
-			reasoningOpts := []llmsdk.ReasoingPartOption{}
+			reasoningOpts := []llmsdk.ReasoningPartOption{}
 			if item.Reasoning.EncryptedContent != nil {
 				reasoningOpts = append(reasoningOpts, llmsdk.WithReasoningSignature(*item.Reasoning.EncryptedContent))
 			}

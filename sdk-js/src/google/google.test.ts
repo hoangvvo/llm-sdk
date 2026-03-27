@@ -17,7 +17,7 @@ suite("GoogleModel", () => {
 
   const imageModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-2.5-flash-image-preview",
+    modelId: "gemini-2.5-flash-image",
   });
 
   const multimodalToolModel = new GoogleModel({
@@ -27,7 +27,7 @@ suite("GoogleModel", () => {
 
   const thinkingModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-2.0-flash-thinking-exp-01-21",
+    modelId: "gemini-2.5-flash",
   });
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {

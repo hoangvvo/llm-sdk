@@ -35,7 +35,7 @@ fn google_audio_model() -> GoogleModel {
 
 fn google_image_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-2.5-flash-image-preview".to_string(),
+        "gemini-2.5-flash-image".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()
@@ -55,7 +55,7 @@ fn google_multimodal_tool_model() -> GoogleModel {
 
 fn google_reasoning_model() -> GoogleModel {
     GoogleModel::new(
-        "gemini-2.0-flash-thinking-exp-01-21".to_string(),
+        "gemini-2.5-flash".to_string(),
         GoogleModelOptions {
             api_key: google_api_key().clone(),
             ..Default::default()

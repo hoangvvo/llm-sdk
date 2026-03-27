@@ -1,6 +1,10 @@
 use crate::Part;
 use regex::Regex;
 
+pub fn compile_pattern(pattern: &str) -> Regex {
+    Regex::new(&format!("(?s){pattern}")).unwrap()
+}
+
 #[derive(Debug, Clone)]
 pub struct TextPartAssertion {
     pub text: Regex,
@@ -29,25 +33,9 @@ impl TextPartAssertion {
 }
 
 #[derive(Debug, Clone)]
-pub enum ToolCallpartAssertionArgPropValue {
-    Value(Regex),
-}
-
-impl ToolCallpartAssertionArgPropValue {
-    pub fn is_matched(&self, actual: &serde_json::Value) -> bool {
-        match self {
-            Self::Value(regex) => {
-                let actual_str = actual.to_string();
-                regex.is_match(&actual_str)
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct ToolCallPartAssertion {
     pub tool_name: String,
-    pub args: Vec<(String, ToolCallpartAssertionArgPropValue)>,
+    pub args: Option<Regex>,
 }
 
 impl ToolCallPartAssertion {
@@ -55,11 +43,8 @@ impl ToolCallPartAssertion {
         let found_part = content.iter().find(|part| {
             if let Part::ToolCall(tool_call_part) = part {
                 tool_call_part.tool_name == self.tool_name
-                    && self.args.iter().all(|(key, value)| {
-                        tool_call_part
-                            .args
-                            .get(key)
-                            .is_some_and(|arg| value.is_matched(arg))
+                    && self.args.as_ref().is_none_or(|regex| {
+                        regex.is_match(&serde_json::to_string(&tool_call_part.args).unwrap())
                     })
             } else {
                 false

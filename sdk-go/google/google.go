@@ -523,7 +523,7 @@ func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
 			if part.Text != nil {
 				text = *part.Text
 			}
-			opts := []llmsdk.ReasoingPartOption{}
+			opts := []llmsdk.ReasoningPartOption{}
 			if part.ThoughtSignature != nil {
 				opts = append(opts, llmsdk.WithReasoningSignature(*part.ThoughtSignature))
 			}

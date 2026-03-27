@@ -1,6 +1,7 @@
 package testcommon
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -27,34 +28,24 @@ func (a TextPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 	t.Errorf("Expected matching text part:\nExpected: %s\nReceived:\n%s", a.Text.String(), string(contentJSON))
 }
 
-// ToolCallPartAssertionArgProp represents tool call argument assertions
-type ToolCallPartAssertionArgProp map[string]*regexp.Regexp
-
 // ToolCallPartAssertion represents an assertion for tool call parts
 type ToolCallPartAssertion struct {
 	ToolName string
-	Args     ToolCallPartAssertionArgProp
+	Args     *regexp.Regexp
 }
 
 // matchToolCallArgs matches tool call arguments against assertions
-func matchToolCallArgs(raw json.RawMessage, expected ToolCallPartAssertionArgProp) bool {
-	var actual map[string]any
-	if err := json.Unmarshal(raw, &actual); err != nil {
+func matchToolCallArgs(raw json.RawMessage, expected *regexp.Regexp) bool {
+	if expected == nil {
+		return true
+	}
+
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, raw); err != nil {
 		return false
 	}
 
-	for key, expectedRegex := range expected {
-		actualValue, exists := actual[key]
-		if !exists {
-			return false
-		}
-
-		actualStr := fmt.Sprintf("%v", actualValue)
-		if !expectedRegex.MatchString(actualStr) {
-			return false
-		}
-	}
-	return true
+	return expected.Match(compact.Bytes())
 }
 
 func (a ToolCallPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
@@ -214,22 +205,21 @@ func assertContentPart(t *testing.T, content []llmsdk.Part, assertions []PartAss
 func NewTextAssertion(pattern string) PartAssertion {
 	return PartAssertion{
 		TextPart: &TextPartAssertion{
-			Text: regexp.MustCompile(pattern),
+			Text: regexp.MustCompile("(?s)" + pattern),
 		},
 	}
 }
 
 // NewToolCallAssertion creates a new tool call part assertion
-func NewToolCallAssertion(toolName string, args map[string]string) PartAssertion {
-	argAssertions := make(ToolCallPartAssertionArgProp)
-	for key, pattern := range args {
-		argAssertions[key] = regexp.MustCompile(pattern)
+func NewToolCallAssertion(toolName string, argsPattern string) PartAssertion {
+	var args *regexp.Regexp
+	if argsPattern != "" {
+		args = regexp.MustCompile("(?s)" + argsPattern)
 	}
-
 	return PartAssertion{
 		ToolCallPart: &ToolCallPartAssertion{
 			ToolName: toolName,
-			Args:     argAssertions,
+			Args:     args,
 		},
 	}
 }
@@ -237,7 +227,7 @@ func NewToolCallAssertion(toolName string, args map[string]string) PartAssertion
 func NewReasoningAssertion(textPattern string) PartAssertion {
 	return PartAssertion{
 		ReasoningPart: &ReasoningPartAssertion{
-			Text: regexp.MustCompile(textPattern),
+			Text: regexp.MustCompile("(?s)" + textPattern),
 		},
 	}
 }
@@ -245,7 +235,7 @@ func NewReasoningAssertion(textPattern string) PartAssertion {
 func NewAudioAssertion(audioID bool, transcriptPattern string) PartAssertion {
 	var transcriptRegex *regexp.Regexp
 	if transcriptPattern != "" {
-		transcriptRegex = regexp.MustCompile(transcriptPattern)
+		transcriptRegex = regexp.MustCompile("(?s)" + transcriptPattern)
 	}
 	return PartAssertion{
 		AudioPart: &AudioPartAssertion{

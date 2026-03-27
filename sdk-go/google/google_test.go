@@ -30,13 +30,13 @@ func TestMain(m *testing.M) {
 	audioModel = google.NewGoogleModel("gemini-2.5-flash-preview-tts", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	imageModel = google.NewGoogleModel("gemini-2.5-flash-image-preview", google.GoogleModelOptions{
+	imageModel = google.NewGoogleModel("gemini-2.5-flash-image", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
 	multimodalToolModel = google.NewGoogleModel("gemini-3-flash-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	reasoningModel = google.NewGoogleModel("gemini-2.0-flash-thinking-exp-01-21", google.GoogleModelOptions{
+	reasoningModel = google.NewGoogleModel("gemini-2.5-flash", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
 

@@ -359,7 +359,7 @@ func createAudioPart(data *accumulatedAudioData) (Part, error) {
 
 // createReasoningPart creates a reasoning part from accumulated reasoning data
 func createReasoningPart(data *ReasoningPartDelta) Part {
-	var opts []ReasoingPartOption
+	var opts []ReasoningPartOption
 	if data.Signature != nil {
 		opts = append(opts, WithReasoningSignature(*data.Signature))
 	}

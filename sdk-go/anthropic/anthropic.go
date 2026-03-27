@@ -295,12 +295,6 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 		params.Thinking = convertToAnthropicThinkingConfigParam(*input.Reasoning, maxTokens)
 	}
 
-	if len(input.Metadata) > 0 {
-		if userID, ok := input.Metadata["user_id"]; ok {
-			params.Metadata = &anthropicapi.Metadata{UserId: ptr.To(userID)}
-		}
-	}
-
 	return params, nil
 }
 
@@ -559,7 +553,7 @@ func mapAnthropicContentBlock(block anthropicapi.ContentBlock) (*llmsdk.Part, er
 		return &part, nil
 
 	case block.Thinking != nil:
-		opts := []llmsdk.ReasoingPartOption{}
+		opts := []llmsdk.ReasoningPartOption{}
 		if block.Thinking.Signature != "" {
 			opts = append(opts, llmsdk.WithReasoningSignature(block.Thinking.Signature))
 		}

@@ -388,13 +388,6 @@ impl TryFrom<UserMessage> for InputItem {
                                         )),
                                     })
                                 }
-                                Part::Audio(audio_part) => Err(LanguageModelError::Unsupported(
-                                    PROVIDER,
-                                    format!(
-                                "Responses API does not support converting audio input parts: {:?}",
-                                audio_part.format
-                            ),
-                                ))?,
                                 _ => Err(LanguageModelError::Unsupported(
                                     PROVIDER,
                                     format!(
@@ -418,29 +411,31 @@ fn convert_assistant_message_to_response_input_items(
 
     message_parts
         .into_iter()
-        .map(|part| {
-            Ok(match part {
+        .try_fold(Vec::new(), |mut acc, part| {
+            let item = match part {
                 Part::Text(text_part) => {
-                    InputItem::Item(responses_api::Item::OutputMessage(OutputMessage {
-                        // Response output item requires an ID.
-                        // This usually applies if we enable OpenAI "store".
-                        // or that we propogate the message ID in output.
-                        // For compatibility, we want to avoid doing that, so we use a generated
-                        // ID to avoid the API from returning an
-                        // error.
-                        id: format!("msg_{}", id_utils::generate_string(15)),
-                        role: OutputMessageRole::Assistant,
-                        content: vec![OutputMessageContent::OutputText(OutputTextContent {
-                            text: text_part.text,
-                            annotations: vec![],
-                            logprobs: vec![],
-                        })],
-                        phase: None,
-                        status: OutputMessageStatus::Completed,
-                    }))
+                    Some(InputItem::Item(responses_api::Item::OutputMessage(
+                        OutputMessage {
+                            // Response output item requires an ID.
+                            // This usually applies if we enable OpenAI "store".
+                            // or that we propogate the message ID in output.
+                            // For compatibility, we want to avoid doing that, so we use a generated
+                            // ID to avoid the API from returning an
+                            // error.
+                            id: format!("msg_{}", id_utils::generate_string(15)),
+                            role: OutputMessageRole::Assistant,
+                            content: vec![OutputMessageContent::OutputText(OutputTextContent {
+                                text: text_part.text,
+                                annotations: vec![],
+                                logprobs: vec![],
+                            })],
+                            phase: None,
+                            status: OutputMessageStatus::Completed,
+                        },
+                    )))
                 }
-                Part::Reasoning(reasoning_part) => {
-                    InputItem::Item(responses_api::Item::ReasoningItem(ReasoningItem {
+                Part::Reasoning(reasoning_part) => Some(InputItem::Item(
+                    responses_api::Item::ReasoningItem(ReasoningItem {
                         id: reasoning_part.id.unwrap_or_default(),
                         summary: vec![SummaryTextContent {
                             text: reasoning_part.text,
@@ -449,10 +444,10 @@ fn convert_assistant_message_to_response_input_items(
                         content: None,
                         encrypted_content: reasoning_part.signature,
                         status: None,
-                    }))
-                }
-                Part::Image(image_part) => {
-                    InputItem::Item(responses_api::Item::ImageGenToolCall(ImageGenToolCall {
+                    }),
+                )),
+                Part::Image(image_part) => Some(InputItem::Item(
+                    responses_api::Item::ImageGenToolCall(ImageGenToolCall {
                         action: None,
                         background: None,
                         id: image_part.id.unwrap_or_default(),
@@ -465,25 +460,28 @@ fn convert_assistant_message_to_response_input_items(
                         )),
                         revised_prompt: None,
                         size: None,
-                    }))
-                }
-                Part::ToolCall(tool_call_part) => {
-                    InputItem::Item(responses_api::Item::FunctionToolCall(FunctionToolCall {
+                    }),
+                )),
+                Part::ToolCall(tool_call_part) => Some(InputItem::Item(
+                    responses_api::Item::FunctionToolCall(FunctionToolCall {
                         arguments: tool_call_part.args.to_string(),
                         call_id: tool_call_part.tool_call_id,
                         name: tool_call_part.tool_name,
                         id: tool_call_part.id,
                         namespace: None,
                         status: None,
-                    }))
-                }
+                    }),
+                )),
                 _ => Err(LanguageModelError::Unsupported(
                     PROVIDER,
                     format!("Cannot convert part to OpenAI input item for part {part:?}"),
                 ))?,
-            })
+            };
+            if let Some(item) = item {
+                acc.push(item);
+            }
+            Ok(acc)
         })
-        .collect::<LanguageModelResult<_>>()
 }
 
 fn convert_tool_message_to_response_input_items(
@@ -661,9 +659,7 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                 let mut tool_call_part =
                     ToolCallPart::new(function_tool_call.call_id, function_tool_call.name, args);
 
-                if let Some(id) = function_tool_call.id {
-                    tool_call_part.id = Some(id);
-                }
+                tool_call_part.id = function_tool_call.id;
                 let part = Part::ToolCall(tool_call_part);
 
                 acc.push(part);
@@ -738,11 +734,12 @@ fn map_openai_stream_event(
                 }
                 OutputItem::Reasoning(reasoning_item) => {
                     if let Some(encrypted_content) = reasoning_item.encrypted_content {
-                        let reasoning_part = PartDelta::Reasoning(ReasoningPartDelta {
+                        let reasoning_part = ReasoningPartDelta {
                             signature: Some(encrypted_content),
                             text: None,
                             id: Some(reasoning_item.id),
-                        });
+                        };
+                        let reasoning_part = PartDelta::Reasoning(reasoning_part);
                         Ok(Some(ContentDelta {
                             index: usize::try_from(output_item_added_event.output_index)
                                 .unwrap_or(0),

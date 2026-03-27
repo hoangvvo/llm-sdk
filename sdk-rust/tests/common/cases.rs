@@ -1,12 +1,12 @@
 use crate::common::assert::{
-    AudioPartAssertion, ImagePartAssertion, OutputAssertion, PartAssertion, ReasoningPartAssertion,
-    TextPartAssertion, ToolCallPartAssertion, ToolCallpartAssertionArgPropValue,
+    compile_pattern, AudioPartAssertion, ImagePartAssertion, OutputAssertion, PartAssertion,
+    ReasoningPartAssertion, TextPartAssertion, ToolCallPartAssertion,
 };
 use futures::stream::StreamExt;
+use json_dotpath::DotPaths;
 use llm_sdk::*;
-use regex::Regex;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::{collections::HashMap, error::Error, fs, path::PathBuf, sync::LazyLock};
 
 #[derive(Debug, Clone)]
@@ -17,23 +17,14 @@ pub enum TestMethod {
 
 #[derive(Debug, Clone)]
 pub struct TestCase {
-    pub input: LanguageModelInput,
+    pub stages: Vec<TestStage>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TestStage {
+    pub input_template: Value,
     pub method: TestMethod,
     pub output: OutputAssertion,
-    pub setup: Option<TestCaseSetup>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct TestCaseSetup {
-    pub generate_assistant: Option<GenerateAssistantSetup>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct GenerateAssistantSetup {
-    pub input: LanguageModelInput,
-    #[serde(default)]
-    pub input_tools: Vec<String>,
-    pub target_message_index: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,16 +36,19 @@ struct TestDataJSON {
 #[derive(Debug, Deserialize)]
 struct TestCaseJSON {
     name: String,
-    #[serde(rename = "type")]
-    test_type: String,
-    input: LanguageModelInput,
-    #[serde(default)]
-    input_tools: Vec<String>,
-    setup: Option<TestCaseSetup>,
-    output: Value,
+    stages: Vec<TestStageJSON>,
 }
 
-// Load test data from JSON at compile time
+#[derive(Debug, Deserialize)]
+struct TestStageJSON {
+    #[serde(rename = "type")]
+    test_type: String,
+    input: Value,
+    #[serde(default)]
+    input_tools: Vec<String>,
+    expect: Value,
+}
+
 static TEST_DATA: LazyLock<TestDataJSON> = LazyLock::new(|| {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("../sdk-tests/tests.json");
@@ -80,43 +74,63 @@ static TEST_CASES: LazyLock<HashMap<String, TestCase>> = LazyLock::new(|| {
 });
 
 fn convert_json_to_test_case(tc: &TestCaseJSON) -> TestCase {
-    // Input is already a LanguageModelInput from JSON deserialization
-    let mut input = tc.input.clone();
+    let stages = tc
+        .stages
+        .iter()
+        .map(|stage| TestStage {
+            input_template: build_stage_input_template(&stage.input, &stage.input_tools),
+            method: parse_test_method(&stage.test_type),
+            output: convert_output(&stage.expect),
+        })
+        .collect();
 
-    // Handle tools
-    if !tc.input_tools.is_empty() {
-        let mut resolved_tools = Vec::new();
-        for tool_name in &tc.input_tools {
-            if let Some(tool) = TOOLS_MAP.get(tool_name) {
-                resolved_tools.push(tool.clone());
-            }
-        }
-        if !resolved_tools.is_empty() {
-            input.tools = Some(resolved_tools);
-        }
+    TestCase { stages }
+}
+
+fn build_stage_input_template(input: &Value, input_tools: &[String]) -> Value {
+    if input_tools.is_empty() {
+        return input.clone();
     }
 
-    // Convert output
-    let mut output = OutputAssertion {
-        content: Vec::new(),
+    let mut input_value = input.clone();
+    let Value::Object(ref mut object) = input_value else {
+        panic!("Stage input must be a JSON object");
     };
-    if let Some(content) = tc.output.get("content").and_then(|v| v.as_array()) {
-        output.content = convert_output_assertions(content);
-    }
+    object.insert(
+        "tools".to_string(),
+        Value::Array(resolve_tools(input_tools)),
+    );
+    input_value
+}
 
-    // Determine method
-    let method = if tc.test_type == "stream" {
+fn parse_test_method(value: &str) -> TestMethod {
+    if value == "stream" {
         TestMethod::Stream
     } else {
         TestMethod::Generate
-    };
-
-    TestCase {
-        input,
-        method,
-        output,
-        setup: tc.setup.clone(),
     }
+}
+
+fn resolve_tools(tool_names: &[String]) -> Vec<Value> {
+    tool_names
+        .iter()
+        .map(|tool_name| {
+            let tool = TOOLS_MAP
+                .get(tool_name)
+                .unwrap_or_else(|| panic!("Tool {tool_name} not found in test data"));
+            serde_json::to_value(tool).expect("Failed to encode tool")
+        })
+        .collect()
+}
+
+fn convert_output(output: &Value) -> OutputAssertion {
+    let mut converted = OutputAssertion {
+        content: Vec::new(),
+    };
+    if let Some(content) = output.get("content").and_then(Value::as_array) {
+        converted.content = convert_output_assertions(content);
+    }
+    converted
 }
 
 fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
@@ -129,9 +143,8 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
             match part_type {
                 "text" => {
                     if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {
-                        // Always treat as regex
                         assertions.push(PartAssertion::Text(TextPartAssertion {
-                            text: Regex::new(text).unwrap(),
+                            text: compile_pattern(text),
                         }));
                     }
                 }
@@ -141,50 +154,31 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
-                    let mut args = Vec::new();
-                    if let Some(args_obj) = part_obj.get("args").and_then(|v| v.as_object()) {
-                        for (key, value) in args_obj {
-                            if let Some(val_str) = value.as_str() {
-                                // Always treat as regex
-                                args.push((
-                                    key.clone(),
-                                    ToolCallpartAssertionArgPropValue::Value(
-                                        Regex::new(val_str).unwrap(),
-                                    ),
-                                ));
-                            }
-                        }
-                    }
+                    let args = part_obj
+                        .get("args")
+                        .and_then(|v| v.as_str())
+                        .map(compile_pattern);
                     assertions.push(PartAssertion::ToolCall(ToolCallPartAssertion {
                         tool_name,
                         args,
                     }));
                 }
                 "audio" => {
-                    let id = part_obj
-                        .get("id")
-                        .and_then(serde_json::Value::as_bool)
-                        .unwrap_or(false);
+                    let id = part_obj.get("id").and_then(Value::as_bool).unwrap_or(false);
                     let transcript = part_obj
                         .get("transcript")
                         .and_then(|v| v.as_str())
-                        .map(|t| {
-                            // Always treat as regex
-                            Regex::new(t).unwrap()
-                        });
+                        .map(compile_pattern);
                     assertions.push(PartAssertion::Audio(AudioPartAssertion { id, transcript }));
                 }
                 "image" => {
-                    let id = part_obj
-                        .get("id")
-                        .and_then(serde_json::Value::as_bool)
-                        .unwrap_or(false);
+                    let id = part_obj.get("id").and_then(Value::as_bool).unwrap_or(false);
                     assertions.push(PartAssertion::Image(ImagePartAssertion { id }));
                 }
                 "reasoning" => {
                     if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {
                         assertions.push(PartAssertion::Reasoning(ReasoningPartAssertion {
-                            text: Regex::new(text).unwrap(),
+                            text: compile_pattern(text),
                         }));
                     }
                 }
@@ -196,6 +190,70 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
     assertions
 }
 
+fn resolve_stage_input(
+    input_template: &Value,
+    context: &Value,
+) -> Result<LanguageModelInput, Box<dyn Error>> {
+    let resolved = resolve_stage_refs(input_template, context)?;
+    Ok(serde_json::from_value(resolved)?)
+}
+
+fn resolve_stage_refs(value: &Value, root: &Value) -> Result<Value, Box<dyn Error>> {
+    match value {
+        Value::Array(items) => {
+            let mut resolved = Vec::with_capacity(items.len());
+            for item in items {
+                resolved.push(resolve_stage_refs(item, root)?);
+            }
+            Ok(Value::Array(resolved))
+        }
+        Value::Object(object) => {
+            if let Some(path) = get_stage_ref_path(object) {
+                return resolve_ref_path(path, root);
+            }
+
+            let mut resolved = serde_json::Map::with_capacity(object.len());
+            for (key, child) in object {
+                resolved.insert(key.clone(), resolve_stage_refs(child, root)?);
+            }
+            Ok(Value::Object(resolved))
+        }
+        _ => Ok(value.clone()),
+    }
+}
+
+fn get_stage_ref_path(object: &serde_json::Map<String, Value>) -> Option<&str> {
+    if object.len() != 1 {
+        return None;
+    }
+    object.get("$ref").and_then(Value::as_str)
+}
+
+fn resolve_ref_path(path: &str, root: &Value) -> Result<Value, Box<dyn Error>> {
+    root.dot_get::<Value>(path)?
+        .ok_or_else(|| std::io::Error::other(format!("Invalid stage ref path '{path}'")).into())
+}
+
+fn tool_call_parts_value(content: &[Part]) -> Value {
+    Value::Array(
+        content
+            .iter()
+            .filter_map(|part| match part {
+                Part::ToolCall(tool_call) => Some(serde_json::to_value(tool_call).ok()),
+                _ => None,
+            })
+            .flatten()
+            .map(|value| {
+                let Value::Object(mut object) = value else {
+                    unreachable!("tool call part must serialize to object");
+                };
+                object.insert("type".to_string(), Value::String("tool-call".to_string()));
+                Value::Object(object)
+            })
+            .collect(),
+    )
+}
+
 pub async fn run_test_case(
     model: &dyn LanguageModel,
     test_case_name: &str,
@@ -203,63 +261,70 @@ pub async fn run_test_case(
 ) -> Result<(), Box<dyn Error>> {
     let test_case = TEST_CASES
         .get(test_case_name)
-        .ok_or_else(|| format!("Test case '{test_case_name}' not found"))?
+        .ok_or_else(|| std::io::Error::other(format!("Test case '{test_case_name}' not found")))?
         .clone();
 
-    let mut input = test_case.input.clone();
-    let mut output = test_case.output.clone();
-    if let Some(opts) = options {
-        if let Some(f) = opts.additional_input {
-            f(&mut input);
-        }
-        if let Some(f) = opts.custom_output_content {
-            output.content = f(&mut output.content);
-        }
-    }
+    let mut history: Vec<Message> = Vec::new();
+    let mut context = json!({ "stages": [] });
 
-    if let Some(setup) = test_case.setup {
-        if let Some(generate_assistant) = setup.generate_assistant {
-            let mut setup_input = generate_assistant.input;
-            if !generate_assistant.input_tools.is_empty() {
-                let mut resolved_tools = Vec::new();
-                for tool_name in generate_assistant.input_tools {
-                    if let Some(tool) = TOOLS_MAP.get(&tool_name) {
-                        resolved_tools.push(tool.clone());
-                    }
+    for stage in test_case.stages {
+        let mut input = resolve_stage_input(&stage.input_template, &context)?;
+        let stage_messages = input.messages.clone();
+        input.messages = history
+            .iter()
+            .cloned()
+            .chain(stage_messages.iter().cloned())
+            .collect();
+
+        let mut request_input = input.clone();
+        let mut output = stage.output.clone();
+        if let Some(opts) = &options {
+            if let Some(f) = opts.additional_input {
+                f(&mut request_input);
+            }
+            if let Some(f) = opts.custom_output_content {
+                output.content = f(&mut output.content);
+            }
+        }
+
+        let assistant_content = match stage.method {
+            TestMethod::Generate => {
+                let result = model.generate(request_input).await?;
+                for part_assertion in output.content {
+                    part_assertion.assert(&result.content)?;
                 }
-                if !resolved_tools.is_empty() {
-                    setup_input.tools = Some(resolved_tools);
+                result.content
+            }
+            TestMethod::Stream => {
+                let mut stream = model.stream(request_input).await?;
+                let mut accumulator = StreamAccumulator::new();
+
+                while let Some(partial_response) = stream.next().await {
+                    let partial_response = partial_response?;
+                    accumulator.add_partial(partial_response)?;
                 }
+
+                let result = accumulator.compute_response()?;
+                for part_assertion in output.content {
+                    part_assertion.assert(&result.content)?;
+                }
+                result.content
             }
-            let setup_result = model.generate(setup_input).await?;
-            input.messages[generate_assistant.target_message_index] =
-                Message::assistant(setup_result.content);
-        }
+        };
+        let tool_calls = tool_call_parts_value(&assistant_content);
+
+        history = input.messages.clone();
+        history.push(Message::assistant(assistant_content.clone()));
+
+        let Some(stages) = context.get_mut("stages").and_then(Value::as_array_mut) else {
+            return Err("missing stage execution context".into());
+        };
+        stages.push(json!({
+            "assistant": assistant_content,
+            "tool_calls": tool_calls,
+        }));
     }
 
-    match test_case.method {
-        TestMethod::Generate => {
-            let result = model.generate(input).await?;
-            for part_assertion in output.content {
-                part_assertion.assert(&result.content)?;
-            }
-        }
-        TestMethod::Stream => {
-            let mut stream = model.stream(input).await?;
-
-            let mut accumulator = StreamAccumulator::new();
-
-            while let Some(partial_response) = stream.next().await {
-                let partial_response = partial_response?;
-                accumulator.add_partial(partial_response)?;
-            }
-
-            let result = accumulator.compute_response()?;
-            for part_assertion in output.content {
-                part_assertion.assert(&result.content)?;
-            }
-        }
-    }
     Ok(())
 }
 

@@ -5,6 +5,7 @@ import {
   RefusalError,
   UnsupportedError,
 } from "../errors.ts";
+import { generateString } from "../id.utils.ts";
 import type {
   LanguageModel,
   LanguageModelMetadata,
@@ -228,30 +229,6 @@ function convertUserMessageToResponseInputItem(
             image_url: `data:${part.mime_type};base64,${part.data}`,
             detail: "auto",
           };
-        case "audio": {
-          let format: OpenAI.Responses.ResponseInputAudio.InputAudio["format"];
-          switch (part.format) {
-            case "mp3":
-              format = "mp3";
-              break;
-            case "wav":
-              format = "wav";
-              break;
-            default:
-              throw new UnsupportedError(
-                PROVIDER,
-                `Cannot convert audio format to OpenAI InputAudio format for format ${part.format}`,
-              );
-          }
-          // FIXME: fix in the next PR to update schema
-          return {
-            type: "input_audio",
-            input_audio: {
-              data: part.data,
-              format,
-            },
-          } as unknown as OpenAI.Responses.ResponseInputContent;
-        }
         default:
           throw new UnsupportedError(
             PROVIDER,
@@ -276,7 +253,7 @@ function convertAssistantMessageToResponseInputItems(
           // or that we propogate the message ID in output.
           // For compatibility, we want to avoid doing that, so we use a generated ID
           // to avoid the API from returning an error.
-          id: "msg_" + genidForMessageId(),
+          id: "msg_" + generateString(10),
           type: "message",
           role: "assistant",
           status: "completed",
@@ -724,8 +701,4 @@ function mapOpenAIUsage(usage: OpenAI.Responses.ResponseUsage): ModelUsage {
     output_tokens: usage.output_tokens,
   };
   return result;
-}
-
-function genidForMessageId() {
-  return Math.random().toString(36).substring(2, 15);
 }

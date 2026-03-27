@@ -15,6 +15,11 @@ suite("CohereModel", () => {
     modelId: "command-a-reasoning-08-2025",
   });
 
+  const visionModel = new CohereModel({
+    apiKey: process.env["CO_API_KEY"],
+    modelId: "command-a-vision-07-2025",
+  });
+
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TEXT);
   });
@@ -88,11 +93,11 @@ suite("CohereModel", () => {
   );
 
   test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
+    return runTestCase(t, visionModel, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
   });
 
   test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
+    return runTestCase(t, visionModel, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
   });
 
   test(
