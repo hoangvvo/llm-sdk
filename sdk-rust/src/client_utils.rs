@@ -68,14 +68,19 @@ pub async fn send_sse_stream<T: Serialize + 'static, R: DeserializeOwned + Send 
         while let Some(event) = sse_stream.next().await {
             match event {
                 Ok(event) => {
-                    if event.data.is_empty() {
+                    let data = event
+                        .data
+                        .strip_prefix(' ')
+                        .unwrap_or(&event.data);
+
+                    if data.is_empty() {
                         continue; // Skip empty events
                     }
-                    if event.data == "[DONE]" {
+                    if data == "[DONE]" {
                         break; // End of stream
                     }
 
-                    let chunk: R = serde_json::from_str(&event.data).map_err(|e| {
+                    let chunk: R = serde_json::from_str(data).map_err(|e| {
                         LanguageModelError::Invariant(
                             provider,
                             format!("Failed to parse stream chunk: {e}"),
