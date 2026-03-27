@@ -369,6 +369,7 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 						Id:     "msg_" + randutil.String(15),
 						Role:   openaiapi.OutputMessageRoleAssistant,
 						Status: openaiapi.OutputMessageStatusCompleted,
+						Type:   openaiapi.OutputMessageTypeMessage,
 						Content: []openaiapi.OutputMessageContent{
 							{
 								OutputText: &openaiapi.OutputTextContent{
@@ -398,6 +399,7 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 							},
 						},
 						EncryptedContent: part.ReasoningPart.Signature,
+						Type:             openaiapi.ReasoningItemTypeReasoning,
 					},
 				},
 			})
@@ -413,6 +415,7 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 						Id:     id,
 						Status: "completed",
 						Result: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data)),
+						Type:   openaiapi.ImageGenToolCallTypeImageGenerationCall,
 					},
 				},
 			})
@@ -426,6 +429,7 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 						CallId:    part.ToolCallPart.ToolCallID,
 						Name:      part.ToolCallPart.ToolName,
 						Id:        part.ToolCallPart.ID,
+						Type:      openaiapi.FunctionToolCallTypeFunctionCall,
 					},
 				},
 			})
@@ -499,6 +503,7 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.InputCont
 		return &openaiapi.InputContent{
 			InputText: &openaiapi.InputTextContent{
 				Text: part.TextPart.Text,
+				Type: openaiapi.InputTextContentTypeInputText,
 			},
 		}, nil
 
@@ -507,6 +512,7 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.InputCont
 			InputImage: &openaiapi.InputImageContent{
 				Detail:   openaiapi.ImageDetailAuto,
 				ImageUrl: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data)),
+				Type:     openaiapi.InputImageContentTypeInputImage,
 			},
 		}, nil
 

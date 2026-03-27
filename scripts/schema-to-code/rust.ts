@@ -1,3 +1,8 @@
+import { execFile } from "node:child_process";
+import { access } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { promisify } from "node:util";
+
 import type {
   AliasDeclaration,
   CodegenDocument,
@@ -9,10 +14,13 @@ import type {
   UnionDeclaration,
 } from "./core.ts";
 
+const execFileAsync = promisify(execFile);
+
 export function renderRustDocument(document: CodegenDocument): string {
   const attributes = [
     "#![allow(clippy::enum_variant_names)]",
     "#![allow(clippy::struct_field_names)]",
+    "#![allow(clippy::doc_markdown)]",
   ];
   const imports = ["use serde::{Deserialize, Serialize};"];
   if (document.usesJsonValue) {
@@ -27,6 +35,17 @@ export function renderRustDocument(document: CodegenDocument): string {
     parts.push(renderRustDeclaration(declaration));
   }
   return `${parts.join("\n\n")}\n`;
+}
+
+export async function formatRustOutput(outputPath: string): Promise<void> {
+  const manifestPath = await findNearestCargoManifest(outputPath);
+  await execFileAsync(
+    "cargo",
+    ["+nightly", "fmt", "--manifest-path", manifestPath],
+    {
+      cwd: dirname(manifestPath),
+    },
+  );
 }
 
 function renderRustDeclaration(declaration: Declaration): string {
@@ -211,6 +230,23 @@ function renderRustComment(
 
 function normalizeRustFieldName(fieldName: string): string {
   return fieldName.startsWith("r#") ? fieldName.slice(2) : fieldName;
+}
+
+async function findNearestCargoManifest(startPath: string): Promise<string> {
+  let currentDir = dirname(resolve(startPath));
+  while (true) {
+    const manifestPath = join(currentDir, "Cargo.toml");
+    try {
+      await access(manifestPath);
+      return manifestPath;
+    } catch {
+      const parentDir = dirname(currentDir);
+      if (parentDir === currentDir) {
+        throw new Error(`Could not find Cargo.toml for ${startPath}`);
+      }
+      currentDir = parentDir;
+    }
+  }
 }
 
 function fail(message: string): never {

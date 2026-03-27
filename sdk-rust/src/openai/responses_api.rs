@@ -1,7 +1,8 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
+#![allow(clippy::doc_markdown)]
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -336,7 +337,7 @@ pub struct ResponseProperties {
     /// by the model will be ignored.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tool_calls: Option<i64>,
-    /// Model ID used to generate the response, like `gpt-4o` or `o3`. `OpenAI`
+    /// Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI
     /// offers a wide range of models with different capabilities, performance
     /// characteristics, and price points. Refer to the [model
     /// guide](/docs/models) to browse and compare available models.
@@ -476,7 +477,7 @@ pub struct ResponseStreamOptionsValue {
     /// These obfuscation fields are included by default, but add a small amount
     /// of overhead to the data stream. You can set `include_obfuscation` to
     /// false to optimize for bandwidth if you trust the network links between
-    /// your application and the `OpenAI` API.
+    /// your application and the OpenAI API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_obfuscation: Option<bool>,
 }
@@ -487,8 +488,8 @@ pub type ResponseStreamOptions = Option<Option<ResponseStreamOptionsValue>>;
 pub struct ModelResponseProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
-    /// Used by `OpenAI` to cache responses for similar requests to optimize
-    /// your cache hit rates. Replaces the `user` field. [Learn
+    /// Used by OpenAI to cache responses for similar requests to optimize your
+    /// cache hit rates. Replaces the `user` field. [Learn
     /// more](/docs/guides/prompt-caching).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
@@ -499,8 +500,8 @@ pub struct ModelResponseProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_retention: Option<ModelResponsePropertiesPromptCacheRetention>,
     /// A stable identifier used to help detect users of your application that
-    /// may be violating `OpenAI`'s usage policies. The IDs should be a
-    /// string that uniquely identifies each user, with a maximum length of 64
+    /// may be violating OpenAI's usage policies. The IDs should be a string
+    /// that uniquely identifies each user, with a maximum length of 64
     /// characters. We recommend hashing their username or email address, in
     /// order to avoid sending us any identifying information. [Learn
     /// more](/docs/guides/safety-best-practices#safety-identifiers).
@@ -520,7 +521,7 @@ pub struct ModelResponseProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<i64>,
     /// An alternative to sampling with temperature, called nucleus sampling,
-    /// where the model considers the results of the tokens with `top_p`
+    /// where the model considers the results of the tokens with top_p
     /// probability mass. So 0.1 means only the tokens comprising the top
     /// 10% probability mass are considered.
     ///
@@ -531,7 +532,7 @@ pub struct ModelResponseProperties {
     /// `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
     /// optimizations. A stable identifier for your end-users.
     /// Used to boost cache hit rates by better bucketing similar requests and
-    /// to help `OpenAI` detect and prevent abuse. [Learn
+    /// to help OpenAI detect and prevent abuse. [Learn
     /// more](/docs/guides/safety-best-practices#safety-identifiers).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
@@ -865,8 +866,7 @@ pub struct ResponseFunctionCallArgumentsDoneEvent {
     /// The ID of the item.
     pub item_id: String,
     /// The name of the function that was called.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: String,
     /// The index of the output item.
     pub output_index: i64,
     /// The sequence number of this event.
@@ -1488,12 +1488,12 @@ pub enum ToolChoiceParam {
 /// can specify which tool to use by setting the `tool_choice` parameter.
 ///
 /// We support the following categories of tools:
-/// - **Built-in tools**: Tools that are provided by `OpenAI` that extend the
+/// - **Built-in tools**: Tools that are provided by OpenAI that extend the
 ///   model's capabilities, like [web search](/docs/guides/tools-web-search) or
 ///   [file search](/docs/guides/tools-file-search). Learn more about [built-in
 ///   tools](/docs/guides/tools).
 /// - **MCP Tools**: Integrations with third-party systems via custom MCP
-///   servers or predefined connectors such as Google Drive and `SharePoint`.
+///   servers or predefined connectors such as Google Drive and SharePoint.
 ///   Learn more about [MCP Tools](/docs/guides/tools-connectors-mcp).
 /// - **Function calls (custom tools)**: Functions that are defined by you,
 ///   enabling the model to call your own code with strongly typed arguments and
@@ -1636,7 +1636,7 @@ pub enum EasyInputMessageType {
 }
 
 /// Content item used to generate a response.
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Item {
     InputMessage(InputMessage),
@@ -1665,94 +1665,6 @@ pub enum Item {
     MCPToolCall(MCPToolCall),
     CustomToolCallOutput(CustomToolCallOutput),
     CustomToolCall(CustomToolCall),
-}
-
-impl Serialize for Item {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        #[derive(Serialize)]
-        struct Tagged<'a, T> {
-            #[serde(rename = "type")]
-            kind: &'static str,
-            #[serde(flatten)]
-            value: &'a T,
-        }
-
-        match self {
-            Self::InputMessage(value) => value.serialize(serializer),
-            Self::OutputMessage(value) => Tagged {
-                kind: "message",
-                value,
-            }
-            .serialize(serializer),
-            Self::FileSearchToolCall(value) => Tagged {
-                kind: "file_search_call",
-                value,
-            }
-            .serialize(serializer),
-            Self::ComputerToolCall(value) => Tagged {
-                kind: "computer_call",
-                value,
-            }
-            .serialize(serializer),
-            Self::ComputerCallOutputItemParam(value) => value.serialize(serializer),
-            Self::WebSearchToolCall(value) => Tagged {
-                kind: "web_search_call",
-                value,
-            }
-            .serialize(serializer),
-            Self::FunctionToolCall(value) => Tagged {
-                kind: "function_call",
-                value,
-            }
-            .serialize(serializer),
-            Self::FunctionCallOutputItemParam(value) => value.serialize(serializer),
-            Self::ToolSearchCallItemParam(value) => value.serialize(serializer),
-            Self::ToolSearchOutputItemParam(value) => value.serialize(serializer),
-            Self::ReasoningItem(value) => Tagged {
-                kind: "reasoning",
-                value,
-            }
-            .serialize(serializer),
-            Self::CompactionSummaryItemParam(value) => value.serialize(serializer),
-            Self::ImageGenToolCall(value) => Tagged {
-                kind: "image_generation_call",
-                value,
-            }
-            .serialize(serializer),
-            Self::CodeInterpreterToolCall(value) => Tagged {
-                kind: "code_interpreter_call",
-                value,
-            }
-            .serialize(serializer),
-            Self::LocalShellToolCall(value) => Tagged {
-                kind: "local_shell_call",
-                value,
-            }
-            .serialize(serializer),
-            Self::LocalShellToolCallOutput(value) => value.serialize(serializer),
-            Self::FunctionShellCallItemParam(value) => value.serialize(serializer),
-            Self::FunctionShellCallOutputItemParam(value) => value.serialize(serializer),
-            Self::ApplyPatchToolCallItemParam(value) => value.serialize(serializer),
-            Self::ApplyPatchToolCallOutputItemParam(value) => value.serialize(serializer),
-            Self::MCPListTools(value) => value.serialize(serializer),
-            Self::MCPApprovalRequest(value) => Tagged {
-                kind: "mcp_approval_request",
-                value,
-            }
-            .serialize(serializer),
-            Self::MCPApprovalResponse(value) => value.serialize(serializer),
-            Self::MCPToolCall(value) => Tagged {
-                kind: "mcp_call",
-                value,
-            }
-            .serialize(serializer),
-            Self::CustomToolCallOutput(value) => value.serialize(serializer),
-            Self::CustomToolCall(value) => value.serialize(serializer),
-        }
-    }
 }
 
 /// An internal identifier for an item to reference.
@@ -1786,6 +1698,8 @@ pub struct OutputMessage {
     /// The status of the message input. One of `in_progress`, `completed`, or
     /// `incomplete`. Populated when input items are returned via API.
     pub status: OutputMessageStatus,
+    /// The type of the output message. Always `message`.
+    pub r#type: OutputMessageType,
 }
 
 /// The role of the output message. Always `assistant`.
@@ -1807,6 +1721,13 @@ pub enum OutputMessageStatus {
     Incomplete,
 }
 
+/// The type of the output message. Always `message`.
+#[derive(Serialize, Deserialize)]
+pub enum OutputMessageType {
+    #[serde(rename = "message")]
+    Message,
+}
+
 /// The results of a file search tool call. See the
 /// [file search guide](/docs/guides/tools-file-search) for more information.
 #[derive(Serialize, Deserialize)]
@@ -1821,6 +1742,8 @@ pub struct FileSearchToolCall {
     /// The status of the file search tool call. One of `in_progress`,
     /// `searching`, `incomplete` or `failed`,
     pub status: FileSearchToolCallStatus,
+    /// The type of the file search tool call. Always `file_search_call`.
+    pub r#type: FileSearchToolCallType,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1857,6 +1780,13 @@ pub enum FileSearchToolCallStatus {
     Failed,
 }
 
+/// The type of the file search tool call. Always `file_search_call`.
+#[derive(Serialize, Deserialize)]
+pub enum FileSearchToolCallType {
+    #[serde(rename = "file_search_call")]
+    FileSearchCall,
+}
+
 /// A tool call to run a function. See the
 /// [function calling guide](/docs/guides/function-calling) for more
 /// information.
@@ -1878,6 +1808,8 @@ pub struct FunctionToolCall {
     /// `incomplete`. Populated when items are returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<FunctionToolCallStatus>,
+    /// The type of the function tool call. Always `function_call`.
+    pub r#type: FunctionToolCallType,
 }
 
 /// The status of the item. One of `in_progress`, `completed`, or
@@ -1892,23 +1824,32 @@ pub enum FunctionToolCallStatus {
     Incomplete,
 }
 
+/// The type of the function tool call. Always `function_call`.
+#[derive(Serialize, Deserialize)]
+pub enum FunctionToolCallType {
+    #[serde(rename = "function_call")]
+    FunctionCall,
+}
+
 /// The results of a web search tool call. See the
 /// [web search guide](/docs/guides/tools-web-search) for more information.
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchToolCall {
     /// An object describing the specific action taken in this web search call.
-    /// Includes details on how the model used the web (search, `open_page`,
-    /// `find_in_page`).
+    /// Includes details on how the model used the web (search, open_page,
+    /// find_in_page).
     pub action: WebSearchToolCallAction,
     /// The unique ID of the web search tool call.
     pub id: String,
     /// The status of the web search tool call.
     pub status: WebSearchToolCallStatus,
+    /// The type of the web search tool call. Always `web_search_call`.
+    pub r#type: WebSearchToolCallType,
 }
 
 /// An object describing the specific action taken in this web search call.
-/// Includes details on how the model used the web (search, `open_page`,
-/// `find_in_page`).
+/// Includes details on how the model used the web (search, open_page,
+/// find_in_page).
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum WebSearchToolCallAction {
@@ -1933,6 +1874,13 @@ pub enum WebSearchToolCallStatus {
     Failed,
 }
 
+/// The type of the web search tool call. Always `web_search_call`.
+#[derive(Serialize, Deserialize)]
+pub enum WebSearchToolCallType {
+    #[serde(rename = "web_search_call")]
+    WebSearchCall,
+}
+
 /// A tool call to a computer use tool. See the
 /// [computer use guide](/docs/guides/tools-computer-use) for more information.
 #[derive(Serialize, Deserialize)]
@@ -1950,6 +1898,8 @@ pub struct ComputerToolCall {
     /// The status of the item. One of `in_progress`, `completed`, or
     /// `incomplete`. Populated when items are returned via API.
     pub status: ComputerToolCallStatus,
+    /// The type of the computer call. Always `computer_call`.
+    pub r#type: ComputerToolCallType,
 }
 
 /// The status of the item. One of `in_progress`, `completed`, or
@@ -1962,6 +1912,13 @@ pub enum ComputerToolCallStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+}
+
+/// The type of the computer call. Always `computer_call`.
+#[derive(Serialize, Deserialize)]
+pub enum ComputerToolCallType {
+    #[serde(rename = "computer_call")]
+    ComputerCall,
 }
 
 /// A description of the chain of thought used by a reasoning model while
@@ -1986,6 +1943,8 @@ pub struct ReasoningItem {
     pub status: Option<ReasoningItemStatus>,
     /// Reasoning summary content.
     pub summary: Vec<SummaryTextContent>,
+    /// The type of the object. Always `reasoning`.
+    pub r#type: ReasoningItemType,
 }
 
 /// The status of the item. One of `in_progress`, `completed`, or
@@ -1998,6 +1957,13 @@ pub enum ReasoningItemStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+}
+
+/// The type of the object. Always `reasoning`.
+#[derive(Serialize, Deserialize)]
+pub enum ReasoningItemType {
+    #[serde(rename = "reasoning")]
+    Reasoning,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2074,6 +2040,8 @@ pub struct ImageGenToolCall {
     pub size: Option<String>,
     /// The status of the image generation call.
     pub status: ImageGenToolCallStatus,
+    /// The type of the image generation call. Always `image_generation_call`.
+    pub r#type: ImageGenToolCallType,
 }
 
 /// The image generation action performed by the model.
@@ -2122,6 +2090,13 @@ pub enum ImageGenToolCallStatus {
     Failed,
 }
 
+/// The type of the image generation call. Always `image_generation_call`.
+#[derive(Serialize, Deserialize)]
+pub enum ImageGenToolCallType {
+    #[serde(rename = "image_generation_call")]
+    ImageGenerationCall,
+}
+
 /// A tool call to run code.
 #[derive(Serialize, Deserialize)]
 pub struct CodeInterpreterToolCall {
@@ -2137,6 +2112,9 @@ pub struct CodeInterpreterToolCall {
     /// The status of the code interpreter tool call. Valid values are
     /// `in_progress`, `completed`, `incomplete`, `interpreting`, and `failed`.
     pub status: CodeInterpreterToolCallStatus,
+    /// The type of the code interpreter tool call. Always
+    /// `code_interpreter_call`.
+    pub r#type: CodeInterpreterToolCallType,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2164,6 +2142,13 @@ pub enum CodeInterpreterToolCallStatus {
     Failed,
 }
 
+/// The type of the code interpreter tool call. Always `code_interpreter_call`.
+#[derive(Serialize, Deserialize)]
+pub enum CodeInterpreterToolCallType {
+    #[serde(rename = "code_interpreter_call")]
+    CodeInterpreterCall,
+}
+
 /// A tool call to run a command on the local shell.
 #[derive(Serialize, Deserialize)]
 pub struct LocalShellToolCall {
@@ -2174,6 +2159,8 @@ pub struct LocalShellToolCall {
     pub id: String,
     /// The status of the local shell call.
     pub status: LocalShellToolCallStatus,
+    /// The type of the local shell call. Always `local_shell_call`.
+    pub r#type: LocalShellToolCallType,
 }
 
 /// The status of the local shell call.
@@ -2185,6 +2172,13 @@ pub enum LocalShellToolCallStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+}
+
+/// The type of the local shell call. Always `local_shell_call`.
+#[derive(Serialize, Deserialize)]
+pub enum LocalShellToolCallType {
+    #[serde(rename = "local_shell_call")]
+    LocalShellCall,
 }
 
 /// A tool call that executes one or more shell commands in a managed
@@ -2249,16 +2243,16 @@ pub struct ApplyPatchToolCall {
     /// The unique ID of the apply patch tool call. Populated when this item is
     /// returned via API.
     pub id: String,
-    /// One of the `create_file`, `delete_file`, or `update_file` operations
-    /// applied via `apply_patch`.
+    /// One of the create_file, delete_file, or update_file operations applied
+    /// via apply_patch.
     pub operation: ApplyPatchToolCallOperation,
     /// The status of the apply patch tool call. One of `in_progress` or
     /// `completed`.
     pub status: ApplyPatchCallStatus,
 }
 
-/// One of the `create_file`, `delete_file`, or `update_file` operations applied
-/// via `apply_patch`.
+/// One of the create_file, delete_file, or update_file operations applied via
+/// apply_patch.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ApplyPatchToolCallOperation {
@@ -2315,6 +2309,15 @@ pub struct MCPToolCall {
     /// `incomplete`, `calling`, or `failed`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<MCPToolCallStatus>,
+    /// The type of the item. Always `mcp_call`.
+    pub r#type: MCPToolCallType,
+}
+
+/// The type of the item. Always `mcp_call`.
+#[derive(Serialize, Deserialize)]
+pub enum MCPToolCallType {
+    #[serde(rename = "mcp_call")]
+    McpCall,
 }
 
 /// A list of tools available on an MCP server.
@@ -2329,6 +2332,15 @@ pub struct MCPListTools {
     pub server_label: String,
     /// The tools available on the server.
     pub tools: Vec<MCPListToolsTool>,
+    /// The type of the item. Always `mcp_list_tools`.
+    pub r#type: MCPListToolsType,
+}
+
+/// The type of the item. Always `mcp_list_tools`.
+#[derive(Serialize, Deserialize)]
+pub enum MCPListToolsType {
+    #[serde(rename = "mcp_list_tools")]
+    McpListTools,
 }
 
 /// A request for human approval of a tool invocation.
@@ -2342,6 +2354,15 @@ pub struct MCPApprovalRequest {
     pub name: String,
     /// The label of the MCP server making the request.
     pub server_label: String,
+    /// The type of the item. Always `mcp_approval_request`.
+    pub r#type: MCPApprovalRequestType,
+}
+
+/// The type of the item. Always `mcp_approval_request`.
+#[derive(Serialize, Deserialize)]
+pub enum MCPApprovalRequestType {
+    #[serde(rename = "mcp_approval_request")]
+    McpApprovalRequest,
 }
 
 /// A call to a custom tool created by the model.
@@ -2349,7 +2370,7 @@ pub struct MCPApprovalRequest {
 pub struct CustomToolCall {
     /// An identifier used to map this custom tool call to a tool call output.
     pub call_id: String,
-    /// The unique ID of the custom tool call in the `OpenAI` platform.
+    /// The unique ID of the custom tool call in the OpenAI platform.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// The input for the custom tool call generated by the model.
@@ -2359,6 +2380,15 @@ pub struct CustomToolCall {
     /// The namespace of the custom tool being called.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
+    /// The type of the custom tool call. Always `custom_tool_call`.
+    pub r#type: CustomToolCallType,
+}
+
+/// The type of the custom tool call. Always `custom_tool_call`.
+#[derive(Serialize, Deserialize)]
+pub enum CustomToolCallType {
+    #[serde(rename = "custom_tool_call")]
+    CustomToolCall,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2648,7 +2678,7 @@ pub enum ToolChoiceCustomType {
     Custom,
 }
 
-/// Forces the model to call the `apply_patch` tool when executing a tool call.
+/// Forces the model to call the apply_patch tool when executing a tool call.
 #[derive(Serialize, Deserialize)]
 pub struct SpecificApplyPatchParam {
     /// The tool to call. Always `apply_patch`.
@@ -3032,7 +3062,7 @@ pub struct ApplyPatchToolCallItemParam {
     /// returned via API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    /// The specific create, delete, or update instruction for the `apply_patch`
+    /// The specific create, delete, or update instruction for the apply_patch
     /// tool call.
     pub operation: ApplyPatchOperationParam,
     /// The status of the apply patch tool call. One of `in_progress` or
@@ -3107,7 +3137,7 @@ pub struct CustomToolCallOutput {
     /// The call ID, used to map this custom tool call output to a custom tool
     /// call.
     pub call_id: String,
-    /// The unique ID of the custom tool call output in the `OpenAI` platform.
+    /// The unique ID of the custom tool call output in the OpenAI platform.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// The output from the custom tool call generated by your code.
@@ -3195,7 +3225,7 @@ pub enum WebSearchActionSearchSourcesItemType {
     Url,
 }
 
-/// Action type "`open_page`" - Opens a specific URL from search results.
+/// Action type "open_page" - Opens a specific URL from search results.
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchActionOpenPage {
     /// The URL opened by the model.
@@ -3203,7 +3233,7 @@ pub struct WebSearchActionOpenPage {
     pub url: Option<String>,
 }
 
-/// Action type "`find_in_page"`: Searches for a pattern within a loaded page.
+/// Action type "find_in_page": Searches for a pattern within a loaded page.
 #[derive(Serialize, Deserialize)]
 pub struct WebSearchActionFind {
     /// The pattern or text to search for within the page.
@@ -3257,6 +3287,15 @@ pub struct ComputerCallSafetyCheckParam {
 pub struct ReasoningTextContent {
     /// The reasoning text from the model.
     pub text: String,
+    /// The type of the reasoning text. Always `reasoning_text`.
+    pub r#type: ReasoningTextContentType,
+}
+
+/// The type of the reasoning text. Always `reasoning_text`.
+#[derive(Serialize, Deserialize)]
+pub enum ReasoningTextContentType {
+    #[serde(rename = "reasoning_text")]
+    ReasoningText,
 }
 
 /// A summary text from the model.
@@ -3410,7 +3449,7 @@ pub enum LocalShellCallOutputStatusEnum {
     Incomplete,
 }
 
-/// Instruction describing how to create a file via the `apply_patch` tool.
+/// Instruction describing how to create a file via the apply_patch tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchCreateFileOperation {
     /// Diff to apply.
@@ -3419,14 +3458,14 @@ pub struct ApplyPatchCreateFileOperation {
     pub path: String,
 }
 
-/// Instruction describing how to delete a file via the `apply_patch` tool.
+/// Instruction describing how to delete a file via the apply_patch tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchDeleteFileOperation {
     /// Path of the file to delete.
     pub path: String,
 }
 
-/// Instruction describing how to update a file via the `apply_patch` tool.
+/// Instruction describing how to update a file via the apply_patch tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchUpdateFileOperation {
     /// Diff to apply.
@@ -3502,6 +3541,15 @@ pub struct RefusalContent {
 pub struct InputTextContent {
     /// The text input to the model.
     pub text: String,
+    /// The type of the input item. Always `input_text`.
+    pub r#type: InputTextContentType,
+}
+
+/// The type of the input item. Always `input_text`.
+#[derive(Serialize, Deserialize)]
+pub enum InputTextContentType {
+    #[serde(rename = "input_text")]
+    InputText,
 }
 
 /// An image input to the model. Learn about [image
@@ -3518,6 +3566,15 @@ pub struct InputImageContent {
     /// base64 encoded image in a data URL.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image_url: Option<String>,
+    /// The type of the input item. Always `input_image`.
+    pub r#type: InputImageContentType,
+}
+
+/// The type of the input item. Always `input_image`.
+#[derive(Serialize, Deserialize)]
+pub enum InputImageContentType {
+    #[serde(rename = "input_image")]
+    InputImage,
 }
 
 /// A file input to the model.
@@ -3535,6 +3592,15 @@ pub struct InputFileContent {
     /// The name of the file to be sent to the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
+    /// The type of the input item. Always `input_file`.
+    pub r#type: InputFileContentType,
+}
+
+/// The type of the input item. Always `input_file`.
+#[derive(Serialize, Deserialize)]
+pub enum InputFileContentType {
+    #[serde(rename = "input_file")]
+    InputFile,
 }
 
 /// Default response format. Used to generate text responses.
@@ -3719,10 +3785,9 @@ pub struct MCPTool {
     /// must handle the OAuth authorization flow and provide the token here.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorization: Option<String>,
-    /// Identifier for service connectors, like those available in `ChatGPT`.
-    /// One of `server_url` or `connector_id` must be provided. Learn more
-    /// about service connectors
-    /// [here](/docs/guides/tools-remote-mcp#connectors).
+    /// Identifier for service connectors, like those available in ChatGPT. One
+    /// of `server_url` or `connector_id` must be provided. Learn more about
+    /// service connectors [here](/docs/guides/tools-remote-mcp#connectors).
     ///
     /// Currently supported `connector_id` values are:
     ///
@@ -3733,7 +3798,7 @@ pub struct MCPTool {
     /// - Microsoft Teams: `connector_microsoftteams`
     /// - Outlook Calendar: `connector_outlookcalendar`
     /// - Outlook Email: `connector_outlookemail`
-    /// - `SharePoint`: `connector_sharepoint`
+    /// - SharePoint: `connector_sharepoint`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connector_id: Option<MCPToolConnectorId>,
     /// Whether this MCP tool is deferred and discovered via tool search.
@@ -3770,7 +3835,7 @@ pub enum MCPToolAllowedTools {
     MCPToolFilter(MCPToolFilter),
 }
 
-/// Identifier for service connectors, like those available in `ChatGPT`. One of
+/// Identifier for service connectors, like those available in ChatGPT. One of
 /// `server_url` or `connector_id` must be provided. Learn more about service
 /// connectors [here](/docs/guides/tools-remote-mcp#connectors).
 ///
@@ -3783,7 +3848,7 @@ pub enum MCPToolAllowedTools {
 /// - Microsoft Teams: `connector_microsoftteams`
 /// - Outlook Calendar: `connector_outlookcalendar`
 /// - Outlook Email: `connector_outlookemail`
-/// - `SharePoint`: `connector_sharepoint`
+/// - SharePoint: `connector_sharepoint`
 #[derive(Serialize, Deserialize)]
 pub enum MCPToolConnectorId {
     #[serde(rename = "connector_dropbox")]
@@ -4048,6 +4113,8 @@ pub struct CustomToolParam {
     pub format: Option<CustomToolParamFormat>,
     /// The name of the custom tool, used to identify it in tool calls.
     pub name: String,
+    /// The type of the custom tool. Always `custom`.
+    pub r#type: CustomToolParamType,
 }
 
 /// The input format for the custom tool. Default is unconstrained text.
@@ -4058,6 +4125,13 @@ pub enum CustomToolParamFormat {
     Text(CustomTextFormatParam),
     #[serde(rename = "grammar")]
     Grammar(CustomGrammarFormatParam),
+}
+
+/// The type of the custom tool. Always `custom`.
+#[derive(Serialize, Deserialize)]
+pub enum CustomToolParamType {
+    #[serde(rename = "custom")]
+    Custom,
 }
 
 /// Groups function/custom tools under a shared namespace.
@@ -4289,8 +4363,8 @@ pub struct FunctionShellCallOutputContentParam {
     pub stdout: String,
 }
 
-/// One of the `create_file`, `delete_file`, or `update_file` operations
-/// supplied to the `apply_patch` tool.
+/// One of the create_file, delete_file, or update_file operations supplied to
+/// the apply_patch tool.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ApplyPatchOperationParam {
@@ -4302,7 +4376,7 @@ pub enum ApplyPatchOperationParam {
     UpdateFile(ApplyPatchUpdateFileOperationParam),
 }
 
-/// Status values reported for `apply_patch` tool calls.
+/// Status values reported for apply_patch tool calls.
 #[derive(Serialize, Deserialize)]
 pub enum ApplyPatchCallStatusParam {
     #[serde(rename = "in_progress")]
@@ -4311,7 +4385,7 @@ pub enum ApplyPatchCallStatusParam {
     Completed,
 }
 
-/// Outcome values reported for `apply_patch` tool call outputs.
+/// Outcome values reported for apply_patch tool call outputs.
 #[derive(Serialize, Deserialize)]
 pub enum ApplyPatchCallOutputStatusParam {
     #[serde(rename = "completed")]
@@ -4364,7 +4438,7 @@ pub struct DragParam {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keys: Option<Vec<String>>,
     /// An array of coordinates representing the path of the drag action.
-    /// Coordinates will appear as an array of objects, eg 
+    /// Coordinates will appear as an array of objects, eg
     /// ```
     /// [
     ///   { x: 100, y: 200 },
@@ -4749,7 +4823,7 @@ pub enum FunctionShellCallOutputOutcomeParam {
     Exit(FunctionShellCallOutputExitOutcomeParam),
 }
 
-/// Instruction for creating a new file via the `apply_patch` tool.
+/// Instruction for creating a new file via the apply_patch tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchCreateFileOperationParam {
     /// Unified diff content to apply when creating the file.
@@ -4758,14 +4832,14 @@ pub struct ApplyPatchCreateFileOperationParam {
     pub path: String,
 }
 
-/// Instruction for deleting an existing file via the `apply_patch` tool.
+/// Instruction for deleting an existing file via the apply_patch tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchDeleteFileOperationParam {
     /// Path of the file to delete relative to the workspace root.
     pub path: String,
 }
 
-/// Instruction for updating an existing file via the `apply_patch` tool.
+/// Instruction for updating an existing file via the apply_patch tool.
 #[derive(Serialize, Deserialize)]
 pub struct ApplyPatchUpdateFileOperationParam {
     /// Unified diff content to apply to the existing file.

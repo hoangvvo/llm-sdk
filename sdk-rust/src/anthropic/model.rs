@@ -351,7 +351,7 @@ fn convert_tool(tool: SdkTool) -> Tool {
         allowed_callers: None,
         name: tool.name,
         description: Some(tool.description),
-        input_schema: tool.parameters,
+        input_schema: Some(tool.parameters),
         cache_control: None,
         defer_loading: None,
         eager_input_streaming: None,

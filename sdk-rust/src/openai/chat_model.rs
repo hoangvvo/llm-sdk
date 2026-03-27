@@ -9,21 +9,22 @@ use super::chat_api::{
     ChatCompletionRequestMessageContentPartAudioInputAudioFormat,
     ChatCompletionRequestMessageContentPartImage,
     ChatCompletionRequestMessageContentPartImageImageUrl,
-    ChatCompletionRequestMessageContentPartText, ChatCompletionRequestSystemMessage,
-    ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage,
-    ChatCompletionRequestToolMessageContent, ChatCompletionRequestToolMessageContentPart,
-    ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
-    ChatCompletionRequestUserMessageContentPart, ChatCompletionStreamOptionsValue,
-    ChatCompletionStreamResponseDelta, ChatCompletionTool, ChatCompletionToolChoiceOption,
-    CompletionUsage, CompletionUsageCompletionTokensDetails, CompletionUsagePromptTokensDetails,
-    CreateChatCompletionRequest, CreateChatCompletionRequestAllOf2,
-    CreateChatCompletionRequestAllOf2Audio, CreateChatCompletionRequestAllOf2AudioFormat,
-    CreateChatCompletionRequestAllOf2ResponseFormat, CreateChatCompletionRequestAllOf2ToolsItem,
-    CreateChatCompletionResponse, CreateChatCompletionStreamResponse,
-    CreateModelResponseProperties, CreateModelResponsePropertiesAllOf2, FunctionObject,
-    ModelResponseProperties, ReasoningEffort, ReasoningEffortValue, ResponseFormatJsonObject,
-    ResponseFormatJsonSchema, ResponseFormatJsonSchemaJsonSchema, ResponseFormatJsonSchemaSchema,
-    ResponseFormatText, ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
+    ChatCompletionRequestMessageContentPartText, ChatCompletionRequestMessageContentPartTextType,
+    ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageContent,
+    ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContent,
+    ChatCompletionRequestToolMessageContentPart, ChatCompletionRequestUserMessage,
+    ChatCompletionRequestUserMessageContent, ChatCompletionRequestUserMessageContentPart,
+    ChatCompletionStreamOptionsValue, ChatCompletionStreamResponseDelta, ChatCompletionTool,
+    ChatCompletionToolChoiceOption, CompletionUsage, CompletionUsageCompletionTokensDetails,
+    CompletionUsagePromptTokensDetails, CreateChatCompletionRequest,
+    CreateChatCompletionRequestAllOf2, CreateChatCompletionRequestAllOf2Audio,
+    CreateChatCompletionRequestAllOf2AudioFormat, CreateChatCompletionRequestAllOf2ResponseFormat,
+    CreateChatCompletionRequestAllOf2ToolsItem, CreateChatCompletionResponse,
+    CreateChatCompletionStreamResponse, CreateModelResponseProperties,
+    CreateModelResponsePropertiesAllOf2, FunctionObject, ModelResponseProperties, ReasoningEffort,
+    ReasoningEffortValue, ResponseFormatJsonObject, ResponseFormatJsonSchema,
+    ResponseFormatJsonSchemaJsonSchema, ResponseFormatJsonSchemaSchema, ResponseFormatText,
+    ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
 };
 use crate::{
     client_utils, source_part_utils, stream_utils, AssistantMessage, AudioFormat, AudioOptions,
@@ -242,25 +243,27 @@ impl LanguageModel for OpenAIChatModel {
                         while let Some(chunk) = stream.next().await {
                             let chunk = chunk?;
 
-                            if let Some(choice) = chunk.choices.into_iter().next() {
-                                let mut delta = choice.delta;
+                            if let Some(choices) = chunk.choices {
+                                if let Some(choice) = choices.into_iter().next() {
+                                    let mut delta = choice.delta;
 
-                                if let Some(delta_refusal) = delta.refusal.take() {
-                                    refusal.push_str(&delta_refusal);
-                                }
+                                    if let Some(delta_refusal) = delta.refusal.take() {
+                                        refusal.push_str(&delta_refusal);
+                                    }
 
-                                let deltas = map_openai_delta(
-                                    delta,
-                                    &content_deltas,
-                                    audio_format.clone(),
-                                )?;
+                                    let deltas = map_openai_delta(
+                                        delta,
+                                        &content_deltas,
+                                        audio_format.clone(),
+                                    )?;
 
-                                for delta in deltas {
-                                    content_deltas.push(delta.clone());
-                                    yield PartialModelResponse {
-                                        delta: Some(delta),
-                                        ..Default::default()
-                                    };
+                                    for delta in deltas {
+                                        content_deltas.push(delta.clone());
+                                        yield PartialModelResponse {
+                                            delta: Some(delta),
+                                            ..Default::default()
+                                        };
+                                    }
                                 }
                             }
 
@@ -434,6 +437,7 @@ fn convert_user_message(
                 content_parts.push(ChatCompletionRequestUserMessageContentPart::Text(
                     ChatCompletionRequestMessageContentPartText {
                         text: text_part.text,
+                        r#type: ChatCompletionRequestMessageContentPartTextType::Text,
                     },
                 ));
             }
@@ -517,6 +521,7 @@ fn convert_assistant_message(
                 content_parts.push(ChatCompletionRequestAssistantMessageContentPart::Text(
                     ChatCompletionRequestMessageContentPartText {
                         text: text_part.text,
+                        r#type: ChatCompletionRequestMessageContentPartTextType::Text,
                     },
                 ));
             }
@@ -588,6 +593,7 @@ fn convert_tool_message(
                             content_parts.push(ChatCompletionRequestToolMessageContentPart::Text(
                                 ChatCompletionRequestMessageContentPartText {
                                     text: text_part.text,
+                                    r#type: ChatCompletionRequestMessageContentPartTextType::Text,
                                 },
                             ));
                         }

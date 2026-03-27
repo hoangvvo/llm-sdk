@@ -386,6 +386,7 @@ func convertUserMessageToOpenAIChatMessage(message *llmsdk.UserMessage) (openaic
 			openAIContent = append(openAIContent, openaichatapi.ChatCompletionRequestUserMessageContentPart{
 				Text: &openaichatapi.ChatCompletionRequestMessageContentPartText{
 					Text: part.TextPart.Text,
+					Type: openaichatapi.ChatCompletionRequestMessageContentPartTextTypeText,
 				},
 			})
 		case part.ImagePart != nil:
@@ -439,6 +440,7 @@ func convertAssistantMessageToOpenAIChatMessages(message *llmsdk.AssistantMessag
 			contentParts = append(contentParts, openaichatapi.ChatCompletionRequestAssistantMessageContentPart{
 				Text: &openaichatapi.ChatCompletionRequestMessageContentPartText{
 					Text: part.TextPart.Text,
+					Type: openaichatapi.ChatCompletionRequestMessageContentPartTextTypeText,
 				},
 			})
 		case part.ToolCallPart != nil:
@@ -500,6 +502,7 @@ func convertToolMessageToOpenAIChatMessages(message *llmsdk.ToolMessage) ([]open
 			contentParts = append(contentParts, openaichatapi.ChatCompletionRequestToolMessageContentPart{
 				Text: &openaichatapi.ChatCompletionRequestMessageContentPartText{
 					Text: toolResultPart.TextPart.Text,
+					Type: openaichatapi.ChatCompletionRequestMessageContentPartTextTypeText,
 				},
 			})
 		}

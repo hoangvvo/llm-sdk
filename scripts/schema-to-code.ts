@@ -6,8 +6,8 @@ import {
   loadSchemaDocument,
   type TargetLanguage,
 } from "./schema-to-code/core.ts";
-import { renderGoDocument } from "./schema-to-code/go.ts";
-import { renderRustDocument } from "./schema-to-code/rust.ts";
+import { formatGoOutput, renderGoDocument } from "./schema-to-code/go.ts";
+import { formatRustOutput, renderRustDocument } from "./schema-to-code/rust.ts";
 
 interface CliOptions {
   input: string;
@@ -33,6 +33,11 @@ async function main(): Promise<void> {
     const outputPath = resolve(options.output);
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, rendered, "utf8");
+    if (options.language === "go") {
+      await formatGoOutput(outputPath);
+    } else {
+      await formatRustOutput(outputPath);
+    }
     return;
   }
 

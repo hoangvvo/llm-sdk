@@ -2905,13 +2905,7 @@ func (u *Item) MarshalJSON() ([]byte, error) {
 		return json.Marshal(u.InputMessage)
 	}
 	if u.OutputMessage != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*OutputMessage
-		}{
-			Type:          "message",
-			OutputMessage: u.OutputMessage,
-		})
+		return json.Marshal(u.OutputMessage)
 	}
 	if u.FileSearchToolCall != nil {
 		return json.Marshal(u.FileSearchToolCall)
@@ -2926,13 +2920,7 @@ func (u *Item) MarshalJSON() ([]byte, error) {
 		return json.Marshal(u.WebSearchToolCall)
 	}
 	if u.FunctionToolCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*FunctionToolCall
-		}{
-			Type:             "function_call",
-			FunctionToolCall: u.FunctionToolCall,
-		})
+		return json.Marshal(u.FunctionToolCall)
 	}
 	if u.FunctionCallOutputItemParam != nil {
 		return json.Marshal(u.FunctionCallOutputItemParam)
@@ -2944,25 +2932,13 @@ func (u *Item) MarshalJSON() ([]byte, error) {
 		return json.Marshal(u.ToolSearchOutputItemParam)
 	}
 	if u.ReasoningItem != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ReasoningItem
-		}{
-			Type:          "reasoning",
-			ReasoningItem: u.ReasoningItem,
-		})
+		return json.Marshal(u.ReasoningItem)
 	}
 	if u.CompactionSummaryItemParam != nil {
 		return json.Marshal(u.CompactionSummaryItemParam)
 	}
 	if u.ImageGenToolCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ImageGenToolCall
-		}{
-			Type:             "image_generation_call",
-			ImageGenToolCall: u.ImageGenToolCall,
-		})
+		return json.Marshal(u.ImageGenToolCall)
 	}
 	if u.CodeInterpreterToolCall != nil {
 		return json.Marshal(u.CodeInterpreterToolCall)
@@ -3258,6 +3234,9 @@ type OutputMessage struct {
 	// `incomplete`. Populated when input items are returned via API.
 	//
 	Status OutputMessageStatus `json:"status"`
+	// The type of the output message. Always `message`.
+	//
+	Type OutputMessageType `json:"type"`
 }
 
 // The role of the output message. Always `assistant`.
@@ -3277,6 +3256,13 @@ const (
 	OutputMessageStatusIncomplete OutputMessageStatus = "incomplete"
 )
 
+// The type of the output message. Always `message`.
+type OutputMessageType string
+
+const (
+	OutputMessageTypeMessage OutputMessageType = "message"
+)
+
 // The results of a file search tool call. See the
 // [file search guide](/docs/guides/tools-file-search) for more information.
 type FileSearchToolCall struct {
@@ -3293,6 +3279,9 @@ type FileSearchToolCall struct {
 	// `searching`, `incomplete` or `failed`,
 	//
 	Status FileSearchToolCallStatus `json:"status"`
+	// The type of the file search tool call. Always `file_search_call`.
+	//
+	Type FileSearchToolCallType `json:"type"`
 }
 
 type FileSearchToolCallResultsItem struct {
@@ -3323,6 +3312,13 @@ const (
 	FileSearchToolCallStatusFailed     FileSearchToolCallStatus = "failed"
 )
 
+// The type of the file search tool call. Always `file_search_call`.
+type FileSearchToolCallType string
+
+const (
+	FileSearchToolCallTypeFileSearchCall FileSearchToolCallType = "file_search_call"
+)
+
 // A tool call to run a function. See the
 // [function calling guide](/docs/guides/function-calling) for more information.
 type FunctionToolCall struct {
@@ -3345,6 +3341,9 @@ type FunctionToolCall struct {
 	// `incomplete`. Populated when items are returned via API.
 	//
 	Status *FunctionToolCallStatus `json:"status,omitempty"`
+	// The type of the function tool call. Always `function_call`.
+	//
+	Type FunctionToolCallType `json:"type"`
 }
 
 // The status of the item. One of `in_progress`, `completed`, or
@@ -3355,6 +3354,13 @@ const (
 	FunctionToolCallStatusInProgress FunctionToolCallStatus = "in_progress"
 	FunctionToolCallStatusCompleted  FunctionToolCallStatus = "completed"
 	FunctionToolCallStatusIncomplete FunctionToolCallStatus = "incomplete"
+)
+
+// The type of the function tool call. Always `function_call`.
+type FunctionToolCallType string
+
+const (
+	FunctionToolCallTypeFunctionCall FunctionToolCallType = "function_call"
 )
 
 // The results of a web search tool call. See the
@@ -3370,6 +3376,9 @@ type WebSearchToolCall struct {
 	// The status of the web search tool call.
 	//
 	Status WebSearchToolCallStatus `json:"status"`
+	// The type of the web search tool call. Always `web_search_call`.
+	//
+	Type WebSearchToolCallType `json:"type"`
 }
 
 // An object describing the specific action taken in this web search call.
@@ -3460,6 +3469,13 @@ const (
 	WebSearchToolCallStatusFailed     WebSearchToolCallStatus = "failed"
 )
 
+// The type of the web search tool call. Always `web_search_call`.
+type WebSearchToolCallType string
+
+const (
+	WebSearchToolCallTypeWebSearchCall WebSearchToolCallType = "web_search_call"
+)
+
 // A tool call to a computer use tool. See the
 // [computer use guide](/docs/guides/tools-computer-use) for more information.
 type ComputerToolCall struct {
@@ -3477,6 +3493,8 @@ type ComputerToolCall struct {
 	// `incomplete`. Populated when items are returned via API.
 	//
 	Status ComputerToolCallStatus `json:"status"`
+	// The type of the computer call. Always `computer_call`.
+	Type ComputerToolCallType `json:"type"`
 }
 
 // The status of the item. One of `in_progress`, `completed`, or
@@ -3487,6 +3505,13 @@ const (
 	ComputerToolCallStatusInProgress ComputerToolCallStatus = "in_progress"
 	ComputerToolCallStatusCompleted  ComputerToolCallStatus = "completed"
 	ComputerToolCallStatusIncomplete ComputerToolCallStatus = "incomplete"
+)
+
+// The type of the computer call. Always `computer_call`.
+type ComputerToolCallType string
+
+const (
+	ComputerToolCallTypeComputerCall ComputerToolCallType = "computer_call"
 )
 
 // A description of the chain of thought used by a reasoning model while generating
@@ -3511,6 +3536,9 @@ type ReasoningItem struct {
 	// Reasoning summary content.
 	//
 	Summary []SummaryTextContent `json:"summary"`
+	// The type of the object. Always `reasoning`.
+	//
+	Type ReasoningItemType `json:"type"`
 }
 
 // The status of the item. One of `in_progress`, `completed`, or
@@ -3521,6 +3549,13 @@ const (
 	ReasoningItemStatusInProgress ReasoningItemStatus = "in_progress"
 	ReasoningItemStatusCompleted  ReasoningItemStatus = "completed"
 	ReasoningItemStatusIncomplete ReasoningItemStatus = "incomplete"
+)
+
+// The type of the object. Always `reasoning`.
+type ReasoningItemType string
+
+const (
+	ReasoningItemTypeReasoning ReasoningItemType = "reasoning"
 )
 
 type ToolSearchCall struct {
@@ -3592,6 +3627,9 @@ type ImageGenToolCall struct {
 	// The status of the image generation call.
 	//
 	Status ImageGenToolCallStatus `json:"status"`
+	// The type of the image generation call. Always `image_generation_call`.
+	//
+	Type ImageGenToolCallType `json:"type"`
 }
 
 // The image generation action performed by the model.
@@ -3631,6 +3669,13 @@ const (
 	ImageGenToolCallStatusFailed     ImageGenToolCallStatus = "failed"
 )
 
+// The type of the image generation call. Always `image_generation_call`.
+type ImageGenToolCallType string
+
+const (
+	ImageGenToolCallTypeImageGenerationCall ImageGenToolCallType = "image_generation_call"
+)
+
 // A tool call to run code.
 type CodeInterpreterToolCall struct {
 	// The code to run, or null if not available.
@@ -3649,6 +3694,9 @@ type CodeInterpreterToolCall struct {
 	// The status of the code interpreter tool call. Valid values are `in_progress`, `completed`, `incomplete`, `interpreting`, and `failed`.
 	//
 	Status CodeInterpreterToolCallStatus `json:"status"`
+	// The type of the code interpreter tool call. Always `code_interpreter_call`.
+	//
+	Type CodeInterpreterToolCallType `json:"type"`
 }
 
 type CodeInterpreterToolCallOutputsItem struct {
@@ -3722,6 +3770,13 @@ const (
 	CodeInterpreterToolCallStatusFailed       CodeInterpreterToolCallStatus = "failed"
 )
 
+// The type of the code interpreter tool call. Always `code_interpreter_call`.
+type CodeInterpreterToolCallType string
+
+const (
+	CodeInterpreterToolCallTypeCodeInterpreterCall CodeInterpreterToolCallType = "code_interpreter_call"
+)
+
 // A tool call to run a command on the local shell.
 type LocalShellToolCall struct {
 	Action LocalShellExecAction `json:"action"`
@@ -3734,6 +3789,9 @@ type LocalShellToolCall struct {
 	// The status of the local shell call.
 	//
 	Status LocalShellToolCallStatus `json:"status"`
+	// The type of the local shell call. Always `local_shell_call`.
+	//
+	Type LocalShellToolCallType `json:"type"`
 }
 
 // The status of the local shell call.
@@ -3743,6 +3801,13 @@ const (
 	LocalShellToolCallStatusInProgress LocalShellToolCallStatus = "in_progress"
 	LocalShellToolCallStatusCompleted  LocalShellToolCallStatus = "completed"
 	LocalShellToolCallStatusIncomplete LocalShellToolCallStatus = "incomplete"
+)
+
+// The type of the local shell call. Always `local_shell_call`.
+type LocalShellToolCallType string
+
+const (
+	LocalShellToolCallTypeLocalShellCall LocalShellToolCallType = "local_shell_call"
 )
 
 // A tool call that executes one or more shell commands in a managed environment.
@@ -3968,7 +4033,17 @@ type MCPToolCall struct {
 	// The status of the tool call. One of `in_progress`, `completed`, `incomplete`, `calling`, or `failed`.
 	//
 	Status *MCPToolCallStatus `json:"status,omitempty"`
+	// The type of the item. Always `mcp_call`.
+	//
+	Type MCPToolCallType `json:"type"`
 }
+
+// The type of the item. Always `mcp_call`.
+type MCPToolCallType string
+
+const (
+	MCPToolCallTypeMcpCall MCPToolCallType = "mcp_call"
+)
 
 // A list of tools available on an MCP server.
 type MCPListTools struct {
@@ -3984,7 +4059,17 @@ type MCPListTools struct {
 	// The tools available on the server.
 	//
 	Tools []MCPListToolsTool `json:"tools"`
+	// The type of the item. Always `mcp_list_tools`.
+	//
+	Type MCPListToolsType `json:"type"`
 }
+
+// The type of the item. Always `mcp_list_tools`.
+type MCPListToolsType string
+
+const (
+	MCPListToolsTypeMcpListTools MCPListToolsType = "mcp_list_tools"
+)
 
 // A request for human approval of a tool invocation.
 type MCPApprovalRequest struct {
@@ -4000,7 +4085,17 @@ type MCPApprovalRequest struct {
 	// The label of the MCP server making the request.
 	//
 	ServerLabel string `json:"server_label"`
+	// The type of the item. Always `mcp_approval_request`.
+	//
+	Type MCPApprovalRequestType `json:"type"`
 }
+
+// The type of the item. Always `mcp_approval_request`.
+type MCPApprovalRequestType string
+
+const (
+	MCPApprovalRequestTypeMcpApprovalRequest MCPApprovalRequestType = "mcp_approval_request"
+)
 
 // A call to a custom tool created by the model.
 type CustomToolCall struct {
@@ -4019,7 +4114,17 @@ type CustomToolCall struct {
 	// The namespace of the custom tool being called.
 	//
 	Namespace *string `json:"namespace,omitempty"`
+	// The type of the custom tool call. Always `custom_tool_call`.
+	//
+	Type CustomToolCallType `json:"type"`
 }
+
+// The type of the custom tool call. Always `custom_tool_call`.
+type CustomToolCallType string
+
+const (
+	CustomToolCallTypeCustomToolCall CustomToolCallType = "custom_tool_call"
+)
 
 type OutputContent struct {
 	OutputText    *OutputTextContent
@@ -5635,7 +5740,16 @@ type ComputerCallSafetyCheckParam struct {
 type ReasoningTextContent struct {
 	// The reasoning text from the model.
 	Text string `json:"text"`
+	// The type of the reasoning text. Always `reasoning_text`.
+	Type ReasoningTextContentType `json:"type"`
 }
+
+// The type of the reasoning text. Always `reasoning_text`.
+type ReasoningTextContentType string
+
+const (
+	ReasoningTextContentTypeReasoningText ReasoningTextContentType = "reasoning_text"
+)
 
 // A summary text from the model.
 type SummaryTextContent struct {
@@ -5898,7 +6012,16 @@ type RefusalContent struct {
 type InputTextContent struct {
 	// The text input to the model.
 	Text string `json:"text"`
+	// The type of the input item. Always `input_text`.
+	Type InputTextContentType `json:"type"`
 }
+
+// The type of the input item. Always `input_text`.
+type InputTextContentType string
+
+const (
+	InputTextContentTypeInputText InputTextContentType = "input_text"
+)
 
 // An image input to the model. Learn about [image inputs](/docs/guides/vision).
 type InputImageContent struct {
@@ -5908,7 +6031,16 @@ type InputImageContent struct {
 	FileId *string `json:"file_id,omitempty"`
 	// The URL of the image to be sent to the model. A fully qualified URL or base64 encoded image in a data URL.
 	ImageUrl *string `json:"image_url,omitempty"`
+	// The type of the input item. Always `input_image`.
+	Type InputImageContentType `json:"type"`
 }
+
+// The type of the input item. Always `input_image`.
+type InputImageContentType string
+
+const (
+	InputImageContentTypeInputImage InputImageContentType = "input_image"
+)
 
 // A file input to the model.
 type InputFileContent struct {
@@ -5921,7 +6053,16 @@ type InputFileContent struct {
 	FileUrl *string `json:"file_url,omitempty"`
 	// The name of the file to be sent to the model.
 	Filename *string `json:"filename,omitempty"`
+	// The type of the input item. Always `input_file`.
+	Type InputFileContentType `json:"type"`
 }
+
+// The type of the input item. Always `input_file`.
+type InputFileContentType string
+
+const (
+	InputFileContentTypeInputFile InputFileContentType = "input_file"
+)
 
 // Default response format. Used to generate text responses.
 type ResponseFormatText struct {
@@ -6552,6 +6693,8 @@ type CustomToolParam struct {
 	Format *CustomToolParamFormat `json:"format,omitempty"`
 	// The name of the custom tool, used to identify it in tool calls.
 	Name string `json:"name"`
+	// The type of the custom tool. Always `custom`.
+	Type CustomToolParamType `json:"type"`
 }
 
 // The input format for the custom tool. Default is unconstrained text.
@@ -6614,6 +6757,13 @@ func (u *CustomToolParamFormat) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+// The type of the custom tool. Always `custom`.
+type CustomToolParamType string
+
+const (
+	CustomToolParamTypeCustom CustomToolParamType = "custom"
+)
 
 // Groups function/custom tools under a shared namespace.
 type NamespaceToolParam struct {

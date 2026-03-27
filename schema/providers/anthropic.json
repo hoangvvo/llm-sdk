@@ -419,6 +419,9 @@
         },
         {
           "$ref": "#/definitions/ContentBlockStopEvent"
+        },
+        {
+          "$ref": "#/definitions/PingEvent"
         }
       ],
       "title": "MessageStreamEvent",
@@ -427,6 +430,21 @@
           "model_name": "MessageStreamEvent"
         }
       }
+    },
+    "PingEvent": {
+      "properties": {
+        "type": {
+          "const": "ping",
+          "description": "Event type.",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "PingEvent",
+      "type": "object"
     },
     "CacheControlEphemeral": {
       "additionalProperties": false,

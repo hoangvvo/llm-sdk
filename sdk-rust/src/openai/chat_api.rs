@@ -1,5 +1,6 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
+#![allow(clippy::doc_markdown)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -74,7 +75,7 @@ pub struct CreateChatCompletionRequestAllOf2 {
     pub messages: Vec<ChatCompletionRequestMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modalities: Option<ResponseModalities>,
-    /// Model ID used to generate the response, like `gpt-4o` or `o3`. `OpenAI`
+    /// Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI
     /// offers a wide range of models with different capabilities, performance
     /// characteristics, and price points. Refer to the [model
     /// guide](/docs/models) to browse and compare available models.
@@ -387,8 +388,8 @@ pub struct CreateChatCompletionStreamResponse {
     /// A list of chat completion choices. Can contain more than one elements if
     /// `n` is greater than 1. Can also be empty for the last chunk if you
     /// set `stream_options: {"include_usage": true}`.
-    #[serde(default)]
-    pub choices: Vec<CreateChatCompletionStreamResponseChoicesItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub choices: Option<Vec<CreateChatCompletionStreamResponseChoicesItem>>,
     /// The Unix timestamp (in seconds) of when the chat completion was created.
     /// Each chunk has the same timestamp.
     pub created: i64,
@@ -553,9 +554,6 @@ pub type ResponseModalities = Option<Option<Vec<ResponseModalitiesValueItem>>>;
 
 pub type ModelIdsShared = Option<String>;
 
-/// Whether to enable [parallel function
-/// calling](/docs/guides/function-calling#
-/// configuring-parallel-function-calling) during tool use.
 pub type ParallelToolCalls = Option<bool>;
 
 /// Static predicted output content, such as the content of a text file that is
@@ -683,7 +681,7 @@ pub struct ChatCompletionStreamOptionsValue {
     /// These obfuscation fields are included by default, but add a small amount
     /// of overhead to the data stream. You can set `include_obfuscation` to
     /// false to optimize for bandwidth if you trust the network links between
-    /// your application and the `OpenAI` API.
+    /// your application and the OpenAI API.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_obfuscation: Option<bool>,
     /// If set, an additional chunk will be streamed before the `data: [DONE]`
@@ -1139,8 +1137,8 @@ pub struct ChatCompletionStreamResponseDeltaAudio {
 pub struct ModelResponseProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
-    /// Used by `OpenAI` to cache responses for similar requests to optimize
-    /// your cache hit rates. Replaces the `user` field. [Learn
+    /// Used by OpenAI to cache responses for similar requests to optimize your
+    /// cache hit rates. Replaces the `user` field. [Learn
     /// more](/docs/guides/prompt-caching).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
@@ -1151,8 +1149,8 @@ pub struct ModelResponseProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_retention: Option<ModelResponsePropertiesPromptCacheRetention>,
     /// A stable identifier used to help detect users of your application that
-    /// may be violating `OpenAI`'s usage policies. The IDs should be a
-    /// string that uniquely identifies each user, with a maximum length of 64
+    /// may be violating OpenAI's usage policies. The IDs should be a string
+    /// that uniquely identifies each user, with a maximum length of 64
     /// characters. We recommend hashing their username or email address, in
     /// order to avoid sending us any identifying information. [Learn
     /// more](/docs/guides/safety-best-practices#safety-identifiers).
@@ -1172,7 +1170,7 @@ pub struct ModelResponseProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<i64>,
     /// An alternative to sampling with temperature, called nucleus sampling,
-    /// where the model considers the results of the tokens with `top_p`
+    /// where the model considers the results of the tokens with top_p
     /// probability mass. So 0.1 means only the tokens comprising the top
     /// 10% probability mass are considered.
     ///
@@ -1183,7 +1181,7 @@ pub struct ModelResponseProperties {
     /// `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
     /// optimizations. A stable identifier for your end-users.
     /// Used to boost cache hit rates by better bucketing similar requests and
-    /// to help `OpenAI` detect and prevent abuse. [Learn
+    /// to help OpenAI detect and prevent abuse. [Learn
     /// more](/docs/guides/safety-best-practices#safety-identifiers).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
@@ -1406,6 +1404,15 @@ pub struct ChatCompletionRequestFunctionMessage {
 pub struct ChatCompletionRequestMessageContentPartText {
     /// The text content.
     pub text: String,
+    /// The type of the content part.
+    pub r#type: ChatCompletionRequestMessageContentPartTextType,
+}
+
+/// The type of the content part.
+#[derive(Serialize, Deserialize)]
+pub enum ChatCompletionRequestMessageContentPartTextType {
+    #[serde(rename = "text")]
+    Text,
 }
 
 /// The schema for the response format, described as a JSON Schema object.
@@ -1587,7 +1594,7 @@ pub struct ChatCompletionAllowedTools {
     /// A list of tool definitions that the model should be allowed to call.
     ///
     /// For the Chat Completions API, the list of tool definitions might look
-    /// like: 
+    /// like:
     /// ```json
     /// [
     ///   { "type": "function", "function": { "name": "get_weather" } },

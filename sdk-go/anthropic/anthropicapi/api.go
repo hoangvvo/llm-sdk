@@ -573,6 +573,7 @@ type MessageStreamEvent struct {
 	ContentBlockStart *ContentBlockStartEvent
 	ContentBlockDelta *ContentBlockDeltaEvent
 	ContentBlockStop  *ContentBlockStopEvent
+	Ping              *PingEvent
 }
 
 func (u *MessageStreamEvent) MarshalJSON() ([]byte, error) {
@@ -630,6 +631,15 @@ func (u *MessageStreamEvent) MarshalJSON() ([]byte, error) {
 			ContentBlockStopEvent: u.ContentBlockStop,
 		})
 	}
+	if u.Ping != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*PingEvent
+		}{
+			Type:      "ping",
+			PingEvent: u.Ping,
+		})
+	}
 	return nil, errors.New("invalid MessageStreamEvent: all variants are nil")
 }
 
@@ -684,10 +694,19 @@ func (u *MessageStreamEvent) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.ContentBlockStop = &value
+	case "ping":
+		var value PingEvent
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Ping = &value
 	default:
-		return nil
+		return errors.New("invalid type field in MessageStreamEvent")
 	}
 	return nil
+}
+
+type PingEvent struct {
 }
 
 type CacheControlEphemeral struct {
@@ -4576,6 +4595,7 @@ type RequestDocumentBlock struct {
 	Context      *string                           `json:"context,omitempty"`
 	Source       RequestDocumentBlockSource        `json:"source"`
 	Title        *string                           `json:"title,omitempty"`
+	Type         string                            `json:"type"`
 }
 
 // Create a cache control breakpoint at this content block.
@@ -6362,6 +6382,7 @@ type RequestToolReferenceBlock struct {
 	// Create a cache control breakpoint at this content block.
 	CacheControl *RequestToolReferenceBlockCacheControl `json:"cache_control,omitempty"`
 	ToolName     string                                 `json:"tool_name"`
+	Type         string                                 `json:"type"`
 }
 
 // Create a cache control breakpoint at this content block.

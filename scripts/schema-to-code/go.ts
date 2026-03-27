@@ -1,3 +1,6 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 import type {
   AliasDeclaration,
   CodegenDocument,
@@ -8,6 +11,8 @@ import type {
   TypeExpression,
   UnionDeclaration,
 } from "./core.ts";
+
+const execFileAsync = promisify(execFile);
 
 export function renderGoDocument(
   document: CodegenDocument,
@@ -33,6 +38,10 @@ export function renderGoDocument(
   }
 
   return `${parts.join("\n\n")}\n`;
+}
+
+export async function formatGoOutput(outputPath: string): Promise<void> {
+  await execFileAsync("gofmt", ["-w", outputPath]);
 }
 
 function renderGoDeclaration(declaration: Declaration): string {

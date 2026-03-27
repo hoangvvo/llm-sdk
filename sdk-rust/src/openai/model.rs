@@ -4,17 +4,18 @@ use crate::{
         self, CreateModelResponseProperties, CreateModelResponsePropertiesAllOf2, CreateResponse,
         CreateResponseAllOf3, DetailEnum, FunctionCallOutputItemParam,
         FunctionCallOutputItemParamOutput, FunctionCallOutputItemParamOutputArrayItem,
-        FunctionCallOutputItemParamType, FunctionTool, FunctionToolCall, FunctionToolType,
-        ImageDetail, ImageGenTool, ImageGenToolCall, ImageGenToolType, IncludeEnum, InputContent,
-        InputImageContent, InputImageContentParamAutoParam, InputItem, InputMessage,
+        FunctionCallOutputItemParamType, FunctionTool, FunctionToolCall, FunctionToolCallType,
+        FunctionToolType, ImageDetail, ImageGenTool, ImageGenToolCall, ImageGenToolCallType,
+        ImageGenToolType, IncludeEnum, InputContent, InputImageContent,
+        InputImageContentParamAutoParam, InputImageContentType, InputItem, InputMessage,
         InputMessageRole, InputMessageType, InputTextContent, InputTextContentParam,
-        ModelResponseProperties, OutputItem, OutputMessage, OutputMessageContent,
-        OutputMessageRole, OutputMessageStatus, OutputTextContent, Reasoning, ReasoningItem,
-        ReasoningSummary, Response, ResponseFormatJsonObject, ResponseFormatText,
-        ResponseProperties, ResponseStreamEvent, ResponseTextParam, ResponseUsage,
-        SummaryTextContent, SummaryTextContentType, TextResponseFormatConfiguration,
-        TextResponseFormatJsonSchema, Tool as OpenAITool, ToolChoiceFunction,
-        ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam,
+        InputTextContentType, ModelResponseProperties, OutputItem, OutputMessage,
+        OutputMessageContent, OutputMessageRole, OutputMessageStatus, OutputMessageType,
+        OutputTextContent, Reasoning, ReasoningItem, ReasoningItemType, ReasoningSummary, Response,
+        ResponseFormatJsonObject, ResponseFormatText, ResponseProperties, ResponseStreamEvent,
+        ResponseTextParam, ResponseUsage, SummaryTextContent, SummaryTextContentType,
+        TextResponseFormatConfiguration, TextResponseFormatJsonSchema, Tool as OpenAITool,
+        ToolChoiceFunction, ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam,
     },
     source_part_utils, AssistantMessage, ContentDelta, ImagePart, ImagePartDelta, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
@@ -379,6 +380,7 @@ impl TryFrom<UserMessage> for InputItem {
                                 Part::Text(text_part) => {
                                     InputContent::InputText(InputTextContent {
                                         text: text_part.text,
+                                        r#type: InputTextContentType::InputText,
                                     })
                                 }
                                 Part::Image(image_part) => {
@@ -389,6 +391,7 @@ impl TryFrom<UserMessage> for InputItem {
                                             "data:{};base64,{}",
                                             image_part.mime_type, image_part.data
                                         )),
+                                        r#type: InputImageContentType::InputImage,
                                     })
                                 }
                                 _ => Err(LanguageModelError::Unsupported(
@@ -435,6 +438,7 @@ fn convert_assistant_message_to_response_input_items(
                             })],
                             phase: None,
                             status: OutputMessageStatus::Completed,
+                            r#type: OutputMessageType::Message,
                         },
                     )))
                 }
@@ -448,6 +452,7 @@ fn convert_assistant_message_to_response_input_items(
                         content: None,
                         encrypted_content: reasoning_part.signature,
                         status: None,
+                        r#type: ReasoningItemType::Reasoning,
                     }),
                 )),
                 Part::Image(image_part) => Some(InputItem::Item(
@@ -464,6 +469,7 @@ fn convert_assistant_message_to_response_input_items(
                         )),
                         revised_prompt: None,
                         size: None,
+                        r#type: ImageGenToolCallType::ImageGenerationCall,
                     }),
                 )),
                 Part::ToolCall(tool_call_part) => Some(InputItem::Item(
@@ -474,6 +480,7 @@ fn convert_assistant_message_to_response_input_items(
                         id: tool_call_part.id,
                         namespace: None,
                         status: None,
+                        r#type: FunctionToolCallType::FunctionCall,
                     }),
                 )),
                 _ => Err(LanguageModelError::Unsupported(

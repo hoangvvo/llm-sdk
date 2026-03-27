@@ -528,7 +528,7 @@ type CreateChatCompletionStreamResponse struct {
 	// A list of chat completion choices. Can contain more than one elements if `n` is greater than 1. Can also be empty for the
 	// last chunk if you set `stream_options: {"include_usage": true}`.
 	//
-	Choices []CreateChatCompletionStreamResponseChoicesItem `json:"choices"`
+	Choices []CreateChatCompletionStreamResponseChoicesItem `json:"choices,omitempty"`
 	// The Unix timestamp (in seconds) of when the chat completion was created. Each chunk has the same timestamp.
 	Created int `json:"created"`
 	// A unique identifier for the chat completion. Each chunk has the same ID.
@@ -1862,7 +1862,16 @@ type ChatCompletionRequestFunctionMessage struct {
 type ChatCompletionRequestMessageContentPartText struct {
 	// The text content.
 	Text string `json:"text"`
+	// The type of the content part.
+	Type ChatCompletionRequestMessageContentPartTextType `json:"type"`
 }
+
+// The type of the content part.
+type ChatCompletionRequestMessageContentPartTextType string
+
+const (
+	ChatCompletionRequestMessageContentPartTextTypeText ChatCompletionRequestMessageContentPartTextType = "text"
+)
 
 // The schema for the response format, described as a JSON Schema object.
 // Learn how to build JSON schemas [here](https://json-schema.org/).

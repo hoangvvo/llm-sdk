@@ -430,7 +430,15 @@ class SchemaDocumentBuilder {
   private readonly definitions: Record<string, JSONSchema7Definition>;
   private readonly language: TargetLanguage;
   private readonly reservedNames = new Set<string>();
+  // When a named definition is referenced as a tagged-union variant via $ref,
+  // we record the discriminator metadata here so the lowered struct can omit
+  // that property and let the generated union wrapper inject it instead.
+  //
+  // This is a shared lowering behavior. It works well for definitions that are
+  // only ever used as union variants, but it is a known sharp edge when the
+  // same definition is also reused later as a plain nested object.
   private readonly variantUsageByDefinition = new Map<string, VariantUsage>();
+  private readonly referencedOutsideTaggedUnion = new Set<string>();
   private usesMap = false;
   private usesJsonValue = false;
 
@@ -488,14 +496,22 @@ class SchemaDocumentBuilder {
     schema: JSONSchema7,
     path: string[],
     owningTypeName: string,
+    suppressDirectRefUsage = false,
   ): void {
     const unwrapped = unwrapNullableSchema(schema, formatPath(path)).schema;
+    const ref = getSchemaRef(unwrapped);
+    if (ref) {
+      if (!suppressDirectRefUsage) {
+        this.referencedOutsideTaggedUnion.add(
+          toCamelCase(this.resolveRefName(ref, formatPath(path))),
+        );
+      }
+      return;
+    }
+
+    let analysis: UnionAnalysis | undefined;
     if (unwrapped.oneOf || unwrapped.anyOf) {
-      const analysis = this.tryAnalyzeTaggedUnion(
-        unwrapped,
-        path,
-        owningTypeName,
-      );
+      analysis = this.tryAnalyzeTaggedUnion(unwrapped, path, owningTypeName);
       if (analysis) {
         for (const variant of analysis.variants) {
           if (!variant.refName) {
@@ -526,10 +542,15 @@ class SchemaDocumentBuilder {
       }
       value.forEach((item, index) => {
         if (isSchemaObject(item)) {
+          const suppressChildDirectRefUsage =
+            analysis !== undefined &&
+            (key === "oneOf" || key === "anyOf") &&
+            getSchemaRef(item) !== undefined;
           this.scanForUnionVariantUsage(
             item,
             [...path, `.${key}[${index}]`],
             owningTypeName,
+            suppressChildDirectRefUsage,
           );
         }
       });
@@ -814,6 +835,11 @@ class SchemaDocumentBuilder {
     const requiredProperties = new Set(
       Array.isArray(schema.required) ? schema.required : [],
     );
+    // If this definition was recorded as a tagged-union variant, omit the
+    // discriminator field from the lowered struct because the generated union
+    // serializer emits it on the outer wrapper object. If the same definition
+    // is also reused outside tagged-union wrapping, we must keep the field on
+    // the struct itself so nested plain-object serialization stays valid.
     const variantUsage = this.variantUsageByDefinition.get(typeName);
     const fields: PropertyField[] = [];
     const declarations: Declaration[] = [];
@@ -828,7 +854,11 @@ class SchemaDocumentBuilder {
         formatPath(propertyPath),
       );
 
-      if (variantUsage && propertyName === variantUsage.propertyName) {
+      if (
+        variantUsage &&
+        propertyName === variantUsage.propertyName &&
+        !this.referencedOutsideTaggedUnion.has(typeName)
+      ) {
         continue;
       }
 
@@ -1567,12 +1597,23 @@ class SchemaDocumentBuilder {
           getDiscriminator(schema)?.mapping,
         ),
       );
-    } catch {
+    } catch (error) {
+      this.warnTaggedUnionFallback(
+        ownerTypeName,
+        path,
+        `could not resolve discriminator values for property ${JSON.stringify(discriminatorName)}`,
+        error,
+      );
       return undefined;
     }
     const discriminatorValues = new Set<string>();
     for (const variant of variants) {
       if (discriminatorValues.has(variant.discriminatorValue)) {
+        this.warnTaggedUnionFallback(
+          ownerTypeName,
+          path,
+          `duplicate discriminator value ${JSON.stringify(variant.discriminatorValue)} for property ${JSON.stringify(discriminatorName)}`,
+        );
         return undefined;
       }
       discriminatorValues.add(variant.discriminatorValue);
@@ -1582,6 +1623,25 @@ class SchemaDocumentBuilder {
       discriminator: discriminatorName,
       variants,
     };
+  }
+
+  private warnTaggedUnionFallback(
+    ownerTypeName: string,
+    path: string[],
+    reason: string,
+    error?: unknown,
+  ): void {
+    const errorSuffix =
+      error instanceof Error && error.message.length > 0
+        ? ` (${error.message})`
+        : "";
+    // We intentionally warn instead of throwing here because some upstream
+    // schemas are still representable as untagged unions, and some generated
+    // outputs are currently patched manually after codegen. The warning makes
+    // that silent downgrade visible during generation.
+    console.warn(
+      `[schema-to-code] Falling back from tagged union for ${ownerTypeName} at ${formatPath(path)}: ${reason}${errorSuffix}`,
+    );
   }
 
   private determineDiscriminatorName(

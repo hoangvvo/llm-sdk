@@ -1,5 +1,6 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
+#![allow(clippy::doc_markdown)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -7,8 +8,8 @@ use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateMessageParams {
-    /// Top-level cache control automatically applies a `cache_control` marker
-    /// to the last cacheable block in the request.
+    /// Top-level cache control automatically applies a cache_control marker to
+    /// the last cacheable block in the request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CreateMessageParamsCacheControl>,
     /// Container identifier for reuse across requests.
@@ -232,8 +233,8 @@ pub struct CreateMessageParams {
     pub top_p: Option<f64>,
 }
 
-/// Top-level cache control automatically applies a `cache_control` marker to
-/// the last cacheable block in the request.
+/// Top-level cache control automatically applies a cache_control marker to the
+/// last cacheable block in the request.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CreateMessageParamsCacheControl {
@@ -381,8 +382,6 @@ pub struct Message {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum MessageStreamEvent {
-    #[serde(rename = "ping")]
-    Ping(PingEvent),
     #[serde(rename = "message_start")]
     MessageStart(MessageStartEvent),
     #[serde(rename = "message_delta")]
@@ -395,6 +394,8 @@ pub enum MessageStreamEvent {
     ContentBlockDelta(ContentBlockDeltaEvent),
     #[serde(rename = "content_block_stop")]
     ContentBlockStop(ContentBlockStopEvent),
+    #[serde(rename = "ping")]
+    Ping(PingEvent),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -488,7 +489,6 @@ pub struct RequestTextBlock {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<Vec<RequestTextBlockCitationsItem>>,
     pub text: String,
-    #[serde(rename = "type")]
     pub r#type: String,
 }
 
@@ -556,7 +556,7 @@ pub struct Tool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<ToolCacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Description of what this tool does.
@@ -610,7 +610,7 @@ pub struct BashTool20250124 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<BashTool20250124CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -642,7 +642,7 @@ pub struct CodeExecutionTool20250522 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CodeExecutionTool20250522CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
@@ -672,7 +672,7 @@ pub struct CodeExecutionTool20250825 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CodeExecutionTool20250825CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
@@ -704,7 +704,7 @@ pub struct CodeExecutionTool20260120 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CodeExecutionTool20260120CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
@@ -734,7 +734,7 @@ pub struct MemoryTool20250818 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<MemoryTool20250818CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -766,7 +766,7 @@ pub struct TextEditor20250124 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<TextEditor20250124CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -798,7 +798,7 @@ pub struct TextEditor20250429 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<TextEditor20250429CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -830,7 +830,7 @@ pub struct TextEditor20250728 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<TextEditor20250728CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -874,7 +874,7 @@ pub struct WebSearchTool20250305 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<WebSearchTool20250305CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Maximum number of times the tool can be used in the API request.
@@ -921,7 +921,7 @@ pub struct WebFetchTool20250910 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<RequestCitationsConfig>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Maximum number of tokens used by including web page text content in the
@@ -967,7 +967,7 @@ pub struct WebSearchTool20260209 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<WebSearchTool20260209CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Maximum number of times the tool can be used in the API request.
@@ -1014,7 +1014,7 @@ pub struct WebFetchTool20260209 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<RequestCitationsConfig>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Maximum number of tokens used by including web page text content in the
@@ -1044,7 +1044,7 @@ pub enum WebFetchTool20260209CacheControl {
     Ephemeral(CacheControlEphemeral),
 }
 
-/// Web fetch tool with `use_cache` parameter for bypassing cached content.
+/// Web fetch tool with use_cache parameter for bypassing cached content.
 #[derive(Serialize, Deserialize)]
 pub struct WebFetchTool20260309 {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1063,7 +1063,7 @@ pub struct WebFetchTool20260309 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<RequestCitationsConfig>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Maximum number of tokens used by including web page text content in the
@@ -1106,7 +1106,7 @@ pub struct ToolSearchToolBM2520251119 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<ToolSearchToolBM2520251119CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
@@ -1144,7 +1144,7 @@ pub struct ToolSearchToolRegex20251119 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<ToolSearchToolRegex20251119CacheControl>,
     /// If true, tool will not be included in initial system prompt. Only loaded
-    /// when returned via `tool_reference` from tool search.
+    /// when returned via tool_reference from tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub defer_loading: Option<bool>,
     /// Name of the tool.
@@ -1527,9 +1527,9 @@ pub struct ToolChoiceTool {
 ///
 /// Values:
 ///     direct: The model can call this tool directly.
-///     `code_execution_20250825`: The tool can be called from the code
-/// execution environment (v1).     `code_execution_20260120`: The tool can be
-/// called from the code execution environment (v2 with persistence).
+///     code_execution_20250825: The tool can be called from the code execution
+/// environment (v1).     code_execution_20260120: The tool can be called from
+/// the code execution environment (v2 with persistence).
 #[derive(Serialize, Deserialize)]
 pub enum AllowedCaller {
     #[serde(rename = "direct")]
@@ -1541,7 +1541,8 @@ pub enum AllowedCaller {
 }
 
 pub type JsonValue = Option<Value>;
-pub type InputSchema = Value;
+
+pub type InputSchema = Option<Value>;
 
 #[derive(Serialize, Deserialize)]
 pub struct UserLocation {
@@ -1954,6 +1955,7 @@ pub struct RequestDocumentBlock {
     pub source: RequestDocumentBlockSource,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    pub r#type: String,
 }
 
 /// Create a cache control breakpoint at this content block.
@@ -2327,7 +2329,7 @@ pub struct ResponseCodeExecutionResultBlock {
     pub stdout: String,
 }
 
-/// Code execution result with encrypted stdout for PFC + `web_search` results.
+/// Code execution result with encrypted stdout for PFC + web_search results.
 #[derive(Serialize, Deserialize)]
 pub struct ResponseEncryptedCodeExecutionResultBlock {
     pub content: Vec<ResponseCodeExecutionOutputBlock>,
@@ -2504,7 +2506,7 @@ pub struct RequestCodeExecutionResultBlock {
     pub stdout: String,
 }
 
-/// Code execution result with encrypted stdout for PFC + `web_search` results.
+/// Code execution result with encrypted stdout for PFC + web_search results.
 #[derive(Serialize, Deserialize)]
 pub struct RequestEncryptedCodeExecutionResultBlock {
     pub content: Vec<RequestCodeExecutionOutputBlock>,
@@ -2626,13 +2628,14 @@ pub struct RequestTextEditorCodeExecutionStrReplaceResultBlock {
     pub old_start: Option<i64>,
 }
 
-/// Tool reference block that can be included in `tool_result` content.
+/// Tool reference block that can be included in tool_result content.
 #[derive(Serialize, Deserialize)]
 pub struct RequestToolReferenceBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<RequestToolReferenceBlockCacheControl>,
     pub tool_name: String,
+    pub r#type: String,
 }
 
 /// Create a cache control breakpoint at this content block.
