@@ -1,6 +1,7 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
 #![allow(clippy::doc_markdown)]
+#![allow(clippy::too_many_lines)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -4675,7 +4676,7 @@ pub struct DragParam {
     pub keys: Option<Vec<String>>,
     /// An array of coordinates representing the path of the drag action.
     /// Coordinates will appear as an array of objects, eg
-    /// ```
+    /// ```json
     /// [
     ///   { x: 100, y: 200 },
     ///   { x: 200, y: 300 }

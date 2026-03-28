@@ -1,6 +1,7 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
 #![allow(clippy::doc_markdown)]
+#![allow(clippy::too_many_lines)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -556,9 +557,6 @@ pub type ResponseModalities = Option<Option<Vec<ResponseModalitiesValueItem>>>;
 
 pub type ModelIdsShared = Option<String>;
 
-/// Whether to enable [parallel function
-/// calling](/docs/guides/function-calling#
-/// configuring-parallel-function-calling) during tool use.
 pub type ParallelToolCalls = Option<bool>;
 
 /// Static predicted output content, such as the content of a text file that is
