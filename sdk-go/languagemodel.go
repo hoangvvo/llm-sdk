@@ -7,8 +7,8 @@ import (
 )
 
 type LanguageModelMetadata struct {
-	Pricing      *LanguageModelPricing     `json:"pricing"`
-	Capabilities []LanguageModelCapability `json:"capabilities,omitempty"`
+	Pricing      *LanguageModelPricing      `json:"pricing"`
+	Capabilities *LanguageModelCapabilities `json:"capabilities,omitempty"`
 }
 
 type LanguageModel interface {

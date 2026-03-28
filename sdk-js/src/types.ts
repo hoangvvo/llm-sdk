@@ -55,19 +55,20 @@ export type ToolChoiceOption =
  */
 export type ResponseFormatOption = ResponseFormatText | ResponseFormatJson;
 /**
- * A metadata property that describes the capability of the model.
+ * The capabilities supported by the model.
  */
-export type LanguageModelCapability =
-  | "text-input"
-  | "text-output"
-  | "image-input"
-  | "image-output"
-  | "audio-input"
-  | "audio-output"
-  | "function-calling"
-  | "structured-output"
-  | "citation"
-  | "reasoning";
+export interface LanguageModelCapabilities {
+  text_input: boolean;
+  text_output: boolean;
+  image_input: boolean;
+  image_output: boolean;
+  audio_input: boolean;
+  audio_output: boolean;
+  function_calling: boolean;
+  structured_output: boolean;
+  citation: boolean;
+  reasoning: boolean;
+}
 
 /**
  * A part of the message that contains text.

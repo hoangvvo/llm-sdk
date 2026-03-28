@@ -1,5 +1,6 @@
 import type {
   AudioOptions,
+  LanguageModelCapabilities,
   LanguageModelMetadata,
   Modality,
   ReasoningOptions,
@@ -19,6 +20,44 @@ import type {
 } from "../types";
 
 const MODALITY_OPTIONS: Modality[] = ["text", "image", "audio"];
+const CAPABILITY_ORDER = [
+  "text_input",
+  "text_output",
+  "image_input",
+  "image_output",
+  "audio_input",
+  "audio_output",
+  "function_calling",
+  "structured_output",
+  "citation",
+  "reasoning",
+] as const;
+const INPUT_CAPABILITIES = [
+  ["Text", "text_input"],
+  ["Image", "image_input"],
+  ["Audio", "audio_input"],
+] as const;
+const OUTPUT_CAPABILITIES = [
+  ["Text", "text_output"],
+  ["Image", "image_output"],
+  ["Audio", "audio_output"],
+] as const;
+const EXTRA_CAPABILITIES = CAPABILITY_ORDER.filter(
+  (capability) =>
+    !INPUT_CAPABILITIES.some(([, key]) => key === capability) &&
+    !OUTPUT_CAPABILITIES.some(([, key]) => key === capability),
+);
+
+function isCapabilityEnabled(
+  capabilities: LanguageModelCapabilities,
+  capability: (typeof CAPABILITY_ORDER)[number],
+): boolean {
+  return capabilities[capability];
+}
+
+function getCapabilityChipClass(enabled: boolean): string {
+  return `console-chip transition-opacity ${enabled ? "opacity-100" : "opacity-40"}`;
+}
 
 interface SidebarProps {
   serverOptions?: string[];
@@ -1175,7 +1214,7 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
 
 function ModelDetails({ option }: { option: ModelOption }) {
   const pricing = option.metadata?.pricing;
-  const capabilities = option.metadata?.capabilities ?? [];
+  const capabilities = option.metadata?.capabilities;
   const pricingEntries: [string, number | null | undefined][] = pricing
     ? [
         ["Input text token", pricing.input_cost_per_text_token],
@@ -1193,17 +1232,60 @@ function ModelDetails({ option }: { option: ModelOption }) {
 
   return (
     <div className="console-surface text-xs text-slate-600">
-      <h3 className="console-subheading">Capabilities</h3>
-      {capabilities.length > 0 ? (
+      <h3 className="console-subheading">Inputs</h3>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {INPUT_CAPABILITIES.map(([label, capability]) => (
+          <li
+            key={capability}
+            className={getCapabilityChipClass(
+              capabilities
+                ? isCapabilityEnabled(capabilities, capability)
+                : false,
+            )}
+          >
+            {label}
+          </li>
+        ))}
+      </ul>
+
+      <h3 className="console-subheading mt-4">Output</h3>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {OUTPUT_CAPABILITIES.map(([label, capability]) => (
+          <li
+            key={capability}
+            className={getCapabilityChipClass(
+              capabilities
+                ? isCapabilityEnabled(capabilities, capability)
+                : false,
+            )}
+          >
+            {label}
+          </li>
+        ))}
+      </ul>
+
+      <h3 className="console-subheading mt-4">Capabilities</h3>
+      {capabilities ? (
         <ul className="mt-2 flex flex-wrap gap-2">
-          {capabilities.map((capability) => (
-            <li key={capability} className="console-chip">
+          {EXTRA_CAPABILITIES.map((capability) => (
+            <li
+              key={capability}
+              className={getCapabilityChipClass(
+                isCapabilityEnabled(capabilities, capability),
+              )}
+            >
               {formatCapability(capability)}
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-slate-400">No capability data.</p>
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {EXTRA_CAPABILITIES.map((capability) => (
+            <li key={capability} className={getCapabilityChipClass(false)}>
+              {formatCapability(capability)}
+            </li>
+          ))}
+        </ul>
       )}
 
       <h3 className="console-subheading mt-4">Pricing (USD/M tokens)</h3>
@@ -1235,7 +1317,7 @@ function ModelDetails({ option }: { option: ModelOption }) {
 
 function formatCapability(capability: string): string {
   return capability
-    .split("-")
+    .split(/[-_]/)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
 }

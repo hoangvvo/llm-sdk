@@ -27,10 +27,7 @@
               "$ref": "../schema/sdk.json#/definitions/LanguageModelPricing"
             },
             "capabilities": {
-              "type": "array",
-              "items": {
-                "$ref": "../schema/sdk.json#/definitions/LanguageModelCapability"
-              }
+              "$ref": "../schema/sdk.json#/definitions/LanguageModelCapabilities"
             }
           }
         },

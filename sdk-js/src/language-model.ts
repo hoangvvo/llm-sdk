@@ -1,5 +1,5 @@
 import type {
-  LanguageModelCapability,
+  LanguageModelCapabilities,
   LanguageModelInput,
   LanguageModelPricing,
   ModelResponse,
@@ -14,7 +14,7 @@ export interface LanguageModelMetadata {
   /**
    * The capabilities of the model.
    */
-  capabilities?: LanguageModelCapability[];
+  capabilities?: LanguageModelCapabilities;
 }
 
 export interface LanguageModel {
