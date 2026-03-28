@@ -562,7 +562,7 @@ type CreateChatCompletionStreamResponseChoicesItem struct {
 	// `content_filter` if content was omitted due to a flag from our content filters,
 	// `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function.
 	//
-	FinishReason CreateChatCompletionStreamResponseChoicesItemFinishReason `json:"finish_reason"`
+	FinishReason *CreateChatCompletionStreamResponseChoicesItemFinishReason `json:"finish_reason,omitempty"`
 	// The index of the choice in the list of choices.
 	Index int `json:"index"`
 	// Log probability information for the choice.
