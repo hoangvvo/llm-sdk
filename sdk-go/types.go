@@ -717,21 +717,19 @@ type ReasoningOptions struct {
 	BudgetTokens *uint32 `json:"budget_tokens,omitempty"`
 }
 
-// LanguageModelCapability represents a metadata property that describes the capability of the model.
-type LanguageModelCapability string
-
-const (
-	CapabilityTextInput        LanguageModelCapability = "text-input"
-	CapabilityTextOutput       LanguageModelCapability = "text-output"
-	CapabilityImageInput       LanguageModelCapability = "image-input"
-	CapabilityImageOutput      LanguageModelCapability = "image-output"
-	CapabilityAudioInput       LanguageModelCapability = "audio-input"
-	CapabilityAudioOutput      LanguageModelCapability = "audio-output"
-	CapabilityFunctionCalling  LanguageModelCapability = "function-calling"
-	CapabilityStructuredOutput LanguageModelCapability = "structured-output"
-	CapabilityCitation         LanguageModelCapability = "citation"
-	CapabilityReasoning        LanguageModelCapability = "reasoning"
-)
+// LanguageModelCapabilities describes the capabilities supported by the model.
+type LanguageModelCapabilities struct {
+	TextInput        bool `json:"text_input"`
+	TextOutput       bool `json:"text_output"`
+	ImageInput       bool `json:"image_input"`
+	ImageOutput      bool `json:"image_output"`
+	AudioInput       bool `json:"audio_input"`
+	AudioOutput      bool `json:"audio_output"`
+	FunctionCalling  bool `json:"function_calling"`
+	StructuredOutput bool `json:"structured_output"`
+	Citation         bool `json:"citation"`
+	Reasoning        bool `json:"reasoning"`
+}
 
 // ContentDelta represents a delta update in a message's content, enabling partial streaming updates in LLM responses.
 type ContentDelta struct {

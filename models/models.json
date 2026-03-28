@@ -6,17 +6,21 @@
       "model_id": "gpt-5.4",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.5e-6,
-          "output_cost_per_text_token": 15.0e-6
+          "input_cost_per_text_token": 0.0000025,
+          "output_cost_per_text_token": 0.000015
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output",
-          "reasoning"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": true
+        }
       },
       "default_modalities": ["text"],
       "default_reasoning": {
@@ -28,17 +32,21 @@
       "model_id": "gpt-5.4-mini",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.75e-6,
-          "output_cost_per_text_token": 4.5e-6
+          "input_cost_per_text_token": 7.5e-7,
+          "output_cost_per_text_token": 0.0000045
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output",
-          "reasoning"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": true
+        }
       },
       "default_reasoning": {
         "enabled": true
@@ -49,18 +57,23 @@
       "model_id": "gpt-audio-1.5",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.5e-6,
-          "output_cost_per_text_token": 10.0e-6,
-          "input_cost_per_audio_token": 32e-6,
-          "output_cost_per_audio_token": 64e-6
+          "input_cost_per_text_token": 0.0000025,
+          "output_cost_per_text_token": 0.00001,
+          "input_cost_per_audio_token": 0.000032,
+          "output_cost_per_audio_token": 0.000064
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "audio-input",
-          "audio-output",
-          "function-calling"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": false,
+          "image_output": false,
+          "audio_input": true,
+          "audio_output": true,
+          "function_calling": true,
+          "structured_output": false,
+          "citation": false,
+          "reasoning": false
+        }
       },
       "default_modalities": ["text", "audio"],
       "default_audio": {
@@ -73,16 +86,21 @@
       "model_id": "gpt-4.1",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.0e-6,
-          "output_cost_per_text_token": 8.0e-6
+          "input_cost_per_text_token": 0.000002,
+          "output_cost_per_text_token": 0.000008
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": false
+        }
       }
     },
     {
@@ -90,16 +108,21 @@
       "model_id": "gpt-4o",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.5e-6,
-          "output_cost_per_text_token": 10.0e-6
+          "input_cost_per_text_token": 0.0000025,
+          "output_cost_per_text_token": 0.00001
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": false
+        }
       }
     },
     {
@@ -107,18 +130,21 @@
       "model_id": "claude-opus-4-6",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 5e-6,
-          "output_cost_per_text_token": 25e-6
+          "input_cost_per_text_token": 0.000005,
+          "output_cost_per_text_token": 0.000025
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output",
-          "reasoning",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": true
+        }
       },
       "default_reasoning": {
         "enabled": true,
@@ -130,18 +156,21 @@
       "model_id": "claude-sonnet-4-6",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 3e-6,
-          "output_cost_per_text_token": 15e-6
+          "input_cost_per_text_token": 0.000003,
+          "output_cost_per_text_token": 0.000015
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output",
-          "reasoning",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": true
+        }
       },
       "default_reasoning": {
         "enabled": true,
@@ -153,18 +182,21 @@
       "model_id": "claude-haiku-4-5",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 1e-6,
-          "output_cost_per_text_token": 5e-6
+          "input_cost_per_text_token": 0.000001,
+          "output_cost_per_text_token": 0.000005
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output",
-          "reasoning",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": true
+        }
       },
       "default_reasoning": {
         "enabled": true,
@@ -176,18 +208,21 @@
       "model_id": "gemini-3.1-pro-preview",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2e-6,
-          "output_cost_per_text_token": 12.0e-6
+          "input_cost_per_text_token": 0.000002,
+          "output_cost_per_text_token": 0.000012
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "audio-input",
-          "function-calling",
-          "structured-output",
-          "reasoning"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": true,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": true
+        }
       },
       "default_reasoning": {
         "enabled": true
@@ -198,19 +233,22 @@
       "model_id": "gemini-3.1-flash-lite-preview",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.25e-6,
-          "output_cost_per_text_token": 1.5e-6,
-          "input_cost_per_audio_token": 0.5e-6
+          "input_cost_per_text_token": 2.5e-7,
+          "output_cost_per_text_token": 0.0000015,
+          "input_cost_per_audio_token": 5e-7
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "audio-input",
-          "function-calling",
-          "structured-output",
-          "reasoning"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": true,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": true
+        }
       },
       "default_reasoning": {
         "enabled": true
@@ -221,18 +259,23 @@
       "model_id": "gemini-3.1-flash-image-preview",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.5e-6,
-          "input_cost_per_image_token": 0.5e-6,
-          "output_cost_per_text_token": 3e-6,
-          "output_cost_per_image_token": 60e-6
+          "input_cost_per_text_token": 5e-7,
+          "input_cost_per_image_token": 5e-7,
+          "output_cost_per_text_token": 0.000003,
+          "output_cost_per_image_token": 0.00006
         },
-        "capabilities": [
-          "text-input",
-          "image-input",
-          "text-output",
-          "image-output",
-          "structured-output"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": true,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": false,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": false
+        }
       },
       "default_modalities": ["text", "image"]
     },
@@ -241,10 +284,21 @@
       "model_id": "gemini-2.5-flash-preview-tts",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.5e-6,
-          "output_cost_per_audio_token": 10e-6
+          "input_cost_per_text_token": 5e-7,
+          "output_cost_per_audio_token": 0.00001
         },
-        "capabilities": ["text-input", "audio-output"]
+        "capabilities": {
+          "text_input": true,
+          "text_output": false,
+          "image_input": false,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": true,
+          "function_calling": false,
+          "structured_output": false,
+          "citation": false,
+          "reasoning": false
+        }
       },
       "default_modalities": ["audio"],
       "default_audio": {
@@ -257,16 +311,21 @@
       "model_id": "command-a-03-2025",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.5e-6,
-          "output_cost_per_text_token": 10.0e-6
+          "input_cost_per_text_token": 0.0000025,
+          "output_cost_per_text_token": 0.00001
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "function-calling",
-          "structured-output",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": false,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": false
+        }
       }
     },
     {
@@ -274,17 +333,21 @@
       "model_id": "command-a-reasoning-08-2025",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.5e-6,
-          "output_cost_per_text_token": 10.0e-6
+          "input_cost_per_text_token": 0.0000025,
+          "output_cost_per_text_token": 0.00001
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "function-calling",
-          "structured-output",
-          "reasoning",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": false,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": true
+        }
       }
     },
     {
@@ -292,16 +355,21 @@
       "model_id": "command-a-translate-08-2025",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.5e-6,
-          "output_cost_per_text_token": 10.0e-6
+          "input_cost_per_text_token": 0.0000025,
+          "output_cost_per_text_token": 0.00001
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "function-calling",
-          "structured-output",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": false,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": false
+        }
       }
     },
     {
@@ -309,16 +377,21 @@
       "model_id": "command-a-vision-07-2025",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.5e-6,
-          "output_cost_per_text_token": 10.0e-6
+          "input_cost_per_text_token": 0.0000025,
+          "output_cost_per_text_token": 0.00001
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "structured-output",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": false,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": false
+        }
       }
     },
     {
@@ -326,17 +399,21 @@
       "model_id": "mistral-medium-latest",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.4e-6,
-          "output_cost_per_text_token": 2.0e-6
+          "input_cost_per_text_token": 4e-7,
+          "output_cost_per_text_token": 0.000002
         },
-        "capabilities": [
-          "text-input",
-          "image-input",
-          "text-output",
-          "function-calling",
-          "structured-output",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": false
+        }
       }
     },
     {
@@ -344,18 +421,21 @@
       "model_id": "magistral-medium-latest",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.0e-6,
-          "output_cost_per_text_token": 5.0e-6
+          "input_cost_per_text_token": 0.000002,
+          "output_cost_per_text_token": 0.000005
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output",
-          "reasoning",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": true
+        }
       }
     },
     {
@@ -363,17 +443,21 @@
       "model_id": "mistral-small-latest",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.1e-6,
-          "output_cost_per_text_token": 0.3e-6
+          "input_cost_per_text_token": 1e-7,
+          "output_cost_per_text_token": 3e-7
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "image-input",
-          "function-calling",
-          "structured-output",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": false
+        }
       }
     },
     {
@@ -381,17 +465,21 @@
       "model_id": "magistral-small-latest",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.5e-6,
-          "output_cost_per_text_token": 1.5e-6
+          "input_cost_per_text_token": 5e-7,
+          "output_cost_per_text_token": 0.0000015
         },
-        "capabilities": [
-          "text-input",
-          "text-output",
-          "function-calling",
-          "structured-output",
-          "reasoning",
-          "citation"
-        ]
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": false,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": true
+        }
       }
     }
   ]

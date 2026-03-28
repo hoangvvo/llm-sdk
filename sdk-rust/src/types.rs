@@ -97,21 +97,20 @@ pub enum ResponseFormatOption {
     Json(ResponseFormatJson),
 }
 
-/// A metadata property that describes the capability of the model.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// The capabilities supported by the model.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[serde(rename_all = "kebab-case")]
-pub enum LanguageModelCapability {
-    TextInput,
-    TextOutput,
-    ImageInput,
-    ImageOutput,
-    AudioInput,
-    AudioOutput,
-    FunctionCalling,
-    StructuredOutput,
-    Citation,
-    Reasoning,
+pub struct LanguageModelCapabilities {
+    pub text_input: bool,
+    pub text_output: bool,
+    pub image_input: bool,
+    pub image_output: bool,
+    pub audio_input: bool,
+    pub audio_output: bool,
+    pub function_calling: bool,
+    pub structured_output: bool,
+    pub citation: bool,
+    pub reasoning: bool,
 }
 
 /// A part of the message that contains text.

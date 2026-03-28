@@ -1,5 +1,5 @@
 use crate::{
-    boxed_stream::BoxedStream, LanguageModelCapability, LanguageModelInput, LanguageModelPricing,
+    boxed_stream::BoxedStream, LanguageModelCapabilities, LanguageModelInput, LanguageModelPricing,
     LanguageModelResult, ModelResponse, PartialModelResponse,
 };
 use futures::future::BoxFuture;
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LanguageModelMetadata {
     pub pricing: Option<LanguageModelPricing>,
-    pub capabilities: Option<Vec<LanguageModelCapability>>,
+    pub capabilities: Option<LanguageModelCapabilities>,
 }
 
 pub trait LanguageModel: Send + Sync {

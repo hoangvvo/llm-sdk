@@ -57,21 +57,34 @@
         { "$ref": "#/definitions/ResponseFormatJson" }
       ]
     },
-    "LanguageModelCapability": {
-      "type": "string",
-      "description": "A metadata property that describes the capability of the model.",
-      "enum": [
-        "text-input",
-        "text-output",
-        "audio-input",
-        "audio-output",
-        "image-input",
-        "image-output",
-        "function-calling",
-        "structured-output",
+    "LanguageModelCapabilities": {
+      "type": "object",
+      "description": "The capabilities supported by the model.",
+      "properties": {
+        "text_input": { "type": "boolean" },
+        "text_output": { "type": "boolean" },
+        "image_input": { "type": "boolean" },
+        "image_output": { "type": "boolean" },
+        "audio_input": { "type": "boolean" },
+        "audio_output": { "type": "boolean" },
+        "function_calling": { "type": "boolean" },
+        "structured_output": { "type": "boolean" },
+        "citation": { "type": "boolean" },
+        "reasoning": { "type": "boolean" }
+      },
+      "required": [
+        "text_input",
+        "text_output",
+        "image_input",
+        "image_output",
+        "audio_input",
+        "audio_output",
+        "function_calling",
+        "structured_output",
         "citation",
         "reasoning"
-      ]
+      ],
+      "additionalProperties": false
     },
 
     "TextPart": {
@@ -263,11 +276,7 @@
           "description": "The end index of the document content part being cited."
         }
       },
-      "required": [
-        "source",
-        "start_index",
-        "end_index"
-      ],
+      "required": ["source", "start_index", "end_index"],
       "additionalProperties": false
     },
     "UserMessage": {
@@ -712,8 +721,8 @@
           "type": "object",
           "description": "A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.",
           "additionalProperties": { "type": "string" }
-    }
-  },
+        }
+      },
       "required": ["messages"],
       "additionalProperties": false
     },
