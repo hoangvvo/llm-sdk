@@ -9,7 +9,7 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let mut stream = common::get_model("anthropic", "claude-opus-4-20250514")
+    let mut stream = common::get_model("anthropic", "claude-opus-4-6")
         .stream(LanguageModelInput {
             messages: vec![
                 Message::user(vec![

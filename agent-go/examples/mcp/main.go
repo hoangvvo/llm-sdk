@@ -41,7 +41,7 @@ func main() {
 	stopServer := startStubMCPServer()
 	defer stopServer()
 
-	model := openai.NewOpenAIModel("gpt-4o-mini", openai.OpenAIModelOptions{APIKey: apiKey})
+	model := openai.NewOpenAIModel("gpt-5.4-mini", openai.OpenAIModelOptions{APIKey: apiKey})
 
 	// Build the agent and register the MCP toolkit so every run hydrates tools from the remote server.
 	agent := llmagent.NewAgent[*sessionContext](

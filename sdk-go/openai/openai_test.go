@@ -13,6 +13,7 @@ var chatModel *openai.OpenAIChatModel
 var audioChatModel *openai.OpenAIChatModel
 
 var model *openai.OpenAIModel
+var reasoningModel *openai.OpenAIModel
 
 func TestMain(m *testing.M) {
 	godotenv.Load("../../.env")
@@ -21,14 +22,17 @@ func TestMain(m *testing.M) {
 		panic("OPENAI_API_KEY must be set")
 	}
 
-	model = openai.NewOpenAIModel("gpt-5", openai.OpenAIModelOptions{
+	model = openai.NewOpenAIModel("gpt-5.4", openai.OpenAIModelOptions{
+		APIKey: apiKey,
+	})
+	reasoningModel = openai.NewOpenAIModel("o1", openai.OpenAIModelOptions{
 		APIKey: apiKey,
 	})
 
 	chatModel = openai.NewOpenAIChatModel("gpt-4o", openai.OpenAIChatModelOptions{
 		APIKey: apiKey,
 	})
-	audioChatModel = openai.NewOpenAIChatModel("gpt-4o-audio-preview", openai.OpenAIChatModelOptions{
+	audioChatModel = openai.NewOpenAIChatModel("gpt-audio-1.5", openai.OpenAIChatModelOptions{
 		APIKey: apiKey,
 	})
 
@@ -113,9 +117,9 @@ func TestStreamAudio(t *testing.T) {
 }
 
 func TestGenerateReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, model, "generate_reasoning")
+	testcommon.RunTestCase(t, reasoningModel, "generate_reasoning")
 }
 
 func TestStreamReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, model, "stream_reasoning")
+	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
 }

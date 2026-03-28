@@ -3,6 +3,7 @@ package openaiapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 type CreateResponseAllOf3 struct {
@@ -1067,7 +1068,7 @@ func (u *ResponseStreamEvent) UnmarshalJSON(data []byte) error {
 		}
 		u.ResponseCustomToolCallInputDone = &value
 	default:
-		return errors.New("invalid type field in ResponseStreamEvent")
+		return fmt.Errorf("invalid type field in ResponseStreamEvent: %q", discriminator)
 	}
 	return nil
 }
@@ -1738,7 +1739,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 		}
 		u.CustomToolCall = &value
 	default:
-		return errors.New("invalid type field in OutputItem")
+		return fmt.Errorf("invalid type field in OutputItem: %q", discriminator)
 	}
 	return nil
 }
@@ -3454,7 +3455,7 @@ func (u *WebSearchToolCallAction) UnmarshalJSON(data []byte) error {
 		}
 		u.FindInPage = &value
 	default:
-		return errors.New("invalid type field in WebSearchToolCallAction")
+		return fmt.Errorf("invalid type field in WebSearchToolCallAction: %q", discriminator)
 	}
 	return nil
 }
@@ -3754,7 +3755,7 @@ func (u *CodeInterpreterToolCallOutputsItem) UnmarshalJSON(data []byte) error {
 		}
 		u.Image = &value
 	default:
-		return errors.New("invalid type field in CodeInterpreterToolCallOutputsItem")
+		return fmt.Errorf("invalid type field in CodeInterpreterToolCallOutputsItem: %q", discriminator)
 	}
 	return nil
 }
@@ -3880,7 +3881,7 @@ func (u *FunctionShellCallEnvironment) UnmarshalJSON(data []byte) error {
 		}
 		u.ContainerReference = &value
 	default:
-		return errors.New("invalid type field in FunctionShellCallEnvironment")
+		return fmt.Errorf("invalid type field in FunctionShellCallEnvironment: %q", discriminator)
 	}
 	return nil
 }
@@ -3987,7 +3988,7 @@ func (u *ApplyPatchToolCallOperation) UnmarshalJSON(data []byte) error {
 		}
 		u.UpdateFile = &value
 	default:
-		return errors.New("invalid type field in ApplyPatchToolCallOperation")
+		return fmt.Errorf("invalid type field in ApplyPatchToolCallOperation: %q", discriminator)
 	}
 	return nil
 }
@@ -4197,7 +4198,7 @@ func (u *OutputContent) UnmarshalJSON(data []byte) error {
 		}
 		u.ReasoningText = &value
 	default:
-		return errors.New("invalid type field in OutputContent")
+		return fmt.Errorf("invalid type field in OutputContent: %q", discriminator)
 	}
 	return nil
 }
@@ -4407,7 +4408,7 @@ func (u *TextResponseFormatConfiguration) UnmarshalJSON(data []byte) error {
 		}
 		u.JsonObject = &value
 	default:
-		return errors.New("invalid type field in TextResponseFormatConfiguration")
+		return fmt.Errorf("invalid type field in TextResponseFormatConfiguration: %q", discriminator)
 	}
 	return nil
 }
@@ -4974,7 +4975,7 @@ func (u *FunctionCallOutputItemParamOutputArrayItem) UnmarshalJSON(data []byte) 
 		}
 		u.InputFile = &value
 	default:
-		return errors.New("invalid type field in FunctionCallOutputItemParamOutputArrayItem")
+		return fmt.Errorf("invalid type field in FunctionCallOutputItemParamOutputArrayItem: %q", discriminator)
 	}
 	return nil
 }
@@ -5198,7 +5199,7 @@ func (u *FunctionShellCallItemParamEnvironment) UnmarshalJSON(data []byte) error
 		}
 		u.ContainerReference = &value
 	default:
-		return errors.New("invalid type field in FunctionShellCallItemParamEnvironment")
+		return fmt.Errorf("invalid type field in FunctionShellCallItemParamEnvironment: %q", discriminator)
 	}
 	return nil
 }
@@ -5431,7 +5432,7 @@ func (u *OutputMessageContent) UnmarshalJSON(data []byte) error {
 		}
 		u.Refusal = &value
 	default:
-		return errors.New("invalid type field in OutputMessageContent")
+		return fmt.Errorf("invalid type field in OutputMessageContent: %q", discriminator)
 	}
 	return nil
 }
@@ -5717,7 +5718,7 @@ func (u *ComputerAction) UnmarshalJSON(data []byte) error {
 		}
 		u.Wait = &value
 	default:
-		return errors.New("invalid type field in ComputerAction")
+		return fmt.Errorf("invalid type field in ComputerAction: %q", discriminator)
 	}
 	return nil
 }
@@ -5918,7 +5919,7 @@ func (u *FunctionShellCallOutputContentOutcome) UnmarshalJSON(data []byte) error
 		}
 		u.Exit = &value
 	default:
-		return errors.New("invalid type field in FunctionShellCallOutputContentOutcome")
+		return fmt.Errorf("invalid type field in FunctionShellCallOutputContentOutcome: %q", discriminator)
 	}
 	return nil
 }
@@ -6671,7 +6672,7 @@ func (u *FunctionShellToolParamEnvironment) UnmarshalJSON(data []byte) error {
 		}
 		u.ContainerReference = &value
 	default:
-		return errors.New("invalid type field in FunctionShellToolParamEnvironment")
+		return fmt.Errorf("invalid type field in FunctionShellToolParamEnvironment: %q", discriminator)
 	}
 	return nil
 }
@@ -6753,7 +6754,7 @@ func (u *CustomToolParamFormat) UnmarshalJSON(data []byte) error {
 		}
 		u.Grammar = &value
 	default:
-		return errors.New("invalid type field in CustomToolParamFormat")
+		return fmt.Errorf("invalid type field in CustomToolParamFormat: %q", discriminator)
 	}
 	return nil
 }
@@ -6833,7 +6834,7 @@ func (u *NamespaceToolParamToolsItem) UnmarshalJSON(data []byte) error {
 		}
 		u.Custom = &value
 	default:
-		return errors.New("invalid type field in NamespaceToolParamToolsItem")
+		return fmt.Errorf("invalid type field in NamespaceToolParamToolsItem: %q", discriminator)
 	}
 	return nil
 }
@@ -6967,7 +6968,7 @@ func (u *InputContent) UnmarshalJSON(data []byte) error {
 		}
 		u.InputFile = &value
 	default:
-		return errors.New("invalid type field in InputContent")
+		return fmt.Errorf("invalid type field in InputContent: %q", discriminator)
 	}
 	return nil
 }
@@ -7141,7 +7142,7 @@ func (u *ApplyPatchOperationParam) UnmarshalJSON(data []byte) error {
 		}
 		u.UpdateFile = &value
 	default:
-		return errors.New("invalid type field in ApplyPatchOperationParam")
+		return fmt.Errorf("invalid type field in ApplyPatchOperationParam: %q", discriminator)
 	}
 	return nil
 }
@@ -7233,7 +7234,7 @@ func (u *FunctionAndCustomToolCallOutput) UnmarshalJSON(data []byte) error {
 		}
 		u.InputFile = &value
 	default:
-		return errors.New("invalid type field in FunctionAndCustomToolCallOutput")
+		return fmt.Errorf("invalid type field in FunctionAndCustomToolCallOutput: %q", discriminator)
 	}
 	return nil
 }
@@ -7416,7 +7417,7 @@ func (u *Annotation) UnmarshalJSON(data []byte) error {
 		}
 		u.FilePath = &value
 	default:
-		return errors.New("invalid type field in Annotation")
+		return fmt.Errorf("invalid type field in Annotation: %q", discriminator)
 	}
 	return nil
 }
@@ -7608,7 +7609,7 @@ func (u *AutoCodeInterpreterToolParamNetworkPolicy) UnmarshalJSON(data []byte) e
 		}
 		u.Allowlist = &value
 	default:
-		return errors.New("invalid type field in AutoCodeInterpreterToolParamNetworkPolicy")
+		return fmt.Errorf("invalid type field in AutoCodeInterpreterToolParamNetworkPolicy: %q", discriminator)
 	}
 	return nil
 }
@@ -7703,7 +7704,7 @@ func (u *ContainerAutoParamNetworkPolicy) UnmarshalJSON(data []byte) error {
 		}
 		u.Allowlist = &value
 	default:
-		return errors.New("invalid type field in ContainerAutoParamNetworkPolicy")
+		return fmt.Errorf("invalid type field in ContainerAutoParamNetworkPolicy: %q", discriminator)
 	}
 	return nil
 }
@@ -7763,7 +7764,7 @@ func (u *ContainerAutoParamSkillsItem) UnmarshalJSON(data []byte) error {
 		}
 		u.Inline = &value
 	default:
-		return errors.New("invalid type field in ContainerAutoParamSkillsItem")
+		return fmt.Errorf("invalid type field in ContainerAutoParamSkillsItem: %q", discriminator)
 	}
 	return nil
 }
@@ -7898,7 +7899,7 @@ func (u *FunctionShellCallOutputOutcomeParam) UnmarshalJSON(data []byte) error {
 		}
 		u.Exit = &value
 	default:
-		return errors.New("invalid type field in FunctionShellCallOutputOutcomeParam")
+		return fmt.Errorf("invalid type field in FunctionShellCallOutputOutcomeParam: %q", discriminator)
 	}
 	return nil
 }

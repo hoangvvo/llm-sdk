@@ -117,6 +117,10 @@ func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 			return nil, llmsdk.NewInvariantError(Provider, "no candidates returned")
 		}
 
+		if response.Candidates[0].Content == nil {
+			return nil, llmsdk.NewInvariantError(Provider, "candidate content is missing")
+		}
+
 		content, err := mapGoogleContent(response.Candidates[0].Content.Parts)
 		if err != nil {
 			return nil, err

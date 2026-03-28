@@ -1,6 +1,7 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
 #![allow(clippy::doc_markdown)]
+#![allow(clippy::too_many_lines)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -336,7 +337,8 @@ pub struct CreateChatCompletionResponseChoicesItem {
     /// reached, `content_filter` if content was omitted due to a flag from
     /// our content filters, `tool_calls` if the model called a tool, or
     /// `function_call` (deprecated) if the model called a function.
-    pub finish_reason: CreateChatCompletionResponseChoicesItemFinishReason,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish_reason: Option<CreateChatCompletionResponseChoicesItemFinishReason>,
     /// The index of the choice in the list of choices.
     pub index: i64,
     /// Log probability information for the choice.
@@ -428,7 +430,8 @@ pub struct CreateChatCompletionStreamResponseChoicesItem {
     /// reached, `content_filter` if content was omitted due to a flag from
     /// our content filters, `tool_calls` if the model called a tool, or
     /// `function_call` (deprecated) if the model called a function.
-    pub finish_reason: CreateChatCompletionStreamResponseChoicesItemFinishReason,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish_reason: Option<CreateChatCompletionStreamResponseChoicesItemFinishReason>,
     /// The index of the choice in the list of choices.
     pub index: i64,
     /// Log probability information for the choice.

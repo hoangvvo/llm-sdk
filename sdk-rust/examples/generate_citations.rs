@@ -8,7 +8,7 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("anthropic", "claude-opus-4-20250514");
+    let model = common::get_model("anthropic", "claude-opus-4-6");
 
     let response = model
         .generate(LanguageModelInput {

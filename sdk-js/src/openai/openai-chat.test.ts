@@ -11,7 +11,7 @@ suite("OpenAIChatModel", () => {
   });
 
   const audioModel = new OpenAIChatModel({
-    modelId: "gpt-4o-audio-preview",
+    modelId: "gpt-audio-1.5",
     apiKey: process.env["OPENAI_API_KEY"],
   });
 

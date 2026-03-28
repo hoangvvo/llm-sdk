@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 		panic("ANTHROPIC_API_KEY must be set")
 	}
 
-	model = anthropic.NewAnthropicModel("claude-sonnet-4-5", anthropic.AnthropicModelOptions{
+	model = anthropic.NewAnthropicModel("claude-sonnet-4-6", anthropic.AnthropicModelOptions{
 		APIKey: apiKey,
 	})
 

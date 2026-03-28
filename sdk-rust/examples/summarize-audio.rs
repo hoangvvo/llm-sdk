@@ -17,7 +17,7 @@ async fn main() {
 
     let audio_b64 = BASE64_STANDARD.encode(&audio_bytes);
 
-    let model = common::get_model("google", "gemini-2.0-flash");
+    let model = common::get_model("google", "gemini-3.1-flash-lite-preview");
 
     let response = model
         .generate(LanguageModelInput {

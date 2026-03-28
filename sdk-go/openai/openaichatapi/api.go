@@ -3,6 +3,7 @@ package openaichatapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 type CreateChatCompletionRequestAllOf2 struct {
@@ -277,7 +278,7 @@ func (u *CreateChatCompletionRequestAllOf2Prediction) UnmarshalJSON(data []byte)
 		}
 		u.Content = &value
 	default:
-		return errors.New("invalid type field in CreateChatCompletionRequestAllOf2Prediction")
+		return fmt.Errorf("invalid type field in CreateChatCompletionRequestAllOf2Prediction: %q", discriminator)
 	}
 	return nil
 }
@@ -363,7 +364,7 @@ func (u *CreateChatCompletionRequestAllOf2ResponseFormat) UnmarshalJSON(data []b
 		}
 		u.JsonObject = &value
 	default:
-		return errors.New("invalid type field in CreateChatCompletionRequestAllOf2ResponseFormat")
+		return fmt.Errorf("invalid type field in CreateChatCompletionRequestAllOf2ResponseFormat: %q", discriminator)
 	}
 	return nil
 }
@@ -423,7 +424,7 @@ func (u *CreateChatCompletionRequestAllOf2ToolsItem) UnmarshalJSON(data []byte) 
 		}
 		u.Custom = &value
 	default:
-		return errors.New("invalid type field in CreateChatCompletionRequestAllOf2ToolsItem")
+		return fmt.Errorf("invalid type field in CreateChatCompletionRequestAllOf2ToolsItem: %q", discriminator)
 	}
 	return nil
 }
@@ -484,7 +485,7 @@ type CreateChatCompletionResponseChoicesItem struct {
 	// `content_filter` if content was omitted due to a flag from our content filters,
 	// `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function.
 	//
-	FinishReason CreateChatCompletionResponseChoicesItemFinishReason `json:"finish_reason"`
+	FinishReason *CreateChatCompletionResponseChoicesItemFinishReason `json:"finish_reason,omitempty"`
 	// The index of the choice in the list of choices.
 	Index int `json:"index"`
 	// Log probability information for the choice.
@@ -561,7 +562,7 @@ type CreateChatCompletionStreamResponseChoicesItem struct {
 	// `content_filter` if content was omitted due to a flag from our content filters,
 	// `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function.
 	//
-	FinishReason CreateChatCompletionStreamResponseChoicesItemFinishReason `json:"finish_reason"`
+	FinishReason *CreateChatCompletionStreamResponseChoicesItemFinishReason `json:"finish_reason,omitempty"`
 	// The index of the choice in the list of choices.
 	Index int `json:"index"`
 	// Log probability information for the choice.
@@ -791,7 +792,7 @@ func (u *ChatCompletionRequestMessage) UnmarshalJSON(data []byte) error {
 		}
 		u.Function = &value
 	default:
-		return errors.New("invalid role field in ChatCompletionRequestMessage")
+		return fmt.Errorf("invalid role field in ChatCompletionRequestMessage: %q", discriminator)
 	}
 	return nil
 }
@@ -1221,7 +1222,7 @@ func (u *CustomToolChatCompletionsCustomFormat) UnmarshalJSON(data []byte) error
 		}
 		u.Grammar = &value
 	default:
-		return errors.New("invalid type field in CustomToolChatCompletionsCustomFormat")
+		return fmt.Errorf("invalid type field in CustomToolChatCompletionsCustomFormat: %q", discriminator)
 	}
 	return nil
 }
@@ -1994,7 +1995,7 @@ func (u *ChatCompletionMessageToolCallsItem) UnmarshalJSON(data []byte) error {
 		}
 		u.Custom = &value
 	default:
-		return errors.New("invalid type field in ChatCompletionMessageToolCallsItem")
+		return fmt.Errorf("invalid type field in ChatCompletionMessageToolCallsItem: %q", discriminator)
 	}
 	return nil
 }
@@ -2072,7 +2073,7 @@ func (u *ChatCompletionRequestSystemMessageContentPart) UnmarshalJSON(data []byt
 		}
 		u.Text = &value
 	default:
-		return errors.New("invalid type field in ChatCompletionRequestSystemMessageContentPart")
+		return fmt.Errorf("invalid type field in ChatCompletionRequestSystemMessageContentPart: %q", discriminator)
 	}
 	return nil
 }
@@ -2164,7 +2165,7 @@ func (u *ChatCompletionRequestUserMessageContentPart) UnmarshalJSON(data []byte)
 		}
 		u.File = &value
 	default:
-		return errors.New("invalid type field in ChatCompletionRequestUserMessageContentPart")
+		return fmt.Errorf("invalid type field in ChatCompletionRequestUserMessageContentPart: %q", discriminator)
 	}
 	return nil
 }
@@ -2224,7 +2225,7 @@ func (u *ChatCompletionRequestAssistantMessageContentPart) UnmarshalJSON(data []
 		}
 		u.Refusal = &value
 	default:
-		return errors.New("invalid type field in ChatCompletionRequestAssistantMessageContentPart")
+		return fmt.Errorf("invalid type field in ChatCompletionRequestAssistantMessageContentPart: %q", discriminator)
 	}
 	return nil
 }
@@ -2268,7 +2269,7 @@ func (u *ChatCompletionRequestToolMessageContentPart) UnmarshalJSON(data []byte)
 		}
 		u.Text = &value
 	default:
-		return errors.New("invalid type field in ChatCompletionRequestToolMessageContentPart")
+		return fmt.Errorf("invalid type field in ChatCompletionRequestToolMessageContentPart: %q", discriminator)
 	}
 	return nil
 }

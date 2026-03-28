@@ -3,6 +3,7 @@ package anthropicapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 type CreateMessageParams struct {
@@ -214,7 +215,7 @@ func (u *CreateMessageParamsCacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in CreateMessageParamsCacheControl")
+		return fmt.Errorf("invalid type field in CreateMessageParamsCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -701,7 +702,7 @@ func (u *MessageStreamEvent) UnmarshalJSON(data []byte) error {
 		}
 		u.Ping = &value
 	default:
-		return errors.New("invalid type field in MessageStreamEvent")
+		return fmt.Errorf("invalid type field in MessageStreamEvent: %q", discriminator)
 	}
 	return nil
 }
@@ -860,7 +861,7 @@ func (u *RequestTextBlockCacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestTextBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestTextBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -968,7 +969,7 @@ func (u *RequestTextBlockCitationsItem) UnmarshalJSON(data []byte) error {
 		}
 		u.SearchResultLocation = &value
 	default:
-		return errors.New("invalid type field in RequestTextBlockCitationsItem")
+		return fmt.Errorf("invalid type field in RequestTextBlockCitationsItem: %q", discriminator)
 	}
 	return nil
 }
@@ -1049,7 +1050,7 @@ func (u *ThinkingConfigParam) UnmarshalJSON(data []byte) error {
 		}
 		u.Adaptive = &value
 	default:
-		return errors.New("invalid type field in ThinkingConfigParam")
+		return fmt.Errorf("invalid type field in ThinkingConfigParam: %q", discriminator)
 	}
 	return nil
 }
@@ -1142,7 +1143,7 @@ func (u *ToolChoice) UnmarshalJSON(data []byte) error {
 		}
 		u.None = &value
 	default:
-		return errors.New("invalid type field in ToolChoice")
+		return fmt.Errorf("invalid type field in ToolChoice: %q", discriminator)
 	}
 	return nil
 }
@@ -1213,7 +1214,7 @@ func (u *ToolCacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in ToolCacheControl")
+		return fmt.Errorf("invalid type field in ToolCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1274,7 +1275,7 @@ func (u *BashTool20250124CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in BashTool20250124CacheControl")
+		return fmt.Errorf("invalid type field in BashTool20250124CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1334,7 +1335,7 @@ func (u *CodeExecutionTool20250522CacheControl) UnmarshalJSON(data []byte) error
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in CodeExecutionTool20250522CacheControl")
+		return fmt.Errorf("invalid type field in CodeExecutionTool20250522CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1394,7 +1395,7 @@ func (u *CodeExecutionTool20250825CacheControl) UnmarshalJSON(data []byte) error
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in CodeExecutionTool20250825CacheControl")
+		return fmt.Errorf("invalid type field in CodeExecutionTool20250825CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1455,7 +1456,7 @@ func (u *CodeExecutionTool20260120CacheControl) UnmarshalJSON(data []byte) error
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in CodeExecutionTool20260120CacheControl")
+		return fmt.Errorf("invalid type field in CodeExecutionTool20260120CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1516,7 +1517,7 @@ func (u *MemoryTool20250818CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in MemoryTool20250818CacheControl")
+		return fmt.Errorf("invalid type field in MemoryTool20250818CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1577,7 +1578,7 @@ func (u *TextEditor20250124CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in TextEditor20250124CacheControl")
+		return fmt.Errorf("invalid type field in TextEditor20250124CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1638,7 +1639,7 @@ func (u *TextEditor20250429CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in TextEditor20250429CacheControl")
+		return fmt.Errorf("invalid type field in TextEditor20250429CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1701,7 +1702,7 @@ func (u *TextEditor20250728CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in TextEditor20250728CacheControl")
+		return fmt.Errorf("invalid type field in TextEditor20250728CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1769,7 +1770,7 @@ func (u *WebSearchTool20250305CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in WebSearchTool20250305CacheControl")
+		return fmt.Errorf("invalid type field in WebSearchTool20250305CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1839,7 +1840,7 @@ func (u *WebFetchTool20250910CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in WebFetchTool20250910CacheControl")
+		return fmt.Errorf("invalid type field in WebFetchTool20250910CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1907,7 +1908,7 @@ func (u *WebSearchTool20260209CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in WebSearchTool20260209CacheControl")
+		return fmt.Errorf("invalid type field in WebSearchTool20260209CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -1977,7 +1978,7 @@ func (u *WebFetchTool20260209CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in WebFetchTool20260209CacheControl")
+		return fmt.Errorf("invalid type field in WebFetchTool20260209CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -2050,7 +2051,7 @@ func (u *WebFetchTool20260309CacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in WebFetchTool20260309CacheControl")
+		return fmt.Errorf("invalid type field in WebFetchTool20260309CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -2110,7 +2111,7 @@ func (u *ToolSearchToolBM2520251119CacheControl) UnmarshalJSON(data []byte) erro
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in ToolSearchToolBM2520251119CacheControl")
+		return fmt.Errorf("invalid type field in ToolSearchToolBM2520251119CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -2177,7 +2178,7 @@ func (u *ToolSearchToolRegex20251119CacheControl) UnmarshalJSON(data []byte) err
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in ToolSearchToolRegex20251119CacheControl")
+		return fmt.Errorf("invalid type field in ToolSearchToolRegex20251119CacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -2412,7 +2413,7 @@ func (u *ContentBlock) UnmarshalJSON(data []byte) error {
 		}
 		u.ContainerUpload = &value
 	default:
-		return errors.New("invalid type field in ContentBlock")
+		return fmt.Errorf("invalid type field in ContentBlock: %q", discriminator)
 	}
 	return nil
 }
@@ -2564,7 +2565,7 @@ func (u *ContentBlockDeltaEventDelta) UnmarshalJSON(data []byte) error {
 		}
 		u.SignatureDelta = &value
 	default:
-		return errors.New("invalid type field in ContentBlockDeltaEventDelta")
+		return fmt.Errorf("invalid type field in ContentBlockDeltaEventDelta: %q", discriminator)
 	}
 	return nil
 }
@@ -2789,7 +2790,7 @@ func (u *ContentBlockStartEventContentBlock) UnmarshalJSON(data []byte) error {
 		}
 		u.ContainerUpload = &value
 	default:
-		return errors.New("invalid type field in ContentBlockStartEventContentBlock")
+		return fmt.Errorf("invalid type field in ContentBlockStartEventContentBlock: %q", discriminator)
 	}
 	return nil
 }
@@ -3098,7 +3099,7 @@ func (u *InputContentBlock) UnmarshalJSON(data []byte) error {
 		}
 		u.ContainerUpload = &value
 	default:
-		return errors.New("invalid type field in InputContentBlock")
+		return fmt.Errorf("invalid type field in InputContentBlock: %q", discriminator)
 	}
 	return nil
 }
@@ -3303,7 +3304,7 @@ func (u *ResponseBashCodeExecutionToolResultBlockContent) UnmarshalJSON(data []b
 		}
 		u.BashCodeExecutionResult = &value
 	default:
-		return errors.New("invalid type field in ResponseBashCodeExecutionToolResultBlockContent")
+		return fmt.Errorf("invalid type field in ResponseBashCodeExecutionToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -3384,7 +3385,7 @@ func (u *ResponseCodeExecutionToolResultBlockContent) UnmarshalJSON(data []byte)
 		}
 		u.EncryptedCodeExecutionResult = &value
 	default:
-		return errors.New("invalid type field in ResponseCodeExecutionToolResultBlockContent")
+		return fmt.Errorf("invalid type field in ResponseCodeExecutionToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -3476,7 +3477,7 @@ func (u *ResponseServerToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return errors.New("invalid type field in ResponseServerToolUseBlockCaller")
+		return fmt.Errorf("invalid type field in ResponseServerToolUseBlockCaller: %q", discriminator)
 	}
 	return nil
 }
@@ -3604,7 +3605,7 @@ func (u *ResponseTextBlockCitationsItem) UnmarshalJSON(data []byte) error {
 		}
 		u.SearchResultLocation = &value
 	default:
-		return errors.New("invalid type field in ResponseTextBlockCitationsItem")
+		return fmt.Errorf("invalid type field in ResponseTextBlockCitationsItem: %q", discriminator)
 	}
 	return nil
 }
@@ -3701,7 +3702,7 @@ func (u *ResponseTextEditorCodeExecutionToolResultBlockContent) UnmarshalJSON(da
 		}
 		u.TextEditorCodeExecutionStrReplaceResult = &value
 	default:
-		return errors.New("invalid type field in ResponseTextEditorCodeExecutionToolResultBlockContent")
+		return fmt.Errorf("invalid type field in ResponseTextEditorCodeExecutionToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -3771,7 +3772,7 @@ func (u *ResponseToolSearchToolResultBlockContent) UnmarshalJSON(data []byte) er
 		}
 		u.ToolSearchToolSearchResult = &value
 	default:
-		return errors.New("invalid type field in ResponseToolSearchToolResultBlockContent")
+		return fmt.Errorf("invalid type field in ResponseToolSearchToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -3854,7 +3855,7 @@ func (u *ResponseToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return errors.New("invalid type field in ResponseToolUseBlockCaller")
+		return fmt.Errorf("invalid type field in ResponseToolUseBlockCaller: %q", discriminator)
 	}
 	return nil
 }
@@ -3936,7 +3937,7 @@ func (u *ResponseWebFetchToolResultBlockCaller) UnmarshalJSON(data []byte) error
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return errors.New("invalid type field in ResponseWebFetchToolResultBlockCaller")
+		return fmt.Errorf("invalid type field in ResponseWebFetchToolResultBlockCaller: %q", discriminator)
 	}
 	return nil
 }
@@ -3996,7 +3997,7 @@ func (u *ResponseWebFetchToolResultBlockContent) UnmarshalJSON(data []byte) erro
 		}
 		u.WebFetchResult = &value
 	default:
-		return errors.New("invalid type field in ResponseWebFetchToolResultBlockContent")
+		return fmt.Errorf("invalid type field in ResponseWebFetchToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -4078,7 +4079,7 @@ func (u *ResponseWebSearchToolResultBlockCaller) UnmarshalJSON(data []byte) erro
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return errors.New("invalid type field in ResponseWebSearchToolResultBlockCaller")
+		return fmt.Errorf("invalid type field in ResponseWebSearchToolResultBlockCaller: %q", discriminator)
 	}
 	return nil
 }
@@ -4252,7 +4253,7 @@ func (u *CitationsDeltaCitation) UnmarshalJSON(data []byte) error {
 		}
 		u.SearchResultLocation = &value
 	default:
-		return errors.New("invalid type field in CitationsDeltaCitation")
+		return fmt.Errorf("invalid type field in CitationsDeltaCitation: %q", discriminator)
 	}
 	return nil
 }
@@ -4342,7 +4343,7 @@ func (u *RequestBashCodeExecutionToolResultBlockCacheControl) UnmarshalJSON(data
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestBashCodeExecutionToolResultBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestBashCodeExecutionToolResultBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -4402,7 +4403,7 @@ func (u *RequestBashCodeExecutionToolResultBlockContent) UnmarshalJSON(data []by
 		}
 		u.BashCodeExecutionResult = &value
 	default:
-		return errors.New("invalid type field in RequestBashCodeExecutionToolResultBlockContent")
+		return fmt.Errorf("invalid type field in RequestBashCodeExecutionToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -4454,7 +4455,7 @@ func (u *RequestCodeExecutionToolResultBlockCacheControl) UnmarshalJSON(data []b
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestCodeExecutionToolResultBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestCodeExecutionToolResultBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -4530,7 +4531,7 @@ func (u *RequestCodeExecutionToolResultBlockContent) UnmarshalJSON(data []byte) 
 		}
 		u.EncryptedCodeExecutionResult = &value
 	default:
-		return errors.New("invalid type field in RequestCodeExecutionToolResultBlockContent")
+		return fmt.Errorf("invalid type field in RequestCodeExecutionToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -4583,7 +4584,7 @@ func (u *RequestContainerUploadBlockCacheControl) UnmarshalJSON(data []byte) err
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestContainerUploadBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestContainerUploadBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -4638,7 +4639,7 @@ func (u *RequestDocumentBlockCacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestDocumentBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestDocumentBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -4730,7 +4731,7 @@ func (u *RequestDocumentBlockSource) UnmarshalJSON(data []byte) error {
 		}
 		u.Url = &value
 	default:
-		return errors.New("invalid type field in RequestDocumentBlockSource")
+		return fmt.Errorf("invalid type field in RequestDocumentBlockSource: %q", discriminator)
 	}
 	return nil
 }
@@ -4781,7 +4782,7 @@ func (u *RequestImageBlockCacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestImageBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestImageBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -4841,7 +4842,7 @@ func (u *RequestImageBlockSource) UnmarshalJSON(data []byte) error {
 		}
 		u.Url = &value
 	default:
-		return errors.New("invalid type field in RequestImageBlockSource")
+		return fmt.Errorf("invalid type field in RequestImageBlockSource: %q", discriminator)
 	}
 	return nil
 }
@@ -4899,7 +4900,7 @@ func (u *RequestSearchResultBlockCacheControl) UnmarshalJSON(data []byte) error 
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestSearchResultBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestSearchResultBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -4953,7 +4954,7 @@ func (u *RequestServerToolUseBlockCacheControl) UnmarshalJSON(data []byte) error
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestServerToolUseBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestServerToolUseBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -5029,7 +5030,7 @@ func (u *RequestServerToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return errors.New("invalid type field in RequestServerToolUseBlockCaller")
+		return fmt.Errorf("invalid type field in RequestServerToolUseBlockCaller: %q", discriminator)
 	}
 	return nil
 }
@@ -5093,7 +5094,7 @@ func (u *RequestTextEditorCodeExecutionToolResultBlockCacheControl) UnmarshalJSO
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestTextEditorCodeExecutionToolResultBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestTextEditorCodeExecutionToolResultBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -5185,7 +5186,7 @@ func (u *RequestTextEditorCodeExecutionToolResultBlockContent) UnmarshalJSON(dat
 		}
 		u.TextEditorCodeExecutionStrReplaceResult = &value
 	default:
-		return errors.New("invalid type field in RequestTextEditorCodeExecutionToolResultBlockContent")
+		return fmt.Errorf("invalid type field in RequestTextEditorCodeExecutionToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -5243,7 +5244,7 @@ func (u *RequestToolResultBlockCacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestToolResultBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestToolResultBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -5353,7 +5354,7 @@ func (u *RequestToolResultBlockContentArrayItem) UnmarshalJSON(data []byte) erro
 		}
 		u.ToolReference = &value
 	default:
-		return errors.New("invalid type field in RequestToolResultBlockContentArrayItem")
+		return fmt.Errorf("invalid type field in RequestToolResultBlockContentArrayItem: %q", discriminator)
 	}
 	return nil
 }
@@ -5450,7 +5451,7 @@ func (u *RequestToolSearchToolResultBlockCacheControl) UnmarshalJSON(data []byte
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestToolSearchToolResultBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestToolSearchToolResultBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -5510,7 +5511,7 @@ func (u *RequestToolSearchToolResultBlockContent) UnmarshalJSON(data []byte) err
 		}
 		u.ToolSearchToolSearchResult = &value
 	default:
-		return errors.New("invalid type field in RequestToolSearchToolResultBlockContent")
+		return fmt.Errorf("invalid type field in RequestToolSearchToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -5564,7 +5565,7 @@ func (u *RequestToolUseBlockCacheControl) UnmarshalJSON(data []byte) error {
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestToolUseBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestToolUseBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -5640,7 +5641,7 @@ func (u *RequestToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return errors.New("invalid type field in RequestToolUseBlockCaller")
+		return fmt.Errorf("invalid type field in RequestToolUseBlockCaller: %q", discriminator)
 	}
 	return nil
 }
@@ -5693,7 +5694,7 @@ func (u *RequestWebFetchToolResultBlockCacheControl) UnmarshalJSON(data []byte) 
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestWebFetchToolResultBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestWebFetchToolResultBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -5769,7 +5770,7 @@ func (u *RequestWebFetchToolResultBlockCaller) UnmarshalJSON(data []byte) error 
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return errors.New("invalid type field in RequestWebFetchToolResultBlockCaller")
+		return fmt.Errorf("invalid type field in RequestWebFetchToolResultBlockCaller: %q", discriminator)
 	}
 	return nil
 }
@@ -5829,7 +5830,7 @@ func (u *RequestWebFetchToolResultBlockContent) UnmarshalJSON(data []byte) error
 		}
 		u.WebFetchResult = &value
 	default:
-		return errors.New("invalid type field in RequestWebFetchToolResultBlockContent")
+		return fmt.Errorf("invalid type field in RequestWebFetchToolResultBlockContent: %q", discriminator)
 	}
 	return nil
 }
@@ -5882,7 +5883,7 @@ func (u *RequestWebSearchToolResultBlockCacheControl) UnmarshalJSON(data []byte)
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestWebSearchToolResultBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestWebSearchToolResultBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -5958,7 +5959,7 @@ func (u *RequestWebSearchToolResultBlockCaller) UnmarshalJSON(data []byte) error
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return errors.New("invalid type field in RequestWebSearchToolResultBlockCaller")
+		return fmt.Errorf("invalid type field in RequestWebSearchToolResultBlockCaller: %q", discriminator)
 	}
 	return nil
 }
@@ -6267,7 +6268,7 @@ func (u *ContentBlockSourceContentArrayItem) UnmarshalJSON(data []byte) error {
 		}
 		u.Image = &value
 	default:
-		return errors.New("invalid type field in ContentBlockSourceContentArrayItem")
+		return fmt.Errorf("invalid type field in ContentBlockSourceContentArrayItem: %q", discriminator)
 	}
 	return nil
 }
@@ -6425,7 +6426,7 @@ func (u *RequestToolReferenceBlockCacheControl) UnmarshalJSON(data []byte) error
 		}
 		u.Ephemeral = &value
 	default:
-		return errors.New("invalid type field in RequestToolReferenceBlockCacheControl")
+		return fmt.Errorf("invalid type field in RequestToolReferenceBlockCacheControl: %q", discriminator)
 	}
 	return nil
 }
@@ -6593,7 +6594,7 @@ func (u *ResponseDocumentBlockSource) UnmarshalJSON(data []byte) error {
 		}
 		u.Text = &value
 	default:
-		return errors.New("invalid type field in ResponseDocumentBlockSource")
+		return fmt.Errorf("invalid type field in ResponseDocumentBlockSource: %q", discriminator)
 	}
 	return nil
 }

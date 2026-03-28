@@ -25,7 +25,7 @@ fn openai_model() -> OpenAIChatModel {
 
 fn openai_audio_model() -> OpenAIChatModel {
     OpenAIChatModel::new(
-        "gpt-4o-audio-preview".to_string(),
+        "gpt-audio-1.5".to_string(),
         OpenAIChatModelOptions {
             api_key: openai_api_key().clone(),
             ..Default::default()

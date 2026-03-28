@@ -14,7 +14,7 @@ fn anthropic_api_key() -> &'static String {
 
 fn anthropic_model() -> AnthropicModel {
     AnthropicModel::new(
-        "claude-sonnet-4-5".to_string(),
+        "claude-sonnet-4-6".to_string(),
         AnthropicModelOptions {
             api_key: anthropic_api_key().clone(),
             ..Default::default()

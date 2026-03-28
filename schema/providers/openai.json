@@ -1666,7 +1666,6 @@
       "required": [
         "type",
         "item_id",
-        "name",
         "output_index",
         "arguments",
         "sequence_number"

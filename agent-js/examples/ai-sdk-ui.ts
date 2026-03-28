@@ -962,7 +962,7 @@ async function handleChatRequest(
     const provider =
       typeof body.provider === "string" ? body.provider : "openai";
     const modelId =
-      typeof body.modelId === "string" ? body.modelId : "gpt-4o-mini";
+      typeof body.modelId === "string" ? body.modelId : "gpt-5.4-mini";
     const agent = createAgent(provider, modelId, body.metadata);
 
     const uiHistory = Array.isArray(body.messages) ? body.messages : [];

@@ -1,6 +1,7 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
 #![allow(clippy::doc_markdown)]
+#![allow(clippy::too_many_lines)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -577,7 +578,7 @@ pub enum InputItem {
     ItemReferenceParam(ItemReferenceParam),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[serde(tag = "type")]
 pub enum OutputItem {
     #[serde(rename = "message")]
@@ -620,6 +621,107 @@ pub enum OutputItem {
     McpApprovalRequest(MCPApprovalRequest),
     #[serde(rename = "custom_tool_call")]
     CustomToolCall(CustomToolCall),
+}
+
+impl<'de> Deserialize<'de> for OutputItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let type_str = value
+            .get("type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| serde::de::Error::missing_field("type"))?;
+
+        match type_str {
+            "message" => serde_json::from_value(value)
+                .map(Self::Message)
+                .map_err(serde::de::Error::custom),
+            "file_search_call" => serde_json::from_value(value)
+                .map(Self::FileSearchCall)
+                .map_err(serde::de::Error::custom),
+            "function_call" => serde_json::from_value(value)
+                .map(Self::FunctionCall)
+                .map_err(serde::de::Error::custom),
+            "web_search_call" => serde_json::from_value(value)
+                .map(Self::WebSearchCall)
+                .map_err(serde::de::Error::custom),
+            "computer_call" => serde_json::from_value(value)
+                .map(Self::ComputerCall)
+                .map_err(serde::de::Error::custom),
+            "reasoning" => serde_json::from_value(value)
+                .map(Self::Reasoning)
+                .map_err(serde::de::Error::custom),
+            "tool_search_call" => serde_json::from_value(value)
+                .map(Self::ToolSearchCall)
+                .map_err(serde::de::Error::custom),
+            "tool_search_output" => serde_json::from_value(value)
+                .map(Self::ToolSearchOutput)
+                .map_err(serde::de::Error::custom),
+            "compaction" => serde_json::from_value(value)
+                .map(Self::Compaction)
+                .map_err(serde::de::Error::custom),
+            "image_generation_call" => serde_json::from_value(value)
+                .map(Self::ImageGenerationCall)
+                .map_err(serde::de::Error::custom),
+            "code_interpreter_call" => serde_json::from_value(value)
+                .map(Self::CodeInterpreterCall)
+                .map_err(serde::de::Error::custom),
+            "local_shell_call" => serde_json::from_value(value)
+                .map(Self::LocalShellCall)
+                .map_err(serde::de::Error::custom),
+            "shell_call" => serde_json::from_value(value)
+                .map(Self::ShellCall)
+                .map_err(serde::de::Error::custom),
+            "shell_call_output" => serde_json::from_value(value)
+                .map(Self::ShellCallOutput)
+                .map_err(serde::de::Error::custom),
+            "apply_patch_call" => serde_json::from_value(value)
+                .map(Self::ApplyPatchCall)
+                .map_err(serde::de::Error::custom),
+            "apply_patch_call_output" => serde_json::from_value(value)
+                .map(Self::ApplyPatchCallOutput)
+                .map_err(serde::de::Error::custom),
+            "mcp_call" => serde_json::from_value(value)
+                .map(Self::McpCall)
+                .map_err(serde::de::Error::custom),
+            "mcp_list_tools" => serde_json::from_value(value)
+                .map(Self::McpListTools)
+                .map_err(serde::de::Error::custom),
+            "mcp_approval_request" => serde_json::from_value(value)
+                .map(Self::McpApprovalRequest)
+                .map_err(serde::de::Error::custom),
+            "custom_tool_call" => serde_json::from_value(value)
+                .map(Self::CustomToolCall)
+                .map_err(serde::de::Error::custom),
+            _ => Err(serde::de::Error::unknown_variant(
+                type_str,
+                &[
+                    "message",
+                    "file_search_call",
+                    "function_call",
+                    "web_search_call",
+                    "computer_call",
+                    "reasoning",
+                    "tool_search_call",
+                    "tool_search_output",
+                    "compaction",
+                    "image_generation_call",
+                    "code_interpreter_call",
+                    "local_shell_call",
+                    "shell_call",
+                    "shell_call_output",
+                    "apply_patch_call",
+                    "apply_patch_call_output",
+                    "mcp_call",
+                    "mcp_list_tools",
+                    "mcp_approval_request",
+                    "custom_tool_call",
+                ],
+            )),
+        }
+    }
 }
 
 /// Represents token usage details including input tokens, output tokens,
@@ -866,7 +968,8 @@ pub struct ResponseFunctionCallArgumentsDoneEvent {
     /// The ID of the item.
     pub item_id: String,
     /// The name of the function that was called.
-    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     /// The index of the output item.
     pub output_index: i64,
     /// The sequence number of this event.
@@ -1636,7 +1739,7 @@ pub enum EasyInputMessageType {
 }
 
 /// Content item used to generate a response.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[serde(untagged)]
 pub enum Item {
     InputMessage(InputMessage),
@@ -1665,6 +1768,140 @@ pub enum Item {
     MCPToolCall(MCPToolCall),
     CustomToolCallOutput(CustomToolCallOutput),
     CustomToolCall(CustomToolCall),
+}
+
+impl<'de> Deserialize<'de> for Item {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let type_str = value
+            .get("type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| serde::de::Error::missing_field("type"))?;
+
+        match type_str {
+            "message" => {
+                let role = value
+                    .get("role")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| serde::de::Error::missing_field("role"))?;
+
+                if role == "assistant" && value.get("id").is_some() {
+                    serde_json::from_value(value)
+                        .map(Self::OutputMessage)
+                        .map_err(serde::de::Error::custom)
+                } else {
+                    serde_json::from_value(value)
+                        .map(Self::InputMessage)
+                        .map_err(serde::de::Error::custom)
+                }
+            }
+            "file_search_call" => serde_json::from_value(value)
+                .map(Self::FileSearchToolCall)
+                .map_err(serde::de::Error::custom),
+            "computer_call" => serde_json::from_value(value)
+                .map(Self::ComputerToolCall)
+                .map_err(serde::de::Error::custom),
+            "computer_call_output" => serde_json::from_value(value)
+                .map(Self::ComputerCallOutputItemParam)
+                .map_err(serde::de::Error::custom),
+            "web_search_call" => serde_json::from_value(value)
+                .map(Self::WebSearchToolCall)
+                .map_err(serde::de::Error::custom),
+            "function_call" => serde_json::from_value(value)
+                .map(Self::FunctionToolCall)
+                .map_err(serde::de::Error::custom),
+            "function_call_output" => serde_json::from_value(value)
+                .map(Self::FunctionCallOutputItemParam)
+                .map_err(serde::de::Error::custom),
+            "tool_search_call" => serde_json::from_value(value)
+                .map(Self::ToolSearchCallItemParam)
+                .map_err(serde::de::Error::custom),
+            "tool_search_output" => serde_json::from_value(value)
+                .map(Self::ToolSearchOutputItemParam)
+                .map_err(serde::de::Error::custom),
+            "reasoning" => serde_json::from_value(value)
+                .map(Self::ReasoningItem)
+                .map_err(serde::de::Error::custom),
+            "compaction" => serde_json::from_value(value)
+                .map(Self::CompactionSummaryItemParam)
+                .map_err(serde::de::Error::custom),
+            "image_generation_call" => serde_json::from_value(value)
+                .map(Self::ImageGenToolCall)
+                .map_err(serde::de::Error::custom),
+            "code_interpreter_call" => serde_json::from_value(value)
+                .map(Self::CodeInterpreterToolCall)
+                .map_err(serde::de::Error::custom),
+            "local_shell_call" => serde_json::from_value(value)
+                .map(Self::LocalShellToolCall)
+                .map_err(serde::de::Error::custom),
+            "local_shell_call_output" => serde_json::from_value(value)
+                .map(Self::LocalShellToolCallOutput)
+                .map_err(serde::de::Error::custom),
+            "shell_call" => serde_json::from_value(value)
+                .map(Self::FunctionShellCallItemParam)
+                .map_err(serde::de::Error::custom),
+            "shell_call_output" => serde_json::from_value(value)
+                .map(Self::FunctionShellCallOutputItemParam)
+                .map_err(serde::de::Error::custom),
+            "apply_patch_call" => serde_json::from_value(value)
+                .map(Self::ApplyPatchToolCallItemParam)
+                .map_err(serde::de::Error::custom),
+            "apply_patch_call_output" => serde_json::from_value(value)
+                .map(Self::ApplyPatchToolCallOutputItemParam)
+                .map_err(serde::de::Error::custom),
+            "mcp_list_tools" => serde_json::from_value(value)
+                .map(Self::MCPListTools)
+                .map_err(serde::de::Error::custom),
+            "mcp_approval_request" => serde_json::from_value(value)
+                .map(Self::MCPApprovalRequest)
+                .map_err(serde::de::Error::custom),
+            "mcp_approval_response" => serde_json::from_value(value)
+                .map(Self::MCPApprovalResponse)
+                .map_err(serde::de::Error::custom),
+            "mcp_call" => serde_json::from_value(value)
+                .map(Self::MCPToolCall)
+                .map_err(serde::de::Error::custom),
+            "custom_tool_call_output" => serde_json::from_value(value)
+                .map(Self::CustomToolCallOutput)
+                .map_err(serde::de::Error::custom),
+            "custom_tool_call" => serde_json::from_value(value)
+                .map(Self::CustomToolCall)
+                .map_err(serde::de::Error::custom),
+            _ => Err(serde::de::Error::unknown_variant(
+                type_str,
+                &[
+                    "message",
+                    "file_search_call",
+                    "computer_call",
+                    "computer_call_output",
+                    "web_search_call",
+                    "function_call",
+                    "function_call_output",
+                    "tool_search_call",
+                    "tool_search_output",
+                    "reasoning",
+                    "compaction",
+                    "image_generation_call",
+                    "code_interpreter_call",
+                    "local_shell_call",
+                    "local_shell_call_output",
+                    "shell_call",
+                    "shell_call_output",
+                    "apply_patch_call",
+                    "apply_patch_call_output",
+                    "mcp_list_tools",
+                    "mcp_approval_request",
+                    "mcp_approval_response",
+                    "mcp_call",
+                    "custom_tool_call_output",
+                    "custom_tool_call",
+                ],
+            )),
+        }
+    }
 }
 
 /// An internal identifier for an item to reference.
@@ -4439,7 +4676,7 @@ pub struct DragParam {
     pub keys: Option<Vec<String>>,
     /// An array of coordinates representing the path of the drag action.
     /// Coordinates will appear as an array of objects, eg
-    /// ```
+    /// ```json
     /// [
     ///   { x: 100, y: 200 },
     ///   { x: 200, y: 300 }
