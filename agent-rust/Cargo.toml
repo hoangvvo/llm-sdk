@@ -28,7 +28,7 @@ use_self = "warn"
 [dependencies]
 async-stream = "0.3.6"
 futures = "0.3"
-llm-sdk-rs = { version = "0.3", path = "../sdk-rust" }
+llm-sdk-rs = { version = ">=0.3, <1.0", path = "../sdk-rust" }
 opentelemetry = "0.31"
 rmcp = { version = "1.2", features = [
   "client",
