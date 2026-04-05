@@ -146,8 +146,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Resolve previous package tag
+        id: previous-tag
+        run: |
+          module_tag_prefix="${{ github.event.inputs.module }}/v"
+          current_tag="${module_tag_prefix}${{ github.event.inputs.version }}"
+          previous_tag=$(git tag --list "${module_tag_prefix}*" --sort=-version:refname | grep -Fvx "$current_tag" | head -n 1)
+
+          if [[ -n "$previous_tag" ]]; then
+            echo "Using previous tag: $previous_tag"
+            echo "tag=$previous_tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "No previous tag found for $module_tag_prefix"
+          fi
       - name: Create release ${{ github.event.inputs.module }}/${{ github.event.inputs.version }}
         uses: ncipollo/release-action@v1
         with:
           tag: "${{ github.event.inputs.module }}/v${{ github.event.inputs.version }}"
           generateReleaseNotes: true
+          generateReleaseNotesPreviousTag: ${{ steps.previous-tag.outputs.tag }}
