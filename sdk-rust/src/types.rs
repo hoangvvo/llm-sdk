@@ -98,6 +98,7 @@ pub enum ResponseFormatOption {
 }
 
 /// The capabilities supported by the model.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct LanguageModelCapabilities {
