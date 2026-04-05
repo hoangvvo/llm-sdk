@@ -65,8 +65,24 @@ jobs:
           else
             echo "No changes detected, skipping commit"
           fi
+      - name: Resolve npm package name
+        id: npm-package
+        run: |
+          echo "name=$(npm pkg get name --workspace=${{ github.event.inputs.module }} | tr -d '"')" >> "$GITHUB_OUTPUT"
+      - name: Check if npm version already exists
+        id: npm-version
+        run: |
+          if npm view "${{ steps.npm-package.outputs.name }}@${{ github.event.inputs.version }}" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish to npm
+        if: steps.npm-version.outputs.exists != 'true'
         run: npm publish --workspace=${{ github.event.inputs.module }}
+      - name: Skip npm publish
+        if: steps.npm-version.outputs.exists == 'true'
+        run: echo "npm version already exists, skipping publish"
       - name: Push version commit
         run: git push
 
@@ -95,10 +111,27 @@ jobs:
           else
             echo "No changes detected, skipping commit"
           fi
+      - name: Resolve crate name
+        id: crate
+        run: |
+          crate_name=$(sed -n 's/^name = "\(.*\)"/\1/p' ./${{ github.event.inputs.module }}/Cargo.toml | head -n 1)
+          echo "name=$crate_name" >> "$GITHUB_OUTPUT"
+      - name: Check if crate version already exists
+        id: crate-version
+        run: |
+          if curl -fsS "https://crates.io/api/v1/crates/${{ steps.crate.outputs.name }}/${{ github.event.inputs.version }}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish to crates.io
+        if: steps.crate-version.outputs.exists != 'true'
         run: cargo publish --manifest-path ./${{ github.event.inputs.module }}/Cargo.toml --token ${{ steps.auth.outputs.token }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - name: Skip crates.io publish
+        if: steps.crate-version.outputs.exists == 'true'
+        run: echo "crate version already exists, skipping publish"
       - name: Push version commit
         run: git push
 
