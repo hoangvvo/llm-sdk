@@ -68,7 +68,8 @@ jobs:
       - name: Resolve npm package name
         id: npm-package
         run: |
-          echo "name=$(npm pkg get name --workspace=${{ github.event.inputs.module }} | tr -d '"')" >> "$GITHUB_OUTPUT"
+          package_name=$(npm run env --workspace=${{ github.event.inputs.module }} | grep "^npm_package_name=" | cut -d "=" -f 2-)
+          echo "name=$package_name" >> "$GITHUB_OUTPUT"
       - name: Check if npm version already exists
         id: npm-version
         run: |
@@ -114,7 +115,7 @@ jobs:
       - name: Resolve crate name
         id: crate
         run: |
-          crate_name=$(sed -n 's/^name = "\(.*\)"/\1/p' ./${{ github.event.inputs.module }}/Cargo.toml | head -n 1)
+          crate_name=$(cargo read-manifest --manifest-path ./${{ github.event.inputs.module }}/Cargo.toml | jq -r .name)
           echo "name=$crate_name" >> "$GITHUB_OUTPUT"
       - name: Check if crate version already exists
         id: crate-version
