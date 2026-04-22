@@ -535,6 +535,10 @@ type Message struct {
 	//
 	// This will always be `"assistant"`.
 	Role string `json:"role"`
+	// Structured information about why model output stopped.
+	//
+	// This is `null` when the `stop_reason` has no additional detail to report.
+	StopDetails *RefusalStopDetails `json:"stop_details"`
 	// The reason that we stopped.
 	//
 	// This may be one the following values:
@@ -2418,6 +2422,29 @@ func (u *ContentBlock) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Structured information about a refusal.
+type RefusalStopDetails struct {
+	// The policy category that triggered the refusal.
+	//
+	// `null` when the refusal doesn't map to a named category.
+	Category *RefusalStopDetailsCategory `json:"category"`
+	// Human-readable explanation of the refusal.
+	//
+	// This text is not guaranteed to be stable. `null` when no explanation is available for the category.
+	Explanation *string `json:"explanation"`
+	Type        string  `json:"type"`
+}
+
+// The policy category that triggered the refusal.
+//
+// `null` when the refusal doesn't map to a named category.
+type RefusalStopDetailsCategory string
+
+const (
+	RefusalStopDetailsCategoryCyber RefusalStopDetailsCategory = "cyber"
+	RefusalStopDetailsCategoryBio   RefusalStopDetailsCategory = "bio"
+)
+
 type StopReason string
 
 const (
@@ -3111,6 +3138,7 @@ const (
 	EffortLevelLow    EffortLevel = "low"
 	EffortLevelMedium EffortLevel = "medium"
 	EffortLevelHigh   EffortLevel = "high"
+	EffortLevelXhigh  EffortLevel = "xhigh"
 	EffortLevelMax    EffortLevel = "max"
 )
 
@@ -4278,9 +4306,13 @@ type MessageDelta struct {
 	// Information about the container used in this request.
 	//
 	// This will be non-null if a container tool (e.g. code execution) was used.
-	Container    *Container  `json:"container"`
-	StopReason   *StopReason `json:"stop_reason"`
-	StopSequence *string     `json:"stop_sequence"`
+	Container *Container `json:"container"`
+	// Structured information about why model output stopped.
+	//
+	// This is `null` when the `stop_reason` has no additional detail to report.
+	StopDetails  *RefusalStopDetails `json:"stop_details"`
+	StopReason   *StopReason         `json:"stop_reason"`
+	StopSequence *string             `json:"stop_sequence"`
 }
 
 type MessageDeltaUsage struct {

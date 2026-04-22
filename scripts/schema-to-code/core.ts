@@ -1346,6 +1346,67 @@ class SchemaDocumentBuilder {
     schema: JSONSchema7,
     path: string[],
   ): UnionVariantMatch {
+    if (schema.allOf && schema.allOf.length > 0) {
+      const requiredProperties = new Set<string>();
+      let discriminator: ObjectDiscriminatorMatch | undefined;
+      let nestedTaggedUnion: NestedTaggedUnionMatch | undefined;
+
+      schema.allOf.forEach((member, index) => {
+        const memberPath = [...path, `.allOf[${index}]`];
+        const memberSchema = assertSchemaObject(member, formatPath(memberPath));
+        const resolvedMember = memberSchema.$ref
+          ? this.resolveDefinitionSchema(
+              memberSchema.$ref,
+              formatPath(memberPath),
+            )
+          : memberSchema;
+        const match = this.getUntaggedMatchForSchema(resolvedMember, memberPath);
+        if (match.kind !== "object") {
+          throw new Error(
+            `Unsupported non-object allOf member in untagged match at ${formatPath(memberPath)}`,
+          );
+        }
+
+        for (const property of match.requiredProperties) {
+          requiredProperties.add(property);
+        }
+
+        if (match.discriminator) {
+          if (
+            discriminator &&
+            (discriminator.property !== match.discriminator.property ||
+              discriminator.value !== match.discriminator.value)
+          ) {
+            throw new Error(
+              `Conflicting discriminators in allOf at ${formatPath(memberPath)}`,
+            );
+          }
+          discriminator = match.discriminator;
+        }
+
+        if (match.nestedTaggedUnion) {
+          if (
+            nestedTaggedUnion &&
+            (nestedTaggedUnion.property !== match.nestedTaggedUnion.property ||
+              nestedTaggedUnion.values.join("\u0000") !==
+                match.nestedTaggedUnion.values.join("\u0000"))
+          ) {
+            throw new Error(
+              `Conflicting nested tagged unions in allOf at ${formatPath(memberPath)}`,
+            );
+          }
+          nestedTaggedUnion = match.nestedTaggedUnion;
+        }
+      });
+
+      return {
+        kind: "object",
+        requiredProperties: [...requiredProperties],
+        ...(discriminator && { discriminator }),
+        ...(nestedTaggedUnion && { nestedTaggedUnion }),
+      };
+    }
+
     const primitive = normalizePrimitiveSchema(schema);
     if (primitive) {
       if (primitive === "integer" || primitive === "number") {

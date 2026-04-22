@@ -28,6 +28,9 @@ type CreateResponseAllOf3 struct {
 	// to swap out system (or developer) messages in new responses.
 	//
 	Instructions *string `json:"instructions,omitempty"`
+	// An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).
+	//
+	MaxOutputTokens *int `json:"max_output_tokens,omitempty"`
 	// Whether to allow the model to run tool calls in parallel.
 	//
 	ParallelToolCalls *bool `json:"parallel_tool_calls,omitempty"`
@@ -73,6 +76,9 @@ type ResponseAllOf3 struct {
 	// to swap out system (or developer) messages in new responses.
 	//
 	Instructions *ResponseAllOf3Instructions `json:"instructions"`
+	// An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).
+	//
+	MaxOutputTokens *int `json:"max_output_tokens,omitempty"`
 	// The object type of this resource - always set to `response`.
 	//
 	Object ResponseAllOf3Object `json:"object"`
@@ -1074,6 +1080,10 @@ func (u *ResponseStreamEvent) UnmarshalJSON(data []byte) error {
 }
 
 type CreateModelResponsePropertiesAllOf2 struct {
+	// An integer between 0 and 20 specifying the number of most likely tokens to
+	// return at each token position, each with an associated log probability.
+	//
+	TopLogprobs *int `json:"top_logprobs,omitempty"`
 }
 
 type CreateModelResponseProperties struct {
@@ -1322,7 +1332,7 @@ type ModelResponseProperties struct {
 type ModelResponsePropertiesPromptCacheRetention string
 
 const (
-	ModelResponsePropertiesPromptCacheRetentionInMemory ModelResponsePropertiesPromptCacheRetention = "in-memory"
+	ModelResponsePropertiesPromptCacheRetentionInMemory ModelResponsePropertiesPromptCacheRetention = "in_memory"
 	ModelResponsePropertiesPromptCacheRetentionN24H     ModelResponsePropertiesPromptCacheRetention = "24h"
 )
 
@@ -1370,7 +1380,7 @@ func (u *InputItem) UnmarshalJSON(data []byte) error {
 	*u = InputItem{}
 	switch value := raw.(type) {
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "message" && value["role"] != nil && value["content"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "message") && value["role"] != nil && value["content"] != nil {
 			var v EasyInputMessage
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -1378,7 +1388,7 @@ func (u *InputItem) UnmarshalJSON(data []byte) error {
 			u.EasyInputMessage = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "item_reference" && value["id"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "item_reference") && value["id"] != nil {
 			var v ItemReferenceParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -1397,351 +1407,326 @@ func (u *InputItem) UnmarshalJSON(data []byte) error {
 }
 
 type OutputItem struct {
-	Message              *OutputMessage
-	FileSearchCall       *FileSearchToolCall
-	FunctionCall         *FunctionToolCall
-	WebSearchCall        *WebSearchToolCall
-	ComputerCall         *ComputerToolCall
-	Reasoning            *ReasoningItem
-	ToolSearchCall       *ToolSearchCall
-	ToolSearchOutput     *ToolSearchOutput
-	Compaction           *CompactionBody
-	ImageGenerationCall  *ImageGenToolCall
-	CodeInterpreterCall  *CodeInterpreterToolCall
-	LocalShellCall       *LocalShellToolCall
-	ShellCall            *FunctionShellCall
-	ShellCallOutput      *FunctionShellCallOutput
-	ApplyPatchCall       *ApplyPatchToolCall
-	ApplyPatchCallOutput *ApplyPatchToolCallOutput
-	McpCall              *MCPToolCall
-	McpListTools         *MCPListTools
-	McpApprovalRequest   *MCPApprovalRequest
-	CustomToolCall       *CustomToolCall
+	OutputMessage                  *OutputMessage
+	FileSearchToolCall             *FileSearchToolCall
+	FunctionToolCall               *FunctionToolCall
+	FunctionToolCallOutputResource *FunctionToolCallOutputResource
+	WebSearchToolCall              *WebSearchToolCall
+	ComputerToolCall               *ComputerToolCall
+	ComputerToolCallOutputResource *ComputerToolCallOutputResource
+	ReasoningItem                  *ReasoningItem
+	ToolSearchCall                 *ToolSearchCall
+	ToolSearchOutput               *ToolSearchOutput
+	CompactionBody                 *CompactionBody
+	ImageGenToolCall               *ImageGenToolCall
+	CodeInterpreterToolCall        *CodeInterpreterToolCall
+	LocalShellToolCall             *LocalShellToolCall
+	LocalShellToolCallOutput       *LocalShellToolCallOutput
+	FunctionShellCall              *FunctionShellCall
+	FunctionShellCallOutput        *FunctionShellCallOutput
+	ApplyPatchToolCall             *ApplyPatchToolCall
+	ApplyPatchToolCallOutput       *ApplyPatchToolCallOutput
+	MCPToolCall                    *MCPToolCall
+	MCPListTools                   *MCPListTools
+	MCPApprovalRequest             *MCPApprovalRequest
+	MCPApprovalResponseResource    *MCPApprovalResponseResource
+	CustomToolCall                 *CustomToolCall
+	CustomToolCallOutputResource   *CustomToolCallOutputResource
 }
 
 func (u *OutputItem) MarshalJSON() ([]byte, error) {
-	if u.Message != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*OutputMessage
-		}{
-			Type:          "message",
-			OutputMessage: u.Message,
-		})
+	if u == nil {
+		return []byte("null"), nil
 	}
-	if u.FileSearchCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*FileSearchToolCall
-		}{
-			Type:               "file_search_call",
-			FileSearchToolCall: u.FileSearchCall,
-		})
+	if u.OutputMessage != nil {
+		return json.Marshal(u.OutputMessage)
 	}
-	if u.FunctionCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*FunctionToolCall
-		}{
-			Type:             "function_call",
-			FunctionToolCall: u.FunctionCall,
-		})
+	if u.FileSearchToolCall != nil {
+		return json.Marshal(u.FileSearchToolCall)
 	}
-	if u.WebSearchCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*WebSearchToolCall
-		}{
-			Type:              "web_search_call",
-			WebSearchToolCall: u.WebSearchCall,
-		})
+	if u.FunctionToolCall != nil {
+		return json.Marshal(u.FunctionToolCall)
 	}
-	if u.ComputerCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ComputerToolCall
-		}{
-			Type:             "computer_call",
-			ComputerToolCall: u.ComputerCall,
-		})
+	if u.FunctionToolCallOutputResource != nil {
+		return json.Marshal(u.FunctionToolCallOutputResource)
 	}
-	if u.Reasoning != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ReasoningItem
-		}{
-			Type:          "reasoning",
-			ReasoningItem: u.Reasoning,
-		})
+	if u.WebSearchToolCall != nil {
+		return json.Marshal(u.WebSearchToolCall)
+	}
+	if u.ComputerToolCall != nil {
+		return json.Marshal(u.ComputerToolCall)
+	}
+	if u.ComputerToolCallOutputResource != nil {
+		return json.Marshal(u.ComputerToolCallOutputResource)
+	}
+	if u.ReasoningItem != nil {
+		return json.Marshal(u.ReasoningItem)
 	}
 	if u.ToolSearchCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ToolSearchCall
-		}{
-			Type:           "tool_search_call",
-			ToolSearchCall: u.ToolSearchCall,
-		})
+		return json.Marshal(u.ToolSearchCall)
 	}
 	if u.ToolSearchOutput != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ToolSearchOutput
-		}{
-			Type:             "tool_search_output",
-			ToolSearchOutput: u.ToolSearchOutput,
-		})
+		return json.Marshal(u.ToolSearchOutput)
 	}
-	if u.Compaction != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*CompactionBody
-		}{
-			Type:           "compaction",
-			CompactionBody: u.Compaction,
-		})
+	if u.CompactionBody != nil {
+		return json.Marshal(u.CompactionBody)
 	}
-	if u.ImageGenerationCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ImageGenToolCall
-		}{
-			Type:             "image_generation_call",
-			ImageGenToolCall: u.ImageGenerationCall,
-		})
+	if u.ImageGenToolCall != nil {
+		return json.Marshal(u.ImageGenToolCall)
 	}
-	if u.CodeInterpreterCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*CodeInterpreterToolCall
-		}{
-			Type:                    "code_interpreter_call",
-			CodeInterpreterToolCall: u.CodeInterpreterCall,
-		})
+	if u.CodeInterpreterToolCall != nil {
+		return json.Marshal(u.CodeInterpreterToolCall)
 	}
-	if u.LocalShellCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*LocalShellToolCall
-		}{
-			Type:               "local_shell_call",
-			LocalShellToolCall: u.LocalShellCall,
-		})
+	if u.LocalShellToolCall != nil {
+		return json.Marshal(u.LocalShellToolCall)
 	}
-	if u.ShellCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*FunctionShellCall
-		}{
-			Type:              "shell_call",
-			FunctionShellCall: u.ShellCall,
-		})
+	if u.LocalShellToolCallOutput != nil {
+		return json.Marshal(u.LocalShellToolCallOutput)
 	}
-	if u.ShellCallOutput != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*FunctionShellCallOutput
-		}{
-			Type:                    "shell_call_output",
-			FunctionShellCallOutput: u.ShellCallOutput,
-		})
+	if u.FunctionShellCall != nil {
+		return json.Marshal(u.FunctionShellCall)
 	}
-	if u.ApplyPatchCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ApplyPatchToolCall
-		}{
-			Type:               "apply_patch_call",
-			ApplyPatchToolCall: u.ApplyPatchCall,
-		})
+	if u.FunctionShellCallOutput != nil {
+		return json.Marshal(u.FunctionShellCallOutput)
 	}
-	if u.ApplyPatchCallOutput != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ApplyPatchToolCallOutput
-		}{
-			Type:                     "apply_patch_call_output",
-			ApplyPatchToolCallOutput: u.ApplyPatchCallOutput,
-		})
+	if u.ApplyPatchToolCall != nil {
+		return json.Marshal(u.ApplyPatchToolCall)
 	}
-	if u.McpCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*MCPToolCall
-		}{
-			Type:        "mcp_call",
-			MCPToolCall: u.McpCall,
-		})
+	if u.ApplyPatchToolCallOutput != nil {
+		return json.Marshal(u.ApplyPatchToolCallOutput)
 	}
-	if u.McpListTools != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*MCPListTools
-		}{
-			Type:         "mcp_list_tools",
-			MCPListTools: u.McpListTools,
-		})
+	if u.MCPToolCall != nil {
+		return json.Marshal(u.MCPToolCall)
 	}
-	if u.McpApprovalRequest != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*MCPApprovalRequest
-		}{
-			Type:               "mcp_approval_request",
-			MCPApprovalRequest: u.McpApprovalRequest,
-		})
+	if u.MCPListTools != nil {
+		return json.Marshal(u.MCPListTools)
+	}
+	if u.MCPApprovalRequest != nil {
+		return json.Marshal(u.MCPApprovalRequest)
+	}
+	if u.MCPApprovalResponseResource != nil {
+		return json.Marshal(u.MCPApprovalResponseResource)
 	}
 	if u.CustomToolCall != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*CustomToolCall
-		}{
-			Type:           "custom_tool_call",
-			CustomToolCall: u.CustomToolCall,
-		})
+		return json.Marshal(u.CustomToolCall)
+	}
+	if u.CustomToolCallOutputResource != nil {
+		return json.Marshal(u.CustomToolCallOutputResource)
 	}
 	return nil, errors.New("invalid OutputItem: all variants are nil")
 }
 
 func (u *OutputItem) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
+	var raw interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	rawType, ok := raw["type"]
-	if !ok {
-		return errors.New("missing type field in OutputItem")
-	}
-	var discriminator string
-	if err := json.Unmarshal(rawType, &discriminator); err != nil {
-		return err
-	}
 	*u = OutputItem{}
-	switch discriminator {
-	case "message":
-		var value OutputMessage
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+	switch value := raw.(type) {
+	case map[string]interface{}:
+		if rawType, ok := value["type"]; (!ok || rawType == "tool_search_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["execution"] != nil && value["arguments"] != nil && value["status"] != nil {
+			var v ToolSearchCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.ToolSearchCall = &v
+			return nil
 		}
-		u.Message = &value
-	case "file_search_call":
-		var value FileSearchToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "tool_search_output") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["execution"] != nil && value["tools"] != nil && value["status"] != nil {
+			var v ToolSearchOutput
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.ToolSearchOutput = &v
+			return nil
 		}
-		u.FileSearchCall = &value
-	case "function_call":
-		var value FunctionToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "code_interpreter_call") && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["container_id"] != nil && value["code"] != nil && value["outputs"] != nil {
+			var v CodeInterpreterToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.CodeInterpreterToolCall = &v
+			return nil
 		}
-		u.FunctionCall = &value
-	case "web_search_call":
-		var value WebSearchToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "shell_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["action"] != nil && value["status"] != nil && value["environment"] != nil {
+			var v FunctionShellCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.FunctionShellCall = &v
+			return nil
 		}
-		u.WebSearchCall = &value
-	case "computer_call":
-		var value ComputerToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "shell_call_output") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["status"] != nil && value["output"] != nil && value["max_output_length"] != nil {
+			var v FunctionShellCallOutput
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.FunctionShellCallOutput = &v
+			return nil
 		}
-		u.ComputerCall = &value
-	case "reasoning":
-		var value ReasoningItem
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawRole, ok := value["role"]; (!ok || rawRole == "assistant") && value["id"] != nil && value["type"] != nil && value["role"] != nil && value["content"] != nil && value["status"] != nil {
+			var v OutputMessage
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.OutputMessage = &v
+			return nil
 		}
-		u.Reasoning = &value
-	case "tool_search_call":
-		var value ToolSearchCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "function_call_output") && value["type"] != nil && value["call_id"] != nil && value["output"] != nil && value["id"] != nil && value["status"] != nil {
+			var v FunctionToolCallOutputResource
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.FunctionToolCallOutputResource = &v
+			return nil
 		}
-		u.ToolSearchCall = &value
-	case "tool_search_output":
-		var value ToolSearchOutput
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "computer_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["pending_safety_checks"] != nil && value["status"] != nil {
+			var v ComputerToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.ComputerToolCall = &v
+			return nil
 		}
-		u.ToolSearchOutput = &value
-	case "compaction":
-		var value CompactionBody
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "computer_call_output") && value["type"] != nil && value["call_id"] != nil && value["output"] != nil && value["id"] != nil && value["status"] != nil {
+			var v ComputerToolCallOutputResource
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.ComputerToolCallOutputResource = &v
+			return nil
 		}
-		u.Compaction = &value
-	case "image_generation_call":
-		var value ImageGenToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "local_shell_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["action"] != nil && value["status"] != nil {
+			var v LocalShellToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.LocalShellToolCall = &v
+			return nil
 		}
-		u.ImageGenerationCall = &value
-	case "code_interpreter_call":
-		var value CodeInterpreterToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["status"] != nil && value["operation"] != nil {
+			var v ApplyPatchToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.ApplyPatchToolCall = &v
+			return nil
 		}
-		u.CodeInterpreterCall = &value
-	case "local_shell_call":
-		var value LocalShellToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp_call") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
+			var v MCPToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.MCPToolCall = &v
+			return nil
 		}
-		u.LocalShellCall = &value
-	case "shell_call":
-		var value FunctionShellCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp_approval_request") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
+			var v MCPApprovalRequest
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.MCPApprovalRequest = &v
+			return nil
 		}
-		u.ShellCall = &value
-	case "shell_call_output":
-		var value FunctionShellCallOutput
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp_approval_response") && value["type"] != nil && value["id"] != nil && value["request_id"] != nil && value["approve"] != nil && value["approval_request_id"] != nil {
+			var v MCPApprovalResponseResource
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.MCPApprovalResponseResource = &v
+			return nil
 		}
-		u.ShellCallOutput = &value
-	case "apply_patch_call":
-		var value ApplyPatchToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "custom_tool_call_output") && value["type"] != nil && value["call_id"] != nil && value["output"] != nil && value["id"] != nil && value["status"] != nil {
+			var v CustomToolCallOutputResource
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.CustomToolCallOutputResource = &v
+			return nil
 		}
-		u.ApplyPatchCall = &value
-	case "apply_patch_call_output":
-		var value ApplyPatchToolCallOutput
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "file_search_call") && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["queries"] != nil {
+			var v FileSearchToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.FileSearchToolCall = &v
+			return nil
 		}
-		u.ApplyPatchCallOutput = &value
-	case "mcp_call":
-		var value MCPToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "function_call") && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["arguments"] != nil {
+			var v FunctionToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.FunctionToolCall = &v
+			return nil
 		}
-		u.McpCall = &value
-	case "mcp_list_tools":
-		var value MCPListTools
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "web_search_call") && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["action"] != nil {
+			var v WebSearchToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.WebSearchToolCall = &v
+			return nil
 		}
-		u.McpListTools = &value
-	case "mcp_approval_request":
-		var value MCPApprovalRequest
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "image_generation_call") && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["result"] != nil {
+			var v ImageGenToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.ImageGenToolCall = &v
+			return nil
 		}
-		u.McpApprovalRequest = &value
-	case "custom_tool_call":
-		var value CustomToolCall
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+		if rawType, ok := value["type"]; (!ok || rawType == "local_shell_call_output") && value["id"] != nil && value["type"] != nil && value["call_id"] != nil && value["output"] != nil {
+			var v LocalShellToolCallOutput
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.LocalShellToolCallOutput = &v
+			return nil
 		}
-		u.CustomToolCall = &value
-	default:
-		return fmt.Errorf("invalid type field in OutputItem: %q", discriminator)
+		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch_call_output") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["status"] != nil {
+			var v ApplyPatchToolCallOutput
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.ApplyPatchToolCallOutput = &v
+			return nil
+		}
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp_list_tools") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["tools"] != nil {
+			var v MCPListTools
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.MCPListTools = &v
+			return nil
+		}
+		if rawType, ok := value["type"]; (!ok || rawType == "custom_tool_call") && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["input"] != nil {
+			var v CustomToolCall
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.CustomToolCall = &v
+			return nil
+		}
+		if rawType, ok := value["type"]; (!ok || rawType == "reasoning") && value["id"] != nil && value["summary"] != nil && value["type"] != nil {
+			var v ReasoningItem
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.ReasoningItem = &v
+			return nil
+		}
+		if rawType, ok := value["type"]; (!ok || rawType == "compaction") && value["type"] != nil && value["id"] != nil && value["encrypted_content"] != nil {
+			var v CompactionBody
+			if err := json.Unmarshal(data, &v); err != nil {
+				return err
+			}
+			u.CompactionBody = &v
+			return nil
+		}
+		return errors.New("invalid OutputItem")
 	}
-	return nil
+	return errors.New("invalid OutputItem")
 }
 
 // Represents token usage details including input tokens, output tokens,
@@ -2338,9 +2323,6 @@ type ResponseImageGenCallInProgressEvent struct {
 
 // Emitted when a partial image is available during image generation streaming.
 type ResponseImageGenCallPartialImageEvent struct {
-	// The background setting used for the generated image.
-	//
-	Background *ResponseImageGenCallPartialImageEventBackground `json:"background,omitempty"`
 	// The unique identifier of the image generation item being processed.
 	ItemId string `json:"item_id"`
 	// The output format of the generated image.
@@ -2352,34 +2334,12 @@ type ResponseImageGenCallPartialImageEvent struct {
 	PartialImageB64 string `json:"partial_image_b64"`
 	// 0-based index for the partial image (backend is 1-based, but this is 0-based for the user).
 	PartialImageIndex int `json:"partial_image_index"`
-	// The quality of the generated image.
-	//
-	Quality *ResponseImageGenCallPartialImageEventQuality `json:"quality,omitempty"`
 	// The sequence number of the image generation item being processed.
 	SequenceNumber int `json:"sequence_number"`
 	// The size of the generated image.
 	//
 	Size *string `json:"size,omitempty"`
 }
-
-// The background setting used for the generated image.
-type ResponseImageGenCallPartialImageEventBackground string
-
-const (
-	ResponseImageGenCallPartialImageEventBackgroundTransparent ResponseImageGenCallPartialImageEventBackground = "transparent"
-	ResponseImageGenCallPartialImageEventBackgroundOpaque      ResponseImageGenCallPartialImageEventBackground = "opaque"
-	ResponseImageGenCallPartialImageEventBackgroundAuto        ResponseImageGenCallPartialImageEventBackground = "auto"
-)
-
-// The quality of the generated image.
-type ResponseImageGenCallPartialImageEventQuality string
-
-const (
-	ResponseImageGenCallPartialImageEventQualityLow    ResponseImageGenCallPartialImageEventQuality = "low"
-	ResponseImageGenCallPartialImageEventQualityMedium ResponseImageGenCallPartialImageEventQuality = "medium"
-	ResponseImageGenCallPartialImageEventQualityHigh   ResponseImageGenCallPartialImageEventQuality = "high"
-	ResponseImageGenCallPartialImageEventQualityAuto   ResponseImageGenCallPartialImageEventQuality = "auto"
-)
 
 // Emitted when there is a delta (partial update) to the arguments of an MCP tool call.
 type ResponseMCPCallArgumentsDeltaEvent struct {
@@ -2644,7 +2604,7 @@ func (u *ToolChoiceParam) UnmarshalJSON(data []byte) error {
 		u.ToolChoiceOptions = &v
 		return nil
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "allowed_tools" && value["type"] != nil && value["mode"] != nil && value["tools"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "allowed_tools") && value["type"] != nil && value["mode"] != nil && value["tools"] != nil {
 			var v ToolChoiceAllowed
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -2652,7 +2612,7 @@ func (u *ToolChoiceParam) UnmarshalJSON(data []byte) error {
 			u.ToolChoiceAllowed = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "function" && value["type"] != nil && value["name"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "function") && value["type"] != nil && value["name"] != nil {
 			var v ToolChoiceFunction
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -2660,7 +2620,7 @@ func (u *ToolChoiceParam) UnmarshalJSON(data []byte) error {
 			u.ToolChoiceFunction = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "mcp" && value["type"] != nil && value["server_label"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp") && value["type"] != nil && value["server_label"] != nil {
 			var v ToolChoiceMCP
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -2668,7 +2628,7 @@ func (u *ToolChoiceParam) UnmarshalJSON(data []byte) error {
 			u.ToolChoiceMCP = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "custom" && value["type"] != nil && value["name"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "custom") && value["type"] != nil && value["name"] != nil {
 			var v ToolChoiceCustom
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -2676,7 +2636,7 @@ func (u *ToolChoiceParam) UnmarshalJSON(data []byte) error {
 			u.ToolChoiceCustom = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "apply_patch" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch") && value["type"] != nil {
 			var v SpecificApplyPatchParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -2684,7 +2644,7 @@ func (u *ToolChoiceParam) UnmarshalJSON(data []byte) error {
 			u.SpecificApplyPatchParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "shell" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "shell") && value["type"] != nil {
 			var v SpecificFunctionShellParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -2991,7 +2951,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 	*u = Item{}
 	switch value := raw.(type) {
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "code_interpreter_call" && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["container_id"] != nil && value["code"] != nil && value["outputs"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "code_interpreter_call") && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["container_id"] != nil && value["code"] != nil && value["outputs"] != nil {
 			var v CodeInterpreterToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -2999,7 +2959,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.CodeInterpreterToolCall = &v
 			return nil
 		}
-		if rawRole, ok := value["role"]; !ok || rawRole == "assistant" && value["id"] != nil && value["type"] != nil && value["role"] != nil && value["content"] != nil && value["status"] != nil {
+		if rawRole, ok := value["role"]; (!ok || rawRole == "assistant") && value["id"] != nil && value["type"] != nil && value["role"] != nil && value["content"] != nil && value["status"] != nil {
 			var v OutputMessage
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3007,7 +2967,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.OutputMessage = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "computer_call" && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["pending_safety_checks"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "computer_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["pending_safety_checks"] != nil && value["status"] != nil {
 			var v ComputerToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3015,7 +2975,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ComputerToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "local_shell_call" && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["action"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "local_shell_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["action"] != nil && value["status"] != nil {
 			var v LocalShellToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3023,7 +2983,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.LocalShellToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "mcp_approval_request" && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp_approval_request") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
 			var v MCPApprovalRequest
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3031,7 +2991,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.MCPApprovalRequest = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "mcp_call" && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp_call") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
 			var v MCPToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3039,7 +2999,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.MCPToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "file_search_call" && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["queries"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "file_search_call") && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["queries"] != nil {
 			var v FileSearchToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3047,7 +3007,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FileSearchToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "web_search_call" && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["action"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "web_search_call") && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["action"] != nil {
 			var v WebSearchToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3055,7 +3015,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.WebSearchToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "function_call" && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "function_call") && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["arguments"] != nil {
 			var v FunctionToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3063,7 +3023,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FunctionToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "image_generation_call" && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["result"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "image_generation_call") && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["result"] != nil {
 			var v ImageGenToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3071,7 +3031,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ImageGenToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "local_shell_call_output" && value["id"] != nil && value["type"] != nil && value["call_id"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "local_shell_call_output") && value["id"] != nil && value["type"] != nil && value["call_id"] != nil && value["output"] != nil {
 			var v LocalShellToolCallOutput
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3079,7 +3039,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.LocalShellToolCallOutput = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "apply_patch_call" && value["type"] != nil && value["call_id"] != nil && value["status"] != nil && value["operation"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch_call") && value["type"] != nil && value["call_id"] != nil && value["status"] != nil && value["operation"] != nil {
 			var v ApplyPatchToolCallItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3087,7 +3047,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ApplyPatchToolCallItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "mcp_list_tools" && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["tools"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp_list_tools") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["tools"] != nil {
 			var v MCPListTools
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3095,7 +3055,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.MCPListTools = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "mcp_approval_response" && value["type"] != nil && value["request_id"] != nil && value["approve"] != nil && value["approval_request_id"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp_approval_response") && value["type"] != nil && value["request_id"] != nil && value["approve"] != nil && value["approval_request_id"] != nil {
 			var v MCPApprovalResponse
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3103,7 +3063,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.MCPApprovalResponse = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "custom_tool_call" && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["input"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "custom_tool_call") && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["input"] != nil {
 			var v CustomToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3111,7 +3071,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.CustomToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "computer_call_output" && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "computer_call_output") && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
 			var v ComputerCallOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3119,7 +3079,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ComputerCallOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "function_call_output" && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "function_call_output") && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
 			var v FunctionCallOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3127,7 +3087,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FunctionCallOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "reasoning" && value["id"] != nil && value["summary"] != nil && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "reasoning") && value["id"] != nil && value["summary"] != nil && value["type"] != nil {
 			var v ReasoningItem
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3135,7 +3095,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ReasoningItem = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "shell_call" && value["call_id"] != nil && value["type"] != nil && value["action"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "shell_call") && value["call_id"] != nil && value["type"] != nil && value["action"] != nil {
 			var v FunctionShellCallItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3143,7 +3103,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FunctionShellCallItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "shell_call_output" && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "shell_call_output") && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
 			var v FunctionShellCallOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3151,7 +3111,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FunctionShellCallOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "apply_patch_call_output" && value["type"] != nil && value["call_id"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch_call_output") && value["type"] != nil && value["call_id"] != nil && value["status"] != nil {
 			var v ApplyPatchToolCallOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3159,7 +3119,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ApplyPatchToolCallOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "custom_tool_call_output" && value["type"] != nil && value["call_id"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "custom_tool_call_output") && value["type"] != nil && value["call_id"] != nil && value["output"] != nil {
 			var v CustomToolCallOutput
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3167,7 +3127,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.CustomToolCallOutput = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "message" && value["role"] != nil && value["content"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "message") && value["role"] != nil && value["content"] != nil {
 			var v InputMessage
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3175,7 +3135,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.InputMessage = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "tool_search_call" && value["type"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "tool_search_call") && value["type"] != nil && value["arguments"] != nil {
 			var v ToolSearchCallItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3183,7 +3143,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ToolSearchCallItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "tool_search_output" && value["type"] != nil && value["tools"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "tool_search_output") && value["type"] != nil && value["tools"] != nil {
 			var v ToolSearchOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3191,7 +3151,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ToolSearchOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "compaction" && value["type"] != nil && value["encrypted_content"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "compaction") && value["type"] != nil && value["encrypted_content"] != nil {
 			var v CompactionSummaryItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -3364,6 +3324,24 @@ const (
 	FunctionToolCallTypeFunctionCall FunctionToolCallType = "function_call"
 )
 
+type FunctionToolCallOutputResourceAllOf2 struct {
+	// The identifier of the actor that created the item.
+	//
+	CreatedBy *string `json:"created_by,omitempty"`
+	// The unique ID of the function call tool output.
+	//
+	Id string `json:"id"`
+	// The status of the item. One of `in_progress`, `completed`, or
+	// `incomplete`. Populated when items are returned via API.
+	//
+	Status FunctionCallOutputStatusEnum `json:"status"`
+}
+
+type FunctionToolCallOutputResource struct {
+	FunctionToolCallOutput
+	FunctionToolCallOutputResourceAllOf2
+}
+
 // The results of a web search tool call. See the
 // [web search guide](/docs/guides/tools-web-search) for more information.
 type WebSearchToolCall struct {
@@ -3515,6 +3493,24 @@ const (
 	ComputerToolCallTypeComputerCall ComputerToolCallType = "computer_call"
 )
 
+type ComputerToolCallOutputResourceAllOf2 struct {
+	// The identifier of the actor that created the item.
+	//
+	CreatedBy *string `json:"created_by,omitempty"`
+	// The unique ID of the computer call tool output.
+	//
+	Id string `json:"id"`
+	// The status of the message input. One of `in_progress`, `completed`, or
+	// `incomplete`. Populated when input items are returned via API.
+	//
+	Status ComputerCallOutputStatus `json:"status"`
+}
+
+type ComputerToolCallOutputResource struct {
+	ComputerToolCallOutput
+	ComputerToolCallOutputResourceAllOf2
+}
+
 // A description of the chain of thought used by a reasoning model while generating
 // a response. Be sure to include these items in your `input` to the Responses API
 // for subsequent turns of a conversation if you are manually
@@ -3572,7 +3568,16 @@ type ToolSearchCall struct {
 	Id string `json:"id"`
 	// The status of the tool search call item that was recorded.
 	Status FunctionCallStatus `json:"status"`
+	// The type of the item. Always `tool_search_call`.
+	Type ToolSearchCallType `json:"type"`
 }
+
+// The type of the item. Always `tool_search_call`.
+type ToolSearchCallType string
+
+const (
+	ToolSearchCallTypeToolSearchCall ToolSearchCallType = "tool_search_call"
+)
 
 type ToolSearchOutput struct {
 	// The unique ID of the tool search call generated by the model.
@@ -3587,7 +3592,16 @@ type ToolSearchOutput struct {
 	Status FunctionCallOutputStatusEnum `json:"status"`
 	// The loaded tool definitions returned by tool search.
 	Tools []Tool `json:"tools"`
+	// The type of the item. Always `tool_search_output`.
+	Type ToolSearchOutputType `json:"type"`
 }
+
+// The type of the item. Always `tool_search_output`.
+type ToolSearchOutputType string
+
+const (
+	ToolSearchOutputTypeToolSearchOutput ToolSearchOutputType = "tool_search_output"
+)
 
 // A compaction item generated by the [`v1/responses/compact` API](/docs/api-reference/responses/compact).
 type CompactionBody struct {
@@ -3597,31 +3611,28 @@ type CompactionBody struct {
 	EncryptedContent string `json:"encrypted_content"`
 	// The unique ID of the compaction item.
 	Id string `json:"id"`
+	// The type of the item. Always `compaction`.
+	Type CompactionBodyType `json:"type"`
 }
+
+// The type of the item. Always `compaction`.
+type CompactionBodyType string
+
+const (
+	CompactionBodyTypeCompaction CompactionBodyType = "compaction"
+)
 
 // An image generation request made by the model.
 type ImageGenToolCall struct {
-	// The image generation action performed by the model.
-	//
-	Action *ImageGenToolCallAction `json:"action,omitempty"`
-	// The background setting used for the generated image.
-	//
-	Background *ImageGenToolCallBackground `json:"background,omitempty"`
 	// The unique ID of the image generation call.
 	//
 	Id string `json:"id"`
 	// The output format of the generated image.
 	//
 	OutputFormat *string `json:"output_format,omitempty"`
-	// The quality of the generated image.
-	//
-	Quality *ImageGenToolCallQuality `json:"quality,omitempty"`
 	// The generated image encoded in base64.
 	//
 	Result *string `json:"result"`
-	// The revised prompt used to generate the image.
-	//
-	RevisedPrompt *string `json:"revised_prompt,omitempty"`
 	// The size of the generated image.
 	//
 	Size *string `json:"size,omitempty"`
@@ -3632,33 +3643,6 @@ type ImageGenToolCall struct {
 	//
 	Type ImageGenToolCallType `json:"type"`
 }
-
-// The image generation action performed by the model.
-type ImageGenToolCallAction string
-
-const (
-	ImageGenToolCallActionGenerate ImageGenToolCallAction = "generate"
-	ImageGenToolCallActionEdit     ImageGenToolCallAction = "edit"
-)
-
-// The background setting used for the generated image.
-type ImageGenToolCallBackground string
-
-const (
-	ImageGenToolCallBackgroundTransparent ImageGenToolCallBackground = "transparent"
-	ImageGenToolCallBackgroundOpaque      ImageGenToolCallBackground = "opaque"
-	ImageGenToolCallBackgroundAuto        ImageGenToolCallBackground = "auto"
-)
-
-// The quality of the generated image.
-type ImageGenToolCallQuality string
-
-const (
-	ImageGenToolCallQualityLow    ImageGenToolCallQuality = "low"
-	ImageGenToolCallQualityMedium ImageGenToolCallQuality = "medium"
-	ImageGenToolCallQualityHigh   ImageGenToolCallQuality = "high"
-	ImageGenToolCallQualityAuto   ImageGenToolCallQuality = "auto"
-)
 
 // The status of the image generation call.
 type ImageGenToolCallStatus string
@@ -3811,6 +3795,38 @@ const (
 	LocalShellToolCallTypeLocalShellCall LocalShellToolCallType = "local_shell_call"
 )
 
+// The output of a local shell tool call.
+type LocalShellToolCallOutput struct {
+	// The unique ID of the local shell tool call generated by the model.
+	//
+	Id string `json:"id"`
+	// A JSON string of the output of the local shell tool call.
+	//
+	Output string `json:"output"`
+	// The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+	//
+	Status *LocalShellToolCallOutputStatus `json:"status,omitempty"`
+	// The type of the local shell tool call output. Always `local_shell_call_output`.
+	//
+	Type LocalShellToolCallOutputType `json:"type"`
+}
+
+// The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+type LocalShellToolCallOutputStatus string
+
+const (
+	LocalShellToolCallOutputStatusInProgress LocalShellToolCallOutputStatus = "in_progress"
+	LocalShellToolCallOutputStatusCompleted  LocalShellToolCallOutputStatus = "completed"
+	LocalShellToolCallOutputStatusIncomplete LocalShellToolCallOutputStatus = "incomplete"
+)
+
+// The type of the local shell tool call output. Always `local_shell_call_output`.
+type LocalShellToolCallOutputType string
+
+const (
+	LocalShellToolCallOutputTypeLocalShellCallOutput LocalShellToolCallOutputType = "local_shell_call_output"
+)
+
 // A tool call that executes one or more shell commands in a managed environment.
 type FunctionShellCall struct {
 	// The shell commands and limits that describe how to run the tool call.
@@ -3824,6 +3840,8 @@ type FunctionShellCall struct {
 	Id string `json:"id"`
 	// The status of the shell call. One of `in_progress`, `completed`, or `incomplete`.
 	Status LocalShellCallStatus `json:"status"`
+	// The type of the item. Always `shell_call`.
+	Type FunctionShellCallType `json:"type"`
 }
 
 type FunctionShellCallEnvironment struct {
@@ -3886,6 +3904,13 @@ func (u *FunctionShellCallEnvironment) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// The type of the item. Always `shell_call`.
+type FunctionShellCallType string
+
+const (
+	FunctionShellCallTypeShellCall FunctionShellCallType = "shell_call"
+)
+
 // The output of a shell tool call that was emitted.
 type FunctionShellCallOutput struct {
 	// The unique ID of the shell tool call generated by the model.
@@ -3900,7 +3925,16 @@ type FunctionShellCallOutput struct {
 	Output []FunctionShellCallOutputContent `json:"output"`
 	// The status of the shell call output. One of `in_progress`, `completed`, or `incomplete`.
 	Status LocalShellCallOutputStatusEnum `json:"status"`
+	// The type of the shell call output. Always `shell_call_output`.
+	Type FunctionShellCallOutputType `json:"type"`
 }
+
+// The type of the shell call output. Always `shell_call_output`.
+type FunctionShellCallOutputType string
+
+const (
+	FunctionShellCallOutputTypeShellCallOutput FunctionShellCallOutputType = "shell_call_output"
+)
 
 // A tool call that applies file diffs by creating, deleting, or updating files.
 type ApplyPatchToolCall struct {
@@ -3914,6 +3948,8 @@ type ApplyPatchToolCall struct {
 	Operation ApplyPatchToolCallOperation `json:"operation"`
 	// The status of the apply patch tool call. One of `in_progress` or `completed`.
 	Status ApplyPatchCallStatus `json:"status"`
+	// The type of the item. Always `apply_patch_call`.
+	Type ApplyPatchToolCallType `json:"type"`
 }
 
 // One of the create_file, delete_file, or update_file operations applied via apply_patch.
@@ -3993,6 +4029,13 @@ func (u *ApplyPatchToolCallOperation) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// The type of the item. Always `apply_patch_call`.
+type ApplyPatchToolCallType string
+
+const (
+	ApplyPatchToolCallTypeApplyPatchCall ApplyPatchToolCallType = "apply_patch_call"
+)
+
 // The output emitted by an apply patch tool call.
 type ApplyPatchToolCallOutput struct {
 	// The unique ID of the apply patch tool call generated by the model.
@@ -4005,7 +4048,16 @@ type ApplyPatchToolCallOutput struct {
 	Output *string `json:"output,omitempty"`
 	// The status of the apply patch tool call output. One of `completed` or `failed`.
 	Status ApplyPatchCallOutputStatus `json:"status"`
+	// The type of the item. Always `apply_patch_call_output`.
+	Type ApplyPatchToolCallOutputType `json:"type"`
 }
+
+// The type of the item. Always `apply_patch_call_output`.
+type ApplyPatchToolCallOutputType string
+
+const (
+	ApplyPatchToolCallOutputTypeApplyPatchCallOutput ApplyPatchToolCallOutputType = "apply_patch_call_output"
+)
 
 // An invocation of a tool on an MCP server.
 type MCPToolCall struct {
@@ -4098,6 +4150,32 @@ const (
 	MCPApprovalRequestTypeMcpApprovalRequest MCPApprovalRequestType = "mcp_approval_request"
 )
 
+// A response to an MCP approval request.
+type MCPApprovalResponseResource struct {
+	// The ID of the approval request being answered.
+	//
+	ApprovalRequestId string `json:"approval_request_id"`
+	// Whether the request was approved.
+	//
+	Approve bool `json:"approve"`
+	// The unique ID of the approval response
+	//
+	Id string `json:"id"`
+	// Optional reason for the decision.
+	//
+	Reason *string `json:"reason,omitempty"`
+	// The type of the item. Always `mcp_approval_response`.
+	//
+	Type MCPApprovalResponseResourceType `json:"type"`
+}
+
+// The type of the item. Always `mcp_approval_response`.
+type MCPApprovalResponseResourceType string
+
+const (
+	MCPApprovalResponseResourceTypeMcpApprovalResponse MCPApprovalResponseResourceType = "mcp_approval_response"
+)
+
 // A call to a custom tool created by the model.
 type CustomToolCall struct {
 	// An identifier used to map this custom tool call to a tool call output.
@@ -4126,6 +4204,24 @@ type CustomToolCallType string
 const (
 	CustomToolCallTypeCustomToolCall CustomToolCallType = "custom_tool_call"
 )
+
+type CustomToolCallOutputResourceAllOf2 struct {
+	// The identifier of the actor that created the item.
+	//
+	CreatedBy *string `json:"created_by,omitempty"`
+	// The unique ID of the custom tool call output item.
+	//
+	Id string `json:"id"`
+	// The status of the item. One of `in_progress`, `completed`, or
+	// `incomplete`. Populated when items are returned via API.
+	//
+	Status FunctionCallOutputStatusEnum `json:"status"`
+}
+
+type CustomToolCallOutputResource struct {
+	CustomToolCallOutput
+	CustomToolCallOutputResourceAllOf2
+}
 
 type OutputContent struct {
 	OutputText    *OutputTextContent
@@ -4269,7 +4365,7 @@ func (u *ResponsePromptVariablesValue) UnmarshalJSON(data []byte) error {
 		u.ResponsePromptVariablesValueString = &v
 		return nil
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "input_text" && value["type"] != nil && value["text"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "input_text") && value["type"] != nil && value["text"] != nil {
 			var v InputTextContent
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4277,7 +4373,7 @@ func (u *ResponsePromptVariablesValue) UnmarshalJSON(data []byte) error {
 			u.InputTextContent = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "input_image" && value["type"] != nil && value["detail"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "input_image") && value["type"] != nil && value["detail"] != nil {
 			var v InputImageContent
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4285,7 +4381,7 @@ func (u *ResponsePromptVariablesValue) UnmarshalJSON(data []byte) error {
 			u.InputImageContent = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "input_file" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "input_file") && value["type"] != nil {
 			var v InputFileContent
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4682,7 +4778,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 	*u = Tool{}
 	switch value := raw.(type) {
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "function" && value["type"] != nil && value["name"] != nil && value["strict"] != nil && value["parameters"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "function") && value["type"] != nil && value["name"] != nil && value["strict"] != nil && value["parameters"] != nil {
 			var v FunctionTool
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4690,7 +4786,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.FunctionTool = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "computer_use_preview" && value["type"] != nil && value["environment"] != nil && value["display_width"] != nil && value["display_height"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "computer_use_preview") && value["type"] != nil && value["environment"] != nil && value["display_width"] != nil && value["display_height"] != nil {
 			var v ComputerUsePreviewTool
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4698,7 +4794,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.ComputerUsePreviewTool = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "namespace" && value["type"] != nil && value["name"] != nil && value["description"] != nil && value["tools"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "namespace") && value["type"] != nil && value["name"] != nil && value["description"] != nil && value["tools"] != nil {
 			var v NamespaceToolParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4706,7 +4802,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.NamespaceToolParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "file_search" && value["type"] != nil && value["vector_store_ids"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "file_search") && value["type"] != nil && value["vector_store_ids"] != nil {
 			var v FileSearchTool
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4714,7 +4810,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.FileSearchTool = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "mcp" && value["type"] != nil && value["server_label"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "mcp") && value["type"] != nil && value["server_label"] != nil {
 			var v MCPTool
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4722,7 +4818,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.MCPTool = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "code_interpreter" && value["type"] != nil && value["container"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "code_interpreter") && value["type"] != nil && value["container"] != nil {
 			var v CodeInterpreterTool
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4730,7 +4826,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.CodeInterpreterTool = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "custom" && value["type"] != nil && value["name"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "custom") && value["type"] != nil && value["name"] != nil {
 			var v CustomToolParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4738,7 +4834,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.CustomToolParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "computer" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "computer") && value["type"] != nil {
 			var v ComputerTool
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4746,7 +4842,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.ComputerTool = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "image_generation" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "image_generation") && value["type"] != nil {
 			var v ImageGenTool
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4754,7 +4850,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.ImageGenTool = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "local_shell" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "local_shell") && value["type"] != nil {
 			var v LocalShellToolParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4762,7 +4858,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.LocalShellToolParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "shell" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "shell") && value["type"] != nil {
 			var v FunctionShellToolParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4770,7 +4866,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.FunctionShellToolParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "tool_search" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "tool_search") && value["type"] != nil {
 			var v ToolSearchToolParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -4778,7 +4874,7 @@ func (u *Tool) UnmarshalJSON(data []byte) error {
 			u.ToolSearchToolParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "apply_patch" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch") && value["type"] != nil {
 			var v ApplyPatchToolParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -5093,38 +5189,6 @@ type CompactionSummaryItemParamType string
 
 const (
 	CompactionSummaryItemParamTypeCompaction CompactionSummaryItemParamType = "compaction"
-)
-
-// The output of a local shell tool call.
-type LocalShellToolCallOutput struct {
-	// The unique ID of the local shell tool call generated by the model.
-	//
-	Id string `json:"id"`
-	// A JSON string of the output of the local shell tool call.
-	//
-	Output string `json:"output"`
-	// The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-	//
-	Status *LocalShellToolCallOutputStatus `json:"status,omitempty"`
-	// The type of the local shell tool call output. Always `local_shell_call_output`.
-	//
-	Type LocalShellToolCallOutputType `json:"type"`
-}
-
-// The status of the item. One of `in_progress`, `completed`, or `incomplete`.
-type LocalShellToolCallOutputStatus string
-
-const (
-	LocalShellToolCallOutputStatusInProgress LocalShellToolCallOutputStatus = "in_progress"
-	LocalShellToolCallOutputStatusCompleted  LocalShellToolCallOutputStatus = "completed"
-	LocalShellToolCallOutputStatusIncomplete LocalShellToolCallOutputStatus = "incomplete"
-)
-
-// The type of the local shell tool call output. Always `local_shell_call_output`.
-type LocalShellToolCallOutputType string
-
-const (
-	LocalShellToolCallOutputTypeLocalShellCallOutput LocalShellToolCallOutputType = "local_shell_call_output"
 )
 
 // A tool representing a request to execute one or more shell commands.
@@ -5504,6 +5568,104 @@ func (u *VectorStoreFileAttributesValue) UnmarshalJSON(data []byte) error {
 // length of 512 characters, booleans, or numbers.
 type VectorStoreFileAttributes map[string]VectorStoreFileAttributesValue
 
+// The output of a function tool call.
+type FunctionToolCallOutput struct {
+	// The unique ID of the function tool call generated by the model.
+	//
+	CallId string `json:"call_id"`
+	// The unique ID of the function tool call output. Populated when this item
+	// is returned via API.
+	//
+	Id *string `json:"id,omitempty"`
+	// The output from the function call generated by your code.
+	// Can be a string or an list of output content.
+	//
+	Output FunctionToolCallOutputOutput `json:"output"`
+	// The status of the item. One of `in_progress`, `completed`, or
+	// `incomplete`. Populated when items are returned via API.
+	//
+	Status *FunctionToolCallOutputStatus `json:"status,omitempty"`
+	// The type of the function tool call output. Always `function_call_output`.
+	//
+	Type FunctionToolCallOutputType `json:"type"`
+}
+
+// A string of the output of the function call.
+type FunctionToolCallOutputOutputString *string
+
+// Text, image, or file output of the function call.
+type FunctionToolCallOutputOutputArray []FunctionAndCustomToolCallOutput
+
+// The output from the function call generated by your code.
+// Can be a string or an list of output content.
+type FunctionToolCallOutputOutput struct {
+	FunctionToolCallOutputOutputString *FunctionToolCallOutputOutputString
+	FunctionToolCallOutputOutputArray  *FunctionToolCallOutputOutputArray
+}
+
+func (u *FunctionToolCallOutputOutput) MarshalJSON() ([]byte, error) {
+	if u == nil {
+		return []byte("null"), nil
+	}
+	if u.FunctionToolCallOutputOutputString != nil {
+		return json.Marshal(u.FunctionToolCallOutputOutputString)
+	}
+	if u.FunctionToolCallOutputOutputArray != nil {
+		return json.Marshal(u.FunctionToolCallOutputOutputArray)
+	}
+	return nil, errors.New("invalid FunctionToolCallOutputOutput: all variants are nil")
+}
+
+func (u *FunctionToolCallOutputOutput) UnmarshalJSON(data []byte) error {
+	var raw interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*u = FunctionToolCallOutputOutput{}
+	switch raw.(type) {
+	case string:
+		var v FunctionToolCallOutputOutputString
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		u.FunctionToolCallOutputOutputString = &v
+		return nil
+	case []interface{}:
+		var v FunctionToolCallOutputOutputArray
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		u.FunctionToolCallOutputOutputArray = &v
+		return nil
+	}
+	return errors.New("invalid FunctionToolCallOutputOutput")
+}
+
+// The status of the item. One of `in_progress`, `completed`, or
+// `incomplete`. Populated when items are returned via API.
+type FunctionToolCallOutputStatus string
+
+const (
+	FunctionToolCallOutputStatusInProgress FunctionToolCallOutputStatus = "in_progress"
+	FunctionToolCallOutputStatusCompleted  FunctionToolCallOutputStatus = "completed"
+	FunctionToolCallOutputStatusIncomplete FunctionToolCallOutputStatus = "incomplete"
+)
+
+// The type of the function tool call output. Always `function_call_output`.
+type FunctionToolCallOutputType string
+
+const (
+	FunctionToolCallOutputTypeFunctionCallOutput FunctionToolCallOutputType = "function_call_output"
+)
+
+type FunctionCallOutputStatusEnum string
+
+const (
+	FunctionCallOutputStatusEnumInProgress FunctionCallOutputStatusEnum = "in_progress"
+	FunctionCallOutputStatusEnumCompleted  FunctionCallOutputStatusEnum = "completed"
+	FunctionCallOutputStatusEnumIncomplete FunctionCallOutputStatusEnum = "incomplete"
+)
+
 // Action type "search" - Performs a web search query.
 type WebSearchActionSearch struct {
 	// The search queries.
@@ -5737,6 +5899,53 @@ type ComputerCallSafetyCheckParam struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// The output of a computer tool call.
+type ComputerToolCallOutput struct {
+	// The safety checks reported by the API that have been acknowledged by the
+	// developer.
+	//
+	AcknowledgedSafetyChecks []ComputerCallSafetyCheckParam `json:"acknowledged_safety_checks,omitempty"`
+	// The ID of the computer tool call that produced the output.
+	//
+	CallId string `json:"call_id"`
+	// The ID of the computer tool call output.
+	//
+	Id     *string                 `json:"id,omitempty"`
+	Output ComputerScreenshotImage `json:"output"`
+	// The status of the message input. One of `in_progress`, `completed`, or
+	// `incomplete`. Populated when input items are returned via API.
+	//
+	Status *ComputerToolCallOutputStatus `json:"status,omitempty"`
+	// The type of the computer tool call output. Always `computer_call_output`.
+	//
+	Type ComputerToolCallOutputType `json:"type"`
+}
+
+// The status of the message input. One of `in_progress`, `completed`, or
+// `incomplete`. Populated when input items are returned via API.
+type ComputerToolCallOutputStatus string
+
+const (
+	ComputerToolCallOutputStatusInProgress ComputerToolCallOutputStatus = "in_progress"
+	ComputerToolCallOutputStatusCompleted  ComputerToolCallOutputStatus = "completed"
+	ComputerToolCallOutputStatusIncomplete ComputerToolCallOutputStatus = "incomplete"
+)
+
+// The type of the computer tool call output. Always `computer_call_output`.
+type ComputerToolCallOutputType string
+
+const (
+	ComputerToolCallOutputTypeComputerCallOutput ComputerToolCallOutputType = "computer_call_output"
+)
+
+type ComputerCallOutputStatus string
+
+const (
+	ComputerCallOutputStatusCompleted  ComputerCallOutputStatus = "completed"
+	ComputerCallOutputStatusIncomplete ComputerCallOutputStatus = "incomplete"
+	ComputerCallOutputStatusFailed     ComputerCallOutputStatus = "failed"
+)
+
 // Reasoning text from the model.
 type ReasoningTextContent struct {
 	// The reasoning text from the model.
@@ -5780,14 +5989,6 @@ const (
 	FunctionCallStatusInProgress FunctionCallStatus = "in_progress"
 	FunctionCallStatusCompleted  FunctionCallStatus = "completed"
 	FunctionCallStatusIncomplete FunctionCallStatus = "incomplete"
-)
-
-type FunctionCallOutputStatusEnum string
-
-const (
-	FunctionCallOutputStatusEnumInProgress FunctionCallOutputStatusEnum = "in_progress"
-	FunctionCallOutputStatusEnumCompleted  FunctionCallOutputStatusEnum = "completed"
-	FunctionCallOutputStatusEnumIncomplete FunctionCallOutputStatusEnum = "incomplete"
 )
 
 // The logs output from the code interpreter.
@@ -6045,6 +6246,8 @@ const (
 
 // A file input to the model.
 type InputFileContent struct {
+	// The detail level of the file to be sent to the model. Use `low` for the default rendering behavior, or `high` to render the file at higher quality. Defaults to `low`.
+	Detail *FileInputDetail `json:"detail,omitempty"`
 	// The content of the file to be sent to the model.
 	//
 	FileData *string `json:"file_data,omitempty"`
@@ -6452,7 +6655,7 @@ func (u *CodeInterpreterToolContainer) UnmarshalJSON(data []byte) error {
 		u.CodeInterpreterToolContainerString = &v
 		return nil
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "auto" && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "auto") && value["type"] != nil {
 			var v AutoCodeInterpreterToolParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return err
@@ -7019,6 +7222,8 @@ type InputImageContentParamAutoParam struct {
 
 // A file input to the model.
 type InputFileContentParam struct {
+	// The detail level of the file to be sent to the model. Use `low` for the default rendering behavior, or `high` to render the file at higher quality. Defaults to `low`.
+	Detail *FileDetailEnum `json:"detail,omitempty"`
 	// The base64-encoded data of the file to be sent to the model.
 	FileData *string `json:"file_data,omitempty"`
 	// The ID of the file to be sent to the model.
@@ -7439,6 +7644,13 @@ const (
 	ImageDetailOriginal ImageDetail = "original"
 )
 
+type FileInputDetail string
+
+const (
+	FileInputDetailLow  FileInputDetail = "low"
+	FileInputDetailHigh FileInputDetail = "high"
+)
+
 // The schema for the response format, described as a JSON Schema object.
 // Learn how to build JSON schemas [here](https://json-schema.org/).
 type ResponseFormatJsonSchemaSchema any
@@ -7832,6 +8044,13 @@ const (
 	DetailEnumHigh     DetailEnum = "high"
 	DetailEnumAuto     DetailEnum = "auto"
 	DetailEnumOriginal DetailEnum = "original"
+)
+
+type FileDetailEnum string
+
+const (
+	FileDetailEnumLow  FileDetailEnum = "low"
+	FileDetailEnumHigh FileDetailEnum = "high"
 )
 
 type LocalSkillParam struct {

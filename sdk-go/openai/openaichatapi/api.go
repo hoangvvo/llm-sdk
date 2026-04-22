@@ -1520,7 +1520,7 @@ type ModelResponseProperties struct {
 type ModelResponsePropertiesPromptCacheRetention string
 
 const (
-	ModelResponsePropertiesPromptCacheRetentionInMemory ModelResponsePropertiesPromptCacheRetention = "in-memory"
+	ModelResponsePropertiesPromptCacheRetentionInMemory ModelResponsePropertiesPromptCacheRetention = "in_memory"
 	ModelResponsePropertiesPromptCacheRetentionN24H     ModelResponsePropertiesPromptCacheRetention = "24h"
 )
 

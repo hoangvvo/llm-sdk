@@ -380,7 +380,7 @@ function renderGoObjectUntaggedCaseBody(
     }
     if (match.discriminator) {
       conditions.push(
-        `raw${toGoFieldName(match.discriminator.property)}, ok := value[${JSON.stringify(match.discriminator.property)}]; !ok || raw${toGoFieldName(match.discriminator.property)} == ${JSON.stringify(match.discriminator.value)}`,
+        `raw${toGoFieldName(match.discriminator.property)}, ok := value[${JSON.stringify(match.discriminator.property)}]; (!ok || raw${toGoFieldName(match.discriminator.property)} == ${JSON.stringify(match.discriminator.value)})`,
       );
     }
     if (match.requiredProperties.length > 0) {

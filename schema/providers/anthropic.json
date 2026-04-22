@@ -137,6 +137,7 @@
           "title": "System"
         },
         "temperature": {
+          "deprecated": true,
           "description": "Amount of randomness injected into the response.\n\nDefaults to `1.0`. Ranges from `0.0` to `1.0`. Use `temperature` closer to `0.0` for analytical / multiple choice, and closer to `1.0` for creative and generative tasks.\n\nNote that even with `temperature` of `0.0`, the results will not be fully deterministic.",
           "examples": [
             1
@@ -144,7 +145,8 @@
           "maximum": 1,
           "minimum": 0,
           "title": "Temperature",
-          "type": "number"
+          "type": "number",
+          "x-stainless-deprecation-message": "Deprecated. Models released after Claude Opus 4.6 do not support setting temperature. A value of 1.0 of will be accepted for backwards compatibility, all other values will be rejected with a 400 error."
         },
         "thinking": {
           "$ref": "#/definitions/ThinkingConfigParam"
@@ -232,15 +234,18 @@
           "type": "array"
         },
         "top_k": {
+          "deprecated": true,
           "description": "Only sample from the top K options for each subsequent token.\n\nUsed to remove \"long tail\" low probability responses. [Learn more technical details here](https://towardsdatascience.com/how-to-sample-from-language-models-682bceb97277).\n\nRecommended for advanced use cases only. You usually only need to use `temperature`.",
           "examples": [
             5
           ],
           "minimum": 0,
           "title": "Top K",
-          "type": "integer"
+          "type": "integer",
+          "x-stainless-deprecation-message": "Deprecated. Models released after Claude Opus 4.6 do not accept top_k; any value will be rejected with a 400 error."
         },
         "top_p": {
+          "deprecated": true,
           "description": "Use nucleus sampling.\n\nIn nucleus sampling, we compute the cumulative distribution over all the options for each subsequent token in decreasing probability order and cut it off once it reaches a particular probability specified by `top_p`. You should either alter `temperature` or `top_p`, but not both.\n\nRecommended for advanced use cases only. You usually only need to use `temperature`.",
           "examples": [
             0.7
@@ -248,7 +253,8 @@
           "maximum": 1,
           "minimum": 0,
           "title": "Top P",
-          "type": "number"
+          "type": "number",
+          "x-stainless-deprecation-message": "Deprecated. Models released after Claude Opus 4.6 do not support setting top_p. A value >= 0.99 will be accepted for backwards compatibility, all other values will be rejected with a 400 error."
         }
       },
       "required": [
@@ -272,6 +278,7 @@
           "id": "msg_013Zva2CMHLNnXjNJJKqJ2EF",
           "model": "claude-opus-4-6",
           "role": "assistant",
+          "stop_details": null,
           "stop_reason": "end_turn",
           "stop_sequence": null,
           "type": "message",
@@ -329,6 +336,18 @@
           "title": "Role",
           "type": "string"
         },
+        "stop_details": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RefusalStopDetails"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Structured information about why model output stopped.\n\nThis is `null` when the `stop_reason` has no additional detail to report."
+        },
         "stop_reason": {
           "anyOf": [
             {
@@ -380,6 +399,7 @@
         "model",
         "stop_reason",
         "stop_sequence",
+        "stop_details",
         "usage",
         "container"
       ],
@@ -550,8 +570,18 @@
           "type": "string"
         },
         {
+          "const": "claude-opus-4-7",
+          "description": "Frontier intelligence for long-running agents and coding",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-mythos-preview",
+          "description": "New class of intelligence, strongest in coding and cybersecurity",
+          "x-stainless-nominal": false
+        },
+        {
           "const": "claude-opus-4-6",
-          "description": "Most intelligent model for building agents and coding",
+          "description": "Frontier intelligence for long-running agents and coding",
           "x-stainless-nominal": false
         },
         {
@@ -601,22 +631,30 @@
         },
         {
           "const": "claude-opus-4-0",
+          "deprecated": true,
           "description": "Powerful model for complex tasks",
+          "x-stainless-deprecation-message": "Will reach end-of-life on June 15th, 2026. Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.",
           "x-stainless-nominal": false
         },
         {
           "const": "claude-opus-4-20250514",
+          "deprecated": true,
           "description": "Powerful model for complex tasks",
+          "x-stainless-deprecation-message": "Will reach end-of-life on June 15th, 2026. Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.",
           "x-stainless-nominal": false
         },
         {
           "const": "claude-sonnet-4-0",
+          "deprecated": true,
           "description": "High-performance model with extended thinking",
+          "x-stainless-deprecation-message": "Will reach end-of-life on June 15th, 2026. Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.",
           "x-stainless-nominal": false
         },
         {
           "const": "claude-sonnet-4-20250514",
+          "deprecated": true,
           "description": "High-performance model with extended thinking",
+          "x-stainless-deprecation-message": "Will reach end-of-life on June 15th, 2026. Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.",
           "x-stainless-nominal": false
         },
         {
@@ -2298,6 +2336,54 @@
         }
       ]
     },
+    "RefusalStopDetails": {
+      "description": "Structured information about a refusal.",
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "enum": [
+                "cyber",
+                "bio"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The policy category that triggered the refusal.\n\n`null` when the refusal doesn't map to a named category.",
+          "title": "Category"
+        },
+        "explanation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable explanation of the refusal.\n\nThis text is not guaranteed to be stable. `null` when no explanation is available for the category.",
+          "title": "Explanation"
+        },
+        "type": {
+          "const": "refusal",
+          "default": "refusal",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "explanation",
+        "type"
+      ],
+      "title": "RefusalStopDetails",
+      "type": "object"
+    },
     "StopReason": {
       "enum": [
         "end_turn",
@@ -2771,6 +2857,7 @@
         "low",
         "medium",
         "high",
+        "xhigh",
         "max"
       ],
       "title": "EffortLevel",
@@ -4079,6 +4166,18 @@
           "default": null,
           "description": "Information about the container used in this request.\n\nThis will be non-null if a container tool (e.g. code execution) was used."
         },
+        "stop_details": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RefusalStopDetails"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Structured information about why model output stopped.\n\nThis is `null` when the `stop_reason` has no additional detail to report."
+        },
         "stop_reason": {
           "anyOf": [
             {
@@ -4106,6 +4205,7 @@
       },
       "required": [
         "container",
+        "stop_details",
         "stop_reason",
         "stop_sequence"
       ],

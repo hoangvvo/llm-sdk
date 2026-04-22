@@ -1,6 +1,7 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
 #![allow(clippy::doc_markdown)]
+#![allow(clippy::too_many_lines)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -334,6 +335,11 @@ pub struct Message {
     ///
     /// This will always be `"assistant"`.
     pub role: String,
+    /// Structured information about why model output stopped.
+    ///
+    /// This is `null` when the `stop_reason` has no additional detail to
+    /// report.
+    pub stop_details: Option<RefusalStopDetails>,
     /// The reason that we stopped.
     ///
     /// This may be one the following values:
@@ -1213,6 +1219,32 @@ pub enum ContentBlock {
     ContainerUpload(ResponseContainerUploadBlock),
 }
 
+/// Structured information about a refusal.
+#[derive(Serialize, Deserialize)]
+pub struct RefusalStopDetails {
+    /// The policy category that triggered the refusal.
+    ///
+    /// `null` when the refusal doesn't map to a named category.
+    pub category: Option<RefusalStopDetailsCategory>,
+    /// Human-readable explanation of the refusal.
+    ///
+    /// This text is not guaranteed to be stable. `null` when no explanation is
+    /// available for the category.
+    pub explanation: Option<String>,
+    pub r#type: String,
+}
+
+/// The policy category that triggered the refusal.
+///
+/// `null` when the refusal doesn't map to a named category.
+#[derive(Serialize, Deserialize)]
+pub enum RefusalStopDetailsCategory {
+    #[serde(rename = "cyber")]
+    Cyber,
+    #[serde(rename = "bio")]
+    Bio,
+}
+
 #[derive(Serialize, Deserialize)]
 pub enum StopReason {
     #[serde(rename = "end_turn")]
@@ -1397,6 +1429,8 @@ pub enum EffortLevel {
     Medium,
     #[serde(rename = "high")]
     High,
+    #[serde(rename = "xhigh")]
+    Xhigh,
     #[serde(rename = "max")]
     Max,
 }
@@ -1852,6 +1886,11 @@ pub struct MessageDelta {
     /// This will be non-null if a container tool (e.g. code execution) was
     /// used.
     pub container: Option<Container>,
+    /// Structured information about why model output stopped.
+    ///
+    /// This is `null` when the `stop_reason` has no additional detail to
+    /// report.
+    pub stop_details: Option<RefusalStopDetails>,
     pub stop_reason: Option<StopReason>,
     pub stop_sequence: Option<String>,
 }

@@ -557,6 +557,9 @@ pub type ResponseModalities = Option<Option<Vec<ResponseModalitiesValueItem>>>;
 
 pub type ModelIdsShared = Option<String>;
 
+/// Whether to enable [parallel function
+/// calling](/docs/guides/function-calling#
+/// configuring-parallel-function-calling) during tool use.
 pub type ParallelToolCalls = Option<bool>;
 
 /// Static predicted output content, such as the content of a text file that is
@@ -1196,7 +1199,7 @@ pub struct ModelResponseProperties {
 /// more](/docs/guides/prompt-caching#prompt-cache-retention).
 #[derive(Serialize, Deserialize)]
 pub enum ModelResponsePropertiesPromptCacheRetention {
-    #[serde(rename = "in-memory")]
+    #[serde(rename = "in_memory")]
     InMemory,
     #[serde(rename = "24h")]
     N24H,

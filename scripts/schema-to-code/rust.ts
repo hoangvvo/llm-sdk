@@ -17,13 +17,22 @@ import type {
 const execFileAsync = promisify(execFile);
 
 export function renderRustDocument(document: CodegenDocument): string {
+  const needsValueImport =
+    document.usesJsonValue ||
+    document.declarations.some(
+      (declaration) =>
+        declaration.kind === "union" &&
+        declaration.representation === "untagged" &&
+        declaration.untaggedDeserializeStrategy === "placeholder",
+    );
   const attributes = [
     "#![allow(clippy::enum_variant_names)]",
     "#![allow(clippy::struct_field_names)]",
     "#![allow(clippy::doc_markdown)]",
+    "#![allow(clippy::too_many_lines)]",
   ];
   const imports = ["use serde::{Deserialize, Serialize};"];
-  if (document.usesJsonValue) {
+  if (needsValueImport) {
     imports.push("use serde_json::Value;");
   }
   if (document.usesMap) {
@@ -171,20 +180,222 @@ function renderRustUnion(declaration: UnionDeclaration): string {
   }
   lines.push("}");
   if (usesPlaceholderDeserialize) {
-    lines.push("");
-    lines.push(`impl<'de> Deserialize<'de> for ${declaration.name} {`);
-    lines.push(
-      "    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>",
-    );
-    lines.push("    where");
-    lines.push("        D: serde::Deserializer<'de>,");
-    lines.push("    {");
-    lines.push("        let _ = deserializer;");
-    lines.push('        todo!("fill in untagged union deserialization");');
-    lines.push("    }");
-    lines.push("}");
+    lines.push(...renderRustUntaggedDeserialize(declaration));
   }
   return lines.join("\n");
+}
+
+function renderRustUntaggedDeserialize(declaration: UnionDeclaration): string[] {
+  const lines: string[] = [];
+  lines.push("");
+  lines.push(`impl<'de> Deserialize<'de> for ${declaration.name} {`);
+  lines.push("    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>");
+  lines.push("    where");
+  lines.push("        D: serde::Deserializer<'de>,");
+  lines.push("    {");
+  lines.push("        let value = Value::deserialize(deserializer)?;");
+  lines.push("        match &value {");
+
+  const stringVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "string",
+  );
+  if (stringVariants.length > 0) {
+    lines.push("            Value::String(_) => {");
+    lines.push(
+      ...renderRustUntaggedPrimitiveCaseBody(
+        stringVariants,
+        declaration.name,
+        "string",
+      ),
+    );
+    lines.push("            }");
+  }
+
+  const numberVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "number",
+  );
+  if (numberVariants.length > 0) {
+    lines.push("            Value::Number(_) => {");
+    lines.push(
+      ...renderRustUntaggedPrimitiveCaseBody(
+        numberVariants,
+        declaration.name,
+        "number",
+      ),
+    );
+    lines.push("            }");
+  }
+
+  const booleanVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "boolean",
+  );
+  if (booleanVariants.length > 0) {
+    lines.push("            Value::Bool(_) => {");
+    lines.push(
+      ...renderRustUntaggedPrimitiveCaseBody(
+        booleanVariants,
+        declaration.name,
+        "boolean",
+      ),
+    );
+    lines.push("            }");
+  }
+
+  const arrayVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "array",
+  );
+  if (arrayVariants.length > 0) {
+    lines.push("            Value::Array(_) => {");
+    lines.push(
+      ...renderRustUntaggedPrimitiveCaseBody(
+        arrayVariants,
+        declaration.name,
+        "array",
+      ),
+    );
+    lines.push("            }");
+  }
+
+  const objectVariants = declaration.variants.filter(
+    (variant) => variant.match.kind === "object",
+  );
+  if (objectVariants.length > 0) {
+    lines.push("            Value::Object(object) => {");
+    lines.push(...renderRustObjectUntaggedCaseBody(objectVariants, declaration.name));
+    lines.push("            }");
+  }
+
+  lines.push(
+    `            _ => Err(serde::de::Error::custom("invalid ${declaration.name}")),`,
+  );
+  lines.push("        }");
+  lines.push("    }");
+  lines.push("}");
+  return lines;
+}
+
+function renderRustUntaggedPrimitiveCaseBody(
+  variants: UnionDeclaration["variants"],
+  unionName: string,
+  kind: string,
+): string[] {
+  if (variants.length !== 1) {
+    throw new Error(
+      `Untagged Rust union ${unionName} (${kind}) has multiple indistinguishable variants`,
+    );
+  }
+
+  const variant = variants[0] ?? fail(`Missing variant for ${unionName}`);
+  return [
+    `                serde_json::from_value(value.clone())`,
+    `                    .map(Self::${variant.name})`,
+    "                    .map_err(serde::de::Error::custom)",
+  ];
+}
+
+function renderRustObjectUntaggedCaseBody(
+  variants: UnionDeclaration["variants"],
+  unionName: string,
+): string[] {
+  const rankedVariants = [...variants].sort((left, right) => {
+    const leftMatch =
+      left.match.kind === "object"
+        ? left.match
+        : fail(`Expected object match for ${unionName}`);
+    const rightMatch =
+      right.match.kind === "object"
+        ? right.match
+        : fail(`Expected object match for ${unionName}`);
+    const leftScore =
+      (leftMatch.nestedTaggedUnion ? 100 : 0) +
+      (leftMatch.discriminator ? 10 : 0) +
+      leftMatch.requiredProperties.length;
+    const rightScore =
+      (rightMatch.nestedTaggedUnion ? 100 : 0) +
+      (rightMatch.discriminator ? 10 : 0) +
+      rightMatch.requiredProperties.length;
+    return rightScore - leftScore;
+  });
+
+  const lines: string[] = [];
+  let hasFallbackError = true;
+
+  rankedVariants.forEach((variant, index) => {
+    if (variant.match.kind !== "object") {
+      return;
+    }
+
+    const match = variant.match;
+    let hasNestedTaggedUnion = false;
+
+    if (match.nestedTaggedUnion) {
+      hasNestedTaggedUnion = true;
+      lines.push(
+        `                if let Some(discriminator) = object.get(${JSON.stringify(
+          match.nestedTaggedUnion.property,
+        )}).and_then(Value::as_str) {`,
+      );
+      lines.push("                    match discriminator {");
+      match.nestedTaggedUnion.values.forEach((allowedValue) => {
+        lines.push(`                        ${JSON.stringify(allowedValue)} => {`);
+        lines.push(
+          `                            return serde_json::from_value(value.clone())`,
+        );
+        lines.push(`                                .map(Self::${variant.name})`);
+        lines.push("                                .map_err(serde::de::Error::custom);");
+        lines.push("                        }");
+      });
+      lines.push("                        _ => {}");
+      lines.push("                    }");
+      lines.push("                }");
+    }
+
+    const conditions: string[] = [];
+    if (match.discriminator) {
+      conditions.push(
+        `object.get(${JSON.stringify(
+          match.discriminator.property,
+        )}).map_or(true, |raw| raw.as_str() == Some(${JSON.stringify(
+          match.discriminator.value,
+        )}))`,
+      );
+    }
+    match.requiredProperties.forEach((property) => {
+      conditions.push(`object.get(${JSON.stringify(property)}).is_some()`);
+    });
+
+    if (conditions.length > 0) {
+      lines.push(`                if ${conditions.join(" && ")} {`);
+      lines.push(`                    return serde_json::from_value(value.clone())`);
+      lines.push(`                        .map(Self::${variant.name})`);
+      lines.push("                        .map_err(serde::de::Error::custom);");
+      lines.push("                }");
+      return;
+    }
+
+    if (hasNestedTaggedUnion) {
+      return;
+    }
+
+    if (index !== rankedVariants.length - 1) {
+      throw new Error(
+        `Untagged Rust union ${unionName} has an ambiguous object variant ordering`,
+      );
+    }
+
+    lines.push(`                return serde_json::from_value(value.clone())`);
+    lines.push(`                    .map(Self::${variant.name})`);
+    lines.push("                    .map_err(serde::de::Error::custom);");
+    hasFallbackError = false;
+  });
+
+  if (hasFallbackError) {
+    lines.push(
+      `                Err(serde::de::Error::custom("invalid ${unionName}"))`,
+    );
+  }
+
+  return lines;
 }
 
 function renderRustType(
