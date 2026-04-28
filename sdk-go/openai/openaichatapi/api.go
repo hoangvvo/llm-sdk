@@ -3,7 +3,6 @@ package openaichatapi
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 )
 
 type CreateChatCompletionRequestAllOf2 struct {
@@ -217,7 +216,7 @@ func (u *CreateChatCompletionRequestAllOf2FunctionCall) UnmarshalJSON(data []byt
 	case string:
 		var v CreateChatCompletionRequestAllOf2FunctionCallString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.CreateChatCompletionRequestAllOf2FunctionCallString = &v
 		return nil
@@ -225,14 +224,14 @@ func (u *CreateChatCompletionRequestAllOf2FunctionCall) UnmarshalJSON(data []byt
 		if value["name"] != nil {
 			var v ChatCompletionFunctionCallOption
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.ChatCompletionFunctionCallOption = &v
 			return nil
 		}
-		return errors.New("invalid CreateChatCompletionRequestAllOf2FunctionCall")
+		return nil
 	}
-	return errors.New("invalid CreateChatCompletionRequestAllOf2FunctionCall")
+	return nil
 }
 
 // Configuration for a [Predicted Output](/docs/guides/predicted-outputs),
@@ -263,7 +262,7 @@ func (u *CreateChatCompletionRequestAllOf2Prediction) UnmarshalJSON(data []byte)
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CreateChatCompletionRequestAllOf2Prediction")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -274,11 +273,11 @@ func (u *CreateChatCompletionRequestAllOf2Prediction) UnmarshalJSON(data []byte)
 	case "content":
 		var value PredictionContent
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Content = &value
 	default:
-		return fmt.Errorf("invalid type field in CreateChatCompletionRequestAllOf2Prediction: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -337,7 +336,7 @@ func (u *CreateChatCompletionRequestAllOf2ResponseFormat) UnmarshalJSON(data []b
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CreateChatCompletionRequestAllOf2ResponseFormat")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -348,23 +347,23 @@ func (u *CreateChatCompletionRequestAllOf2ResponseFormat) UnmarshalJSON(data []b
 	case "text":
 		var value ResponseFormatText
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "json_schema":
 		var value ResponseFormatJsonSchema
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.JsonSchema = &value
 	case "json_object":
 		var value ResponseFormatJsonObject
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.JsonObject = &value
 	default:
-		return fmt.Errorf("invalid type field in CreateChatCompletionRequestAllOf2ResponseFormat: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -403,7 +402,7 @@ func (u *CreateChatCompletionRequestAllOf2ToolsItem) UnmarshalJSON(data []byte) 
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CreateChatCompletionRequestAllOf2ToolsItem")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -414,17 +413,17 @@ func (u *CreateChatCompletionRequestAllOf2ToolsItem) UnmarshalJSON(data []byte) 
 	case "function":
 		var value ChatCompletionTool
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Function = &value
 	case "custom":
 		var value CustomToolChatCompletions
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Custom = &value
 	default:
-		return fmt.Errorf("invalid type field in CreateChatCompletionRequestAllOf2ToolsItem: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -599,6 +598,10 @@ const (
 )
 
 type CreateModelResponsePropertiesAllOf2 struct {
+	// An integer between 0 and 20 specifying the number of most likely tokens to
+	// return at each token position, each with an associated log probability.
+	//
+	TopLogprobs *int `json:"top_logprobs,omitempty"`
 }
 
 type CreateModelResponseProperties struct {
@@ -641,7 +644,7 @@ func (u *VoiceIdsOrCustomVoice) UnmarshalJSON(data []byte) error {
 	case string:
 		var v VoiceIdsShared
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.VoiceIdsShared = &v
 		return nil
@@ -649,14 +652,14 @@ func (u *VoiceIdsOrCustomVoice) UnmarshalJSON(data []byte) error {
 		if value["id"] != nil {
 			var v VoiceIdsOrCustomVoiceVariant2
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.VoiceIdsOrCustomVoiceVariant2 = &v
 			return nil
 		}
-		return errors.New("invalid VoiceIdsOrCustomVoice")
+		return nil
 	}
-	return errors.New("invalid VoiceIdsOrCustomVoice")
+	return nil
 }
 
 // Specifying a particular function via `{"name": "my_function"}` forces the model to call that function.
@@ -747,7 +750,7 @@ func (u *ChatCompletionRequestMessage) UnmarshalJSON(data []byte) error {
 	}
 	rawRole, ok := raw["role"]
 	if !ok {
-		return errors.New("missing role field in ChatCompletionRequestMessage")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawRole, &discriminator); err != nil {
@@ -758,41 +761,41 @@ func (u *ChatCompletionRequestMessage) UnmarshalJSON(data []byte) error {
 	case "developer":
 		var value ChatCompletionRequestDeveloperMessage
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Developer = &value
 	case "system":
 		var value ChatCompletionRequestSystemMessage
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.System = &value
 	case "user":
 		var value ChatCompletionRequestUserMessage
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.User = &value
 	case "assistant":
 		var value ChatCompletionRequestAssistantMessage
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Assistant = &value
 	case "tool":
 		var value ChatCompletionRequestToolMessage
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Tool = &value
 	case "function":
 		var value ChatCompletionRequestFunctionMessage
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Function = &value
 	default:
-		return fmt.Errorf("invalid role field in ChatCompletionRequestMessage: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -869,19 +872,19 @@ func (u *PredictionContentContent) UnmarshalJSON(data []byte) error {
 	case string:
 		var v PredictionContentContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.PredictionContentContentString = &v
 		return nil
 	case []interface{}:
 		var v PredictionContentContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.PredictionContentContentArray = &v
 		return nil
 	}
-	return errors.New("invalid PredictionContentContent")
+	return nil
 }
 
 // Constrains effort on reasoning for
@@ -980,19 +983,19 @@ func (u *StopConfiguration) UnmarshalJSON(data []byte) error {
 	case string:
 		var v StopConfigurationString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.StopConfigurationString = &v
 		return nil
 	case []interface{}:
 		var v StopConfigurationArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.StopConfigurationArray = &v
 		return nil
 	}
-	return errors.New("invalid StopConfiguration")
+	return nil
 }
 
 // Options for streaming response. Only set this when you set `stream: true`.
@@ -1064,38 +1067,38 @@ func (u *ChatCompletionToolChoiceOption) UnmarshalJSON(data []byte) error {
 	case string:
 		var v ChatCompletionToolChoiceOptionString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionToolChoiceOptionString = &v
 		return nil
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "allowed_tools" && value["type"] != nil && value["allowed_tools"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "allowed_tools") && value["type"] != nil && value["allowed_tools"] != nil {
 			var v ChatCompletionAllowedToolsChoice
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.ChatCompletionAllowedToolsChoice = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "function" && value["type"] != nil && value["function"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "function") && value["type"] != nil && value["function"] != nil {
 			var v ChatCompletionNamedToolChoice
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.ChatCompletionNamedToolChoice = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; !ok || rawType == "custom" && value["type"] != nil && value["custom"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "custom") && value["type"] != nil && value["custom"] != nil {
 			var v ChatCompletionNamedToolChoiceCustom
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.ChatCompletionNamedToolChoiceCustom = &v
 			return nil
 		}
-		return errors.New("invalid ChatCompletionToolChoiceOption")
+		return nil
 	}
-	return errors.New("invalid ChatCompletionToolChoiceOption")
+	return nil
 }
 
 // A function tool that can be used to generate a response.
@@ -1201,7 +1204,7 @@ func (u *CustomToolChatCompletionsCustomFormat) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CustomToolChatCompletionsCustomFormat")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1212,17 +1215,17 @@ func (u *CustomToolChatCompletionsCustomFormat) UnmarshalJSON(data []byte) error
 	case "text":
 		var value CustomToolChatCompletionsCustomFormatText
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "grammar":
 		var value CustomToolChatCompletionsCustomFormatGrammar
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Grammar = &value
 	default:
-		return fmt.Errorf("invalid type field in CustomToolChatCompletionsCustomFormat: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1576,19 +1579,19 @@ func (u *ChatCompletionRequestDeveloperMessageContent) UnmarshalJSON(data []byte
 	case string:
 		var v ChatCompletionRequestDeveloperMessageContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestDeveloperMessageContentString = &v
 		return nil
 	case []interface{}:
 		var v ChatCompletionRequestDeveloperMessageContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestDeveloperMessageContentArray = &v
 		return nil
 	}
-	return errors.New("invalid ChatCompletionRequestDeveloperMessageContent")
+	return nil
 }
 
 // Developer-provided instructions that the model should follow, regardless of
@@ -1636,19 +1639,19 @@ func (u *ChatCompletionRequestSystemMessageContent) UnmarshalJSON(data []byte) e
 	case string:
 		var v ChatCompletionRequestSystemMessageContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestSystemMessageContentString = &v
 		return nil
 	case []interface{}:
 		var v ChatCompletionRequestSystemMessageContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestSystemMessageContentArray = &v
 		return nil
 	}
-	return errors.New("invalid ChatCompletionRequestSystemMessageContent")
+	return nil
 }
 
 // Messages sent by an end user, containing prompts or additional context
@@ -1696,19 +1699,19 @@ func (u *ChatCompletionRequestUserMessageContent) UnmarshalJSON(data []byte) err
 	case string:
 		var v ChatCompletionRequestUserMessageContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestUserMessageContentString = &v
 		return nil
 	case []interface{}:
 		var v ChatCompletionRequestUserMessageContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestUserMessageContentArray = &v
 		return nil
 	}
-	return errors.New("invalid ChatCompletionRequestUserMessageContent")
+	return nil
 }
 
 // Messages sent by the model in response to user messages.
@@ -1772,19 +1775,19 @@ func (u *ChatCompletionRequestAssistantMessageContent) UnmarshalJSON(data []byte
 	case string:
 		var v ChatCompletionRequestAssistantMessageContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestAssistantMessageContentString = &v
 		return nil
 	case []interface{}:
 		var v ChatCompletionRequestAssistantMessageContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestAssistantMessageContentArray = &v
 		return nil
 	}
-	return errors.New("invalid ChatCompletionRequestAssistantMessageContent")
+	return nil
 }
 
 // Deprecated and replaced by `tool_calls`. The name and arguments of a function that should be called, as generated by the model.
@@ -1837,19 +1840,19 @@ func (u *ChatCompletionRequestToolMessageContent) UnmarshalJSON(data []byte) err
 	case string:
 		var v ChatCompletionRequestToolMessageContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestToolMessageContentString = &v
 		return nil
 	case []interface{}:
 		var v ChatCompletionRequestToolMessageContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ChatCompletionRequestToolMessageContentArray = &v
 		return nil
 	}
-	return errors.New("invalid ChatCompletionRequestToolMessageContent")
+	return nil
 }
 
 type ChatCompletionRequestFunctionMessage struct {
@@ -1974,7 +1977,7 @@ func (u *ChatCompletionMessageToolCallsItem) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ChatCompletionMessageToolCallsItem")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1985,17 +1988,17 @@ func (u *ChatCompletionMessageToolCallsItem) UnmarshalJSON(data []byte) error {
 	case "function":
 		var value ChatCompletionMessageToolCall
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Function = &value
 	case "custom":
 		var value ChatCompletionMessageCustomToolCall
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Custom = &value
 	default:
-		return fmt.Errorf("invalid type field in ChatCompletionMessageToolCallsItem: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2058,7 +2061,7 @@ func (u *ChatCompletionRequestSystemMessageContentPart) UnmarshalJSON(data []byt
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ChatCompletionRequestSystemMessageContentPart")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2069,11 +2072,11 @@ func (u *ChatCompletionRequestSystemMessageContentPart) UnmarshalJSON(data []byt
 	case "text":
 		var value ChatCompletionRequestMessageContentPartText
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	default:
-		return fmt.Errorf("invalid type field in ChatCompletionRequestSystemMessageContentPart: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2132,7 +2135,7 @@ func (u *ChatCompletionRequestUserMessageContentPart) UnmarshalJSON(data []byte)
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ChatCompletionRequestUserMessageContentPart")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2143,29 +2146,29 @@ func (u *ChatCompletionRequestUserMessageContentPart) UnmarshalJSON(data []byte)
 	case "text":
 		var value ChatCompletionRequestMessageContentPartText
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "image_url":
 		var value ChatCompletionRequestMessageContentPartImage
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ImageUrl = &value
 	case "input_audio":
 		var value ChatCompletionRequestMessageContentPartAudio
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.InputAudio = &value
 	case "file":
 		var value ChatCompletionRequestMessageContentPartFile
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.File = &value
 	default:
-		return fmt.Errorf("invalid type field in ChatCompletionRequestUserMessageContentPart: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2204,7 +2207,7 @@ func (u *ChatCompletionRequestAssistantMessageContentPart) UnmarshalJSON(data []
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ChatCompletionRequestAssistantMessageContentPart")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2215,17 +2218,17 @@ func (u *ChatCompletionRequestAssistantMessageContentPart) UnmarshalJSON(data []
 	case "text":
 		var value ChatCompletionRequestMessageContentPartText
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "refusal":
 		var value ChatCompletionRequestMessageContentPartRefusal
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Refusal = &value
 	default:
-		return fmt.Errorf("invalid type field in ChatCompletionRequestAssistantMessageContentPart: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2254,7 +2257,7 @@ func (u *ChatCompletionRequestToolMessageContentPart) UnmarshalJSON(data []byte)
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ChatCompletionRequestToolMessageContentPart")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2265,11 +2268,11 @@ func (u *ChatCompletionRequestToolMessageContentPart) UnmarshalJSON(data []byte)
 	case "text":
 		var value ChatCompletionRequestMessageContentPartText
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	default:
-		return fmt.Errorf("invalid type field in ChatCompletionRequestToolMessageContentPart: %q", discriminator)
+		return nil
 	}
 	return nil
 }

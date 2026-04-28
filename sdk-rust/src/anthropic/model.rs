@@ -728,7 +728,11 @@ fn map_anthropic_content_block_start_event(
     content_block: ContentBlockStartEventContentBlock,
     index: usize,
 ) -> LanguageModelResult<Vec<ContentDelta>> {
-    if let Some(part) = map_content_block(map_start_content_block(content_block)) {
+    let Some(content_block) = map_start_content_block(content_block) else {
+        return Ok(vec![]);
+    };
+
+    if let Some(part) = map_content_block(content_block) {
         let mut delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
         if let PartDelta::ToolCall(tool_call_delta) = &mut delta {
             tool_call_delta.args = Some(String::new());
@@ -781,6 +785,7 @@ fn map_anthropic_content_block_delta_event(
                 return None;
             }
         }
+        ContentBlockDeltaEventDelta::Unknown => return None,
     };
 
     Some(ContentDelta {
@@ -835,37 +840,40 @@ fn map_anthropic_image_media_type(
     }
 }
 
-fn map_start_content_block(content_block: ContentBlockStartEventContentBlock) -> ContentBlock {
+fn map_start_content_block(
+    content_block: ContentBlockStartEventContentBlock,
+) -> Option<ContentBlock> {
     match content_block {
-        ContentBlockStartEventContentBlock::Text(block) => ContentBlock::Text(block),
-        ContentBlockStartEventContentBlock::Thinking(block) => ContentBlock::Thinking(block),
+        ContentBlockStartEventContentBlock::Text(block) => Some(ContentBlock::Text(block)),
+        ContentBlockStartEventContentBlock::Thinking(block) => Some(ContentBlock::Thinking(block)),
         ContentBlockStartEventContentBlock::RedactedThinking(block) => {
-            ContentBlock::RedactedThinking(block)
+            Some(ContentBlock::RedactedThinking(block))
         }
-        ContentBlockStartEventContentBlock::ToolUse(block) => ContentBlock::ToolUse(block),
+        ContentBlockStartEventContentBlock::ToolUse(block) => Some(ContentBlock::ToolUse(block)),
         ContentBlockStartEventContentBlock::ServerToolUse(block) => {
-            ContentBlock::ServerToolUse(block)
+            Some(ContentBlock::ServerToolUse(block))
         }
         ContentBlockStartEventContentBlock::WebSearchToolResult(block) => {
-            ContentBlock::WebSearchToolResult(block)
+            Some(ContentBlock::WebSearchToolResult(block))
         }
         ContentBlockStartEventContentBlock::WebFetchToolResult(block) => {
-            ContentBlock::WebFetchToolResult(block)
+            Some(ContentBlock::WebFetchToolResult(block))
         }
         ContentBlockStartEventContentBlock::CodeExecutionToolResult(block) => {
-            ContentBlock::CodeExecutionToolResult(block)
+            Some(ContentBlock::CodeExecutionToolResult(block))
         }
         ContentBlockStartEventContentBlock::BashCodeExecutionToolResult(block) => {
-            ContentBlock::BashCodeExecutionToolResult(block)
+            Some(ContentBlock::BashCodeExecutionToolResult(block))
         }
         ContentBlockStartEventContentBlock::TextEditorCodeExecutionToolResult(block) => {
-            ContentBlock::TextEditorCodeExecutionToolResult(block)
+            Some(ContentBlock::TextEditorCodeExecutionToolResult(block))
         }
         ContentBlockStartEventContentBlock::ToolSearchToolResult(block) => {
-            ContentBlock::ToolSearchToolResult(block)
+            Some(ContentBlock::ToolSearchToolResult(block))
         }
         ContentBlockStartEventContentBlock::ContainerUpload(block) => {
-            ContentBlock::ContainerUpload(block)
+            Some(ContentBlock::ContainerUpload(block))
         }
+        ContentBlockStartEventContentBlock::Unknown => None,
     }
 }

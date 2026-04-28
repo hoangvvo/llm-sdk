@@ -3,7 +3,6 @@ package anthropicapi
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 )
 
 type CreateMessageParams struct {
@@ -200,7 +199,7 @@ func (u *CreateMessageParamsCacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CreateMessageParamsCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -211,11 +210,11 @@ func (u *CreateMessageParamsCacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in CreateMessageParamsCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -265,19 +264,19 @@ func (u *CreateMessageParamsSystem) UnmarshalJSON(data []byte) error {
 	case string:
 		var v CreateMessageParamsSystemString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.CreateMessageParamsSystemString = &v
 		return nil
 	case []interface{}:
 		var v CreateMessageParamsSystemArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.CreateMessageParamsSystemArray = &v
 		return nil
 	}
-	return errors.New("invalid CreateMessageParamsSystem")
+	return nil
 }
 
 type CreateMessageParamsToolsItem struct {
@@ -362,137 +361,137 @@ func (u *CreateMessageParamsToolsItem) UnmarshalJSON(data []byte) error {
 	*u = CreateMessageParamsToolsItem{}
 	switch value := raw.(type) {
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "custom" && value["name"] != nil && value["input_schema"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "custom") && value["name"] != nil && value["input_schema"] != nil {
 			var v Tool
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.Tool = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "bash" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "bash") && value["name"] != nil && value["type"] != nil {
 			var v BashTool20250124
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.BashTool20250124 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "code_execution" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "code_execution") && value["name"] != nil && value["type"] != nil {
 			var v CodeExecutionTool20250522
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.CodeExecutionTool20250522 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "code_execution" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "code_execution") && value["name"] != nil && value["type"] != nil {
 			var v CodeExecutionTool20250825
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.CodeExecutionTool20250825 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "code_execution" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "code_execution") && value["name"] != nil && value["type"] != nil {
 			var v CodeExecutionTool20260120
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.CodeExecutionTool20260120 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "memory" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "memory") && value["name"] != nil && value["type"] != nil {
 			var v MemoryTool20250818
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.MemoryTool20250818 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "str_replace_editor" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "str_replace_editor") && value["name"] != nil && value["type"] != nil {
 			var v TextEditor20250124
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.TextEditor20250124 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "str_replace_based_edit_tool" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "str_replace_based_edit_tool") && value["name"] != nil && value["type"] != nil {
 			var v TextEditor20250429
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.TextEditor20250429 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "str_replace_based_edit_tool" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "str_replace_based_edit_tool") && value["name"] != nil && value["type"] != nil {
 			var v TextEditor20250728
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.TextEditor20250728 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "web_search" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "web_search") && value["name"] != nil && value["type"] != nil {
 			var v WebSearchTool20250305
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.WebSearchTool20250305 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "web_fetch" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "web_fetch") && value["name"] != nil && value["type"] != nil {
 			var v WebFetchTool20250910
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.WebFetchTool20250910 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "web_search" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "web_search") && value["name"] != nil && value["type"] != nil {
 			var v WebSearchTool20260209
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.WebSearchTool20260209 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "web_fetch" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "web_fetch") && value["name"] != nil && value["type"] != nil {
 			var v WebFetchTool20260209
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.WebFetchTool20260209 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "web_fetch" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "web_fetch") && value["name"] != nil && value["type"] != nil {
 			var v WebFetchTool20260309
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.WebFetchTool20260309 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "tool_search_tool_bm25" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "tool_search_tool_bm25") && value["name"] != nil && value["type"] != nil {
 			var v ToolSearchToolBM2520251119
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.ToolSearchToolBM2520251119 = &v
 			return nil
 		}
-		if rawName, ok := value["name"]; !ok || rawName == "tool_search_tool_regex" && value["name"] != nil && value["type"] != nil {
+		if rawName, ok := value["name"]; (!ok || rawName == "tool_search_tool_regex") && value["name"] != nil && value["type"] != nil {
 			var v ToolSearchToolRegex20251119
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.ToolSearchToolRegex20251119 = &v
 			return nil
 		}
-		return errors.New("invalid CreateMessageParamsToolsItem")
+		return nil
 	}
-	return errors.New("invalid CreateMessageParamsToolsItem")
+	return nil
 }
 
 type Message struct {
@@ -655,7 +654,7 @@ func (u *MessageStreamEvent) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in MessageStreamEvent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -666,47 +665,47 @@ func (u *MessageStreamEvent) UnmarshalJSON(data []byte) error {
 	case "message_start":
 		var value MessageStartEvent
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.MessageStart = &value
 	case "message_delta":
 		var value MessageDeltaEvent
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.MessageDelta = &value
 	case "message_stop":
 		var value MessageStopEvent
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.MessageStop = &value
 	case "content_block_start":
 		var value ContentBlockStartEvent
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContentBlockStart = &value
 	case "content_block_delta":
 		var value ContentBlockDeltaEvent
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContentBlockDelta = &value
 	case "content_block_stop":
 		var value ContentBlockStopEvent
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContentBlockStop = &value
 	case "ping":
 		var value PingEvent
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ping = &value
 	default:
-		return fmt.Errorf("invalid type field in MessageStreamEvent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -776,19 +775,19 @@ func (u *InputMessageContent) UnmarshalJSON(data []byte) error {
 	case string:
 		var v InputMessageContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.InputMessageContentString = &v
 		return nil
 	case []interface{}:
 		var v InputMessageContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.InputMessageContentArray = &v
 		return nil
 	}
-	return errors.New("invalid InputMessageContent")
+	return nil
 }
 
 type InputMessageRole string
@@ -850,7 +849,7 @@ func (u *RequestTextBlockCacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestTextBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -861,11 +860,11 @@ func (u *RequestTextBlockCacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestTextBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -934,7 +933,7 @@ func (u *RequestTextBlockCitationsItem) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestTextBlockCitationsItem")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -945,35 +944,35 @@ func (u *RequestTextBlockCitationsItem) UnmarshalJSON(data []byte) error {
 	case "char_location":
 		var value RequestCharLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CharLocation = &value
 	case "page_location":
 		var value RequestPageLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.PageLocation = &value
 	case "content_block_location":
 		var value RequestContentBlockLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContentBlockLocation = &value
 	case "web_search_result_location":
 		var value RequestWebSearchResultLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebSearchResultLocation = &value
 	case "search_result_location":
 		var value RequestSearchResultLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.SearchResultLocation = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestTextBlockCitationsItem: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1027,7 +1026,7 @@ func (u *ThinkingConfigParam) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ThinkingConfigParam")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1038,23 +1037,23 @@ func (u *ThinkingConfigParam) UnmarshalJSON(data []byte) error {
 	case "enabled":
 		var value ThinkingConfigEnabled
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Enabled = &value
 	case "disabled":
 		var value ThinkingConfigDisabled
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Disabled = &value
 	case "adaptive":
 		var value ThinkingConfigAdaptive
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Adaptive = &value
 	default:
-		return fmt.Errorf("invalid type field in ThinkingConfigParam: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1114,7 +1113,7 @@ func (u *ToolChoice) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ToolChoice")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1125,29 +1124,29 @@ func (u *ToolChoice) UnmarshalJSON(data []byte) error {
 	case "auto":
 		var value ToolChoiceAuto
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Auto = &value
 	case "any":
 		var value ToolChoiceAny
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Any = &value
 	case "tool":
 		var value ToolChoiceTool
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Tool = &value
 	case "none":
 		var value ToolChoiceNone
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.None = &value
 	default:
-		return fmt.Errorf("invalid type field in ToolChoice: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1203,7 +1202,7 @@ func (u *ToolCacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ToolCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1214,11 +1213,11 @@ func (u *ToolCacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in ToolCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1264,7 +1263,7 @@ func (u *BashTool20250124CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in BashTool20250124CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1275,11 +1274,11 @@ func (u *BashTool20250124CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in BashTool20250124CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1324,7 +1323,7 @@ func (u *CodeExecutionTool20250522CacheControl) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CodeExecutionTool20250522CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1335,11 +1334,11 @@ func (u *CodeExecutionTool20250522CacheControl) UnmarshalJSON(data []byte) error
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in CodeExecutionTool20250522CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1384,7 +1383,7 @@ func (u *CodeExecutionTool20250825CacheControl) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CodeExecutionTool20250825CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1395,11 +1394,11 @@ func (u *CodeExecutionTool20250825CacheControl) UnmarshalJSON(data []byte) error
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in CodeExecutionTool20250825CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1445,7 +1444,7 @@ func (u *CodeExecutionTool20260120CacheControl) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CodeExecutionTool20260120CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1456,11 +1455,11 @@ func (u *CodeExecutionTool20260120CacheControl) UnmarshalJSON(data []byte) error
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in CodeExecutionTool20260120CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1506,7 +1505,7 @@ func (u *MemoryTool20250818CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in MemoryTool20250818CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1517,11 +1516,11 @@ func (u *MemoryTool20250818CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in MemoryTool20250818CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1567,7 +1566,7 @@ func (u *TextEditor20250124CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in TextEditor20250124CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1578,11 +1577,11 @@ func (u *TextEditor20250124CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in TextEditor20250124CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1628,7 +1627,7 @@ func (u *TextEditor20250429CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in TextEditor20250429CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1639,11 +1638,11 @@ func (u *TextEditor20250429CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in TextEditor20250429CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1691,7 +1690,7 @@ func (u *TextEditor20250728CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in TextEditor20250728CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1702,11 +1701,11 @@ func (u *TextEditor20250728CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in TextEditor20250728CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1759,7 +1758,7 @@ func (u *WebSearchTool20250305CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in WebSearchTool20250305CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1770,11 +1769,11 @@ func (u *WebSearchTool20250305CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in WebSearchTool20250305CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1829,7 +1828,7 @@ func (u *WebFetchTool20250910CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in WebFetchTool20250910CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1840,11 +1839,11 @@ func (u *WebFetchTool20250910CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in WebFetchTool20250910CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1897,7 +1896,7 @@ func (u *WebSearchTool20260209CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in WebSearchTool20260209CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1908,11 +1907,11 @@ func (u *WebSearchTool20260209CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in WebSearchTool20260209CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -1967,7 +1966,7 @@ func (u *WebFetchTool20260209CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in WebFetchTool20260209CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -1978,11 +1977,11 @@ func (u *WebFetchTool20260209CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in WebFetchTool20260209CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2040,7 +2039,7 @@ func (u *WebFetchTool20260309CacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in WebFetchTool20260309CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2051,11 +2050,11 @@ func (u *WebFetchTool20260309CacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in WebFetchTool20260309CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2100,7 +2099,7 @@ func (u *ToolSearchToolBM2520251119CacheControl) UnmarshalJSON(data []byte) erro
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ToolSearchToolBM2520251119CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2111,11 +2110,11 @@ func (u *ToolSearchToolBM2520251119CacheControl) UnmarshalJSON(data []byte) erro
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in ToolSearchToolBM2520251119CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2167,7 +2166,7 @@ func (u *ToolSearchToolRegex20251119CacheControl) UnmarshalJSON(data []byte) err
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ToolSearchToolRegex20251119CacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2178,11 +2177,11 @@ func (u *ToolSearchToolRegex20251119CacheControl) UnmarshalJSON(data []byte) err
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in ToolSearchToolRegex20251119CacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2336,7 +2335,7 @@ func (u *ContentBlock) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ContentBlock")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2347,77 +2346,77 @@ func (u *ContentBlock) UnmarshalJSON(data []byte) error {
 	case "text":
 		var value ResponseTextBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "thinking":
 		var value ResponseThinkingBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Thinking = &value
 	case "redacted_thinking":
 		var value ResponseRedactedThinkingBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.RedactedThinking = &value
 	case "tool_use":
 		var value ResponseToolUseBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolUse = &value
 	case "server_tool_use":
 		var value ResponseServerToolUseBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ServerToolUse = &value
 	case "web_search_tool_result":
 		var value ResponseWebSearchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebSearchToolResult = &value
 	case "web_fetch_tool_result":
 		var value ResponseWebFetchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebFetchToolResult = &value
 	case "code_execution_tool_result":
 		var value ResponseCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecutionToolResult = &value
 	case "bash_code_execution_tool_result":
 		var value ResponseBashCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.BashCodeExecutionToolResult = &value
 	case "text_editor_code_execution_tool_result":
 		var value ResponseTextEditorCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionToolResult = &value
 	case "tool_search_tool_result":
 		var value ResponseToolSearchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolSearchToolResult = &value
 	case "container_upload":
 		var value ResponseContainerUploadBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContainerUpload = &value
 	default:
-		return fmt.Errorf("invalid type field in ContentBlock: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2553,7 +2552,7 @@ func (u *ContentBlockDeltaEventDelta) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ContentBlockDeltaEventDelta")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2564,35 +2563,35 @@ func (u *ContentBlockDeltaEventDelta) UnmarshalJSON(data []byte) error {
 	case "text_delta":
 		var value TextContentBlockDelta
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextDelta = &value
 	case "input_json_delta":
 		var value InputJsonContentBlockDelta
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.InputJsonDelta = &value
 	case "citations_delta":
 		var value CitationsDelta
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CitationsDelta = &value
 	case "thinking_delta":
 		var value ThinkingContentBlockDelta
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ThinkingDelta = &value
 	case "signature_delta":
 		var value SignatureContentBlockDelta
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.SignatureDelta = &value
 	default:
-		return fmt.Errorf("invalid type field in ContentBlockDeltaEventDelta: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -2736,7 +2735,7 @@ func (u *ContentBlockStartEventContentBlock) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ContentBlockStartEventContentBlock")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -2747,77 +2746,77 @@ func (u *ContentBlockStartEventContentBlock) UnmarshalJSON(data []byte) error {
 	case "text":
 		var value ResponseTextBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "thinking":
 		var value ResponseThinkingBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Thinking = &value
 	case "redacted_thinking":
 		var value ResponseRedactedThinkingBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.RedactedThinking = &value
 	case "tool_use":
 		var value ResponseToolUseBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolUse = &value
 	case "server_tool_use":
 		var value ResponseServerToolUseBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ServerToolUse = &value
 	case "web_search_tool_result":
 		var value ResponseWebSearchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebSearchToolResult = &value
 	case "web_fetch_tool_result":
 		var value ResponseWebFetchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebFetchToolResult = &value
 	case "code_execution_tool_result":
 		var value ResponseCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecutionToolResult = &value
 	case "bash_code_execution_tool_result":
 		var value ResponseBashCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.BashCodeExecutionToolResult = &value
 	case "text_editor_code_execution_tool_result":
 		var value ResponseTextEditorCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionToolResult = &value
 	case "tool_search_tool_result":
 		var value ResponseToolSearchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolSearchToolResult = &value
 	case "container_upload":
 		var value ResponseContainerUploadBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContainerUpload = &value
 	default:
-		return fmt.Errorf("invalid type field in ContentBlockStartEventContentBlock: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3021,7 +3020,7 @@ func (u *InputContentBlock) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in InputContentBlock")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3032,101 +3031,101 @@ func (u *InputContentBlock) UnmarshalJSON(data []byte) error {
 	case "text":
 		var value RequestTextBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "image":
 		var value RequestImageBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Image = &value
 	case "document":
 		var value RequestDocumentBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Document = &value
 	case "search_result":
 		var value RequestSearchResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.SearchResult = &value
 	case "thinking":
 		var value RequestThinkingBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Thinking = &value
 	case "redacted_thinking":
 		var value RequestRedactedThinkingBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.RedactedThinking = &value
 	case "tool_use":
 		var value RequestToolUseBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolUse = &value
 	case "tool_result":
 		var value RequestToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolResult = &value
 	case "server_tool_use":
 		var value RequestServerToolUseBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ServerToolUse = &value
 	case "web_search_tool_result":
 		var value RequestWebSearchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebSearchToolResult = &value
 	case "web_fetch_tool_result":
 		var value RequestWebFetchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebFetchToolResult = &value
 	case "code_execution_tool_result":
 		var value RequestCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecutionToolResult = &value
 	case "bash_code_execution_tool_result":
 		var value RequestBashCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.BashCodeExecutionToolResult = &value
 	case "text_editor_code_execution_tool_result":
 		var value RequestTextEditorCodeExecutionToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionToolResult = &value
 	case "tool_search_tool_result":
 		var value RequestToolSearchToolResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolSearchToolResult = &value
 	case "container_upload":
 		var value RequestContainerUploadBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContainerUpload = &value
 	default:
-		return fmt.Errorf("invalid type field in InputContentBlock: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3311,7 +3310,7 @@ func (u *ResponseBashCodeExecutionToolResultBlockContent) UnmarshalJSON(data []b
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseBashCodeExecutionToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3322,17 +3321,17 @@ func (u *ResponseBashCodeExecutionToolResultBlockContent) UnmarshalJSON(data []b
 	case "bash_code_execution_tool_result_error":
 		var value ResponseBashCodeExecutionToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.BashCodeExecutionToolResultError = &value
 	case "bash_code_execution_result":
 		var value ResponseBashCodeExecutionResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.BashCodeExecutionResult = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseBashCodeExecutionToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3386,7 +3385,7 @@ func (u *ResponseCodeExecutionToolResultBlockContent) UnmarshalJSON(data []byte)
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseCodeExecutionToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3397,23 +3396,23 @@ func (u *ResponseCodeExecutionToolResultBlockContent) UnmarshalJSON(data []byte)
 	case "code_execution_tool_result_error":
 		var value ResponseCodeExecutionToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecutionToolResultError = &value
 	case "code_execution_result":
 		var value ResponseCodeExecutionResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecutionResult = &value
 	case "encrypted_code_execution_result":
 		var value ResponseEncryptedCodeExecutionResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.EncryptedCodeExecutionResult = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseCodeExecutionToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3478,7 +3477,7 @@ func (u *ResponseServerToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseServerToolUseBlockCaller")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3489,23 +3488,23 @@ func (u *ResponseServerToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 	case "direct":
 		var value DirectCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Direct = &value
 	case "code_execution_20250825":
 		var value ServerToolCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20250825 = &value
 	case "code_execution_20260120":
 		var value ServerToolCaller20260120
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseServerToolUseBlockCaller: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3594,7 +3593,7 @@ func (u *ResponseTextBlockCitationsItem) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseTextBlockCitationsItem")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3605,35 +3604,35 @@ func (u *ResponseTextBlockCitationsItem) UnmarshalJSON(data []byte) error {
 	case "char_location":
 		var value ResponseCharLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CharLocation = &value
 	case "page_location":
 		var value ResponsePageLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.PageLocation = &value
 	case "content_block_location":
 		var value ResponseContentBlockLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContentBlockLocation = &value
 	case "web_search_result_location":
 		var value ResponseWebSearchResultLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebSearchResultLocation = &value
 	case "search_result_location":
 		var value ResponseSearchResultLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.SearchResultLocation = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseTextBlockCitationsItem: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3697,7 +3696,7 @@ func (u *ResponseTextEditorCodeExecutionToolResultBlockContent) UnmarshalJSON(da
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseTextEditorCodeExecutionToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3708,29 +3707,29 @@ func (u *ResponseTextEditorCodeExecutionToolResultBlockContent) UnmarshalJSON(da
 	case "text_editor_code_execution_tool_result_error":
 		var value ResponseTextEditorCodeExecutionToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionToolResultError = &value
 	case "text_editor_code_execution_view_result":
 		var value ResponseTextEditorCodeExecutionViewResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionViewResult = &value
 	case "text_editor_code_execution_create_result":
 		var value ResponseTextEditorCodeExecutionCreateResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionCreateResult = &value
 	case "text_editor_code_execution_str_replace_result":
 		var value ResponseTextEditorCodeExecutionStrReplaceResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionStrReplaceResult = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseTextEditorCodeExecutionToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3779,7 +3778,7 @@ func (u *ResponseToolSearchToolResultBlockContent) UnmarshalJSON(data []byte) er
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseToolSearchToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3790,17 +3789,17 @@ func (u *ResponseToolSearchToolResultBlockContent) UnmarshalJSON(data []byte) er
 	case "tool_search_tool_result_error":
 		var value ResponseToolSearchToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolSearchToolResultError = &value
 	case "tool_search_tool_search_result":
 		var value ResponseToolSearchToolSearchResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolSearchToolSearchResult = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseToolSearchToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3856,7 +3855,7 @@ func (u *ResponseToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseToolUseBlockCaller")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3867,23 +3866,23 @@ func (u *ResponseToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 	case "direct":
 		var value DirectCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Direct = &value
 	case "code_execution_20250825":
 		var value ServerToolCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20250825 = &value
 	case "code_execution_20260120":
 		var value ServerToolCaller20260120
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseToolUseBlockCaller: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -3938,7 +3937,7 @@ func (u *ResponseWebFetchToolResultBlockCaller) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseWebFetchToolResultBlockCaller")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -3949,23 +3948,23 @@ func (u *ResponseWebFetchToolResultBlockCaller) UnmarshalJSON(data []byte) error
 	case "direct":
 		var value DirectCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Direct = &value
 	case "code_execution_20250825":
 		var value ServerToolCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20250825 = &value
 	case "code_execution_20260120":
 		var value ServerToolCaller20260120
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseWebFetchToolResultBlockCaller: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4004,7 +4003,7 @@ func (u *ResponseWebFetchToolResultBlockContent) UnmarshalJSON(data []byte) erro
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseWebFetchToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4015,17 +4014,17 @@ func (u *ResponseWebFetchToolResultBlockContent) UnmarshalJSON(data []byte) erro
 	case "web_fetch_tool_result_error":
 		var value ResponseWebFetchToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebFetchToolResultError = &value
 	case "web_fetch_result":
 		var value ResponseWebFetchResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebFetchResult = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseWebFetchToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4080,7 +4079,7 @@ func (u *ResponseWebSearchToolResultBlockCaller) UnmarshalJSON(data []byte) erro
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseWebSearchToolResultBlockCaller")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4091,23 +4090,23 @@ func (u *ResponseWebSearchToolResultBlockCaller) UnmarshalJSON(data []byte) erro
 	case "direct":
 		var value DirectCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Direct = &value
 	case "code_execution_20250825":
 		var value ServerToolCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20250825 = &value
 	case "code_execution_20260120":
 		var value ServerToolCaller20260120
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseWebSearchToolResultBlockCaller: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4142,22 +4141,22 @@ func (u *ResponseWebSearchToolResultBlockContent) UnmarshalJSON(data []byte) err
 	case []interface{}:
 		var v ResponseWebSearchToolResultBlockContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ResponseWebSearchToolResultBlockContentArray = &v
 		return nil
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "web_search_tool_result_error" && value["error_code"] != nil && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "web_search_tool_result_error") && value["error_code"] != nil && value["type"] != nil {
 			var v ResponseWebSearchToolResultError
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.ResponseWebSearchToolResultError = &v
 			return nil
 		}
-		return errors.New("invalid ResponseWebSearchToolResultBlockContent")
+		return nil
 	}
-	return errors.New("invalid ResponseWebSearchToolResultBlockContent")
+	return nil
 }
 
 type CacheCreation struct {
@@ -4242,7 +4241,7 @@ func (u *CitationsDeltaCitation) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in CitationsDeltaCitation")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4253,35 +4252,35 @@ func (u *CitationsDeltaCitation) UnmarshalJSON(data []byte) error {
 	case "char_location":
 		var value ResponseCharLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CharLocation = &value
 	case "page_location":
 		var value ResponsePageLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.PageLocation = &value
 	case "content_block_location":
 		var value ResponseContentBlockLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ContentBlockLocation = &value
 	case "web_search_result_location":
 		var value ResponseWebSearchResultLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebSearchResultLocation = &value
 	case "search_result_location":
 		var value ResponseSearchResultLocationCitation
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.SearchResultLocation = &value
 	default:
-		return fmt.Errorf("invalid type field in CitationsDeltaCitation: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4360,7 +4359,7 @@ func (u *RequestBashCodeExecutionToolResultBlockCacheControl) UnmarshalJSON(data
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestBashCodeExecutionToolResultBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4371,11 +4370,11 @@ func (u *RequestBashCodeExecutionToolResultBlockCacheControl) UnmarshalJSON(data
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestBashCodeExecutionToolResultBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4414,7 +4413,7 @@ func (u *RequestBashCodeExecutionToolResultBlockContent) UnmarshalJSON(data []by
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestBashCodeExecutionToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4425,17 +4424,17 @@ func (u *RequestBashCodeExecutionToolResultBlockContent) UnmarshalJSON(data []by
 	case "bash_code_execution_tool_result_error":
 		var value RequestBashCodeExecutionToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.BashCodeExecutionToolResultError = &value
 	case "bash_code_execution_result":
 		var value RequestBashCodeExecutionResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.BashCodeExecutionResult = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestBashCodeExecutionToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4472,7 +4471,7 @@ func (u *RequestCodeExecutionToolResultBlockCacheControl) UnmarshalJSON(data []b
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestCodeExecutionToolResultBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4483,11 +4482,11 @@ func (u *RequestCodeExecutionToolResultBlockCacheControl) UnmarshalJSON(data []b
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestCodeExecutionToolResultBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4536,7 +4535,7 @@ func (u *RequestCodeExecutionToolResultBlockContent) UnmarshalJSON(data []byte) 
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestCodeExecutionToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4547,23 +4546,23 @@ func (u *RequestCodeExecutionToolResultBlockContent) UnmarshalJSON(data []byte) 
 	case "code_execution_tool_result_error":
 		var value RequestCodeExecutionToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecutionToolResultError = &value
 	case "code_execution_result":
 		var value RequestCodeExecutionResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecutionResult = &value
 	case "encrypted_code_execution_result":
 		var value RequestEncryptedCodeExecutionResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.EncryptedCodeExecutionResult = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestCodeExecutionToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4601,7 +4600,7 @@ func (u *RequestContainerUploadBlockCacheControl) UnmarshalJSON(data []byte) err
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestContainerUploadBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4612,11 +4611,11 @@ func (u *RequestContainerUploadBlockCacheControl) UnmarshalJSON(data []byte) err
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestContainerUploadBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4656,7 +4655,7 @@ func (u *RequestDocumentBlockCacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestDocumentBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4667,11 +4666,11 @@ func (u *RequestDocumentBlockCacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestDocumentBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4730,7 +4729,7 @@ func (u *RequestDocumentBlockSource) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestDocumentBlockSource")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4741,29 +4740,29 @@ func (u *RequestDocumentBlockSource) UnmarshalJSON(data []byte) error {
 	case "base64":
 		var value Base64PDFSource
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Base64 = &value
 	case "text":
 		var value PlainTextSource
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "content":
 		var value ContentBlockSource
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Content = &value
 	case "url":
 		var value URLPDFSource
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Url = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestDocumentBlockSource: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4799,7 +4798,7 @@ func (u *RequestImageBlockCacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestImageBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4810,11 +4809,11 @@ func (u *RequestImageBlockCacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestImageBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4853,7 +4852,7 @@ func (u *RequestImageBlockSource) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestImageBlockSource")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4864,17 +4863,17 @@ func (u *RequestImageBlockSource) UnmarshalJSON(data []byte) error {
 	case "base64":
 		var value Base64ImageSource
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Base64 = &value
 	case "url":
 		var value URLImageSource
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Url = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestImageBlockSource: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4917,7 +4916,7 @@ func (u *RequestSearchResultBlockCacheControl) UnmarshalJSON(data []byte) error 
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestSearchResultBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4928,11 +4927,11 @@ func (u *RequestSearchResultBlockCacheControl) UnmarshalJSON(data []byte) error 
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestSearchResultBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -4971,7 +4970,7 @@ func (u *RequestServerToolUseBlockCacheControl) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestServerToolUseBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -4982,11 +4981,11 @@ func (u *RequestServerToolUseBlockCacheControl) UnmarshalJSON(data []byte) error
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestServerToolUseBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5035,7 +5034,7 @@ func (u *RequestServerToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestServerToolUseBlockCaller")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5046,23 +5045,23 @@ func (u *RequestServerToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 	case "direct":
 		var value DirectCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Direct = &value
 	case "code_execution_20250825":
 		var value ServerToolCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20250825 = &value
 	case "code_execution_20260120":
 		var value ServerToolCaller20260120
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestServerToolUseBlockCaller: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5111,7 +5110,7 @@ func (u *RequestTextEditorCodeExecutionToolResultBlockCacheControl) UnmarshalJSO
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestTextEditorCodeExecutionToolResultBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5122,11 +5121,11 @@ func (u *RequestTextEditorCodeExecutionToolResultBlockCacheControl) UnmarshalJSO
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestTextEditorCodeExecutionToolResultBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5185,7 +5184,7 @@ func (u *RequestTextEditorCodeExecutionToolResultBlockContent) UnmarshalJSON(dat
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestTextEditorCodeExecutionToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5196,29 +5195,29 @@ func (u *RequestTextEditorCodeExecutionToolResultBlockContent) UnmarshalJSON(dat
 	case "text_editor_code_execution_tool_result_error":
 		var value RequestTextEditorCodeExecutionToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionToolResultError = &value
 	case "text_editor_code_execution_view_result":
 		var value RequestTextEditorCodeExecutionViewResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionViewResult = &value
 	case "text_editor_code_execution_create_result":
 		var value RequestTextEditorCodeExecutionCreateResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionCreateResult = &value
 	case "text_editor_code_execution_str_replace_result":
 		var value RequestTextEditorCodeExecutionStrReplaceResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.TextEditorCodeExecutionStrReplaceResult = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestTextEditorCodeExecutionToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5261,7 +5260,7 @@ func (u *RequestToolResultBlockCacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestToolResultBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5272,11 +5271,11 @@ func (u *RequestToolResultBlockCacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestToolResultBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5347,7 +5346,7 @@ func (u *RequestToolResultBlockContentArrayItem) UnmarshalJSON(data []byte) erro
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestToolResultBlockContentArrayItem")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5358,35 +5357,35 @@ func (u *RequestToolResultBlockContentArrayItem) UnmarshalJSON(data []byte) erro
 	case "text":
 		var value RequestTextBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "image":
 		var value RequestImageBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Image = &value
 	case "search_result":
 		var value RequestSearchResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.SearchResult = &value
 	case "document":
 		var value RequestDocumentBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Document = &value
 	case "tool_reference":
 		var value RequestToolReferenceBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolReference = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestToolResultBlockContentArrayItem: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5421,19 +5420,19 @@ func (u *RequestToolResultBlockContent) UnmarshalJSON(data []byte) error {
 	case string:
 		var v RequestToolResultBlockContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.RequestToolResultBlockContentString = &v
 		return nil
 	case []interface{}:
 		var v RequestToolResultBlockContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.RequestToolResultBlockContentArray = &v
 		return nil
 	}
-	return errors.New("invalid RequestToolResultBlockContent")
+	return nil
 }
 
 type RequestToolSearchToolResultBlock struct {
@@ -5468,7 +5467,7 @@ func (u *RequestToolSearchToolResultBlockCacheControl) UnmarshalJSON(data []byte
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestToolSearchToolResultBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5479,11 +5478,11 @@ func (u *RequestToolSearchToolResultBlockCacheControl) UnmarshalJSON(data []byte
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestToolSearchToolResultBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5522,7 +5521,7 @@ func (u *RequestToolSearchToolResultBlockContent) UnmarshalJSON(data []byte) err
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestToolSearchToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5533,17 +5532,17 @@ func (u *RequestToolSearchToolResultBlockContent) UnmarshalJSON(data []byte) err
 	case "tool_search_tool_result_error":
 		var value RequestToolSearchToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolSearchToolResultError = &value
 	case "tool_search_tool_search_result":
 		var value RequestToolSearchToolSearchResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.ToolSearchToolSearchResult = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestToolSearchToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5582,7 +5581,7 @@ func (u *RequestToolUseBlockCacheControl) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestToolUseBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5593,11 +5592,11 @@ func (u *RequestToolUseBlockCacheControl) UnmarshalJSON(data []byte) error {
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestToolUseBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5646,7 +5645,7 @@ func (u *RequestToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestToolUseBlockCaller")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5657,23 +5656,23 @@ func (u *RequestToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 	case "direct":
 		var value DirectCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Direct = &value
 	case "code_execution_20250825":
 		var value ServerToolCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20250825 = &value
 	case "code_execution_20260120":
 		var value ServerToolCaller20260120
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestToolUseBlockCaller: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5711,7 +5710,7 @@ func (u *RequestWebFetchToolResultBlockCacheControl) UnmarshalJSON(data []byte) 
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestWebFetchToolResultBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5722,11 +5721,11 @@ func (u *RequestWebFetchToolResultBlockCacheControl) UnmarshalJSON(data []byte) 
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestWebFetchToolResultBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5775,7 +5774,7 @@ func (u *RequestWebFetchToolResultBlockCaller) UnmarshalJSON(data []byte) error 
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestWebFetchToolResultBlockCaller")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5786,23 +5785,23 @@ func (u *RequestWebFetchToolResultBlockCaller) UnmarshalJSON(data []byte) error 
 	case "direct":
 		var value DirectCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Direct = &value
 	case "code_execution_20250825":
 		var value ServerToolCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20250825 = &value
 	case "code_execution_20260120":
 		var value ServerToolCaller20260120
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestWebFetchToolResultBlockCaller: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5841,7 +5840,7 @@ func (u *RequestWebFetchToolResultBlockContent) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestWebFetchToolResultBlockContent")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5852,17 +5851,17 @@ func (u *RequestWebFetchToolResultBlockContent) UnmarshalJSON(data []byte) error
 	case "web_fetch_tool_result_error":
 		var value RequestWebFetchToolResultError
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebFetchToolResultError = &value
 	case "web_fetch_result":
 		var value RequestWebFetchResultBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.WebFetchResult = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestWebFetchToolResultBlockContent: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5900,7 +5899,7 @@ func (u *RequestWebSearchToolResultBlockCacheControl) UnmarshalJSON(data []byte)
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestWebSearchToolResultBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5911,11 +5910,11 @@ func (u *RequestWebSearchToolResultBlockCacheControl) UnmarshalJSON(data []byte)
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestWebSearchToolResultBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -5964,7 +5963,7 @@ func (u *RequestWebSearchToolResultBlockCaller) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestWebSearchToolResultBlockCaller")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -5975,23 +5974,23 @@ func (u *RequestWebSearchToolResultBlockCaller) UnmarshalJSON(data []byte) error
 	case "direct":
 		var value DirectCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Direct = &value
 	case "code_execution_20250825":
 		var value ServerToolCaller
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20250825 = &value
 	case "code_execution_20260120":
 		var value ServerToolCaller20260120
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.CodeExecution20260120 = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestWebSearchToolResultBlockCaller: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -6026,22 +6025,22 @@ func (u *RequestWebSearchToolResultBlockContent) UnmarshalJSON(data []byte) erro
 	case []interface{}:
 		var v RequestWebSearchToolResultBlockContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.RequestWebSearchToolResultBlockContentArray = &v
 		return nil
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; !ok || rawType == "web_search_tool_result_error" && value["error_code"] != nil && value["type"] != nil {
+		if rawType, ok := value["type"]; (!ok || rawType == "web_search_tool_result_error") && value["error_code"] != nil && value["type"] != nil {
 			var v RequestWebSearchToolResultError
 			if err := json.Unmarshal(data, &v); err != nil {
-				return err
+				return nil
 			}
 			u.RequestWebSearchToolResultError = &v
 			return nil
 		}
-		return errors.New("invalid RequestWebSearchToolResultBlockContent")
+		return nil
 	}
-	return errors.New("invalid RequestWebSearchToolResultBlockContent")
+	return nil
 }
 
 type ThinkingDisplayMode string
@@ -6279,7 +6278,7 @@ func (u *ContentBlockSourceContentArrayItem) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ContentBlockSourceContentArrayItem")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -6290,17 +6289,17 @@ func (u *ContentBlockSourceContentArrayItem) UnmarshalJSON(data []byte) error {
 	case "text":
 		var value RequestTextBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	case "image":
 		var value RequestImageBlock
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Image = &value
 	default:
-		return fmt.Errorf("invalid type field in ContentBlockSourceContentArrayItem: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -6335,19 +6334,19 @@ func (u *ContentBlockSourceContent) UnmarshalJSON(data []byte) error {
 	case string:
 		var v ContentBlockSourceContentString
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ContentBlockSourceContentString = &v
 		return nil
 	case []interface{}:
 		var v ContentBlockSourceContentArray
 		if err := json.Unmarshal(data, &v); err != nil {
-			return err
+			return nil
 		}
 		u.ContentBlockSourceContentArray = &v
 		return nil
 	}
-	return errors.New("invalid ContentBlockSourceContent")
+	return nil
 }
 
 type PlainTextSource struct {
@@ -6443,7 +6442,7 @@ func (u *RequestToolReferenceBlockCacheControl) UnmarshalJSON(data []byte) error
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in RequestToolReferenceBlockCacheControl")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -6454,11 +6453,11 @@ func (u *RequestToolReferenceBlockCacheControl) UnmarshalJSON(data []byte) error
 	case "ephemeral":
 		var value CacheControlEphemeral
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Ephemeral = &value
 	default:
-		return fmt.Errorf("invalid type field in RequestToolReferenceBlockCacheControl: %q", discriminator)
+		return nil
 	}
 	return nil
 }
@@ -6605,7 +6604,7 @@ func (u *ResponseDocumentBlockSource) UnmarshalJSON(data []byte) error {
 	}
 	rawType, ok := raw["type"]
 	if !ok {
-		return errors.New("missing type field in ResponseDocumentBlockSource")
+		return nil
 	}
 	var discriminator string
 	if err := json.Unmarshal(rawType, &discriminator); err != nil {
@@ -6616,17 +6615,17 @@ func (u *ResponseDocumentBlockSource) UnmarshalJSON(data []byte) error {
 	case "base64":
 		var value Base64PDFSource
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Base64 = &value
 	case "text":
 		var value PlainTextSource
 		if err := json.Unmarshal(data, &value); err != nil {
-			return err
+			return nil
 		}
 		u.Text = &value
 	default:
-		return fmt.Errorf("invalid type field in ResponseDocumentBlockSource: %q", discriminator)
+		return nil
 	}
 	return nil
 }

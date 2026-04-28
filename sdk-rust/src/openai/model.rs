@@ -641,18 +641,21 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
         .into_iter()
         .try_fold(Vec::new(), |mut acc, item| match item {
             OutputItem::OutputMessage(msg) => {
-                let parts = msg
-                    .content
-                    .into_iter()
-                    .map(|content| match content {
-                        OutputMessageContent::OutputText(output_text) => {
-                            Ok(Part::text(output_text.text))
+                let parts = msg.content.into_iter().try_fold(
+                    Vec::new(),
+                    |mut parts, content| -> LanguageModelResult<Vec<Part>> {
+                        match content {
+                            OutputMessageContent::OutputText(output_text) => {
+                                parts.push(Part::text(output_text.text));
+                            }
+                            OutputMessageContent::Refusal(refusal) => {
+                                return Err(LanguageModelError::Refusal(refusal.refusal));
+                            }
+                            OutputMessageContent::Unknown => {}
                         }
-                        OutputMessageContent::Refusal(refusal) => {
-                            Err(LanguageModelError::Refusal(refusal.refusal))
-                        }
-                    })
-                    .collect::<LanguageModelResult<Vec<_>>>()?;
+                        Ok(parts)
+                    },
+                )?;
 
                 acc.extend(parts);
                 Ok(acc)

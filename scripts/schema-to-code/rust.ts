@@ -22,8 +22,8 @@ export function renderRustDocument(document: CodegenDocument): string {
     document.declarations.some(
       (declaration) =>
         declaration.kind === "union" &&
-        declaration.representation === "untagged" &&
-        declaration.untaggedDeserializeStrategy === "placeholder",
+        (declaration.representation === "untagged" ||
+          declaration.untaggedDeserializeStrategy === "placeholder"),
     );
   const attributes = [
     "#![allow(clippy::enum_variant_names)]",
@@ -89,11 +89,15 @@ function renderRustEnum(declaration: EnumDeclaration): string {
     lines.push(comments);
   }
   lines.push("#[derive(Serialize, Deserialize)]");
+  lines.push("#[non_exhaustive]");
   lines.push(`pub enum ${declaration.name} {`);
   for (const variant of declaration.variants) {
     lines.push(`    #[serde(rename = ${JSON.stringify(variant.value)})]`);
     lines.push(`    ${variant.name},`);
   }
+  lines.push("    #[serde(other)]");
+  lines.push("    #[serde(skip_serializing)]");
+  lines.push("    Unknown,");
   lines.push("}");
   return lines.join("\n");
 }
@@ -151,11 +155,12 @@ function renderRustUnion(declaration: UnionDeclaration): string {
   const usesPlaceholderDeserialize =
     declaration.representation === "untagged" &&
     declaration.untaggedDeserializeStrategy === "placeholder";
-  if (declaration.representation === "tagged" || !usesPlaceholderDeserialize) {
+  if (!usesPlaceholderDeserialize) {
     lines.push("#[derive(Serialize, Deserialize)]");
   } else {
     lines.push("#[derive(Serialize)]");
   }
+  lines.push("#[non_exhaustive]");
   if (declaration.representation === "tagged") {
     lines.push(
       `#[serde(tag = ${JSON.stringify(
@@ -177,6 +182,14 @@ function renderRustUnion(declaration: UnionDeclaration): string {
       );
     }
     lines.push(`    ${variant.name}(${variant.typeName}),`);
+  }
+  if (declaration.representation === "tagged") {
+    lines.push("    #[serde(other)]");
+    lines.push("    #[serde(skip_serializing)]");
+    lines.push("    Unknown,");
+  } else {
+    lines.push("    #[serde(skip_serializing)]");
+    lines.push("    Unknown(Value),");
   }
   lines.push("}");
   if (usesPlaceholderDeserialize) {
@@ -265,9 +278,7 @@ function renderRustUntaggedDeserialize(declaration: UnionDeclaration): string[] 
     lines.push("            }");
   }
 
-  lines.push(
-    `            _ => Err(serde::de::Error::custom("invalid ${declaration.name}")),`,
-  );
+  lines.push(`            _ => Ok(Self::Unknown(value)),`);
   lines.push("        }");
   lines.push("    }");
   lines.push("}");
@@ -289,7 +300,7 @@ function renderRustUntaggedPrimitiveCaseBody(
   return [
     `                serde_json::from_value(value.clone())`,
     `                    .map(Self::${variant.name})`,
-    "                    .map_err(serde::de::Error::custom)",
+    "                    .or(Ok(Self::Unknown(value.clone())))",
   ];
 }
 
@@ -342,7 +353,7 @@ function renderRustObjectUntaggedCaseBody(
           `                            return serde_json::from_value(value.clone())`,
         );
         lines.push(`                                .map(Self::${variant.name})`);
-        lines.push("                                .map_err(serde::de::Error::custom);");
+        lines.push("                                .or(Ok(Self::Unknown(value.clone())));");
         lines.push("                        }");
       });
       lines.push("                        _ => {}");
@@ -368,7 +379,7 @@ function renderRustObjectUntaggedCaseBody(
       lines.push(`                if ${conditions.join(" && ")} {`);
       lines.push(`                    return serde_json::from_value(value.clone())`);
       lines.push(`                        .map(Self::${variant.name})`);
-      lines.push("                        .map_err(serde::de::Error::custom);");
+      lines.push("                        .or(Ok(Self::Unknown(value.clone())));");
       lines.push("                }");
       return;
     }
@@ -385,14 +396,12 @@ function renderRustObjectUntaggedCaseBody(
 
     lines.push(`                return serde_json::from_value(value.clone())`);
     lines.push(`                    .map(Self::${variant.name})`);
-    lines.push("                    .map_err(serde::de::Error::custom);");
+    lines.push("                    .or(Ok(Self::Unknown(value.clone())));");
     hasFallbackError = false;
   });
 
   if (hasFallbackError) {
-    lines.push(
-      `                Err(serde::de::Error::custom("invalid ${unionName}"))`,
-    );
+    lines.push(`                Ok(Self::Unknown(value.clone()))`);
   }
 
   return lines;

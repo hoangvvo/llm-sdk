@@ -141,11 +141,15 @@ pub struct ResponseAllOf3IncompleteDetails {
 
 /// The reason why the response is incomplete.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ResponseAllOf3IncompleteDetailsReason {
     #[serde(rename = "max_output_tokens")]
     MaxOutputTokens,
     #[serde(rename = "content_filter")]
     ContentFilter,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A text input to the model, equivalent to a text input with the
@@ -162,22 +166,30 @@ pub type ResponseAllOf3InstructionsArray = Option<Vec<InputItem>>;
 /// previous response will not be carried over to the next response. This makes
 /// it simple to swap out system (or developer) messages in new responses.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum ResponseAllOf3Instructions {
     ResponseAllOf3InstructionsString(ResponseAllOf3InstructionsString),
     ResponseAllOf3InstructionsArray(ResponseAllOf3InstructionsArray),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// The object type of this resource - always set to `response`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ResponseAllOf3Object {
     #[serde(rename = "response")]
     Response,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The status of the response generation. One of `completed`, `failed`,
 /// `in_progress`, `cancelled`, `queued`, or `incomplete`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ResponseAllOf3Status {
     #[serde(rename = "completed")]
     Completed,
@@ -191,6 +203,9 @@ pub enum ResponseAllOf3Status {
     Queued,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -204,6 +219,7 @@ pub struct Response {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseStreamEvent {
     #[serde(rename = "response.audio.delta")]
@@ -312,6 +328,9 @@ pub enum ResponseStreamEvent {
     ResponseCustomToolCallInputDelta(ResponseCustomToolCallInputDeltaEvent),
     #[serde(rename = "response.custom_tool_call_input.done")]
     ResponseCustomToolCallInputDone(ResponseCustomToolCallInputDoneEvent),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -387,11 +406,15 @@ pub struct ResponseProperties {
 /// - `disabled` (default): If the input size will exceed the context window
 ///   size for a model, the request will fail with a 400 error.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ResponsePropertiesTruncation {
     #[serde(rename = "auto")]
     Auto,
     #[serde(rename = "disabled")]
     Disabled,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -412,10 +435,13 @@ pub type ConversationParamString = Option<String>;
 /// output items from this response are automatically added to this conversation
 /// after this response completes.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum ConversationParam {
     ConversationParamString(ConversationParamString),
     ConversationParam2(ConversationParam2),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// Specify additional output data to include in the model response. Currently
@@ -437,6 +463,7 @@ pub enum ConversationParam {
 ///   when the `store` parameter is set to `false`, or when an organization is
 ///   enrolled in the zero data retention program).
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum IncludeEnum {
     #[serde(rename = "file_search_call.results")]
     FileSearchCallResults,
@@ -454,6 +481,9 @@ pub enum IncludeEnum {
     ReasoningEncryptedContent,
     #[serde(rename = "message.output_text.logprobs")]
     MessageOutputTextLogprobs,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A text input to the model, equivalent to a text input with the
@@ -473,10 +503,13 @@ pub type InputParamArray = Option<Vec<InputItem>>;
 /// - [Conversation state](/docs/guides/conversation-state)
 /// - [Function calling](/docs/guides/function-calling)
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum InputParam {
     InputParamString(InputParamString),
     InputParamArray(InputParamArray),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// Options for streaming responses. Only set this when you set `stream: true`.
@@ -554,11 +587,15 @@ pub struct ModelResponseProperties {
 /// maximum of 24 hours. [Learn
 /// more](/docs/guides/prompt-caching#prompt-cache-retention).
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ModelResponsePropertiesPromptCacheRetention {
     #[serde(rename = "in_memory")]
     InMemory,
     #[serde(rename = "24h")]
     N24H,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The conversation that this response belonged to. Input items and output
@@ -581,14 +618,18 @@ pub struct ResponseErrorValue {
 pub type ResponseError = Option<Option<ResponseErrorValue>>;
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum InputItem {
     EasyInputMessage(EasyInputMessage),
     Item(Item),
     ItemReferenceParam(ItemReferenceParam),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum OutputItem {
     OutputMessage(OutputMessage),
@@ -616,6 +657,8 @@ pub enum OutputItem {
     MCPApprovalResponseResource(MCPApprovalResponseResource),
     CustomToolCall(CustomToolCall),
     CustomToolCallOutputResource(CustomToolCallOutputResource),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// Represents token usage details including input tokens, output tokens,
@@ -862,7 +905,8 @@ pub struct ResponseFunctionCallArgumentsDoneEvent {
     /// The ID of the item.
     pub item_id: String,
     /// The name of the function that was called.
-    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     /// The index of the output item.
     pub output_index: i64,
     /// The sequence number of this event.
@@ -944,9 +988,13 @@ pub struct ResponseReasoningSummaryPartAddedEventPart {
 
 /// The type of the summary part. Always `summary_text`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ResponseReasoningSummaryPartAddedEventPartType {
     #[serde(rename = "summary_text")]
     SummaryText,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Emitted when a reasoning summary part is completed.
@@ -975,9 +1023,13 @@ pub struct ResponseReasoningSummaryPartDoneEventPart {
 
 /// The type of the summary part. Always `summary_text`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ResponseReasoningSummaryPartDoneEventPartType {
     #[serde(rename = "summary_text")]
     SummaryText,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Emitted when a delta is added to a reasoning summary text.
@@ -1397,6 +1449,7 @@ pub struct Reasoning {
 /// useful for debugging and understanding the model's reasoning process.
 /// One of `auto`, `concise`, or `detailed`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ReasoningGenerateSummary {
     #[serde(rename = "auto")]
     Auto,
@@ -1404,6 +1457,9 @@ pub enum ReasoningGenerateSummary {
     Concise,
     #[serde(rename = "detailed")]
     Detailed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A summary of the reasoning performed by the model. This can be
@@ -1413,6 +1469,7 @@ pub enum ReasoningGenerateSummary {
 /// `concise` is supported for `computer-use-preview` models and all reasoning
 /// models after `gpt-5`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ReasoningSummary {
     #[serde(rename = "auto")]
     Auto,
@@ -1420,6 +1477,9 @@ pub enum ReasoningSummary {
     Concise,
     #[serde(rename = "detailed")]
     Detailed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Configuration options for a text response from the model. Can be plain
@@ -1438,6 +1498,7 @@ pub struct ResponseTextParam {
 /// a response. See the `tools` parameter to see how to specify which tools
 /// the model can call.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum ToolChoiceParam {
     ToolChoiceOptions(ToolChoiceOptions),
@@ -1448,6 +1509,8 @@ pub enum ToolChoiceParam {
     ToolChoiceCustom(ToolChoiceCustom),
     SpecificApplyPatchParam(SpecificApplyPatchParam),
     SpecificFunctionShellParam(SpecificFunctionShellParam),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// An array of tools the model may call while generating a response. You
@@ -1492,6 +1555,7 @@ pub type Metadata = Option<Option<HashMap<String, String>>>;
 /// the request. This response value may be different from the value set in the
 /// parameter.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ServiceTierValue {
     #[serde(rename = "auto")]
     Auto,
@@ -1503,12 +1567,16 @@ pub enum ServiceTierValue {
     Scale,
     #[serde(rename = "priority")]
     Priority,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 pub type ServiceTier = Option<Option<ServiceTierValue>>;
 
 /// The error code for the response.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ResponseErrorCode {
     #[serde(rename = "server_error")]
     ServerError,
@@ -1546,6 +1614,9 @@ pub enum ResponseErrorCode {
     FailedToDownloadImage,
     #[serde(rename = "image_file_not_found")]
     ImageFileNotFound,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A message input to the model with a role indicating instruction following
@@ -1574,15 +1645,19 @@ pub type EasyInputMessageContentString = Option<String>;
 /// Text, image, or audio input to the model, used to generate a response.
 /// Can also contain previous assistant responses.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum EasyInputMessageContent {
     EasyInputMessageContentString(EasyInputMessageContentString),
     InputMessageContentList(InputMessageContentList),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// The role of the message input. One of `user`, `assistant`, `system`, or
 /// `developer`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum EasyInputMessageRole {
     #[serde(rename = "user")]
     User,
@@ -1592,17 +1667,25 @@ pub enum EasyInputMessageRole {
     System,
     #[serde(rename = "developer")]
     Developer,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the message input. Always `message`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum EasyInputMessageType {
     #[serde(rename = "message")]
     Message,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Content item used to generate a response.
 #[derive(Serialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum Item {
     InputMessage(InputMessage),
@@ -1631,6 +1714,8 @@ pub enum Item {
     MCPToolCall(MCPToolCall),
     CustomToolCallOutput(CustomToolCallOutput),
     CustomToolCall(CustomToolCall),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 impl<'de> Deserialize<'de> for Item {
@@ -1653,7 +1738,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::CodeInterpreterToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("role")
@@ -1666,7 +1751,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::OutputMessage)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1679,7 +1764,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::ComputerToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1692,7 +1777,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::LocalShellToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1705,7 +1790,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::MCPApprovalRequest)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1718,7 +1803,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::MCPToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1730,7 +1815,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::FileSearchToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1742,7 +1827,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::WebSearchToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1754,7 +1839,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::FunctionToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1766,7 +1851,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::ImageGenToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1778,7 +1863,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::LocalShellToolCallOutput)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1790,7 +1875,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::ApplyPatchToolCallItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1802,7 +1887,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::MCPListTools)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1814,7 +1899,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::MCPApprovalResponse)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1826,7 +1911,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::CustomToolCall)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1837,7 +1922,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::ComputerCallOutputItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1848,7 +1933,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::FunctionCallOutputItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1859,7 +1944,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::ReasoningItem)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1870,7 +1955,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::FunctionShellCallItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1881,7 +1966,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::FunctionShellCallOutputItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1892,7 +1977,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::ApplyPatchToolCallOutputItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1903,7 +1988,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::CustomToolCallOutput)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1913,7 +1998,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::InputMessage)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1923,7 +2008,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::ToolSearchCallItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1933,7 +2018,7 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::ToolSearchOutputItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
                 if object
                     .get("type")
@@ -1943,11 +2028,11 @@ impl<'de> Deserialize<'de> for Item {
                 {
                     return serde_json::from_value(value.clone())
                         .map(Self::CompactionSummaryItemParam)
-                        .map_err(serde::de::Error::custom);
+                        .or(Ok(Self::Unknown(value.clone())));
                 }
-                Err(serde::de::Error::custom("invalid Item"))
+                Ok(Self::Unknown(value.clone()))
             }
-            _ => Err(serde::de::Error::custom("invalid Item")),
+            _ => Ok(Self::Unknown(value)),
         }
     }
 }
@@ -1964,9 +2049,13 @@ pub struct ItemReferenceParam {
 
 /// The type of item to reference. Always `item_reference`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ItemReferenceParamType {
     #[serde(rename = "item_reference")]
     ItemReference,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// An output message from the model.
@@ -1989,14 +2078,19 @@ pub struct OutputMessage {
 
 /// The role of the output message. Always `assistant`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum OutputMessageRole {
     #[serde(rename = "assistant")]
     Assistant,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The status of the message input. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when input items are returned via API.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum OutputMessageStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2004,13 +2098,20 @@ pub enum OutputMessageStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the output message. Always `message`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum OutputMessageType {
     #[serde(rename = "message")]
     Message,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The results of a file search tool call. See the
@@ -2052,6 +2153,7 @@ pub struct FileSearchToolCallResultsItem {
 /// The status of the file search tool call. One of `in_progress`,
 /// `searching`, `incomplete` or `failed`,
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FileSearchToolCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2063,13 +2165,20 @@ pub enum FileSearchToolCallStatus {
     Incomplete,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the file search tool call. Always `file_search_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FileSearchToolCallType {
     #[serde(rename = "file_search_call")]
     FileSearchCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool call to run a function. See the
@@ -2100,6 +2209,7 @@ pub struct FunctionToolCall {
 /// The status of the item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionToolCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2107,13 +2217,20 @@ pub enum FunctionToolCallStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the function tool call. Always `function_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionToolCallType {
     #[serde(rename = "function_call")]
     FunctionCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2156,6 +2273,7 @@ pub struct WebSearchToolCall {
 /// Includes details on how the model used the web (search, open_page,
 /// find_in_page).
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum WebSearchToolCallAction {
     #[serde(rename = "search")]
@@ -2164,10 +2282,14 @@ pub enum WebSearchToolCallAction {
     OpenPage(WebSearchActionOpenPage),
     #[serde(rename = "find_in_page")]
     FindInPage(WebSearchActionFind),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The status of the web search tool call.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum WebSearchToolCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2177,13 +2299,20 @@ pub enum WebSearchToolCallStatus {
     Completed,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the web search tool call. Always `web_search_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum WebSearchToolCallType {
     #[serde(rename = "web_search_call")]
     WebSearchCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool call to a computer use tool. See the
@@ -2210,6 +2339,7 @@ pub struct ComputerToolCall {
 /// The status of the item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerToolCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2217,13 +2347,20 @@ pub enum ComputerToolCallStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the computer call. Always `computer_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerToolCallType {
     #[serde(rename = "computer_call")]
     ComputerCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2275,6 +2412,7 @@ pub struct ReasoningItem {
 /// The status of the item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ReasoningItemStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2282,13 +2420,20 @@ pub enum ReasoningItemStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the object. Always `reasoning`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ReasoningItemType {
     #[serde(rename = "reasoning")]
     Reasoning,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2312,9 +2457,13 @@ pub struct ToolSearchCall {
 
 /// The type of the item. Always `tool_search_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolSearchCallType {
     #[serde(rename = "tool_search_call")]
     ToolSearchCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2338,9 +2487,13 @@ pub struct ToolSearchOutput {
 
 /// The type of the item. Always `tool_search_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolSearchOutputType {
     #[serde(rename = "tool_search_output")]
     ToolSearchOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A compaction item generated by the [`v1/responses/compact`
@@ -2360,9 +2513,13 @@ pub struct CompactionBody {
 
 /// The type of the item. Always `compaction`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CompactionBodyType {
     #[serde(rename = "compaction")]
     Compaction,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// An image generation request made by the model.
@@ -2386,6 +2543,7 @@ pub struct ImageGenToolCall {
 
 /// The status of the image generation call.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenToolCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2395,13 +2553,20 @@ pub enum ImageGenToolCallStatus {
     Generating,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the image generation call. Always `image_generation_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenToolCallType {
     #[serde(rename = "image_generation_call")]
     ImageGenerationCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool call to run code.
@@ -2425,17 +2590,22 @@ pub struct CodeInterpreterToolCall {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum CodeInterpreterToolCallOutputsItem {
     #[serde(rename = "logs")]
     Logs(CodeInterpreterOutputLogs),
     #[serde(rename = "image")]
     Image(CodeInterpreterOutputImage),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The status of the code interpreter tool call. Valid values are
 /// `in_progress`, `completed`, `incomplete`, `interpreting`, and `failed`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CodeInterpreterToolCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2447,13 +2617,20 @@ pub enum CodeInterpreterToolCallStatus {
     Interpreting,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the code interpreter tool call. Always `code_interpreter_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CodeInterpreterToolCallType {
     #[serde(rename = "code_interpreter_call")]
     CodeInterpreterCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool call to run a command on the local shell.
@@ -2472,6 +2649,7 @@ pub struct LocalShellToolCall {
 
 /// The status of the local shell call.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum LocalShellToolCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2479,13 +2657,20 @@ pub enum LocalShellToolCallStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the local shell call. Always `local_shell_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum LocalShellToolCallType {
     #[serde(rename = "local_shell_call")]
     LocalShellCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The output of a local shell tool call.
@@ -2506,6 +2691,7 @@ pub struct LocalShellToolCallOutput {
 
 /// The status of the item. One of `in_progress`, `completed`, or `incomplete`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum LocalShellToolCallOutputStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -2513,14 +2699,21 @@ pub enum LocalShellToolCallOutputStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the local shell tool call output. Always
 /// `local_shell_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum LocalShellToolCallOutputType {
     #[serde(rename = "local_shell_call_output")]
     LocalShellCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool call that executes one or more shell commands in a managed
@@ -2546,19 +2739,27 @@ pub struct FunctionShellCall {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum FunctionShellCallEnvironment {
     #[serde(rename = "local")]
     Local(LocalEnvironmentResource),
     #[serde(rename = "container_reference")]
     ContainerReference(ContainerReferenceResource),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the item. Always `shell_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionShellCallType {
     #[serde(rename = "shell_call")]
     ShellCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The output of a shell tool call that was emitted.
@@ -2586,9 +2787,13 @@ pub struct FunctionShellCallOutput {
 
 /// The type of the shell call output. Always `shell_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionShellCallOutputType {
     #[serde(rename = "shell_call_output")]
     ShellCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool call that applies file diffs by creating, deleting, or updating
@@ -2616,6 +2821,7 @@ pub struct ApplyPatchToolCall {
 /// One of the create_file, delete_file, or update_file operations applied via
 /// apply_patch.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ApplyPatchToolCallOperation {
     #[serde(rename = "create_file")]
@@ -2624,13 +2830,20 @@ pub enum ApplyPatchToolCallOperation {
     DeleteFile(ApplyPatchDeleteFileOperation),
     #[serde(rename = "update_file")]
     UpdateFile(ApplyPatchUpdateFileOperation),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the item. Always `apply_patch_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchToolCallType {
     #[serde(rename = "apply_patch_call")]
     ApplyPatchCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The output emitted by an apply patch tool call.
@@ -2656,9 +2869,13 @@ pub struct ApplyPatchToolCallOutput {
 
 /// The type of the item. Always `apply_patch_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchToolCallOutputType {
     #[serde(rename = "apply_patch_call_output")]
     ApplyPatchCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// An invocation of a tool on an MCP server.
@@ -2693,9 +2910,13 @@ pub struct MCPToolCall {
 
 /// The type of the item. Always `mcp_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MCPToolCallType {
     #[serde(rename = "mcp_call")]
     McpCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A list of tools available on an MCP server.
@@ -2716,9 +2937,13 @@ pub struct MCPListTools {
 
 /// The type of the item. Always `mcp_list_tools`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MCPListToolsType {
     #[serde(rename = "mcp_list_tools")]
     McpListTools,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A request for human approval of a tool invocation.
@@ -2738,9 +2963,13 @@ pub struct MCPApprovalRequest {
 
 /// The type of the item. Always `mcp_approval_request`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MCPApprovalRequestType {
     #[serde(rename = "mcp_approval_request")]
     McpApprovalRequest,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A response to an MCP approval request.
@@ -2761,9 +2990,13 @@ pub struct MCPApprovalResponseResource {
 
 /// The type of the item. Always `mcp_approval_response`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MCPApprovalResponseResourceType {
     #[serde(rename = "mcp_approval_response")]
     McpApprovalResponse,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A call to a custom tool created by the model.
@@ -2787,9 +3020,13 @@ pub struct CustomToolCall {
 
 /// The type of the custom tool call. Always `custom_tool_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CustomToolCallType {
     #[serde(rename = "custom_tool_call")]
     CustomToolCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2813,6 +3050,7 @@ pub struct CustomToolCallOutputResource {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum OutputContent {
     #[serde(rename = "output_text")]
@@ -2821,6 +3059,9 @@ pub enum OutputContent {
     Refusal(RefusalContent),
     #[serde(rename = "reasoning_text")]
     ReasoningText(ReasoningTextContent),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A logprob is the logarithmic probability that the model assigns to producing
@@ -2848,15 +3089,20 @@ pub struct ResponseLogProbTopLogprobsItem {
     pub token: Option<String>,
 }
 
+pub type ModelIdsShared = Option<String>;
+
 pub type ResponsePromptVariablesValueValueString = Option<String>;
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum ResponsePromptVariablesValueValue {
     ResponsePromptVariablesValueValueString(ResponsePromptVariablesValueValueString),
     InputTextContent(InputTextContent),
     InputImageContent(InputImageContent),
     InputFileContent(InputFileContent),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 pub type ResponsePromptVariables =
@@ -2877,6 +3123,7 @@ pub type ResponsePromptVariables =
 ///   effort.
 /// - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ReasoningEffortValue {
     #[serde(rename = "none")]
     None,
@@ -2890,6 +3137,9 @@ pub enum ReasoningEffortValue {
     High,
     #[serde(rename = "xhigh")]
     Xhigh,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 pub type ReasoningEffort = Option<Option<ReasoningEffortValue>>;
@@ -2908,6 +3158,7 @@ pub type ReasoningEffort = Option<Option<ReasoningEffortValue>>;
 /// ensures the message the model generates is valid JSON. Using `json_schema`
 /// is preferred for models that support it.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum TextResponseFormatConfiguration {
     #[serde(rename = "text")]
@@ -2916,12 +3167,16 @@ pub enum TextResponseFormatConfiguration {
     JsonSchema(TextResponseFormatJsonSchema),
     #[serde(rename = "json_object")]
     JsonObject(ResponseFormatJsonObject),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Constrains the verbosity of the model's response. Lower values will result
 /// in more concise responses, while higher values will result in more verbose
 /// responses. Currently supported values are `low`, `medium`, and `high`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum VerbosityValue {
     #[serde(rename = "low")]
     Low,
@@ -2929,6 +3184,9 @@ pub enum VerbosityValue {
     Medium,
     #[serde(rename = "high")]
     High,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 pub type Verbosity = Option<Option<VerbosityValue>>;
@@ -2943,6 +3201,7 @@ pub type Verbosity = Option<Option<VerbosityValue>>;
 ///
 /// `required` means the model must call one or more tools.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolChoiceOptions {
     #[serde(rename = "none")]
     None,
@@ -2950,6 +3209,9 @@ pub enum ToolChoiceOptions {
     Auto,
     #[serde(rename = "required")]
     Required,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Constrains the tools available to the model to a pre-defined set.
@@ -2984,18 +3246,26 @@ pub struct ToolChoiceAllowed {
 ///
 /// `required` requires the model to call one or more of the allowed tools.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolChoiceAllowedMode {
     #[serde(rename = "auto")]
     Auto,
     #[serde(rename = "required")]
     Required,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Allowed tool configuration type. Always `allowed_tools`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolChoiceAllowedType {
     #[serde(rename = "allowed_tools")]
     AllowedTools,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Indicates that the model should use a built-in tool to generate a response.
@@ -3028,6 +3298,7 @@ pub struct ToolChoiceTypes {
 /// - `code_interpreter`
 /// - `image_generation`
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolChoiceTypesType {
     #[serde(rename = "file_search")]
     FileSearch,
@@ -3045,6 +3316,9 @@ pub enum ToolChoiceTypesType {
     ImageGeneration,
     #[serde(rename = "code_interpreter")]
     CodeInterpreter,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Use this option to force the model to call a specific function.
@@ -3058,9 +3332,13 @@ pub struct ToolChoiceFunction {
 
 /// For function calling, the type is always `function`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolChoiceFunctionType {
     #[serde(rename = "function")]
     Function,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Use this option to force the model to call a specific tool on a remote MCP
@@ -3078,9 +3356,13 @@ pub struct ToolChoiceMCP {
 
 /// For MCP tools, the type is always `mcp`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolChoiceMCPType {
     #[serde(rename = "mcp")]
     Mcp,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Use this option to force the model to call a specific custom tool.
@@ -3094,9 +3376,13 @@ pub struct ToolChoiceCustom {
 
 /// For custom tool calling, the type is always `custom`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolChoiceCustomType {
     #[serde(rename = "custom")]
     Custom,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Forces the model to call the apply_patch tool when executing a tool call.
@@ -3108,9 +3394,13 @@ pub struct SpecificApplyPatchParam {
 
 /// The tool to call. Always `apply_patch`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SpecificApplyPatchParamType {
     #[serde(rename = "apply_patch")]
     ApplyPatch,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Forces the model to call the shell tool when a tool call is required.
@@ -3122,13 +3412,18 @@ pub struct SpecificFunctionShellParam {
 
 /// The tool to call. Always `shell`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SpecificFunctionShellParamType {
     #[serde(rename = "shell")]
     Shell,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool that can be used to generate a response.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum Tool {
     FunctionTool(FunctionTool),
@@ -3146,6 +3441,8 @@ pub enum Tool {
     ToolSearchToolParam(ToolSearchToolParam),
     WebSearchPreviewTool(WebSearchPreviewTool),
     ApplyPatchToolParam(ApplyPatchToolParam),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// A list of one or many input items to the model, containing different content
@@ -3158,11 +3455,15 @@ pub type InputMessageContentList = Option<Vec<InputContent>>;
 /// assistant messages — dropping it can degrade performance. Not used for user
 /// messages.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MessagePhase {
     #[serde(rename = "commentary")]
     Commentary,
     #[serde(rename = "final_answer")]
     FinalAnswer,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A message input to the model with a role indicating instruction following
@@ -3184,6 +3485,7 @@ pub struct InputMessage {
 
 /// The role of the message input. One of `user`, `system`, or `developer`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InputMessageRole {
     #[serde(rename = "user")]
     User,
@@ -3191,11 +3493,15 @@ pub enum InputMessageRole {
     System,
     #[serde(rename = "developer")]
     Developer,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The status of item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InputMessageStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -3203,13 +3509,20 @@ pub enum InputMessageStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the message input. Always set to `message`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InputMessageType {
     #[serde(rename = "message")]
     Message,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The output of a computer tool call.
@@ -3236,9 +3549,13 @@ pub struct ComputerCallOutputItemParam {
 
 /// The type of the computer tool call output. Always `computer_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerCallOutputItemParamType {
     #[serde(rename = "computer_call_output")]
     ComputerCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The output of a function tool call.
@@ -3266,6 +3583,7 @@ pub type FunctionCallOutputItemParamOutputString = Option<String>;
 
 /// A piece of message content, such as text, an image, or a file.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum FunctionCallOutputItemParamOutputArrayItem {
     #[serde(rename = "input_text")]
@@ -3274,6 +3592,9 @@ pub enum FunctionCallOutputItemParamOutputArrayItem {
     InputImage(InputImageContentParamAutoParam),
     #[serde(rename = "input_file")]
     InputFile(InputFileContentParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// An array of content outputs (text, image, file) for the function tool call.
@@ -3282,17 +3603,24 @@ pub type FunctionCallOutputItemParamOutputArray =
 
 /// Text, image, or file output of the function tool call.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum FunctionCallOutputItemParamOutput {
     FunctionCallOutputItemParamOutputString(FunctionCallOutputItemParamOutputString),
     FunctionCallOutputItemParamOutputArray(FunctionCallOutputItemParamOutputArray),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// The type of the function tool call output. Always `function_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionCallOutputItemParamType {
     #[serde(rename = "function_call_output")]
     FunctionCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -3317,9 +3645,13 @@ pub struct ToolSearchCallItemParam {
 
 /// The item type. Always `tool_search_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolSearchCallItemParamType {
     #[serde(rename = "tool_search_call")]
     ToolSearchCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -3344,9 +3676,13 @@ pub struct ToolSearchOutputItemParam {
 
 /// The item type. Always `tool_search_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolSearchOutputItemParamType {
     #[serde(rename = "tool_search_output")]
     ToolSearchOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A compaction item generated by the [`v1/responses/compact`
@@ -3364,9 +3700,13 @@ pub struct CompactionSummaryItemParam {
 
 /// The type of the item. Always `compaction`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CompactionSummaryItemParamType {
     #[serde(rename = "compaction")]
     Compaction,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool representing a request to execute one or more shell commands.
@@ -3393,19 +3733,27 @@ pub struct FunctionShellCallItemParam {
 
 /// The environment to execute the shell commands in.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum FunctionShellCallItemParamEnvironment {
     #[serde(rename = "local")]
     Local(LocalEnvironmentParam),
     #[serde(rename = "container_reference")]
     ContainerReference(ContainerReferenceParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the item. Always `shell_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionShellCallItemParamType {
     #[serde(rename = "shell_call")]
     ShellCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The streamed output items emitted by a shell tool call.
@@ -3433,9 +3781,13 @@ pub struct FunctionShellCallOutputItemParam {
 
 /// The type of the item. Always `shell_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionShellCallOutputItemParamType {
     #[serde(rename = "shell_call_output")]
     ShellCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool call representing a request to create, delete, or update files using
@@ -3460,9 +3812,13 @@ pub struct ApplyPatchToolCallItemParam {
 
 /// The type of the item. Always `apply_patch_call`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchToolCallItemParamType {
     #[serde(rename = "apply_patch_call")]
     ApplyPatchCall,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The streamed output emitted by an apply patch tool call.
@@ -3487,9 +3843,13 @@ pub struct ApplyPatchToolCallOutputItemParam {
 
 /// The type of the item. Always `apply_patch_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchToolCallOutputItemParamType {
     #[serde(rename = "apply_patch_call_output")]
     ApplyPatchCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A response to an MCP approval request.
@@ -3511,9 +3871,13 @@ pub struct MCPApprovalResponse {
 
 /// The type of the item. Always `mcp_approval_response`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MCPApprovalResponseType {
     #[serde(rename = "mcp_approval_response")]
     McpApprovalResponse,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The output of a custom tool call from your code, being sent back to the
@@ -3543,26 +3907,37 @@ pub type CustomToolCallOutputOutputArray = Option<Vec<FunctionAndCustomToolCallO
 /// The output from the custom tool call generated by your code.
 /// Can be a string or an list of output content.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum CustomToolCallOutputOutput {
     CustomToolCallOutputOutputString(CustomToolCallOutputOutputString),
     CustomToolCallOutputOutputArray(CustomToolCallOutputOutputArray),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// The type of the custom tool call output. Always `custom_tool_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CustomToolCallOutputType {
     #[serde(rename = "custom_tool_call_output")]
     CustomToolCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum OutputMessageContent {
     #[serde(rename = "output_text")]
     OutputText(OutputTextContent),
     #[serde(rename = "refusal")]
     Refusal(RefusalContent),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 pub type VectorStoreFileAttributesValueValueString = Option<String>;
@@ -3572,11 +3947,14 @@ pub type VectorStoreFileAttributesValueValueNumber = Option<f64>;
 pub type VectorStoreFileAttributesValueValueBoolean = Option<bool>;
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum VectorStoreFileAttributesValueValue {
     VectorStoreFileAttributesValueValueString(VectorStoreFileAttributesValueValueString),
     VectorStoreFileAttributesValueValueNumber(VectorStoreFileAttributesValueValueNumber),
     VectorStoreFileAttributesValueValueBoolean(VectorStoreFileAttributesValueValueBoolean),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 pub type VectorStoreFileAttributes =
@@ -3612,15 +3990,19 @@ pub type FunctionToolCallOutputOutputArray = Option<Vec<FunctionAndCustomToolCal
 /// The output from the function call generated by your code.
 /// Can be a string or an list of output content.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum FunctionToolCallOutputOutput {
     FunctionToolCallOutputOutputString(FunctionToolCallOutputOutputString),
     FunctionToolCallOutputOutputArray(FunctionToolCallOutputOutputArray),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// The status of the item. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when items are returned via API.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionToolCallOutputStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -3628,16 +4010,24 @@ pub enum FunctionToolCallOutputStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the function tool call output. Always `function_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionToolCallOutputType {
     #[serde(rename = "function_call_output")]
     FunctionCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionCallOutputStatusEnum {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -3645,6 +4035,9 @@ pub enum FunctionCallOutputStatusEnum {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Action type "search" - Performs a web search query.
@@ -3671,9 +4064,13 @@ pub struct WebSearchActionSearchSourcesItem {
 
 /// The type of source. Always `url`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum WebSearchActionSearchSourcesItemType {
     #[serde(rename = "url")]
     Url,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Action type "open_page" - Opens a specific URL from search results.
@@ -3694,6 +4091,7 @@ pub struct WebSearchActionFind {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ComputerAction {
     #[serde(rename = "click")]
@@ -3714,6 +4112,9 @@ pub enum ComputerAction {
     Type(TypeParam),
     #[serde(rename = "wait")]
     Wait(WaitParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Flattened batched actions for `computer_use`. Each action includes an
@@ -3758,6 +4159,7 @@ pub struct ComputerToolCallOutput {
 /// The status of the message input. One of `in_progress`, `completed`, or
 /// `incomplete`. Populated when input items are returned via API.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerToolCallOutputStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -3765,16 +4167,24 @@ pub enum ComputerToolCallOutputStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the computer tool call output. Always `computer_call_output`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerToolCallOutputType {
     #[serde(rename = "computer_call_output")]
     ComputerCallOutput,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerCallOutputStatus {
     #[serde(rename = "completed")]
     Completed,
@@ -3782,6 +4192,9 @@ pub enum ComputerCallOutputStatus {
     Incomplete,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Reasoning text from the model.
@@ -3795,9 +4208,13 @@ pub struct ReasoningTextContent {
 
 /// The type of the reasoning text. Always `reasoning_text`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ReasoningTextContentType {
     #[serde(rename = "reasoning_text")]
     ReasoningText,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A summary text from the model.
@@ -3811,20 +4228,29 @@ pub struct SummaryTextContent {
 
 /// The type of the object. Always `summary_text`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SummaryTextContentType {
     #[serde(rename = "summary_text")]
     SummaryText,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolSearchExecutionType {
     #[serde(rename = "server")]
     Server,
     #[serde(rename = "client")]
     Client,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -3832,6 +4258,9 @@ pub enum FunctionCallStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The logs output from the code interpreter.
@@ -3870,9 +4299,13 @@ pub struct LocalShellExecAction {
 
 /// The type of the local shell action. Always `exec`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum LocalShellExecActionType {
     #[serde(rename = "exec")]
     Exec,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Execute a shell command.
@@ -3896,6 +4329,7 @@ pub struct ContainerReferenceResource {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum LocalShellCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -3903,6 +4337,9 @@ pub enum LocalShellCallStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The content of a shell tool call output that was emitted.
@@ -3923,15 +4360,20 @@ pub struct FunctionShellCallOutputContent {
 /// Represents either an exit outcome (with an exit code) or a timeout outcome
 /// for a shell call output chunk.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum FunctionShellCallOutputContentOutcome {
     #[serde(rename = "timeout")]
     Timeout(FunctionShellCallOutputTimeoutOutcome),
     #[serde(rename = "exit")]
     Exit(FunctionShellCallOutputExitOutcome),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum LocalShellCallOutputStatusEnum {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -3939,6 +4381,9 @@ pub enum LocalShellCallOutputStatusEnum {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Instruction describing how to create a file via the apply_patch tool.
@@ -3967,22 +4412,31 @@ pub struct ApplyPatchUpdateFileOperation {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
     #[serde(rename = "completed")]
     Completed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchCallOutputStatus {
     #[serde(rename = "completed")]
     Completed,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MCPToolCallStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -3994,6 +4448,9 @@ pub enum MCPToolCallStatus {
     Calling,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool available on an MCP server.
@@ -4039,9 +4496,13 @@ pub struct InputTextContent {
 
 /// The type of the input item. Always `input_text`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InputTextContentType {
     #[serde(rename = "input_text")]
     InputText,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// An image input to the model. Learn about [image
@@ -4064,9 +4525,13 @@ pub struct InputImageContent {
 
 /// The type of the input item. Always `input_image`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InputImageContentType {
     #[serde(rename = "input_image")]
     InputImage,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A file input to the model.
@@ -4095,9 +4560,13 @@ pub struct InputFileContent {
 
 /// The type of the input item. Always `input_file`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InputFileContentType {
     #[serde(rename = "input_file")]
     InputFile,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Default response format. Used to generate text responses.
@@ -4154,9 +4623,13 @@ pub struct FunctionTool {
 
 /// The type of the function tool. Always `function`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionToolType {
     #[serde(rename = "function")]
     Function,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool that searches for relevant content from uploaded files. Learn more about the [file search tool](https://platform.openai.com/docs/guides/tools-file-search).
@@ -4180,9 +4653,13 @@ pub struct FileSearchTool {
 
 /// The type of the file search tool. Always `file_search`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FileSearchToolType {
     #[serde(rename = "file_search")]
     FileSearch,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool that controls a virtual computer. Learn more about the [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
@@ -4194,9 +4671,13 @@ pub struct ComputerTool {
 
 /// The type of the computer tool. Always `computer`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerToolType {
     #[serde(rename = "computer")]
     Computer,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool that controls a virtual computer. Learn more about the [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
@@ -4214,9 +4695,13 @@ pub struct ComputerUsePreviewTool {
 
 /// The type of the computer use tool. Always `computer_use_preview`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerUsePreviewToolType {
     #[serde(rename = "computer_use_preview")]
     ComputerUsePreview,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Search the Internet for sources related to the prompt. Learn more about the
@@ -4251,6 +4736,7 @@ pub struct WebSearchToolFilters {
 /// High level guidance for the amount of context window space to use for the
 /// search. One of `low`, `medium`, or `high`. `medium` is the default.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum WebSearchToolSearchContextSize {
     #[serde(rename = "low")]
     Low,
@@ -4258,16 +4744,23 @@ pub enum WebSearchToolSearchContextSize {
     Medium,
     #[serde(rename = "high")]
     High,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the web search tool. One of `web_search` or
 /// `web_search_2025_08_26`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum WebSearchToolType {
     #[serde(rename = "web_search")]
     WebSearch,
     #[serde(rename = "web_search_2025_08_26")]
     WebSearch20250826,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Give the model access to additional tools via remote Model Context Protocol
@@ -4326,10 +4819,13 @@ pub type MCPToolAllowedToolsArray = Option<Vec<String>>;
 
 /// List of allowed tool names or a filter object.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum MCPToolAllowedTools {
     MCPToolAllowedToolsArray(MCPToolAllowedToolsArray),
     MCPToolFilter(MCPToolFilter),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// Identifier for service connectors, like those available in ChatGPT. One of
@@ -4347,6 +4843,7 @@ pub enum MCPToolAllowedTools {
 /// - Outlook Email: `connector_outlookemail`
 /// - SharePoint: `connector_sharepoint`
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MCPToolConnectorId {
     #[serde(rename = "connector_dropbox")]
     ConnectorDropbox,
@@ -4364,6 +4861,9 @@ pub enum MCPToolConnectorId {
     ConnectorOutlookemail,
     #[serde(rename = "connector_sharepoint")]
     ConnectorSharepoint,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Specify which of the MCP server's tools require approval. Can be
@@ -4384,17 +4884,24 @@ pub type MCPToolRequireApprovalString = Option<String>;
 
 /// Specify which of the MCP server's tools require approval.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum MCPToolRequireApproval {
     MCPToolRequireApprovalVariant1(MCPToolRequireApprovalVariant1),
     MCPToolRequireApprovalString(MCPToolRequireApprovalString),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// The type of the MCP tool. Always `mcp`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MCPToolType {
     #[serde(rename = "mcp")]
     Mcp,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool that runs Python code to help generate a response to a prompt.
@@ -4415,17 +4922,24 @@ pub type CodeInterpreterToolContainerString = Option<String>;
 /// specifies uploaded file IDs to make available to your code, along with an
 /// optional `memory_limit` setting.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum CodeInterpreterToolContainer {
     CodeInterpreterToolContainerString(CodeInterpreterToolContainerString),
     AutoCodeInterpreterToolParam(AutoCodeInterpreterToolParam),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// The type of the code interpreter tool. Always `code_interpreter`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CodeInterpreterToolType {
     #[serde(rename = "code_interpreter")]
     CodeInterpreter,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool that generates images using the GPT image models.
@@ -4476,6 +4990,7 @@ pub struct ImageGenTool {
 /// Background type for the generated image. One of `transparent`,
 /// `opaque`, or `auto`. Default: `auto`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenToolBackground {
     #[serde(rename = "transparent")]
     Transparent,
@@ -4483,6 +4998,9 @@ pub enum ImageGenToolBackground {
     Opaque,
     #[serde(rename = "auto")]
     Auto,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Optional mask for inpainting. Contains `image_url`
@@ -4499,16 +5017,21 @@ pub struct ImageGenToolInputImageMask {
 
 /// Moderation level for the generated image. Default: `auto`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenToolModeration {
     #[serde(rename = "auto")]
     Auto,
     #[serde(rename = "low")]
     Low,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The output format of the generated image. One of `png`, `webp`, or
 /// `jpeg`. Default: `png`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenToolOutputFormat {
     #[serde(rename = "png")]
     Png,
@@ -4516,11 +5039,15 @@ pub enum ImageGenToolOutputFormat {
     Webp,
     #[serde(rename = "jpeg")]
     Jpeg,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The quality of the generated image. One of `low`, `medium`, `high`,
 /// or `auto`. Default: `auto`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenToolQuality {
     #[serde(rename = "low")]
     Low,
@@ -4530,11 +5057,15 @@ pub enum ImageGenToolQuality {
     High,
     #[serde(rename = "auto")]
     Auto,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The size of the generated image. One of `1024x1024`, `1024x1536`,
 /// `1536x1024`, or `auto`. Default: `auto`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenToolSize {
     #[serde(rename = "1024x1024")]
     N1024X1024,
@@ -4544,13 +5075,20 @@ pub enum ImageGenToolSize {
     N1536X1024,
     #[serde(rename = "auto")]
     Auto,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the image generation tool. Always `image_generation`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenToolType {
     #[serde(rename = "image_generation")]
     ImageGeneration,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool that allows the model to execute shell commands in a local
@@ -4563,9 +5101,13 @@ pub struct LocalShellToolParam {
 
 /// The type of the local shell tool. Always `local_shell`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum LocalShellToolParamType {
     #[serde(rename = "local_shell")]
     LocalShell,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A tool that allows the model to execute shell commands.
@@ -4578,6 +5120,7 @@ pub struct FunctionShellToolParam {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum FunctionShellToolParamEnvironment {
     #[serde(rename = "container_auto")]
@@ -4586,13 +5129,20 @@ pub enum FunctionShellToolParamEnvironment {
     Local(LocalEnvironmentParam),
     #[serde(rename = "container_reference")]
     ContainerReference(ContainerReferenceParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the shell tool. Always `shell`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionShellToolParamType {
     #[serde(rename = "shell")]
     Shell,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A custom tool that processes input using a specified format. Learn more
@@ -4616,19 +5166,27 @@ pub struct CustomToolParam {
 
 /// The input format for the custom tool. Default is unconstrained text.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum CustomToolParamFormat {
     #[serde(rename = "text")]
     Text(CustomTextFormatParam),
     #[serde(rename = "grammar")]
     Grammar(CustomGrammarFormatParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the custom tool. Always `custom`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CustomToolParamType {
     #[serde(rename = "custom")]
     Custom,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Groups function/custom tools under a shared namespace.
@@ -4646,19 +5204,27 @@ pub struct NamespaceToolParam {
 
 /// A function or custom tool that belongs to a namespace.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum NamespaceToolParamToolsItem {
     #[serde(rename = "function")]
     Function(FunctionToolParam),
     #[serde(rename = "custom")]
     Custom(CustomToolParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the tool. Always `namespace`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum NamespaceToolParamType {
     #[serde(rename = "namespace")]
     Namespace,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Hosted or BYOT tool search configuration for deferred tools.
@@ -4679,9 +5245,13 @@ pub struct ToolSearchToolParam {
 
 /// The type of the tool. Always `tool_search`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ToolSearchToolParamType {
     #[serde(rename = "tool_search")]
     ToolSearch,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// This tool searches the web for relevant results to use in a response. Learn more about the [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
@@ -4704,11 +5274,15 @@ pub struct WebSearchPreviewTool {
 /// The type of the web search tool. One of `web_search_preview` or
 /// `web_search_preview_2025_03_11`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum WebSearchPreviewToolType {
     #[serde(rename = "web_search_preview")]
     WebSearchPreview,
     #[serde(rename = "web_search_preview_2025_03_11")]
     WebSearchPreview20250311,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Allows the assistant to create, delete, or update files using unified diffs.
@@ -4720,12 +5294,17 @@ pub struct ApplyPatchToolParam {
 
 /// The type of the tool. Always `apply_patch`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchToolParamType {
     #[serde(rename = "apply_patch")]
     ApplyPatch,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum InputContent {
     #[serde(rename = "input_text")]
@@ -4734,6 +5313,9 @@ pub enum InputContent {
     InputImage(InputImageContent),
     #[serde(rename = "input_file")]
     InputFile(InputFileContent),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A computer screenshot image used with the computer use tool.
@@ -4753,12 +5335,17 @@ pub struct ComputerScreenshotImage {
 /// Specifies the event type. For a computer screenshot, this property is
 /// always set to `computer_screenshot`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerScreenshotImageType {
     #[serde(rename = "computer_screenshot")]
     ComputerScreenshot,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionCallItemStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -4766,6 +5353,9 @@ pub enum FunctionCallItemStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A text input to the model.
@@ -4845,6 +5435,7 @@ pub struct ContainerReferenceParam {
 
 /// Status values reported for shell tool calls.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FunctionShellCallItemStatus {
     #[serde(rename = "in_progress")]
     InProgress,
@@ -4852,6 +5443,9 @@ pub enum FunctionShellCallItemStatus {
     Completed,
     #[serde(rename = "incomplete")]
     Incomplete,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Captured stdout and stderr for a portion of a shell tool call output.
@@ -4868,6 +5462,7 @@ pub struct FunctionShellCallOutputContentParam {
 /// One of the create_file, delete_file, or update_file operations supplied to
 /// the apply_patch tool.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ApplyPatchOperationParam {
     #[serde(rename = "create_file")]
@@ -4876,27 +5471,39 @@ pub enum ApplyPatchOperationParam {
     DeleteFile(ApplyPatchDeleteFileOperationParam),
     #[serde(rename = "update_file")]
     UpdateFile(ApplyPatchUpdateFileOperationParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Status values reported for apply_patch tool calls.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchCallStatusParam {
     #[serde(rename = "in_progress")]
     InProgress,
     #[serde(rename = "completed")]
     Completed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Outcome values reported for apply_patch tool call outputs.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyPatchCallOutputStatusParam {
     #[serde(rename = "completed")]
     Completed,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum FunctionAndCustomToolCallOutput {
     #[serde(rename = "input_text")]
@@ -4905,6 +5512,9 @@ pub enum FunctionAndCustomToolCallOutput {
     InputImage(InputImageContent),
     #[serde(rename = "input_file")]
     InputFile(InputFileContent),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// A click action.
@@ -4940,7 +5550,7 @@ pub struct DragParam {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keys: Option<Vec<String>>,
     /// An array of coordinates representing the path of the drag action.
-    /// Coordinates will appear as an array of objects, eg
+    /// Coordinates will appear as an array of objects, eg 
     /// ```
     /// [
     ///   { x: 100, y: 200 },
@@ -5014,6 +5624,7 @@ pub struct FunctionShellCallOutputExitOutcome {
 
 /// An annotation that applies to a span of output text.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum Annotation {
     #[serde(rename = "file_citation")]
@@ -5024,6 +5635,9 @@ pub enum Annotation {
     ContainerFileCitation(ContainerFileCitationBody),
     #[serde(rename = "file_path")]
     FilePath(FilePath),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The log probability of a token.
@@ -5036,6 +5650,7 @@ pub struct LogProb {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageDetail {
     #[serde(rename = "low")]
     Low,
@@ -5045,14 +5660,21 @@ pub enum ImageDetail {
     Auto,
     #[serde(rename = "original")]
     Original,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FileInputDetail {
     #[serde(rename = "low")]
     Low,
     #[serde(rename = "high")]
     High,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The schema for the response format, described as a JSON Schema object.
@@ -5060,10 +5682,13 @@ pub enum FileInputDetail {
 pub type ResponseFormatJsonSchemaSchema = Option<Value>;
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum Filters {
     ComparisonFilter(ComparisonFilter),
     CompoundFilter(CompoundFilter),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -5084,6 +5709,7 @@ pub struct RankingOptions {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComputerEnvironment {
     #[serde(rename = "windows")]
     Windows,
@@ -5095,6 +5721,9 @@ pub enum ComputerEnvironment {
     Ubuntu,
     #[serde(rename = "browser")]
     Browser,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The approximate location of the user.
@@ -5119,9 +5748,13 @@ pub struct WebSearchApproximateLocationValue {
 
 /// The type of location approximation. Always `approximate`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum WebSearchApproximateLocationValueType {
     #[serde(rename = "approximate")]
     Approximate,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 pub type WebSearchApproximateLocation = Option<Option<WebSearchApproximateLocationValue>>;
@@ -5158,22 +5791,31 @@ pub struct AutoCodeInterpreterToolParam {
 
 /// Network access policy for the container.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum AutoCodeInterpreterToolParamNetworkPolicy {
     #[serde(rename = "disabled")]
     Disabled(ContainerNetworkPolicyDisabledParam),
     #[serde(rename = "allowlist")]
     Allowlist(ContainerNetworkPolicyAllowlistParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Always `auto`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum AutoCodeInterpreterToolParamType {
     #[serde(rename = "auto")]
     Auto,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ImageGenActionEnum {
     #[serde(rename = "generate")]
     Generate,
@@ -5181,6 +5823,9 @@ pub enum ImageGenActionEnum {
     Edit,
     #[serde(rename = "auto")]
     Auto,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Control how much effort the model will exert to match the style and
@@ -5189,11 +5834,15 @@ pub enum ImageGenActionEnum {
 /// unsupported for `gpt-image-1-mini`. Supports `high` and `low`. Defaults to
 /// `low`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InputFidelity {
     #[serde(rename = "high")]
     High,
     #[serde(rename = "low")]
     Low,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -5214,21 +5863,29 @@ pub struct ContainerAutoParam {
 
 /// Network access policy for the container.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ContainerAutoParamNetworkPolicy {
     #[serde(rename = "disabled")]
     Disabled(ContainerNetworkPolicyDisabledParam),
     #[serde(rename = "allowlist")]
     Allowlist(ContainerNetworkPolicyAllowlistParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ContainerAutoParamSkillsItem {
     #[serde(rename = "skill_reference")]
     SkillReference(SkillReferenceParam),
     #[serde(rename = "inline")]
     Inline(InlineSkillParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Unconstrained free-form text.
@@ -5259,14 +5916,19 @@ pub struct FunctionToolParam {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SearchContentType {
     #[serde(rename = "text")]
     Text,
     #[serde(rename = "image")]
     Image,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SearchContextSize {
     #[serde(rename = "low")]
     Low,
@@ -5274,6 +5936,9 @@ pub enum SearchContextSize {
     Medium,
     #[serde(rename = "high")]
     High,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -5296,12 +5961,17 @@ pub struct ApproximateLocation {
 
 /// The type of location approximation. Always `approximate`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApproximateLocationType {
     #[serde(rename = "approximate")]
     Approximate,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum DetailEnum {
     #[serde(rename = "low")]
     Low,
@@ -5311,14 +5981,21 @@ pub enum DetailEnum {
     Auto,
     #[serde(rename = "original")]
     Original,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum FileDetailEnum {
     #[serde(rename = "low")]
     Low,
     #[serde(rename = "high")]
     High,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -5333,12 +6010,16 @@ pub struct LocalSkillParam {
 
 /// The exit or timeout outcome associated with this shell call.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum FunctionShellCallOutputOutcomeParam {
     #[serde(rename = "timeout")]
     Timeout(FunctionShellCallOutputTimeoutOutcomeParam),
     #[serde(rename = "exit")]
     Exit(FunctionShellCallOutputExitOutcomeParam),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Instruction for creating a new file via the apply_patch tool.
@@ -5367,6 +6048,7 @@ pub struct ApplyPatchUpdateFileOperationParam {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ClickButtonType {
     #[serde(rename = "left")]
     Left,
@@ -5378,6 +6060,9 @@ pub enum ClickButtonType {
     Back,
     #[serde(rename = "forward")]
     Forward,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// An x/y coordinate pair, e.g. `{ x: 100, y: 200 }`.
@@ -5480,6 +6165,7 @@ pub struct ComparisonFilter {
 /// - `in`: in
 /// - `nin`: not in
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ComparisonFilterType {
     #[serde(rename = "eq")]
     Eq,
@@ -5497,6 +6183,9 @@ pub enum ComparisonFilterType {
     In,
     #[serde(rename = "nin")]
     Nin,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 pub type ComparisonFilterValueString = Option<String>;
@@ -5510,10 +6199,13 @@ pub type ComparisonFilterValueArrayItemString = Option<String>;
 pub type ComparisonFilterValueArrayItemNumber = Option<f64>;
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum ComparisonFilterValueArrayItem {
     ComparisonFilterValueArrayItemString(ComparisonFilterValueArrayItemString),
     ComparisonFilterValueArrayItemNumber(ComparisonFilterValueArrayItemNumber),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 pub type ComparisonFilterValueArray = Option<Vec<ComparisonFilterValueArrayItem>>;
@@ -5521,12 +6213,15 @@ pub type ComparisonFilterValueArray = Option<Vec<ComparisonFilterValueArrayItem>
 /// The value to compare against the attribute key; supports string, number, or
 /// boolean types.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum ComparisonFilterValue {
     ComparisonFilterValueString(ComparisonFilterValueString),
     ComparisonFilterValueNumber(ComparisonFilterValueNumber),
     ComparisonFilterValueBoolean(ComparisonFilterValueBoolean),
     ComparisonFilterValueArray(ComparisonFilterValueArray),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// Combine multiple filters using `and` or `or`.
@@ -5540,19 +6235,26 @@ pub struct CompoundFilter {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(untagged)]
 pub enum CompoundFilterFiltersItem {
     ComparisonFilter(ComparisonFilter),
     CompoundFilter(CompoundFilter),
+    #[serde(skip_serializing)]
+    Unknown(Value),
 }
 
 /// Type of operation: `and` or `or`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CompoundFilterType {
     #[serde(rename = "and")]
     And,
     #[serde(rename = "or")]
     Or,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -5564,14 +6266,19 @@ pub struct HybridSearchOptions {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum RankerVersionType {
     #[serde(rename = "auto")]
     Auto,
     #[serde(rename = "default-2024-11-15")]
     Default20241115,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ContainerMemoryLimit {
     #[serde(rename = "1g")]
     N1G,
@@ -5581,6 +6288,9 @@ pub enum ContainerMemoryLimit {
     N16G,
     #[serde(rename = "64g")]
     N64G,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -5616,11 +6326,15 @@ pub struct InlineSkillParam {
 }
 
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum GrammarSyntax1 {
     #[serde(rename = "lark")]
     Lark,
     #[serde(rename = "regex")]
     Regex,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// Indicates that the shell call exceeded its configured time limit.
@@ -5657,14 +6371,22 @@ pub struct InlineSkillSourceParam {
 
 /// The media type of the inline skill payload. Must be `application/zip`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InlineSkillSourceParamMediaType {
     #[serde(rename = "application/zip")]
     ApplicationZip,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
 
 /// The type of the inline skill source. Must be `base64`.
 #[derive(Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum InlineSkillSourceParamType {
     #[serde(rename = "base64")]
     Base64,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
 }
