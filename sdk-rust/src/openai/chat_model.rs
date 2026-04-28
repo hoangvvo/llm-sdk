@@ -845,6 +845,7 @@ fn map_openai_message(
                         ),
                     ));
                 }
+                ChatCompletionMessageToolCallsItem::Unknown => {}
             }
         }
     }
@@ -860,6 +861,7 @@ fn map_openai_audio_format(format: &CreateChatCompletionRequestAllOf2AudioFormat
         CreateChatCompletionRequestAllOf2AudioFormat::Opus => AudioFormat::Opus,
         CreateChatCompletionRequestAllOf2AudioFormat::Pcm16 => AudioFormat::Linear16,
         CreateChatCompletionRequestAllOf2AudioFormat::Aac => AudioFormat::Aac,
+        CreateChatCompletionRequestAllOf2AudioFormat::Unknown => AudioFormat::Wav,
     }
 }
 

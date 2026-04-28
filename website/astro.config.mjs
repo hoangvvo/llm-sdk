@@ -4,7 +4,6 @@ import starlight from "@astrojs/starlight";
 import tailwindcss from "@tailwindcss/vite";
 import mermaid from "astro-mermaid";
 import { defineConfig } from "astro/config";
-import { ion } from "starlight-ion-theme";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
 // https://astro.build/config
@@ -89,7 +88,6 @@ export default defineConfig({
           ],
         },
       ],
-      plugins: [ion()],
       customCss: ["./src/styles/custom.css"],
     }),
     react(),

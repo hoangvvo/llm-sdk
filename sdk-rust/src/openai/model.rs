@@ -312,6 +312,7 @@ fn convert_to_response_create_params(
                 convert_to_openai_inputs(messages)?,
             ))),
             instructions: system_prompt,
+            max_output_tokens: max_tokens.map(i64::from),
             parallel_tool_calls: None,
             store: Some(false),
             stream: None,
@@ -457,17 +458,13 @@ fn convert_assistant_message_to_response_input_items(
                 )),
                 Part::Image(image_part) => Some(InputItem::Item(
                     responses_api::Item::ImageGenToolCall(ImageGenToolCall {
-                        action: None,
-                        background: None,
                         id: image_part.id.unwrap_or_default(),
                         output_format: None,
-                        quality: None,
                         status: responses_api::ImageGenToolCallStatus::Completed,
                         result: Some(format!(
                             "data:{};base64,{}",
                             image_part.mime_type, image_part.data
                         )),
-                        revised_prompt: None,
                         size: None,
                         r#type: ImageGenToolCallType::ImageGenerationCall,
                     }),
@@ -643,24 +640,27 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
     items
         .into_iter()
         .try_fold(Vec::new(), |mut acc, item| match item {
-            OutputItem::Message(msg) => {
-                let parts = msg
-                    .content
-                    .into_iter()
-                    .map(|content| match content {
-                        OutputMessageContent::OutputText(output_text) => {
-                            Ok(Part::text(output_text.text))
+            OutputItem::OutputMessage(msg) => {
+                let parts = msg.content.into_iter().try_fold(
+                    Vec::new(),
+                    |mut parts, content| -> LanguageModelResult<Vec<Part>> {
+                        match content {
+                            OutputMessageContent::OutputText(output_text) => {
+                                parts.push(Part::text(output_text.text));
+                            }
+                            OutputMessageContent::Refusal(refusal) => {
+                                return Err(LanguageModelError::Refusal(refusal.refusal));
+                            }
+                            OutputMessageContent::Unknown => {}
                         }
-                        OutputMessageContent::Refusal(refusal) => {
-                            Err(LanguageModelError::Refusal(refusal.refusal))
-                        }
-                    })
-                    .collect::<LanguageModelResult<Vec<_>>>()?;
+                        Ok(parts)
+                    },
+                )?;
 
                 acc.extend(parts);
                 Ok(acc)
             }
-            OutputItem::FunctionCall(function_tool_call) => {
+            OutputItem::FunctionToolCall(function_tool_call) => {
                 let args = serde_json::from_str(&function_tool_call.arguments).map_err(|e| {
                     LanguageModelError::Invariant(
                         PROVIDER,
@@ -676,7 +676,7 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                 acc.push(part);
                 Ok(acc)
             }
-            OutputItem::ImageGenerationCall(image_gen_call) => {
+            OutputItem::ImageGenToolCall(image_gen_call) => {
                 let mut image_part = ImagePart::new(
                     image_gen_call.result.ok_or_else(|| {
                         LanguageModelError::Invariant(
@@ -697,7 +697,7 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                 acc.push(part);
                 Ok(acc)
             }
-            OutputItem::Reasoning(reasoning_item) => {
+            OutputItem::ReasoningItem(reasoning_item) => {
                 let summary_text = reasoning_item
                     .summary
                     .into_iter()
@@ -729,7 +729,7 @@ fn map_openai_stream_event(
         )),
         ResponseStreamEvent::ResponseOutputItemAdded(output_item_added_event) => {
             match output_item_added_event.item {
-                OutputItem::FunctionCall(function_tool_call) => {
+                OutputItem::FunctionToolCall(function_tool_call) => {
                     let tool_call_part = PartDelta::ToolCall(ToolCallPartDelta {
                         args: Some(function_tool_call.arguments),
                         tool_name: Some(function_tool_call.name),
@@ -742,7 +742,7 @@ fn map_openai_stream_event(
                         part: tool_call_part,
                     }))
                 }
-                OutputItem::Reasoning(reasoning_item) => {
+                OutputItem::ReasoningItem(reasoning_item) => {
                     if let Some(encrypted_content) = reasoning_item.encrypted_content {
                         let reasoning_part = ReasoningPartDelta {
                             signature: Some(encrypted_content),

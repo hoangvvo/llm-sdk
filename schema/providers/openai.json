@@ -63,6 +63,18 @@
                 }
               ]
             },
+            "max_output_tokens": {
+              "anyOf": [
+                {
+                  "description": "An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).\n",
+                  "minimum": 16,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "parallel_tool_calls": {
               "anyOf": [
                 {
@@ -189,6 +201,17 @@
                       "type": "array"
                     }
                   ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "max_output_tokens": {
+              "anyOf": [
+                {
+                  "description": "An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).\n",
+                  "type": "integer"
                 },
                 {
                   "type": "null"
@@ -703,7 +726,7 @@
             {
               "description": "The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).\n",
               "enum": [
-                "in-memory",
+                "in_memory",
                 "24h"
               ],
               "type": "string"
@@ -832,7 +855,10 @@
       ]
     },
     "OutputItem": {
-      "anyOf": [
+      "discriminator": {
+        "propertyName": "type"
+      },
+      "oneOf": [
         {
           "$ref": "#/definitions/OutputMessage"
         },
@@ -843,10 +869,16 @@
           "$ref": "#/definitions/FunctionToolCall"
         },
         {
+          "$ref": "#/definitions/FunctionToolCallOutputResource"
+        },
+        {
           "$ref": "#/definitions/WebSearchToolCall"
         },
         {
           "$ref": "#/definitions/ComputerToolCall"
+        },
+        {
+          "$ref": "#/definitions/ComputerToolCallOutputResource"
         },
         {
           "$ref": "#/definitions/ReasoningItem"
@@ -870,6 +902,9 @@
           "$ref": "#/definitions/LocalShellToolCall"
         },
         {
+          "$ref": "#/definitions/LocalShellToolCallOutput"
+        },
+        {
           "$ref": "#/definitions/FunctionShellCall"
         },
         {
@@ -891,12 +926,15 @@
           "$ref": "#/definitions/MCPApprovalRequest"
         },
         {
+          "$ref": "#/definitions/MCPApprovalResponseResource"
+        },
+        {
           "$ref": "#/definitions/CustomToolCall"
+        },
+        {
+          "$ref": "#/definitions/CustomToolCallOutputResource"
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "ResponseUsage": {
       "description": "Represents token usage details including input tokens, output tokens,\na breakdown of output tokens, and the total tokens used.\n",
@@ -2597,20 +2635,11 @@
     "ResponseImageGenCallPartialImageEvent": {
       "description": "Emitted when a partial image is available during image generation streaming.\n",
       "properties": {
-        "background": {
-          "description": "The background setting used for the generated image.\n",
-          "enum": [
-            "transparent",
-            "opaque",
-            "auto"
-          ],
-          "type": "string"
-        },
         "item_id": {
           "description": "The unique identifier of the image generation item being processed.",
           "type": "string"
         },
-        "output_format": {
+         "output_format": {
           "description": "The output format of the generated image.\n",
           "type": "string"
         },
@@ -2625,16 +2654,6 @@
         "partial_image_index": {
           "description": "0-based index for the partial image (backend is 1-based, but this is 0-based for the user).",
           "type": "integer"
-        },
-        "quality": {
-          "description": "The quality of the generated image.\n",
-          "enum": [
-            "low",
-            "medium",
-            "high",
-            "auto"
-          ],
-          "type": "string"
         },
         "sequence_number": {
           "description": "The sequence number of the image generation item being processed.",
@@ -3739,6 +3758,34 @@
       "title": "Function tool call",
       "type": "object"
     },
+    "FunctionToolCallOutputResource": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/FunctionToolCallOutput"
+        },
+        {
+          "properties": {
+            "created_by": {
+              "description": "The identifier of the actor that created the item.\n",
+              "type": "string"
+            },
+            "id": {
+              "description": "The unique ID of the function call tool output.\n",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/definitions/FunctionCallOutputStatusEnum",
+              "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n"
+            }
+          },
+          "required": [
+            "id",
+            "status"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "WebSearchToolCall": {
       "description": "The results of a web search tool call. See the\n[web search guide](/docs/guides/tools-web-search) for more information.\n",
       "properties": {
@@ -3843,6 +3890,34 @@
       ],
       "title": "Computer tool call",
       "type": "object"
+    },
+    "ComputerToolCallOutputResource": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/ComputerToolCallOutput"
+        },
+        {
+          "properties": {
+            "created_by": {
+              "description": "The identifier of the actor that created the item.\n",
+              "type": "string"
+            },
+            "id": {
+              "description": "The unique ID of the computer call tool output.\n",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/definitions/ComputerCallOutputStatus",
+              "description": "The status of the message input. One of `in_progress`, `completed`, or\n`incomplete`. Populated when input items are returned via API.\n"
+            }
+          },
+          "required": [
+            "id",
+            "status"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "ReasoningItem": {
       "description": "A description of the chain of thought used by a reasoning model while generating\na response. Be sure to include these items in your `input` to the Responses API\nfor subsequent turns of a conversation if you are manually\n[managing context](/docs/guides/conversation-state).\n",
@@ -4046,39 +4121,12 @@
     "ImageGenToolCall": {
       "description": "An image generation request made by the model.\n",
       "properties": {
-        "action": {
-          "description": "The image generation action performed by the model.\n",
-          "enum": [
-            "generate",
-            "edit"
-          ],
-          "type": "string"
-        },
-        "background": {
-          "description": "The background setting used for the generated image.\n",
-          "enum": [
-            "transparent",
-            "opaque",
-            "auto"
-          ],
-          "type": "string"
-        },
         "id": {
           "description": "The unique ID of the image generation call.\n",
           "type": "string"
         },
         "output_format": {
           "description": "The output format of the generated image.\n",
-          "type": "string"
-        },
-        "quality": {
-          "description": "The quality of the generated image.\n",
-          "enum": [
-            "low",
-            "medium",
-            "high",
-            "auto"
-          ],
           "type": "string"
         },
         "result": {
@@ -4091,10 +4139,6 @@
               "type": "null"
             }
           ]
-        },
-        "revised_prompt": {
-          "description": "The revised prompt used to generate the image.\n",
-          "type": "string"
         },
         "size": {
           "description": "The size of the generated image.\n",
@@ -4249,6 +4293,51 @@
         "status"
       ],
       "title": "Local shell call",
+      "type": "object"
+    },
+    "LocalShellToolCallOutput": {
+      "description": "The output of a local shell tool call.\n",
+      "properties": {
+        "id": {
+          "description": "The unique ID of the local shell tool call generated by the model.\n",
+          "type": "string"
+        },
+        "output": {
+          "description": "A JSON string of the output of the local shell tool call.\n",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "description": "The status of the item. One of `in_progress`, `completed`, or `incomplete`.\n",
+              "enum": [
+                "in_progress",
+                "completed",
+                "incomplete"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "description": "The type of the local shell tool call output. Always `local_shell_call_output`.\n",
+          "enum": [
+            "local_shell_call_output"
+          ],
+          "type": "string",
+          "x-stainless-const": true
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "call_id",
+        "output"
+      ],
+      "title": "Local shell call output",
       "type": "object"
     },
     "FunctionShellCall": {
@@ -4639,6 +4728,51 @@
       "title": "MCP approval request",
       "type": "object"
     },
+    "MCPApprovalResponseResource": {
+      "description": "A response to an MCP approval request.\n",
+      "properties": {
+        "approval_request_id": {
+          "description": "The ID of the approval request being answered.\n",
+          "type": "string"
+        },
+        "approve": {
+          "description": "Whether the request was approved.\n",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "The unique ID of the approval response\n",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "description": "Optional reason for the decision.\n",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "description": "The type of the item. Always `mcp_approval_response`.\n",
+          "enum": [
+            "mcp_approval_response"
+          ],
+          "type": "string",
+          "x-stainless-const": true
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "request_id",
+        "approve",
+        "approval_request_id"
+      ],
+      "title": "MCP approval response",
+      "type": "object"
+    },
     "CustomToolCall": {
       "description": "A call to a custom tool created by the model.\n",
       "properties": {
@@ -4679,6 +4813,35 @@
       ],
       "title": "Custom tool call",
       "type": "object"
+    },
+    "CustomToolCallOutputResource": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/CustomToolCallOutput"
+        },
+        {
+          "properties": {
+            "created_by": {
+              "description": "The identifier of the actor that created the item.\n",
+              "type": "string"
+            },
+            "id": {
+              "description": "The unique ID of the custom tool call output item.\n",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/definitions/FunctionCallOutputStatusEnum",
+              "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n"
+            }
+          },
+          "required": [
+            "id",
+            "status"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ResponseCustomToolCallOutputItem"
     },
     "OutputContent": {
       "discriminator": {
@@ -5516,51 +5679,6 @@
       "title": "Compaction item",
       "type": "object"
     },
-    "LocalShellToolCallOutput": {
-      "description": "The output of a local shell tool call.\n",
-      "properties": {
-        "id": {
-          "description": "The unique ID of the local shell tool call generated by the model.\n",
-          "type": "string"
-        },
-        "output": {
-          "description": "A JSON string of the output of the local shell tool call.\n",
-          "type": "string"
-        },
-        "status": {
-          "anyOf": [
-            {
-              "description": "The status of the item. One of `in_progress`, `completed`, or `incomplete`.\n",
-              "enum": [
-                "in_progress",
-                "completed",
-                "incomplete"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "type": {
-          "description": "The type of the local shell tool call output. Always `local_shell_call_output`.\n",
-          "enum": [
-            "local_shell_call_output"
-          ],
-          "type": "string",
-          "x-stainless-const": true
-        }
-      },
-      "required": [
-        "id",
-        "type",
-        "call_id",
-        "output"
-      ],
-      "title": "Local shell call output",
-      "type": "object"
-    },
     "FunctionShellCallItemParam": {
       "description": "A tool representing a request to execute one or more shell commands.",
       "properties": {
@@ -5948,6 +6066,69 @@
         }
       ]
     },
+    "FunctionToolCallOutput": {
+      "description": "The output of a function tool call.\n",
+      "properties": {
+        "call_id": {
+          "description": "The unique ID of the function tool call generated by the model.\n",
+          "type": "string"
+        },
+        "id": {
+          "description": "The unique ID of the function tool call output. Populated when this item\nis returned via API.\n",
+          "type": "string"
+        },
+        "output": {
+          "description": "The output from the function call generated by your code.\nCan be a string or an list of output content.\n",
+          "oneOf": [
+            {
+              "description": "A string of the output of the function call.\n",
+              "title": "string output",
+              "type": "string"
+            },
+            {
+              "description": "Text, image, or file output of the function call.\n",
+              "items": {
+                "$ref": "#/definitions/FunctionAndCustomToolCallOutput"
+              },
+              "title": "output content list",
+              "type": "array"
+            }
+          ]
+        },
+        "status": {
+          "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n",
+          "enum": [
+            "in_progress",
+            "completed",
+            "incomplete"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "description": "The type of the function tool call output. Always `function_call_output`.\n",
+          "enum": [
+            "function_call_output"
+          ],
+          "type": "string",
+          "x-stainless-const": true
+        }
+      },
+      "required": [
+        "type",
+        "call_id",
+        "output"
+      ],
+      "title": "Function tool call output",
+      "type": "object"
+    },
+    "FunctionCallOutputStatusEnum": {
+      "enum": [
+        "in_progress",
+        "completed",
+        "incomplete"
+      ],
+      "type": "string"
+    },
     "WebSearchActionSearch": {
       "description": "Action type \"search\" - Performs a web search query.\n",
       "properties": {
@@ -6144,6 +6325,62 @@
       ],
       "type": "object"
     },
+    "ComputerToolCallOutput": {
+      "description": "The output of a computer tool call.\n",
+      "properties": {
+        "acknowledged_safety_checks": {
+          "description": "The safety checks reported by the API that have been acknowledged by the\ndeveloper.\n",
+          "items": {
+            "$ref": "#/definitions/ComputerCallSafetyCheckParam"
+          },
+          "type": "array"
+        },
+        "call_id": {
+          "description": "The ID of the computer tool call that produced the output.\n",
+          "type": "string"
+        },
+        "id": {
+          "description": "The ID of the computer tool call output.\n",
+          "type": "string"
+        },
+        "output": {
+          "$ref": "#/definitions/ComputerScreenshotImage"
+        },
+        "status": {
+          "description": "The status of the message input. One of `in_progress`, `completed`, or\n`incomplete`. Populated when input items are returned via API.\n",
+          "enum": [
+            "in_progress",
+            "completed",
+            "incomplete"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "default": "computer_call_output",
+          "description": "The type of the computer tool call output. Always `computer_call_output`.\n",
+          "enum": [
+            "computer_call_output"
+          ],
+          "type": "string",
+          "x-stainless-const": true
+        }
+      },
+      "required": [
+        "type",
+        "call_id",
+        "output"
+      ],
+      "title": "Computer tool call output",
+      "type": "object"
+    },
+    "ComputerCallOutputStatus": {
+      "enum": [
+        "completed",
+        "incomplete",
+        "failed"
+      ],
+      "type": "string"
+    },
     "ReasoningTextContent": {
       "description": "Reasoning text from the model.",
       "properties": {
@@ -6200,14 +6437,6 @@
       "type": "string"
     },
     "FunctionCallStatus": {
-      "enum": [
-        "in_progress",
-        "completed",
-        "incomplete"
-      ],
-      "type": "string"
-    },
-    "FunctionCallOutputStatusEnum": {
       "enum": [
         "in_progress",
         "completed",
@@ -6753,6 +6982,10 @@
     "InputFileContent": {
       "description": "A file input to the model.",
       "properties": {
+        "detail": {
+          "$ref": "#/definitions/FileInputDetail",
+          "description": "The detail level of the file to be sent to the model. Use `low` for the default rendering behavior, or `high` to render the file at higher quality. Defaults to `low`."
+        },
         "file_data": {
           "description": "The content of the file to be sent to the model.\n",
           "type": "string"
@@ -7779,11 +8012,15 @@
     "InputFileContentParam": {
       "description": "A file input to the model.",
       "properties": {
+        "detail": {
+          "$ref": "#/definitions/FileDetailEnum",
+          "description": "The detail level of the file to be sent to the model. Use `low` for the default rendering behavior, or `high` to render the file at higher quality. Defaults to `low`."
+        },
         "file_data": {
           "anyOf": [
             {
               "description": "The base64-encoded data of the file to be sent to the model.",
-              "maxLength": 33554432,
+              "maxLength": 73400320,
               "type": "string"
             },
             {
@@ -8443,6 +8680,13 @@
       ],
       "type": "string"
     },
+    "FileInputDetail": {
+      "enum": [
+        "low",
+        "high"
+      ],
+      "type": "string"
+    },
     "ResponseFormatJsonSchemaSchema": {
       "additionalProperties": true,
       "description": "The schema for the response format, described as a JSON Schema object.\nLearn how to build JSON schemas [here](https://json-schema.org/).\n",
@@ -8900,6 +9144,13 @@
         "high",
         "auto",
         "original"
+      ],
+      "type": "string"
+    },
+    "FileDetailEnum": {
+      "enum": [
+        "low",
+        "high"
       ],
       "type": "string"
     },
