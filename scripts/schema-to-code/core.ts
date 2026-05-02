@@ -419,10 +419,7 @@ function stripNonBehavioralSchemaMetadata(value: unknown): unknown {
   }
   const stripped: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value)) {
-    if (
-      NON_TYPE_AFFECTING_SCHEMA_KEYS.has(key) ||
-      key.startsWith("x-")
-    ) {
+    if (NON_TYPE_AFFECTING_SCHEMA_KEYS.has(key) || key.startsWith("x-")) {
       continue;
     }
     stripped[key] = stripNonBehavioralSchemaMetadata(entry);
@@ -824,7 +821,9 @@ class SchemaDocumentBuilder {
 
     for (const property of mergedProperties) {
       const lowered = this.lowerAnonymousType(
-        property.nullable ? wrapNullableSchema(property.schema) : property.schema,
+        property.nullable
+          ? wrapNullableSchema(property.schema)
+          : property.schema,
         `${typeName}${toCamelCase(property.propertyName)}`,
         property.path,
       );
@@ -921,7 +920,9 @@ class SchemaDocumentBuilder {
       );
     }
 
-    const requiredProperties = new Set(getObjectRequiredProperties(activeSchema));
+    const requiredProperties = new Set(
+      getObjectRequiredProperties(activeSchema),
+    );
     for (const [propertyName, propertyDefinition] of Object.entries(
       properties as Record<string, JSONSchema7Definition>,
     )) {
@@ -986,7 +987,10 @@ class SchemaDocumentBuilder {
       return this.preferAllOfPropertySchema(left, right);
     }
 
-    const intersectedEnum = this.intersectStringEnums(leftResolved, rightResolved);
+    const intersectedEnum = this.intersectStringEnums(
+      leftResolved,
+      rightResolved,
+    );
     if (intersectedEnum) {
       return intersectedEnum;
     }
@@ -1020,7 +1024,9 @@ class SchemaDocumentBuilder {
       return undefined;
     }
 
-    const intersection = leftValues.filter((value) => rightValues.includes(value));
+    const intersection = leftValues.filter((value) =>
+      rightValues.includes(value),
+    );
     if (intersection.length === 0) {
       return undefined;
     }
@@ -1045,7 +1051,9 @@ class SchemaDocumentBuilder {
     const seenRefs = new Set<string>();
     while (current.$ref) {
       if (seenRefs.has(current.$ref)) {
-        throw new Error(`Circular $ref encountered while comparing allOf properties: ${current.$ref}`);
+        throw new Error(
+          `Circular $ref encountered while comparing allOf properties: ${current.$ref}`,
+        );
       }
       seenRefs.add(current.$ref);
       current = mergeSchemaMetadata(
@@ -1605,7 +1613,10 @@ class SchemaDocumentBuilder {
               formatPath(memberPath),
             )
           : memberSchema;
-        const match = this.getUntaggedMatchForSchema(resolvedMember, memberPath);
+        const match = this.getUntaggedMatchForSchema(
+          resolvedMember,
+          memberPath,
+        );
         if (match.kind !== "object") {
           throw new Error(
             `Unsupported non-object allOf member in untagged match at ${formatPath(memberPath)}`,

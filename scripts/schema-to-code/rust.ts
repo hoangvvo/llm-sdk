@@ -200,11 +200,15 @@ function renderRustUnion(declaration: UnionDeclaration): string {
   return lines.join("\n");
 }
 
-function renderRustUntaggedDeserialize(declaration: UnionDeclaration): string[] {
+function renderRustUntaggedDeserialize(
+  declaration: UnionDeclaration,
+): string[] {
   const lines: string[] = [];
   lines.push("");
   lines.push(`impl<'de> Deserialize<'de> for ${declaration.name} {`);
-  lines.push("    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>");
+  lines.push(
+    "    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>",
+  );
   lines.push("    where");
   lines.push("        D: serde::Deserializer<'de>,");
   lines.push("    {");
@@ -276,7 +280,9 @@ function renderRustUntaggedDeserialize(declaration: UnionDeclaration): string[] 
   );
   if (objectVariants.length > 0) {
     lines.push("            Value::Object(object) => {");
-    lines.push(...renderRustObjectUntaggedCaseBody(objectVariants, declaration.name));
+    lines.push(
+      ...renderRustObjectUntaggedCaseBody(objectVariants, declaration.name),
+    );
     lines.push("            }");
   }
 
@@ -350,12 +356,18 @@ function renderRustObjectUntaggedCaseBody(
       );
       lines.push("                    match discriminator {");
       match.nestedTaggedUnion.values.forEach((allowedValue) => {
-        lines.push(`                        ${JSON.stringify(allowedValue)} => {`);
+        lines.push(
+          `                        ${JSON.stringify(allowedValue)} => {`,
+        );
         lines.push(
           `                            return serde_json::from_value(value.clone())`,
         );
-        lines.push(`                                .map(Self::${variant.name})`);
-        lines.push("                                .or(Ok(Self::Unknown(value.clone())));");
+        lines.push(
+          `                                .map(Self::${variant.name})`,
+        );
+        lines.push(
+          "                                .or(Ok(Self::Unknown(value.clone())));",
+        );
         lines.push("                        }");
       });
       lines.push("                        _ => {}");
@@ -379,9 +391,13 @@ function renderRustObjectUntaggedCaseBody(
 
     if (conditions.length > 0) {
       lines.push(`                if ${conditions.join(" && ")} {`);
-      lines.push(`                    return serde_json::from_value(value.clone())`);
+      lines.push(
+        `                    return serde_json::from_value(value.clone())`,
+      );
       lines.push(`                        .map(Self::${variant.name})`);
-      lines.push("                        .or(Ok(Self::Unknown(value.clone())));");
+      lines.push(
+        "                        .or(Ok(Self::Unknown(value.clone())));",
+      );
       lines.push("                }");
       return;
     }
