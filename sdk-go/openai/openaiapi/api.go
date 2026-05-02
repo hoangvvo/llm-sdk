@@ -5,7 +5,95 @@ import (
 	"errors"
 )
 
-type CreateResponseAllOf3 struct {
+// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+type CreateResponsePromptCacheRetention string
+
+const (
+	CreateResponsePromptCacheRetentionInMemory CreateResponsePromptCacheRetention = "in_memory"
+	CreateResponsePromptCacheRetentionN24H     CreateResponsePromptCacheRetention = "24h"
+)
+
+// The truncation strategy to use for the model response.
+//   - `auto`: If the input to this Response exceeds
+//     the model's context window size, the model will truncate the
+//     response to fit the context window by dropping items from the beginning of the conversation.
+//   - `disabled` (default): If the input size will exceed the context window
+//     size for a model, the request will fail with a 400 error.
+type CreateResponseTruncation string
+
+const (
+	CreateResponseTruncationAuto     CreateResponseTruncation = "auto"
+	CreateResponseTruncationDisabled CreateResponseTruncation = "disabled"
+)
+
+type CreateResponse struct {
+	Metadata *Metadata `json:"metadata,omitempty"`
+	// Used by OpenAI to cache responses for similar requests to optimize your cache hit rates. Replaces the `user` field. [Learn more](/docs/guides/prompt-caching).
+	//
+	PromptCacheKey *string `json:"prompt_cache_key,omitempty"`
+	// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+	//
+	PromptCacheRetention *CreateResponsePromptCacheRetention `json:"prompt_cache_retention,omitempty"`
+	// A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
+	// The IDs should be a string that uniquely identifies each user, with a maximum length of 64 characters. We recommend hashing their username or email address, in order to avoid sending us any identifying information. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	SafetyIdentifier *string      `json:"safety_identifier,omitempty"`
+	ServiceTier      *ServiceTier `json:"service_tier,omitempty"`
+	// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
+	// We generally recommend altering this or `top_p` but not both.
+	//
+	Temperature *float64 `json:"temperature,omitempty"`
+	// An integer between 0 and 20 specifying the number of most likely tokens to
+	// return at each token position, each with an associated log probability.
+	//
+	TopLogprobs *int `json:"top_logprobs,omitempty"`
+	// An alternative to sampling with temperature, called nucleus sampling,
+	// where the model considers the results of the tokens with top_p probability
+	// mass. So 0.1 means only the tokens comprising the top 10% probability mass
+	// are considered.
+	//
+	// We generally recommend altering this or `temperature` but not both.
+	//
+	TopP *float64 `json:"top_p,omitempty"`
+	// This field is being replaced by `safety_identifier` and `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching optimizations.
+	// A stable identifier for your end-users.
+	// Used to boost cache hit rates by better bucketing similar requests and  to help OpenAI detect and prevent abuse. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	User *string `json:"user,omitempty"`
+	// Whether to run the model response in the background.
+	// [Learn more](/docs/guides/background).
+	//
+	Background *bool `json:"background,omitempty"`
+	// An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).
+	//
+	MaxOutputTokens *int `json:"max_output_tokens,omitempty"`
+	// The maximum number of total calls to built-in tools that can be processed in a response. This maximum number applies across all built-in tool calls, not per individual tool. Any further attempts to call a tool by the model will be ignored.
+	//
+	MaxToolCalls *int `json:"max_tool_calls,omitempty"`
+	// Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI
+	// offers a wide range of models with different capabilities, performance
+	// characteristics, and price points. Refer to the [model guide](/docs/models)
+	// to browse and compare available models.
+	//
+	Model *ModelIdsResponses `json:"model,omitempty"`
+	// The unique ID of the previous response to the model. Use this to
+	// create multi-turn conversations. Learn more about
+	// [conversation state](/docs/guides/conversation-state). Cannot be used in conjunction with `conversation`.
+	//
+	PreviousResponseId *string            `json:"previous_response_id,omitempty"`
+	Prompt             *Prompt            `json:"prompt,omitempty"`
+	Reasoning          *Reasoning         `json:"reasoning,omitempty"`
+	Text               *ResponseTextParam `json:"text,omitempty"`
+	ToolChoice         *ToolChoiceParam   `json:"tool_choice,omitempty"`
+	Tools              *ToolsArray        `json:"tools,omitempty"`
+	// The truncation strategy to use for the model response.
+	// - `auto`: If the input to this Response exceeds
+	//   the model's context window size, the model will truncate the
+	//   response to fit the context window by dropping items from the beginning of the conversation.
+	// - `disabled` (default): If the input size will exceed the context window
+	//   size for a model, the request will fail with a 400 error.
+	//
+	Truncation *CreateResponseTruncation `json:"truncation,omitempty"`
 	// Context management configuration for this request.
 	//
 	ContextManagement []ContextManagementParam `json:"context_management,omitempty"`
@@ -27,9 +115,6 @@ type CreateResponseAllOf3 struct {
 	// to swap out system (or developer) messages in new responses.
 	//
 	Instructions *string `json:"instructions,omitempty"`
-	// An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).
-	//
-	MaxOutputTokens *int `json:"max_output_tokens,omitempty"`
 	// Whether to allow the model to run tool calls in parallel.
 	//
 	ParallelToolCalls *bool `json:"parallel_tool_calls,omitempty"`
@@ -46,13 +131,185 @@ type CreateResponseAllOf3 struct {
 	StreamOptions *ResponseStreamOptions `json:"stream_options,omitempty"`
 }
 
-type CreateResponse struct {
-	CreateModelResponseProperties
-	ResponseProperties
-	CreateResponseAllOf3
+// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+type ResponsePromptCacheRetention string
+
+const (
+	ResponsePromptCacheRetentionInMemory ResponsePromptCacheRetention = "in_memory"
+	ResponsePromptCacheRetentionN24H     ResponsePromptCacheRetention = "24h"
+)
+
+// The truncation strategy to use for the model response.
+//   - `auto`: If the input to this Response exceeds
+//     the model's context window size, the model will truncate the
+//     response to fit the context window by dropping items from the beginning of the conversation.
+//   - `disabled` (default): If the input size will exceed the context window
+//     size for a model, the request will fail with a 400 error.
+type ResponseTruncation string
+
+const (
+	ResponseTruncationAuto     ResponseTruncation = "auto"
+	ResponseTruncationDisabled ResponseTruncation = "disabled"
+)
+
+// Details about why the response is incomplete.
+type ResponseIncompleteDetails struct {
+	// The reason why the response is incomplete.
+	Reason *ResponseIncompleteDetailsReason `json:"reason,omitempty"`
 }
 
-type ResponseAllOf3 struct {
+// The reason why the response is incomplete.
+type ResponseIncompleteDetailsReason string
+
+const (
+	ResponseIncompleteDetailsReasonMaxOutputTokens ResponseIncompleteDetailsReason = "max_output_tokens"
+	ResponseIncompleteDetailsReasonContentFilter   ResponseIncompleteDetailsReason = "content_filter"
+)
+
+// A text input to the model, equivalent to a text input with the
+// `developer` role.
+type ResponseInstructionsString *string
+
+// A list of one or many input items to the model, containing
+// different content types.
+type ResponseInstructionsArray []InputItem
+
+// A system (or developer) message inserted into the model's context.
+//
+// When using along with `previous_response_id`, the instructions from a previous
+// response will not be carried over to the next response. This makes it simple
+// to swap out system (or developer) messages in new responses.
+type ResponseInstructions struct {
+	ResponseInstructionsString *ResponseInstructionsString
+	ResponseInstructionsArray  *ResponseInstructionsArray
+}
+
+func (u *ResponseInstructions) MarshalJSON() ([]byte, error) {
+	if u == nil {
+		return []byte("null"), nil
+	}
+	if u.ResponseInstructionsString != nil {
+		return json.Marshal(u.ResponseInstructionsString)
+	}
+	if u.ResponseInstructionsArray != nil {
+		return json.Marshal(u.ResponseInstructionsArray)
+	}
+	return nil, errors.New("invalid ResponseInstructions: all variants are nil")
+}
+
+func (u *ResponseInstructions) UnmarshalJSON(data []byte) error {
+	var raw interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*u = ResponseInstructions{}
+	switch raw.(type) {
+	case string:
+		var v ResponseInstructionsString
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil
+		}
+		u.ResponseInstructionsString = &v
+		return nil
+	case []interface{}:
+		var v ResponseInstructionsArray
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil
+		}
+		u.ResponseInstructionsArray = &v
+		return nil
+	}
+	return nil
+}
+
+// The object type of this resource - always set to `response`.
+type ResponseObject string
+
+const (
+	ResponseObjectResponse ResponseObject = "response"
+)
+
+// The status of the response generation. One of `completed`, `failed`,
+// `in_progress`, `cancelled`, `queued`, or `incomplete`.
+type ResponseStatus string
+
+const (
+	ResponseStatusCompleted  ResponseStatus = "completed"
+	ResponseStatusFailed     ResponseStatus = "failed"
+	ResponseStatusInProgress ResponseStatus = "in_progress"
+	ResponseStatusCancelled  ResponseStatus = "cancelled"
+	ResponseStatusQueued     ResponseStatus = "queued"
+	ResponseStatusIncomplete ResponseStatus = "incomplete"
+)
+
+type Response struct {
+	Metadata *Metadata `json:"metadata,omitempty"`
+	// Used by OpenAI to cache responses for similar requests to optimize your cache hit rates. Replaces the `user` field. [Learn more](/docs/guides/prompt-caching).
+	//
+	PromptCacheKey *string `json:"prompt_cache_key,omitempty"`
+	// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+	//
+	PromptCacheRetention *ResponsePromptCacheRetention `json:"prompt_cache_retention,omitempty"`
+	// A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
+	// The IDs should be a string that uniquely identifies each user, with a maximum length of 64 characters. We recommend hashing their username or email address, in order to avoid sending us any identifying information. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	SafetyIdentifier *string      `json:"safety_identifier,omitempty"`
+	ServiceTier      *ServiceTier `json:"service_tier,omitempty"`
+	// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
+	// We generally recommend altering this or `top_p` but not both.
+	//
+	Temperature *float64 `json:"temperature,omitempty"`
+	// An integer between 0 and 20 specifying the number of most likely tokens to
+	// return at each token position, each with an associated log probability.
+	//
+	TopLogprobs *int `json:"top_logprobs,omitempty"`
+	// An alternative to sampling with temperature, called nucleus sampling,
+	// where the model considers the results of the tokens with top_p probability
+	// mass. So 0.1 means only the tokens comprising the top 10% probability mass
+	// are considered.
+	//
+	// We generally recommend altering this or `temperature` but not both.
+	//
+	TopP *float64 `json:"top_p,omitempty"`
+	// This field is being replaced by `safety_identifier` and `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching optimizations.
+	// A stable identifier for your end-users.
+	// Used to boost cache hit rates by better bucketing similar requests and  to help OpenAI detect and prevent abuse. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	User *string `json:"user,omitempty"`
+	// Whether to run the model response in the background.
+	// [Learn more](/docs/guides/background).
+	//
+	Background *bool `json:"background,omitempty"`
+	// An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).
+	//
+	MaxOutputTokens *int `json:"max_output_tokens,omitempty"`
+	// The maximum number of total calls to built-in tools that can be processed in a response. This maximum number applies across all built-in tool calls, not per individual tool. Any further attempts to call a tool by the model will be ignored.
+	//
+	MaxToolCalls *int `json:"max_tool_calls,omitempty"`
+	// Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI
+	// offers a wide range of models with different capabilities, performance
+	// characteristics, and price points. Refer to the [model guide](/docs/models)
+	// to browse and compare available models.
+	//
+	Model *ModelIdsResponses `json:"model,omitempty"`
+	// The unique ID of the previous response to the model. Use this to
+	// create multi-turn conversations. Learn more about
+	// [conversation state](/docs/guides/conversation-state). Cannot be used in conjunction with `conversation`.
+	//
+	PreviousResponseId *string            `json:"previous_response_id,omitempty"`
+	Prompt             *Prompt            `json:"prompt,omitempty"`
+	Reasoning          *Reasoning         `json:"reasoning,omitempty"`
+	Text               *ResponseTextParam `json:"text,omitempty"`
+	ToolChoice         *ToolChoiceParam   `json:"tool_choice,omitempty"`
+	Tools              *ToolsArray        `json:"tools,omitempty"`
+	// The truncation strategy to use for the model response.
+	// - `auto`: If the input to this Response exceeds
+	//   the model's context window size, the model will truncate the
+	//   response to fit the context window by dropping items from the beginning of the conversation.
+	// - `disabled` (default): If the input size will exceed the context window
+	//   size for a model, the request will fail with a 400 error.
+	//
+	Truncation *ResponseTruncation `json:"truncation,omitempty"`
 	// Unix timestamp (in seconds) of when this Response was completed.
 	// Only present when the status is `completed`.
 	//
@@ -67,20 +324,17 @@ type ResponseAllOf3 struct {
 	Id string `json:"id"`
 	// Details about why the response is incomplete.
 	//
-	IncompleteDetails *ResponseAllOf3IncompleteDetails `json:"incomplete_details"`
+	IncompleteDetails *ResponseIncompleteDetails `json:"incomplete_details"`
 	// A system (or developer) message inserted into the model's context.
 	//
 	// When using along with `previous_response_id`, the instructions from a previous
 	// response will not be carried over to the next response. This makes it simple
 	// to swap out system (or developer) messages in new responses.
 	//
-	Instructions *ResponseAllOf3Instructions `json:"instructions"`
-	// An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](/docs/guides/reasoning).
-	//
-	MaxOutputTokens *int `json:"max_output_tokens,omitempty"`
+	Instructions *ResponseInstructions `json:"instructions"`
 	// The object type of this resource - always set to `response`.
 	//
-	Object ResponseAllOf3Object `json:"object"`
+	Object ResponseObject `json:"object"`
 	// An array of content items generated by the model.
 	//
 	// - The length and order of items in the `output` array is dependent
@@ -102,104 +356,8 @@ type ResponseAllOf3 struct {
 	// The status of the response generation. One of `completed`, `failed`,
 	// `in_progress`, `cancelled`, `queued`, or `incomplete`.
 	//
-	Status *ResponseAllOf3Status `json:"status,omitempty"`
-	Usage  *ResponseUsage        `json:"usage,omitempty"`
-}
-
-// Details about why the response is incomplete.
-type ResponseAllOf3IncompleteDetails struct {
-	// The reason why the response is incomplete.
-	Reason *ResponseAllOf3IncompleteDetailsReason `json:"reason,omitempty"`
-}
-
-// The reason why the response is incomplete.
-type ResponseAllOf3IncompleteDetailsReason string
-
-const (
-	ResponseAllOf3IncompleteDetailsReasonMaxOutputTokens ResponseAllOf3IncompleteDetailsReason = "max_output_tokens"
-	ResponseAllOf3IncompleteDetailsReasonContentFilter   ResponseAllOf3IncompleteDetailsReason = "content_filter"
-)
-
-// A text input to the model, equivalent to a text input with the
-// `developer` role.
-type ResponseAllOf3InstructionsString *string
-
-// A list of one or many input items to the model, containing
-// different content types.
-type ResponseAllOf3InstructionsArray []InputItem
-
-// A system (or developer) message inserted into the model's context.
-//
-// When using along with `previous_response_id`, the instructions from a previous
-// response will not be carried over to the next response. This makes it simple
-// to swap out system (or developer) messages in new responses.
-type ResponseAllOf3Instructions struct {
-	ResponseAllOf3InstructionsString *ResponseAllOf3InstructionsString
-	ResponseAllOf3InstructionsArray  *ResponseAllOf3InstructionsArray
-}
-
-func (u *ResponseAllOf3Instructions) MarshalJSON() ([]byte, error) {
-	if u == nil {
-		return []byte("null"), nil
-	}
-	if u.ResponseAllOf3InstructionsString != nil {
-		return json.Marshal(u.ResponseAllOf3InstructionsString)
-	}
-	if u.ResponseAllOf3InstructionsArray != nil {
-		return json.Marshal(u.ResponseAllOf3InstructionsArray)
-	}
-	return nil, errors.New("invalid ResponseAllOf3Instructions: all variants are nil")
-}
-
-func (u *ResponseAllOf3Instructions) UnmarshalJSON(data []byte) error {
-	var raw interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	*u = ResponseAllOf3Instructions{}
-	switch raw.(type) {
-	case string:
-		var v ResponseAllOf3InstructionsString
-		if err := json.Unmarshal(data, &v); err != nil {
-			return nil
-		}
-		u.ResponseAllOf3InstructionsString = &v
-		return nil
-	case []interface{}:
-		var v ResponseAllOf3InstructionsArray
-		if err := json.Unmarshal(data, &v); err != nil {
-			return nil
-		}
-		u.ResponseAllOf3InstructionsArray = &v
-		return nil
-	}
-	return nil
-}
-
-// The object type of this resource - always set to `response`.
-type ResponseAllOf3Object string
-
-const (
-	ResponseAllOf3ObjectResponse ResponseAllOf3Object = "response"
-)
-
-// The status of the response generation. One of `completed`, `failed`,
-// `in_progress`, `cancelled`, `queued`, or `incomplete`.
-type ResponseAllOf3Status string
-
-const (
-	ResponseAllOf3StatusCompleted  ResponseAllOf3Status = "completed"
-	ResponseAllOf3StatusFailed     ResponseAllOf3Status = "failed"
-	ResponseAllOf3StatusInProgress ResponseAllOf3Status = "in_progress"
-	ResponseAllOf3StatusCancelled  ResponseAllOf3Status = "cancelled"
-	ResponseAllOf3StatusQueued     ResponseAllOf3Status = "queued"
-	ResponseAllOf3StatusIncomplete ResponseAllOf3Status = "incomplete"
-)
-
-type Response struct {
-	ModelResponseProperties
-	ResponseProperties
-	ResponseAllOf3
+	Status *ResponseStatus `json:"status,omitempty"`
+	Usage  *ResponseUsage  `json:"usage,omitempty"`
 }
 
 type ResponseStreamEvent struct {
@@ -1078,16 +1236,48 @@ func (u *ResponseStreamEvent) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type CreateModelResponsePropertiesAllOf2 struct {
+// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+type CreateModelResponsePropertiesPromptCacheRetention string
+
+const (
+	CreateModelResponsePropertiesPromptCacheRetentionInMemory CreateModelResponsePropertiesPromptCacheRetention = "in_memory"
+	CreateModelResponsePropertiesPromptCacheRetentionN24H     CreateModelResponsePropertiesPromptCacheRetention = "24h"
+)
+
+type CreateModelResponseProperties struct {
+	Metadata *Metadata `json:"metadata,omitempty"`
+	// Used by OpenAI to cache responses for similar requests to optimize your cache hit rates. Replaces the `user` field. [Learn more](/docs/guides/prompt-caching).
+	//
+	PromptCacheKey *string `json:"prompt_cache_key,omitempty"`
+	// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+	//
+	PromptCacheRetention *CreateModelResponsePropertiesPromptCacheRetention `json:"prompt_cache_retention,omitempty"`
+	// A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
+	// The IDs should be a string that uniquely identifies each user, with a maximum length of 64 characters. We recommend hashing their username or email address, in order to avoid sending us any identifying information. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	SafetyIdentifier *string      `json:"safety_identifier,omitempty"`
+	ServiceTier      *ServiceTier `json:"service_tier,omitempty"`
+	// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
+	// We generally recommend altering this or `top_p` but not both.
+	//
+	Temperature *float64 `json:"temperature,omitempty"`
 	// An integer between 0 and 20 specifying the number of most likely tokens to
 	// return at each token position, each with an associated log probability.
 	//
 	TopLogprobs *int `json:"top_logprobs,omitempty"`
-}
-
-type CreateModelResponseProperties struct {
-	ModelResponseProperties
-	CreateModelResponsePropertiesAllOf2
+	// An alternative to sampling with temperature, called nucleus sampling,
+	// where the model considers the results of the tokens with top_p probability
+	// mass. So 0.1 means only the tokens comprising the top 10% probability mass
+	// are considered.
+	//
+	// We generally recommend altering this or `temperature` but not both.
+	//
+	TopP *float64 `json:"top_p,omitempty"`
+	// This field is being replaced by `safety_identifier` and `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching optimizations.
+	// A stable identifier for your end-users.
+	// Used to boost cache hit rates by better bucketing similar requests and  to help OpenAI detect and prevent abuse. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	User *string `json:"user,omitempty"`
 }
 
 type ResponseProperties struct {
@@ -3323,22 +3513,86 @@ const (
 	FunctionToolCallTypeFunctionCall FunctionToolCallType = "function_call"
 )
 
-type FunctionToolCallOutputResourceAllOf2 struct {
-	// The identifier of the actor that created the item.
+// A string of the output of the function call.
+type FunctionToolCallOutputResourceOutputString *string
+
+// Text, image, or file output of the function call.
+type FunctionToolCallOutputResourceOutputArray []FunctionAndCustomToolCallOutput
+
+// The output from the function call generated by your code.
+// Can be a string or an list of output content.
+type FunctionToolCallOutputResourceOutput struct {
+	FunctionToolCallOutputResourceOutputString *FunctionToolCallOutputResourceOutputString
+	FunctionToolCallOutputResourceOutputArray  *FunctionToolCallOutputResourceOutputArray
+}
+
+func (u *FunctionToolCallOutputResourceOutput) MarshalJSON() ([]byte, error) {
+	if u == nil {
+		return []byte("null"), nil
+	}
+	if u.FunctionToolCallOutputResourceOutputString != nil {
+		return json.Marshal(u.FunctionToolCallOutputResourceOutputString)
+	}
+	if u.FunctionToolCallOutputResourceOutputArray != nil {
+		return json.Marshal(u.FunctionToolCallOutputResourceOutputArray)
+	}
+	return nil, errors.New("invalid FunctionToolCallOutputResourceOutput: all variants are nil")
+}
+
+func (u *FunctionToolCallOutputResourceOutput) UnmarshalJSON(data []byte) error {
+	var raw interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*u = FunctionToolCallOutputResourceOutput{}
+	switch raw.(type) {
+	case string:
+		var v FunctionToolCallOutputResourceOutputString
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil
+		}
+		u.FunctionToolCallOutputResourceOutputString = &v
+		return nil
+	case []interface{}:
+		var v FunctionToolCallOutputResourceOutputArray
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil
+		}
+		u.FunctionToolCallOutputResourceOutputArray = &v
+		return nil
+	}
+	return nil
+}
+
+// The type of the function tool call output. Always `function_call_output`.
+type FunctionToolCallOutputResourceType string
+
+const (
+	FunctionToolCallOutputResourceTypeFunctionCallOutput FunctionToolCallOutputResourceType = "function_call_output"
+)
+
+type FunctionToolCallOutputResource struct {
+	// The unique ID of the function tool call generated by the model.
 	//
-	CreatedBy *string `json:"created_by,omitempty"`
-	// The unique ID of the function call tool output.
+	CallId string `json:"call_id"`
+	// The unique ID of the function tool call output. Populated when this item
+	// is returned via API.
 	//
 	Id string `json:"id"`
+	// The output from the function call generated by your code.
+	// Can be a string or an list of output content.
+	//
+	Output FunctionToolCallOutputResourceOutput `json:"output"`
 	// The status of the item. One of `in_progress`, `completed`, or
 	// `incomplete`. Populated when items are returned via API.
 	//
 	Status FunctionCallOutputStatusEnum `json:"status"`
-}
-
-type FunctionToolCallOutputResource struct {
-	FunctionToolCallOutput
-	FunctionToolCallOutputResourceAllOf2
+	// The type of the function tool call output. Always `function_call_output`.
+	//
+	Type FunctionToolCallOutputResourceType `json:"type"`
+	// The identifier of the actor that created the item.
+	//
+	CreatedBy *string `json:"created_by,omitempty"`
 }
 
 // The results of a web search tool call. See the
@@ -3492,22 +3746,42 @@ const (
 	ComputerToolCallTypeComputerCall ComputerToolCallType = "computer_call"
 )
 
-type ComputerToolCallOutputResourceAllOf2 struct {
-	// The identifier of the actor that created the item.
+type ComputerToolCallOutputResourceStatus string
+
+const (
+	ComputerToolCallOutputResourceStatusCompleted  ComputerToolCallOutputResourceStatus = "completed"
+	ComputerToolCallOutputResourceStatusIncomplete ComputerToolCallOutputResourceStatus = "incomplete"
+)
+
+// The type of the computer tool call output. Always `computer_call_output`.
+type ComputerToolCallOutputResourceType string
+
+const (
+	ComputerToolCallOutputResourceTypeComputerCallOutput ComputerToolCallOutputResourceType = "computer_call_output"
+)
+
+type ComputerToolCallOutputResource struct {
+	// The safety checks reported by the API that have been acknowledged by the
+	// developer.
 	//
-	CreatedBy *string `json:"created_by,omitempty"`
-	// The unique ID of the computer call tool output.
+	AcknowledgedSafetyChecks []ComputerCallSafetyCheckParam `json:"acknowledged_safety_checks,omitempty"`
+	// The ID of the computer tool call that produced the output.
 	//
-	Id string `json:"id"`
+	CallId string `json:"call_id"`
+	// The ID of the computer tool call output.
+	//
+	Id     string                  `json:"id"`
+	Output ComputerScreenshotImage `json:"output"`
 	// The status of the message input. One of `in_progress`, `completed`, or
 	// `incomplete`. Populated when input items are returned via API.
 	//
-	Status ComputerCallOutputStatus `json:"status"`
-}
-
-type ComputerToolCallOutputResource struct {
-	ComputerToolCallOutput
-	ComputerToolCallOutputResourceAllOf2
+	Status ComputerToolCallOutputResourceStatus `json:"status"`
+	// The type of the computer tool call output. Always `computer_call_output`.
+	//
+	Type ComputerToolCallOutputResourceType `json:"type"`
+	// The identifier of the actor that created the item.
+	//
+	CreatedBy *string `json:"created_by,omitempty"`
 }
 
 // A description of the chain of thought used by a reasoning model while generating
@@ -4204,22 +4478,85 @@ const (
 	CustomToolCallTypeCustomToolCall CustomToolCallType = "custom_tool_call"
 )
 
-type CustomToolCallOutputResourceAllOf2 struct {
+// A string of the output of the custom tool call.
+type CustomToolCallOutputResourceOutputString *string
+
+// Text, image, or file output of the custom tool call.
+type CustomToolCallOutputResourceOutputArray []FunctionAndCustomToolCallOutput
+
+// The output from the custom tool call generated by your code.
+// Can be a string or an list of output content.
+type CustomToolCallOutputResourceOutput struct {
+	CustomToolCallOutputResourceOutputString *CustomToolCallOutputResourceOutputString
+	CustomToolCallOutputResourceOutputArray  *CustomToolCallOutputResourceOutputArray
+}
+
+func (u *CustomToolCallOutputResourceOutput) MarshalJSON() ([]byte, error) {
+	if u == nil {
+		return []byte("null"), nil
+	}
+	if u.CustomToolCallOutputResourceOutputString != nil {
+		return json.Marshal(u.CustomToolCallOutputResourceOutputString)
+	}
+	if u.CustomToolCallOutputResourceOutputArray != nil {
+		return json.Marshal(u.CustomToolCallOutputResourceOutputArray)
+	}
+	return nil, errors.New("invalid CustomToolCallOutputResourceOutput: all variants are nil")
+}
+
+func (u *CustomToolCallOutputResourceOutput) UnmarshalJSON(data []byte) error {
+	var raw interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*u = CustomToolCallOutputResourceOutput{}
+	switch raw.(type) {
+	case string:
+		var v CustomToolCallOutputResourceOutputString
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil
+		}
+		u.CustomToolCallOutputResourceOutputString = &v
+		return nil
+	case []interface{}:
+		var v CustomToolCallOutputResourceOutputArray
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil
+		}
+		u.CustomToolCallOutputResourceOutputArray = &v
+		return nil
+	}
+	return nil
+}
+
+// The type of the custom tool call output. Always `custom_tool_call_output`.
+type CustomToolCallOutputResourceType string
+
+const (
+	CustomToolCallOutputResourceTypeCustomToolCallOutput CustomToolCallOutputResourceType = "custom_tool_call_output"
+)
+
+type CustomToolCallOutputResource struct {
+	// The call ID, used to map this custom tool call output to a custom tool call.
+	//
+	CallId string `json:"call_id"`
+	// The unique ID of the custom tool call output in the OpenAI platform.
+	//
+	Id string `json:"id"`
+	// The output from the custom tool call generated by your code.
+	// Can be a string or an list of output content.
+	//
+	Output CustomToolCallOutputResourceOutput `json:"output"`
+	// The type of the custom tool call output. Always `custom_tool_call_output`.
+	//
+	Type CustomToolCallOutputResourceType `json:"type"`
 	// The identifier of the actor that created the item.
 	//
 	CreatedBy *string `json:"created_by,omitempty"`
-	// The unique ID of the custom tool call output item.
-	//
-	Id string `json:"id"`
 	// The status of the item. One of `in_progress`, `completed`, or
 	// `incomplete`. Populated when items are returned via API.
 	//
 	Status FunctionCallOutputStatusEnum `json:"status"`
-}
-
-type CustomToolCallOutputResource struct {
-	CustomToolCallOutput
-	CustomToolCallOutputResourceAllOf2
 }
 
 type OutputContent struct {

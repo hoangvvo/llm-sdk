@@ -245,7 +245,7 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 	}
 	if input.MaxTokens != nil {
 		maxTokens := int(*input.MaxTokens)
-		params.CreateResponseAllOf3.MaxOutputTokens = &maxTokens
+		params.MaxOutputTokens = &maxTokens
 	}
 
 	if input.Tools != nil {

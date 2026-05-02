@@ -5,11 +5,362 @@ import (
 	"errors"
 )
 
-type CreateChatCompletionRequestAllOf2 struct {
+// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+type CreateChatCompletionRequestPromptCacheRetention string
+
+const (
+	CreateChatCompletionRequestPromptCacheRetentionInMemory CreateChatCompletionRequestPromptCacheRetention = "in_memory"
+	CreateChatCompletionRequestPromptCacheRetentionN24H     CreateChatCompletionRequestPromptCacheRetention = "24h"
+)
+
+// Parameters for audio output. Required when audio output is requested with
+// `modalities: ["audio"]`. [Learn more](/docs/guides/audio).
+type CreateChatCompletionRequestAudio struct {
+	// Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,
+	// `opus`, or `pcm16`.
+	//
+	Format CreateChatCompletionRequestAudioFormat `json:"format"`
+	// The voice the model uses to respond. Supported built-in voices are
+	// `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`,
+	// `sage`, `shimmer`, `marin`, and `cedar`. You may also provide a
+	// custom voice object with an `id`, for example `{ "id": "voice_1234" }`.
+	//
+	Voice VoiceIdsOrCustomVoice `json:"voice"`
+}
+
+// Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,
+// `opus`, or `pcm16`.
+type CreateChatCompletionRequestAudioFormat string
+
+const (
+	CreateChatCompletionRequestAudioFormatWav   CreateChatCompletionRequestAudioFormat = "wav"
+	CreateChatCompletionRequestAudioFormatAac   CreateChatCompletionRequestAudioFormat = "aac"
+	CreateChatCompletionRequestAudioFormatMp3   CreateChatCompletionRequestAudioFormat = "mp3"
+	CreateChatCompletionRequestAudioFormatFlac  CreateChatCompletionRequestAudioFormat = "flac"
+	CreateChatCompletionRequestAudioFormatOpus  CreateChatCompletionRequestAudioFormat = "opus"
+	CreateChatCompletionRequestAudioFormatPcm16 CreateChatCompletionRequestAudioFormat = "pcm16"
+)
+
+// `none` means the model will not call a function and instead generates a message. `auto` means the model can pick between generating a message or calling a function.
+type CreateChatCompletionRequestFunctionCallString *string
+
+// Deprecated in favor of `tool_choice`.
+//
+// Controls which (if any) function is called by the model.
+//
+// `none` means the model will not call a function and instead generates a
+// message.
+//
+// `auto` means the model can pick between generating a message or calling a
+// function.
+//
+// Specifying a particular function via `{"name": "my_function"}` forces the
+// model to call that function.
+//
+// `none` is the default when no functions are present. `auto` is the default
+// if functions are present.
+type CreateChatCompletionRequestFunctionCall struct {
+	CreateChatCompletionRequestFunctionCallString *CreateChatCompletionRequestFunctionCallString
+	ChatCompletionFunctionCallOption              *ChatCompletionFunctionCallOption
+}
+
+func (u *CreateChatCompletionRequestFunctionCall) MarshalJSON() ([]byte, error) {
+	if u == nil {
+		return []byte("null"), nil
+	}
+	if u.CreateChatCompletionRequestFunctionCallString != nil {
+		return json.Marshal(u.CreateChatCompletionRequestFunctionCallString)
+	}
+	if u.ChatCompletionFunctionCallOption != nil {
+		return json.Marshal(u.ChatCompletionFunctionCallOption)
+	}
+	return nil, errors.New("invalid CreateChatCompletionRequestFunctionCall: all variants are nil")
+}
+
+func (u *CreateChatCompletionRequestFunctionCall) UnmarshalJSON(data []byte) error {
+	var raw interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*u = CreateChatCompletionRequestFunctionCall{}
+	switch value := raw.(type) {
+	case string:
+		var v CreateChatCompletionRequestFunctionCallString
+		if err := json.Unmarshal(data, &v); err != nil {
+			return nil
+		}
+		u.CreateChatCompletionRequestFunctionCallString = &v
+		return nil
+	case map[string]interface{}:
+		if value["name"] != nil {
+			var v ChatCompletionFunctionCallOption
+			if err := json.Unmarshal(data, &v); err != nil {
+				return nil
+			}
+			u.ChatCompletionFunctionCallOption = &v
+			return nil
+		}
+		return nil
+	}
+	return nil
+}
+
+// Configuration for a [Predicted Output](/docs/guides/predicted-outputs),
+// which can greatly improve response times when large parts of the model
+// response are known ahead of time. This is most common when you are
+// regenerating a file with only minor changes to most of the content.
+type CreateChatCompletionRequestPrediction struct {
+	Content *PredictionContent
+}
+
+func (u *CreateChatCompletionRequestPrediction) MarshalJSON() ([]byte, error) {
+	if u.Content != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*PredictionContent
+		}{
+			Type:              "content",
+			PredictionContent: u.Content,
+		})
+	}
+	return nil, errors.New("invalid CreateChatCompletionRequestPrediction: all variants are nil")
+}
+
+func (u *CreateChatCompletionRequestPrediction) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	rawType, ok := raw["type"]
+	if !ok {
+		return nil
+	}
+	var discriminator string
+	if err := json.Unmarshal(rawType, &discriminator); err != nil {
+		return err
+	}
+	*u = CreateChatCompletionRequestPrediction{}
+	switch discriminator {
+	case "content":
+		var value PredictionContent
+		if err := json.Unmarshal(data, &value); err != nil {
+			return nil
+		}
+		u.Content = &value
+	default:
+		return nil
+	}
+	return nil
+}
+
+// An object specifying the format that the model must output.
+//
+// Setting to `{ "type": "json_schema", "json_schema": {...} }` enables
+// Structured Outputs which ensures the model will match your supplied JSON
+// schema. Learn more in the [Structured Outputs
+// guide](/docs/guides/structured-outputs).
+//
+// Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+// ensures the message the model generates is valid JSON. Using `json_schema`
+// is preferred for models that support it.
+type CreateChatCompletionRequestResponseFormat struct {
+	Text       *ResponseFormatText
+	JsonSchema *ResponseFormatJsonSchema
+	JsonObject *ResponseFormatJsonObject
+}
+
+func (u *CreateChatCompletionRequestResponseFormat) MarshalJSON() ([]byte, error) {
+	if u.Text != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ResponseFormatText
+		}{
+			Type:               "text",
+			ResponseFormatText: u.Text,
+		})
+	}
+	if u.JsonSchema != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ResponseFormatJsonSchema
+		}{
+			Type:                     "json_schema",
+			ResponseFormatJsonSchema: u.JsonSchema,
+		})
+	}
+	if u.JsonObject != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ResponseFormatJsonObject
+		}{
+			Type:                     "json_object",
+			ResponseFormatJsonObject: u.JsonObject,
+		})
+	}
+	return nil, errors.New("invalid CreateChatCompletionRequestResponseFormat: all variants are nil")
+}
+
+func (u *CreateChatCompletionRequestResponseFormat) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	rawType, ok := raw["type"]
+	if !ok {
+		return nil
+	}
+	var discriminator string
+	if err := json.Unmarshal(rawType, &discriminator); err != nil {
+		return err
+	}
+	*u = CreateChatCompletionRequestResponseFormat{}
+	switch discriminator {
+	case "text":
+		var value ResponseFormatText
+		if err := json.Unmarshal(data, &value); err != nil {
+			return nil
+		}
+		u.Text = &value
+	case "json_schema":
+		var value ResponseFormatJsonSchema
+		if err := json.Unmarshal(data, &value); err != nil {
+			return nil
+		}
+		u.JsonSchema = &value
+	case "json_object":
+		var value ResponseFormatJsonObject
+		if err := json.Unmarshal(data, &value); err != nil {
+			return nil
+		}
+		u.JsonObject = &value
+	default:
+		return nil
+	}
+	return nil
+}
+
+type CreateChatCompletionRequestToolsItem struct {
+	Function *ChatCompletionTool
+	Custom   *CustomToolChatCompletions
+}
+
+func (u *CreateChatCompletionRequestToolsItem) MarshalJSON() ([]byte, error) {
+	if u.Function != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ChatCompletionTool
+		}{
+			Type:               "function",
+			ChatCompletionTool: u.Function,
+		})
+	}
+	if u.Custom != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*CustomToolChatCompletions
+		}{
+			Type:                      "custom",
+			CustomToolChatCompletions: u.Custom,
+		})
+	}
+	return nil, errors.New("invalid CreateChatCompletionRequestToolsItem: all variants are nil")
+}
+
+func (u *CreateChatCompletionRequestToolsItem) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	rawType, ok := raw["type"]
+	if !ok {
+		return nil
+	}
+	var discriminator string
+	if err := json.Unmarshal(rawType, &discriminator); err != nil {
+		return err
+	}
+	*u = CreateChatCompletionRequestToolsItem{}
+	switch discriminator {
+	case "function":
+		var value ChatCompletionTool
+		if err := json.Unmarshal(data, &value); err != nil {
+			return nil
+		}
+		u.Function = &value
+	case "custom":
+		var value CustomToolChatCompletions
+		if err := json.Unmarshal(data, &value); err != nil {
+			return nil
+		}
+		u.Custom = &value
+	default:
+		return nil
+	}
+	return nil
+}
+
+// This tool searches the web for relevant results to use in a response.
+// Learn more about the [web search tool](/docs/guides/tools-web-search?api-mode=chat).
+type CreateChatCompletionRequestWebSearchOptions struct {
+	SearchContextSize *WebSearchContextSize `json:"search_context_size,omitempty"`
+	// Approximate location parameters for the search.
+	//
+	UserLocation *CreateChatCompletionRequestWebSearchOptionsUserLocation `json:"user_location,omitempty"`
+}
+
+// Approximate location parameters for the search.
+type CreateChatCompletionRequestWebSearchOptionsUserLocation struct {
+	Approximate WebSearchLocation `json:"approximate"`
+	// The type of location approximation. Always `approximate`.
+	//
+	Type CreateChatCompletionRequestWebSearchOptionsUserLocationType `json:"type"`
+}
+
+// The type of location approximation. Always `approximate`.
+type CreateChatCompletionRequestWebSearchOptionsUserLocationType string
+
+const (
+	CreateChatCompletionRequestWebSearchOptionsUserLocationTypeApproximate CreateChatCompletionRequestWebSearchOptionsUserLocationType = "approximate"
+)
+
+type CreateChatCompletionRequest struct {
+	Metadata *Metadata `json:"metadata,omitempty"`
+	// Used by OpenAI to cache responses for similar requests to optimize your cache hit rates. Replaces the `user` field. [Learn more](/docs/guides/prompt-caching).
+	//
+	PromptCacheKey *string `json:"prompt_cache_key,omitempty"`
+	// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+	//
+	PromptCacheRetention *CreateChatCompletionRequestPromptCacheRetention `json:"prompt_cache_retention,omitempty"`
+	// A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
+	// The IDs should be a string that uniquely identifies each user, with a maximum length of 64 characters. We recommend hashing their username or email address, in order to avoid sending us any identifying information. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	SafetyIdentifier *string      `json:"safety_identifier,omitempty"`
+	ServiceTier      *ServiceTier `json:"service_tier,omitempty"`
+	// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
+	// We generally recommend altering this or `top_p` but not both.
+	//
+	Temperature *float64 `json:"temperature,omitempty"`
+	// An integer between 0 and 20 specifying the number of most likely tokens to
+	// return at each token position, each with an associated log probability.
+	//
+	TopLogprobs *int `json:"top_logprobs,omitempty"`
+	// An alternative to sampling with temperature, called nucleus sampling,
+	// where the model considers the results of the tokens with top_p probability
+	// mass. So 0.1 means only the tokens comprising the top 10% probability mass
+	// are considered.
+	//
+	// We generally recommend altering this or `temperature` but not both.
+	//
+	TopP *float64 `json:"top_p,omitempty"`
+	// This field is being replaced by `safety_identifier` and `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching optimizations.
+	// A stable identifier for your end-users.
+	// Used to boost cache hit rates by better bucketing similar requests and  to help OpenAI detect and prevent abuse. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	User *string `json:"user,omitempty"`
 	// Parameters for audio output. Required when audio output is requested with
 	// `modalities: ["audio"]`. [Learn more](/docs/guides/audio).
 	//
-	Audio *CreateChatCompletionRequestAllOf2Audio `json:"audio,omitempty"`
+	Audio *CreateChatCompletionRequestAudio `json:"audio,omitempty"`
 	// Number between -2.0 and 2.0. Positive values penalize new tokens based on
 	// their existing frequency in the text so far, decreasing the model's
 	// likelihood to repeat the same line verbatim.
@@ -31,7 +382,7 @@ type CreateChatCompletionRequestAllOf2 struct {
 	// `none` is the default when no functions are present. `auto` is the default
 	// if functions are present.
 	//
-	FunctionCall *CreateChatCompletionRequestAllOf2FunctionCall `json:"function_call,omitempty"`
+	FunctionCall *CreateChatCompletionRequestFunctionCall `json:"function_call,omitempty"`
 	// Deprecated in favor of `tools`.
 	//
 	// A list of functions the model may generate JSON inputs for.
@@ -84,7 +435,7 @@ type CreateChatCompletionRequestAllOf2 struct {
 	// response are known ahead of time. This is most common when you are
 	// regenerating a file with only minor changes to most of the content.
 	//
-	Prediction *CreateChatCompletionRequestAllOf2Prediction `json:"prediction,omitempty"`
+	Prediction *CreateChatCompletionRequestPrediction `json:"prediction,omitempty"`
 	// Number between -2.0 and 2.0. Positive values penalize new tokens based on
 	// whether they appear in the text so far, increasing the model's likelihood
 	// to talk about new topics.
@@ -102,7 +453,7 @@ type CreateChatCompletionRequestAllOf2 struct {
 	// ensures the message the model generates is valid JSON. Using `json_schema`
 	// is preferred for models that support it.
 	//
-	ResponseFormat *CreateChatCompletionRequestAllOf2ResponseFormat `json:"response_format,omitempty"`
+	ResponseFormat *CreateChatCompletionRequestResponseFormat `json:"response_format,omitempty"`
 	// This feature is in Beta.
 	// If specified, our system will make a best effort to sample deterministically, such that repeated requests with the same `seed` and parameters should return the same result.
 	// Determinism is not guaranteed, and you should refer to the `system_fingerprint` response parameter to monitor changes in the backend.
@@ -129,332 +480,12 @@ type CreateChatCompletionRequestAllOf2 struct {
 	// [custom tools](/docs/guides/function-calling#custom-tools) or
 	// [function tools](/docs/guides/function-calling).
 	//
-	Tools []CreateChatCompletionRequestAllOf2ToolsItem `json:"tools,omitempty"`
-	// An integer between 0 and 20 specifying the number of most likely tokens to
-	// return at each token position, each with an associated log probability.
-	// `logprobs` must be set to `true` if this parameter is used.
-	//
-	TopLogprobs *int       `json:"top_logprobs,omitempty"`
-	Verbosity   *Verbosity `json:"verbosity,omitempty"`
+	Tools     []CreateChatCompletionRequestToolsItem `json:"tools,omitempty"`
+	Verbosity *Verbosity                             `json:"verbosity,omitempty"`
 	// This tool searches the web for relevant results to use in a response.
 	// Learn more about the [web search tool](/docs/guides/tools-web-search?api-mode=chat).
 	//
-	WebSearchOptions *CreateChatCompletionRequestAllOf2WebSearchOptions `json:"web_search_options,omitempty"`
-}
-
-// Parameters for audio output. Required when audio output is requested with
-// `modalities: ["audio"]`. [Learn more](/docs/guides/audio).
-type CreateChatCompletionRequestAllOf2Audio struct {
-	// Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,
-	// `opus`, or `pcm16`.
-	//
-	Format CreateChatCompletionRequestAllOf2AudioFormat `json:"format"`
-	// The voice the model uses to respond. Supported built-in voices are
-	// `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`,
-	// `sage`, `shimmer`, `marin`, and `cedar`. You may also provide a
-	// custom voice object with an `id`, for example `{ "id": "voice_1234" }`.
-	//
-	Voice VoiceIdsOrCustomVoice `json:"voice"`
-}
-
-// Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,
-// `opus`, or `pcm16`.
-type CreateChatCompletionRequestAllOf2AudioFormat string
-
-const (
-	CreateChatCompletionRequestAllOf2AudioFormatWav   CreateChatCompletionRequestAllOf2AudioFormat = "wav"
-	CreateChatCompletionRequestAllOf2AudioFormatAac   CreateChatCompletionRequestAllOf2AudioFormat = "aac"
-	CreateChatCompletionRequestAllOf2AudioFormatMp3   CreateChatCompletionRequestAllOf2AudioFormat = "mp3"
-	CreateChatCompletionRequestAllOf2AudioFormatFlac  CreateChatCompletionRequestAllOf2AudioFormat = "flac"
-	CreateChatCompletionRequestAllOf2AudioFormatOpus  CreateChatCompletionRequestAllOf2AudioFormat = "opus"
-	CreateChatCompletionRequestAllOf2AudioFormatPcm16 CreateChatCompletionRequestAllOf2AudioFormat = "pcm16"
-)
-
-// `none` means the model will not call a function and instead generates a message. `auto` means the model can pick between generating a message or calling a function.
-type CreateChatCompletionRequestAllOf2FunctionCallString *string
-
-// Deprecated in favor of `tool_choice`.
-//
-// Controls which (if any) function is called by the model.
-//
-// `none` means the model will not call a function and instead generates a
-// message.
-//
-// `auto` means the model can pick between generating a message or calling a
-// function.
-//
-// Specifying a particular function via `{"name": "my_function"}` forces the
-// model to call that function.
-//
-// `none` is the default when no functions are present. `auto` is the default
-// if functions are present.
-type CreateChatCompletionRequestAllOf2FunctionCall struct {
-	CreateChatCompletionRequestAllOf2FunctionCallString *CreateChatCompletionRequestAllOf2FunctionCallString
-	ChatCompletionFunctionCallOption                    *ChatCompletionFunctionCallOption
-}
-
-func (u *CreateChatCompletionRequestAllOf2FunctionCall) MarshalJSON() ([]byte, error) {
-	if u == nil {
-		return []byte("null"), nil
-	}
-	if u.CreateChatCompletionRequestAllOf2FunctionCallString != nil {
-		return json.Marshal(u.CreateChatCompletionRequestAllOf2FunctionCallString)
-	}
-	if u.ChatCompletionFunctionCallOption != nil {
-		return json.Marshal(u.ChatCompletionFunctionCallOption)
-	}
-	return nil, errors.New("invalid CreateChatCompletionRequestAllOf2FunctionCall: all variants are nil")
-}
-
-func (u *CreateChatCompletionRequestAllOf2FunctionCall) UnmarshalJSON(data []byte) error {
-	var raw interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	*u = CreateChatCompletionRequestAllOf2FunctionCall{}
-	switch value := raw.(type) {
-	case string:
-		var v CreateChatCompletionRequestAllOf2FunctionCallString
-		if err := json.Unmarshal(data, &v); err != nil {
-			return nil
-		}
-		u.CreateChatCompletionRequestAllOf2FunctionCallString = &v
-		return nil
-	case map[string]interface{}:
-		if value["name"] != nil {
-			var v ChatCompletionFunctionCallOption
-			if err := json.Unmarshal(data, &v); err != nil {
-				return nil
-			}
-			u.ChatCompletionFunctionCallOption = &v
-			return nil
-		}
-		return nil
-	}
-	return nil
-}
-
-// Configuration for a [Predicted Output](/docs/guides/predicted-outputs),
-// which can greatly improve response times when large parts of the model
-// response are known ahead of time. This is most common when you are
-// regenerating a file with only minor changes to most of the content.
-type CreateChatCompletionRequestAllOf2Prediction struct {
-	Content *PredictionContent
-}
-
-func (u *CreateChatCompletionRequestAllOf2Prediction) MarshalJSON() ([]byte, error) {
-	if u.Content != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*PredictionContent
-		}{
-			Type:              "content",
-			PredictionContent: u.Content,
-		})
-	}
-	return nil, errors.New("invalid CreateChatCompletionRequestAllOf2Prediction: all variants are nil")
-}
-
-func (u *CreateChatCompletionRequestAllOf2Prediction) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	rawType, ok := raw["type"]
-	if !ok {
-		return nil
-	}
-	var discriminator string
-	if err := json.Unmarshal(rawType, &discriminator); err != nil {
-		return err
-	}
-	*u = CreateChatCompletionRequestAllOf2Prediction{}
-	switch discriminator {
-	case "content":
-		var value PredictionContent
-		if err := json.Unmarshal(data, &value); err != nil {
-			return nil
-		}
-		u.Content = &value
-	default:
-		return nil
-	}
-	return nil
-}
-
-// An object specifying the format that the model must output.
-//
-// Setting to `{ "type": "json_schema", "json_schema": {...} }` enables
-// Structured Outputs which ensures the model will match your supplied JSON
-// schema. Learn more in the [Structured Outputs
-// guide](/docs/guides/structured-outputs).
-//
-// Setting to `{ "type": "json_object" }` enables the older JSON mode, which
-// ensures the message the model generates is valid JSON. Using `json_schema`
-// is preferred for models that support it.
-type CreateChatCompletionRequestAllOf2ResponseFormat struct {
-	Text       *ResponseFormatText
-	JsonSchema *ResponseFormatJsonSchema
-	JsonObject *ResponseFormatJsonObject
-}
-
-func (u *CreateChatCompletionRequestAllOf2ResponseFormat) MarshalJSON() ([]byte, error) {
-	if u.Text != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ResponseFormatText
-		}{
-			Type:               "text",
-			ResponseFormatText: u.Text,
-		})
-	}
-	if u.JsonSchema != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ResponseFormatJsonSchema
-		}{
-			Type:                     "json_schema",
-			ResponseFormatJsonSchema: u.JsonSchema,
-		})
-	}
-	if u.JsonObject != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ResponseFormatJsonObject
-		}{
-			Type:                     "json_object",
-			ResponseFormatJsonObject: u.JsonObject,
-		})
-	}
-	return nil, errors.New("invalid CreateChatCompletionRequestAllOf2ResponseFormat: all variants are nil")
-}
-
-func (u *CreateChatCompletionRequestAllOf2ResponseFormat) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	rawType, ok := raw["type"]
-	if !ok {
-		return nil
-	}
-	var discriminator string
-	if err := json.Unmarshal(rawType, &discriminator); err != nil {
-		return err
-	}
-	*u = CreateChatCompletionRequestAllOf2ResponseFormat{}
-	switch discriminator {
-	case "text":
-		var value ResponseFormatText
-		if err := json.Unmarshal(data, &value); err != nil {
-			return nil
-		}
-		u.Text = &value
-	case "json_schema":
-		var value ResponseFormatJsonSchema
-		if err := json.Unmarshal(data, &value); err != nil {
-			return nil
-		}
-		u.JsonSchema = &value
-	case "json_object":
-		var value ResponseFormatJsonObject
-		if err := json.Unmarshal(data, &value); err != nil {
-			return nil
-		}
-		u.JsonObject = &value
-	default:
-		return nil
-	}
-	return nil
-}
-
-type CreateChatCompletionRequestAllOf2ToolsItem struct {
-	Function *ChatCompletionTool
-	Custom   *CustomToolChatCompletions
-}
-
-func (u *CreateChatCompletionRequestAllOf2ToolsItem) MarshalJSON() ([]byte, error) {
-	if u.Function != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*ChatCompletionTool
-		}{
-			Type:               "function",
-			ChatCompletionTool: u.Function,
-		})
-	}
-	if u.Custom != nil {
-		return json.Marshal(struct {
-			Type string `json:"type"`
-			*CustomToolChatCompletions
-		}{
-			Type:                      "custom",
-			CustomToolChatCompletions: u.Custom,
-		})
-	}
-	return nil, errors.New("invalid CreateChatCompletionRequestAllOf2ToolsItem: all variants are nil")
-}
-
-func (u *CreateChatCompletionRequestAllOf2ToolsItem) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	rawType, ok := raw["type"]
-	if !ok {
-		return nil
-	}
-	var discriminator string
-	if err := json.Unmarshal(rawType, &discriminator); err != nil {
-		return err
-	}
-	*u = CreateChatCompletionRequestAllOf2ToolsItem{}
-	switch discriminator {
-	case "function":
-		var value ChatCompletionTool
-		if err := json.Unmarshal(data, &value); err != nil {
-			return nil
-		}
-		u.Function = &value
-	case "custom":
-		var value CustomToolChatCompletions
-		if err := json.Unmarshal(data, &value); err != nil {
-			return nil
-		}
-		u.Custom = &value
-	default:
-		return nil
-	}
-	return nil
-}
-
-// This tool searches the web for relevant results to use in a response.
-// Learn more about the [web search tool](/docs/guides/tools-web-search?api-mode=chat).
-type CreateChatCompletionRequestAllOf2WebSearchOptions struct {
-	SearchContextSize *WebSearchContextSize `json:"search_context_size,omitempty"`
-	// Approximate location parameters for the search.
-	//
-	UserLocation *CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocation `json:"user_location,omitempty"`
-}
-
-// Approximate location parameters for the search.
-type CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocation struct {
-	Approximate WebSearchLocation `json:"approximate"`
-	// The type of location approximation. Always `approximate`.
-	//
-	Type CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocationType `json:"type"`
-}
-
-// The type of location approximation. Always `approximate`.
-type CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocationType string
-
-const (
-	CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocationTypeApproximate CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocationType = "approximate"
-)
-
-type CreateChatCompletionRequest struct {
-	CreateModelResponseProperties
-	CreateChatCompletionRequestAllOf2
+	WebSearchOptions *CreateChatCompletionRequestWebSearchOptions `json:"web_search_options,omitempty"`
 }
 
 // Represents a chat completion response returned by model, based on the provided input.
@@ -597,16 +628,48 @@ const (
 	CreateChatCompletionStreamResponseObjectChatCompletionChunk CreateChatCompletionStreamResponseObject = "chat.completion.chunk"
 )
 
-type CreateModelResponsePropertiesAllOf2 struct {
+// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+type CreateModelResponsePropertiesPromptCacheRetention string
+
+const (
+	CreateModelResponsePropertiesPromptCacheRetentionInMemory CreateModelResponsePropertiesPromptCacheRetention = "in_memory"
+	CreateModelResponsePropertiesPromptCacheRetentionN24H     CreateModelResponsePropertiesPromptCacheRetention = "24h"
+)
+
+type CreateModelResponseProperties struct {
+	Metadata *Metadata `json:"metadata,omitempty"`
+	// Used by OpenAI to cache responses for similar requests to optimize your cache hit rates. Replaces the `user` field. [Learn more](/docs/guides/prompt-caching).
+	//
+	PromptCacheKey *string `json:"prompt_cache_key,omitempty"`
+	// The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).
+	//
+	PromptCacheRetention *CreateModelResponsePropertiesPromptCacheRetention `json:"prompt_cache_retention,omitempty"`
+	// A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
+	// The IDs should be a string that uniquely identifies each user, with a maximum length of 64 characters. We recommend hashing their username or email address, in order to avoid sending us any identifying information. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	SafetyIdentifier *string      `json:"safety_identifier,omitempty"`
+	ServiceTier      *ServiceTier `json:"service_tier,omitempty"`
+	// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
+	// We generally recommend altering this or `top_p` but not both.
+	//
+	Temperature *float64 `json:"temperature,omitempty"`
 	// An integer between 0 and 20 specifying the number of most likely tokens to
 	// return at each token position, each with an associated log probability.
 	//
 	TopLogprobs *int `json:"top_logprobs,omitempty"`
-}
-
-type CreateModelResponseProperties struct {
-	ModelResponseProperties
-	CreateModelResponsePropertiesAllOf2
+	// An alternative to sampling with temperature, called nucleus sampling,
+	// where the model considers the results of the tokens with top_p probability
+	// mass. So 0.1 means only the tokens comprising the top 10% probability mass
+	// are considered.
+	//
+	// We generally recommend altering this or `temperature` but not both.
+	//
+	TopP *float64 `json:"top_p,omitempty"`
+	// This field is being replaced by `safety_identifier` and `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching optimizations.
+	// A stable identifier for your end-users.
+	// Used to boost cache hit rates by better bucketing similar requests and  to help OpenAI detect and prevent abuse. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
+	//
+	User *string `json:"user,omitempty"`
 }
 
 // Custom voice reference.

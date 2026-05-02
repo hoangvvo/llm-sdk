@@ -137,6 +137,15 @@ interface LoweredType {
   declarations: Declaration[];
 }
 
+interface MergedAllOfProperty {
+  propertyName: string;
+  schema: JSONSchema7;
+  required: boolean;
+  nullable: boolean;
+  description: string | undefined;
+  path: string[];
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -374,6 +383,57 @@ function normalizePrimitiveSchema(
 function propertyDescription(schema: JSONSchema7): string | undefined {
   const nullable = unwrapNullableSchema(schema, "<description>");
   return nullable.schema.description ?? schema.description;
+}
+
+const NON_TYPE_AFFECTING_SCHEMA_KEYS = new Set([
+  "description",
+  "title",
+  "default",
+  "example",
+  "examples",
+  "deprecated",
+  "nullable",
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+  "minLength",
+  "maxLength",
+  "pattern",
+  "format",
+  "minItems",
+  "maxItems",
+  "uniqueItems",
+  "minProperties",
+  "maxProperties",
+  "x-oaiSupportedSDKs",
+]);
+
+function stripNonBehavioralSchemaMetadata(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripNonBehavioralSchemaMetadata(item));
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  const stripped: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (
+      NON_TYPE_AFFECTING_SCHEMA_KEYS.has(key) ||
+      key.startsWith("x-")
+    ) {
+      continue;
+    }
+    stripped[key] = stripNonBehavioralSchemaMetadata(entry);
+  }
+  return stripped;
+}
+
+function wrapNullableSchema(schema: JSONSchema7): JSONSchema7 {
+  return {
+    anyOf: [schema, { type: "null" }],
+  };
 }
 
 export async function loadSchemaDocument(
@@ -758,49 +818,32 @@ class SchemaDocumentBuilder {
     }
 
     const declarations: Declaration[] = [];
-    const fields: FlattenField[] = [];
+    const fields: PropertyField[] = [];
     const seenFieldNames = new Set<string>();
+    const mergedProperties = this.collectAllOfProperties(schema.allOf, path);
 
-    schema.allOf.forEach((member, index) => {
-      const memberPath = [...path, `.allOf[${index}]`];
-      const memberSchema = assertSchemaObject(member, formatPath(memberPath));
-      if (memberSchema.$ref) {
-        const refName = this.resolveRefName(
-          memberSchema.$ref,
-          formatPath(memberPath),
-        );
-        const typeRefName = toCamelCase(refName);
-        const fieldName = this.makeRustFieldName(
-          typeRefName,
-          seenFieldNames,
-          formatPath(memberPath),
-        );
-        fields.push({
-          kind: "flatten",
-          name: fieldName,
-          typeName: typeRefName,
-        });
-        return;
-      }
-
-      const memberTypeName = this.reserveGeneratedName(
-        `${typeName}AllOf${index + 1}`,
-        formatPath(memberPath),
+    for (const property of mergedProperties) {
+      const lowered = this.lowerAnonymousType(
+        property.nullable ? wrapNullableSchema(property.schema) : property.schema,
+        `${typeName}${toCamelCase(property.propertyName)}`,
+        property.path,
       );
-      declarations.push(
-        ...this.lowerNamedDeclaration(memberTypeName, memberSchema, memberPath),
-      );
-      const fieldName = this.makeRustFieldName(
-        memberTypeName,
+      const fieldName = this.makeStructFieldName(
+        property.propertyName,
         seenFieldNames,
-        formatPath(memberPath),
+        formatPath(property.path),
       );
       fields.push({
-        kind: "flatten",
+        kind: "property",
         name: fieldName,
-        typeName: memberTypeName,
+        originalName: property.propertyName,
+        description: property.description,
+        type: lowered.type,
+        required: property.required,
+        nullable: property.nullable,
       });
-    });
+      declarations.push(...lowered.declarations);
+    }
 
     declarations.push({
       kind: "struct",
@@ -809,6 +852,208 @@ class SchemaDocumentBuilder {
       fields,
     });
     return declarations;
+  }
+
+  private collectAllOfProperties(
+    members: JSONSchema7Definition[],
+    path: string[],
+  ): MergedAllOfProperty[] {
+    const mergedProperties = new Map<string, MergedAllOfProperty>();
+    members.forEach((member, index) => {
+      const memberPath = [...path, `.allOf[${index}]`];
+      this.collectAllOfPropertiesFromSchema(
+        assertSchemaObject(member, formatPath(memberPath)),
+        memberPath,
+        mergedProperties,
+      );
+    });
+    return [...mergedProperties.values()];
+  }
+
+  private collectAllOfPropertiesFromSchema(
+    schema: JSONSchema7,
+    path: string[],
+    mergedProperties: Map<string, MergedAllOfProperty>,
+  ): void {
+    const normalized = unwrapNullableSchema(schema, formatPath(path));
+    if (normalized.nullable) {
+      throw new Error(
+        `Nullable allOf members are not supported at ${formatPath(path)}`,
+      );
+    }
+    const activeSchema = normalized.schema;
+
+    if (activeSchema.$ref) {
+      this.collectAllOfPropertiesFromSchema(
+        this.resolveDefinitionSchema(activeSchema.$ref, formatPath(path)),
+        path,
+        mergedProperties,
+      );
+      return;
+    }
+
+    if (activeSchema.allOf && activeSchema.allOf.length > 0) {
+      activeSchema.allOf.forEach((member, index) => {
+        const memberPath = [...path, `.allOf[${index}]`];
+        this.collectAllOfPropertiesFromSchema(
+          assertSchemaObject(member, formatPath(memberPath)),
+          memberPath,
+          mergedProperties,
+        );
+      });
+      return;
+    }
+
+    const properties = activeSchema.properties;
+    if (!properties || !isRecord(properties)) {
+      throw new Error(
+        `allOf members must resolve to object schemas with properties at ${formatPath(path)}`,
+      );
+    }
+
+    if (
+      activeSchema.additionalProperties !== undefined &&
+      activeSchema.additionalProperties !== false &&
+      activeSchema.additionalProperties !== true
+    ) {
+      throw new Error(
+        `Object schemas with both properties and additionalProperties are not supported at ${formatPath(path)}`,
+      );
+    }
+
+    const requiredProperties = new Set(getObjectRequiredProperties(activeSchema));
+    for (const [propertyName, propertyDefinition] of Object.entries(
+      properties as Record<string, JSONSchema7Definition>,
+    )) {
+      const propertyPath = [...path, `.properties.${propertyName}`];
+      this.mergeAllOfProperty(
+        mergedProperties,
+        propertyName,
+        assertSchemaObject(propertyDefinition, formatPath(propertyPath)),
+        requiredProperties.has(propertyName),
+        propertyPath,
+      );
+    }
+  }
+
+  private mergeAllOfProperty(
+    mergedProperties: Map<string, MergedAllOfProperty>,
+    propertyName: string,
+    propertySchema: JSONSchema7,
+    required: boolean,
+    path: string[],
+  ): void {
+    const normalized = unwrapNullableSchema(propertySchema, formatPath(path));
+    const existing = mergedProperties.get(propertyName);
+    if (!existing) {
+      mergedProperties.set(propertyName, {
+        propertyName,
+        schema: normalized.schema,
+        required,
+        nullable: normalized.nullable,
+        description: propertyDescription(propertySchema),
+        path,
+      });
+      return;
+    }
+
+    const mergedSchema = this.mergeAllOfPropertySchemas(
+      existing.schema,
+      normalized.schema,
+    );
+    if (!mergedSchema) {
+      throw new Error(
+        `Conflicting allOf property definitions for ${JSON.stringify(propertyName)} at ${formatPath(path)}`,
+      );
+    }
+
+    existing.schema = mergedSchema;
+    existing.required ||= required;
+    existing.nullable &&= normalized.nullable;
+    existing.description ??= propertyDescription(propertySchema);
+  }
+
+  private mergeAllOfPropertySchemas(
+    left: JSONSchema7,
+    right: JSONSchema7,
+  ): JSONSchema7 | undefined {
+    const leftResolved = this.resolveAllOfComparisonSchema(left);
+    const rightResolved = this.resolveAllOfComparisonSchema(right);
+    if (
+      JSON.stringify(stripNonBehavioralSchemaMetadata(leftResolved)) ===
+      JSON.stringify(stripNonBehavioralSchemaMetadata(rightResolved))
+    ) {
+      return this.preferAllOfPropertySchema(left, right);
+    }
+
+    const intersectedEnum = this.intersectStringEnums(leftResolved, rightResolved);
+    if (intersectedEnum) {
+      return intersectedEnum;
+    }
+
+    return undefined;
+  }
+
+  private preferAllOfPropertySchema(
+    left: JSONSchema7,
+    right: JSONSchema7,
+  ): JSONSchema7 {
+    if (right.$ref && !left.$ref) {
+      return right;
+    }
+    return left;
+  }
+
+  private intersectStringEnums(
+    left: JSONSchema7,
+    right: JSONSchema7,
+  ): JSONSchema7 | undefined {
+    const leftType = normalizePrimitiveSchema(left);
+    const rightType = normalizePrimitiveSchema(right);
+    if (leftType !== "string" || rightType !== "string") {
+      return undefined;
+    }
+
+    const leftValues = this.getStringLiteralValues(left);
+    const rightValues = this.getStringLiteralValues(right);
+    if (!leftValues || !rightValues) {
+      return undefined;
+    }
+
+    const intersection = leftValues.filter((value) => rightValues.includes(value));
+    if (intersection.length === 0) {
+      return undefined;
+    }
+    if (intersection.length === 1) {
+      return { type: "string", enum: intersection };
+    }
+    return { type: "string", enum: intersection };
+  }
+
+  private getStringLiteralValues(schema: JSONSchema7): string[] | undefined {
+    if (typeof schema.const === "string") {
+      return [schema.const];
+    }
+    if (isStringEnumSchema(schema)) {
+      return [...schema.enum];
+    }
+    return undefined;
+  }
+
+  private resolveAllOfComparisonSchema(schema: JSONSchema7): JSONSchema7 {
+    let current = schema;
+    const seenRefs = new Set<string>();
+    while (current.$ref) {
+      if (seenRefs.has(current.$ref)) {
+        throw new Error(`Circular $ref encountered while comparing allOf properties: ${current.$ref}`);
+      }
+      seenRefs.add(current.$ref);
+      current = mergeSchemaMetadata(
+        this.resolveDefinitionSchema(current.$ref, current.$ref),
+        current,
+      );
+    }
+    return current;
   }
 
   private lowerStructDeclaration(

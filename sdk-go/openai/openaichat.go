@@ -275,7 +275,7 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 	}
 
 	if input.Tools != nil {
-		var tools []openaichatapi.CreateChatCompletionRequestAllOf2ToolsItem
+		var tools []openaichatapi.CreateChatCompletionRequestToolsItem
 		for _, tool := range input.Tools {
 			openAITool := openaichatapi.ChatCompletionTool{
 				Function: openaichatapi.FunctionObject{
@@ -291,7 +291,7 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 			}
 			strict := true
 			openAITool.Function.Strict = &strict
-			tools = append(tools, openaichatapi.CreateChatCompletionRequestAllOf2ToolsItem{
+			tools = append(tools, openaichatapi.CreateChatCompletionRequestToolsItem{
 				Function: &openAITool,
 			})
 		}
@@ -706,7 +706,7 @@ func convertToOpenAIChatModality(modality llmsdk.Modality) (openaichatapi.Respon
 	}
 }
 
-func convertToOpenAIChatAudio(options llmsdk.AudioOptions) (*openaichatapi.CreateChatCompletionRequestAllOf2Audio, error) {
+func convertToOpenAIChatAudio(options llmsdk.AudioOptions) (*openaichatapi.CreateChatCompletionRequestAudio, error) {
 	if options.Voice == nil || *options.Voice == "" {
 		return nil, llmsdk.NewInvalidInputError("audio voice is required for OpenAI audio")
 	}
@@ -720,7 +720,7 @@ func convertToOpenAIChatAudio(options llmsdk.AudioOptions) (*openaichatapi.Creat
 		return nil, err
 	}
 
-	return &openaichatapi.CreateChatCompletionRequestAllOf2Audio{
+	return &openaichatapi.CreateChatCompletionRequestAudio{
 		Format: format,
 		Voice: openaichatapi.VoiceIdsOrCustomVoice{
 			VoiceIdsShared: func() *openaichatapi.VoiceIdsShared {
@@ -731,20 +731,20 @@ func convertToOpenAIChatAudio(options llmsdk.AudioOptions) (*openaichatapi.Creat
 	}, nil
 }
 
-func convertToOpenAIChatAudioFormat(format llmsdk.AudioFormat) (openaichatapi.CreateChatCompletionRequestAllOf2AudioFormat, error) {
+func convertToOpenAIChatAudioFormat(format llmsdk.AudioFormat) (openaichatapi.CreateChatCompletionRequestAudioFormat, error) {
 	switch format {
 	case llmsdk.AudioFormatWav:
-		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatWav, nil
+		return openaichatapi.CreateChatCompletionRequestAudioFormatWav, nil
 	case llmsdk.AudioFormatMP3:
-		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatMp3, nil
+		return openaichatapi.CreateChatCompletionRequestAudioFormatMp3, nil
 	case llmsdk.AudioFormatFLAC:
-		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatFlac, nil
+		return openaichatapi.CreateChatCompletionRequestAudioFormatFlac, nil
 	case llmsdk.AudioFormatOpus:
-		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatOpus, nil
+		return openaichatapi.CreateChatCompletionRequestAudioFormatOpus, nil
 	case llmsdk.AudioFormatLinear16:
-		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatPcm16, nil
+		return openaichatapi.CreateChatCompletionRequestAudioFormatPcm16, nil
 	case llmsdk.AudioFormatAAC:
-		return openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatAac, nil
+		return openaichatapi.CreateChatCompletionRequestAudioFormatAac, nil
 	default:
 		return "", llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert audio format %s to OpenAI audio format", format))
 	}
@@ -761,19 +761,19 @@ func convertUserAudioFormat(format llmsdk.AudioFormat) (openaichatapi.ChatComple
 	}
 }
 
-func mapOpenAIChatAudioFormat(format openaichatapi.CreateChatCompletionRequestAllOf2AudioFormat) (llmsdk.AudioFormat, error) {
+func mapOpenAIChatAudioFormat(format openaichatapi.CreateChatCompletionRequestAudioFormat) (llmsdk.AudioFormat, error) {
 	switch format {
-	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatWav:
+	case openaichatapi.CreateChatCompletionRequestAudioFormatWav:
 		return llmsdk.AudioFormatWav, nil
-	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatMp3:
+	case openaichatapi.CreateChatCompletionRequestAudioFormatMp3:
 		return llmsdk.AudioFormatMP3, nil
-	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatFlac:
+	case openaichatapi.CreateChatCompletionRequestAudioFormatFlac:
 		return llmsdk.AudioFormatFLAC, nil
-	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatOpus:
+	case openaichatapi.CreateChatCompletionRequestAudioFormatOpus:
 		return llmsdk.AudioFormatOpus, nil
-	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatPcm16:
+	case openaichatapi.CreateChatCompletionRequestAudioFormatPcm16:
 		return llmsdk.AudioFormatLinear16, nil
-	case openaichatapi.CreateChatCompletionRequestAllOf2AudioFormatAac:
+	case openaichatapi.CreateChatCompletionRequestAudioFormatAac:
 		return llmsdk.AudioFormatAAC, nil
 	default:
 		return "", llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("unknown OpenAI audio format %s", format))
@@ -811,10 +811,10 @@ func convertToOpenAIChatToolChoice(choice llmsdk.ToolChoiceOption) (*openaichata
 	}
 }
 
-func convertToOpenAIChatResponseFormat(option llmsdk.ResponseFormatOption) (*openaichatapi.CreateChatCompletionRequestAllOf2ResponseFormat, error) {
+func convertToOpenAIChatResponseFormat(option llmsdk.ResponseFormatOption) (*openaichatapi.CreateChatCompletionRequestResponseFormat, error) {
 	switch {
 	case option.Text != nil:
-		return &openaichatapi.CreateChatCompletionRequestAllOf2ResponseFormat{
+		return &openaichatapi.CreateChatCompletionRequestResponseFormat{
 			Text: &openaichatapi.ResponseFormatText{},
 		}, nil
 	case option.JSON != nil:
@@ -828,11 +828,11 @@ func convertToOpenAIChatResponseFormat(option llmsdk.ResponseFormatOption) (*ope
 			if option.JSON.Description != nil {
 				jsonSchema.JsonSchema.Description = option.JSON.Description
 			}
-			return &openaichatapi.CreateChatCompletionRequestAllOf2ResponseFormat{
+			return &openaichatapi.CreateChatCompletionRequestResponseFormat{
 				JsonSchema: &jsonSchema,
 			}, nil
 		}
-		return &openaichatapi.CreateChatCompletionRequestAllOf2ResponseFormat{
+		return &openaichatapi.CreateChatCompletionRequestResponseFormat{
 			JsonObject: &openaichatapi.ResponseFormatJsonObject{},
 		}, nil
 	default:

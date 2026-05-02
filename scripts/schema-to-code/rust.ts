@@ -26,6 +26,7 @@ export function renderRustDocument(document: CodegenDocument): string {
           declaration.untaggedDeserializeStrategy === "placeholder"),
     );
   const attributes = [
+    "#![allow(dead_code)]",
     "#![allow(clippy::enum_variant_names)]",
     "#![allow(clippy::struct_field_names)]",
     "#![allow(clippy::doc_markdown)]",
@@ -188,6 +189,7 @@ function renderRustUnion(declaration: UnionDeclaration): string {
     lines.push("    #[serde(skip_serializing)]");
     lines.push("    Unknown,");
   } else {
+    lines.push("    #[allow(dead_code)]");
     lines.push("    #[serde(skip_serializing)]");
     lines.push("    Unknown(Value),");
   }
@@ -366,7 +368,7 @@ function renderRustObjectUntaggedCaseBody(
       conditions.push(
         `object.get(${JSON.stringify(
           match.discriminator.property,
-        )}).map_or(true, |raw| raw.as_str() == Some(${JSON.stringify(
+        )}).is_none_or(|raw| raw.as_str() == Some(${JSON.stringify(
           match.discriminator.value,
         )}))`,
       );

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::struct_field_names)]
 #![allow(clippy::doc_markdown)]
@@ -7,12 +8,229 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// The retention policy for the prompt cache. Set to `24h` to enable extended
+/// prompt caching, which keeps cached prefixes active for longer, up to a
+/// maximum of 24 hours. [Learn
+/// more](/docs/guides/prompt-caching#prompt-cache-retention).
 #[derive(Serialize, Deserialize)]
-pub struct CreateChatCompletionRequestAllOf2 {
+#[non_exhaustive]
+pub enum CreateChatCompletionRequestPromptCacheRetention {
+    #[serde(rename = "in_memory")]
+    InMemory,
+    #[serde(rename = "24h")]
+    N24H,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
+}
+
+/// Parameters for audio output. Required when audio output is requested with
+/// `modalities: ["audio"]`. [Learn more](/docs/guides/audio).
+#[derive(Serialize, Deserialize)]
+pub struct CreateChatCompletionRequestAudio {
+    /// Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,
+    /// `opus`, or `pcm16`.
+    pub format: CreateChatCompletionRequestAudioFormat,
+    /// The voice the model uses to respond. Supported built-in voices are
+    /// `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`,
+    /// `sage`, `shimmer`, `marin`, and `cedar`. You may also provide a
+    /// custom voice object with an `id`, for example `{ "id": "voice_1234" }`.
+    pub voice: VoiceIdsOrCustomVoice,
+}
+
+/// Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,
+/// `opus`, or `pcm16`.
+#[derive(Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum CreateChatCompletionRequestAudioFormat {
+    #[serde(rename = "wav")]
+    Wav,
+    #[serde(rename = "aac")]
+    Aac,
+    #[serde(rename = "mp3")]
+    Mp3,
+    #[serde(rename = "flac")]
+    Flac,
+    #[serde(rename = "opus")]
+    Opus,
+    #[serde(rename = "pcm16")]
+    Pcm16,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
+}
+
+/// `none` means the model will not call a function and instead generates a
+/// message. `auto` means the model can pick between generating a message or
+/// calling a function.
+pub type CreateChatCompletionRequestFunctionCallString = Option<String>;
+
+/// Deprecated in favor of `tool_choice`.
+///
+/// Controls which (if any) function is called by the model.
+///
+/// `none` means the model will not call a function and instead generates a
+/// message.
+///
+/// `auto` means the model can pick between generating a message or calling a
+/// function.
+///
+/// Specifying a particular function via `{"name": "my_function"}` forces the
+/// model to call that function.
+///
+/// `none` is the default when no functions are present. `auto` is the default
+/// if functions are present.
+#[derive(Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(untagged)]
+pub enum CreateChatCompletionRequestFunctionCall {
+    CreateChatCompletionRequestFunctionCallString(CreateChatCompletionRequestFunctionCallString),
+    ChatCompletionFunctionCallOption(ChatCompletionFunctionCallOption),
+    #[allow(dead_code)]
+    #[serde(skip_serializing)]
+    Unknown(Value),
+}
+
+/// Configuration for a [Predicted Output](/docs/guides/predicted-outputs),
+/// which can greatly improve response times when large parts of the model
+/// response are known ahead of time. This is most common when you are
+/// regenerating a file with only minor changes to most of the content.
+#[derive(Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(tag = "type")]
+pub enum CreateChatCompletionRequestPrediction {
+    #[serde(rename = "content")]
+    Content(PredictionContent),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
+}
+
+/// An object specifying the format that the model must output.
+///
+/// Setting to `{ "type": "json_schema", "json_schema": {...} }` enables
+/// Structured Outputs which ensures the model will match your supplied JSON
+/// schema. Learn more in the [Structured Outputs
+/// guide](/docs/guides/structured-outputs).
+///
+/// Setting to `{ "type": "json_object" }` enables the older JSON mode, which
+/// ensures the message the model generates is valid JSON. Using `json_schema`
+/// is preferred for models that support it.
+#[derive(Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(tag = "type")]
+pub enum CreateChatCompletionRequestResponseFormat {
+    #[serde(rename = "text")]
+    Text(ResponseFormatText),
+    #[serde(rename = "json_schema")]
+    JsonSchema(ResponseFormatJsonSchema),
+    #[serde(rename = "json_object")]
+    JsonObject(ResponseFormatJsonObject),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(tag = "type")]
+pub enum CreateChatCompletionRequestToolsItem {
+    #[serde(rename = "function")]
+    Function(ChatCompletionTool),
+    #[serde(rename = "custom")]
+    Custom(CustomToolChatCompletions),
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
+}
+
+/// This tool searches the web for relevant results to use in a response.
+/// Learn more about the [web search
+/// tool](/docs/guides/tools-web-search?api-mode=chat).
+#[derive(Serialize, Deserialize)]
+pub struct CreateChatCompletionRequestWebSearchOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_context_size: Option<WebSearchContextSize>,
+    /// Approximate location parameters for the search.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_location: Option<CreateChatCompletionRequestWebSearchOptionsUserLocation>,
+}
+
+/// Approximate location parameters for the search.
+#[derive(Serialize, Deserialize)]
+pub struct CreateChatCompletionRequestWebSearchOptionsUserLocation {
+    pub approximate: WebSearchLocation,
+    /// The type of location approximation. Always `approximate`.
+    pub r#type: CreateChatCompletionRequestWebSearchOptionsUserLocationType,
+}
+
+/// The type of location approximation. Always `approximate`.
+#[derive(Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum CreateChatCompletionRequestWebSearchOptionsUserLocationType {
+    #[serde(rename = "approximate")]
+    Approximate,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateChatCompletionRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Metadata>,
+    /// Used by OpenAI to cache responses for similar requests to optimize your
+    /// cache hit rates. Replaces the `user` field. [Learn
+    /// more](/docs/guides/prompt-caching).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_key: Option<String>,
+    /// The retention policy for the prompt cache. Set to `24h` to enable
+    /// extended prompt caching, which keeps cached prefixes active for longer,
+    /// up to a maximum of 24 hours. [Learn
+    /// more](/docs/guides/prompt-caching#prompt-cache-retention).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_retention: Option<CreateChatCompletionRequestPromptCacheRetention>,
+    /// A stable identifier used to help detect users of your application that
+    /// may be violating OpenAI's usage policies. The IDs should be a string
+    /// that uniquely identifies each user, with a maximum length of 64
+    /// characters. We recommend hashing their username or email address, in
+    /// order to avoid sending us any identifying information. [Learn
+    /// more](/docs/guides/safety-best-practices#safety-identifiers).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_identifier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_tier: Option<ServiceTier>,
+    /// What sampling temperature to use, between 0 and 2. Higher values like
+    /// 0.8 will make the output more random, while lower values like 0.2 will
+    /// make it more focused and deterministic. We generally recommend
+    /// altering this or `top_p` but not both.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    /// An integer between 0 and 20 specifying the number of most likely tokens
+    /// to return at each token position, each with an associated log
+    /// probability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_logprobs: Option<i64>,
+    /// An alternative to sampling with temperature, called nucleus sampling,
+    /// where the model considers the results of the tokens with top_p
+    /// probability mass. So 0.1 means only the tokens comprising the top
+    /// 10% probability mass are considered.
+    ///
+    /// We generally recommend altering this or `temperature` but not both.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+    /// This field is being replaced by `safety_identifier` and
+    /// `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+    /// optimizations. A stable identifier for your end-users.
+    /// Used to boost cache hit rates by better bucketing similar requests and
+    /// to help OpenAI detect and prevent abuse. [Learn
+    /// more](/docs/guides/safety-best-practices#safety-identifiers).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
     /// Parameters for audio output. Required when audio output is requested
     /// with `modalities: ["audio"]`. [Learn more](/docs/guides/audio).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audio: Option<CreateChatCompletionRequestAllOf2Audio>,
+    pub audio: Option<CreateChatCompletionRequestAudio>,
     /// Number between -2.0 and 2.0. Positive values penalize new tokens based
     /// on their existing frequency in the text so far, decreasing the
     /// model's likelihood to repeat the same line verbatim.
@@ -34,7 +252,7 @@ pub struct CreateChatCompletionRequestAllOf2 {
     /// `none` is the default when no functions are present. `auto` is the
     /// default if functions are present.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_call: Option<CreateChatCompletionRequestAllOf2FunctionCall>,
+    pub function_call: Option<CreateChatCompletionRequestFunctionCall>,
     /// Deprecated in favor of `tools`.
     ///
     /// A list of functions the model may generate JSON inputs for.
@@ -93,7 +311,7 @@ pub struct CreateChatCompletionRequestAllOf2 {
     /// response are known ahead of time. This is most common when you are
     /// regenerating a file with only minor changes to most of the content.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prediction: Option<CreateChatCompletionRequestAllOf2Prediction>,
+    pub prediction: Option<CreateChatCompletionRequestPrediction>,
     /// Number between -2.0 and 2.0. Positive values penalize new tokens based
     /// on whether they appear in the text so far, increasing the model's
     /// likelihood to talk about new topics.
@@ -112,7 +330,7 @@ pub struct CreateChatCompletionRequestAllOf2 {
     /// which ensures the message the model generates is valid JSON. Using
     /// `json_schema` is preferred for models that support it.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<CreateChatCompletionRequestAllOf2ResponseFormat>,
+    pub response_format: Option<CreateChatCompletionRequestResponseFormat>,
     /// This feature is in Beta.
     /// If specified, our system will make a best effort to sample
     /// deterministically, such that repeated requests with the same `seed` and
@@ -147,180 +365,14 @@ pub struct CreateChatCompletionRequestAllOf2 {
     /// [custom tools](/docs/guides/function-calling#custom-tools) or
     /// [function tools](/docs/guides/function-calling).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<CreateChatCompletionRequestAllOf2ToolsItem>>,
-    /// An integer between 0 and 20 specifying the number of most likely tokens
-    /// to return at each token position, each with an associated log
-    /// probability. `logprobs` must be set to `true` if this parameter is
-    /// used.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub top_logprobs: Option<i64>,
+    pub tools: Option<Vec<CreateChatCompletionRequestToolsItem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verbosity: Option<Verbosity>,
     /// This tool searches the web for relevant results to use in a response.
     /// Learn more about the [web search
     /// tool](/docs/guides/tools-web-search?api-mode=chat).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub web_search_options: Option<CreateChatCompletionRequestAllOf2WebSearchOptions>,
-}
-
-/// Parameters for audio output. Required when audio output is requested with
-/// `modalities: ["audio"]`. [Learn more](/docs/guides/audio).
-#[derive(Serialize, Deserialize)]
-pub struct CreateChatCompletionRequestAllOf2Audio {
-    /// Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,
-    /// `opus`, or `pcm16`.
-    pub format: CreateChatCompletionRequestAllOf2AudioFormat,
-    /// The voice the model uses to respond. Supported built-in voices are
-    /// `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`,
-    /// `sage`, `shimmer`, `marin`, and `cedar`. You may also provide a
-    /// custom voice object with an `id`, for example `{ "id": "voice_1234" }`.
-    pub voice: VoiceIdsOrCustomVoice,
-}
-
-/// Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,
-/// `opus`, or `pcm16`.
-#[derive(Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum CreateChatCompletionRequestAllOf2AudioFormat {
-    #[serde(rename = "wav")]
-    Wav,
-    #[serde(rename = "aac")]
-    Aac,
-    #[serde(rename = "mp3")]
-    Mp3,
-    #[serde(rename = "flac")]
-    Flac,
-    #[serde(rename = "opus")]
-    Opus,
-    #[serde(rename = "pcm16")]
-    Pcm16,
-    #[serde(other)]
-    #[serde(skip_serializing)]
-    Unknown,
-}
-
-/// `none` means the model will not call a function and instead generates a
-/// message. `auto` means the model can pick between generating a message or
-/// calling a function.
-pub type CreateChatCompletionRequestAllOf2FunctionCallString = Option<String>;
-
-/// Deprecated in favor of `tool_choice`.
-///
-/// Controls which (if any) function is called by the model.
-///
-/// `none` means the model will not call a function and instead generates a
-/// message.
-///
-/// `auto` means the model can pick between generating a message or calling a
-/// function.
-///
-/// Specifying a particular function via `{"name": "my_function"}` forces the
-/// model to call that function.
-///
-/// `none` is the default when no functions are present. `auto` is the default
-/// if functions are present.
-#[derive(Serialize, Deserialize)]
-#[non_exhaustive]
-#[serde(untagged)]
-pub enum CreateChatCompletionRequestAllOf2FunctionCall {
-    CreateChatCompletionRequestAllOf2FunctionCallString(
-        CreateChatCompletionRequestAllOf2FunctionCallString,
-    ),
-    ChatCompletionFunctionCallOption(ChatCompletionFunctionCallOption),
-    #[serde(skip_serializing)]
-    Unknown(Value),
-}
-
-/// Configuration for a [Predicted Output](/docs/guides/predicted-outputs),
-/// which can greatly improve response times when large parts of the model
-/// response are known ahead of time. This is most common when you are
-/// regenerating a file with only minor changes to most of the content.
-#[derive(Serialize, Deserialize)]
-#[non_exhaustive]
-#[serde(tag = "type")]
-pub enum CreateChatCompletionRequestAllOf2Prediction {
-    #[serde(rename = "content")]
-    Content(PredictionContent),
-    #[serde(other)]
-    #[serde(skip_serializing)]
-    Unknown,
-}
-
-/// An object specifying the format that the model must output.
-///
-/// Setting to `{ "type": "json_schema", "json_schema": {...} }` enables
-/// Structured Outputs which ensures the model will match your supplied JSON
-/// schema. Learn more in the [Structured Outputs
-/// guide](/docs/guides/structured-outputs).
-///
-/// Setting to `{ "type": "json_object" }` enables the older JSON mode, which
-/// ensures the message the model generates is valid JSON. Using `json_schema`
-/// is preferred for models that support it.
-#[derive(Serialize, Deserialize)]
-#[non_exhaustive]
-#[serde(tag = "type")]
-pub enum CreateChatCompletionRequestAllOf2ResponseFormat {
-    #[serde(rename = "text")]
-    Text(ResponseFormatText),
-    #[serde(rename = "json_schema")]
-    JsonSchema(ResponseFormatJsonSchema),
-    #[serde(rename = "json_object")]
-    JsonObject(ResponseFormatJsonObject),
-    #[serde(other)]
-    #[serde(skip_serializing)]
-    Unknown,
-}
-
-#[derive(Serialize, Deserialize)]
-#[non_exhaustive]
-#[serde(tag = "type")]
-pub enum CreateChatCompletionRequestAllOf2ToolsItem {
-    #[serde(rename = "function")]
-    Function(ChatCompletionTool),
-    #[serde(rename = "custom")]
-    Custom(CustomToolChatCompletions),
-    #[serde(other)]
-    #[serde(skip_serializing)]
-    Unknown,
-}
-
-/// This tool searches the web for relevant results to use in a response.
-/// Learn more about the [web search
-/// tool](/docs/guides/tools-web-search?api-mode=chat).
-#[derive(Serialize, Deserialize)]
-pub struct CreateChatCompletionRequestAllOf2WebSearchOptions {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub search_context_size: Option<WebSearchContextSize>,
-    /// Approximate location parameters for the search.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub user_location: Option<CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocation>,
-}
-
-/// Approximate location parameters for the search.
-#[derive(Serialize, Deserialize)]
-pub struct CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocation {
-    pub approximate: WebSearchLocation,
-    /// The type of location approximation. Always `approximate`.
-    pub r#type: CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocationType,
-}
-
-/// The type of location approximation. Always `approximate`.
-#[derive(Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum CreateChatCompletionRequestAllOf2WebSearchOptionsUserLocationType {
-    #[serde(rename = "approximate")]
-    Approximate,
-    #[serde(other)]
-    #[serde(skip_serializing)]
-    Unknown,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CreateChatCompletionRequest {
-    #[serde(flatten)]
-    pub create_model_response_properties: CreateModelResponseProperties,
-    #[serde(flatten)]
-    pub create_chat_completion_request_all_of_2: CreateChatCompletionRequestAllOf2,
+    pub web_search_options: Option<CreateChatCompletionRequestWebSearchOptions>,
 }
 
 /// Represents a chat completion response returned by model, based on the
@@ -514,21 +566,74 @@ pub enum CreateChatCompletionStreamResponseObject {
     Unknown,
 }
 
+/// The retention policy for the prompt cache. Set to `24h` to enable extended
+/// prompt caching, which keeps cached prefixes active for longer, up to a
+/// maximum of 24 hours. [Learn
+/// more](/docs/guides/prompt-caching#prompt-cache-retention).
 #[derive(Serialize, Deserialize)]
-pub struct CreateModelResponsePropertiesAllOf2 {
+#[non_exhaustive]
+pub enum CreateModelResponsePropertiesPromptCacheRetention {
+    #[serde(rename = "in_memory")]
+    InMemory,
+    #[serde(rename = "24h")]
+    N24H,
+    #[serde(other)]
+    #[serde(skip_serializing)]
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateModelResponseProperties {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Metadata>,
+    /// Used by OpenAI to cache responses for similar requests to optimize your
+    /// cache hit rates. Replaces the `user` field. [Learn
+    /// more](/docs/guides/prompt-caching).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_key: Option<String>,
+    /// The retention policy for the prompt cache. Set to `24h` to enable
+    /// extended prompt caching, which keeps cached prefixes active for longer,
+    /// up to a maximum of 24 hours. [Learn
+    /// more](/docs/guides/prompt-caching#prompt-cache-retention).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_retention: Option<CreateModelResponsePropertiesPromptCacheRetention>,
+    /// A stable identifier used to help detect users of your application that
+    /// may be violating OpenAI's usage policies. The IDs should be a string
+    /// that uniquely identifies each user, with a maximum length of 64
+    /// characters. We recommend hashing their username or email address, in
+    /// order to avoid sending us any identifying information. [Learn
+    /// more](/docs/guides/safety-best-practices#safety-identifiers).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_identifier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_tier: Option<ServiceTier>,
+    /// What sampling temperature to use, between 0 and 2. Higher values like
+    /// 0.8 will make the output more random, while lower values like 0.2 will
+    /// make it more focused and deterministic. We generally recommend
+    /// altering this or `top_p` but not both.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
     /// An integer between 0 and 20 specifying the number of most likely tokens
     /// to return at each token position, each with an associated log
     /// probability.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<i64>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CreateModelResponseProperties {
-    #[serde(flatten)]
-    pub model_response_properties: ModelResponseProperties,
-    #[serde(flatten)]
-    pub create_model_response_properties_all_of_2: CreateModelResponsePropertiesAllOf2,
+    /// An alternative to sampling with temperature, called nucleus sampling,
+    /// where the model considers the results of the tokens with top_p
+    /// probability mass. So 0.1 means only the tokens comprising the top
+    /// 10% probability mass are considered.
+    ///
+    /// We generally recommend altering this or `temperature` but not both.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+    /// This field is being replaced by `safety_identifier` and
+    /// `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+    /// optimizations. A stable identifier for your end-users.
+    /// Used to boost cache hit rates by better bucketing similar requests and
+    /// to help OpenAI detect and prevent abuse. [Learn
+    /// more](/docs/guides/safety-best-practices#safety-identifiers).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
 }
 
 /// Custom voice reference.
@@ -545,6 +650,7 @@ pub struct VoiceIdsOrCustomVoiceVariant2 {
 pub enum VoiceIdsOrCustomVoice {
     VoiceIdsShared(VoiceIdsShared),
     VoiceIdsOrCustomVoiceVariant2(VoiceIdsOrCustomVoiceVariant2),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -607,9 +713,7 @@ pub type ResponseModalities = Option<Option<Vec<ResponseModalitiesValueItem>>>;
 
 pub type ModelIdsShared = Option<String>;
 
-/// Whether to enable [parallel function
-/// calling](/docs/guides/function-calling#
-/// configuring-parallel-function-calling) during tool use.
+/// Whether to enable parallel function calling during tool use.
 pub type ParallelToolCalls = Option<bool>;
 
 /// Static predicted output content, such as the content of a text file that is
@@ -640,6 +744,7 @@ pub type PredictionContentContentArray = Option<Vec<ChatCompletionRequestMessage
 pub enum PredictionContentContent {
     PredictionContentContentString(PredictionContentContentString),
     PredictionContentContentArray(PredictionContentContentArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -734,6 +839,7 @@ pub type StopConfigurationArray = Option<Vec<String>>;
 pub enum StopConfiguration {
     StopConfigurationString(StopConfigurationString),
     StopConfigurationArray(StopConfigurationArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -787,6 +893,7 @@ pub enum ChatCompletionToolChoiceOption {
     ChatCompletionAllowedToolsChoice(ChatCompletionAllowedToolsChoice),
     ChatCompletionNamedToolChoice(ChatCompletionNamedToolChoice),
     ChatCompletionNamedToolChoiceCustom(ChatCompletionNamedToolChoiceCustom),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -1351,6 +1458,7 @@ pub enum ChatCompletionRequestDeveloperMessageContent {
     ChatCompletionRequestDeveloperMessageContentArray(
         ChatCompletionRequestDeveloperMessageContentArray,
     ),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -1385,6 +1493,7 @@ pub enum ChatCompletionRequestSystemMessageContent {
         ChatCompletionRequestSystemMessageContentString,
     ),
     ChatCompletionRequestSystemMessageContentArray(ChatCompletionRequestSystemMessageContentArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -1417,6 +1526,7 @@ pub type ChatCompletionRequestUserMessageContentArray =
 pub enum ChatCompletionRequestUserMessageContent {
     ChatCompletionRequestUserMessageContentString(ChatCompletionRequestUserMessageContentString),
     ChatCompletionRequestUserMessageContentArray(ChatCompletionRequestUserMessageContentArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -1475,6 +1585,7 @@ pub enum ChatCompletionRequestAssistantMessageContent {
     ChatCompletionRequestAssistantMessageContentArray(
         ChatCompletionRequestAssistantMessageContentArray,
     ),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -1515,6 +1626,7 @@ pub type ChatCompletionRequestToolMessageContentArray =
 pub enum ChatCompletionRequestToolMessageContent {
     ChatCompletionRequestToolMessageContentString(ChatCompletionRequestToolMessageContentString),
     ChatCompletionRequestToolMessageContentArray(ChatCompletionRequestToolMessageContentArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -1762,7 +1874,7 @@ pub struct ChatCompletionAllowedTools {
     /// A list of tool definitions that the model should be allowed to call.
     ///
     /// For the Chat Completions API, the list of tool definitions might look
-    /// like: 
+    /// like:
     /// ```json
     /// [
     ///   { "type": "function", "function": { "name": "get_weather" } },

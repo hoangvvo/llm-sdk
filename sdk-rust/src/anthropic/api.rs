@@ -276,6 +276,7 @@ pub type CreateMessageParamsSystemArray = Option<Vec<RequestTextBlock>>;
 pub enum CreateMessageParamsSystem {
     CreateMessageParamsSystemString(CreateMessageParamsSystemString),
     CreateMessageParamsSystemArray(CreateMessageParamsSystemArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -300,6 +301,7 @@ pub enum CreateMessageParamsToolsItem {
     WebFetchTool20260309(WebFetchTool20260309),
     ToolSearchToolBM2520251119(ToolSearchToolBM2520251119),
     ToolSearchToolRegex20251119(ToolSearchToolRegex20251119),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -473,6 +475,7 @@ pub type InputMessageContentArray = Option<Vec<InputContentBlock>>;
 pub enum InputMessageContent {
     InputMessageContentString(InputMessageContentString),
     InputMessageContentArray(InputMessageContentArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -2017,6 +2020,7 @@ pub type ResponseWebSearchToolResultBlockContentArray = Option<Vec<ResponseWebSe
 pub enum ResponseWebSearchToolResultBlockContent {
     ResponseWebSearchToolResultError(ResponseWebSearchToolResultError),
     ResponseWebSearchToolResultBlockContentArray(ResponseWebSearchToolResultBlockContentArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -2470,6 +2474,7 @@ pub type RequestToolResultBlockContentArray = Option<Vec<RequestToolResultBlockC
 pub enum RequestToolResultBlockContent {
     RequestToolResultBlockContentString(RequestToolResultBlockContentString),
     RequestToolResultBlockContentArray(RequestToolResultBlockContentArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -2644,6 +2649,7 @@ pub type RequestWebSearchToolResultBlockContentArray = Option<Vec<RequestWebSear
 pub enum RequestWebSearchToolResultBlockContent {
     RequestWebSearchToolResultBlockContentArray(RequestWebSearchToolResultBlockContentArray),
     RequestWebSearchToolResultError(RequestWebSearchToolResultError),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }
@@ -2910,6 +2916,7 @@ pub type ContentBlockSourceContentArray = Option<Vec<ContentBlockSourceContentAr
 pub enum ContentBlockSourceContent {
     ContentBlockSourceContentString(ContentBlockSourceContentString),
     ContentBlockSourceContentArray(ContentBlockSourceContentArray),
+    #[allow(dead_code)]
     #[serde(skip_serializing)]
     Unknown(Value),
 }

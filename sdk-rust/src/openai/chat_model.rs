@@ -17,12 +17,10 @@ use super::chat_api::{
     ChatCompletionStreamOptionsValue, ChatCompletionStreamResponseDelta, ChatCompletionTool,
     ChatCompletionToolChoiceOption, CompletionUsage, CompletionUsageCompletionTokensDetails,
     CompletionUsagePromptTokensDetails, CreateChatCompletionRequest,
-    CreateChatCompletionRequestAllOf2, CreateChatCompletionRequestAllOf2Audio,
-    CreateChatCompletionRequestAllOf2AudioFormat, CreateChatCompletionRequestAllOf2ResponseFormat,
-    CreateChatCompletionRequestAllOf2ToolsItem, CreateChatCompletionResponse,
-    CreateChatCompletionStreamResponse, CreateModelResponseProperties,
-    CreateModelResponsePropertiesAllOf2, FunctionObject, ModelResponseProperties, ReasoningEffort,
-    ReasoningEffortValue, ResponseFormatJsonObject, ResponseFormatJsonSchema,
+    CreateChatCompletionRequestAudio, CreateChatCompletionRequestAudioFormat,
+    CreateChatCompletionRequestResponseFormat, CreateChatCompletionRequestToolsItem,
+    CreateChatCompletionResponse, CreateChatCompletionStreamResponse, FunctionObject,
+    ReasoningEffort, ReasoningEffortValue, ResponseFormatJsonObject, ResponseFormatJsonSchema,
     ResponseFormatJsonSchemaJsonSchema, ResponseFormatJsonSchemaSchema, ResponseFormatText,
     ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
 };
@@ -177,7 +175,6 @@ impl LanguageModel for OpenAIChatModel {
                     let content = map_openai_message(
                         message,
                         request
-                            .create_chat_completion_request_all_of_2
                             .audio
                             .as_ref()
                             .map(|audio| map_openai_audio_format(&audio.format)),
@@ -218,7 +215,6 @@ impl LanguageModel for OpenAIChatModel {
                     let metadata = self.metadata.clone();
                     let request = convert_to_openai_create_params(input, &self.model_id(), true)?;
                     let audio_format = request
-                        .create_chat_completion_request_all_of_2
                         .audio
                         .as_ref()
                         .map(|audio| map_openai_audio_format(&audio.format));
@@ -324,60 +320,50 @@ fn convert_to_openai_create_params(
         .transpose()?;
 
     Ok(CreateChatCompletionRequest {
-        create_model_response_properties: CreateModelResponseProperties {
-            model_response_properties: ModelResponseProperties {
-                metadata: None,
-                prompt_cache_key: None,
-                prompt_cache_retention: None,
-                safety_identifier: None,
-                service_tier: None,
-                temperature: input.temperature,
-                top_logprobs: None,
-                top_p: input.top_p,
-                user: None,
-            },
-            create_model_response_properties_all_of_2: CreateModelResponsePropertiesAllOf2 {
-                top_logprobs: None,
-            },
+        metadata: None,
+        prompt_cache_key: None,
+        prompt_cache_retention: None,
+        safety_identifier: None,
+        service_tier: None,
+        temperature: input.temperature,
+        top_logprobs: None,
+        top_p: input.top_p,
+        user: None,
+        audio,
+        frequency_penalty: input.frequency_penalty,
+        function_call: None,
+        functions: None,
+        logit_bias: None,
+        logprobs: None,
+        max_completion_tokens: input.max_tokens.map(i64::from),
+        max_tokens: None,
+        messages,
+        modalities: Some(modalities),
+        model: Some(model_id.to_string()),
+        n: None,
+        parallel_tool_calls: None,
+        prediction: None,
+        presence_penalty: input.presence_penalty,
+        reasoning_effort,
+        response_format: input.response_format.map(convert_to_openai_response_format),
+        seed: input.seed,
+        stop: None,
+        store: None,
+        stream: Some(stream),
+        stream_options: if stream {
+            Some(Some(Some(ChatCompletionStreamOptionsValue {
+                include_obfuscation: None,
+                include_usage: Some(true),
+            })))
+        } else {
+            None
         },
-        create_chat_completion_request_all_of_2: CreateChatCompletionRequestAllOf2 {
-            audio,
-            frequency_penalty: input.frequency_penalty,
-            function_call: None,
-            functions: None,
-            logit_bias: None,
-            logprobs: None,
-            max_completion_tokens: input.max_tokens.map(i64::from),
-            max_tokens: None,
-            messages,
-            modalities: modalities.map(Some),
-            model: Some(model_id.to_string()),
-            n: None,
-            parallel_tool_calls: None,
-            prediction: None,
-            presence_penalty: input.presence_penalty,
-            reasoning_effort,
-            response_format: input.response_format.map(convert_to_openai_response_format),
-            seed: input.seed,
-            stop: None,
-            store: None,
-            stream: Some(stream),
-            stream_options: if stream {
-                Some(Some(Some(ChatCompletionStreamOptionsValue {
-                    include_obfuscation: None,
-                    include_usage: Some(true),
-                })))
-            } else {
-                None
-            },
-            tool_choice: input.tool_choice.map(convert_to_openai_tool_choice),
-            tools: input
-                .tools
-                .map(|tools| tools.into_iter().map(convert_to_openai_tool).collect()),
-            top_logprobs: None,
-            verbosity: None,
-            web_search_options: None,
-        },
+        tool_choice: input.tool_choice.map(convert_to_openai_tool_choice),
+        tools: input
+            .tools
+            .map(|tools| tools.into_iter().map(convert_to_openai_tool).collect()),
+        verbosity: None,
+        web_search_options: None,
     })
 }
 
@@ -625,14 +611,14 @@ fn convert_tool_message(
     Ok(result)
 }
 
-fn convert_to_openai_tool(tool: Tool) -> CreateChatCompletionRequestAllOf2ToolsItem {
+fn convert_to_openai_tool(tool: Tool) -> CreateChatCompletionRequestToolsItem {
     let function = FunctionObject {
         description: Some(tool.description),
         name: tool.name,
         parameters: Some(Some(tool.parameters)),
         strict: Some(true),
     };
-    CreateChatCompletionRequestAllOf2ToolsItem::Function(ChatCompletionTool { function })
+    CreateChatCompletionRequestToolsItem::Function(ChatCompletionTool { function })
 }
 
 fn convert_to_openai_tool_call(
@@ -691,10 +677,10 @@ fn convert_to_openai_tool_choice(tool_choice: ToolChoiceOption) -> ChatCompletio
 
 fn convert_to_openai_response_format(
     response_format: ResponseFormatOption,
-) -> CreateChatCompletionRequestAllOf2ResponseFormat {
+) -> CreateChatCompletionRequestResponseFormat {
     match response_format {
         ResponseFormatOption::Text => {
-            CreateChatCompletionRequestAllOf2ResponseFormat::Text(ResponseFormatText {})
+            CreateChatCompletionRequestResponseFormat::Text(ResponseFormatText {})
         }
         ResponseFormatOption::Json(ResponseFormatJson {
             name,
@@ -702,20 +688,16 @@ fn convert_to_openai_response_format(
             schema,
         }) => {
             if let Some(schema) = schema {
-                CreateChatCompletionRequestAllOf2ResponseFormat::JsonSchema(
-                    ResponseFormatJsonSchema {
-                        json_schema: ResponseFormatJsonSchemaJsonSchema {
-                            description,
-                            name,
-                            schema: Some(ResponseFormatJsonSchemaSchema::from(schema)),
-                            strict: Some(true),
-                        },
+                CreateChatCompletionRequestResponseFormat::JsonSchema(ResponseFormatJsonSchema {
+                    json_schema: ResponseFormatJsonSchemaJsonSchema {
+                        description,
+                        name,
+                        schema: Some(ResponseFormatJsonSchemaSchema::from(schema)),
+                        strict: Some(true),
                     },
-                )
+                })
             } else {
-                CreateChatCompletionRequestAllOf2ResponseFormat::JsonObject(
-                    ResponseFormatJsonObject {},
-                )
+                CreateChatCompletionRequestResponseFormat::JsonObject(ResponseFormatJsonObject {})
             }
         }
     }
@@ -738,18 +720,18 @@ fn convert_to_openai_modality(
 
 fn convert_to_openai_audio(
     audio: AudioOptions,
-) -> LanguageModelResult<CreateChatCompletionRequestAllOf2Audio> {
+) -> LanguageModelResult<CreateChatCompletionRequestAudio> {
     let voice = audio.voice.ok_or_else(|| {
         LanguageModelError::InvalidInput("Audio voice is required for OpenAI audio".to_string())
     })?;
 
     let format = match audio.format {
-        Some(AudioFormat::Wav) => CreateChatCompletionRequestAllOf2AudioFormat::Wav,
-        Some(AudioFormat::Mp3) => CreateChatCompletionRequestAllOf2AudioFormat::Mp3,
-        Some(AudioFormat::Flac) => CreateChatCompletionRequestAllOf2AudioFormat::Flac,
-        Some(AudioFormat::Aac) => CreateChatCompletionRequestAllOf2AudioFormat::Aac,
-        Some(AudioFormat::Opus) => CreateChatCompletionRequestAllOf2AudioFormat::Opus,
-        Some(AudioFormat::Linear16) => CreateChatCompletionRequestAllOf2AudioFormat::Pcm16,
+        Some(AudioFormat::Wav) => CreateChatCompletionRequestAudioFormat::Wav,
+        Some(AudioFormat::Mp3) => CreateChatCompletionRequestAudioFormat::Mp3,
+        Some(AudioFormat::Flac) => CreateChatCompletionRequestAudioFormat::Flac,
+        Some(AudioFormat::Aac) => CreateChatCompletionRequestAudioFormat::Aac,
+        Some(AudioFormat::Opus) => CreateChatCompletionRequestAudioFormat::Opus,
+        Some(AudioFormat::Linear16) => CreateChatCompletionRequestAudioFormat::Pcm16,
         None => {
             return Err(LanguageModelError::InvalidInput(
                 "Audio format is required for OpenAI audio".to_string(),
@@ -763,7 +745,7 @@ fn convert_to_openai_audio(
         }
     };
 
-    Ok(CreateChatCompletionRequestAllOf2Audio {
+    Ok(CreateChatCompletionRequestAudio {
         format,
         voice: VoiceIdsOrCustomVoice::VoiceIdsShared(Some(voice)),
     })
@@ -853,15 +835,15 @@ fn map_openai_message(
     Ok(parts)
 }
 
-fn map_openai_audio_format(format: &CreateChatCompletionRequestAllOf2AudioFormat) -> AudioFormat {
+fn map_openai_audio_format(format: &CreateChatCompletionRequestAudioFormat) -> AudioFormat {
     match format {
-        CreateChatCompletionRequestAllOf2AudioFormat::Wav => AudioFormat::Wav,
-        CreateChatCompletionRequestAllOf2AudioFormat::Mp3 => AudioFormat::Mp3,
-        CreateChatCompletionRequestAllOf2AudioFormat::Flac => AudioFormat::Flac,
-        CreateChatCompletionRequestAllOf2AudioFormat::Opus => AudioFormat::Opus,
-        CreateChatCompletionRequestAllOf2AudioFormat::Pcm16 => AudioFormat::Linear16,
-        CreateChatCompletionRequestAllOf2AudioFormat::Aac => AudioFormat::Aac,
-        CreateChatCompletionRequestAllOf2AudioFormat::Unknown => AudioFormat::Wav,
+        CreateChatCompletionRequestAudioFormat::Wav
+        | CreateChatCompletionRequestAudioFormat::Unknown => AudioFormat::Wav,
+        CreateChatCompletionRequestAudioFormat::Mp3 => AudioFormat::Mp3,
+        CreateChatCompletionRequestAudioFormat::Flac => AudioFormat::Flac,
+        CreateChatCompletionRequestAudioFormat::Opus => AudioFormat::Opus,
+        CreateChatCompletionRequestAudioFormat::Pcm16 => AudioFormat::Linear16,
+        CreateChatCompletionRequestAudioFormat::Aac => AudioFormat::Aac,
     }
 }
 

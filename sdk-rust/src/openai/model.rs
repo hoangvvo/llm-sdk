@@ -1,21 +1,20 @@
 use crate::{
     client_utils, id_utils,
     openai::responses_api::{
-        self, CreateModelResponseProperties, CreateModelResponsePropertiesAllOf2, CreateResponse,
-        CreateResponseAllOf3, DetailEnum, FunctionCallOutputItemParam,
+        self, CreateResponse, DetailEnum, FunctionCallOutputItemParam,
         FunctionCallOutputItemParamOutput, FunctionCallOutputItemParamOutputArrayItem,
         FunctionCallOutputItemParamType, FunctionTool, FunctionToolCall, FunctionToolCallType,
         FunctionToolType, ImageDetail, ImageGenTool, ImageGenToolCall, ImageGenToolCallType,
         ImageGenToolType, IncludeEnum, InputContent, InputImageContent,
         InputImageContentParamAutoParam, InputImageContentType, InputItem, InputMessage,
         InputMessageRole, InputMessageType, InputTextContent, InputTextContentParam,
-        InputTextContentType, ModelResponseProperties, OutputItem, OutputMessage,
-        OutputMessageContent, OutputMessageRole, OutputMessageStatus, OutputMessageType,
-        OutputTextContent, Reasoning, ReasoningItem, ReasoningItemType, ReasoningSummary, Response,
-        ResponseFormatJsonObject, ResponseFormatText, ResponseProperties, ResponseStreamEvent,
-        ResponseTextParam, ResponseUsage, SummaryTextContent, SummaryTextContentType,
-        TextResponseFormatConfiguration, TextResponseFormatJsonSchema, Tool as OpenAITool,
-        ToolChoiceFunction, ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam,
+        InputTextContentType, OutputItem, OutputMessage, OutputMessageContent, OutputMessageRole,
+        OutputMessageStatus, OutputMessageType, OutputTextContent, Reasoning, ReasoningItem,
+        ReasoningItemType, ReasoningSummary, Response, ResponseFormatJsonObject,
+        ResponseFormatText, ResponseStreamEvent, ResponseTextParam, ResponseUsage,
+        SummaryTextContent, SummaryTextContentType, TextResponseFormatConfiguration,
+        TextResponseFormatJsonSchema, Tool as OpenAITool, ToolChoiceFunction,
+        ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam,
     },
     source_part_utils, AssistantMessage, ContentDelta, ImagePart, ImagePartDelta, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
@@ -147,8 +146,8 @@ impl LanguageModel for OpenAIModel {
                         header_map,
                     )
                     .await?;
-                    let output = json.response_all_of_3.output;
-                    let usage = json.response_all_of_3.usage;
+                    let output = json.output;
+                    let usage = json.usage;
 
                     let content = map_openai_output_items(output)?;
                     let usage = usage.map(|usage| map_openai_response_usage(&usage));
@@ -185,7 +184,7 @@ impl LanguageModel for OpenAIModel {
                 |input| async move {
                     let metadata = self.metadata.clone();
                     let mut params = convert_to_response_create_params(input, &self.model_id())?;
-                    params.create_response_all_of_3.stream = Some(true);
+                    params.stream = Some(true);
                     let header_map = self.request_headers()?;
 
                     let mut chunk_stream = client_utils::send_sse_stream::<_, ResponseStreamEvent>(
@@ -204,7 +203,7 @@ impl LanguageModel for OpenAIModel {
                             let event = event?;
 
                             if let ResponseStreamEvent::ResponseCompleted(ref completed_event) = event {
-                                if let Some(usage) = &completed_event.response.response_all_of_3.usage {
+                                if let Some(usage) = &completed_event.response.usage {
                                     let usage = map_openai_response_usage(usage);
                                     yield PartialModelResponse {
                                         delta: None,
@@ -261,68 +260,55 @@ fn convert_to_response_create_params(
     let include_reasoning_encrypted = reasoning.as_ref().is_some_and(|r| r.enabled);
 
     let mut params = CreateResponse {
-        create_model_response_properties: CreateModelResponseProperties {
-            model_response_properties: ModelResponseProperties {
-                metadata: None,
-                prompt_cache_key: None,
-                prompt_cache_retention: None,
-                safety_identifier: None,
-                service_tier: None,
-                temperature,
-                top_logprobs: None,
-                top_p,
-                user: None,
-            },
-            create_model_response_properties_all_of_2: CreateModelResponsePropertiesAllOf2 {
-                top_logprobs: None,
-            },
+        metadata: None,
+        prompt_cache_key: None,
+        prompt_cache_retention: None,
+        safety_identifier: None,
+        service_tier: None,
+        temperature,
+        top_logprobs: None,
+        top_p,
+        user: None,
+        background: None,
+        max_output_tokens: max_tokens.map(i64::from),
+        max_tool_calls: None,
+        model: Some(Some(model_id.to_string())),
+        previous_response_id: None,
+        prompt: None,
+        reasoning: reasoning
+            .as_ref()
+            .map(convert_to_openai_reasoning)
+            .transpose()?,
+        text: response_format.map(Into::into),
+        tool_choice: tool_choice.map(convert_to_openai_response_tool_choice),
+        tools: tools
+            .map(|ts| {
+                ts.into_iter()
+                    .map(convert_to_openai_tool)
+                    .collect::<LanguageModelResult<Vec<_>>>()
+            })
+            .transpose()?
+            .map(Some),
+        truncation: None,
+        context_management: None,
+        conversation: None,
+        include: if include_reasoning_encrypted {
+            Some(vec![IncludeEnum::ReasoningEncryptedContent])
+        } else {
+            None
         },
-        response_properties: ResponseProperties {
-            background: None,
-            max_output_tokens: max_tokens.map(i64::from),
-            max_tool_calls: None,
-            model: Some(Some(model_id.to_string())),
-            previous_response_id: None,
-            prompt: None,
-            reasoning: reasoning
-                .as_ref()
-                .map(convert_to_openai_reasoning)
-                .transpose()?,
-            text: response_format.map(Into::into),
-            tool_choice: tool_choice.map(convert_to_openai_response_tool_choice),
-            tools: tools
-                .map(|ts| {
-                    ts.into_iter()
-                        .map(convert_to_openai_tool)
-                        .collect::<LanguageModelResult<Vec<_>>>()
-                })
-                .transpose()?
-                .map(Some),
-            truncation: None,
-        },
-        create_response_all_of_3: CreateResponseAllOf3 {
-            context_management: None,
-            conversation: None,
-            include: if include_reasoning_encrypted {
-                Some(vec![IncludeEnum::ReasoningEncryptedContent])
-            } else {
-                None
-            },
-            input: Some(responses_api::InputParam::InputParamArray(Some(
-                convert_to_openai_inputs(messages)?,
-            ))),
-            instructions: system_prompt,
-            max_output_tokens: max_tokens.map(i64::from),
-            parallel_tool_calls: None,
-            store: Some(false),
-            stream: None,
-            stream_options: None,
-        },
+        input: Some(responses_api::InputParam::InputParamArray(Some(
+            convert_to_openai_inputs(messages)?,
+        ))),
+        instructions: system_prompt,
+        parallel_tool_calls: None,
+        store: Some(false),
+        stream: None,
+        stream_options: None,
     };
 
     if modalities.is_some_and(|m| m.contains(&crate::Modality::Image)) {
         params
-            .response_properties
             .tools
             .get_or_insert_with(|| Some(Vec::new()))
             .get_or_insert_with(Vec::new)
