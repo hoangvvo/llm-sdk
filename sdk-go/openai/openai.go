@@ -609,8 +609,8 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 
 	for _, item := range items {
 		switch {
-		case item.Message != nil:
-			for _, content := range item.Message.Content {
+		case item.OutputMessage != nil:
+			for _, content := range item.OutputMessage.Content {
 				switch {
 				case content.OutputText != nil:
 					parts = append(parts, llmsdk.NewTextPart(content.OutputText.Text))
@@ -619,22 +619,22 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 				}
 			}
 
-		case item.FunctionCall != nil:
+		case item.FunctionToolCall != nil:
 			var args map[string]any
-			if err := json.Unmarshal([]byte(item.FunctionCall.Arguments), &args); err != nil {
+			if err := json.Unmarshal([]byte(item.FunctionToolCall.Arguments), &args); err != nil {
 				return nil, fmt.Errorf("failed to parse tool arguments: %w", err)
 			}
 
 			toolCallPart := llmsdk.NewToolCallPart(
-				item.FunctionCall.CallId,
-				item.FunctionCall.Name,
+				item.FunctionToolCall.CallId,
+				item.FunctionToolCall.Name,
 				args,
 			)
-			toolCallPart.ToolCallPart.ID = item.FunctionCall.Id
+			toolCallPart.ToolCallPart.ID = item.FunctionToolCall.Id
 			parts = append(parts, toolCallPart)
 
-		case item.ImageGenerationCall != nil:
-			responseOutputItemImageGenerationCall := item.ImageGenerationCall
+		case item.ImageGenToolCall != nil:
+			responseOutputItemImageGenerationCall := item.ImageGenToolCall
 			if responseOutputItemImageGenerationCall.Result == nil {
 				return nil, llmsdk.NewInvariantError(Provider, "image generation call did not return a result")
 			}
@@ -663,17 +663,17 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 				imageOpts...,
 			))
 
-		case item.Reasoning != nil:
+		case item.ReasoningItem != nil:
 			var summary = ""
-			for _, s := range item.Reasoning.Summary {
+			for _, s := range item.ReasoningItem.Summary {
 				summary += s.Text + "\n"
 			}
 
 			reasoningOpts := []llmsdk.ReasoningPartOption{}
-			if item.Reasoning.EncryptedContent != nil {
-				reasoningOpts = append(reasoningOpts, llmsdk.WithReasoningSignature(*item.Reasoning.EncryptedContent))
+			if item.ReasoningItem.EncryptedContent != nil {
+				reasoningOpts = append(reasoningOpts, llmsdk.WithReasoningSignature(*item.ReasoningItem.EncryptedContent))
 			}
-			reasoningOpts = append(reasoningOpts, llmsdk.WithReasoningID(item.Reasoning.Id))
+			reasoningOpts = append(reasoningOpts, llmsdk.WithReasoningID(item.ReasoningItem.Id))
 			parts = append(parts, llmsdk.NewReasoningPart(summary, reasoningOpts...))
 		}
 	}
@@ -692,27 +692,27 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 	case event.ResponseOutputItemAdded != nil:
 		item := event.ResponseOutputItemAdded.Item
 
-		if item.FunctionCall != nil {
+		if item.FunctionToolCall != nil {
 			return &llmsdk.ContentDelta{
 				Index: event.ResponseOutputItemAdded.OutputIndex,
 				Part: llmsdk.PartDelta{
 					ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-						Args:       ptr.To(item.FunctionCall.Arguments),
-						ToolName:   ptr.To(item.FunctionCall.Name),
-						ToolCallID: ptr.To(item.FunctionCall.CallId),
-						ID:         item.FunctionCall.Id,
+						Args:       ptr.To(item.FunctionToolCall.Arguments),
+						ToolName:   ptr.To(item.FunctionToolCall.Name),
+						ToolCallID: ptr.To(item.FunctionToolCall.CallId),
+						ID:         item.FunctionToolCall.Id,
 					},
 				},
 			}, nil
 		}
 
-		if item.Reasoning != nil {
+		if item.ReasoningItem != nil {
 			return &llmsdk.ContentDelta{
 				Index: event.ResponseOutputItemAdded.OutputIndex,
 				Part: llmsdk.PartDelta{
 					ReasoningPartDelta: &llmsdk.ReasoningPartDelta{
-						Signature: item.Reasoning.EncryptedContent,
-						ID:        ptr.To(item.Reasoning.Id),
+						Signature: item.ReasoningItem.EncryptedContent,
+						ID:        ptr.To(item.ReasoningItem.Id),
 					},
 				},
 			}, nil

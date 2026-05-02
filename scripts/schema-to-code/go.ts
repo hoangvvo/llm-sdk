@@ -23,7 +23,7 @@ export function renderGoDocument(
   );
   const importLines: string[] = [];
   if (needsUnionHelpers) {
-    importLines.push('"encoding/json"', '"errors"', '"fmt"');
+    importLines.push('"encoding/json"', '"errors"');
   }
 
   const parts: string[] = [`package ${packageName}`];
@@ -174,9 +174,7 @@ function renderTaggedGoUnion(declaration: UnionDeclaration): string {
     `\traw${toGoFieldName(discriminator)}, ok := raw[${JSON.stringify(discriminator)}]`,
   );
   lines.push("\tif !ok {");
-  lines.push(
-    `\t\treturn errors.New("missing ${discriminator} field in ${declaration.name}")`,
-  );
+  lines.push("\t\treturn nil");
   lines.push("\t}");
   lines.push("\tvar discriminator string");
   lines.push(
@@ -190,14 +188,12 @@ function renderTaggedGoUnion(declaration: UnionDeclaration): string {
     lines.push(`\tcase ${JSON.stringify(variant.discriminatorValue)}:`);
     lines.push(`\t\tvar value ${variant.typeName}`);
     lines.push("\t\tif err := json.Unmarshal(data, &value); err != nil {");
-    lines.push("\t\t\treturn err");
+    lines.push("\t\t\treturn nil");
     lines.push("\t\t}");
     lines.push(`\t\tu.${variant.name} = &value`);
   }
   lines.push("\tdefault:");
-  lines.push(
-    `\t\treturn fmt.Errorf("invalid ${discriminator} field in ${declaration.name}: %q", discriminator)`,
-  );
+  lines.push("\t\treturn nil");
   lines.push("\t}");
   lines.push("\treturn nil");
   lines.push("}");
@@ -299,7 +295,7 @@ function renderUntaggedGoUnion(declaration: UnionDeclaration): string {
     );
   }
   lines.push("\t}");
-  lines.push(`\treturn errors.New("invalid ${declaration.name}")`);
+  lines.push("\treturn nil");
   lines.push("}");
   return lines.join("\n");
 }
@@ -318,7 +314,7 @@ function renderGoUntaggedCaseBody(
   const lines: string[] = [];
   lines.push(`\t\tvar v ${variant.typeName}`);
   lines.push("\t\tif err := json.Unmarshal(data, &v); err != nil {");
-  lines.push("\t\t\treturn err");
+  lines.push("\t\t\treturn nil");
   lines.push("\t\t}");
   lines.push(`\t\tu.${variant.name} = &v`);
   lines.push("\t\treturn nil");
@@ -370,7 +366,7 @@ function renderGoObjectUntaggedCaseBody(
       }
       lines.push(`\t\t\t\t\tvar v ${variant.typeName}`);
       lines.push("\t\t\t\t\tif err := json.Unmarshal(data, &v); err != nil {");
-      lines.push("\t\t\t\t\t\treturn err");
+      lines.push("\t\t\t\t\t\treturn nil");
       lines.push("\t\t\t\t\t}");
       lines.push(`\t\t\t\t\tu.${variant.name} = &v`);
       lines.push("\t\t\t\t\treturn nil");
@@ -380,7 +376,7 @@ function renderGoObjectUntaggedCaseBody(
     }
     if (match.discriminator) {
       conditions.push(
-        `raw${toGoFieldName(match.discriminator.property)}, ok := value[${JSON.stringify(match.discriminator.property)}]; !ok || raw${toGoFieldName(match.discriminator.property)} == ${JSON.stringify(match.discriminator.value)}`,
+        `raw${toGoFieldName(match.discriminator.property)}, ok := value[${JSON.stringify(match.discriminator.property)}]; (!ok || raw${toGoFieldName(match.discriminator.property)} == ${JSON.stringify(match.discriminator.value)})`,
       );
     }
     if (match.requiredProperties.length > 0) {
@@ -392,7 +388,7 @@ function renderGoObjectUntaggedCaseBody(
       lines.push(`\t\tif ${conditions.join(" && ")} {`);
       lines.push(`\t\t\tvar v ${variant.typeName}`);
       lines.push("\t\t\tif err := json.Unmarshal(data, &v); err != nil {");
-      lines.push("\t\t\t\treturn err");
+      lines.push("\t\t\t\treturn nil");
       lines.push("\t\t\t}");
       lines.push(`\t\t\tu.${variant.name} = &v`);
       lines.push("\t\t\treturn nil");
@@ -409,14 +405,14 @@ function renderGoObjectUntaggedCaseBody(
     }
     lines.push(`\t\tvar v ${variant.typeName}`);
     lines.push("\t\tif err := json.Unmarshal(data, &v); err != nil {");
-    lines.push("\t\t\treturn err");
+    lines.push("\t\t\treturn nil");
     lines.push("\t\t}");
     lines.push(`\t\tu.${variant.name} = &v`);
     lines.push("\t\treturn nil");
     hasFallbackError = false;
   }
   if (hasFallbackError) {
-    lines.push(`\t\treturn errors.New("invalid ${unionName}")`);
+    lines.push("\t\treturn nil");
   }
   return lines;
 }
