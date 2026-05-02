@@ -776,14 +776,11 @@ fn map_anthropic_content_block_delta_event(
             })
         }
         ContentBlockDeltaEventDelta::CitationsDelta(delta) => {
-            if let Some(citation) = map_citation_delta(delta.citation) {
-                PartDelta::Text(TextPartDelta {
-                    text: String::new(),
-                    citation: Some(citation),
-                })
-            } else {
-                return None;
-            }
+            let citation = map_citation_delta(delta.citation)?;
+            PartDelta::Text(TextPartDelta {
+                text: String::new(),
+                citation: Some(citation),
+            })
         }
         ContentBlockDeltaEventDelta::Unknown => return None,
     };
