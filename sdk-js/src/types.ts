@@ -410,7 +410,12 @@ export type JSONSchema = Record<string, unknown>;
 /**
  * Represents a tool that can be used by the model.
  */
-export interface Tool {
+export type Tool = FunctionTool | ProviderTool;
+/**
+ * Represents a client-executed function tool that can be used by the model.
+ */
+export interface FunctionTool {
+  type: "function";
   /**
    * The name of the tool.
    */
@@ -423,6 +428,16 @@ export interface Tool {
    * The JSON schema of the parameters that the tool accepts. The type must be "object".
    */
   parameters: JSONSchema;
+}
+/**
+ * Represents a provider-hosted tool that is forwarded to the model provider for execution.
+ */
+export interface ProviderTool {
+  type: "provider";
+  /**
+   * The provider tool name.
+   */
+  name: string;
 }
 /**
  * Represents tool result in the message history.

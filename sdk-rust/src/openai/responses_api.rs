@@ -5937,7 +5937,7 @@ pub struct DragParam {
     pub keys: Option<Vec<String>>,
     /// An array of coordinates representing the path of the drag action.
     /// Coordinates will appear as an array of objects, eg
-    /// ```
+    /// ```text
     /// [
     ///   { x: 100, y: 200 },
     ///   { x: 200, y: 300 }

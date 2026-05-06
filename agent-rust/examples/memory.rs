@@ -1,6 +1,8 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, InstructionParam};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, InstructionParam,
+};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -73,7 +75,7 @@ type Ctx = ();
 struct CoreMemoryUpdate {
     store: Store,
 }
-impl AgentTool<Ctx> for CoreMemoryUpdate {
+impl AgentFunctionTool<Ctx> for CoreMemoryUpdate {
     fn name(&self) -> String {
         "core_memory_update".into()
     }
@@ -125,7 +127,7 @@ impl AgentTool<Ctx> for CoreMemoryUpdate {
 struct ArchivalSearch {
     store: Store,
 }
-impl AgentTool<Ctx> for ArchivalSearch {
+impl AgentFunctionTool<Ctx> for ArchivalSearch {
     fn name(&self) -> String {
         "archival_memory_search".into()
     }
@@ -167,7 +169,7 @@ impl AgentTool<Ctx> for ArchivalSearch {
 struct ArchivalUpdate {
     store: Store,
 }
-impl AgentTool<Ctx> for ArchivalUpdate {
+impl AgentFunctionTool<Ctx> for ArchivalUpdate {
     fn name(&self) -> String {
         "archival_memory_update".into()
     }

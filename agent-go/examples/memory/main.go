@@ -203,9 +203,9 @@ For less important or long-tail info, use archival_memory_search before answerin
 			llmagent.InstructionParam[Ctx]{Func: coreInstr},
 		),
 		llmagent.WithTools(
-			&CoreMemoryUpdateTool{S: store},
-			&ArchivalSearchTool{S: store},
-			&ArchivalUpdateTool{S: store},
+			llmagent.NewAgentFunctionTool(&CoreMemoryUpdateTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArchivalSearchTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArchivalUpdateTool{S: store}),
 		),
 	)
 

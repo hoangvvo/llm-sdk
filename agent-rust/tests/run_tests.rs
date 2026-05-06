@@ -3,14 +3,14 @@ use std::sync::Arc;
 type DynError = Box<dyn std::error::Error + Send + Sync>;
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use llm_agent::{
-    AgentError, AgentItem, AgentItemTool, AgentParams, AgentResponse, AgentStreamEvent,
-    AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam, RunSession,
-    RunSessionRequest, RunState, Toolkit, ToolkitSession,
+    AgentError, AgentFunctionTool, AgentItem, AgentItemTool, AgentParams, AgentResponse,
+    AgentStreamEvent, AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam,
+    RunSession, RunSessionRequest, RunState, Toolkit, ToolkitSession,
 };
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
-    PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta,
+    PartDelta, PartialModelResponse, ProviderTool, TextPartDelta, Tool, ToolCallPartDelta,
 };
 use serde_json::{json, Value};
 
@@ -63,14 +63,14 @@ impl MockTool {
 
 struct MockToolkitSessionState<TCtx> {
     system_prompt: Option<String>,
-    tools: Vec<Arc<dyn AgentTool<TCtx>>>,
+    tools: Vec<AgentTool<TCtx>>,
     system_prompt_calls: std::sync::Mutex<usize>,
     tools_calls: std::sync::Mutex<usize>,
     close_calls: std::sync::Mutex<usize>,
 }
 
 impl<TCtx> MockToolkitSessionState<TCtx> {
-    fn new(system_prompt: Option<String>, tools: Vec<Arc<dyn AgentTool<TCtx>>>) -> Arc<Self> {
+    fn new(system_prompt: Option<String>, tools: Vec<AgentTool<TCtx>>) -> Arc<Self> {
         Arc::new(Self {
             system_prompt,
             tools,
@@ -99,7 +99,7 @@ where
         self.state.system_prompt.clone()
     }
 
-    fn tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
+    fn tools(&self) -> Vec<AgentTool<TCtx>> {
         let mut calls = self.state.tools_calls.lock().unwrap();
         *calls += 1;
         self.state.tools.clone()
@@ -176,7 +176,7 @@ impl LookupOrderTool {
     }
 }
 
-impl AgentTool<CustomerContext> for LookupOrderTool {
+impl AgentFunctionTool<CustomerContext> for LookupOrderTool {
     fn name(&self) -> String {
         "lookup-order".to_string()
     }
@@ -225,7 +225,7 @@ impl AgentTool<CustomerContext> for LookupOrderTool {
     }
 }
 
-impl AgentTool<()> for MockTool {
+impl AgentFunctionTool<()> for MockTool {
     fn name(&self) -> String {
         self.name.clone()
     }
@@ -305,6 +305,71 @@ async fn run_returns_response_when_no_tool_call() {
     };
 
     assert_eq!(response, expected);
+
+    close_run_session(session).await;
+}
+
+#[test]
+fn agent_params_add_tool_accepts_agent_tool_values() {
+    let model = Arc::new(MockLanguageModel::new());
+    let function_tool = MockTool::new(
+        "mock-tool",
+        AgentToolResult {
+            content: vec![Part::text("Done")],
+            is_error: false,
+        },
+    );
+
+    let params = AgentParams::new("test_agent", model)
+        .add_tool(AgentTool::provider(ProviderTool::new("web_search")))
+        .add_tool(AgentTool::function(function_tool));
+
+    assert_eq!(params.tools.len(), 2);
+    assert!(matches!(
+        Tool::from(&params.tools[0]),
+        Tool::Provider(tool) if tool.name == "web_search"
+    ));
+    assert!(matches!(
+        Tool::from(&params.tools[1]),
+        Tool::Function(tool) if tool.name == "mock-tool"
+    ));
+}
+
+#[tokio::test]
+async fn run_forwards_provider_tools_to_model() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Search-ready response")],
+        ..Default::default()
+    });
+
+    let session = new_run_session(
+        Arc::new(
+            AgentParams::new("test_agent", model.clone()).add_tool(ProviderTool::new("web_search")),
+        ),
+        (),
+    )
+    .await;
+
+    let response = session
+        .run(RunSessionRequest {
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Search the web",
+            )]))],
+        })
+        .await
+        .expect("run succeeds");
+
+    assert_eq!(response.content, vec![Part::text("Search-ready response")]);
+
+    let inputs = model.tracked_generate_inputs();
+    assert_eq!(inputs.len(), 1);
+    let tools = inputs[0].tools.as_ref().expect("tools present");
+    assert_eq!(tools.len(), 1);
+    assert!(matches!(
+        &tools[0],
+        llm_sdk::Tool::Provider(tool) if tool.name == "web_search"
+    ));
 
     close_run_session(session).await;
 }
@@ -1090,10 +1155,10 @@ async fn run_merges_toolkit_prompts_and_tools() {
         ..Default::default()
     });
 
-    let lookup_tool = Arc::new(LookupOrderTool::new());
+    let lookup_tool = LookupOrderTool::new();
     let toolkit_session_state = MockToolkitSessionState::new(
         Some("Toolkit prompt".to_string()),
-        vec![lookup_tool.clone()],
+        vec![AgentTool::function(lookup_tool.clone())],
     );
     let toolkit = MockToolkit::new(toolkit_session_state.clone());
     let contexts_handle = toolkit.created_contexts.clone();
@@ -1134,7 +1199,10 @@ async fn run_merges_toolkit_prompts_and_tools() {
         assert_eq!(input.system_prompt, Some("Toolkit prompt".to_string()));
         let tools = input.tools.expect("tools present");
         assert_eq!(tools.len(), 1);
-        assert_eq!(tools[0].name, "lookup-order");
+        assert!(matches!(
+            &tools[0],
+            llm_sdk::Tool::Function(tool) if tool.name == "lookup-order"
+        ));
     }
 
     let expected = AgentResponse {
@@ -1266,10 +1334,10 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
         ..Default::default()
     }]);
 
-    let lookup_tool = Arc::new(LookupOrderTool::new());
+    let lookup_tool = LookupOrderTool::new();
     let toolkit_session_state = MockToolkitSessionState::new(
         Some("Streaming toolkit prompt".to_string()),
-        vec![lookup_tool.clone()],
+        vec![AgentTool::function(lookup_tool.clone())],
     );
     let toolkit = MockToolkit::new(toolkit_session_state.clone());
     let contexts_handle = toolkit.created_contexts.clone();
@@ -1334,7 +1402,10 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
     );
     let tools = input.tools.clone().expect("tools present");
     assert_eq!(tools.len(), 1);
-    assert_eq!(tools[0].name, "lookup-order");
+    assert!(matches!(
+        &tools[0],
+        llm_sdk::Tool::Function(tool) if tool.name == "lookup-order"
+    ));
 
     close_run_session(session).await;
 

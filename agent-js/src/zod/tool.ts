@@ -1,6 +1,6 @@
 import type { z, ZodType } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { type AgentToolResult } from "../tool.ts";
+import { type AgentFunctionTool, type AgentToolResult } from "../tool.ts";
 
 export function zodTool<TContext, TZodSchema extends ZodType>(params: {
   /**
@@ -25,8 +25,9 @@ export function zodTool<TContext, TZodSchema extends ZodType>(params: {
     args: z.infer<TZodSchema>,
     context: TContext,
   ): AgentToolResult | Promise<AgentToolResult>;
-}) {
+}): AgentFunctionTool<TContext, z.infer<TZodSchema>> {
   return {
+    type: "function",
     ...params,
     parameters: zodToJsonSchema(params.parameters, {
       target: "openAi",

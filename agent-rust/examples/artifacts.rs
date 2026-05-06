@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -97,7 +97,7 @@ type Ctx = ();
 struct ArtifactCreate {
     store: Store,
 }
-impl AgentTool<Ctx> for ArtifactCreate {
+impl AgentFunctionTool<Ctx> for ArtifactCreate {
     fn name(&self) -> String {
         "artifact_create".into()
     }
@@ -143,7 +143,7 @@ impl AgentTool<Ctx> for ArtifactCreate {
 struct ArtifactUpdate {
     store: Store,
 }
-impl AgentTool<Ctx> for ArtifactUpdate {
+impl AgentFunctionTool<Ctx> for ArtifactUpdate {
     fn name(&self) -> String {
         "artifact_update".into()
     }
@@ -189,7 +189,7 @@ impl AgentTool<Ctx> for ArtifactUpdate {
 struct ArtifactGet {
     store: Store,
 }
-impl AgentTool<Ctx> for ArtifactGet {
+impl AgentFunctionTool<Ctx> for ArtifactGet {
     fn name(&self) -> String {
         "artifact_get".into()
     }
@@ -224,7 +224,7 @@ impl AgentTool<Ctx> for ArtifactGet {
 struct ArtifactList {
     store: Store,
 }
-impl AgentTool<Ctx> for ArtifactList {
+impl AgentFunctionTool<Ctx> for ArtifactList {
     fn name(&self) -> String {
         "artifact_list".into()
     }
@@ -254,7 +254,7 @@ impl AgentTool<Ctx> for ArtifactList {
 struct ArtifactDelete {
     store: Store,
 }
-impl AgentTool<Ctx> for ArtifactDelete {
+impl AgentFunctionTool<Ctx> for ArtifactDelete {
     fn name(&self) -> String {
         "artifact_delete".into()
     }

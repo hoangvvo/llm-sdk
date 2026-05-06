@@ -1,6 +1,6 @@
 use crate::context::MyContext;
 use futures::future::BoxFuture;
-use llm_agent::{AgentTool, AgentToolResult};
+use llm_agent::{AgentFunctionTool, AgentToolResult};
 use llm_sdk::{JSONSchema, Part};
 use serde::Deserialize;
 use serde_json::Value;
@@ -32,7 +32,7 @@ fn default_extract_length() -> u32 {
 
 pub struct SearchWikipediaTool;
 
-impl AgentTool<MyContext> for SearchWikipediaTool {
+impl AgentFunctionTool<MyContext> for SearchWikipediaTool {
     fn name(&self) -> String {
         "search_wikipedia".to_string()
     }
@@ -230,7 +230,7 @@ fn default_limit_news() -> u32 {
 
 pub struct GetNewsTool;
 
-impl AgentTool<MyContext> for GetNewsTool {
+impl AgentFunctionTool<MyContext> for GetNewsTool {
     fn name(&self) -> String {
         "get_news".to_string()
     }

@@ -44,7 +44,7 @@ func main() {
 	model := openai.NewOpenAIModel("gpt-5.4-mini", openai.OpenAIModelOptions{APIKey: apiKey})
 
 	// Build the agent and register the MCP toolkit so every run hydrates tools from the remote server.
-	agent := llmagent.NewAgent[*sessionContext](
+	agent := llmagent.NewAgent(
 		"Sage",
 		model,
 		llmagent.WithInstructions(
@@ -60,7 +60,7 @@ func main() {
 		llmagent.WithToolkits(
 			// The MCP toolkit primitive resolves transport params per session. Here we pull the rider-specific
 			// authorization token from context so each agent session connects with the correct credentials.
-			llmmcp.NewMCPToolkit[*sessionContext](func(_ context.Context, sc *sessionContext) (llmmcp.MCPParams, error) {
+			llmmcp.NewMCPToolkit(func(_ context.Context, sc *sessionContext) (llmmcp.MCPParams, error) {
 				if sc == nil {
 					return llmmcp.MCPParams{}, fmt.Errorf("session context missing")
 				}

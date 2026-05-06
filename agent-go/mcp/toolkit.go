@@ -185,19 +185,19 @@ func (s *toolkitSession[C]) toAgentTool(tool *mcp.Tool) (llmagent.AgentTool[C], 
 	if tool.InputSchema != nil {
 		raw, err := json.Marshal(tool.InputSchema)
 		if err != nil {
-			return nil, fmt.Errorf("serialise MCP tool schema for %s: %w", tool.Name, err)
+			return llmagent.AgentTool[C]{}, fmt.Errorf("serialise MCP tool schema for %s: %w", tool.Name, err)
 		}
 		if err := json.Unmarshal(raw, &schema); err != nil {
-			return nil, fmt.Errorf("decode MCP tool schema for %s: %w", tool.Name, err)
+			return llmagent.AgentTool[C]{}, fmt.Errorf("decode MCP tool schema for %s: %w", tool.Name, err)
 		}
 	}
 
-	return &agentTool[C]{
+	return llmagent.NewAgentFunctionTool(&agentTool[C]{
 		session:     s.session,
 		name:        tool.Name,
 		description: tool.Description,
 		parameters:  schema,
-	}, nil
+	}), nil
 }
 
 type agentTool[C any] struct {

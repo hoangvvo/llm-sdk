@@ -115,7 +115,9 @@ func (s *lostAndFoundToolkitSession) Tools() []llmagent.AgentTool[*riftContext] 
 	tools := s.buildTools()
 	names := make([]string, 0, len(tools))
 	for _, t := range tools {
-		names = append(names, t.Name())
+		if functionTool := t.AsFunctionTool(); functionTool != nil {
+			names = append(names, functionTool.Name())
+		}
 	}
 	fmt.Printf("[Toolkit] Tools for phase %s: %s\n", strings.ToUpper(string(s.phase)), func() string {
 		if len(names) == 0 {
@@ -179,29 +181,29 @@ func (s *lostAndFoundToolkitSession) buildTools() []llmagent.AgentTool[*riftCont
 		return nil
 	}
 
-	tools := []llmagent.AgentTool[*riftContext]{
+	tools := llmagent.FunctionTools(
 		&stabilizeRiftTool{session: s},
 		&logItemTool{session: s},
-	}
+	)
 
 	if !s.passVerified {
-		tools = append(tools, &verifyPassTool{session: s})
+		tools = append(tools, llmagent.NewAgentFunctionTool(&verifyPassTool{session: s}))
 	}
 
 	if s.phase == phaseRecovery && s.passVerified {
-		tools = append(tools, &summonRetrievalDroneTool{session: s})
+		tools = append(tools, llmagent.NewAgentFunctionTool(&summonRetrievalDroneTool{session: s}))
 
 		if s.prophecyCount == 0 {
-			tools = append(tools, &consultProphetTool{session: s})
+			tools = append(tools, llmagent.NewAgentFunctionTool(&consultProphetTool{session: s}))
 		}
 
 		if len(s.taggedItems) > 0 {
-			tools = append(tools, &issueQuantumReceiptTool{session: s})
+			tools = append(tools, llmagent.NewAgentFunctionTool(&issueQuantumReceiptTool{session: s}))
 		}
 	}
 
 	if s.phase == phaseHandoff {
-		tools = append(tools, &closeManifestTool{session: s})
+		tools = append(tools, llmagent.NewAgentFunctionTool(&closeManifestTool{session: s}))
 	}
 
 	return tools
@@ -616,7 +618,7 @@ func main() {
 			}},
 			llmagent.InstructionParam[*riftContext]{String: stringPtr("When tools remain, call exactly one per turn before concluding. If tools run out, summarise the closure instead.")},
 		),
-		llmagent.WithTools(pageSecurityTool{}),
+		llmagent.WithTools(llmagent.NewAgentFunctionTool(pageSecurityTool{})),
 		llmagent.WithToolkits(lostAndFoundToolkit{}),
 	)
 

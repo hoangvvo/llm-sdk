@@ -171,8 +171,8 @@ func main() {
 			llmagent.InstructionParam[MyContext]{Func: dynamicInstruction},
 		),
 		llmagent.WithTools(
-			&GetWeatherTool{},
-			&SendMessageTool{},
+			llmagent.NewAgentFunctionTool(&GetWeatherTool{}),
+			llmagent.NewAgentFunctionTool(&SendMessageTool{}),
 		),
 	)
 

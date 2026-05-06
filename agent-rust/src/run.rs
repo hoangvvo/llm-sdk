@@ -3,7 +3,8 @@ use crate::{
     opentelemetry::{start_tool_span, trace_agent_run, trace_agent_stream, AgentSpanMethod},
     toolkit::ToolkitSession,
     types::{AgentItemTool, AgentStream, AgentStreamEvent},
-    AgentError, AgentItem, AgentParams, AgentResponse, AgentStreamItemEvent, AgentTool,
+    AgentError, AgentFunctionTool, AgentItem, AgentParams, AgentResponse, AgentStreamItemEvent,
+    AgentTool,
 };
 use async_stream::try_stream;
 use futures::{
@@ -13,7 +14,7 @@ use futures::{
 };
 use llm_sdk::{
     boxed_stream::BoxedStream, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
-    ToolCallPart, ToolResultPart,
+    Tool, ToolCallPart, ToolResultPart,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -89,7 +90,7 @@ where
     fn process<'a>(
         &'a self,
         run_state: &'a RunState,
-        tools: Vec<Arc<dyn AgentTool<TCtx>>>,
+        tools: Vec<Arc<dyn AgentFunctionTool<TCtx>>>,
     ) -> BoxedStream<'a, Result<ProcessEvents, AgentError>> {
         let context_val = self.context.clone();
         let stream = try_stream! {
@@ -281,7 +282,7 @@ where
 
         trace_agent_run(&self.params.name, AgentSpanMethod::Run, async move {
             let state = RunState::new(input, self.params.max_turns);
-            let mut tools = self.get_tools();
+            let mut tools = self.get_function_tools();
 
             loop {
                 let mut process_stream = self.process(&state, tools);
@@ -325,7 +326,7 @@ where
         });
 
         let stream = async_stream::try_stream! {
-            let mut tools = session.get_tools();
+            let mut tools = session.get_function_tools();
 
             loop {
                 let mut process_stream = session.process(&state, tools);
@@ -412,7 +413,7 @@ where
     async fn get_turn_params(
         &self,
         state: &RunState,
-    ) -> Result<(LanguageModelInput, Vec<Arc<dyn AgentTool<TCtx>>>), AgentError> {
+    ) -> Result<(LanguageModelInput, Vec<Arc<dyn AgentFunctionTool<TCtx>>>), AgentError> {
         let mut system_prompts = Vec::new();
         if let Some(prompt) = &self.system_prompt {
             if !prompt.is_empty() {
@@ -449,22 +450,36 @@ where
         }
 
         if !tools.is_empty() {
-            let sdk_tools = tools.iter().map(|tool| tool.as_ref().into()).collect();
+            let sdk_tools = tools.iter().map(Tool::from).collect();
             input.tools = Some(sdk_tools);
         }
 
-        Ok((input, tools))
+        Ok((input, get_function_tools_from(&tools)))
     }
 
-    fn get_tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
-        let mut tools: Vec<Arc<dyn AgentTool<TCtx>>> = self.params.tools.clone();
+    fn get_tools(&self) -> Vec<AgentTool<TCtx>> {
+        let mut tools = self.params.tools.clone();
         for session in self.toolkit_sessions.iter() {
             let toolkit_tools = session.tools();
             tools.extend(toolkit_tools);
         }
         tools
     }
+
+    fn get_function_tools(&self) -> Vec<Arc<dyn AgentFunctionTool<TCtx>>> {
+        get_function_tools_from(&self.get_tools())
+    }
 }
+
+fn get_function_tools_from<TCtx>(
+    tools: &[AgentTool<TCtx>],
+) -> Vec<Arc<dyn AgentFunctionTool<TCtx>>> {
+    tools
+        .iter()
+        .filter_map(|tool| tool.as_function_tool().cloned())
+        .collect()
+}
+
 /// `RunSessionRequest` contains the input items used for a run.
 pub struct RunSessionRequest {
     /// Input holds the items for this run, such as LLM messages.

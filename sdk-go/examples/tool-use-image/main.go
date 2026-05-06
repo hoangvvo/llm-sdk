@@ -31,15 +31,15 @@ func main() {
 	maxTurnLeft := 10
 
 	tools := []llmsdk.Tool{
-		{
-			Name:        "get_color_sample",
-			Description: "Get a color sample image",
-			Parameters: llmsdk.JSONSchema{
+		llmsdk.NewFunctionTool(
+			"get_color_sample",
+			"Get a color sample image",
+			llmsdk.JSONSchema{
 				"type":                 "object",
 				"properties":           map[string]any{},
 				"additionalProperties": false,
 			},
-		},
+		),
 	}
 
 	messages := []llmsdk.Message{

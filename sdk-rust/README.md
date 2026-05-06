@@ -115,6 +115,10 @@ cargo run --example generate-text
 
 ## Migration
 
+### To 0.3.0
+
+- Replace `Tool { name, description, parameters }` with `FunctionTool::new(...)`.
+
 ### To 0.2.0
 
 - `image_data` and `audio_data` have been renamed to just `data` in `ImagePart` and `AudioPart`.

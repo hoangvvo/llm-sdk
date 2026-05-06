@@ -10,7 +10,9 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
 use futures::{future::BoxFuture, StreamExt};
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, BoxedError, RunState};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, BoxedError, RunState,
+};
 use llm_sdk::{
     AudioFormat, LanguageModelMetadata, Message, Part, PartDelta, PartialModelResponse,
     ToolResultPart,
@@ -183,7 +185,7 @@ struct ChatContext;
 
 struct TimeTool;
 
-impl AgentTool<ChatContext> for TimeTool {
+impl AgentFunctionTool<ChatContext> for TimeTool {
     fn name(&self) -> String {
         "get_current_time".to_string()
     }
@@ -223,7 +225,7 @@ struct WeatherParams {
 
 struct WeatherTool;
 
-impl AgentTool<ChatContext> for WeatherTool {
+impl AgentFunctionTool<ChatContext> for WeatherTool {
     fn name(&self) -> String {
         "get_local_weather".to_string()
     }

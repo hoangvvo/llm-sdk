@@ -184,7 +184,10 @@ func main() {
 				return fmt.Sprintf("When asked to contact someone, include a friendly note from %s.", c.CustomerName), nil
 			}},
 		),
-		llmagent.WithTools(&weatherTool{}, &notifyTool{}),
+		llmagent.WithTools(
+			llmagent.NewAgentFunctionTool(&weatherTool{}),
+			llmagent.NewAgentFunctionTool(&notifyTool{}),
+		),
 	)
 
 	// Run a single turn that forces both tools to execute.

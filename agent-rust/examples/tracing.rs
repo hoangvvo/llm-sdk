@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part,
@@ -30,7 +30,7 @@ struct WeatherArgs {
 
 struct WeatherTool;
 
-impl AgentTool<TracingContext> for WeatherTool {
+impl AgentFunctionTool<TracingContext> for WeatherTool {
     fn name(&self) -> String {
         "get_weather".into()
     }
@@ -94,7 +94,7 @@ struct NotifyArgs {
 
 struct NotifyTool;
 
-impl AgentTool<TracingContext> for NotifyTool {
+impl AgentFunctionTool<TracingContext> for NotifyTool {
     fn name(&self) -> String {
         "send_notification".into()
     }

@@ -1,7 +1,9 @@
 use crate::{
-    AssistantMessage, AudioPart, AudioPartDelta, CitationDelta, ImagePart, ImagePartDelta, Message,
-    Part, ReasoningPart, ReasoningPartDelta, SourcePart, TextPart, TextPartDelta, ToolCallPart,
-    ToolCallPartDelta, ToolMessage, ToolResultPart, UserMessage,
+    AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FunctionTool,
+    ImagePart, ImagePartDelta, LanguageModelInput, Message, Modality, Part, ProviderTool,
+    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatOption, SourcePart,
+    TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
+    ToolResultPart, UserMessage,
 };
 
 impl TextPart {
@@ -227,6 +229,38 @@ impl From<ReasoningPart> for Part {
     }
 }
 
+impl FunctionTool {
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        parameters: crate::JSONSchema,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            parameters,
+        }
+    }
+}
+
+impl ProviderTool {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
+    }
+}
+
+impl From<FunctionTool> for Tool {
+    fn from(value: FunctionTool) -> Self {
+        Self::Function(value)
+    }
+}
+
+impl From<ProviderTool> for Tool {
+    fn from(value: ProviderTool) -> Self {
+        Self::Provider(value)
+    }
+}
+
 impl Part {
     pub fn text(text: impl Into<String>) -> Self {
         Self::Text(TextPart::new(text))
@@ -329,6 +363,172 @@ impl Message {
 impl From<UserMessage> for Message {
     fn from(value: UserMessage) -> Self {
         Self::User(value)
+    }
+}
+
+impl LanguageModelInput {
+    pub fn new<I, M>(messages: I) -> Self
+    where
+        I: IntoIterator<Item = M>,
+        M: Into<Message>,
+    {
+        Self {
+            messages: messages.into_iter().map(Into::into).collect(),
+            ..Default::default()
+        }
+    }
+
+    #[must_use]
+    pub fn with_system_prompt(mut self, system_prompt: impl Into<String>) -> Self {
+        self.system_prompt = Some(system_prompt.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_messages<I, M>(mut self, messages: I) -> Self
+    where
+        I: IntoIterator<Item = M>,
+        M: Into<Message>,
+    {
+        self.messages = messages.into_iter().map(Into::into).collect();
+        self
+    }
+
+    #[must_use]
+    pub fn add_message<M>(mut self, message: M) -> Self
+    where
+        M: Into<Message>,
+    {
+        self.messages.push(message.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_tools<I, T>(mut self, tools: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Tool>,
+    {
+        self.tools = Some(tools.into_iter().map(Into::into).collect());
+        self
+    }
+
+    #[must_use]
+    pub fn add_tool<T>(mut self, tool: T) -> Self
+    where
+        T: Into<Tool>,
+    {
+        self.tools.get_or_insert_with(Vec::new).push(tool.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_tool_choice<T>(mut self, tool_choice: T) -> Self
+    where
+        T: Into<ToolChoiceOption>,
+    {
+        self.tool_choice = Some(tool_choice.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_response_format<T>(mut self, response_format: T) -> Self
+    where
+        T: Into<ResponseFormatOption>,
+    {
+        self.response_format = Some(response_format.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_max_tokens(mut self, max_tokens: u32) -> Self {
+        self.max_tokens = Some(max_tokens);
+        self
+    }
+
+    #[must_use]
+    pub fn with_temperature(mut self, temperature: f64) -> Self {
+        self.temperature = Some(temperature);
+        self
+    }
+
+    #[must_use]
+    pub fn with_top_p(mut self, top_p: f64) -> Self {
+        self.top_p = Some(top_p);
+        self
+    }
+
+    #[must_use]
+    pub fn with_top_k(mut self, top_k: i32) -> Self {
+        self.top_k = Some(top_k);
+        self
+    }
+
+    #[must_use]
+    pub fn with_presence_penalty(mut self, presence_penalty: f64) -> Self {
+        self.presence_penalty = Some(presence_penalty);
+        self
+    }
+
+    #[must_use]
+    pub fn with_frequency_penalty(mut self, frequency_penalty: f64) -> Self {
+        self.frequency_penalty = Some(frequency_penalty);
+        self
+    }
+
+    #[must_use]
+    pub fn with_seed(mut self, seed: i64) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    #[must_use]
+    pub fn with_modalities<I>(mut self, modalities: I) -> Self
+    where
+        I: IntoIterator<Item = Modality>,
+    {
+        self.modalities = Some(modalities.into_iter().collect());
+        self
+    }
+
+    #[must_use]
+    pub fn add_modality(mut self, modality: Modality) -> Self {
+        self.modalities.get_or_insert_with(Vec::new).push(modality);
+        self
+    }
+
+    #[must_use]
+    pub fn with_audio<T>(mut self, audio: T) -> Self
+    where
+        T: Into<AudioOptions>,
+    {
+        self.audio = Some(audio.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_reasoning<T>(mut self, reasoning: T) -> Self
+    where
+        T: Into<ReasoningOptions>,
+    {
+        self.reasoning = Some(reasoning.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_metadata<I, K, V>(mut self, metadata: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.metadata = Some(
+            metadata
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        );
+        self
     }
 }
 

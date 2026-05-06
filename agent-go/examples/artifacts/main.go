@@ -262,11 +262,11 @@ func main() {
 			llmagent.InstructionParam[Ctx]{String: &rules},
 		),
 		llmagent.WithTools(
-			&ArtifactCreateTool{S: store},
-			&ArtifactUpdateTool{S: store},
-			&ArtifactGetTool{S: store},
-			&ArtifactListTool{S: store},
-			&ArtifactDeleteTool{S: store},
+			llmagent.NewAgentFunctionTool(&ArtifactCreateTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArtifactUpdateTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArtifactGetTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArtifactListTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArtifactDeleteTool{S: store}),
 		),
 	)
 

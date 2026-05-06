@@ -52,10 +52,10 @@ func main() {
 	maxTurnLeft := 10
 
 	tools := []llmsdk.Tool{
-		{
-			Name:        "trade",
-			Description: "Trade stocks",
-			Parameters: llmsdk.JSONSchema{
+		llmsdk.NewFunctionTool(
+			"trade",
+			"Trade stocks",
+			llmsdk.JSONSchema{
 				"type": "object",
 				"properties": map[string]any{
 					"action": map[string]any{
@@ -75,7 +75,7 @@ func main() {
 				"required":             []string{"action", "quantity", "symbol"},
 				"additionalProperties": false,
 			},
-		},
+		),
 	}
 
 	messages := []llmsdk.Message{

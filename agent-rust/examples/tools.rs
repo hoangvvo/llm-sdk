@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult};
+use llm_agent::{Agent, AgentFunctionTool, AgentRequest, AgentToolResult};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     Message, Part,
@@ -52,7 +52,7 @@ struct IntakeItemParams {
     priority: Option<String>,
 }
 
-impl AgentTool<LostAndFoundContext> for IntakeItemTool {
+impl AgentFunctionTool<LostAndFoundContext> for IntakeItemTool {
     fn name(&self) -> String {
         "intake_item".into()
     }
@@ -144,7 +144,7 @@ struct FlagContrabandParams {
     reason: String,
 }
 
-impl AgentTool<LostAndFoundContext> for FlagContrabandTool {
+impl AgentFunctionTool<LostAndFoundContext> for FlagContrabandTool {
     fn name(&self) -> String {
         "flag_contraband".into()
     }
@@ -221,7 +221,7 @@ struct IssueReceiptParams {
     traveller: String,
 }
 
-impl AgentTool<LostAndFoundContext> for IssueReceiptTool {
+impl AgentFunctionTool<LostAndFoundContext> for IssueReceiptTool {
     fn name(&self) -> String {
         "issue_receipt".into()
     }

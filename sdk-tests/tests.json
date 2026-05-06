@@ -1,6 +1,7 @@
 {
   "tools": [
     {
+      "type": "function",
       "name": "get_weather",
       "description": "Get the weather",
       "parameters": {
@@ -15,6 +16,7 @@
       }
     },
     {
+      "type": "function",
       "name": "get_stock_price",
       "description": "Get the stock price",
       "parameters": {
@@ -29,6 +31,7 @@
       }
     },
     {
+      "type": "function",
       "name": "get_first_secret_number",
       "description": "Get the first secret number",
       "parameters": {
@@ -38,6 +41,7 @@
       }
     },
     {
+      "type": "function",
       "name": "get_color_sample",
       "description": "Get a color sample image",
       "parameters": {
@@ -619,6 +623,7 @@
             ],
             "tools": [
               {
+                "type": "function",
                 "name": "get_first_secret_number",
                 "description": "Get the first secret number",
                 "parameters": {
@@ -670,6 +675,7 @@
             ],
             "tools": [
               {
+                "type": "function",
                 "name": "get_first_secret_number",
                 "description": "Get the first secret number",
                 "parameters": {
@@ -716,6 +722,7 @@
             ],
             "tools": [
               {
+                "type": "function",
                 "name": "get_first_secret_number",
                 "description": "Get the first secret number",
                 "parameters": {

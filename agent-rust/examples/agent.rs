@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part,
@@ -30,7 +30,7 @@ struct GetWeatherParams {
 // Define the agent tools
 struct GetWeatherTool;
 
-impl AgentTool<MyContext> for GetWeatherTool {
+impl AgentFunctionTool<MyContext> for GetWeatherTool {
     fn name(&self) -> String {
         "get_weather".to_string()
     }
@@ -87,7 +87,7 @@ struct SendMessageParams {
 
 struct SendMessageTool;
 
-impl AgentTool<MyContext> for SendMessageTool {
+impl AgentFunctionTool<MyContext> for SendMessageTool {
     fn name(&self) -> String {
         "send_message".to_string()
     }

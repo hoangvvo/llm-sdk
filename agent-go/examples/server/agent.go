@@ -38,7 +38,7 @@ The user speaks %s language.`, name, location, language), nil
 Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`)},
 }
 
-var availableTools = []llmagent.AgentTool[*MyContext]{
+var availableTools = llmagent.FunctionTools[*MyContext](
 	&ArtifactCreateTool{},
 	&ArtifactUpdateTool{},
 	&ArtifactGetTool{},
@@ -50,7 +50,7 @@ var availableTools = []llmagent.AgentTool[*MyContext]{
 	&GetNewsTool{},
 	&GetCoordinatesTool{},
 	&GetWeatherTool{},
-}
+)
 
 type AgentOptions struct {
 	EnabledTools     []string
@@ -73,7 +73,7 @@ func createAgent(model llmsdk.LanguageModel, options *AgentOptions) *llmagent.Ag
 			toolNameSet[name] = true
 		}
 		for _, tool := range availableTools {
-			if toolNameSet[tool.Name()] {
+			if functionTool := tool.AsFunctionTool(); functionTool != nil && toolNameSet[functionTool.Name()] {
 				tools = append(tools, tool)
 			}
 		}

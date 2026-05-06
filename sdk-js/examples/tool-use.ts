@@ -39,6 +39,7 @@ const model = getModel("openai", "gpt-4o");
 
 const tools: Tool[] = [
   {
+    type: "function",
     name: "trade",
     description: "Trade stocks",
     parameters: {

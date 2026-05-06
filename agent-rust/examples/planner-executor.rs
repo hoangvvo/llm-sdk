@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -72,7 +72,7 @@ type Ctx = ();
 struct UpdatePlan {
     s: Store,
 }
-impl AgentTool<Ctx> for UpdatePlan {
+impl AgentFunctionTool<Ctx> for UpdatePlan {
     fn name(&self) -> String {
         "update_plan".into()
     }

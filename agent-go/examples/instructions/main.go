@@ -60,7 +60,7 @@ func main() {
 		return fmt.Sprintf("Weave in the oracle whisper: \"%s\" so it feels like an in-world hint.", whisper), nil
 	}
 
-	dungeonCoach := llmagent.NewAgent[*DungeonRunContext]("Torch", model,
+	dungeonCoach := llmagent.NewAgent("Torch", model,
 		llmagent.WithInstructions(
 			llmagent.InstructionParam[*DungeonRunContext]{String: &staticInstruction},
 			llmagent.InstructionParam[*DungeonRunContext]{Func: dynamicInstruction},

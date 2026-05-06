@@ -307,7 +307,10 @@ func createAgent(provider, modelID string, metadata llmsdk.LanguageModelMetadata
 			llmagent.InstructionParam[chatContext]{String: &instruction1},
 			llmagent.InstructionParam[chatContext]{String: &instruction2},
 		),
-		llmagent.WithTools(&timeTool{}, &weatherTool{}),
+		llmagent.WithTools(
+			llmagent.NewAgentFunctionTool(&timeTool{}),
+			llmagent.NewAgentFunctionTool(&weatherTool{}),
+		),
 	)
 }
 

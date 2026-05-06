@@ -243,7 +243,11 @@ func main() {
 			llmagent.InstructionParam[*LostAndFoundContext]{String: ptr("When travellers report belongings, call the available tools to mutate the manifest and then summarise your actions.")},
 			llmagent.InstructionParam[*LostAndFoundContext]{String: ptr("If a tool reports an error, acknowledge the issue and guide the traveller appropriately.")},
 		),
-		llmagent.WithTools(intakeItemTool{}, flagContrabandTool{}, issueReceiptTool{}),
+		llmagent.WithTools(
+			llmagent.NewAgentFunctionTool(intakeItemTool{}),
+			llmagent.NewAgentFunctionTool(flagContrabandTool{}),
+			llmagent.NewAgentFunctionTool(issueReceiptTool{}),
+		),
 	)
 
 	// Successful run exercises multiple tools in a single turn.

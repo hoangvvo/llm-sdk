@@ -19,6 +19,7 @@ test("typeboxTool returns AgentTool", (t: TestContext) => {
   });
 
   const expected: AgentTool<object> = {
+    type: "function",
     name: "echo",
     description: "Echo input",
     parameters: {

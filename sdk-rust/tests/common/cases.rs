@@ -60,7 +60,12 @@ static TEST_DATA: LazyLock<TestDataJSON> = LazyLock::new(|| {
 static TOOLS_MAP: LazyLock<HashMap<String, Tool>> = LazyLock::new(|| {
     let mut map = HashMap::new();
     for tool in &TEST_DATA.tools {
-        map.insert(tool.name.clone(), tool.clone());
+        match tool {
+            Tool::Function(function_tool) => {
+                map.insert(function_tool.name.clone(), tool.clone());
+            }
+            Tool::Provider(_) => panic!("test tools must be function tools"),
+        }
     }
     map
 });

@@ -1,6 +1,6 @@
 use crate::context::MyContext;
 use futures::future::BoxFuture;
-use llm_agent::{AgentTool, AgentToolResult};
+use llm_agent::{AgentFunctionTool, AgentToolResult};
 use llm_sdk::{JSONSchema, Part};
 use serde::Deserialize;
 use serde_json::Value;
@@ -14,7 +14,7 @@ struct GetCoordinatesParams {
 
 pub struct GetCoordinatesTool;
 
-impl AgentTool<MyContext> for GetCoordinatesTool {
+impl AgentFunctionTool<MyContext> for GetCoordinatesTool {
     fn name(&self) -> String {
         "get_coordinates".to_string()
     }
@@ -130,7 +130,7 @@ struct GetWeatherParams {
 
 pub struct GetWeatherTool;
 
-impl AgentTool<MyContext> for GetWeatherTool {
+impl AgentFunctionTool<MyContext> for GetWeatherTool {
     fn name(&self) -> String {
         "get_weather".to_string()
     }

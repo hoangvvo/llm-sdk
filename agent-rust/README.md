@@ -12,7 +12,7 @@ cargo add llm-agent
 
 ```rust
 use dotenvy::dotenv;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part,
@@ -43,7 +43,7 @@ struct GetWeatherParams {
 // Define the agent tools
 struct GetWeatherTool;
 
-impl AgentTool<MyContext> for GetWeatherTool {
+impl AgentFunctionTool<MyContext> for GetWeatherTool {
     fn name(&self) -> String {
         "get_weather".to_string()
     }
@@ -100,7 +100,7 @@ struct SendMessageParams {
 
 struct SendMessageTool;
 
-impl AgentTool<MyContext> for SendMessageTool {
+impl AgentFunctionTool<MyContext> for SendMessageTool {
     fn name(&self) -> String {
         "send_message".to_string()
     }
@@ -232,6 +232,12 @@ cargo run --example agent
 ```
 
 An example server that exposes an API to interact with the agent can be found in [examples/server](./examples/server). This can be used to test the agent with the [console application](../website).
+
+## Migration
+
+### To 0.3.0
+
+- Rename `AgentTool` trait implementations to `AgentFunctionTool`.
 
 ## License
 

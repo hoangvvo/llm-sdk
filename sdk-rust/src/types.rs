@@ -403,7 +403,16 @@ pub type JSONSchema = Value;
 /// Represents a tool that can be used by the model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-pub struct Tool {
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum Tool {
+    Function(FunctionTool),
+    Provider(ProviderTool),
+}
+
+/// Represents a client-executed function tool that can be used by the model.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct FunctionTool {
     /// The name of the tool.
     pub name: String,
     /// A description of the tool.
@@ -411,6 +420,15 @@ pub struct Tool {
     /// The JSON schema of the parameters that the tool accepts. The type must
     /// be "object".
     pub parameters: JSONSchema,
+}
+
+/// Represents a provider-hosted tool that is forwarded to the model provider
+/// for execution.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ProviderTool {
+    /// The provider tool name.
+    pub name: String,
 }
 
 /// Represents tool result in the message history.

@@ -132,6 +132,10 @@ node examples/generate-text.ts
 
 ## Migration
 
+### To 0.5.0
+
+- Function tools now require `type: "function"`.
+
 ### To 0.4.0
 
 - `image_data` and `audio_data` have been renamed to just `data` in `ImagePart` and `AudioPart`.

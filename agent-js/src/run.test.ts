@@ -27,6 +27,7 @@ function createMockTool<TContext = any>(
   executeFn?: (args: any, ctx: TContext, state: RunState) => any,
 ): AgentTool<TContext> {
   return {
+    type: "function",
     name,
     description: `Mock tool ${name}`,
     parameters: { type: "object", properties: {} },
@@ -1180,6 +1181,7 @@ suite("RunSession#run", () => {
     }[] = [];
 
     const dynamicTool: AgentTool<Context, { orderId: string }> = {
+      type: "function",
       name: "lookup-order",
       description: "Lookup an order by ID",
       parameters: {
@@ -1259,6 +1261,7 @@ suite("RunSession#run", () => {
       t.assert.strictEqual(input.system_prompt, "Toolkit prompt");
       t.assert.deepStrictEqual(input.tools, [
         {
+          type: "function",
           name: "lookup-order",
           description: "Lookup an order by ID",
           parameters: dynamicTool.parameters,
@@ -1900,6 +1903,7 @@ suite("RunSession#runStream", () => {
     let closeCalls = 0;
 
     const dynamicTool: AgentTool<Context> = {
+      type: "function",
       name: "noop",
       description: "No operation",
       parameters: {
@@ -2007,6 +2011,7 @@ suite("RunSession#runStream", () => {
       [
         [
           {
+            type: "function",
             name: "noop",
             description: "No operation",
             parameters: dynamicTool.parameters,
@@ -2016,6 +2021,7 @@ suite("RunSession#runStream", () => {
     );
     t.assert.deepStrictEqual(model.trackedStreamInputs[0]?.tools, [
       {
+        type: "function",
         name: "noop",
         description: "No operation",
         parameters: dynamicTool.parameters,

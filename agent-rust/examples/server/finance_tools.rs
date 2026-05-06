@@ -1,6 +1,6 @@
 use crate::context::MyContext;
 use futures::future::BoxFuture;
-use llm_agent::{AgentTool, AgentToolResult};
+use llm_agent::{AgentFunctionTool, AgentToolResult};
 use llm_sdk::{JSONSchema, Part};
 use serde::Deserialize;
 use serde_json::Value;
@@ -14,7 +14,7 @@ struct GetStockPriceParams {
 
 pub struct GetStockPriceTool;
 
-impl AgentTool<MyContext> for GetStockPriceTool {
+impl AgentFunctionTool<MyContext> for GetStockPriceTool {
     fn name(&self) -> String {
         "get_stock_price".to_string()
     }
@@ -127,7 +127,7 @@ struct GetCryptoPriceParams {
 
 pub struct GetCryptoPriceTool;
 
-impl AgentTool<MyContext> for GetCryptoPriceTool {
+impl AgentFunctionTool<MyContext> for GetCryptoPriceTool {
     fn name(&self) -> String {
         "get_crypto_price".to_string()
     }

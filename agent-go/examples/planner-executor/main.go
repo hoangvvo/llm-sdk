@@ -159,7 +159,7 @@ When the work is complete, respond with the final deliverable and a brief one-pa
 				return b.String(), nil
 			}},
 		),
-		llmagent.WithTools(&UpdatePlanTool{S: store}),
+		llmagent.WithTools(llmagent.NewAgentFunctionTool(&UpdatePlanTool{S: store})),
 		llmagent.WithMaxTurns[Ctx](20),
 	)
 

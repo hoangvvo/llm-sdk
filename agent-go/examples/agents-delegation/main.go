@@ -327,8 +327,8 @@ func main() {
 			llmagent.InstructionParam[*MyContext]{String: &orderInst},
 		),
 		llmagent.WithTools(
-			&CreateOrderTool{},
-			&GetOrdersTool{},
+			llmagent.NewAgentFunctionTool(&CreateOrderTool{}),
+			llmagent.NewAgentFunctionTool(&GetOrdersTool{}),
 		),
 	)
 
@@ -339,7 +339,7 @@ func main() {
 			llmagent.InstructionParam[*MyContext]{String: &deliveryInst},
 		),
 		llmagent.WithTools(
-			&DeliverOrderTool{},
+			llmagent.NewAgentFunctionTool(&DeliverOrderTool{}),
 		),
 	)
 
@@ -358,8 +358,8 @@ You should also poll the order status in every turn to send them for delivery on
 			llmagent.InstructionParam[*MyContext]{String: &coordInst3},
 		),
 		llmagent.WithTools(
-			NewAgentTransferTool(orderAgent, "handling customer orders and get order statuses"),
-			NewAgentTransferTool(deliveryAgent, "delivering processed orders"),
+			llmagent.NewAgentFunctionTool(NewAgentTransferTool(orderAgent, "handling customer orders and get order statuses")),
+			llmagent.NewAgentFunctionTool(NewAgentTransferTool(deliveryAgent, "delivering processed orders")),
 		),
 	)
 

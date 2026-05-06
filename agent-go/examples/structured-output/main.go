@@ -245,8 +245,8 @@ func main() {
 		),
 		llmagent.WithResponseFormat[struct{}](*responseFormat),
 		llmagent.WithTools(
-			&SearchFlightsTool{},
-			&SearchHotelsTool{},
+			llmagent.NewAgentFunctionTool(&SearchFlightsTool{}),
+			llmagent.NewAgentFunctionTool(&SearchHotelsTool{}),
 		),
 	)
 

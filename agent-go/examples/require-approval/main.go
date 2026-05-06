@@ -101,11 +101,11 @@ func (unlockArtifactTool) Execute(ctx context.Context, raw json.RawMessage, stat
 
 func newAgent(model llmsdk.LanguageModel) *llmagent.Agent[*vaultContext] {
 	instruction := "You supervise the Eon Vault, safeguarding experimental expedition technology."
-	return llmagent.NewAgent[*vaultContext](
+	return llmagent.NewAgent(
 		"VaultSentinel",
 		model,
 		llmagent.WithInstructions(llmagent.InstructionParam[*vaultContext]{String: &instruction}),
-		llmagent.WithTools(unlockArtifactTool{}),
+		llmagent.WithTools(llmagent.NewAgentFunctionTool(unlockArtifactTool{})),
 	)
 }
 

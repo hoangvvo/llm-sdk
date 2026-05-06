@@ -472,6 +472,143 @@ func NewToolChoiceTool(toolName string) *ToolChoiceOption {
 	return &ToolChoiceOption{Tool: &ToolChoiceTool{ToolName: toolName}}
 }
 
+// NewFunctionTool creates a function tool.
+func NewFunctionTool(name string, description string, parameters JSONSchema) Tool {
+	return Tool{
+		FunctionTool: &FunctionTool{
+			Name:        name,
+			Description: description,
+			Parameters:  parameters,
+		},
+	}
+}
+
+// NewProviderTool creates a provider-hosted tool.
+func NewProviderTool(name string) Tool {
+	return Tool{
+		ProviderTool: &ProviderTool{
+			Name: name,
+		},
+	}
+}
+
+// LanguageModelInputOption configures a LanguageModelInput.
+type LanguageModelInputOption func(*LanguageModelInput)
+
+// NewLanguageModelInput creates a language model input with functional options.
+func NewLanguageModelInput(messages []Message, opts ...LanguageModelInputOption) *LanguageModelInput {
+	input := &LanguageModelInput{
+		Messages: append([]Message(nil), messages...),
+	}
+	for _, opt := range opts {
+		opt(input)
+	}
+	return input
+}
+
+func WithInputSystemPrompt(systemPrompt string) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.SystemPrompt = &systemPrompt
+	}
+}
+
+func WithInputMessages(messages ...Message) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Messages = append([]Message(nil), messages...)
+	}
+}
+
+func WithInputTools(tools ...Tool) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Tools = append([]Tool(nil), tools...)
+	}
+}
+
+func WithInputToolChoice(toolChoice *ToolChoiceOption) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.ToolChoice = toolChoice
+	}
+}
+
+func WithInputResponseFormat(responseFormat *ResponseFormatOption) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.ResponseFormat = responseFormat
+	}
+}
+
+func WithInputMaxTokens(maxTokens uint32) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.MaxTokens = &maxTokens
+	}
+}
+
+func WithInputTemperature(temperature float64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Temperature = &temperature
+	}
+}
+
+func WithInputTopP(topP float64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.TopP = &topP
+	}
+}
+
+func WithInputTopK(topK int32) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.TopK = &topK
+	}
+}
+
+func WithInputPresencePenalty(presencePenalty float64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.PresencePenalty = &presencePenalty
+	}
+}
+
+func WithInputFrequencyPenalty(frequencyPenalty float64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.FrequencyPenalty = &frequencyPenalty
+	}
+}
+
+func WithInputSeed(seed int64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Seed = &seed
+	}
+}
+
+func WithInputModalities(modalities ...Modality) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Modalities = append([]Modality(nil), modalities...)
+	}
+}
+
+func WithInputMetadata(metadata map[string]string) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		if metadata == nil {
+			input.Metadata = nil
+			return
+		}
+		input.Metadata = make(map[string]string, len(metadata))
+		for k, v := range metadata {
+			input.Metadata[k] = v
+		}
+	}
+}
+
+func WithInputAudio(audio *AudioOptions) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Audio = audio
+	}
+}
+
+func WithInputReasoning(reasoning *ReasoningOptions) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Reasoning = reasoning
+	}
+}
+
 // NewResponseFormatText creates a text response format
 func NewResponseFormatText() *ResponseFormatOption {
 	return &ResponseFormatOption{Text: &ResponseFormatText{}}

@@ -11,7 +11,7 @@ use crate::{
 use chrono::Utc;
 use llm_agent::{
     mcp::{MCPInit, MCPParams, MCPToolkit},
-    Agent, AgentTool,
+    Agent, AgentFunctionTool,
 };
 use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions};
 use std::sync::Arc;
@@ -30,7 +30,7 @@ pub struct AgentOptions {
     pub modalities: Option<Vec<Modality>>,
 }
 
-pub fn get_available_tools() -> Vec<Box<dyn AgentTool<MyContext> + Send + Sync>> {
+pub fn get_available_tools() -> Vec<Box<dyn AgentFunctionTool<MyContext> + Send + Sync>> {
     vec![
         Box::new(ArtifactCreateTool),
         Box::new(ArtifactUpdateTool),

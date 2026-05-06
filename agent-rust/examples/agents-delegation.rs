@@ -4,7 +4,7 @@ use futures::{
     lock::{Mutex, MutexGuard},
     FutureExt,
 };
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part,
@@ -43,7 +43,7 @@ impl<TCtx> AgentTransferTool<TCtx> {
     }
 }
 
-impl<TCtx> AgentTool<TCtx> for AgentTransferTool<TCtx>
+impl<TCtx> AgentFunctionTool<TCtx> for AgentTransferTool<TCtx>
 where
     TCtx: Send + Sync + Clone + 'static,
 {
@@ -124,7 +124,7 @@ struct CreateOrderParams {
 
 struct CreateOrderTool;
 
-impl AgentTool<MyContext> for CreateOrderTool {
+impl AgentFunctionTool<MyContext> for CreateOrderTool {
     fn name(&self) -> String {
         "create_order".to_string()
     }
@@ -180,7 +180,7 @@ struct OrderStatus {
 
 struct GetOrdersTool;
 
-impl AgentTool<MyContext> for GetOrdersTool {
+impl AgentFunctionTool<MyContext> for GetOrdersTool {
     fn name(&self) -> String {
         "get_orders".to_string()
     }
@@ -243,7 +243,7 @@ struct DeliverOrderParams {
 
 pub struct DeliverOrderTool;
 
-impl AgentTool<MyContext> for DeliverOrderTool {
+impl AgentFunctionTool<MyContext> for DeliverOrderTool {
     fn name(&self) -> String {
         "deliver_order".to_string()
     }

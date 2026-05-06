@@ -12,8 +12,8 @@ import (
 func main() {
 	model := examples.GetModel("openai", "gpt-4o")
 
-	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
-		Messages: []llmsdk.Message{
+	response, err := model.Generate(context.Background(), llmsdk.NewLanguageModelInput(
+		[]llmsdk.Message{
 			llmsdk.NewUserMessage(
 				llmsdk.NewTextPart("Tell me a story."),
 			),
@@ -24,7 +24,7 @@ func main() {
 				llmsdk.NewTextPart("A fairy tale."),
 			),
 		},
-	})
+	))
 
 	if err != nil {
 		log.Fatalf("Generation failed: %v", err)

@@ -121,9 +121,13 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 func listToolsHandler(w http.ResponseWriter) {
 	tools := make([]map[string]string, 0, len(availableTools))
 	for _, tool := range availableTools {
+		functionTool := tool.AsFunctionTool()
+		if functionTool == nil {
+			continue
+		}
 		tools = append(tools, map[string]string{
-			"name":        tool.Name(),
-			"description": tool.Description(),
+			"name":        functionTool.Name(),
+			"description": functionTool.Description(),
 		})
 	}
 

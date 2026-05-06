@@ -20,7 +20,7 @@ import {
   type AgentParams,
   type AgentParamsWithDefaults,
 } from "./params.ts";
-import { type AgentTool } from "./tool.ts";
+import { type AgentFunctionTool, type AgentTool } from "./tool.ts";
 import type { ToolkitSession } from "./toolkit.ts";
 import type {
   AgentItem,
@@ -243,7 +243,8 @@ export class RunSession<TContext> {
       }
 
       const agentTool = tools.find(
-        (tool) => tool.name === toolCallPart.tool_name,
+        (tool): tool is AgentFunctionTool<TContext> =>
+          tool.type === "function" && tool.name === toolCallPart.tool_name,
       );
 
       if (!agentTool) {
@@ -528,11 +529,16 @@ export class RunSession<TContext> {
       // Add tools
       const tools = this.#getTools();
       if (tools.length > 0) {
-        input.tools = tools.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        }));
+        input.tools = tools.map((tool) =>
+          tool.type === "function"
+            ? {
+                type: "function",
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.parameters,
+              }
+            : tool,
+        );
       }
 
       // Add other model params

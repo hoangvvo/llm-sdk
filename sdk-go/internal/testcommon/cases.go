@@ -71,7 +71,10 @@ func ensureInitialized() {
 
 		toolsMap = make(map[string]llmsdk.Tool)
 		for _, tool := range testData.Tools {
-			toolsMap[tool.Name] = tool
+			if tool.FunctionTool == nil {
+				panic("test tools must be function tools")
+			}
+			toolsMap[tool.FunctionTool.Name] = tool
 		}
 
 		testCases = make(map[string]TestCase)

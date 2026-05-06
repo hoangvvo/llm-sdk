@@ -1,7 +1,8 @@
 use dotenvy::dotenv;
 use futures::{future::BoxFuture, StreamExt};
 use llm_agent::{
-    Agent, AgentError, AgentItem, AgentRequest, AgentStreamEvent, AgentTool, AgentToolResult,
+    Agent, AgentError, AgentFunctionTool, AgentItem, AgentRequest, AgentStreamEvent,
+    AgentToolResult,
 };
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
@@ -86,7 +87,7 @@ struct UnlockArtifactArgs {
     artifact: String,
 }
 
-impl AgentTool<VaultContext> for UnlockArtifactTool {
+impl AgentFunctionTool<VaultContext> for UnlockArtifactTool {
     fn name(&self) -> String {
         "unlock_artifact".into()
     }

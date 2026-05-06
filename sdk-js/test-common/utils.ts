@@ -50,6 +50,9 @@ export function transformInputForCompatibleSchema(
   }
   if (newInput.tools) {
     newInput.tools = newInput.tools.map((tool) => {
+      if (tool.type !== "function") {
+        return tool;
+      }
       return {
         ...tool,
         parameters: transformCompatibleSchema(tool.parameters),

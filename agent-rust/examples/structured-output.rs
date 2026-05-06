@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption,
@@ -23,7 +23,7 @@ struct SearchFlightsParams {
 
 struct SearchFlightsTool;
 
-impl AgentTool<()> for SearchFlightsTool {
+impl AgentFunctionTool<()> for SearchFlightsTool {
     fn name(&self) -> String {
         "search_flights".to_string()
     }
@@ -82,7 +82,7 @@ struct SearchHotelsParams {
 
 struct SearchHotelsTool;
 
-impl AgentTool<()> for SearchHotelsTool {
+impl AgentFunctionTool<()> for SearchHotelsTool {
     fn name(&self) -> String {
         "search_hotels".to_string()
     }

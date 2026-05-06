@@ -742,12 +742,94 @@ type JSONSchema map[string]any
 
 // Tool represents a tool that can be used by the model.
 type Tool struct {
+	FunctionTool *FunctionTool `json:"-"`
+	ProviderTool *ProviderTool `json:"-"`
+}
+
+type ToolType string
+
+const (
+	ToolTypeFunction ToolType = "function"
+	ToolTypeProvider ToolType = "provider"
+)
+
+func (t Tool) Type() ToolType {
+	switch {
+	case t.FunctionTool != nil:
+		return ToolTypeFunction
+	case t.ProviderTool != nil:
+		return ToolTypeProvider
+	default:
+		return ""
+	}
+}
+
+// FunctionTool represents a client-executed function tool that can be used by the model.
+type FunctionTool struct {
 	// The name of the tool.
 	Name string `json:"name"`
 	// A description of the tool.
 	Description string `json:"description"`
 	// The JSON schema of the parameters that the tool accepts. The type must be "object".
 	Parameters JSONSchema `json:"parameters"`
+}
+
+// ProviderTool represents a provider-hosted tool that is forwarded to the model provider for execution.
+type ProviderTool struct {
+	// The provider tool name.
+	Name string `json:"name"`
+}
+
+// MarshalJSON implements custom JSON marshaling for Tool.
+func (t Tool) MarshalJSON() ([]byte, error) {
+	if t.FunctionTool != nil {
+		return json.Marshal(struct {
+			Type ToolType `json:"type"`
+			*FunctionTool
+		}{
+			Type:         ToolTypeFunction,
+			FunctionTool: t.FunctionTool,
+		})
+	}
+	if t.ProviderTool != nil {
+		return json.Marshal(struct {
+			Type ToolType `json:"type"`
+			*ProviderTool
+		}{
+			Type:         ToolTypeProvider,
+			ProviderTool: t.ProviderTool,
+		})
+	}
+	return nil, fmt.Errorf("tool has no content")
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Tool.
+func (t *Tool) UnmarshalJSON(data []byte) error {
+	var temp struct {
+		Type ToolType `json:"type"`
+	}
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	switch temp.Type {
+	case ToolTypeFunction:
+		var tool FunctionTool
+		if err := json.Unmarshal(data, &tool); err != nil {
+			return err
+		}
+		t.FunctionTool = &tool
+	case ToolTypeProvider:
+		var tool ProviderTool
+		if err := json.Unmarshal(data, &tool); err != nil {
+			return err
+		}
+		t.ProviderTool = &tool
+	default:
+		return fmt.Errorf("unknown tool type: %s", temp.Type)
+	}
+
+	return nil
 }
 
 // ModelTokensDetails represents the token usage details of the model.

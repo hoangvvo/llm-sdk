@@ -478,9 +478,17 @@
       "additionalProperties": true
     },
     "Tool": {
-      "type": "object",
       "description": "Represents a tool that can be used by the model.",
+      "oneOf": [
+        { "$ref": "#/definitions/FunctionTool" },
+        { "$ref": "#/definitions/ProviderTool" }
+      ]
+    },
+    "FunctionTool": {
+      "type": "object",
+      "description": "Represents a client-executed function tool that can be used by the model.",
       "properties": {
+        "type": { "const": "function" },
         "name": {
           "type": "string",
           "description": "The name of the tool."
@@ -501,7 +509,20 @@
           ]
         }
       },
-      "required": ["name", "description", "parameters"],
+      "required": ["type", "name", "description", "parameters"],
+      "additionalProperties": false
+    },
+    "ProviderTool": {
+      "type": "object",
+      "description": "Represents a provider-hosted tool that is forwarded to the model provider for execution.",
+      "properties": {
+        "type": { "const": "provider" },
+        "name": {
+          "type": "string",
+          "description": "The provider tool name."
+        }
+      },
+      "required": ["type", "name"],
       "additionalProperties": false
     },
     "ModelTokensDetails": {

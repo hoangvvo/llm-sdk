@@ -24,6 +24,7 @@ const model = getModel("openai", "gpt-4o");
 
 const tools: Tool[] = [
   {
+    type: "function",
     name: "get_color_sample",
     description: "Get a color sample image",
     parameters: {
