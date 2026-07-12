@@ -329,6 +329,7 @@
               }
             },
             "required": [
+              "finish_reason",
               "index",
               "message",
               "logprobs"
@@ -439,6 +440,7 @@
             },
             "required": [
               "delta",
+              "finish_reason",
               "index"
             ],
             "type": "object"

@@ -7,6 +7,7 @@ interface ProviderSchemaConfig {
   provider: string;
   source_schema_url: string;
   schemas: ProviderRootSchema[];
+  allow_missing_schema_references?: boolean;
 }
 
 type ProviderRootSchema =
@@ -38,6 +39,13 @@ const providers: ProviderSchemaConfig[] = [
     source_schema_url:
       "https://github.com/gr2m/ai-provider-monitor/raw/refs/heads/main/cache/anthropic/openapi.json",
     schemas: ["CreateMessageParams", "Message", "MessageStreamEvent"],
+  },
+  {
+    provider: "google",
+    source_schema_url:
+      "https://generativelanguage.googleapis.com/$discovery/rest?version=v1beta",
+    schemas: ["GenerateContentRequest", "GenerateContentResponse"],
+    allow_missing_schema_references: true,
   },
   {
     provider: "cohere",
@@ -101,6 +109,13 @@ function extractSchemaNameFromPointer(pointer: string): string | undefined {
   return undefined;
 }
 
+function extractSchemaNameFromReference(reference: string): string | undefined {
+  return (
+    extractSchemaNameFromPointer(reference) ??
+    (/^[A-Za-z_][A-Za-z0-9_]*$/.test(reference) ? reference : undefined)
+  );
+}
+
 function normalizeSchemaPointer(pointer: string): string {
   for (const prefix of schemaPointerPrefixes) {
     if (pointer.startsWith(prefix)) {
@@ -135,7 +150,13 @@ function collectReferencedSchemaNames(
     return;
   }
 
-  for (const nestedValue of Object.values(value)) {
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (key === "$ref" && typeof nestedValue === "string") {
+      const schemaName = extractSchemaNameFromReference(nestedValue);
+      if (schemaName) {
+        referencedNames.add(schemaName);
+      }
+    }
     collectReferencedSchemaNames(nestedValue, referencedNames);
   }
 }
@@ -153,12 +174,21 @@ function rewriteInternalSchemaPointers(value: unknown): unknown {
     return value;
   }
 
-  return Object.fromEntries(
-    Object.entries(value).map(([key, nestedValue]) => [
-      key,
-      rewriteInternalSchemaPointers(nestedValue),
-    ]),
-  );
+  const rewritten: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (key === "type" && nestedValue === "any") {
+      continue;
+    }
+    if (key === "$ref" && typeof nestedValue === "string") {
+      const schemaName = extractSchemaNameFromReference(nestedValue);
+      if (schemaName) {
+        rewritten[key] = `#/definitions/${schemaName}`;
+        continue;
+      }
+    }
+    rewritten[key] = rewriteInternalSchemaPointers(nestedValue);
+  }
+  return rewritten;
 }
 
 function extractDefinitions(document: unknown): Record<string, unknown> {
@@ -175,6 +205,10 @@ function extractDefinitions(document: unknown): Record<string, unknown> {
     isRecord(document["components"]["schemas"])
   ) {
     return document["components"]["schemas"];
+  }
+
+  if (isRecord(document["schemas"])) {
+    return document["schemas"];
   }
 
   return {};
@@ -306,6 +340,7 @@ function trimDefinitions(
   definitions: Record<string, unknown>,
   rootSchemas: Record<string, unknown>,
   provider: string,
+  allowMissingSchemaReferences: boolean,
 ): Record<string, unknown> {
   const retainedSchemas = new Map<string, unknown>(Object.entries(rootSchemas));
   const queue = Object.entries(rootSchemas);
@@ -322,9 +357,16 @@ function trimDefinitions(
 
     for (const referencedSchemaName of referencedSchemaNames) {
       if (!(referencedSchemaName in definitions)) {
-        throw new Error(
-          `${provider}: dependency "${referencedSchemaName}" referenced by "${currentSchemaName}" was not found in source schema`,
+        if (!allowMissingSchemaReferences) {
+          throw new Error(
+            `${provider}: dependency "${referencedSchemaName}" referenced by "${currentSchemaName}" was not found in source schema`,
+          );
+        }
+        console.warn(
+          `${provider}: dependency "${referencedSchemaName}" referenced by "${currentSchemaName}" was not found; using an unconstrained schema`,
         );
+        retainedSchemas.set(referencedSchemaName, {});
+        continue;
       }
 
       if (retainedSchemas.has(referencedSchemaName)) {
@@ -403,6 +445,7 @@ async function writeProviderSchema(
     definitions,
     rootSchemas,
     config.provider,
+    config.allow_missing_schema_references ?? false,
   );
   const outputPath = join(providersOutputDir, `${config.provider}.json`);
 
@@ -420,7 +463,20 @@ async function writeProviderSchema(
 async function main(): Promise<void> {
   await mkdir(providersOutputDir, { recursive: true });
 
-  for (const provider of providers) {
+  const requestedProviders = new Set(process.argv.slice(2));
+  const selectedProviders =
+    requestedProviders.size === 0
+      ? providers
+      : providers.filter((config) => requestedProviders.has(config.provider));
+  if (selectedProviders.length !== requestedProviders.size) {
+    const knownProviders = new Set(providers.map((config) => config.provider));
+    const unknownProviders = [...requestedProviders].filter(
+      (provider) => !knownProviders.has(provider),
+    );
+    throw new Error(`Unknown providers: ${unknownProviders.join(", ")}`);
+  }
+
+  for (const provider of selectedProviders) {
     await writeProviderSchema(provider);
   }
 }
