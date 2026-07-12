@@ -1,16 +1,17 @@
 use super::api::{
-    Content, FunctionCall, FunctionCallingConfig, FunctionCallingConfigMode, FunctionDeclaration,
-    FunctionResponse, FunctionResponseBlob, FunctionResponsePart, GenerateContentConfig,
-    GenerateContentParameters, GenerateContentResponse, MediaModality, ModalityTokenCount,
-    Part as GooglePart, PrebuiltVoiceConfig, SpeechConfig, ThinkingConfig, Tool, ToolConfig,
-    VoiceConfig,
+    Blob, Content, FunctionCall, FunctionCallingConfig, FunctionCallingConfigMode,
+    FunctionDeclaration, FunctionResponse, FunctionResponseBlob, FunctionResponsePart,
+    GenerateContentRequest, GenerateContentResponse, GenerationConfig,
+    GenerationConfigResponseModalitiesItem, ModalityTokenCount, ModalityTokenCountModality,
+    Part as GooglePart, PrebuiltVoiceConfig, SpeechConfig, ThinkingConfig, Tool as GoogleTool,
+    ToolConfig, UsageMetadata, VoiceConfig,
 };
 use crate::{
     audio_part_utils, client_utils, id_utils, source_part_utils, stream_utils, AudioPart,
     ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
     LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
     ModelTokensDetails, ModelUsage, Part, PartialModelResponse, ReasoningPart,
-    ResponseFormatOption, ToolChoiceOption,
+    ResponseFormatOption, TextPart, Tool as SdkTool, ToolChoiceOption,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -222,6 +223,7 @@ impl LanguageModel for GoogleModel {
                                         }
                                     }
                                 }
+
                             }
 
                             if let Some(usage_metadata) = response.usage_metadata {
@@ -249,15 +251,15 @@ impl LanguageModel for GoogleModel {
 fn convert_to_generate_content_parameters(
     input: LanguageModelInput,
     model_id: &str,
-) -> LanguageModelResult<GenerateContentParameters> {
+) -> LanguageModelResult<GenerateContentRequest> {
     let messages = convert_to_google_contents(input.messages)?;
 
-    let mut params = GenerateContentParameters {
-        contents: messages,
-        model: model_id.to_string(),
+    let mut params = GenerateContentRequest {
+        contents: Some(messages),
+        model: Some(model_id.to_string()),
         ..Default::default()
     };
-    let mut config = GenerateContentConfig::default();
+    let mut config = GenerationConfig::default();
 
     if let Some(system_prompt) = input.system_prompt {
         params.system_instruction = Some(Content {
@@ -276,7 +278,7 @@ fn convert_to_generate_content_parameters(
         config.top_p = Some(top_p);
     }
     if let Some(top_k) = input.top_k {
-        config.top_k = Some(top_k);
+        config.top_k = Some(i64::from(top_k));
     }
     if let Some(presence_penalty) = input.presence_penalty {
         config.presence_penalty = Some(presence_penalty);
@@ -288,28 +290,43 @@ fn convert_to_generate_content_parameters(
         config.seed = Some(seed);
     }
     if let Some(max_tokens) = input.max_tokens {
-        config.max_output_tokens = Some(max_tokens);
+        config.max_output_tokens = Some(i64::from(max_tokens));
     }
 
+    let mut google_tools = Vec::new();
     if let Some(tools) = input.tools {
-        let function_declarations = tools
-            .into_iter()
-            .map(|tool| FunctionDeclaration {
-                name: Some(tool.name),
-                description: Some(tool.description),
-                parameters_json_schema: Some(tool.parameters),
-                ..Default::default()
-            })
-            .collect();
-
-        params.tools = Some(vec![Tool {
-            function_declarations: Some(function_declarations),
-        }]);
+        let mut function_declarations = Vec::new();
+        for tool in tools {
+            match tool {
+                SdkTool::Function(tool) => function_declarations.push(FunctionDeclaration {
+                    name: Some(tool.name),
+                    description: Some(tool.description),
+                    parameters_json_schema: Some(tool.parameters),
+                    ..Default::default()
+                }),
+                SdkTool::Provider(tool) => {
+                    return Err(LanguageModelError::Unsupported(
+                        PROVIDER,
+                        format!("provider tool {:?} is not supported", tool.name),
+                    ));
+                }
+            }
+        }
+        if !function_declarations.is_empty() {
+            google_tools.insert(
+                0,
+                GoogleTool {
+                    function_declarations: Some(function_declarations),
+                    ..Default::default()
+                },
+            );
+        }
     }
 
     if let Some(tool_choice) = input.tool_choice {
         params.tool_config = Some(ToolConfig {
             function_calling_config: Some(convert_to_google_function_calling_config(tool_choice)),
+            ..Default::default()
         });
     }
 
@@ -325,9 +342,9 @@ fn convert_to_generate_content_parameters(
             modalities
                 .into_iter()
                 .map(|m| match m {
-                    crate::Modality::Text => "TEXT".to_string(),
-                    crate::Modality::Image => "IMAGE".to_string(),
-                    crate::Modality::Audio => "AUDIO".to_string(),
+                    crate::Modality::Text => GenerationConfigResponseModalitiesItem::TEXT,
+                    crate::Modality::Image => GenerationConfigResponseModalitiesItem::IMAGE,
+                    crate::Modality::Audio => GenerationConfigResponseModalitiesItem::AUDIO,
                 })
                 .collect(),
         );
@@ -339,10 +356,12 @@ fn convert_to_generate_content_parameters(
                 voice_config: Some(VoiceConfig {
                     prebuilt_voice_config: Some(PrebuiltVoiceConfig {
                         voice_name: Some(voice),
+                        ..Default::default()
                     }),
+                    ..Default::default()
                 }),
                 language_code: audio.language,
-                multi_speaker_voice_config: None,
+                ..Default::default()
             });
         }
     }
@@ -350,13 +369,13 @@ fn convert_to_generate_content_parameters(
     if let Some(reasoning) = input.reasoning {
         config.thinking_config = Some(ThinkingConfig {
             include_thoughts: Some(reasoning.enabled),
-            thinking_budget: reasoning
-                .budget_tokens
-                .map(|t| i32::try_from(t).unwrap_or(0)),
+            thinking_budget: reasoning.budget_tokens.map(i64::from),
+            ..Default::default()
         });
     }
 
     params.generation_config = Some(config);
+    params.tools = (!google_tools.is_empty()).then_some(google_tools);
 
     Ok(params)
 }
@@ -393,23 +412,22 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
     Ok(match part {
         Part::Text(text_part) => vec![GooglePart {
             text: Some(text_part.text),
+            thought_signature: text_part.signature,
             ..Default::default()
         }],
         Part::Image(image_part) => vec![GooglePart {
-            inline_data: Some(super::api::Blob2 {
+            inline_data: Some(Blob {
                 data: Some(image_part.data),
                 mime_type: Some(image_part.mime_type),
-                display_name: None,
             }),
             ..Default::default()
         }],
         Part::Audio(audio_part) => vec![GooglePart {
-            inline_data: Some(super::api::Blob2 {
+            inline_data: Some(Blob {
                 data: Some(audio_part.data),
                 mime_type: Some(audio_part_utils::map_audio_format_to_mime_type(
                     &audio_part.format,
                 )),
-                display_name: None,
             }),
             ..Default::default()
         }],
@@ -420,15 +438,28 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
             ..Default::default()
         }],
         Part::Source(source_part) => convert_parts_to_google_parts(source_part.content)?,
-        Part::ToolCall(tool_call_part) => vec![GooglePart {
-            function_call: Some(FunctionCall {
-                name: Some(tool_call_part.tool_name),
-                args: Some(tool_call_part.args),
-                id: Some(tool_call_part.tool_call_id),
-            }),
-            thought_signature: tool_call_part.signature,
-            ..Default::default()
-        }],
+        Part::ToolCall(tool_call_part) => {
+            let args = tool_call_part
+                .args
+                .as_object()
+                .cloned()
+                .ok_or_else(|| {
+                    LanguageModelError::InvalidInput(
+                        "Google function arguments must be an object".to_string(),
+                    )
+                })?
+                .into_iter()
+                .collect();
+            vec![GooglePart {
+                function_call: Some(FunctionCall {
+                    name: Some(tool_call_part.tool_name),
+                    args: Some(args),
+                    id: Some(tool_call_part.tool_call_id),
+                }),
+                thought_signature: tool_call_part.signature,
+                ..Default::default()
+            }]
+        }
         Part::ToolResult(tool_result_part) => vec![GooglePart {
             function_response: Some(convert_to_google_function_result(tool_result_part)?),
             ..Default::default()
@@ -439,27 +470,26 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
 fn convert_to_google_function_result(
     tool_result_part: crate::ToolResultPart,
 ) -> LanguageModelResult<FunctionResponse> {
-    let function_response = convert_to_google_function_response(
+    let (response, parts) = convert_to_google_function_response(
         tool_result_part.content,
         tool_result_part.is_error.unwrap_or(false),
     )?;
     Ok(FunctionResponse {
         id: Some(tool_result_part.tool_call_id),
         name: Some(tool_result_part.tool_name),
-        response: Some(function_response.response),
-        parts: function_response.parts,
+        response: Some(response),
+        parts,
+        ..Default::default()
     })
-}
-
-struct GoogleFunctionResponse {
-    response: HashMap<String, serde_json::Value>,
-    parts: Option<Vec<FunctionResponsePart>>,
 }
 
 fn convert_to_google_function_response(
     parts: Vec<Part>,
     is_error: bool,
-) -> LanguageModelResult<GoogleFunctionResponse> {
+) -> LanguageModelResult<(
+    HashMap<String, serde_json::Value>,
+    Option<Vec<FunctionResponsePart>>,
+)> {
     let compatible_parts = source_part_utils::get_compatible_parts_without_source_parts(parts);
     let mut text_parts: Vec<String> = Vec::new();
     let mut function_response_parts: Vec<FunctionResponsePart> = Vec::new();
@@ -471,9 +501,7 @@ fn convert_to_google_function_response(
                 inline_data: Some(FunctionResponseBlob {
                     data: Some(image_part.data),
                     mime_type: Some(image_part.mime_type),
-                    display_name: None,
                 }),
-                file_data: None,
             }),
             Part::Audio(audio_part) => function_response_parts.push(FunctionResponsePart {
                 inline_data: Some(FunctionResponseBlob {
@@ -481,9 +509,7 @@ fn convert_to_google_function_response(
                     mime_type: Some(audio_part_utils::map_audio_format_to_mime_type(
                         &audio_part.format,
                     )),
-                    display_name: None,
                 }),
-                file_data: None,
             }),
             unsupported_part => {
                 return Err(LanguageModelError::InvalidInput(format!(
@@ -510,10 +536,10 @@ fn convert_to_google_function_response(
         json!(responses)
     };
     result.insert(key.to_string(), value);
-    Ok(GoogleFunctionResponse {
-        response: result,
-        parts: (!function_response_parts.is_empty()).then_some(function_response_parts),
-    })
+    Ok((
+        result,
+        (!function_response_parts.is_empty()).then_some(function_response_parts),
+    ))
 }
 
 fn convert_to_google_function_calling_config(
@@ -521,19 +547,19 @@ fn convert_to_google_function_calling_config(
 ) -> FunctionCallingConfig {
     match tool_choice {
         ToolChoiceOption::Auto => FunctionCallingConfig {
-            mode: Some(FunctionCallingConfigMode::Auto),
+            mode: Some(FunctionCallingConfigMode::AUTO),
             allowed_function_names: None,
         },
         ToolChoiceOption::None => FunctionCallingConfig {
-            mode: Some(FunctionCallingConfigMode::None),
+            mode: Some(FunctionCallingConfigMode::NONE),
             allowed_function_names: None,
         },
         ToolChoiceOption::Required => FunctionCallingConfig {
-            mode: Some(FunctionCallingConfigMode::Any),
+            mode: Some(FunctionCallingConfigMode::ANY),
             allowed_function_names: None,
         },
         ToolChoiceOption::Tool(tool) => FunctionCallingConfig {
-            mode: Some(FunctionCallingConfigMode::Any),
+            mode: Some(FunctionCallingConfigMode::ANY),
             allowed_function_names: Some(vec![tool.tool_name]),
         },
     }
@@ -562,7 +588,11 @@ fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> 
                     }
                     Some(Ok(reasoning_part.into()))
                 } else {
-                    Some(Ok(Part::text(text)))
+                    Some(Ok(Part::Text(TextPart {
+                        text,
+                        citations: None,
+                        signature: part.thought_signature,
+                    })))
                 }
             } else if let Some(inline_data) = part.inline_data {
                 if let (Some(data), Some(mime_type)) = (inline_data.data, inline_data.mime_type) {
@@ -650,11 +680,15 @@ fn map_google_content_to_delta(
     Ok(deltas)
 }
 
-fn map_google_usage_metadata(
-    usage: &super::api::GenerateContentResponseUsageMetadata,
-) -> ModelUsage {
-    let input_tokens = usage.prompt_token_count.unwrap_or(0);
-    let output_tokens = usage.candidates_token_count.unwrap_or(0);
+fn map_google_usage_metadata(usage: &UsageMetadata) -> ModelUsage {
+    let input_tokens = usage
+        .prompt_token_count
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or(0);
+    let output_tokens = usage
+        .candidates_token_count
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or(0);
 
     let input_tokens_details = map_modality_token_counts(
         usage.prompt_tokens_details.as_ref(),
@@ -692,14 +726,17 @@ fn map_modality_token_counts(
     if let Some(details) = details {
         for detail in details {
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
+                let Ok(count) = u32::try_from(count) else {
+                    continue;
+                };
                 match modality {
-                    MediaModality::Text => {
+                    ModalityTokenCountModality::TEXT => {
                         *tokens_details.text_tokens.get_or_insert_default() += count;
                     }
-                    MediaModality::Audio => {
+                    ModalityTokenCountModality::AUDIO => {
                         *tokens_details.audio_tokens.get_or_insert_default() += count;
                     }
-                    MediaModality::Image => {
+                    ModalityTokenCountModality::IMAGE => {
                         *tokens_details.image_tokens.get_or_insert_default() += count;
                     }
                     _ => {}
@@ -711,14 +748,17 @@ fn map_modality_token_counts(
     if let Some(cached) = cached_details {
         for detail in cached {
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
+                let Ok(count) = u32::try_from(count) else {
+                    continue;
+                };
                 match modality {
-                    MediaModality::Text => {
+                    ModalityTokenCountModality::TEXT => {
                         *tokens_details.cached_text_tokens.get_or_insert_default() += count;
                     }
-                    MediaModality::Audio => {
+                    ModalityTokenCountModality::AUDIO => {
                         *tokens_details.cached_audio_tokens.get_or_insert_default() += count;
                     }
-                    MediaModality::Image => {
+                    ModalityTokenCountModality::IMAGE => {
                         *tokens_details.cached_image_tokens.get_or_insert_default() += count;
                     }
                     _ => {}

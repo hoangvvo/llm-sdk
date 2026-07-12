@@ -8,6 +8,7 @@ import type {
   PrebuiltVoiceConfig,
   SpeechConfig,
   ThinkingConfig,
+  Tool as GoogleTool,
   UsageMetadata,
 } from "@google/genai";
 import {
@@ -21,7 +22,11 @@ import {
   mapAudioFormatToMimeType,
   mapMimeTypeToAudioFormat,
 } from "../audio-part.utils.ts";
-import { InvalidInputError, InvariantError } from "../errors.ts";
+import {
+  InvalidInputError,
+  InvariantError,
+  UnsupportedError,
+} from "../errors.ts";
 import { generateString } from "../id.utils.ts";
 import type {
   LanguageModel,
@@ -191,7 +196,7 @@ function convertToGenerateContentParameters(
     config.maxOutputTokens = max_tokens;
   }
   if (tools) {
-    config.tools = [{ functionDeclarations: tools.map(convertToGoogleTool) }];
+    config.tools = convertToGoogleTools(tools);
   }
   if (tool_choice) {
     config.toolConfig = {
@@ -247,9 +252,9 @@ function convertToGoogleParts(part: Part): GooglePart[] {
   switch (part.type) {
     case "text":
       return [
-        {
-          text: part.text,
-        },
+        part.signature
+          ? { text: part.text, thoughtSignature: part.signature }
+          : { text: part.text },
       ];
     case "image":
       return [
@@ -381,12 +386,31 @@ function maybeParseJSON(text: string) {
   }
 }
 
-function convertToGoogleTool(tool: Tool): FunctionDeclaration {
-  return {
-    name: tool.name,
-    description: tool.description,
-    parametersJsonSchema: tool.parameters,
-  };
+function convertToGoogleTools(tools: Tool[]): GoogleTool[] {
+  const functionDeclarations: FunctionDeclaration[] = [];
+  const googleTools: GoogleTool[] = [];
+
+  for (const tool of tools) {
+    if (tool.type === "function") {
+      functionDeclarations.push({
+        name: tool.name,
+        description: tool.description,
+        parametersJsonSchema: tool.parameters,
+      });
+      continue;
+    }
+
+    throw new UnsupportedError(
+      PROVIDER,
+      `Provider tool ${tool.name} is not supported`,
+    );
+  }
+
+  if (functionDeclarations.length > 0) {
+    googleTools.unshift({ functionDeclarations });
+  }
+
+  return googleTools;
 }
 
 function convertToGoogleFunctionCallingConfig(
@@ -471,10 +495,14 @@ function mapGoogleContent(parts: GooglePart[]): Part[] {
         return reasoningPart;
       }
       if (googlePart.text) {
-        return {
+        const textPart: TextPart = {
           type: "text",
           text: googlePart.text,
         };
+        if (googlePart.thoughtSignature) {
+          textPart.signature = googlePart.thoughtSignature;
+        }
+        return textPart;
       }
       if (googlePart.inlineData?.mimeType?.startsWith("image/")) {
         if (!googlePart.inlineData.data) {
