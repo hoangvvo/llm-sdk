@@ -28,6 +28,7 @@ interface AccumulatedTextData {
   type: "text";
   text: string;
   citations: Map<number, CitationDelta>;
+  signature?: string;
 }
 
 /**
@@ -63,6 +64,9 @@ function createDelta(delta: ContentDelta): AccumulatedData {
       };
       if (delta.part.citation) {
         textData.citations.set(0, delta.part.citation);
+      }
+      if (delta.part.signature) {
+        textData.signature = delta.part.signature;
       }
       return textData;
     }
@@ -123,6 +127,9 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
         // delta will have index = length of existing citations
         const citationIndex = existingPart.citations.size;
         existingPart.citations.set(citationIndex, delta.part.citation);
+      }
+      if (delta.part.signature) {
+        existingPart.signature = delta.part.signature;
       }
       break;
     }
@@ -214,6 +221,9 @@ function createTextPart(data: AccumulatedTextData): Part {
     type: "text",
     text: data.text,
   };
+  if (data.signature) {
+    textPart.signature = data.signature;
+  }
 
   if (data.citations.size > 0) {
     // Sort citations by their original index to maintain order
@@ -221,26 +231,28 @@ function createTextPart(data: AccumulatedTextData): Part {
       .sort(([a], [b]) => a - b)
       .map(([, citation]) => citation);
     textPart.citations = sortedCitations.map((citationDelta): Citation => {
-      if (
-        !citationDelta.source ||
-        citationDelta.start_index === undefined ||
-        citationDelta.end_index === undefined
-      ) {
+      if (!citationDelta.source) {
         throw new Error(
-          `Incomplete citation data: source=${String(citationDelta.source)}, ` +
-            `start_index=${String(citationDelta.start_index)}, end_index=${String(citationDelta.end_index)}`,
+          `Incomplete citation data: source=${String(citationDelta.source)}`,
         );
       }
       const citation: Citation = {
         source: citationDelta.source,
-        start_index: citationDelta.start_index,
-        end_index: citationDelta.end_index,
       };
       if (citationDelta.title) {
         citation.title = citationDelta.title;
       }
       if (citationDelta.cited_text) {
         citation.cited_text = citationDelta.cited_text;
+      }
+      if (citationDelta.start_index !== undefined) {
+        citation.start_index = citationDelta.start_index;
+      }
+      if (citationDelta.end_index !== undefined) {
+        citation.end_index = citationDelta.end_index;
+      }
+      if (citationDelta.signature) {
+        citation.signature = citationDelta.signature;
       }
 
       return citation;

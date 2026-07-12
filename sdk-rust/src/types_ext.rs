@@ -11,12 +11,19 @@ impl TextPart {
         Self {
             text: text.into(),
             citations: None,
+            signature: None,
         }
     }
 
     #[must_use]
     pub fn with_citation(mut self, citation: Vec<crate::Citation>) -> Self {
         self.citations = Some(citation);
+        self
+    }
+
+    #[must_use]
+    pub fn with_signature(mut self, signature: impl Into<String>) -> Self {
+        self.signature = Some(signature.into());
         self
     }
 }
@@ -26,6 +33,7 @@ impl From<&str> for TextPart {
         Self {
             text: value.to_string(),
             citations: None,
+            signature: None,
         }
     }
 }
@@ -35,6 +43,7 @@ impl From<String> for TextPart {
         Self {
             text: value,
             citations: None,
+            signature: None,
         }
     }
 }
@@ -549,12 +558,19 @@ impl TextPartDelta {
         Self {
             text: text.into(),
             citation: None,
+            signature: None,
         }
     }
 
     #[must_use]
     pub fn with_citation_delta(mut self, citation: CitationDelta) -> Self {
         self.citation = Some(citation);
+        self
+    }
+
+    #[must_use]
+    pub fn with_signature(mut self, signature: impl Into<String>) -> Self {
+        self.signature = Some(signature.into());
         self
     }
 }
@@ -587,6 +603,12 @@ impl CitationDelta {
     #[must_use]
     pub fn with_end_index(mut self, end_index: usize) -> Self {
         self.end_index = Some(end_index);
+        self
+    }
+
+    #[must_use]
+    pub fn with_signature(mut self, signature: impl Into<String>) -> Self {
+        self.signature = Some(signature.into());
         self
     }
 }

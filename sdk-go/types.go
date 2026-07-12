@@ -67,6 +67,8 @@ func (p Part) Type() PartType {
 type TextPart struct {
 	Text      string     `json:"text"`
 	Citations []Citation `json:"citations,omitempty"`
+	// An opaque provider signature used to preserve text-part continuity when returning the part to the same provider.
+	Signature *string `json:"signature,omitempty"`
 }
 
 // ImagePart represents a part of the message that contains an image.
@@ -155,9 +157,11 @@ type Citation struct {
 	// The text snippet from the document being cited.
 	CitedText *string `json:"cited_text,omitempty"`
 	// The start index of the document content part being cited.
-	StartIndex int `json:"start_index"`
+	StartIndex *int `json:"start_index,omitempty"`
 	// The end index of the document content part being cited.
-	EndIndex int `json:"end_index"`
+	EndIndex *int `json:"end_index,omitempty"`
+	// An opaque provider signature used to preserve citation continuity when returning it to the same provider.
+	Signature *string `json:"signature,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Part
@@ -298,8 +302,9 @@ type PartDelta struct {
 
 // TextPartDelta represents a delta update for a text part, used in streaming or incremental updates of a message.
 type TextPartDelta struct {
-	Text     string         `json:"text"`
-	Citation *CitationDelta `json:"citation,omitempty"`
+	Text      string         `json:"text"`
+	Citation  *CitationDelta `json:"citation,omitempty"`
+	Signature *string        `json:"signature,omitempty"`
 }
 
 // CitationDelta represents a delta update for a citation part, used in streaming of citation messages.
@@ -309,6 +314,7 @@ type CitationDelta struct {
 	CitedText  *string `json:"cited_text,omitempty"`
 	StartIndex *int    `json:"start_index,omitempty"`
 	EndIndex   *int    `json:"end_index,omitempty"`
+	Signature  *string `json:"signature,omitempty"`
 }
 
 func (c CitationDelta) MarshalJSON() ([]byte, error) {

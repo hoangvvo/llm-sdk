@@ -49,6 +49,10 @@
         "properties": {},
         "additionalProperties": false
       }
+    },
+    {
+      "type": "provider",
+      "name": "web_search"
     }
   ],
   "test_cases": [
@@ -932,6 +936,74 @@
               {
                 "type": "text",
                 "text": "red|Red"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_web_search",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use web search to find the official IANA page about reserved domains. Reply with one sentence containing the word IANA and cite the source."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search"],
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "IANA",
+                "citation": {
+                  "source": "^https?://",
+                  "title": "IANA|iana|Reserved|reserved"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stream_web_search",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use web search to find the official IANA page about reserved domains. Reply with one sentence containing the word IANA and cite the source."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search"],
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "IANA",
+                "citation": {
+                  "source": "^https?://",
+                  "title": "IANA|iana|Reserved|reserved"
+                }
               }
             ]
           }

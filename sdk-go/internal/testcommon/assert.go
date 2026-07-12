@@ -12,14 +12,46 @@ import (
 
 // TextPartAssertion represents an assertion for text parts
 type TextPartAssertion struct {
-	Text *regexp.Regexp
+	Text     *regexp.Regexp
+	Citation *CitationAssertion
+}
+
+type CitationAssertion struct {
+	Source    *regexp.Regexp
+	Title     *regexp.Regexp
+	CitedText *regexp.Regexp
+}
+
+func (a CitationAssertion) matches(citation llmsdk.Citation) bool {
+	if a.Source != nil && !a.Source.MatchString(citation.Source) {
+		return false
+	}
+	if a.Title != nil && (citation.Title == nil || !a.Title.MatchString(*citation.Title)) {
+		return false
+	}
+	if a.CitedText != nil && (citation.CitedText == nil || !a.CitedText.MatchString(*citation.CitedText)) {
+		return false
+	}
+	return true
+}
+
+func (a TextPartAssertion) matchesCitation(citations []llmsdk.Citation) bool {
+	if a.Citation == nil {
+		return true
+	}
+	for _, citation := range citations {
+		if a.Citation.matches(citation) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a TextPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 	t.Helper()
 
 	for _, part := range content {
-		if part.TextPart != nil && a.Text.MatchString(part.TextPart.Text) {
+		if part.TextPart != nil && a.Text.MatchString(part.TextPart.Text) && a.matchesCitation(part.TextPart.Citations) {
 			return
 		}
 	}
@@ -208,6 +240,12 @@ func NewTextAssertion(pattern string) PartAssertion {
 			Text: regexp.MustCompile("(?s)" + pattern),
 		},
 	}
+}
+
+func NewTextAssertionWithCitation(pattern string, citation CitationAssertion) PartAssertion {
+	assertion := NewTextAssertion(pattern)
+	assertion.TextPart.Citation = &citation
+	return assertion
 }
 
 // NewToolCallAssertion creates a new tool call part assertion

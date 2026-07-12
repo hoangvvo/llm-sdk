@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sync"
 	"testing"
@@ -71,10 +72,11 @@ func ensureInitialized() {
 
 		toolsMap = make(map[string]llmsdk.Tool)
 		for _, tool := range testData.Tools {
-			if tool.FunctionTool == nil {
-				panic("test tools must be function tools")
+			if tool.FunctionTool != nil {
+				toolsMap[tool.FunctionTool.Name] = tool
+			} else if tool.ProviderTool != nil {
+				toolsMap[tool.ProviderTool.Name] = tool
 			}
-			toolsMap[tool.FunctionTool.Name] = tool
 		}
 
 		testCases = make(map[string]TestCase)
@@ -144,7 +146,21 @@ func convertOutputAssertions(content []interface{}) []PartAssertion {
 		switch partType {
 		case "text":
 			text := partMap["text"].(string)
-			assertions = append(assertions, NewTextAssertion(text))
+			if citationMap, ok := partMap["citation"].(map[string]interface{}); ok {
+				citation := CitationAssertion{}
+				if source, ok := citationMap["source"].(string); ok {
+					citation.Source = regexp.MustCompile("(?s)" + source)
+				}
+				if title, ok := citationMap["title"].(string); ok {
+					citation.Title = regexp.MustCompile("(?s)" + title)
+				}
+				if citedText, ok := citationMap["cited_text"].(string); ok {
+					citation.CitedText = regexp.MustCompile("(?s)" + citedText)
+				}
+				assertions = append(assertions, NewTextAssertionWithCitation(text, citation))
+			} else {
+				assertions = append(assertions, NewTextAssertion(text))
+			}
 		case "tool_call":
 			args := ""
 			if value, ok := partMap["args"].(string); ok {

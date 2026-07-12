@@ -98,6 +98,7 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
         Part::Text(text_part) => PartDelta::Text(TextPartDelta {
             text: text_part.text,
             citation: None,
+            signature: text_part.signature,
         }),
         Part::Image(image_part) => PartDelta::Image(ImagePartDelta {
             data: Some(image_part.data),

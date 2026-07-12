@@ -77,6 +77,10 @@ export interface TextPart {
   type: "text";
   text: string;
   citations?: Citation[];
+  /**
+   * An opaque provider signature used to preserve text-part continuity when returning the part to the same provider.
+   */
+  signature?: string;
 }
 /**
  * A part of the message that contains an image.
@@ -242,11 +246,16 @@ export interface Citation {
   /**
    * The start index of the document content part being cited.
    */
-  start_index: number;
+  start_index?: number;
   /**
    * The end index of the document content part being cited.
    */
-  end_index: number;
+  end_index?: number;
+
+  /**
+   * An opaque provider signature used to preserve citation continuity when returning it to the same provider.
+   */
+  signature?: string;
 }
 /**
  * Represents a message sent by the user.
@@ -269,6 +278,10 @@ export interface TextPartDelta {
   type: "text";
   text: string;
   citation?: CitationDelta;
+  /**
+   * An opaque provider signature used to preserve text-part continuity when returning the part to the same provider.
+   */
+  signature?: string;
 }
 /**
  * A delta update for a tool call part, used in streaming of a tool invocation.
@@ -395,6 +408,10 @@ export interface CitationDelta {
    * The end index of the document content part being cited.
    */
   end_index?: number;
+  /**
+   * An opaque provider signature used to preserve citation continuity when returning it to the same provider.
+   */
+  signature?: string;
 }
 /**
  * Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.

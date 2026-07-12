@@ -96,6 +96,10 @@
         "citations": {
           "type": "array",
           "items": { "$ref": "#/definitions/Citation" }
+        },
+        "signature": {
+          "type": "string",
+          "description": "An opaque provider signature used to preserve text-part continuity when returning the part to the same provider."
         }
       },
       "required": ["type", "text"],
@@ -274,9 +278,13 @@
         "end_index": {
           "type": "number",
           "description": "The end index of the document content part being cited."
+        },
+        "signature": {
+          "type": "string",
+          "description": "An opaque provider signature used to preserve citation continuity when returning it to the same provider."
         }
       },
-      "required": ["source", "start_index", "end_index"],
+      "required": ["source"],
       "additionalProperties": false
     },
     "UserMessage": {
@@ -324,7 +332,11 @@
       "properties": {
         "type": { "const": "text" },
         "text": { "type": "string" },
-        "citation": { "$ref": "#/definitions/CitationDelta" }
+        "citation": { "$ref": "#/definitions/CitationDelta" },
+        "signature": {
+          "type": "string",
+          "description": "An opaque provider signature used to preserve text-part continuity when returning the part to the same provider."
+        }
       },
       "required": ["type", "text"],
       "additionalProperties": false
@@ -353,6 +365,10 @@
         "end_index": {
           "type": "number",
           "description": "The end index of the document content part being cited."
+        },
+        "signature": {
+          "type": "string",
+          "description": "An opaque provider signature used to preserve citation continuity when returning it to the same provider."
         }
       },
       "required": ["type"],

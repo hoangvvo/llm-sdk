@@ -121,6 +121,10 @@ pub struct TextPart {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<Vec<Citation>>,
+    /// An opaque provider signature used to preserve text-part continuity when
+    /// returning the part to the same provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// A part of the message that contains an image.
@@ -249,11 +253,19 @@ pub struct Citation {
     /**
      * The start index of the document content part being cited.
      */
-    pub start_index: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_index: Option<usize>,
     /**
      * The end index of the document content part being cited.
      */
-    pub end_index: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_index: Option<usize>,
+    /**
+     * An opaque provider signature used to preserve citation continuity
+     * when returning it to the same provider.
+     */
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// Represents a message sent by the user.
@@ -278,6 +290,10 @@ pub struct TextPartDelta {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citation: Option<CitationDelta>,
+    /// An opaque provider signature used to preserve text-part continuity when
+    /// returning the part to the same provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// A delta update for a citation part, used in streaming of citation messages.
@@ -302,6 +318,10 @@ pub struct CitationDelta {
     /// The end index of the document content part being cited.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_index: Option<usize>,
+    /// An opaque provider signature used to preserve citation continuity when
+    /// returning it to the same provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// A delta update for a tool call part, used in streaming of a tool invocation.

@@ -25,6 +25,12 @@ func WithTextCitations(citations []Citation) TextPartOption {
 	}
 }
 
+func WithTextSignature(signature string) TextPartOption {
+	return func(p *TextPart) {
+		p.Signature = &signature
+	}
+}
+
 // NewImagePart creates a new image part
 func NewImagePart(data, mimeType string, opts ...ImagePartOption) Part {
 	imagePart := &ImagePart{
@@ -228,6 +234,12 @@ func WithTextPartDeltaCitation(citation *CitationDelta) TextPartDeltaOption {
 	}
 }
 
+func WithTextPartDeltaSignature(signature string) TextPartDeltaOption {
+	return func(p *TextPartDelta) {
+		p.Signature = &signature
+	}
+}
+
 // NewCitationDelta constructs a citation delta for streaming updates.
 func NewCitationDelta(opts ...CitationDeltaOption) *CitationDelta {
 	citation := &CitationDelta{}
@@ -268,6 +280,12 @@ func WithCitationDeltaStartIndex(start int) CitationDeltaOption {
 func WithCitationDeltaEndIndex(end int) CitationDeltaOption {
 	return func(c *CitationDelta) {
 		c.EndIndex = &end
+	}
+}
+
+func WithCitationDeltaSignature(signature string) CitationDeltaOption {
+	return func(c *CitationDelta) {
+		c.Signature = &signature
 	}
 }
 
