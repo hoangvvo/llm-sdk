@@ -31,6 +31,7 @@ Keep chat replies brief and put the full document content into artifacts via the
 ];
 
 export const availableTools: AgentTool<MyContext>[] = [
+  { type: "provider", name: "web_search" },
   ...getArtifactTools(),
   getStockPriceTool,
   getCryptoPriceTool,

@@ -47,6 +47,8 @@ struct RunStreamBody {
 struct ToolInfo {
     name: String,
     description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    providers: Option<Vec<String>>,
 }
 
 #[derive(Clone)]
@@ -174,13 +176,23 @@ async fn main() -> Result<(), BoxedError> {
     // Load environment variables
     dotenv().ok();
 
-    let available_tools = agent::get_available_tools()
+    let mut available_tools = agent::get_available_tools()
         .iter()
         .map(|tool| ToolInfo {
             name: tool.name(),
             description: tool.description(),
+            providers: None,
         })
-        .collect();
+        .collect::<Vec<_>>();
+    available_tools.push(ToolInfo {
+        name: "web_search".to_string(),
+        description: "Search the web using the model provider's hosted search tool.".to_string(),
+        providers: Some(
+            ["openai", "google", "anthropic"]
+                .map(str::to_string)
+                .to_vec(),
+        ),
+    });
 
     let state = AppState { available_tools };
 

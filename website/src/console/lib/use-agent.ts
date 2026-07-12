@@ -9,6 +9,7 @@ import type {
   AudioOptions,
   AudioPart,
   AudioPartDelta,
+  Citation,
   ImagePart,
   Modality,
   Part,
@@ -470,15 +471,40 @@ function reduceContentDelta(
 
   switch (part.type) {
     case "text": {
-      const previousText =
-        next[index]?.type === "text" && typeof next[index].text === "string"
-          ? next[index].text
-          : "";
-      const text = `${previousText}${part.text}`;
-      next[index] = {
+      const previousPart: TextPart =
+        next[index]?.type === "text" ? next[index] : { type: "text", text: "" };
+      const citations = [...(previousPart.citations ?? [])];
+      if (part.citation?.source) {
+        const citation: Citation = { source: part.citation.source };
+        if (part.citation.title !== undefined) {
+          citation.title = part.citation.title;
+        }
+        if (part.citation.cited_text !== undefined) {
+          citation.cited_text = part.citation.cited_text;
+        }
+        if (part.citation.start_index !== undefined) {
+          citation.start_index = part.citation.start_index;
+        }
+        if (part.citation.end_index !== undefined) {
+          citation.end_index = part.citation.end_index;
+        }
+        if (part.citation.signature !== undefined) {
+          citation.signature = part.citation.signature;
+        }
+        citations.push(citation);
+      }
+      const textPart: TextPart = {
         type: "text",
-        text,
-      } satisfies TextPart;
+        text: `${previousPart.text}${part.text}`,
+      };
+      if (citations.length > 0) {
+        textPart.citations = citations;
+      }
+      const signature = part.signature ?? previousPart.signature;
+      if (signature !== undefined) {
+        textPart.signature = signature;
+      }
+      next[index] = textPart;
       break;
     }
     case "image": {

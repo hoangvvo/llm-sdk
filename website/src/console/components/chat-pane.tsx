@@ -1,5 +1,5 @@
 import type { AgentItem } from "@hoangvvo/llm-agent";
-import type { AudioPart, Part } from "@hoangvvo/llm-sdk";
+import type { AudioPart, Part, TextPart } from "@hoangvvo/llm-sdk";
 import { useEffect, useState } from "react";
 import { base64ToArrayBuffer } from "../lib/utils.ts";
 import { WavPacker } from "../lib/wavtools/wav_packer.ts";
@@ -145,7 +145,7 @@ function PartsList({ parts }: { parts: Part[] }) {
 function PartView({ part }: { part: Part }) {
   switch (part.type) {
     case "text":
-      return <Markdown>{part.text}</Markdown>;
+      return <TextPartView part={part} />;
     case "image":
       return (
         <img
@@ -203,6 +203,50 @@ function PartView({ part }: { part: Part }) {
           {JSON.stringify(part, null, 2)}
         </pre>
       );
+  }
+}
+
+function TextPartView({ part }: { part: TextPart }) {
+  return (
+    <div className="w-full space-y-3">
+      <Markdown>{part.text}</Markdown>
+      {part.citations && part.citations.length > 0 ? (
+        <ol className="space-y-1 border-t border-slate-200 pt-2 text-xs text-slate-500">
+          {part.citations.map((citation, index) => {
+            const href = citationHref(citation.source);
+            const label = citation.title ?? citation.source;
+            return (
+              <li key={`${citation.source}-${String(index)}`}>
+                <span className="mr-1">[{String(index + 1)}]</span>
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-sky-700 underline decoration-sky-300 underline-offset-2"
+                  >
+                    {label}
+                  </a>
+                ) : (
+                  <span className="break-all">{label}</span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
+    </div>
+  );
+}
+
+function citationHref(source: string): string | null {
+  try {
+    const url = new URL(source);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
   }
 }
 

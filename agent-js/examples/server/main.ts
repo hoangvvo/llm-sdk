@@ -98,10 +98,16 @@ function listToolsHandler(
   _req: http.IncomingMessage,
   res: http.ServerResponse,
 ) {
-  const tools = availableTools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-  }));
+  const tools = availableTools.map((tool) =>
+    tool.type === "function"
+      ? { name: tool.name, description: tool.description }
+      : {
+          name: tool.name,
+          description:
+            "Search the web using the model provider's hosted search tool.",
+          providers: ["openai", "google", "anthropic"],
+        },
+  );
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify(tools));
 }

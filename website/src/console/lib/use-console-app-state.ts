@@ -283,7 +283,16 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     [],
   );
 
-  const toolOptions = useMemo(() => toolsData ?? [], [toolsData]);
+  const toolOptions = useMemo(
+    () =>
+      (toolsData ?? []).filter(
+        (tool) =>
+          !tool.providers ||
+          !modelSelection ||
+          tool.providers.includes(modelSelection.provider),
+      ),
+    [modelSelection, toolsData],
+  );
   const toolsInitialized = toolsData !== null || toolsError !== null;
 
   const handleEnabledToolsChange = useCallback(

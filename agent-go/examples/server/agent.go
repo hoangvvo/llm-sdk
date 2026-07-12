@@ -38,18 +38,21 @@ The user speaks %s language.`, name, location, language), nil
 Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`)},
 }
 
-var availableTools = llmagent.FunctionTools[*MyContext](
-	&ArtifactCreateTool{},
-	&ArtifactUpdateTool{},
-	&ArtifactGetTool{},
-	&ArtifactListTool{},
-	&ArtifactDeleteTool{},
-	&GetStockPriceTool{},
-	&GetCryptoPriceTool{},
-	&SearchWikipediaTool{},
-	&GetNewsTool{},
-	&GetCoordinatesTool{},
-	&GetWeatherTool{},
+var availableTools = append(
+	llmagent.FunctionTools[*MyContext](
+		&ArtifactCreateTool{},
+		&ArtifactUpdateTool{},
+		&ArtifactGetTool{},
+		&ArtifactListTool{},
+		&ArtifactDeleteTool{},
+		&GetStockPriceTool{},
+		&GetCryptoPriceTool{},
+		&SearchWikipediaTool{},
+		&GetNewsTool{},
+		&GetCoordinatesTool{},
+		&GetWeatherTool{},
+	),
+	llmagent.NewAgentProviderTool[*MyContext](llmsdk.ProviderTool{Name: "web_search"}),
 )
 
 type AgentOptions struct {
@@ -73,7 +76,13 @@ func createAgent(model llmsdk.LanguageModel, options *AgentOptions) *llmagent.Ag
 			toolNameSet[name] = true
 		}
 		for _, tool := range availableTools {
-			if functionTool := tool.AsFunctionTool(); functionTool != nil && toolNameSet[functionTool.Name()] {
+			toolName := ""
+			if functionTool := tool.AsFunctionTool(); functionTool != nil {
+				toolName = functionTool.Name()
+			} else if tool.ProviderTool != nil {
+				toolName = tool.ProviderTool.Name
+			}
+			if toolNameSet[toolName] {
 				tools = append(tools, tool)
 			}
 		}

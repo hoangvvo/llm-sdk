@@ -33,6 +33,12 @@ type RunStreamBody struct {
 	Modalities       []llmsdk.Modality                 `json:"modalities,omitempty"`
 }
 
+type ToolInfo struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Providers   []string `json:"providers,omitempty"`
+}
+
 func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -119,16 +125,21 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func listToolsHandler(w http.ResponseWriter) {
-	tools := make([]map[string]string, 0, len(availableTools))
+	tools := make([]ToolInfo, 0, len(availableTools))
 	for _, tool := range availableTools {
 		functionTool := tool.AsFunctionTool()
-		if functionTool == nil {
-			continue
+		if functionTool != nil {
+			tools = append(tools, ToolInfo{
+				Name:        functionTool.Name(),
+				Description: functionTool.Description(),
+			})
+		} else if tool.ProviderTool != nil {
+			tools = append(tools, ToolInfo{
+				Name:        tool.ProviderTool.Name,
+				Description: "Search the web using the model provider's hosted search tool.",
+				Providers:   []string{"openai", "google", "anthropic"},
+			})
 		}
-		tools = append(tools, map[string]string{
-			"name":        functionTool.Name(),
-			"description": functionTool.Description(),
-		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

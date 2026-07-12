@@ -37,6 +37,7 @@ export interface MyContext {
 export interface ToolInfo {
   name: string;
   description?: string;
+  providers?: string[];
 }
 
 export type McpServerConfig =
