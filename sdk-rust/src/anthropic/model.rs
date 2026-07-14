@@ -187,6 +187,7 @@ impl LanguageModel for AnthropicModel {
         })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn stream(
         &self,
         input: LanguageModelInput,
@@ -357,14 +358,7 @@ fn convert_to_anthropic_create_params(
         thinking: reasoning
             .map(|options| convert_to_anthropic_thinking_config(&options, max_tokens)),
         tool_choice: tool_choice.map(convert_to_anthropic_tool_choice),
-        tools: tools
-            .map(|tool_list| {
-                tool_list
-                    .into_iter()
-                    .map(convert_tool)
-                    .collect::<LanguageModelResult<Vec<_>>>()
-            })
-            .transpose()?,
+        tools: tools.map(|tool_list| tool_list.into_iter().map(convert_tool).collect()),
         top_k: top_k.map(i64::from),
         top_p,
     };
@@ -372,9 +366,9 @@ fn convert_to_anthropic_create_params(
     Ok(params)
 }
 
-fn convert_tool(tool: SdkTool) -> LanguageModelResult<CreateMessageParamsToolsItem> {
+fn convert_tool(tool: SdkTool) -> CreateMessageParamsToolsItem {
     match tool {
-        SdkTool::Function(tool) => Ok(CreateMessageParamsToolsItem::Tool(Tool {
+        SdkTool::Function(tool) => CreateMessageParamsToolsItem::Tool(Tool {
             allowed_callers: None,
             name: tool.name,
             description: Some(tool.description),
@@ -385,8 +379,8 @@ fn convert_tool(tool: SdkTool) -> LanguageModelResult<CreateMessageParamsToolsIt
             input_examples: None,
             strict: Some(true),
             r#type: None,
-        })),
-        SdkTool::WebSearch(tool) => Ok(CreateMessageParamsToolsItem::WebSearchTool20250305(
+        }),
+        SdkTool::WebSearch(tool) => CreateMessageParamsToolsItem::WebSearchTool20250305(
             // The basic version supports both common options without enabling
             // Anthropic's newer code-execution filtering flow.
             WebSearchTool20250305 {
@@ -407,7 +401,7 @@ fn convert_tool(tool: SdkTool) -> LanguageModelResult<CreateMessageParamsToolsIt
                     r#type: "approximate".to_string(),
                 }),
             },
-        )),
+        ),
     }
 }
 
@@ -718,18 +712,17 @@ fn map_text_citations(
 
                 results.push(mapped);
             }
-            api::ResponseTextBlockCitationsItem::WebSearchResultLocation(citation) => {
-                if !citation.url.is_empty() {
-                    results.push(Citation {
-                        source: citation.url,
-                        title: citation.title,
-                        cited_text: (!citation.cited_text.is_empty())
-                            .then_some(citation.cited_text),
-                        start_index: None,
-                        end_index: None,
-                        signature: Some(citation.encrypted_index),
-                    });
-                }
+            api::ResponseTextBlockCitationsItem::WebSearchResultLocation(citation)
+                if !citation.url.is_empty() =>
+            {
+                results.push(Citation {
+                    source: citation.url,
+                    title: citation.title,
+                    cited_text: (!citation.cited_text.is_empty()).then_some(citation.cited_text),
+                    start_index: None,
+                    end_index: None,
+                    signature: Some(citation.encrypted_index),
+                });
             }
             _ => {}
         }

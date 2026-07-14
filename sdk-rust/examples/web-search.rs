@@ -14,7 +14,8 @@ async fn main() {
     let response = model
         .generate(
             LanguageModelInput::new([Message::user([Part::text(
-                "Use web search to find the official IANA page about reserved domains. Reply with one sentence containing the word IANA and cite the source.",
+                "Use web search to find the official IANA page about reserved domains. Reply with \
+                 one sentence containing the word IANA and cite the source.",
             )])])
             .with_tools([WebSearchTool::new()]),
         )

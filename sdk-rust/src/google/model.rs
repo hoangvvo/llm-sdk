@@ -283,6 +283,7 @@ impl LanguageModel for GoogleModel {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn convert_to_generate_content_parameters(
     input: LanguageModelInput,
     model_id: &str,
@@ -405,9 +406,7 @@ fn convert_to_generate_content_parameters(
                 voice_config: Some(VoiceConfig {
                     prebuilt_voice_config: Some(PrebuiltVoiceConfig {
                         voice_name: Some(voice),
-                        ..Default::default()
                     }),
-                    ..Default::default()
                 }),
                 language_code: audio.language,
                 ..Default::default()
@@ -532,13 +531,15 @@ fn convert_to_google_function_result(
     })
 }
 
+type GoogleFunctionResponse = (
+    HashMap<String, serde_json::Value>,
+    Option<Vec<FunctionResponsePart>>,
+);
+
 fn convert_to_google_function_response(
     parts: Vec<Part>,
     is_error: bool,
-) -> LanguageModelResult<(
-    HashMap<String, serde_json::Value>,
-    Option<Vec<FunctionResponsePart>>,
-)> {
+) -> LanguageModelResult<GoogleFunctionResponse> {
     let compatible_parts = source_part_utils::get_compatible_parts_without_source_parts(parts);
     let mut text_parts: Vec<String> = Vec::new();
     let mut function_response_parts: Vec<FunctionResponsePart> = Vec::new();
@@ -780,26 +781,23 @@ fn map_google_content_to_delta(
             continue;
         };
         let part_delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
-        let index = match &part_delta {
-            PartDelta::Text(_) => {
-                // Google's citation partIndex addresses the provider's parts
-                // array. Keep a text-only mapping because provider slots are
-                // not stable for separate tool calls, which must retain the
-                // existing index-matching behavior.
-                let index = stream_text_part_mappings
-                    .get(&provider_part_index)
-                    .copied()
-                    .unwrap_or_else(|| next_google_delta_index(existing_deltas, &deltas));
-                stream_text_part_mappings.insert(provider_part_index, index);
-                index
-            }
-            _ => {
-                let all_content_deltas = existing_deltas
-                    .iter()
-                    .chain(deltas.iter())
-                    .collect::<Vec<_>>();
-                stream_utils::guess_delta_index(&part_delta, &all_content_deltas, None)
-            }
+        let index = if let PartDelta::Text(_) = &part_delta {
+            // Google's citation partIndex addresses the provider's parts
+            // array. Keep a text-only mapping because provider slots are
+            // not stable for separate tool calls, which must retain the
+            // existing index-matching behavior.
+            let index = stream_text_part_mappings
+                .get(&provider_part_index)
+                .copied()
+                .unwrap_or_else(|| next_google_delta_index(existing_deltas, &deltas));
+            stream_text_part_mappings.insert(provider_part_index, index);
+            index
+        } else {
+            let all_content_deltas = existing_deltas
+                .iter()
+                .chain(deltas.iter())
+                .collect::<Vec<_>>();
+            stream_utils::guess_delta_index(&part_delta, &all_content_deltas, None)
         };
         deltas.push(ContentDelta {
             index,

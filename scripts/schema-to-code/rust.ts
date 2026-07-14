@@ -32,7 +32,12 @@ export function renderRustDocument(document: CodegenDocument): string {
     "#![allow(clippy::enum_variant_names)]",
     "#![allow(clippy::struct_field_names)]",
     "#![allow(clippy::doc_markdown)]",
+    "#![allow(clippy::doc_broken_link)]",
+    "#![allow(clippy::doc_lazy_continuation)]",
+    "#![allow(clippy::doc_link_with_quotes)]",
     "#![allow(clippy::too_many_lines)]",
+    "#![allow(clippy::upper_case_acronyms)]",
+    "#![allow(clippy::use_self)]",
   ];
   const imports = ["use serde::{Deserialize, Serialize};"];
   if (needsValueImport) {

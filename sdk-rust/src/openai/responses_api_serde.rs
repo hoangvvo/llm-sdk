@@ -1,7 +1,15 @@
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
-use super::responses_api::*;
+use super::responses_api::{
+    ApplyPatchToolCallItemParam, ApplyPatchToolCallOutputItemParam, CodeInterpreterToolCall,
+    CompactionSummaryItemParam, ComputerCallOutputItemParam, ComputerToolCall, CustomToolCall,
+    CustomToolCallOutput, FileSearchToolCall, FunctionCallOutputItemParam,
+    FunctionShellCallItemParam, FunctionShellCallOutputItemParam, FunctionToolCall,
+    ImageGenToolCall, InputMessage, Item, LocalShellToolCall, LocalShellToolCallOutput,
+    MCPApprovalRequest, MCPApprovalResponse, MCPListTools, MCPToolCall, OutputMessage,
+    ReasoningItem, ToolSearchCallItemParam, ToolSearchOutputItemParam, WebSearchToolCall,
+};
 
 impl<'de> Deserialize<'de> for Item {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -85,7 +93,7 @@ impl<'de> Deserialize<'de> for Item {
             None if value.get("role").is_some() && value.get("content").is_some() => {
                 decode!(InputMessage, InputMessage)
             }
-            _ => Ok(Item::Unknown(value)),
+            _ => Ok(Self::Unknown(value)),
         }
     }
 }

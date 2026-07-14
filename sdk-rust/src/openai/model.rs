@@ -744,6 +744,7 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
         })
 }
 
+#[allow(clippy::too_many_lines)]
 fn map_openai_stream_event(
     event: ResponseStreamEvent,
 ) -> LanguageModelResult<Option<ContentDelta>> {

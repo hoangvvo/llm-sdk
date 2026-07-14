@@ -65,10 +65,12 @@ impl<TCtx> AgentTool<TCtx> {
         Self::Function(Arc::new(tool))
     }
 
+    #[must_use]
     pub fn web_search(tool: WebSearchTool) -> Self {
         Self::WebSearch(tool)
     }
 
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
             Self::Function(tool) => tool.name(),
@@ -106,7 +108,7 @@ impl<TCtx> From<WebSearchTool> for AgentTool<TCtx> {
 }
 
 impl<TCtx> IntoAgentTool<TCtx, AgentToolArg> for AgentTool<TCtx> {
-    fn into_agent_tool(self) -> AgentTool<TCtx> {
+    fn into_agent_tool(self) -> Self {
         self
     }
 }
@@ -132,7 +134,7 @@ impl<TCtx> From<&AgentTool<TCtx>> for Tool {
             AgentTool::Function(tool) => {
                 FunctionTool::new(tool.name(), tool.description(), tool.parameters()).into()
             }
-            AgentTool::WebSearch(tool) => Tool::WebSearch(tool.clone()),
+            AgentTool::WebSearch(tool) => Self::WebSearch(tool.clone()),
         }
     }
 }

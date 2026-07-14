@@ -635,7 +635,9 @@ fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<CreateChatCompletio
         Tool::WebSearch(_) => {
             return Err(LanguageModelError::Unsupported(
                 PROVIDER,
-                "Hosted web search is not supported by this OpenAI Chat Completions adapter; use OpenAIModel (Responses API)".to_string(),
+                "Hosted web search is not supported by this OpenAI Chat Completions adapter; use \
+                 OpenAIModel (Responses API)"
+                    .to_string(),
             ));
         }
     };
