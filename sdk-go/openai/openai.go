@@ -251,8 +251,27 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 	if input.Tools != nil {
 		tools := openaiapi.ToolsArray{}
 		for _, tool := range input.Tools {
+			if tool.WebSearchTool != nil {
+				webSearch := tool.WebSearchTool
+				openAIWebSearch := &openaiapi.WebSearchTool{
+					Type: openaiapi.WebSearchToolTypeWebSearch,
+				}
+				if len(webSearch.AllowedDomains) > 0 {
+					openAIWebSearch.Filters = &openaiapi.WebSearchToolFilters{AllowedDomains: webSearch.AllowedDomains}
+				}
+				if webSearch.UserLocation != nil {
+					locationType := openaiapi.WebSearchApproximateLocationTypeApproximate
+					openAIWebSearch.UserLocation = &openaiapi.WebSearchApproximateLocation{
+						City: webSearch.UserLocation.City, Country: webSearch.UserLocation.Country,
+						Region: webSearch.UserLocation.Region, Timezone: webSearch.UserLocation.Timezone,
+						Type: &locationType,
+					}
+				}
+				tools = append(tools, openaiapi.Tool{WebSearchTool: openAIWebSearch})
+				continue
+			}
 			if tool.FunctionTool == nil {
-				return nil, llmsdk.NewUnsupportedError(Provider, "web search tool is not supported")
+				continue
 			}
 			functionTool := tool.FunctionTool
 			openAITool := openaiapi.Tool{
@@ -617,7 +636,13 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 			for _, content := range item.OutputMessage.Content {
 				switch {
 				case content.OutputText != nil:
-					parts = append(parts, llmsdk.NewTextPart(content.OutputText.Text))
+					textPart := llmsdk.NewTextPart(content.OutputText.Text)
+					for _, annotation := range content.OutputText.Annotations {
+						if annotation.UrlCitation != nil {
+							textPart.TextPart.Citations = append(textPart.TextPart.Citations, mapOpenAIURLCitation(*annotation.UrlCitation))
+						}
+					}
+					parts = append(parts, textPart)
 				case content.Refusal != nil:
 					return nil, llmsdk.NewRefusalError(content.Refusal.Refusal)
 				}
@@ -730,6 +755,31 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 			Part:  llmsdk.NewTextPartDelta(event.ResponseOutputTextDelta.Delta),
 		}, nil
 
+	case event.ResponseOutputTextAnnotationAdded != nil:
+		// The generated API leaves streaming annotations untyped, so decode the
+		// tagged annotation before mapping a citation delta.
+		data, err := json.Marshal(event.ResponseOutputTextAnnotationAdded.Annotation)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal OpenAI citation annotation: %w", err)
+		}
+		var annotation openaiapi.Annotation
+		if err := json.Unmarshal(data, &annotation); err != nil {
+			return nil, fmt.Errorf("failed to parse OpenAI citation annotation: %w", err)
+		}
+		if annotation.UrlCitation == nil {
+			return nil, nil
+		}
+		citation := mapOpenAIURLCitation(*annotation.UrlCitation)
+		return &llmsdk.ContentDelta{
+			Index: event.ResponseOutputTextAnnotationAdded.OutputIndex,
+			Part: llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{
+				Citation: &llmsdk.CitationDelta{
+					Source: &citation.Source, Title: citation.Title, CitedText: citation.CitedText,
+					StartIndex: citation.StartIndex, EndIndex: citation.EndIndex, Signature: citation.Signature,
+				},
+			}},
+		}, nil
+
 	case event.ResponseFunctionCallArgumentsDelta != nil:
 		// Note: function name is added in "response.output_item.added"
 		return &llmsdk.ContentDelta{
@@ -769,6 +819,13 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 
 	default:
 		return nil, nil
+	}
+}
+
+func mapOpenAIURLCitation(value openaiapi.UrlCitationBody) llmsdk.Citation {
+	return llmsdk.Citation{
+		Source: value.Url, Title: &value.Title,
+		StartIndex: &value.StartIndex, EndIndex: &value.EndIndex,
 	}
 }
 

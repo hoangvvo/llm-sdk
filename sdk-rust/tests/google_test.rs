@@ -13,6 +13,15 @@ fn google_api_key() -> &'static String {
     })
 }
 
+fn clear_web_search_options(input: &mut LanguageModelInput) {
+    for tool in input.tools.iter_mut().flatten() {
+        if let Tool::WebSearch(web_search) = tool {
+            web_search.allowed_domains = None;
+            web_search.user_location = None;
+        }
+    }
+}
+
 fn google_model() -> GoogleModel {
     GoogleModel::new(
         "gemini-3.1-flash-lite".to_string(),
@@ -91,6 +100,24 @@ test_set!(google_model(), stream_parallel_tool_calls_same_name);
 test_set!(google_model(), structured_response_format);
 
 test_set!(google_model(), source_part_input);
+
+test_set!(
+    google_model(),
+    generate_web_search,
+    Some(RunTestCaseOptions {
+        additional_input: Some(clear_web_search_options),
+        ..Default::default()
+    })
+);
+
+test_set!(
+    google_model(),
+    stream_web_search,
+    Some(RunTestCaseOptions {
+        additional_input: Some(clear_web_search_options),
+        ..Default::default()
+    })
+);
 
 test_set!(google_image_model(), generate_image);
 

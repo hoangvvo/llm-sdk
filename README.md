@@ -25,6 +25,7 @@ The accompanying [Console app](https://llm-sdk.hoangvvo.com/console/chat/) demon
 - Supports multiple LLM providers with a unified API.
 - Handles multiple modalities: Text, Image, and Audio. Supports streaming.
 - Supports multi-modality function calling (image/audio returned from tools).
+- Supports provider-hosted web search with normalized citations.
 - Supports citations (RAG) and reasoning for supported models.
 - Reports token usage and calculates the cost of a request when provided with the model’s pricing information.
 - Unified serialization across JS, Rust, and Go (systems in different languages can work together).

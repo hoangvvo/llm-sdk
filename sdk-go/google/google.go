@@ -121,7 +121,7 @@ func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 			return nil, llmsdk.NewInvariantError(Provider, "candidate content is missing")
 		}
 
-		content, err := mapGoogleContent(response.Candidates[0].Content.Parts)
+		content, err := mapGoogleContent(response.Candidates[0].Content.Parts, response.Candidates[0].GroundingMetadata)
 		if err != nil {
 			return nil, err
 		}
@@ -170,6 +170,10 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 			defer sseStream.Close()
 
 			allContentDeltas := []llmsdk.ContentDelta{}
+			// Streaming support indices address grounding chunks accumulated across
+			// every response chunk, not only the current chunk.
+			groundingChunks := []googleapi.GroundingChunk{}
+			streamTextPartMappings := map[int]int{}
 
 			for sseStream.Next() {
 				streamEvent, err := sseStream.Current()
@@ -182,19 +186,42 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 				}
 
 				candidate := streamEvent.Candidates[0]
+				incomingContentDeltas := []llmsdk.ContentDelta{}
 				if candidate.Content != nil {
-					incomingContentDeltas, err := mapGoogleContentToDelta(*candidate.Content, allContentDeltas)
+					incomingContentDeltas, err = mapGoogleContentToDelta(
+						*candidate.Content,
+						allContentDeltas,
+						streamTextPartMappings,
+					)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content delta: %w", err)
 						return
 					}
 
-					allContentDeltas = append(allContentDeltas, incomingContentDeltas...)
-
-					for _, delta := range incomingContentDeltas {
-						partial := &llmsdk.PartialModelResponse{Delta: &delta}
-						responseCh <- partial
+				}
+				if candidate.GroundingMetadata != nil {
+					groundingChunks = append(groundingChunks, candidate.GroundingMetadata.GroundingChunks...)
+					for _, support := range candidate.GroundingMetadata.GroundingSupports {
+						sdkPartIndex, ok := streamTextPartMappings[googleGroundingSupportPartIndex(support)]
+						if !ok {
+							continue
+						}
+						for _, citation := range mapGoogleGroundingCitations(support, groundingChunks) {
+							part := llmsdk.PartDelta{TextPartDelta: &llmsdk.TextPartDelta{Citation: &llmsdk.CitationDelta{
+								Source: &citation.Source, Title: citation.Title, CitedText: citation.CitedText,
+								StartIndex: citation.StartIndex, EndIndex: citation.EndIndex,
+							}}}
+							incomingContentDeltas = append(incomingContentDeltas, llmsdk.ContentDelta{
+								Index: sdkPartIndex,
+								Part:  part,
+							})
+						}
 					}
+				}
+				allContentDeltas = append(allContentDeltas, incomingContentDeltas...)
+				for _, delta := range incomingContentDeltas {
+					partial := &llmsdk.PartialModelResponse{Delta: &delta}
+					responseCh <- partial
 				}
 
 				if streamEvent.UsageMetadata != nil {
@@ -459,8 +486,13 @@ func convertToGoogleTools(tools []llmsdk.Tool) ([]googleapi.Tool, error) {
 				Description:          &tool.FunctionTool.Description,
 				ParametersJsonSchema: tool.FunctionTool.Parameters,
 			})
-		default:
-			return nil, llmsdk.NewUnsupportedError(Provider, "web search tool is not supported")
+		case tool.WebSearchTool != nil:
+			if len(tool.WebSearchTool.AllowedDomains) > 0 || tool.WebSearchTool.UserLocation != nil {
+				// GoogleSearch has no equivalent fields. Reject these options instead
+				// of silently broadening or de-localizing the search.
+				return nil, llmsdk.NewUnsupportedError(Provider, "Google Search does not support allowed_domains or user_location")
+			}
+			googleTools = append(googleTools, googleapi.Tool{GoogleSearch: &googleapi.GoogleSearch{}})
 		}
 	}
 
@@ -541,90 +573,166 @@ func convertToGoogleThinkingConfig(reasoning llmsdk.ReasoningOptions) *googleapi
 }
 
 // mapGoogleContent maps Google API parts to SDK parts
-func mapGoogleContent(parts []googleapi.Part) ([]llmsdk.Part, error) {
-	var result []llmsdk.Part
-
-	for _, part := range parts {
-		if part.Thought != nil && *part.Thought {
-			text := ""
-			if part.Text != nil {
-				text = *part.Text
-			}
-			opts := []llmsdk.ReasoningPartOption{}
-			if part.ThoughtSignature != nil {
-				opts = append(opts, llmsdk.WithReasoningSignature(*part.ThoughtSignature))
-			}
-			result = append(result, llmsdk.NewReasoningPart(text, opts...))
-			continue
+func mapGoogleContent(parts []googleapi.Part, groundingMetadata *googleapi.GroundingMetadata) ([]llmsdk.Part, error) {
+	mappedParts := make([]*llmsdk.Part, len(parts))
+	for i, part := range parts {
+		mappedPart, err := mapGooglePart(part)
+		if err != nil {
+			return nil, err
 		}
+		mappedParts[i] = mappedPart
+	}
 
-		if part.Text != nil {
-			opts := []llmsdk.TextPartOption{}
-			if part.ThoughtSignature != nil {
-				opts = append(opts, llmsdk.WithTextSignature(*part.ThoughtSignature))
+	if groundingMetadata != nil {
+		for _, support := range groundingMetadata.GroundingSupports {
+			// Attach citations while provider part slots still exist. Filtering
+			// unsupported Google parts first would shift segment.partIndex.
+			partIndex := googleGroundingSupportPartIndex(support)
+			if partIndex < 0 || partIndex >= len(mappedParts) {
+				continue
 			}
-			result = append(result, llmsdk.NewTextPart(*part.Text, opts...))
-			continue
-		}
-
-		if part.InlineData != nil {
-			if part.InlineData.MimeType != nil && part.InlineData.Data != nil {
-				if strings.HasPrefix(*part.InlineData.MimeType, "image/") {
-					result = append(result, llmsdk.NewImagePart(*part.InlineData.Data, *part.InlineData.MimeType))
-					continue
-				}
-
-				if strings.HasPrefix(*part.InlineData.MimeType, "audio/") {
-					format, err := partutil.MapMimeTypeToAudioFormat(*part.InlineData.MimeType)
-					if err != nil {
-						return nil, llmsdk.NewInvariantError(Provider, fmt.Sprintf("unsupported audio mime type: %s", *part.InlineData.MimeType))
-					}
-					result = append(result, llmsdk.NewAudioPart(*part.InlineData.Data, format))
-					continue
-				}
+			part := mappedParts[partIndex]
+			if part != nil && part.TextPart != nil {
+				part.TextPart.Citations = append(
+					part.TextPart.Citations,
+					mapGoogleGroundingCitations(support, groundingMetadata.GroundingChunks)...,
+				)
 			}
-		}
-
-		if part.FunctionCall != nil {
-			if part.FunctionCall.Name == nil {
-				return nil, llmsdk.NewInvariantError(Provider, "function call name is missing")
-			}
-			toolCallID := ""
-			if part.FunctionCall.Id != nil {
-				toolCallID = *part.FunctionCall.Id
-			} else {
-				toolCallID = fmt.Sprintf("call_%s", randutil.String(10))
-			}
-			args, err := json.Marshal(part.FunctionCall.Args)
-			if err != nil {
-				return nil, llmsdk.NewInvariantError(Provider, fmt.Sprintf("invalid function call arguments: %v", err))
-			}
-			toolCallPart := llmsdk.NewToolCallPart(toolCallID, *part.FunctionCall.Name, args)
-			toolCallPart.ToolCallPart.Args = args
-			toolCallPart.ToolCallPart.Signature = part.ThoughtSignature
-			result = append(result, toolCallPart)
-			continue
 		}
 	}
 
+	result := make([]llmsdk.Part, 0, len(mappedParts))
+	for _, part := range mappedParts {
+		if part != nil {
+			result = append(result, *part)
+		}
+	}
 	return result, nil
 }
 
+func mapGooglePart(part googleapi.Part) (*llmsdk.Part, error) {
+	if part.Thought != nil && *part.Thought {
+		text := ""
+		if part.Text != nil {
+			text = *part.Text
+		}
+		opts := []llmsdk.ReasoningPartOption{}
+		if part.ThoughtSignature != nil {
+			opts = append(opts, llmsdk.WithReasoningSignature(*part.ThoughtSignature))
+		}
+		mapped := llmsdk.NewReasoningPart(text, opts...)
+		return &mapped, nil
+	}
+
+	if part.Text != nil {
+		opts := []llmsdk.TextPartOption{}
+		if part.ThoughtSignature != nil {
+			opts = append(opts, llmsdk.WithTextSignature(*part.ThoughtSignature))
+		}
+		mapped := llmsdk.NewTextPart(*part.Text, opts...)
+		return &mapped, nil
+	}
+
+	if part.InlineData != nil && part.InlineData.MimeType != nil && part.InlineData.Data != nil {
+		if strings.HasPrefix(*part.InlineData.MimeType, "image/") {
+			mapped := llmsdk.NewImagePart(*part.InlineData.Data, *part.InlineData.MimeType)
+			return &mapped, nil
+		}
+		if strings.HasPrefix(*part.InlineData.MimeType, "audio/") {
+			format, err := partutil.MapMimeTypeToAudioFormat(*part.InlineData.MimeType)
+			if err != nil {
+				return nil, llmsdk.NewInvariantError(Provider, fmt.Sprintf("unsupported audio mime type: %s", *part.InlineData.MimeType))
+			}
+			mapped := llmsdk.NewAudioPart(*part.InlineData.Data, format)
+			return &mapped, nil
+		}
+	}
+
+	if part.FunctionCall != nil {
+		if part.FunctionCall.Name == nil {
+			return nil, llmsdk.NewInvariantError(Provider, "function call name is missing")
+		}
+		toolCallID := ""
+		if part.FunctionCall.Id != nil {
+			toolCallID = *part.FunctionCall.Id
+		} else {
+			toolCallID = fmt.Sprintf("call_%s", randutil.String(10))
+		}
+		args, err := json.Marshal(part.FunctionCall.Args)
+		if err != nil {
+			return nil, llmsdk.NewInvariantError(Provider, fmt.Sprintf("invalid function call arguments: %v", err))
+		}
+		mapped := llmsdk.NewToolCallPart(toolCallID, *part.FunctionCall.Name, args)
+		mapped.ToolCallPart.Args = args
+		mapped.ToolCallPart.Signature = part.ThoughtSignature
+		return &mapped, nil
+	}
+
+	return nil, nil
+}
+
+func googleGroundingSupportPartIndex(support googleapi.GoogleAiGenerativelanguageV1BetaGroundingSupport) int {
+	if support.Segment == nil || support.Segment.PartIndex == nil {
+		return 0
+	}
+	return *support.Segment.PartIndex
+}
+
+func mapGoogleGroundingCitations(
+	support googleapi.GoogleAiGenerativelanguageV1BetaGroundingSupport,
+	chunks []googleapi.GroundingChunk,
+) []llmsdk.Citation {
+	if support.Segment == nil {
+		return nil
+	}
+	var citations []llmsdk.Citation
+	for _, chunkIndex := range support.GroundingChunkIndices {
+		if chunkIndex < 0 || chunkIndex >= len(chunks) || chunks[chunkIndex].Web == nil || chunks[chunkIndex].Web.Uri == nil {
+			continue
+		}
+		web := chunks[chunkIndex].Web
+		citations = append(citations, llmsdk.Citation{
+			Source: *web.Uri, Title: web.Title, CitedText: support.Segment.Text,
+			StartIndex: support.Segment.StartIndex, EndIndex: support.Segment.EndIndex,
+		})
+	}
+	return citations
+}
+
 // mapGoogleContentToDelta maps Google API content to content deltas for streaming
-func mapGoogleContentToDelta(content googleapi.Content, existingContentDeltas []llmsdk.ContentDelta) ([]llmsdk.ContentDelta, error) {
+func mapGoogleContentToDelta(
+	content googleapi.Content,
+	existingContentDeltas []llmsdk.ContentDelta,
+	streamTextPartMappings map[int]int,
+) ([]llmsdk.ContentDelta, error) {
 	if len(content.Parts) == 0 {
 		return []llmsdk.ContentDelta{}, nil
 	}
 
 	contentDeltas := []llmsdk.ContentDelta{}
-	parts, err := mapGoogleContent(content.Parts)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, part := range parts {
-		partDelta := partutil.LooselyConvertPartToPartDelta(part)
-		index := partutil.GuessDeltaIndex(partDelta, append(existingContentDeltas, contentDeltas...), nil)
+	for providerPartIndex, part := range content.Parts {
+		mappedPart, err := mapGooglePart(part)
+		if err != nil {
+			return nil, err
+		}
+		if mappedPart == nil {
+			continue
+		}
+		partDelta := partutil.LooselyConvertPartToPartDelta(*mappedPart)
+		var index int
+		if partDelta.TextPartDelta != nil {
+			// Google's citation partIndex addresses the provider's parts array.
+			// Keep a text-only mapping because provider slots are not stable for
+			// separate tool calls, which retain the existing index matching.
+			var ok bool
+			index, ok = streamTextPartMappings[providerPartIndex]
+			if !ok {
+				index = nextGoogleDeltaIndex(existingContentDeltas, contentDeltas)
+				streamTextPartMappings[providerPartIndex] = index
+			}
+		} else {
+			index = partutil.GuessDeltaIndex(partDelta, append(existingContentDeltas, contentDeltas...), nil)
+		}
 		contentDeltas = append(contentDeltas, llmsdk.ContentDelta{
 			Index: index,
 			Part:  partDelta,
@@ -632,6 +740,21 @@ func mapGoogleContentToDelta(content googleapi.Content, existingContentDeltas []
 	}
 
 	return contentDeltas, nil
+}
+
+func nextGoogleDeltaIndex(existingContentDeltas, incomingContentDeltas []llmsdk.ContentDelta) int {
+	maxIndex := -1
+	for _, delta := range existingContentDeltas {
+		if delta.Index > maxIndex {
+			maxIndex = delta.Index
+		}
+	}
+	for _, delta := range incomingContentDeltas {
+		if delta.Index > maxIndex {
+			maxIndex = delta.Index
+		}
+	}
+	return maxIndex + 1
 }
 
 // mapGoogleUsageMetadata maps Google usage metadata to SDK usage

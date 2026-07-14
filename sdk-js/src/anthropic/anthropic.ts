@@ -83,6 +83,7 @@ export class AnthropicModel implements LanguageModel {
     const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
     const stream = this.#anthropic.messages.stream(createParams);
+    const providerToolBlockIndexes = new Set<number>();
 
     for await (const chunk of stream) {
       switch (chunk.type) {
@@ -105,6 +106,17 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
         case "content_block_start": {
+          const isWebSearchProviderBlock =
+            (chunk.content_block.type === "server_tool_use" &&
+              chunk.content_block.name === "web_search") ||
+            chunk.content_block.type === "web_search_tool_result";
+          if (isWebSearchProviderBlock) {
+            // Anthropic streams hosted-search arguments with the same
+            // input_json_delta shape as client tools. Track these indexes so
+            // they are not exposed as function calls the client must execute.
+            providerToolBlockIndexes.add(chunk.index);
+            break;
+          }
           const incomingContentDeltas =
             mapAnthropicRawContentBlockStartEvent(chunk);
           for (const delta of incomingContentDeltas) {
@@ -114,6 +126,7 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
         case "content_block_delta": {
+          if (providerToolBlockIndexes.has(chunk.index)) break;
           const incomingContentDeltas =
             mapAnthropicRawContentBlockDeltaEvent(chunk);
           for (const delta of incomingContentDeltas) {
@@ -333,9 +346,24 @@ export function convertToAnthropicThinkingBlockParam(
 
 // MARK: To Provider Tools
 
-function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
+function convertToAnthropicTool(tool: Tool): Anthropic.Messages.ToolUnion {
   if (tool.type === "web_search") {
-    throw new UnsupportedError(PROVIDER, "Web search tool is not supported");
+    // Use Anthropic's basic hosted-search version: it supports both common
+    // options without enabling the newer code-execution filtering flow.
+    const webSearchTool: Anthropic.Messages.WebSearchTool20250305 = {
+      type: "web_search_20250305",
+      name: "web_search",
+    };
+    if (tool.allowed_domains) {
+      webSearchTool.allowed_domains = tool.allowed_domains;
+    }
+    if (tool.user_location) {
+      webSearchTool.user_location = {
+        type: "approximate",
+        ...tool.user_location,
+      };
+    }
+    return webSearchTool;
   }
 
   return {
@@ -465,6 +493,17 @@ function mapAnthropicTextBlock(block: Anthropic.Messages.TextBlock): TextPart {
           }
           return citation;
         }
+        if (textCitation.type === "web_search_result_location") {
+          const citation: Citation = {
+            source: textCitation.url,
+            cited_text: textCitation.cited_text,
+            signature: textCitation.encrypted_index,
+          };
+          if (textCitation.title) {
+            citation.title = textCitation.title;
+          }
+          return citation;
+        }
         return null;
       })
       .filter((c) => !!c);
@@ -541,6 +580,22 @@ function mapAnthropicRawContentBlockDelta(
           end_index: delta.citation.end_block_index,
           source: delta.citation.source,
           cited_text: delta.citation.cited_text,
+        };
+        if (delta.citation.title) {
+          citation.title = delta.citation.title;
+        }
+        return {
+          type: "text",
+          text: "",
+          citation,
+        };
+      }
+      if (delta.citation.type === "web_search_result_location") {
+        const citation: CitationDelta = {
+          type: "citation",
+          source: delta.citation.url,
+          cited_text: delta.citation.cited_text,
+          signature: delta.citation.encrypted_index,
         };
         if (delta.citation.title) {
           citation.title = delta.citation.title;

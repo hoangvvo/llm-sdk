@@ -363,7 +363,10 @@ function convertToMistralToolCall(
 
 function convertToMistralTool(tool: Tool): MistralComponents.Tool {
   if (tool.type === "web_search") {
-    throw new UnsupportedError(PROVIDER, "Web search tool is not supported");
+    throw new UnsupportedError(
+      PROVIDER,
+      "Hosted web search is not supported by Mistral Chat Completions; Mistral exposes it through Agents/Conversations",
+    );
   }
 
   return {

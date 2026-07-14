@@ -17,35 +17,27 @@ import {
 
 Citation-enabled models can attribute parts of their responses back to specific source documents. The SDK represents this with `SourcePart` inputs and `Citation` metadata that appears alongside text output.
 
+Provider-hosted [web search](../web-search/) also returns `Citation` metadata without requiring `SourcePart` inputs.
+
 `SourcePart` carries the structured document content the model can cite. It can be added directly to the conversation history or returned from tools.
 
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptTypes([
-        "SourcePart",
-      ])}
+      code={extractTypescriptTypes(["SourcePart"])}
       lang="typescript"
       title="types.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustTypes([
-        "SourcePart",
-      ])}
+      code={extractRustTypes(["SourcePart"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
-    <Code
-      code={extractGoTypes([
-        "SourcePart",
-      ])}
-      lang="go"
-      title="types.go"
-    />
+    <Code code={extractGoTypes(["SourcePart"])} lang="go" title="types.go" />
   </TabItem>
 </Tabs>
 
@@ -54,30 +46,21 @@ When a model returns an attributed answer it adds `Citation` entries to the gene
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptTypes([
-        "TextPart",
-        "Citation",
-      ])}
+      code={extractTypescriptTypes(["TextPart", "Citation"])}
       lang="typescript"
       title="types.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustTypes([
-        "TextPart",
-        "Citation",
-      ])}
+      code={extractRustTypes(["TextPart", "Citation"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
     <Code
-      code={extractGoTypes([
-        "TextPart",
-        "Citation",
-      ])}
+      code={extractGoTypes(["TextPart", "Citation"])}
       lang="go"
       title="types.go"
     />
@@ -124,11 +107,7 @@ Use `generate()` when you want a single response that includes citations. The SD
     />
   </TabItem>
   <TabItem label="Go">
-    <Code
-      code={goGenerateCitationsCode}
-      lang="go"
-      title="main.go"
-    />
+    <Code code={goGenerateCitationsCode} lang="go" title="main.go" />
   </TabItem>
 </Tabs>
 
@@ -139,30 +118,21 @@ During streaming, citation information arrives incrementally as `CitationDelta` 
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptTypes([
-        "TextPartDelta",
-        "CitationDelta",
-      ])}
+      code={extractTypescriptTypes(["TextPartDelta", "CitationDelta"])}
       lang="typescript"
       title="types.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustTypes([
-        "TextPartDelta",
-        "CitationDelta",
-      ])}
+      code={extractRustTypes(["TextPartDelta", "CitationDelta"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
     <Code
-      code={extractGoTypes([
-        "TextPartDelta",
-        "CitationDelta",
-      ])}
+      code={extractGoTypes(["TextPartDelta", "CitationDelta"])}
       lang="go"
       title="types.go"
     />
@@ -187,10 +157,6 @@ When you stream responses, `TextPartDelta` chunks include optional `citation` de
     />
   </TabItem>
   <TabItem label="Go">
-    <Code
-      code={goStreamCitationsCode}
-      lang="go"
-      title="main.go"
-    />
+    <Code code={goStreamCitationsCode} lang="go" title="main.go" />
   </TabItem>
 </Tabs>

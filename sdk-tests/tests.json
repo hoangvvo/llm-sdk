@@ -52,7 +52,7 @@
     },
     {
       "type": "web_search",
-      "allowed_domains": ["example.com"],
+      "allowed_domains": ["iana.org"],
       "user_location": {
         "city": "San Francisco",
         "region": "California",

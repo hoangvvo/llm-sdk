@@ -88,6 +88,14 @@ suite("AnthropicModel", () => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
   });
 
+  test(TEST_CASE_NAMES.GENERATE_WEB_SEARCH, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_WEB_SEARCH);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_WEB_SEARCH, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_WEB_SEARCH);
+  });
+
   test(
     TEST_CASE_NAMES.GENERATE_IMAGE,
     { skip: "model does not support image generation" },

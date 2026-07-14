@@ -453,20 +453,19 @@ pub async fn test_source_part_input(
     run_test_case(model, "source_part_input", options).await
 }
 
-// TODO: Re-enable the web search cases once WebSearchTool is implemented by
-// providers. pub async fn test_generate_web_search(
-//     model: &dyn LanguageModel,
-//     options: Option<RunTestCaseOptions>,
-// ) -> Result<(), Box<dyn Error>> {
-//     run_test_case(model, "generate_web_search", options).await
-// }
-//
-// pub async fn test_stream_web_search(
-//     model: &dyn LanguageModel,
-//     options: Option<RunTestCaseOptions>,
-// ) -> Result<(), Box<dyn Error>> {
-//     run_test_case(model, "stream_web_search", options).await
-// }
+pub async fn test_generate_web_search(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "generate_web_search", options).await
+}
+
+pub async fn test_stream_web_search(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "stream_web_search", options).await
+}
 
 pub async fn test_generate_image(
     model: &dyn LanguageModel,

@@ -95,6 +95,23 @@ func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
 }
 
+var clearWebSearchOptions = testcommon.WithAdditionalInput(func(input *llmsdk.LanguageModelInput) {
+	for i := range input.Tools {
+		if input.Tools[i].WebSearchTool != nil {
+			input.Tools[i].WebSearchTool.AllowedDomains = nil
+			input.Tools[i].WebSearchTool.UserLocation = nil
+		}
+	}
+})
+
+func TestGenerateWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_web_search", clearWebSearchOptions)
+}
+
+func TestStreamWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_web_search", clearWebSearchOptions)
+}
+
 func TestGenerateImage(t *testing.T) {
 	testcommon.RunTestCase(t, imageModel, "generate_image")
 }

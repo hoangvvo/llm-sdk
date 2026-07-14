@@ -441,7 +441,10 @@ function convertToOpenAITool(
   tool: Tool,
 ): OpenAI.Chat.Completions.ChatCompletionTool {
   if (tool.type === "web_search") {
-    throw new UnsupportedError(PROVIDER, "Web search tool is not supported");
+    throw new UnsupportedError(
+      PROVIDER,
+      "Hosted web search is not supported by this OpenAI Chat Completions adapter; use OpenAIModel (Responses API)",
+    );
   }
 
   return {

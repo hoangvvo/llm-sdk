@@ -103,6 +103,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`describe-image`: Describe image](./examples/describe-image.rs)
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio.rs)
 - [`tool-use`: Function calling](./examples/tool-use.rs)
+- [`web-search`: Web search](./examples/web-search.rs)
 - [`structured-output`: Structured output](./examples/structured-output.rs)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning.rs)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.rs)

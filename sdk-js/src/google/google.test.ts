@@ -1,6 +1,7 @@
 import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
+import type { ContentDelta } from "../types.ts";
 import { GoogleModel } from "./google.ts";
 
 suite("GoogleModel", () => {
@@ -92,6 +93,183 @@ suite("GoogleModel", () => {
 
   test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
+  });
+
+  const googleWebSearchOptions = {
+    additionalInputs: (input: Parameters<typeof model.generate>[0]) => ({
+      ...input,
+      tools: input.tools?.map((tool) =>
+        tool.type === "web_search" ? { type: "web_search" as const } : tool,
+      ),
+    }),
+  };
+
+  test(TEST_CASE_NAMES.GENERATE_WEB_SEARCH, (t) => {
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.GENERATE_WEB_SEARCH,
+      googleWebSearchOptions,
+    );
+  });
+
+  test(TEST_CASE_NAMES.STREAM_WEB_SEARCH, (t) => {
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.STREAM_WEB_SEARCH,
+      googleWebSearchOptions,
+    );
+  });
+
+  test("maps citations using provider part indexes before filtering", async (t) => {
+    t.mock.method(globalThis, "fetch", () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [{}, { text: "first" }, { text: "second" }],
+                },
+                groundingMetadata: {
+                  groundingChunks: [
+                    {
+                      web: {
+                        uri: "https://example.com",
+                        title: "Example",
+                      },
+                    },
+                  ],
+                  groundingSupports: [
+                    {
+                      segment: { partIndex: 2, text: "second" },
+                      groundingChunkIndices: [0, 0],
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+
+    const response = await new GoogleModel({
+      apiKey: "test",
+      modelId: "test",
+    }).generate({
+      messages: [{ role: "user", content: [{ type: "text", text: "test" }] }],
+    });
+
+    assert.deepStrictEqual(response.content, [
+      { type: "text", text: "first" },
+      {
+        type: "text",
+        text: "second",
+        citations: [
+          {
+            source: "https://example.com",
+            title: "Example",
+            cited_text: "second",
+          },
+          {
+            source: "https://example.com",
+            title: "Example",
+            cited_text: "second",
+          },
+        ],
+      },
+    ]);
+  });
+
+  test("streams citations on the explicitly mapped text part", async (t) => {
+    const streamEvents = [
+      {
+        candidates: [
+          {
+            content: {
+              parts: [{}, { text: "first" }, { text: "second" }],
+            },
+          },
+        ],
+      },
+      {
+        candidates: [
+          {
+            content: { parts: [{}, {}, {}] },
+            groundingMetadata: {
+              groundingChunks: [
+                {
+                  web: {
+                    uri: "https://example.com",
+                    title: "Example",
+                  },
+                },
+              ],
+              groundingSupports: [
+                {
+                  segment: { partIndex: 2, text: "second" },
+                  groundingChunkIndices: [0, 0],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ];
+    t.mock.method(globalThis, "fetch", () =>
+      Promise.resolve(
+        new Response(
+          streamEvents
+            .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+            .join(""),
+          { headers: { "content-type": "text/event-stream" } },
+        ),
+      ),
+    );
+
+    const deltas: ContentDelta[] = [];
+    const stream = new GoogleModel({
+      apiKey: "test",
+      modelId: "test",
+    }).stream({
+      messages: [{ role: "user", content: [{ type: "text", text: "test" }] }],
+    });
+    for await (const event of stream) {
+      if (event.delta) deltas.push(event.delta);
+    }
+
+    assert.deepStrictEqual(
+      deltas.map((delta) => delta.index),
+      [0, 1, 1, 1],
+    );
+    assert.deepStrictEqual(
+      deltas.slice(2).map((delta) => delta.part),
+      [
+        {
+          type: "text",
+          text: "",
+          citation: {
+            type: "citation",
+            source: "https://example.com",
+            title: "Example",
+            cited_text: "second",
+          },
+        },
+        {
+          type: "text",
+          text: "",
+          citation: {
+            type: "citation",
+            source: "https://example.com",
+            title: "Example",
+            cited_text: "second",
+          },
+        },
+      ],
+    );
   });
 
   test(TEST_CASE_NAMES.GENERATE_IMAGE, { timeout: 60 * 1000 }, (t) => {

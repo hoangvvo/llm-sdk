@@ -70,7 +70,7 @@ const testData: TestDataJSON = JSON.parse(testDataContent) as TestDataJSON;
 // Create tool map from JSON
 const toolsMap = new Map<string, Tool>();
 for (const tool of testData.tools) {
-  toolsMap.set(tool.name, tool);
+  toolsMap.set(tool.type === "function" ? tool.name : "web_search", tool);
 }
 
 // Helper function to resolve tools from names
@@ -236,9 +236,8 @@ export const TEST_CASE_NAMES = {
   GENERATE_IMAGE_INPUT: "generate_image_input",
   STREAM_IMAGE_INPUT: "stream_image_input",
   GENERATE_REASONING: "generate_reasoning",
-  // TODO: Re-enable the web search cases once WebSearchTool is implemented by providers.
-  // GENERATE_WEB_SEARCH: "generate_web_search",
-  // STREAM_WEB_SEARCH: "stream_web_search",
+  GENERATE_WEB_SEARCH: "generate_web_search",
+  STREAM_WEB_SEARCH: "stream_web_search",
   STREAM_REASONING: "stream_reasoning",
 } as const;
 

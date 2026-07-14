@@ -3,6 +3,9 @@ import type {
   FunctionDeclaration,
   FunctionResponsePart,
   GenerateContentConfig,
+  GroundingChunk,
+  GroundingMetadata,
+  GroundingSupport,
   Part as GooglePart,
   ModalityTokenCount,
   PrebuiltVoiceConfig,
@@ -40,6 +43,8 @@ import {
 } from "../stream.utils.ts";
 import type {
   AudioOptions,
+  Citation,
+  CitationDelta,
   ContentDelta,
   LanguageModelInput,
   Message,
@@ -94,7 +99,10 @@ export class GoogleModel implements LanguageModel {
       throw new InvariantError(PROVIDER, "No candidate in response");
     }
 
-    const content = mapGoogleContent(candidate.content?.parts ?? []);
+    const content = mapGoogleContent(
+      candidate.content?.parts ?? [],
+      candidate.groundingMetadata,
+    );
     const result: ModelResponse = { content };
     if (response.usageMetadata) {
       result.usage = mapGoogleUsageMetadata(response.usageMetadata);
@@ -114,16 +122,52 @@ export class GoogleModel implements LanguageModel {
     const stream = await this.#ai.models.generateContentStream(params);
 
     const allContentDeltas: ContentDelta[] = [];
+    // Streaming support indices refer to grounding chunks accumulated across
+    // all chunks, rather than only the current response chunk.
+    const groundingChunks: GroundingChunk[] = [];
+    const streamTextPartMappings = new Map<number, number>();
 
     for await (const chunk of stream) {
       const candidate = chunk.candidates?.[0];
+      const incomingContentDeltas: ContentDelta[] = [];
 
       if (candidate?.content) {
-        const incomingContentDeltas = mapGoogleContentToDelta(
-          candidate.content,
-          allContentDeltas,
+        incomingContentDeltas.push(
+          ...mapGoogleContentToDelta(
+            candidate.content,
+            allContentDeltas,
+            streamTextPartMappings,
+          ),
         );
+      }
 
+      const metadata = candidate?.groundingMetadata;
+      if (metadata) {
+        if (metadata.groundingChunks) {
+          groundingChunks.push(...metadata.groundingChunks);
+        }
+        for (const support of metadata.groundingSupports ?? []) {
+          const sdkPartIndex = streamTextPartMappings.get(
+            support.segment?.partIndex ?? 0,
+          );
+          if (sdkPartIndex === undefined) continue;
+          for (const citation of mapGoogleGroundingCitations(
+            support,
+            groundingChunks,
+          )) {
+            const citationDelta: CitationDelta = {
+              type: "citation",
+              ...citation,
+            };
+            incomingContentDeltas.push({
+              index: sdkPartIndex,
+              part: { type: "text", text: "", citation: citationDelta },
+            });
+          }
+        }
+      }
+
+      if (incomingContentDeltas.length > 0) {
         allContentDeltas.push(...incomingContentDeltas);
 
         for (const delta of incomingContentDeltas) {
@@ -400,7 +444,18 @@ function convertToGoogleTools(tools: Tool[]): GoogleTool[] {
       continue;
     }
 
-    throw new UnsupportedError(PROVIDER, "Web search tool is not supported");
+    if (
+      (tool.allowed_domains && tool.allowed_domains.length > 0) ||
+      tool.user_location
+    ) {
+      // GoogleSearch has no equivalent request fields. Rejecting these avoids
+      // silently broadening a domain-restricted or localized search.
+      throw new UnsupportedError(
+        PROVIDER,
+        "Google Search does not support allowed_domains or user_location",
+      );
+    }
+    googleTools.push({ googleSearch: {} });
   }
 
   if (functionDeclarations.length > 0) {
@@ -478,84 +533,137 @@ function convertToGoogleThinkingConfig(
   return thinkingConfig;
 }
 
-function mapGoogleContent(parts: GooglePart[]): Part[] {
-  return parts
-    .map((googlePart): Part | null => {
-      if (googlePart.thought) {
-        const reasoningPart: ReasoningPart = {
-          type: "reasoning",
-          text: googlePart.text ?? "",
-        };
-        if (googlePart.thoughtSignature) {
-          reasoningPart.signature = googlePart.thoughtSignature;
-        }
-        return reasoningPart;
-      }
-      if (googlePart.text) {
-        const textPart: TextPart = {
-          type: "text",
-          text: googlePart.text,
-        };
-        if (googlePart.thoughtSignature) {
-          textPart.signature = googlePart.thoughtSignature;
-        }
-        return textPart;
-      }
-      if (googlePart.inlineData?.mimeType?.startsWith("image/")) {
-        if (!googlePart.inlineData.data) {
-          throw new InvariantError(PROVIDER, "Image data is empty");
-        }
-        return {
-          type: "image",
-          data: googlePart.inlineData.data,
-          mime_type: googlePart.inlineData.mimeType,
-        };
-      }
-      if (googlePart.inlineData?.mimeType?.startsWith("audio/")) {
-        if (!googlePart.inlineData.data) {
-          throw new InvariantError(PROVIDER, "Audio data is empty");
-        }
-        return {
-          type: "audio",
-          format: mapMimeTypeToAudioFormat(googlePart.inlineData.mimeType),
-          data: googlePart.inlineData.data,
-        };
-      }
-      if (googlePart.functionCall) {
-        if (!googlePart.functionCall.name) {
-          throw new InvariantError(PROVIDER, "Function call name is missing");
-        }
-        const toolCallPart: Extract<Part, { type: "tool-call" }> = {
-          type: "tool-call",
-          tool_call_id: googlePart.functionCall.id ?? generateString(10),
-          tool_name: googlePart.functionCall.name,
-          args: googlePart.functionCall.args ?? {},
-        };
-        if (googlePart.thoughtSignature) {
-          toolCallPart.signature = googlePart.thoughtSignature;
-        }
-        return toolCallPart;
-      }
-      return null;
-    })
-    .filter((part) => !!part);
+function mapGoogleContent(
+  parts: GooglePart[],
+  groundingMetadata?: GroundingMetadata,
+): Part[] {
+  const mappedParts = parts.map(mapGooglePart);
+
+  for (const support of groundingMetadata?.groundingSupports ?? []) {
+    const part = mappedParts[support.segment?.partIndex ?? 0];
+    if (part?.type !== "text") continue;
+    for (const citation of mapGoogleGroundingCitations(
+      support,
+      groundingMetadata?.groundingChunks ?? [],
+    )) {
+      part.citations = part.citations ?? [];
+      part.citations.push(citation);
+    }
+  }
+
+  return mappedParts.filter((part) => part !== null);
+}
+
+function mapGooglePart(googlePart: GooglePart): Part | null {
+  if (googlePart.thought) {
+    const reasoningPart: ReasoningPart = {
+      type: "reasoning",
+      text: googlePart.text ?? "",
+    };
+    if (googlePart.thoughtSignature) {
+      reasoningPart.signature = googlePart.thoughtSignature;
+    }
+    return reasoningPart;
+  }
+  if (googlePart.text) {
+    const textPart: TextPart = {
+      type: "text",
+      text: googlePart.text,
+    };
+    if (googlePart.thoughtSignature) {
+      textPart.signature = googlePart.thoughtSignature;
+    }
+    return textPart;
+  }
+  if (googlePart.inlineData?.mimeType?.startsWith("image/")) {
+    if (!googlePart.inlineData.data) {
+      throw new InvariantError(PROVIDER, "Image data is empty");
+    }
+    return {
+      type: "image",
+      data: googlePart.inlineData.data,
+      mime_type: googlePart.inlineData.mimeType,
+    };
+  }
+  if (googlePart.inlineData?.mimeType?.startsWith("audio/")) {
+    if (!googlePart.inlineData.data) {
+      throw new InvariantError(PROVIDER, "Audio data is empty");
+    }
+    return {
+      type: "audio",
+      format: mapMimeTypeToAudioFormat(googlePart.inlineData.mimeType),
+      data: googlePart.inlineData.data,
+    };
+  }
+  if (googlePart.functionCall) {
+    if (!googlePart.functionCall.name) {
+      throw new InvariantError(PROVIDER, "Function call name is missing");
+    }
+    const toolCallPart: Extract<Part, { type: "tool-call" }> = {
+      type: "tool-call",
+      tool_call_id: googlePart.functionCall.id ?? generateString(10),
+      tool_name: googlePart.functionCall.name,
+      args: googlePart.functionCall.args ?? {},
+    };
+    if (googlePart.thoughtSignature) {
+      toolCallPart.signature = googlePart.thoughtSignature;
+    }
+    return toolCallPart;
+  }
+  return null;
+}
+
+function mapGoogleGroundingCitations(
+  support: GroundingSupport,
+  chunks: GroundingChunk[],
+): Citation[] {
+  const citations: Citation[] = [];
+  for (const chunkIndex of support.groundingChunkIndices ?? []) {
+    const web = chunks[chunkIndex]?.web;
+    if (!web?.uri) continue;
+    const citation: Citation = { source: web.uri };
+    if (web.title) citation.title = web.title;
+    if (support.segment?.text) citation.cited_text = support.segment.text;
+    // Google reports byte offsets within the referenced content part. Keep
+    // those provider offsets intact in the common citation shape.
+    if (support.segment?.startIndex !== undefined) {
+      citation.start_index = support.segment.startIndex;
+    }
+    if (support.segment?.endIndex !== undefined) {
+      citation.end_index = support.segment.endIndex;
+    }
+    citations.push(citation);
+  }
+  return citations;
 }
 
 function mapGoogleContentToDelta(
   content: Content,
   existingContentDeltas: ContentDelta[],
+  streamTextPartMappings: Map<number, number>,
 ): ContentDelta[] {
   if (!content.parts) return [];
   const contentDeltas: ContentDelta[] = [];
 
-  const parts = mapGoogleContent(content.parts);
-
-  for (const part of parts) {
+  for (const [providerPartIndex, googlePart] of content.parts.entries()) {
+    const part = mapGooglePart(googlePart);
+    if (!part) continue;
     const partDelta = looselyConvertPartToPartDelta(part);
-    const index = guessDeltaIndex(partDelta, [
-      ...existingContentDeltas,
-      ...contentDeltas,
-    ]);
+    let index: number;
+    if (partDelta.type === "text") {
+      // Google's citation partIndex addresses the provider's parts array. Keep
+      // a text-only mapping because provider slots are not stable for separate
+      // tool calls, which must retain the existing index-matching behavior.
+      index =
+        streamTextPartMappings.get(providerPartIndex) ??
+        nextGoogleDeltaIndex(existingContentDeltas, contentDeltas);
+      streamTextPartMappings.set(providerPartIndex, index);
+    } else {
+      index = guessDeltaIndex(partDelta, [
+        ...existingContentDeltas,
+        ...contentDeltas,
+      ]);
+    }
     contentDeltas.push({
       index,
       part: partDelta,
@@ -563,6 +671,19 @@ function mapGoogleContentToDelta(
   }
 
   return contentDeltas;
+}
+
+function nextGoogleDeltaIndex(
+  existingContentDeltas: ContentDelta[],
+  incomingContentDeltas: ContentDelta[],
+): number {
+  return (
+    Math.max(
+      ...existingContentDeltas.map((delta) => delta.index),
+      ...incomingContentDeltas.map((delta) => delta.index),
+      -1,
+    ) + 1
+  );
 }
 
 function mapGoogleUsageMetadata(usageMetadata: UsageMetadata): ModelUsage {

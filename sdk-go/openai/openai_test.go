@@ -35,7 +35,6 @@ func TestMain(m *testing.M) {
 	audioChatModel = openai.NewOpenAIChatModel("gpt-audio-1.5", openai.OpenAIChatModelOptions{
 		APIKey: apiKey,
 	})
-
 	m.Run()
 }
 
@@ -89,6 +88,14 @@ func TestStructuredResponseFormat(t *testing.T) {
 
 func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
+}
+
+func TestGenerateWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_web_search")
+}
+
+func TestStreamWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_web_search")
 }
 func TestGenerateImage(t *testing.T) {
 	testcommon.RunTestCase(t, model, "generate_image")

@@ -150,6 +150,7 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 			defer close(errCh)
 			defer sseStream.Close()
 
+			providerToolBlockIndexes := map[int]bool{}
 			for sseStream.Next() {
 				event, err := sseStream.Current()
 				if err != nil {
@@ -183,6 +184,15 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 				}
 
 				if event.ContentBlockStart != nil {
+					block := event.ContentBlockStart.ContentBlock
+					isWebSearchProviderBlock := (block.ServerToolUse != nil && block.ServerToolUse.Name == "web_search") ||
+						block.WebSearchToolResult != nil
+					if isWebSearchProviderBlock {
+						// Hosted-search arguments use the same input_json_delta shape as client
+						// tools. Suppress them so callers do not receive a function call to run.
+						providerToolBlockIndexes[event.ContentBlockStart.Index] = true
+						continue
+					}
 					deltas, err := mapAnthropicRawContentBlockStartEvent(*event.ContentBlockStart)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content block start: %w", err)
@@ -196,6 +206,9 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 				}
 
 				if event.ContentBlockDelta != nil {
+					if providerToolBlockIndexes[event.ContentBlockDelta.Index] {
+						continue
+					}
 					deltas, err := mapAnthropicRawContentBlockDeltaEvent(*event.ContentBlockDelta)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content block delta: %w", err)
@@ -275,8 +288,26 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 	if len(input.Tools) > 0 {
 		tools := make([]anthropicapi.CreateMessageParamsToolsItem, 0, len(input.Tools))
 		for _, tool := range input.Tools {
+			if tool.WebSearchTool != nil {
+				// The basic version supports both common options without enabling
+				// Anthropic's newer code-execution filtering flow.
+				webSearch := tool.WebSearchTool
+				anthropicWebSearch := &anthropicapi.WebSearchTool20250305{
+					Name: "web_search", Type: "web_search_20250305",
+					AllowedDomains: webSearch.AllowedDomains,
+				}
+				if webSearch.UserLocation != nil {
+					anthropicWebSearch.UserLocation = &anthropicapi.UserLocation{
+						City: webSearch.UserLocation.City, Country: webSearch.UserLocation.Country,
+						Region: webSearch.UserLocation.Region, Timezone: webSearch.UserLocation.Timezone,
+						Type: "approximate",
+					}
+				}
+				tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{WebSearchTool20250305: anthropicWebSearch})
+				continue
+			}
 			if tool.FunctionTool == nil {
-				return nil, llmsdk.NewUnsupportedError(Provider, "web search tool is not supported")
+				continue
 			}
 			functionTool := tool.FunctionTool
 			strict := true
@@ -576,6 +607,17 @@ func mapAnthropicTextCitations(raw []anthropicapi.ResponseTextBlockCitationsItem
 	citations := make([]llmsdk.Citation, 0, len(raw))
 
 	for _, item := range raw {
+		if item.WebSearchResultLocation != nil {
+			web := item.WebSearchResultLocation
+			if web.Url != "" {
+				citation := llmsdk.Citation{Source: web.Url, Title: web.Title, Signature: ptr.To(web.EncryptedIndex)}
+				if web.CitedText != "" {
+					citation.CitedText = ptr.To(web.CitedText)
+				}
+				citations = append(citations, citation)
+			}
+			continue
+		}
 		if item.SearchResultLocation == nil {
 			continue
 		}
@@ -668,6 +710,20 @@ func mapAnthropicRawContentBlockDelta(raw anthropicapi.ContentBlockDeltaEventDel
 
 func mapAnthropicCitationDelta(raw anthropicapi.CitationsDeltaCitation) (*llmsdk.CitationDelta, error) {
 	citation := &llmsdk.CitationDelta{}
+	if raw.WebSearchResultLocation != nil {
+		web := raw.WebSearchResultLocation
+		if web.Url != "" {
+			citation.Source = ptr.To(web.Url)
+		}
+		if web.Title != nil && *web.Title != "" {
+			citation.Title = web.Title
+		}
+		if web.CitedText != "" {
+			citation.CitedText = ptr.To(web.CitedText)
+		}
+		citation.Signature = ptr.To(web.EncryptedIndex)
+		return citation, nil
+	}
 	if raw.SearchResultLocation != nil {
 		if raw.SearchResultLocation.Source != "" {
 			citation.Source = ptr.To(raw.SearchResultLocation.Source)

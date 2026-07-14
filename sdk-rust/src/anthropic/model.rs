@@ -9,7 +9,8 @@ use crate::{
         RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock, RequestThinkingBlock,
         RequestToolResultBlock, RequestToolResultBlockContent,
         RequestToolResultBlockContentArrayItem, RequestToolUseBlock, ThinkingConfigDisabled,
-        ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage,
+        ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage, UserLocation,
+        WebSearchTool20250305,
     },
     client_utils, stream_utils, Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
@@ -25,7 +26,10 @@ use reqwest::{
     Client,
 };
 use serde_json::{Map, Value};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 const PROVIDER: &str = "anthropic";
 const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
@@ -208,6 +212,7 @@ impl LanguageModel for AnthropicModel {
                     let metadata = self.metadata.clone();
 
                     let stream = try_stream! {
+                        let mut provider_tool_block_indexes = HashSet::new();
                         while let Some(event) = chunk_stream.next().await {
                             match event? {
                                 MessageStreamEvent::MessageStart(MessageStartEvent { message }) => {
@@ -237,6 +242,23 @@ impl LanguageModel for AnthropicModel {
                                     };
                                 }
                                 MessageStreamEvent::ContentBlockStart(ContentBlockStartEvent { content_block, index }) => {
+                                    let is_web_search_provider_block = match &content_block {
+                                        ContentBlockStartEventContentBlock::ServerToolUse(block) => {
+                                            matches!(
+                                                block.name,
+                                                api::ResponseServerToolUseBlockName::WebSearch
+                                            )
+                                        }
+                                        ContentBlockStartEventContentBlock::WebSearchToolResult(_) => true,
+                                        _ => false,
+                                    };
+                                    if is_web_search_provider_block {
+                                        // Hosted-search arguments use the same input_json_delta
+                                        // shape as client tools. Suppress those indexes so callers
+                                        // do not receive a function call they are expected to run.
+                                        provider_tool_block_indexes.insert(index);
+                                        continue;
+                                    }
                                     let deltas = map_anthropic_content_block_start_event(
                                         content_block,
                                         usize::try_from(index).map_err(|_| {
@@ -256,6 +278,9 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::ContentBlockDelta(ContentBlockDeltaEvent { delta, index }) => {
+                                    if provider_tool_block_indexes.contains(&index) {
+                                        continue;
+                                    }
                                     if let Some(delta) = map_anthropic_content_block_delta_event(
                                         delta,
                                         usize::try_from(index).map_err(|_| {
@@ -337,7 +362,6 @@ fn convert_to_anthropic_create_params(
                 tool_list
                     .into_iter()
                     .map(convert_tool)
-                    .map(|tool| tool.map(CreateMessageParamsToolsItem::Tool))
                     .collect::<LanguageModelResult<Vec<_>>>()
             })
             .transpose()?,
@@ -348,29 +372,43 @@ fn convert_to_anthropic_create_params(
     Ok(params)
 }
 
-fn convert_tool(tool: SdkTool) -> LanguageModelResult<Tool> {
-    let tool = match tool {
-        SdkTool::Function(tool) => tool,
-        SdkTool::WebSearch(_) => {
-            return Err(LanguageModelError::Unsupported(
-                PROVIDER,
-                "web search tool is not supported".to_string(),
-            ));
-        }
-    };
-
-    Ok(Tool {
-        allowed_callers: None,
-        name: tool.name,
-        description: Some(tool.description),
-        input_schema: Some(tool.parameters),
-        cache_control: None,
-        defer_loading: None,
-        eager_input_streaming: None,
-        input_examples: None,
-        strict: Some(true),
-        r#type: None,
-    })
+fn convert_tool(tool: SdkTool) -> LanguageModelResult<CreateMessageParamsToolsItem> {
+    match tool {
+        SdkTool::Function(tool) => Ok(CreateMessageParamsToolsItem::Tool(Tool {
+            allowed_callers: None,
+            name: tool.name,
+            description: Some(tool.description),
+            input_schema: Some(tool.parameters),
+            cache_control: None,
+            defer_loading: None,
+            eager_input_streaming: None,
+            input_examples: None,
+            strict: Some(true),
+            r#type: None,
+        })),
+        SdkTool::WebSearch(tool) => Ok(CreateMessageParamsToolsItem::WebSearchTool20250305(
+            // The basic version supports both common options without enabling
+            // Anthropic's newer code-execution filtering flow.
+            WebSearchTool20250305 {
+                allowed_callers: None,
+                allowed_domains: tool.allowed_domains,
+                blocked_domains: None,
+                cache_control: None,
+                defer_loading: None,
+                max_uses: None,
+                name: "web_search".to_string(),
+                strict: None,
+                r#type: "web_search_20250305".to_string(),
+                user_location: tool.user_location.map(|location| UserLocation {
+                    city: location.city,
+                    country: location.country,
+                    region: location.region,
+                    timezone: location.timezone,
+                    r#type: "approximate".to_string(),
+                }),
+            },
+        )),
+    }
 }
 
 fn convert_to_anthropic_output_config(
@@ -650,35 +688,50 @@ fn map_text_citations(
     let mut results = Vec::new();
 
     for citation in citations {
-        if let api::ResponseTextBlockCitationsItem::SearchResultLocation(
-            api::ResponseSearchResultLocationCitation {
-                cited_text,
-                end_block_index,
-                search_result_index: _,
-                source,
-                start_block_index,
-                title,
-            },
-        ) = citation
-        {
-            if source.is_empty() {
-                continue;
-            }
-
-            let mapped = Citation {
-                source,
-                title,
-                cited_text: if cited_text.is_empty() {
-                    None
-                } else {
-                    Some(cited_text)
+        match citation {
+            api::ResponseTextBlockCitationsItem::SearchResultLocation(
+                api::ResponseSearchResultLocationCitation {
+                    cited_text,
+                    end_block_index,
+                    search_result_index: _,
+                    source,
+                    start_block_index,
+                    title,
                 },
-                start_index: usize::try_from(start_block_index).ok(),
-                end_index: usize::try_from(end_block_index).ok(),
-                signature: None,
-            };
+            ) => {
+                if source.is_empty() {
+                    continue;
+                }
 
-            results.push(mapped);
+                let mapped = Citation {
+                    source,
+                    title,
+                    cited_text: if cited_text.is_empty() {
+                        None
+                    } else {
+                        Some(cited_text)
+                    },
+                    start_index: usize::try_from(start_block_index).ok(),
+                    end_index: usize::try_from(end_block_index).ok(),
+                    signature: None,
+                };
+
+                results.push(mapped);
+            }
+            api::ResponseTextBlockCitationsItem::WebSearchResultLocation(citation) => {
+                if !citation.url.is_empty() {
+                    results.push(Citation {
+                        source: citation.url,
+                        title: citation.title,
+                        cited_text: (!citation.cited_text.is_empty())
+                            .then_some(citation.cited_text),
+                        start_index: None,
+                        end_index: None,
+                        signature: Some(citation.encrypted_index),
+                    });
+                }
+            }
+            _ => {}
         }
     }
 
@@ -808,35 +861,40 @@ fn map_anthropic_content_block_delta_event(
 }
 
 fn map_citation_delta(citation: api::CitationsDeltaCitation) -> Option<CitationDelta> {
-    let api::CitationsDeltaCitation::SearchResultLocation(
-        api::ResponseSearchResultLocationCitation {
-            cited_text,
-            end_block_index,
-            search_result_index: _,
-            source,
-            start_block_index,
+    match citation {
+        api::CitationsDeltaCitation::SearchResultLocation(
+            api::ResponseSearchResultLocationCitation {
+                cited_text,
+                end_block_index,
+                search_result_index: _,
+                source,
+                start_block_index,
+                title,
+            },
+        ) => Some(CitationDelta {
+            r#type: "citation".to_string(),
+            source: Some(source),
             title,
-        },
-    ) = citation
-    else {
-        return None;
-    };
-
-    let result = CitationDelta {
-        r#type: "citation".to_string(),
-        source: Some(source),
-        title,
-        cited_text: if cited_text.is_empty() {
-            None
-        } else {
-            Some(cited_text)
-        },
-        start_index: usize::try_from(start_block_index).ok(),
-        end_index: usize::try_from(end_block_index).ok(),
-        signature: None,
-    };
-
-    Some(result)
+            cited_text: if cited_text.is_empty() {
+                None
+            } else {
+                Some(cited_text)
+            },
+            start_index: usize::try_from(start_block_index).ok(),
+            end_index: usize::try_from(end_block_index).ok(),
+            signature: None,
+        }),
+        api::CitationsDeltaCitation::WebSearchResultLocation(citation) => Some(CitationDelta {
+            r#type: "citation".to_string(),
+            source: Some(citation.url),
+            title: citation.title,
+            cited_text: (!citation.cited_text.is_empty()).then_some(citation.cited_text),
+            start_index: None,
+            end_index: None,
+            signature: Some(citation.encrypted_index),
+        }),
+        _ => None,
+    }
 }
 
 fn map_anthropic_image_media_type(

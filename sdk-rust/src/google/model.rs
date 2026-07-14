@@ -2,16 +2,16 @@ use super::api::{
     Blob, Content, FunctionCall, FunctionCallingConfig, FunctionCallingConfigMode,
     FunctionDeclaration, FunctionResponse, FunctionResponseBlob, FunctionResponsePart,
     GenerateContentRequest, GenerateContentResponse, GenerationConfig,
-    GenerationConfigResponseModalitiesItem, ModalityTokenCount, ModalityTokenCountModality,
-    Part as GooglePart, PrebuiltVoiceConfig, SpeechConfig, ThinkingConfig, Tool as GoogleTool,
-    ToolConfig, UsageMetadata, VoiceConfig,
+    GenerationConfigResponseModalitiesItem, GoogleSearch, GroundingChunk, GroundingMetadata,
+    ModalityTokenCount, ModalityTokenCountModality, Part as GooglePart, PrebuiltVoiceConfig,
+    SpeechConfig, ThinkingConfig, Tool as GoogleTool, ToolConfig, UsageMetadata, VoiceConfig,
 };
 use crate::{
-    audio_part_utils, client_utils, id_utils, source_part_utils, stream_utils, AudioPart,
-    ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
+    audio_part_utils, client_utils, id_utils, source_part_utils, stream_utils, AudioPart, Citation,
+    CitationDelta, ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
     LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelTokensDetails, ModelUsage, Part, PartialModelResponse, ReasoningPart,
-    ResponseFormatOption, TextPart, Tool as SdkTool, ToolChoiceOption,
+    ModelTokensDetails, ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningPart,
+    ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool, ToolChoiceOption,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -141,6 +141,7 @@ impl LanguageModel for GoogleModel {
 
                     let content = map_google_content(
                         candidate.content.and_then(|c| c.parts).unwrap_or_default(),
+                        candidate.grounding_metadata.as_ref(),
                     )?;
 
                     let usage = response
@@ -196,6 +197,10 @@ impl LanguageModel for GoogleModel {
 
                     let stream = try_stream! {
                         let mut all_content_deltas: Vec<ContentDelta> = Vec::new();
+                        // Streaming support indices address grounding chunks accumulated
+                        // across every response chunk, not only the current chunk.
+                        let mut grounding_chunks: Vec<GroundingChunk> = Vec::new();
+                        let mut stream_text_part_mappings: HashMap<usize, usize> = HashMap::new();
 
                         while let Some(chunk) = chunk_stream.next().await {
                             let response = chunk?;
@@ -204,26 +209,56 @@ impl LanguageModel for GoogleModel {
                                 .candidates
                                 .and_then(|c| c.into_iter().next());
 
-                            if let Some(candidate) = candidate {
-                                if let Some(content) = candidate.content {
-                                    if let Some(parts) = content.parts {
-                                        let incoming_deltas = map_google_content_to_delta(
-                                            parts,
-                                            &all_content_deltas,
-                                        )?;
+                            if let Some(mut candidate) = candidate {
+                                let mut incoming_deltas = if let Some(parts) =
+                                    candidate.content.and_then(|content| content.parts)
+                                {
+                                    map_google_content_to_delta(
+                                        parts,
+                                        &all_content_deltas,
+                                        &mut stream_text_part_mappings,
+                                    )?
+                                } else {
+                                    Vec::new()
+                                };
 
-                                        all_content_deltas.extend(incoming_deltas.clone());
-
-                                        for delta in incoming_deltas {
-                                            yield PartialModelResponse {
-                                                delta: Some(delta),
-                                                usage: None,
-                                                cost: None,
-                                            };
-                                        }
+                                if let Some(mut grounding_metadata) = candidate.grounding_metadata.take() {
+                                    if let Some(chunks) = grounding_metadata.grounding_chunks.take() {
+                                        grounding_chunks.extend(chunks);
+                                    }
+                                    for (part_index, citation) in map_google_citations(&grounding_metadata, &grounding_chunks) {
+                                        let Some(sdk_part_index) = stream_text_part_mappings.get(&part_index) else {
+                                            continue;
+                                        };
+                                        let part = PartDelta::Text(TextPartDelta {
+                                            text: String::new(),
+                                            citation: Some(CitationDelta {
+                                                r#type: "citation".to_string(),
+                                                source: Some(citation.source),
+                                                title: citation.title,
+                                                cited_text: citation.cited_text,
+                                                start_index: citation.start_index,
+                                                end_index: citation.end_index,
+                                                signature: citation.signature,
+                                            }),
+                                            signature: None,
+                                        });
+                                        incoming_deltas.push(ContentDelta {
+                                            index: *sdk_part_index,
+                                            part,
+                                        });
                                     }
                                 }
 
+                                all_content_deltas.extend(incoming_deltas.clone());
+
+                                for delta in incoming_deltas {
+                                    yield PartialModelResponse {
+                                        delta: Some(delta),
+                                        usage: None,
+                                        cost: None,
+                                    };
+                                }
                             }
 
                             if let Some(usage_metadata) = response.usage_metadata {
@@ -304,11 +339,25 @@ fn convert_to_generate_content_parameters(
                     parameters_json_schema: Some(tool.parameters),
                     ..Default::default()
                 }),
-                SdkTool::WebSearch(_) => {
-                    return Err(LanguageModelError::Unsupported(
-                        PROVIDER,
-                        "web search tool is not supported".to_string(),
-                    ));
+                SdkTool::WebSearch(tool) => {
+                    if tool
+                        .allowed_domains
+                        .as_ref()
+                        .is_some_and(|domains| !domains.is_empty())
+                        || tool.user_location.is_some()
+                    {
+                        // GoogleSearch has no equivalent fields. Reject these options
+                        // instead of silently broadening or de-localizing the search.
+                        return Err(LanguageModelError::Unsupported(
+                            PROVIDER,
+                            "Google Search does not support allowed_domains or user_location"
+                                .to_string(),
+                        ));
+                    }
+                    google_tools.push(GoogleTool {
+                        google_search: Some(GoogleSearch::default()),
+                        ..Default::default()
+                    });
                 }
             }
         }
@@ -576,108 +625,201 @@ fn convert_to_google_response_schema(
     }
 }
 
-fn map_google_content(parts: Vec<GooglePart>) -> LanguageModelResult<Vec<Part>> {
-    parts
+fn map_google_content(
+    parts: Vec<GooglePart>,
+    grounding_metadata: Option<&GroundingMetadata>,
+) -> LanguageModelResult<Vec<Part>> {
+    let mut mapped: Vec<Option<Part>> = parts
         .into_iter()
-        .filter_map(|part| {
-            if let Some(text) = part.text {
-                if part.thought.unwrap_or(false) {
-                    let mut reasoning_part = ReasoningPart::new(text);
-                    if let Some(signature) = part.thought_signature {
-                        reasoning_part = reasoning_part.with_signature(signature);
-                    }
-                    Some(Ok(reasoning_part.into()))
-                } else {
-                    Some(Ok(Part::Text(TextPart {
-                        text,
-                        citations: None,
-                        signature: part.thought_signature,
-                    })))
-                }
-            } else if let Some(inline_data) = part.inline_data {
-                if let (Some(data), Some(mime_type)) = (inline_data.data, inline_data.mime_type) {
-                    if mime_type.starts_with("image/") {
-                        Some(Ok(Part::Image(ImagePart {
-                            data,
-                            mime_type,
-                            width: None,
-                            height: None,
-                            id: None,
-                        })))
-                    } else if mime_type.starts_with("audio/") {
-                        if let Ok(format) =
-                            audio_part_utils::map_mime_type_to_audio_format(&mime_type)
-                        {
-                            Some(Ok(Part::Audio(AudioPart {
-                                data,
-                                format,
-                                sample_rate: None,
-                                channels: None,
-                                id: None,
-                                transcript: None,
-                            })))
-                        } else {
-                            Some(Err(LanguageModelError::Invariant(
-                                PROVIDER,
-                                format!("Unsupported audio mime type: {mime_type}"),
-                            )))
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    Some(Err(LanguageModelError::Invariant(
-                        PROVIDER,
-                        "Inline data missing data or mime type".to_string(),
-                    )))
-                }
-            } else if let Some(function_call) = part.function_call {
-                if let Some(name) = function_call.name {
-                    Some(Ok(Part::ToolCall(crate::ToolCallPart {
-                        tool_call_id: function_call
-                            .id
-                            // Google does not always return id, generate one if missing
-                            .unwrap_or_else(|| id_utils::generate_string(10)),
-                        tool_name: name,
-                        args: json!(function_call.args.unwrap_or_default()),
-                        signature: part.thought_signature,
-                        id: None,
-                    })))
-                } else {
-                    Some(Err(LanguageModelError::Invariant(
-                        PROVIDER,
-                        "Function call missing name".to_string(),
-                    )))
-                }
-            } else {
-                None
+        .map(map_google_part)
+        .collect::<LanguageModelResult<Vec<_>>>()?;
+
+    if let Some(metadata) = grounding_metadata {
+        for (part_index, citation) in map_google_citations(
+            metadata,
+            metadata.grounding_chunks.as_deref().unwrap_or_default(),
+        ) {
+            // Attach citations while provider part slots still exist. Filtering
+            // unsupported Google parts first would shift segment.partIndex.
+            if let Some(Some(Part::Text(text))) = mapped.get_mut(part_index) {
+                text.citations.get_or_insert_default().push(citation);
             }
-        })
-        .collect()
+        }
+    }
+    Ok(mapped.into_iter().flatten().collect())
+}
+
+fn map_google_part(part: GooglePart) -> LanguageModelResult<Option<Part>> {
+    if let Some(text) = part.text {
+        if part.thought.unwrap_or(false) {
+            let mut reasoning_part = ReasoningPart::new(text);
+            if let Some(signature) = part.thought_signature {
+                reasoning_part = reasoning_part.with_signature(signature);
+            }
+            Ok(Some(reasoning_part.into()))
+        } else {
+            Ok(Some(Part::Text(TextPart {
+                text,
+                citations: None,
+                signature: part.thought_signature,
+            })))
+        }
+    } else if let Some(inline_data) = part.inline_data {
+        if let (Some(data), Some(mime_type)) = (inline_data.data, inline_data.mime_type) {
+            if mime_type.starts_with("image/") {
+                Ok(Some(Part::Image(ImagePart {
+                    data,
+                    mime_type,
+                    width: None,
+                    height: None,
+                    id: None,
+                })))
+            } else if mime_type.starts_with("audio/") {
+                let format =
+                    audio_part_utils::map_mime_type_to_audio_format(&mime_type).map_err(|_| {
+                        LanguageModelError::Invariant(
+                            PROVIDER,
+                            format!("Unsupported audio mime type: {mime_type}"),
+                        )
+                    })?;
+                Ok(Some(Part::Audio(AudioPart {
+                    data,
+                    format,
+                    sample_rate: None,
+                    channels: None,
+                    id: None,
+                    transcript: None,
+                })))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Err(LanguageModelError::Invariant(
+                PROVIDER,
+                "Inline data missing data or mime type".to_string(),
+            ))
+        }
+    } else if let Some(function_call) = part.function_call {
+        let Some(name) = function_call.name else {
+            return Err(LanguageModelError::Invariant(
+                PROVIDER,
+                "Function call missing name".to_string(),
+            ));
+        };
+        Ok(Some(Part::ToolCall(crate::ToolCallPart {
+            tool_call_id: function_call
+                .id
+                // Google does not always return id, generate one if missing
+                .unwrap_or_else(|| id_utils::generate_string(10)),
+            tool_name: name,
+            args: json!(function_call.args.unwrap_or_default()),
+            signature: part.thought_signature,
+            id: None,
+        })))
+    } else {
+        Ok(None)
+    }
+}
+
+fn map_google_citations(
+    metadata: &GroundingMetadata,
+    chunks: &[GroundingChunk],
+) -> Vec<(usize, Citation)> {
+    let mut citations = Vec::new();
+    for support in metadata.grounding_supports.as_deref().unwrap_or_default() {
+        let Some(segment) = support.segment.as_ref() else {
+            continue;
+        };
+        for chunk_index in support
+            .grounding_chunk_indices
+            .as_deref()
+            .unwrap_or_default()
+        {
+            let Some(web) = usize::try_from(*chunk_index)
+                .ok()
+                .and_then(|index| chunks.get(index))
+                .and_then(|chunk| chunk.web.as_ref())
+            else {
+                continue;
+            };
+            let Some(source) = web.uri.clone() else {
+                continue;
+            };
+            citations.push((
+                segment
+                    .part_index
+                    .and_then(|index| usize::try_from(index).ok())
+                    .unwrap_or(0),
+                Citation {
+                    source,
+                    title: web.title.clone(),
+                    cited_text: segment.text.clone(),
+                    start_index: segment
+                        .start_index
+                        .and_then(|index| usize::try_from(index).ok()),
+                    end_index: segment
+                        .end_index
+                        .and_then(|index| usize::try_from(index).ok()),
+                    signature: None,
+                },
+            ));
+        }
+    }
+    citations
 }
 
 fn map_google_content_to_delta(
     parts: Vec<GooglePart>,
     existing_deltas: &[ContentDelta],
+    stream_text_part_mappings: &mut HashMap<usize, usize>,
 ) -> LanguageModelResult<Vec<ContentDelta>> {
     let mut deltas = Vec::new();
 
-    let parts = map_google_content(parts)?;
-
-    for part in parts {
-        let all_content_deltas = existing_deltas
-            .iter()
-            .chain(deltas.iter())
-            .collect::<Vec<_>>();
+    for (provider_part_index, part) in parts.into_iter().enumerate() {
+        let Some(part) = map_google_part(part)? else {
+            continue;
+        };
         let part_delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
-        let guessed_index = stream_utils::guess_delta_index(&part_delta, &all_content_deltas, None);
+        let index = match &part_delta {
+            PartDelta::Text(_) => {
+                // Google's citation partIndex addresses the provider's parts
+                // array. Keep a text-only mapping because provider slots are
+                // not stable for separate tool calls, which must retain the
+                // existing index-matching behavior.
+                let index = stream_text_part_mappings
+                    .get(&provider_part_index)
+                    .copied()
+                    .unwrap_or_else(|| next_google_delta_index(existing_deltas, &deltas));
+                stream_text_part_mappings.insert(provider_part_index, index);
+                index
+            }
+            _ => {
+                let all_content_deltas = existing_deltas
+                    .iter()
+                    .chain(deltas.iter())
+                    .collect::<Vec<_>>();
+                stream_utils::guess_delta_index(&part_delta, &all_content_deltas, None)
+            }
+        };
         deltas.push(ContentDelta {
-            index: guessed_index,
+            index,
             part: part_delta,
         });
     }
 
     Ok(deltas)
+}
+
+fn next_google_delta_index(
+    existing_deltas: &[ContentDelta],
+    incoming_deltas: &[ContentDelta],
+) -> usize {
+    existing_deltas
+        .iter()
+        .chain(incoming_deltas)
+        .map(|delta| delta.index)
+        .max()
+        .map_or(0, |index| index + 1)
 }
 
 fn map_google_usage_metadata(usage: &UsageMetadata) -> ModelUsage {
@@ -768,4 +910,91 @@ fn map_modality_token_counts(
     }
 
     Some(tokens_details)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::google::api::{
+        GoogleAiGenerativelanguageV1BetaGroundingSupport, GoogleAiGenerativelanguageV1BetaSegment,
+        Web,
+    };
+
+    #[test]
+    fn citations_use_provider_part_index_before_filtering() {
+        let grounding_metadata = GroundingMetadata {
+            grounding_chunks: Some(vec![GroundingChunk {
+                web: Some(Web {
+                    uri: Some("https://example.com".to_string()),
+                    title: Some("Example".to_string()),
+                }),
+                ..Default::default()
+            }]),
+            grounding_supports: Some(vec![GoogleAiGenerativelanguageV1BetaGroundingSupport {
+                segment: Some(GoogleAiGenerativelanguageV1BetaSegment {
+                    part_index: Some(2),
+                    text: Some("second".to_string()),
+                    ..Default::default()
+                }),
+                // Repeated chunk references are preserved; the provider may
+                // intentionally attribute the same source more than once.
+                grounding_chunk_indices: Some(vec![0, 0]),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        let content = map_google_content(
+            vec![
+                GooglePart::default(),
+                GooglePart {
+                    text: Some("first".to_string()),
+                    ..Default::default()
+                },
+                GooglePart {
+                    text: Some("second".to_string()),
+                    ..Default::default()
+                },
+            ],
+            Some(&grounding_metadata),
+        )
+        .expect("content maps successfully");
+
+        assert_eq!(content.len(), 2);
+        let Part::Text(first) = &content[0] else {
+            panic!("expected first text part");
+        };
+        assert!(first.citations.is_none());
+        let Part::Text(second) = &content[1] else {
+            panic!("expected second text part");
+        };
+        assert_eq!(second.citations.as_ref().map(Vec::len), Some(2));
+    }
+
+    #[test]
+    fn streaming_preserves_provider_to_sdk_part_mapping() {
+        let mut mappings = HashMap::new();
+        let deltas = map_google_content_to_delta(
+            vec![
+                GooglePart::default(),
+                GooglePart {
+                    text: Some("first".to_string()),
+                    ..Default::default()
+                },
+                GooglePart {
+                    text: Some("second".to_string()),
+                    ..Default::default()
+                },
+            ],
+            &[],
+            &mut mappings,
+        )
+        .expect("content deltas map successfully");
+
+        assert_eq!(
+            deltas.iter().map(|delta| delta.index).collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        assert_eq!(mappings.get(&1), Some(&0));
+        assert_eq!(mappings.get(&2), Some(&1));
+    }
 }

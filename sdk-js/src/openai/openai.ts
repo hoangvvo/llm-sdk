@@ -14,6 +14,7 @@ import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import type {
   AssistantMessage,
+  Citation,
   ContentDelta,
   ImagePart,
   ImagePartDelta,
@@ -27,6 +28,7 @@ import type {
   ReasoningPart,
   ReasoningPartDelta,
   ResponseFormatOption,
+  TextPart,
   TextPartDelta,
   Tool,
   ToolCallPart,
@@ -364,9 +366,23 @@ function convertToolMessageToResponseInputItems(
 
 // MARK: To Provider Tools
 
-function convertToOpenAITool(tool: Tool): OpenAI.Responses.FunctionTool {
+function convertToOpenAITool(tool: Tool): OpenAI.Responses.Tool {
   if (tool.type === "web_search") {
-    throw new UnsupportedError(PROVIDER, "Web search tool is not supported");
+    const webSearchTool: OpenAI.Responses.WebSearchTool = {
+      type: "web_search",
+    };
+    if (tool.allowed_domains) {
+      webSearchTool.filters = {
+        allowed_domains: tool.allowed_domains,
+      };
+    }
+    if (tool.user_location) {
+      webSearchTool.user_location = {
+        type: "approximate",
+        ...tool.user_location,
+      };
+    }
+    return webSearchTool;
   }
 
   return {
@@ -479,10 +495,7 @@ function mapOpenAIOutputItems(
           return item.content.map((item): Part => {
             switch (item.type) {
               case "output_text":
-                return {
-                  type: "text",
-                  text: item.text,
-                };
+                return mapOpenAIOutputText(item);
               case "refusal":
                 throw new RefusalError(item.refusal);
             }
@@ -552,6 +565,52 @@ function mapOpenAIOutputItems(
     .flat();
 }
 
+function mapOpenAIOutputText(
+  outputText: OpenAI.Responses.ResponseOutputText,
+): TextPart {
+  const textPart: TextPart = {
+    type: "text",
+    text: outputText.text,
+  };
+  const citations = outputText.annotations
+    .filter((annotation) => annotation.type === "url_citation")
+    .map(mapOpenAIURLCitation);
+  if (citations.length > 0) {
+    textPart.citations = citations;
+  }
+  return textPart;
+}
+
+function mapOpenAIURLCitation(
+  annotation: OpenAI.Responses.ResponseOutputText.URLCitation,
+): Citation {
+  return {
+    source: annotation.url,
+    title: annotation.title,
+    start_index: annotation.start_index,
+    end_index: annotation.end_index,
+  };
+}
+
+function isOpenAIURLCitation(
+  annotation: unknown,
+): annotation is OpenAI.Responses.ResponseOutputText.URLCitation {
+  return (
+    typeof annotation === "object" &&
+    annotation !== null &&
+    "type" in annotation &&
+    annotation.type === "url_citation" &&
+    "url" in annotation &&
+    typeof annotation.url === "string" &&
+    "title" in annotation &&
+    typeof annotation.title === "string" &&
+    "start_index" in annotation &&
+    typeof annotation.start_index === "number" &&
+    "end_index" in annotation &&
+    typeof annotation.end_index === "number"
+  );
+}
+
 // MARK: To SDK Delta
 
 function mapOpenAIStreamEvent(
@@ -617,6 +676,24 @@ function mapOpenAIStreamEvent(
       return {
         index,
         part,
+      };
+    }
+
+    case "response.output_text.annotation.added": {
+      // The OpenAI SDK types streaming annotations as unknown, so validate the
+      // URL-citation shape before exposing it as a common citation delta.
+      if (!isOpenAIURLCitation(event.annotation)) return null;
+      const citation = mapOpenAIURLCitation(event.annotation);
+      return {
+        index: event.output_index,
+        part: {
+          type: "text",
+          text: "",
+          citation: {
+            type: "citation",
+            ...citation,
+          },
+        },
       };
     }
 
