@@ -8,7 +8,9 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai", "gpt-5.6-terra");
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(&provider, &model_id);
 
     let mut stream = model
         .stream(LanguageModelInput {

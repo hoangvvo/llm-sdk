@@ -5,15 +5,14 @@ use futures::{
     FutureExt,
 };
 use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
-use llm_sdk::{
-    openai::{OpenAIModel, OpenAIModelOptions},
-    JSONSchema, Message, Part,
-};
+use llm_sdk::{JSONSchema, Message, Part};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{env, error::Error, sync::Arc, time::Duration};
+use std::{error::Error, sync::Arc, time::Duration};
 use tokio::time::Instant;
+
+mod common;
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -280,14 +279,15 @@ impl AgentFunctionTool<MyContext> for DeliverOrderTool {
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
-    let model = Arc::new(OpenAIModel::new(
-        "gpt-5.6-terra",
-        OpenAIModelOptions {
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY environment variable must be set"),
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )
+    .expect("failed to create model");
 
     // Order processing agent
     let order_agent = Agent::<MyContext>::builder("order", model.clone())

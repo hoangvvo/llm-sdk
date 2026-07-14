@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
@@ -33,7 +34,15 @@ func main() {
 
 	imageData := base64.StdEncoding.EncodeToString(imageBytes)
 
-	model := examples.GetModel("openai", "gpt-5.6-terra")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
+	}
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model := examples.GetModel(provider, modelID)
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{

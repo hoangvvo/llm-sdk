@@ -8,7 +8,9 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("anthropic", "claude-opus-4-8");
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "anthropic".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "claude-opus-4-8".to_string());
+    let model = common::get_model(&provider, &model_id);
 
     let response = model
         .generate(LanguageModelInput {

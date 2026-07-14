@@ -12,9 +12,9 @@ import (
 	"time"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmmcp "github.com/hoangvvo/llm-sdk/agent-go/mcp"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -33,15 +33,21 @@ const (
 func main() {
 	godotenv.Load("../.env")
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY is required")
-	}
-
 	stopServer := startStubMCPServer()
 	defer stopServer()
 
-	model := openai.NewOpenAIModel("gpt-5.6-luna", openai.OpenAIModelOptions{APIKey: apiKey})
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
+	}
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-luna"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		log.Fatalf("Failed to create model: %v", err)
+	}
 
 	// Build the agent and register the MCP toolkit so every run hydrates tools from the remote server.
 	agent := llmagent.NewAgent(

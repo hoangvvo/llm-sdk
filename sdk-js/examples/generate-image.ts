@@ -2,7 +2,9 @@ import { getModel } from "./get-model.ts";
 import { spawn } from "node:child_process";
 import { unlink, writeFile } from "node:fs/promises";
 
-const model = getModel("google", "gemini-3.1-flash-image");
+const provider = process.env["PROVIDER"] ?? "google";
+const modelId = process.env["MODEL"] ?? "gemini-3.1-flash-image";
+const model = getModel(provider, modelId);
 
 console.log("Requesting image generation...");
 const response = await model.generate({

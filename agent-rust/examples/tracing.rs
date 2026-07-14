@@ -1,10 +1,7 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
 use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
-use llm_sdk::{
-    openai::{OpenAIModel, OpenAIModelOptions},
-    JSONSchema, Message, Part,
-};
+use llm_sdk::{JSONSchema, Message, Part};
 use opentelemetry::{trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::{SpanExporter, WithHttpConfig};
 use opentelemetry_sdk::{trace::SdkTracerProvider, Resource};
@@ -12,11 +9,13 @@ use reqwest::Client;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{error::Error, sync::Arc, time::Duration};
+use std::{error::Error, time::Duration};
 use tokio::time::sleep;
 use tracing::{info, info_span, Level};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::layer::SubscriberExt;
+
+mod common;
 
 #[derive(Clone)]
 struct TracingContext {
@@ -173,15 +172,17 @@ fn init_tracing() -> Result<SdkTracerProvider, Box<dyn Error>> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
-    let provider = init_tracing()?;
+    let telemetry_provider = init_tracing()?;
 
-    let model = Arc::new(OpenAIModel::new(
-        "gpt-5.6-luna",
-        OpenAIModelOptions {
-            api_key: std::env::var("OPENAI_API_KEY")?,
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-luna".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )
+    .expect("failed to create model");
 
     let agent = Agent::<TracingContext>::builder("Trace Assistant", model)
         // Mirror the guidance used across the JS/Go tracing examples.
@@ -214,9 +215,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let response = agent.run(request).await?;
     println!("Agent response: {response:#?}");
 
-    provider.force_flush().ok();
+    telemetry_provider.force_flush().ok();
 
-    drop(provider); // ensure all spans are exported before exit
+    drop(telemetry_provider); // ensure all spans are exported before exit
 
     Ok(())
 }

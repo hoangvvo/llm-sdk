@@ -9,6 +9,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+mod common;
+
 #[derive(Clone, Serialize, Deserialize)]
 struct PlanItem {
     status: String,
@@ -128,13 +130,15 @@ impl AgentFunctionTool<Ctx> for UpdatePlan {
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    let model = Arc::new(llm_sdk::openai::OpenAIModel::new(
-        "gpt-5.6-terra",
-        llm_sdk::openai::OpenAIModelOptions {
-            api_key: std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set"),
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )
+    .expect("failed to create model");
 
     let store = Store::default();
     let overview = "You are a planner–executor assistant.\nBreak the user's goal into clear, \

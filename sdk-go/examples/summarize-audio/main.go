@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
@@ -28,7 +29,15 @@ func main() {
 
 	audioData := base64.StdEncoding.EncodeToString(audioBytes)
 
-	model := examples.GetModel("google", "gemini-3.1-flash-lite")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "google"
+	}
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gemini-3.1-flash-lite"
+	}
+	model := examples.GetModel(provider, modelID)
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{

@@ -4,17 +4,15 @@ use llm_agent::{
     Agent, AgentFunctionTool, AgentItem, AgentParams, AgentResponse, AgentTool, AgentToolResult,
     RunSessionRequest, Toolkit, ToolkitSession,
 };
-use llm_sdk::{
-    openai::{OpenAIModel, OpenAIModelOptions},
-    Message, Part,
-};
+use llm_sdk::{Message, Part};
 use serde::Deserialize;
 use std::{
-    env,
     sync::{Arc, Mutex},
     time::Duration,
 };
 use tokio::time::sleep;
+
+mod common;
 
 type VisitorId = &'static str;
 
@@ -836,14 +834,14 @@ impl AgentFunctionTool<RiftContext> for PageSecurityTool {
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
     dotenv().ok();
-    let api_key = env::var("OPENAI_API_KEY")?;
-    let model = Arc::new(OpenAIModel::new(
-        "gpt-5.6-luna",
-        OpenAIModelOptions {
-            api_key,
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-luna".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )?;
 
     let agent = Agent::new(
         AgentParams::new("WaypointArchivist", model)

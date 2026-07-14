@@ -530,10 +530,13 @@ const instructions: InstructionParam<RiftContext>[] = [
 ];
 
 // Traditional Agent setup still works: we wire static tools, instructions, and our custom toolkit together.
+const provider = process.env["PROVIDER"] ?? "openai";
+const modelId = process.env["MODEL"] ?? "gpt-5.6-luna";
+
 const archivist = new Agent<RiftContext>({
   name: "WaypointArchivist",
   instructions,
-  model: getModel("openai", "gpt-5.6-luna"),
+  model: getModel(provider, modelId),
   tools: [pageSecurityTool],
   toolkits: [new LostAndFoundToolkit()],
 });

@@ -55,7 +55,9 @@ const coreMemoryPrompt = (memories: MemoryBlock[]) =>
   `Core memories (JSON list):\n${JSON.stringify(memories)}`;
 
 const store = new InMemoryStore();
-const model = getModel("openai", "gpt-5.6-terra");
+const provider = process.env["PROVIDER"] ?? "openai";
+const modelId = process.env["MODEL"] ?? "gpt-5.6-terra";
+const model = getModel(provider, modelId);
 
 const memoryAgent = new Agent<void>({
   name: "memory",

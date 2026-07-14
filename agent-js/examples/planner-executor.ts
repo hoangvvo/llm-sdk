@@ -88,7 +88,9 @@ const updatePlanTool = zodTool({
   },
 });
 
-const model = getModel("openai", "gpt-5.6-terra");
+const provider = process.env["PROVIDER"] ?? "openai";
+const modelId = process.env["MODEL"] ?? "gpt-5.6-terra";
+const model = getModel(provider, modelId);
 
 const agent = new Agent<void>({
   name: "planner-executor",
