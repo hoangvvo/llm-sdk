@@ -10,7 +10,7 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("google", "gemini-3.1-flash-image-preview");
+    let model = common::get_model("google", "gemini-3.1-flash-image");
 
     println!("Requesting image generation...");
     let response = model

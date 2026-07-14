@@ -15,7 +15,7 @@ fn openai_api_key() -> &'static String {
 
 fn openai_model() -> OpenAIChatModel {
     OpenAIChatModel::new(
-        "gpt-4o".to_string(),
+        "gpt-5.6-terra".to_string(),
         OpenAIChatModelOptions {
             api_key: openai_api_key().clone(),
             ..Default::default()

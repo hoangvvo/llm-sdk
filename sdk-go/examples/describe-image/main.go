@@ -33,7 +33,7 @@ func main() {
 
 	imageData := base64.StdEncoding.EncodeToString(imageBytes)
 
-	model := examples.GetModel("openai", "gpt-4o")
+	model := examples.GetModel("openai", "gpt-5.6-terra")
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{

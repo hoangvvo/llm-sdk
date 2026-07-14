@@ -215,7 +215,7 @@ const issueReceiptTool = typeboxTool({
   },
 });
 
-const model = getModel("openai", "gpt-4o");
+const model = getModel("openai", "gpt-5.6-terra");
 
 const lostAndFoundAgent = new Agent<LostAndFoundContext>({
   name: "WaypointClerk",

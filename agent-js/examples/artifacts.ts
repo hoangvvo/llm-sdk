@@ -72,7 +72,7 @@ class InMemoryArtifactStore {
 }
 
 const store = new InMemoryArtifactStore();
-const model = getModel("openai", "gpt-4o");
+const model = getModel("openai", "gpt-5.6-terra");
 
 const overviewPrompt = `Use artifacts (documents/canvases) for substantive deliverables like documents, plans, specs, or code. Keep chat replies brief and status-oriented; put the full content into an artifact via the tools. Always reference artifacts by id.`;
 

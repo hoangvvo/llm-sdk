@@ -201,7 +201,7 @@ func main() {
 		log.Fatal("OPENAI_API_KEY environment variable must be set")
 	}
 
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
+	model := openai.NewOpenAIModel("gpt-5.6-terra", openai.OpenAIModelOptions{APIKey: apiKey})
 	agent := newAgent(model)
 
 	initialText := "We have an emergency launch window in four hours. Please unlock the Starlight Compass for the Horizon survey team."

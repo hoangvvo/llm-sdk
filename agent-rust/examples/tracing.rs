@@ -176,7 +176,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let provider = init_tracing()?;
 
     let model = Arc::new(OpenAIModel::new(
-        "gpt-5.4-mini",
+        "gpt-5.6-luna",
         OpenAIModelOptions {
             api_key: std::env::var("OPENAI_API_KEY")?,
             ..Default::default()

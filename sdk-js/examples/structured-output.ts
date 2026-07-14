@@ -92,7 +92,7 @@ const schema = {
   additionalProperties: false,
 };
 
-const model = getModel("openai", "gpt-4o");
+const model = getModel("openai", "gpt-5.6-terra");
 
 const response = await model.generate({
   system_prompt: `You are a helpful assistant that extracts structured data from text according to a provided JSON schema.`,

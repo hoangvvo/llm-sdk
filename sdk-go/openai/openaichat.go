@@ -277,16 +277,24 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 	if input.Tools != nil {
 		var tools []openaichatapi.CreateChatCompletionRequestToolsItem
 		for _, tool := range input.Tools {
+			if tool.FunctionTool == nil {
+				providerToolName := ""
+				if tool.ProviderTool != nil {
+					providerToolName = tool.ProviderTool.Name
+				}
+				return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("provider tool %q is not supported", providerToolName))
+			}
+			functionTool := tool.FunctionTool
 			openAITool := openaichatapi.ChatCompletionTool{
 				Function: openaichatapi.FunctionObject{
-					Name: tool.Name,
+					Name: functionTool.Name,
 				},
 			}
-			if tool.Description != "" {
-				openAITool.Function.Description = &tool.Description
+			if functionTool.Description != "" {
+				openAITool.Function.Description = &functionTool.Description
 			}
-			if tool.Parameters != nil {
-				parameters := openaichatapi.FunctionParameters(tool.Parameters)
+			if functionTool.Parameters != nil {
+				parameters := openaichatapi.FunctionParameters(functionTool.Parameters)
 				openAITool.Function.Parameters = &parameters
 			}
 			strict := true

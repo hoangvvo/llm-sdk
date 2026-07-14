@@ -157,20 +157,21 @@ func (a ImagePartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 }
 
 type ReasoningPartAssertion struct {
-	Text *regexp.Regexp
+	Text      *regexp.Regexp
+	Signature bool
+}
+
+func (a ReasoningPartAssertion) matches(part *llmsdk.ReasoningPart) bool {
+	textMatches := a.Text.MatchString(part.Text)
+	signatureMatches := !a.Signature || (part.Signature != nil && *part.Signature != "")
+	return textMatches && signatureMatches
 }
 
 func (a ReasoningPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 	t.Helper()
 
 	for _, part := range content {
-		if part.ReasoningPart != nil {
-			if !a.Text.MatchString(part.ReasoningPart.Text) {
-				t.Errorf("Expected matching reasoning text:\nExpected: %s\nReceived: %s", a.Text.String(), part.ReasoningPart.Text)
-				return
-			}
-
-			// pass
+		if part.ReasoningPart != nil && a.matches(part.ReasoningPart) {
 			return
 		}
 	}
@@ -262,10 +263,12 @@ func NewToolCallAssertion(toolName string, argsPattern string) PartAssertion {
 	}
 }
 
-func NewReasoningAssertion(textPattern string) PartAssertion {
+func NewReasoningAssertion(textPattern string, signature ...bool) PartAssertion {
+	hasSignature := len(signature) > 0 && signature[0]
 	return PartAssertion{
 		ReasoningPart: &ReasoningPartAssertion{
-			Text: regexp.MustCompile("(?s)" + textPattern),
+			Text:      regexp.MustCompile("(?s)" + textPattern),
+			Signature: hasSignature,
 		},
 	}
 }

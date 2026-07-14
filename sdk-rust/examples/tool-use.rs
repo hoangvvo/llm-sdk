@@ -50,7 +50,7 @@ async fn main() {
 
     let mut account = Account::new(1000);
 
-    let model = common::get_model("openai", "gpt-4o");
+    let model = common::get_model("openai", "gpt-5.6-terra");
 
     let mut messages = vec![Message::user(vec![Part::text(
         "I would like to buy 50 NVDA stocks.",

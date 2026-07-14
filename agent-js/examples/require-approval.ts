@@ -85,7 +85,7 @@ const unlockArtifact = zodTool({
 
 const sentinel = new Agent<VaultContext>({
   name: "VaultSentinel",
-  model: getModel("openai", "gpt-4o"),
+  model: getModel("openai", "gpt-5.6-terra"),
   instructions: [
     "You supervise the Eon Vault, safeguarding experimental expedition technology.",
   ],

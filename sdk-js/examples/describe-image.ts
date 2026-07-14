@@ -5,7 +5,7 @@ const imageRes = await fetch(imageUrl);
 
 const image = await imageRes.arrayBuffer();
 
-const model = getModel("openai", "gpt-4o");
+const model = getModel("openai", "gpt-5.6-terra");
 
 const response = await model.generate({
   messages: [

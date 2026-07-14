@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("openai", "gpt-4o")
+	model := examples.GetModel("openai", "gpt-5.6-terra")
 
 	response, err := model.Stream(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{

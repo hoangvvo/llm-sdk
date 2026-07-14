@@ -3,7 +3,7 @@ import type { ResponseFormatOption } from "@hoangvvo/llm-sdk";
 import { getModel } from "./get-model.ts";
 
 // Define the model to use for the Agent
-const model = getModel("openai", "gpt-4o");
+const model = getModel("openai", "gpt-5.6-terra");
 
 const searchFlightsTool = tool({
   name: "search_flights",

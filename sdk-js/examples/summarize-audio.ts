@@ -5,7 +5,7 @@ const audioRes = await fetch(audioUrl);
 
 const audio = await audioRes.arrayBuffer();
 
-const model = getModel("google", "gemini-3.1-flash-lite-preview");
+const model = getModel("google", "gemini-3.1-flash-lite");
 
 const response = await model.generate({
   messages: [

@@ -16,8 +16,11 @@ export function mapAudioFormatToMimeType(format: AudioFormat): string {
 }
 
 export function mapMimeTypeToAudioFormat(mimeType: string): AudioFormat {
+  const lowerMimeType = mimeType.toLowerCase();
   const format = Object.keys(audioFormatToMimeTypeMap).find((key) =>
-    mimeType.includes(audioFormatToMimeTypeMap[key as AudioFormat]),
+    lowerMimeType.includes(
+      audioFormatToMimeTypeMap[key as AudioFormat].toLowerCase(),
+    ),
   );
   if (!format) {
     throw new Error(`Unsupported audio format for mime type: ${mimeType}`);

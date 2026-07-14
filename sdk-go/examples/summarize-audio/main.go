@@ -28,7 +28,7 @@ func main() {
 
 	audioData := base64.StdEncoding.EncodeToString(audioBytes)
 
-	model := examples.GetModel("google", "gemini-3.1-flash-lite-preview")
+	model := examples.GetModel("google", "gemini-3.1-flash-lite")
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{

@@ -38,7 +38,7 @@ func main() {
 		log.Fatal("OPENAI_API_KEY environment variable must be set")
 	}
 
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
+	model := openai.NewOpenAIModel("gpt-5.6-terra", openai.OpenAIModelOptions{APIKey: apiKey})
 
 	staticInstruction := "You are Torch, a supportive guide who keeps tabletop role-playing sessions moving. Offer concrete options instead of long monologues."
 

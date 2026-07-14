@@ -26,7 +26,7 @@ func getColorSample() colorSample {
 }
 
 func main() {
-	model := examples.GetModel("openai", "gpt-4o")
+	model := examples.GetModel("openai", "gpt-5.6-terra")
 
 	maxTurnLeft := 10
 

@@ -54,6 +54,7 @@ export interface ImagePartAssertion {
 export interface ReasoningPartAssertion {
   type: "reasoning";
   text: RegExp;
+  signature?: boolean;
 }
 
 export function assertContentPart(
@@ -188,7 +189,10 @@ export function assertReasoningPart(
   assertion: ReasoningPartAssertion,
 ) {
   const foundPart = content.find(
-    (part) => part.type === "reasoning" && assertion.text.test(part.text),
+    (part) =>
+      part.type === "reasoning" &&
+      assertion.text.test(part.text) &&
+      (assertion.signature !== true || Boolean(part.signature)),
   );
   t.assert.ok(
     foundPart,

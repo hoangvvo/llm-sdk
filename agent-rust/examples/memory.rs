@@ -232,7 +232,7 @@ async fn main() {
 
     // Use OpenAI gpt-4o via env var OPENAI_API_KEY
     let model = Arc::new(llm_sdk::openai::OpenAIModel::new(
-        "gpt-4o",
+        "gpt-5.6-terra",
         llm_sdk::openai::OpenAIModelOptions {
             api_key: std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set"),
             ..Default::default()

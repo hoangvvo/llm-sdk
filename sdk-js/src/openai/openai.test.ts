@@ -7,7 +7,7 @@ suite("OpenAIModel", () => {
   assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
   const model = new OpenAIModel({
     apiKey: process.env["OPENAI_API_KEY"],
-    modelId: "gpt-5.4",
+    modelId: "gpt-5.6-sol",
   });
   const reasoningModel = new OpenAIModel({
     apiKey: process.env["OPENAI_API_KEY"],

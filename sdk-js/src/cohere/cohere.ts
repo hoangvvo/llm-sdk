@@ -415,6 +415,13 @@ function convertToCohereToolMessageContent(part: Part): Cohere.ToolContent {
 // MARK: To Provider Tools
 
 function convertToCohereTool(tool: Tool): Cohere.ToolV2 {
+  if (tool.type === "provider") {
+    throw new UnsupportedError(
+      PROVIDER,
+      `Provider tool ${tool.name} is not supported`,
+    );
+  }
+
   return {
     type: "function",
     function: {

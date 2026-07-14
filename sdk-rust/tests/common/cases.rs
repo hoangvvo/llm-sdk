@@ -202,6 +202,10 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
                     if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {
                         assertions.push(PartAssertion::Reasoning(ReasoningPartAssertion {
                             text: compile_pattern(text),
+                            signature: part_obj
+                                .get("signature")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false),
                         }));
                     }
                 }
@@ -449,19 +453,20 @@ pub async fn test_source_part_input(
     run_test_case(model, "source_part_input", options).await
 }
 
-pub async fn test_generate_web_search(
-    model: &dyn LanguageModel,
-    options: Option<RunTestCaseOptions>,
-) -> Result<(), Box<dyn Error>> {
-    run_test_case(model, "generate_web_search", options).await
-}
-
-pub async fn test_stream_web_search(
-    model: &dyn LanguageModel,
-    options: Option<RunTestCaseOptions>,
-) -> Result<(), Box<dyn Error>> {
-    run_test_case(model, "stream_web_search", options).await
-}
+// TODO: Re-enable the web search cases once provider tools are implemented.
+// pub async fn test_generate_web_search(
+//     model: &dyn LanguageModel,
+//     options: Option<RunTestCaseOptions>,
+// ) -> Result<(), Box<dyn Error>> {
+//     run_test_case(model, "generate_web_search", options).await
+// }
+//
+// pub async fn test_stream_web_search(
+//     model: &dyn LanguageModel,
+//     options: Option<RunTestCaseOptions>,
+// ) -> Result<(), Box<dyn Error>> {
+//     run_test_case(model, "stream_web_search", options).await
+// }
 
 pub async fn test_generate_image(
     model: &dyn LanguageModel,

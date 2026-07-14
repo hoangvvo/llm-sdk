@@ -275,14 +275,22 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 	if len(input.Tools) > 0 {
 		tools := make([]anthropicapi.CreateMessageParamsToolsItem, 0, len(input.Tools))
 		for _, tool := range input.Tools {
+			if tool.FunctionTool == nil {
+				providerToolName := ""
+				if tool.ProviderTool != nil {
+					providerToolName = tool.ProviderTool.Name
+				}
+				return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("provider tool %q is not supported", providerToolName))
+			}
+			functionTool := tool.FunctionTool
 			strict := true
 			anthropicTool := anthropicapi.Tool{
-				Name:        tool.Name,
-				InputSchema: anthropicapi.InputSchema(tool.Parameters),
+				Name:        functionTool.Name,
+				InputSchema: anthropicapi.InputSchema(functionTool.Parameters),
 				Strict:      &strict,
 			}
-			if tool.Description != "" {
-				anthropicTool.Description = ptr.To(tool.Description)
+			if functionTool.Description != "" {
+				anthropicTool.Description = ptr.To(functionTool.Description)
 			}
 			tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{
 				Tool: &anthropicTool,
@@ -582,8 +590,8 @@ func mapAnthropicTextCitations(raw []anthropicapi.ResponseTextBlockCitationsItem
 
 		citation := llmsdk.Citation{
 			Source:     source,
-			StartIndex: item.SearchResultLocation.StartBlockIndex,
-			EndIndex:   item.SearchResultLocation.EndBlockIndex,
+			StartIndex: ptr.To(item.SearchResultLocation.StartBlockIndex),
+			EndIndex:   ptr.To(item.SearchResultLocation.EndBlockIndex),
 		}
 		if item.SearchResultLocation.CitedText != "" {
 			citation.CitedText = ptr.To(item.SearchResultLocation.CitedText)

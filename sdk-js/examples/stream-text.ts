@@ -1,7 +1,7 @@
 import { StreamAccumulator } from "@hoangvvo/llm-sdk";
 import { getModel } from "./get-model.ts";
 
-const model = getModel("openai", "gpt-4o");
+const model = getModel("openai", "gpt-5.6-terra");
 
 const response = model.stream({
   messages: [

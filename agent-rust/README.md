@@ -145,7 +145,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
         api_key: env::var("OPENAI_API_KEY")
             .expect("OPENAI_API_KEY environment variable must be set"),
-        model_id: "gpt-4o".to_string(),
+        model_id: "gpt-5.6-terra".to_string(),
         ..Default::default()
     }));
 

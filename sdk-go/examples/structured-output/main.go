@@ -115,7 +115,7 @@ Tags: breakfast, easy, kid-friendly`
 		"additionalProperties": false,
 	}
 
-	model := examples.GetModel("openai", "gpt-4o")
+	model := examples.GetModel("openai", "gpt-5.6-terra")
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		SystemPrompt: ptr.To("You are a helpful assistant that extracts structured data from text according to a provided JSON schema."),

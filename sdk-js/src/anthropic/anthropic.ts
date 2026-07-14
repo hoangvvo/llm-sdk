@@ -334,6 +334,13 @@ export function convertToAnthropicThinkingBlockParam(
 // MARK: To Provider Tools
 
 function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
+  if (tool.type === "provider") {
+    throw new UnsupportedError(
+      PROVIDER,
+      `Provider tool ${tool.name} is not supported`,
+    );
+  }
+
   return {
     name: tool.name,
     description: tool.description,

@@ -332,13 +332,15 @@ fn convert_to_anthropic_create_params(
         thinking: reasoning
             .map(|options| convert_to_anthropic_thinking_config(&options, max_tokens)),
         tool_choice: tool_choice.map(convert_to_anthropic_tool_choice),
-        tools: tools.map(|tool_list| {
-            tool_list
-                .into_iter()
-                .map(convert_tool)
-                .map(CreateMessageParamsToolsItem::Tool)
-                .collect()
-        }),
+        tools: tools
+            .map(|tool_list| {
+                tool_list
+                    .into_iter()
+                    .map(convert_tool)
+                    .map(|tool| tool.map(CreateMessageParamsToolsItem::Tool))
+                    .collect::<LanguageModelResult<Vec<_>>>()
+            })
+            .transpose()?,
         top_k: top_k.map(i64::from),
         top_p,
     };
@@ -346,8 +348,18 @@ fn convert_to_anthropic_create_params(
     Ok(params)
 }
 
-fn convert_tool(tool: SdkTool) -> Tool {
-    Tool {
+fn convert_tool(tool: SdkTool) -> LanguageModelResult<Tool> {
+    let tool = match tool {
+        SdkTool::Function(tool) => tool,
+        SdkTool::Provider(tool) => {
+            return Err(LanguageModelError::Unsupported(
+                PROVIDER,
+                format!("provider tool {:?} is not supported", tool.name),
+            ));
+        }
+    };
+
+    Ok(Tool {
         allowed_callers: None,
         name: tool.name,
         description: Some(tool.description),
@@ -358,7 +370,7 @@ fn convert_tool(tool: SdkTool) -> Tool {
         input_examples: None,
         strict: Some(true),
         r#type: None,
-    }
+    })
 }
 
 fn convert_to_anthropic_output_config(
@@ -626,6 +638,7 @@ fn map_text_block(block: api::ResponseTextBlock) -> TextPart {
     TextPart {
         text: block.text,
         citations,
+        signature: None,
     }
 }
 
@@ -660,8 +673,9 @@ fn map_text_citations(
                 } else {
                     Some(cited_text)
                 },
-                start_index: usize::try_from(start_block_index).ok()?,
-                end_index: usize::try_from(end_block_index).ok()?,
+                start_index: usize::try_from(start_block_index).ok(),
+                end_index: usize::try_from(end_block_index).ok(),
+                signature: None,
             };
 
             results.push(mapped);
@@ -751,6 +765,7 @@ fn map_anthropic_content_block_delta_event(
         ContentBlockDeltaEventDelta::TextDelta(delta) => PartDelta::Text(TextPartDelta {
             text: delta.text,
             citation: None,
+            signature: None,
         }),
         ContentBlockDeltaEventDelta::InputJsonDelta(delta) => {
             PartDelta::ToolCall(ToolCallPartDelta {
@@ -780,6 +795,7 @@ fn map_anthropic_content_block_delta_event(
             PartDelta::Text(TextPartDelta {
                 text: String::new(),
                 citation: Some(citation),
+                signature: None,
             })
         }
         ContentBlockDeltaEventDelta::Unknown => return None,
@@ -817,6 +833,7 @@ fn map_citation_delta(citation: api::CitationsDeltaCitation) -> Option<CitationD
         },
         start_index: usize::try_from(start_block_index).ok(),
         end_index: usize::try_from(end_block_index).ok(),
+        signature: None,
     };
 
     Some(result)

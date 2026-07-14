@@ -550,6 +550,16 @@ fn convert_tool_message_to_response_input_items(
 }
 
 fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<OpenAITool> {
+    let tool = match tool {
+        Tool::Function(tool) => tool,
+        Tool::Provider(tool) => {
+            return Err(LanguageModelError::Unsupported(
+                PROVIDER,
+                format!("provider tool {:?} is not supported", tool.name),
+            ));
+        }
+    };
+
     Ok(OpenAITool::FunctionTool(FunctionTool {
         defer_loading: None,
         description: Some(tool.description),
@@ -752,6 +762,7 @@ fn map_openai_stream_event(
             let text_part = PartDelta::Text(TextPartDelta {
                 text: text_delta_event.delta,
                 citation: None,
+                signature: None,
             });
             Ok(Some(ContentDelta {
                 index: usize::try_from(text_delta_event.output_index).unwrap_or(0),

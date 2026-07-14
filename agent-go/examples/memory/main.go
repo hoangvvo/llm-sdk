@@ -175,7 +175,7 @@ func main() {
 	if apiKey == "" {
 		log.Fatal("OPENAI_API_KEY must be set")
 	}
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
+	model := openai.NewOpenAIModel("gpt-5.6-terra", openai.OpenAIModelOptions{APIKey: apiKey})
 
 	store := NewStore()
 

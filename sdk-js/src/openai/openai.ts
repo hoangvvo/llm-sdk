@@ -365,6 +365,13 @@ function convertToolMessageToResponseInputItems(
 // MARK: To Provider Tools
 
 function convertToOpenAITool(tool: Tool): OpenAI.Responses.FunctionTool {
+  if (tool.type === "provider") {
+    throw new UnsupportedError(
+      PROVIDER,
+      `Provider tool ${tool.name} is not supported`,
+    );
+  }
+
   return {
     type: "function",
     name: tool.name,

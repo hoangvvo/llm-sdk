@@ -51,6 +51,7 @@ interface StageOutputJSON {
     args?: string;
     id?: boolean;
     transcript?: string;
+    signature?: boolean;
   }[];
 }
 
@@ -128,6 +129,7 @@ function convertOutput(output: StageOutputJSON, testCaseName: string) {
         return {
           type: "reasoning",
           text: compilePattern(part.text),
+          signature: part.signature ?? false,
         } as PartAssertion;
       }
       throw new Error(`Invalid part assertion in test case ${testCaseName}`);
@@ -234,8 +236,9 @@ export const TEST_CASE_NAMES = {
   GENERATE_IMAGE_INPUT: "generate_image_input",
   STREAM_IMAGE_INPUT: "stream_image_input",
   GENERATE_REASONING: "generate_reasoning",
-  GENERATE_WEB_SEARCH: "generate_web_search",
-  STREAM_WEB_SEARCH: "stream_web_search",
+  // TODO: Re-enable the web search cases once provider tools are implemented.
+  // GENERATE_WEB_SEARCH: "generate_web_search",
+  // STREAM_WEB_SEARCH: "stream_web_search",
   STREAM_REASONING: "stream_reasoning",
 } as const;
 

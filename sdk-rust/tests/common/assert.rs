@@ -177,6 +177,7 @@ impl ImagePartAssertion {
 #[derive(Debug, Clone)]
 pub struct ReasoningPartAssertion {
     pub text: Regex,
+    pub signature: bool,
 }
 
 impl ReasoningPartAssertion {
@@ -184,6 +185,11 @@ impl ReasoningPartAssertion {
         let found_part = content.iter().find(|part| {
             if let Part::Reasoning(reasoning_part) = part {
                 self.text.is_match(&reasoning_part.text)
+                    && (!self.signature
+                        || reasoning_part
+                            .signature
+                            .as_ref()
+                            .is_some_and(|signature| !signature.is_empty()))
             } else {
                 false
             }

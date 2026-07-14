@@ -1,7 +1,7 @@
 import type { Part } from "@hoangvvo/llm-sdk";
 import { getModel } from "./get-model.ts";
 
-const model = getModel("openai", "gpt-5.4");
+const model = getModel("openai", "gpt-5.6-sol");
 
 const response = await model.generate({
   messages: [

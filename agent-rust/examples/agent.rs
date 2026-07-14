@@ -130,7 +130,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Define the model to use for the Agent
     let model = Arc::new(OpenAIModel::new(
-        "gpt-4o",
+        "gpt-5.6-terra",
         OpenAIModelOptions {
             api_key: env::var("OPENAI_API_KEY")
                 .expect("OPENAI_API_KEY environment variable must be set"),

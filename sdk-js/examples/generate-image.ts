@@ -2,7 +2,7 @@ import { getModel } from "./get-model.ts";
 import { spawn } from "node:child_process";
 import { unlink, writeFile } from "node:fs/promises";
 
-const model = getModel("google", "gemini-3.1-flash-image-preview");
+const model = getModel("google", "gemini-3.1-flash-image");
 
 console.log("Requesting image generation...");
 const response = await model.generate({

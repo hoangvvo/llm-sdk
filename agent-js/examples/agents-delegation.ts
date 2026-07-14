@@ -47,7 +47,7 @@ ${description}`,
   });
 }
 
-const model = getModel("openai", "gpt-4o");
+const model = getModel("openai", "gpt-5.6-terra");
 
 interface Order {
   customer_name: string;

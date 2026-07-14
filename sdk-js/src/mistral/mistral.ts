@@ -177,7 +177,7 @@ function convertToMistralRequest(
     request.responseFormat = convertToMistralResponseFormat(response_format);
   }
   if (reasoning) {
-    request.promptMode = reasoning.enabled ? "reasoning" : null;
+    request.reasoningEffort = reasoning.enabled ? "high" : "none";
   }
 
   return request;
@@ -362,6 +362,13 @@ function convertToMistralToolCall(
 // MARK: To Provider Tools
 
 function convertToMistralTool(tool: Tool): MistralComponents.Tool {
+  if (tool.type === "provider") {
+    throw new UnsupportedError(
+      PROVIDER,
+      `Provider tool ${tool.name} is not supported`,
+    );
+  }
+
   return {
     type: "function",
     function: {

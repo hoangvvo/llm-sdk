@@ -9,7 +9,7 @@ interface DungeonRunContext {
   getOracleWhisper(): Promise<string>;
 }
 
-const model = getModel("openai", "gpt-4o");
+const model = getModel("openai", "gpt-5.6-terra");
 
 const dungeonCoach = new Agent<DungeonRunContext>({
   name: "Torch",

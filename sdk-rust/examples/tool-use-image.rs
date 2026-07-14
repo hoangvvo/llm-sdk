@@ -24,7 +24,7 @@ fn get_color_sample() -> ColorSample {
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai", "gpt-4o");
+    let model = common::get_model("openai", "gpt-5.6-terra");
 
     let mut messages = vec![Message::user(vec![Part::text(
         "What color is the image returned by the tool? Answer with one word.",

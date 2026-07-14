@@ -129,7 +129,7 @@ impl AgentFunctionTool<Ctx> for UpdatePlan {
 async fn main() {
     dotenv().ok();
     let model = Arc::new(llm_sdk::openai::OpenAIModel::new(
-        "gpt-4o",
+        "gpt-5.6-terra",
         llm_sdk::openai::OpenAIModelOptions {
             api_key: std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set"),
             ..Default::default()

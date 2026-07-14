@@ -7,7 +7,7 @@ suite("OpenAIChatModel", () => {
   assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
   const model = new OpenAIChatModel({
     apiKey: process.env["OPENAI_API_KEY"],
-    modelId: "gpt-4o",
+    modelId: "gpt-5.6-terra",
   });
 
   const audioModel = new OpenAIChatModel({

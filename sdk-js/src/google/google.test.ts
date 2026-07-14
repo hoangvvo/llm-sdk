@@ -7,17 +7,17 @@ suite("GoogleModel", () => {
   assert(process.env["GOOGLE_API_KEY"], "GOOGLE_API_KEY must be set");
   const model = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-3.1-flash-lite-preview",
+    modelId: "gemini-3.1-flash-lite",
   });
 
   const audioModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-2.5-flash-preview-tts",
+    modelId: "gemini-3.1-flash-tts-preview",
   });
 
   const imageModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-3.1-flash-image-preview",
+    modelId: "gemini-3.1-flash-image",
   });
 
   const multimodalToolModel = new GoogleModel({

@@ -274,7 +274,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let api_key = env::var("OPENAI_API_KEY")?;
     let model = Arc::new(OpenAIModel::new(
-        "gpt-4o",
+        "gpt-5.6-terra",
         OpenAIModelOptions {
             api_key,
             ..Default::default()

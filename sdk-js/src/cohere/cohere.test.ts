@@ -7,17 +7,17 @@ suite("CohereModel", () => {
   assert(process.env["CO_API_KEY"], "COHERE_API_KEY must be set");
   const model = new CohereModel({
     apiKey: process.env["CO_API_KEY"],
-    modelId: "command-a-03-2025",
+    modelId: "command-a-plus-05-2026",
   });
 
   const reasoningModel = new CohereModel({
     apiKey: process.env["CO_API_KEY"],
-    modelId: "command-a-reasoning-08-2025",
+    modelId: "command-a-plus-05-2026",
   });
 
   const visionModel = new CohereModel({
     apiKey: process.env["CO_API_KEY"],
-    modelId: "command-a-vision-07-2025",
+    modelId: "command-a-plus-05-2026",
   });
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {

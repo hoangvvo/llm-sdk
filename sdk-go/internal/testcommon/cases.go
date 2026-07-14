@@ -187,7 +187,8 @@ func convertOutputAssertions(content []interface{}) []PartAssertion {
 			}
 			assertions = append(assertions, NewImageAssertion(imageID))
 		case "reasoning":
-			assertions = append(assertions, NewReasoningAssertion(partMap["text"].(string)))
+			signature, _ := partMap["signature"].(bool)
+			assertions = append(assertions, NewReasoningAssertion(partMap["text"].(string), signature))
 		}
 	}
 

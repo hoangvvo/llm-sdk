@@ -147,12 +147,17 @@ impl LanguageModel for OpenAIChatModel {
                 input,
                 |input| async move {
                     let request = convert_to_openai_create_params(input, &self.model_id(), false)?;
+                    let audio_format = request
+                        .audio
+                        .as_ref()
+                        .map(|audio| map_openai_audio_format(&audio.format));
+                    let request_json = serialize_openai_chat_request(&request)?;
                     let headers = self.request_headers()?;
 
                     let response: CreateChatCompletionResponse = client_utils::send_json(
                         &self.client,
                         &format!("{}/chat/completions", self.base_url),
-                        &request,
+                        &request_json,
                         headers,
                     )
                     .await?;
@@ -172,13 +177,7 @@ impl LanguageModel for OpenAIChatModel {
                         }
                     }
 
-                    let content = map_openai_message(
-                        message,
-                        request
-                            .audio
-                            .as_ref()
-                            .map(|audio| map_openai_audio_format(&audio.format)),
-                    )?;
+                    let content = map_openai_message(message, audio_format)?;
 
                     let usage = response.usage.map(map_openai_usage).transpose()?;
 
@@ -218,19 +217,18 @@ impl LanguageModel for OpenAIChatModel {
                         .audio
                         .as_ref()
                         .map(|audio| map_openai_audio_format(&audio.format));
+                    let request_json = serialize_openai_chat_request(&request)?;
                     let headers = self.request_headers()?;
 
-                    let mut stream = client_utils::send_sse_stream::<
-                        CreateChatCompletionRequest,
-                        CreateChatCompletionStreamResponse,
-                    >(
-                        &self.client,
-                        &format!("{}/chat/completions", self.base_url),
-                        &request,
-                        headers,
-                        PROVIDER,
-                    )
-                    .await?;
+                    let mut stream =
+                        client_utils::send_sse_stream::<Value, CreateChatCompletionStreamResponse>(
+                            &self.client,
+                            &format!("{}/chat/completions", self.base_url),
+                            &request_json,
+                            headers,
+                            PROVIDER,
+                        )
+                        .await?;
 
                     let mut refusal = String::new();
                     let mut content_deltas: Vec<ContentDelta> = Vec::new();
@@ -361,9 +359,29 @@ fn convert_to_openai_create_params(
         tool_choice: input.tool_choice.map(convert_to_openai_tool_choice),
         tools: input
             .tools
-            .map(|tools| tools.into_iter().map(convert_to_openai_tool).collect()),
+            .map(|tools| {
+                tools
+                    .into_iter()
+                    .map(convert_to_openai_tool)
+                    .collect::<LanguageModelResult<Vec<_>>>()
+            })
+            .transpose()?,
         verbosity: None,
         web_search_options: None,
+    })
+}
+
+fn serialize_openai_chat_request(
+    request: &CreateChatCompletionRequest,
+) -> LanguageModelResult<Value> {
+    // OpenAI reuses content-part schemas both directly and inside tagged unions.
+    // Serializing through Value canonicalizes the union discriminator to one key
+    // before reqwest writes the request body.
+    serde_json::to_value(request).map_err(|error| {
+        LanguageModelError::Invariant(
+            PROVIDER,
+            format!("Failed to serialize OpenAI chat request: {error}"),
+        )
     })
 }
 
@@ -611,14 +629,26 @@ fn convert_tool_message(
     Ok(result)
 }
 
-fn convert_to_openai_tool(tool: Tool) -> CreateChatCompletionRequestToolsItem {
+fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<CreateChatCompletionRequestToolsItem> {
+    let tool = match tool {
+        Tool::Function(tool) => tool,
+        Tool::Provider(tool) => {
+            return Err(LanguageModelError::Unsupported(
+                PROVIDER,
+                format!("provider tool {:?} is not supported", tool.name),
+            ));
+        }
+    };
+
     let function = FunctionObject {
         description: Some(tool.description),
         name: tool.name,
         parameters: Some(Some(tool.parameters)),
         strict: Some(true),
     };
-    CreateChatCompletionRequestToolsItem::Function(ChatCompletionTool { function })
+    Ok(CreateChatCompletionRequestToolsItem::Function(
+        ChatCompletionTool { function },
+    ))
 }
 
 fn convert_to_openai_tool_call(
@@ -781,6 +811,7 @@ fn map_openai_message(
             parts.push(Part::Text(crate::TextPart {
                 text: content,
                 citations: None,
+                signature: None,
             }));
         }
     }
@@ -878,6 +909,7 @@ fn map_openai_delta(
             let part = PartDelta::Text(crate::TextPartDelta {
                 text: content,
                 citation: None,
+                signature: None,
             });
             let combined = existing_content_deltas
                 .iter()
@@ -1026,4 +1058,29 @@ fn map_openai_completion_tokens_details(
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn request_serialization_emits_one_content_part_discriminator() {
+        let input = LanguageModelInput::new([Message::user([Part::text("Hello")])]);
+        let request = convert_to_openai_create_params(input, "gpt-4o", false).unwrap();
+        let request_json = serialize_openai_chat_request(&request).unwrap();
+
+        assert_eq!(
+            request_json.pointer("/messages/0/content/0"),
+            Some(&json!({
+                "text": "Hello",
+                "type": "text",
+            }))
+        );
+
+        let encoded_content =
+            serde_json::to_string(request_json.pointer("/messages/0/content/0").unwrap()).unwrap();
+        assert_eq!(encoded_content.matches("\"type\":\"text\"").count(), 1);
+    }
 }

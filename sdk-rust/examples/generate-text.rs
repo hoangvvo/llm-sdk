@@ -7,7 +7,7 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai", "gpt-4o");
+    let model = common::get_model("openai", "gpt-5.6-terra");
 
     let response = model
         .generate(LanguageModelInput::new([

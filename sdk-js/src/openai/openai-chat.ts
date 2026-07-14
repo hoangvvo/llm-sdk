@@ -440,6 +440,13 @@ function convertToOpenAIToolMessageParamContent(
 function convertToOpenAITool(
   tool: Tool,
 ): OpenAI.Chat.Completions.ChatCompletionTool {
+  if (tool.type === "provider") {
+    throw new UnsupportedError(
+      PROVIDER,
+      `Provider tool ${tool.name} is not supported`,
+    );
+  }
+
   return {
     type: "function",
     function: {

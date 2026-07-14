@@ -22,7 +22,7 @@ async fn main() {
 
     let image_b64 = BASE64_STANDARD.encode(&image_bytes);
 
-    let model = common::get_model("openai", "gpt-4o");
+    let model = common::get_model("openai", "gpt-5.6-terra");
 
     let response = model
         .generate(LanguageModelInput {
