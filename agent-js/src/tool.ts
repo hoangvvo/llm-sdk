@@ -1,4 +1,4 @@
-import type { JSONSchema, Part, ProviderTool } from "@hoangvvo/llm-sdk";
+import type { JSONSchema, Part, WebSearchTool } from "@hoangvvo/llm-sdk";
 import type { RunState } from "./run.ts";
 
 /**
@@ -40,13 +40,13 @@ export interface AgentFunctionTool<
 
 /**
  * Agent tool available to the model. This can either be an agent-executed
- * function tool or a provider-hosted tool that is forwarded to the model.
+ * function tool or a provider-hosted web search tool.
  */
 export type AgentTool<
   TContext,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TArgs extends Record<string, unknown> = any,
-> = AgentFunctionTool<TContext, TArgs> | ProviderTool;
+> = AgentFunctionTool<TContext, TArgs> | WebSearchTool;
 
 export interface AgentToolResult {
   content: Part[];

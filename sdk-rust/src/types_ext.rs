@@ -1,9 +1,9 @@
 use crate::{
     AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FunctionTool,
-    ImagePart, ImagePartDelta, LanguageModelInput, Message, Modality, Part, ProviderTool,
-    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatOption, SourcePart,
-    TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
-    ToolResultPart, UserMessage,
+    ImagePart, ImagePartDelta, LanguageModelInput, Message, Modality, Part, ReasoningOptions,
+    ReasoningPart, ReasoningPartDelta, ResponseFormatOption, SourcePart, TextPart, TextPartDelta,
+    Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart,
+    UserMessage, WebSearchTool, WebSearchUserLocation,
 };
 
 impl TextPart {
@@ -252,9 +252,53 @@ impl FunctionTool {
     }
 }
 
-impl ProviderTool {
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
+impl WebSearchTool {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_allowed_domains(mut self, allowed_domains: Vec<String>) -> Self {
+        self.allowed_domains = Some(allowed_domains);
+        self
+    }
+
+    #[must_use]
+    pub fn with_user_location(mut self, user_location: WebSearchUserLocation) -> Self {
+        self.user_location = Some(user_location);
+        self
+    }
+}
+
+impl WebSearchUserLocation {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_city(mut self, city: impl Into<String>) -> Self {
+        self.city = Some(city.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_region(mut self, region: impl Into<String>) -> Self {
+        self.region = Some(region.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_country(mut self, country: impl Into<String>) -> Self {
+        self.country = Some(country.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_timezone(mut self, timezone: impl Into<String>) -> Self {
+        self.timezone = Some(timezone.into());
+        self
     }
 }
 
@@ -264,9 +308,9 @@ impl From<FunctionTool> for Tool {
     }
 }
 
-impl From<ProviderTool> for Tool {
-    fn from(value: ProviderTool) -> Self {
-        Self::Provider(value)
+impl From<WebSearchTool> for Tool {
+    fn from(value: WebSearchTool) -> Self {
+        Self::WebSearch(value)
     }
 }
 
@@ -732,5 +776,43 @@ impl ReasoningPartDelta {
     pub fn with_signature(mut self, signature: impl Into<String>) -> Self {
         self.signature = Some(signature.into());
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn web_search_tool_json_round_trip() {
+        let tool: Tool = WebSearchTool::new()
+            .with_allowed_domains(vec!["example.com".to_string()])
+            .with_user_location(
+                WebSearchUserLocation::new()
+                    .with_city("San Francisco")
+                    .with_region("California")
+                    .with_country("US")
+                    .with_timezone("America/Los_Angeles"),
+            )
+            .into();
+
+        let value = serde_json::to_value(&tool).expect("tool serializes");
+        assert_eq!(
+            value,
+            json!({
+                "type": "web_search",
+                "allowed_domains": ["example.com"],
+                "user_location": {
+                    "city": "San Francisco",
+                    "region": "California",
+                    "country": "US",
+                    "timezone": "America/Los_Angeles"
+                }
+            })
+        );
+
+        let decoded: Tool = serde_json::from_value(value).expect("tool deserializes");
+        assert_eq!(decoded, tool);
     }
 }

@@ -13,7 +13,7 @@ use llm_agent::{
     mcp::{MCPInit, MCPParams, MCPToolkit},
     Agent, AgentFunctionTool,
 };
-use llm_sdk::{AudioOptions, LanguageModel, Modality, ProviderTool, ReasoningOptions};
+use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions, WebSearchTool};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -149,9 +149,7 @@ pub fn create_agent(
         builder = builder.add_tool(ArtifactDeleteTool);
     }
     if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"web_search".to_string()) {
-        builder = builder.add_tool(ProviderTool {
-            name: "web_search".to_string(),
-        });
+        builder = builder.add_tool(WebSearchTool::new());
     }
 
     builder = builder.max_turns(5);

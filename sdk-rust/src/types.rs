@@ -423,10 +423,12 @@ pub type JSONSchema = Value;
 /// Represents a tool that can be used by the model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[serde(tag = "type", rename_all = "lowercase")]
+#[serde(tag = "type")]
 pub enum Tool {
+    #[serde(rename = "function")]
     Function(FunctionTool),
-    Provider(ProviderTool),
+    #[serde(rename = "web_search")]
+    WebSearch(WebSearchTool),
 }
 
 /// Represents a client-executed function tool that can be used by the model.
@@ -442,13 +444,35 @@ pub struct FunctionTool {
     pub parameters: JSONSchema,
 }
 
-/// Represents a provider-hosted tool that is forwarded to the model provider
-/// for execution.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// Represents a provider-hosted web search tool.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-pub struct ProviderTool {
-    /// The provider tool name.
-    pub name: String,
+pub struct WebSearchTool {
+    /// Restricts search results to these domains when supported by the
+    /// provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_domains: Option<Vec<String>>,
+    /// An approximate user location used to localize web search results.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_location: Option<WebSearchUserLocation>,
+}
+
+/// An approximate user location used to localize web search results.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct WebSearchUserLocation {
+    /// The city of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    /// The region or state of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    /// The two-letter ISO 3166-1 country code of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    /// The IANA timezone of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
 }
 
 /// Represents tool result in the message history.

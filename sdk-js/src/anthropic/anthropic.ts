@@ -334,11 +334,8 @@ export function convertToAnthropicThinkingBlockParam(
 // MARK: To Provider Tools
 
 function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
-  if (tool.type === "provider") {
-    throw new UnsupportedError(
-      PROVIDER,
-      `Provider tool ${tool.name} is not supported`,
-    );
+  if (tool.type === "web_search") {
+    throw new UnsupportedError(PROVIDER, "Web search tool is not supported");
   }
 
   return {

@@ -236,7 +236,7 @@ export const TEST_CASE_NAMES = {
   GENERATE_IMAGE_INPUT: "generate_image_input",
   STREAM_IMAGE_INPUT: "stream_image_input",
   GENERATE_REASONING: "generate_reasoning",
-  // TODO: Re-enable the web search cases once provider tools are implemented.
+  // TODO: Re-enable the web search cases once WebSearchTool is implemented by providers.
   // GENERATE_WEB_SEARCH: "generate_web_search",
   // STREAM_WEB_SEARCH: "stream_web_search",
   STREAM_REASONING: "stream_reasoning",

@@ -351,10 +351,10 @@ fn convert_to_anthropic_create_params(
 fn convert_tool(tool: SdkTool) -> LanguageModelResult<Tool> {
     let tool = match tool {
         SdkTool::Function(tool) => tool,
-        SdkTool::Provider(tool) => {
+        SdkTool::WebSearch(_) => {
             return Err(LanguageModelError::Unsupported(
                 PROVIDER,
-                format!("provider tool {:?} is not supported", tool.name),
+                "web search tool is not supported".to_string(),
             ));
         }
     };

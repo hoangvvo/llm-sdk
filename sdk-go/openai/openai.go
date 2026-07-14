@@ -252,11 +252,7 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 		tools := openaiapi.ToolsArray{}
 		for _, tool := range input.Tools {
 			if tool.FunctionTool == nil {
-				providerToolName := ""
-				if tool.ProviderTool != nil {
-					providerToolName = tool.ProviderTool.Name
-				}
-				return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("provider tool %q is not supported", providerToolName))
+				return nil, llmsdk.NewUnsupportedError(Provider, "web search tool is not supported")
 			}
 			functionTool := tool.FunctionTool
 			openAITool := openaiapi.Tool{

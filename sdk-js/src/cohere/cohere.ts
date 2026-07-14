@@ -415,11 +415,8 @@ function convertToCohereToolMessageContent(part: Part): Cohere.ToolContent {
 // MARK: To Provider Tools
 
 function convertToCohereTool(tool: Tool): Cohere.ToolV2 {
-  if (tool.type === "provider") {
-    throw new UnsupportedError(
-      PROVIDER,
-      `Provider tool ${tool.name} is not supported`,
-    );
+  if (tool.type === "web_search") {
+    throw new UnsupportedError(PROVIDER, "Web search tool is not supported");
   }
 
   return {

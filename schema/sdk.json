@@ -497,7 +497,7 @@
       "description": "Represents a tool that can be used by the model.",
       "oneOf": [
         { "$ref": "#/definitions/FunctionTool" },
-        { "$ref": "#/definitions/ProviderTool" }
+        { "$ref": "#/definitions/WebSearchTool" }
       ]
     },
     "FunctionTool": {
@@ -528,17 +528,44 @@
       "required": ["type", "name", "description", "parameters"],
       "additionalProperties": false
     },
-    "ProviderTool": {
+    "WebSearchTool": {
       "type": "object",
-      "description": "Represents a provider-hosted tool that is forwarded to the model provider for execution.",
+      "description": "Represents a provider-hosted web search tool.",
       "properties": {
-        "type": { "const": "provider" },
-        "name": {
-          "type": "string",
-          "description": "The provider tool name."
+        "type": { "const": "web_search" },
+        "allowed_domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Restricts search results to these domains when supported by the provider."
+        },
+        "user_location": {
+          "$ref": "#/definitions/WebSearchUserLocation"
         }
       },
-      "required": ["type", "name"],
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "WebSearchUserLocation": {
+      "type": "object",
+      "description": "An approximate user location used to localize web search results.",
+      "properties": {
+        "city": {
+          "type": "string",
+          "description": "The city of the user."
+        },
+        "region": {
+          "type": "string",
+          "description": "The region or state of the user."
+        },
+        "country": {
+          "type": "string",
+          "description": "The two-letter ISO 3166-1 country code of the user."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "The IANA timezone of the user."
+        }
+      },
       "additionalProperties": false
     },
     "ModelTokensDetails": {

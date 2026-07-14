@@ -501,13 +501,30 @@ func NewFunctionTool(name string, description string, parameters JSONSchema) Too
 	}
 }
 
-// NewProviderTool creates a provider-hosted tool.
-func NewProviderTool(name string) Tool {
-	return Tool{
-		ProviderTool: &ProviderTool{
-			Name: name,
-		},
+// WebSearchToolOption configures a web search tool.
+type WebSearchToolOption func(*WebSearchTool)
+
+// WithWebSearchAllowedDomains restricts search results to the given domains.
+func WithWebSearchAllowedDomains(allowedDomains ...string) WebSearchToolOption {
+	return func(tool *WebSearchTool) {
+		tool.AllowedDomains = append([]string(nil), allowedDomains...)
 	}
+}
+
+// WithWebSearchUserLocation localizes search results using an approximate user location.
+func WithWebSearchUserLocation(userLocation WebSearchUserLocation) WebSearchToolOption {
+	return func(tool *WebSearchTool) {
+		tool.UserLocation = &userLocation
+	}
+}
+
+// NewWebSearchTool creates a provider-hosted web search tool.
+func NewWebSearchTool(opts ...WebSearchToolOption) Tool {
+	webSearchTool := &WebSearchTool{}
+	for _, opt := range opts {
+		opt(webSearchTool)
+	}
+	return Tool{WebSearchTool: webSearchTool}
 }
 
 // LanguageModelInputOption configures a LanguageModelInput.

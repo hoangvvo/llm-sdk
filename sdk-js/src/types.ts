@@ -427,7 +427,7 @@ export type JSONSchema = Record<string, unknown>;
 /**
  * Represents a tool that can be used by the model.
  */
-export type Tool = FunctionTool | ProviderTool;
+export type Tool = FunctionTool | WebSearchTool;
 /**
  * Represents a client-executed function tool that can be used by the model.
  */
@@ -447,14 +447,39 @@ export interface FunctionTool {
   parameters: JSONSchema;
 }
 /**
- * Represents a provider-hosted tool that is forwarded to the model provider for execution.
+ * Represents a provider-hosted web search tool.
  */
-export interface ProviderTool {
-  type: "provider";
+export interface WebSearchTool {
+  type: "web_search";
   /**
-   * The provider tool name.
+   * Restricts search results to these domains when supported by the provider.
    */
-  name: string;
+  allowed_domains?: string[];
+  /**
+   * An approximate user location used to localize web search results.
+   */
+  user_location?: WebSearchUserLocation;
+}
+/**
+ * An approximate user location used to localize web search results.
+ */
+export interface WebSearchUserLocation {
+  /**
+   * The city of the user.
+   */
+  city?: string;
+  /**
+   * The region or state of the user.
+   */
+  region?: string;
+  /**
+   * The two-letter ISO 3166-1 country code of the user.
+   */
+  country?: string;
+  /**
+   * The IANA timezone of the user.
+   */
+  timezone?: string;
 }
 /**
  * Represents tool result in the message history.

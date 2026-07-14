@@ -304,10 +304,10 @@ fn convert_to_generate_content_parameters(
                     parameters_json_schema: Some(tool.parameters),
                     ..Default::default()
                 }),
-                SdkTool::Provider(tool) => {
+                SdkTool::WebSearch(_) => {
                     return Err(LanguageModelError::Unsupported(
                         PROVIDER,
-                        format!("provider tool {:?} is not supported", tool.name),
+                        "web search tool is not supported".to_string(),
                     ));
                 }
             }

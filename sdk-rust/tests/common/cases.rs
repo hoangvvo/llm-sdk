@@ -64,8 +64,8 @@ static TOOLS_MAP: LazyLock<HashMap<String, Tool>> = LazyLock::new(|| {
             Tool::Function(function_tool) => {
                 map.insert(function_tool.name.clone(), tool.clone());
             }
-            Tool::Provider(provider_tool) => {
-                map.insert(provider_tool.name.clone(), tool.clone());
+            Tool::WebSearch(_) => {
+                map.insert("web_search".to_string(), tool.clone());
             }
         }
     }
@@ -453,8 +453,8 @@ pub async fn test_source_part_input(
     run_test_case(model, "source_part_input", options).await
 }
 
-// TODO: Re-enable the web search cases once provider tools are implemented.
-// pub async fn test_generate_web_search(
+// TODO: Re-enable the web search cases once WebSearchTool is implemented by
+// providers. pub async fn test_generate_web_search(
 //     model: &dyn LanguageModel,
 //     options: Option<RunTestCaseOptions>,
 // ) -> Result<(), Box<dyn Error>> {

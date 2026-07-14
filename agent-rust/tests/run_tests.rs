@@ -10,7 +10,7 @@ use llm_agent::{
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
-    PartDelta, PartialModelResponse, ProviderTool, TextPartDelta, Tool, ToolCallPartDelta,
+    PartDelta, PartialModelResponse, TextPartDelta, Tool, ToolCallPartDelta, WebSearchTool,
 };
 use serde_json::{json, Value};
 
@@ -321,14 +321,11 @@ fn agent_params_add_tool_accepts_agent_tool_values() {
     );
 
     let params = AgentParams::new("test_agent", model)
-        .add_tool(AgentTool::provider(ProviderTool::new("web_search")))
+        .add_tool(AgentTool::web_search(WebSearchTool::new()))
         .add_tool(AgentTool::function(function_tool));
 
     assert_eq!(params.tools.len(), 2);
-    assert!(matches!(
-        Tool::from(&params.tools[0]),
-        Tool::Provider(tool) if tool.name == "web_search"
-    ));
+    assert!(matches!(Tool::from(&params.tools[0]), Tool::WebSearch(_)));
     assert!(matches!(
         Tool::from(&params.tools[1]),
         Tool::Function(tool) if tool.name == "mock-tool"
@@ -336,7 +333,7 @@ fn agent_params_add_tool_accepts_agent_tool_values() {
 }
 
 #[tokio::test]
-async fn run_forwards_provider_tools_to_model() {
+async fn run_forwards_web_search_tools_to_model() {
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
         content: vec![Part::text("Search-ready response")],
@@ -344,9 +341,7 @@ async fn run_forwards_provider_tools_to_model() {
     });
 
     let session = new_run_session(
-        Arc::new(
-            AgentParams::new("test_agent", model.clone()).add_tool(ProviderTool::new("web_search")),
-        ),
+        Arc::new(AgentParams::new("test_agent", model.clone()).add_tool(WebSearchTool::new())),
         (),
     )
     .await;
@@ -366,10 +361,7 @@ async fn run_forwards_provider_tools_to_model() {
     assert_eq!(inputs.len(), 1);
     let tools = inputs[0].tools.as_ref().expect("tools present");
     assert_eq!(tools.len(), 1);
-    assert!(matches!(
-        &tools[0],
-        llm_sdk::Tool::Provider(tool) if tool.name == "web_search"
-    ));
+    assert!(matches!(&tools[0], llm_sdk::Tool::WebSearch(_)));
 
     close_run_session(session).await;
 }

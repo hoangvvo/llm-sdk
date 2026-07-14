@@ -276,11 +276,7 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 		tools := make([]anthropicapi.CreateMessageParamsToolsItem, 0, len(input.Tools))
 		for _, tool := range input.Tools {
 			if tool.FunctionTool == nil {
-				providerToolName := ""
-				if tool.ProviderTool != nil {
-					providerToolName = tool.ProviderTool.Name
-				}
-				return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("provider tool %q is not supported", providerToolName))
+				return nil, llmsdk.NewUnsupportedError(Provider, "web search tool is not supported")
 			}
 			functionTool := tool.FunctionTool
 			strict := true

@@ -133,9 +133,9 @@ func listToolsHandler(w http.ResponseWriter) {
 				Name:        functionTool.Name(),
 				Description: functionTool.Description(),
 			})
-		} else if tool.ProviderTool != nil {
+		} else if tool.WebSearchTool != nil {
 			tools = append(tools, ToolInfo{
-				Name:        tool.ProviderTool.Name,
+				Name:        "web_search",
 				Description: "Search the web using the model provider's hosted search tool.",
 				Providers:   []string{"openai", "google", "anthropic"},
 			})

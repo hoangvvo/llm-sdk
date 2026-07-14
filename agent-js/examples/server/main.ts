@@ -102,7 +102,7 @@ function listToolsHandler(
     tool.type === "function"
       ? { name: tool.name, description: tool.description }
       : {
-          name: tool.name,
+          name: "web_search",
           description:
             "Search the web using the model provider's hosted search tool.",
           providers: ["openai", "google", "anthropic"],

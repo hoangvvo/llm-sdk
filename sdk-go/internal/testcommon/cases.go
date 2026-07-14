@@ -74,8 +74,8 @@ func ensureInitialized() {
 		for _, tool := range testData.Tools {
 			if tool.FunctionTool != nil {
 				toolsMap[tool.FunctionTool.Name] = tool
-			} else if tool.ProviderTool != nil {
-				toolsMap[tool.ProviderTool.Name] = tool
+			} else if tool.WebSearchTool != nil {
+				toolsMap["web_search"] = tool
 			}
 		}
 

@@ -51,8 +51,14 @@
       }
     },
     {
-      "type": "provider",
-      "name": "web_search"
+      "type": "web_search",
+      "allowed_domains": ["example.com"],
+      "user_location": {
+        "city": "San Francisco",
+        "region": "California",
+        "country": "US",
+        "timezone": "America/Los_Angeles"
+      }
     }
   ],
   "test_cases": [

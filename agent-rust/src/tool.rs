@@ -1,6 +1,6 @@
 use crate::RunState;
 use futures::future::BoxFuture;
-use llm_sdk::{FunctionTool, JSONSchema, Part, ProviderTool, Tool};
+use llm_sdk::{FunctionTool, JSONSchema, Part, Tool, WebSearchTool};
 use serde_json::Value;
 use std::{error::Error, fmt::Debug, sync::Arc};
 
@@ -42,13 +42,13 @@ impl<TCtx> Debug for dyn AgentFunctionTool<TCtx> {
 
 pub enum AgentTool<TCtx> {
     Function(Arc<dyn AgentFunctionTool<TCtx>>),
-    Provider(ProviderTool),
+    WebSearch(WebSearchTool),
 }
 
 #[doc(hidden)]
 pub struct AgentToolArg;
 #[doc(hidden)]
-pub struct ProviderToolArg;
+pub struct WebSearchToolArg;
 #[doc(hidden)]
 pub struct FunctionToolArg;
 
@@ -65,21 +65,21 @@ impl<TCtx> AgentTool<TCtx> {
         Self::Function(Arc::new(tool))
     }
 
-    pub fn provider(tool: ProviderTool) -> Self {
-        Self::Provider(tool)
+    pub fn web_search(tool: WebSearchTool) -> Self {
+        Self::WebSearch(tool)
     }
 
     pub fn name(&self) -> String {
         match self {
             Self::Function(tool) => tool.name(),
-            Self::Provider(tool) => tool.name.clone(),
+            Self::WebSearch(_) => "web_search".to_string(),
         }
     }
 
     pub(crate) fn as_function_tool(&self) -> Option<&Arc<dyn AgentFunctionTool<TCtx>>> {
         match self {
             Self::Function(tool) => Some(tool),
-            Self::Provider(_) => None,
+            Self::WebSearch(_) => None,
         }
     }
 }
@@ -88,7 +88,7 @@ impl<TCtx> Clone for AgentTool<TCtx> {
     fn clone(&self) -> Self {
         match self {
             Self::Function(tool) => Self::Function(Arc::clone(tool)),
-            Self::Provider(tool) => Self::Provider(tool.clone()),
+            Self::WebSearch(tool) => Self::WebSearch(tool.clone()),
         }
     }
 }
@@ -99,9 +99,9 @@ pub struct AgentToolResult {
     pub is_error: bool,
 }
 
-impl<TCtx> From<ProviderTool> for AgentTool<TCtx> {
-    fn from(value: ProviderTool) -> Self {
-        Self::provider(value)
+impl<TCtx> From<WebSearchTool> for AgentTool<TCtx> {
+    fn from(value: WebSearchTool) -> Self {
+        Self::web_search(value)
     }
 }
 
@@ -111,7 +111,7 @@ impl<TCtx> IntoAgentTool<TCtx, AgentToolArg> for AgentTool<TCtx> {
     }
 }
 
-impl<TCtx> IntoAgentTool<TCtx, ProviderToolArg> for ProviderTool {
+impl<TCtx> IntoAgentTool<TCtx, WebSearchToolArg> for WebSearchTool {
     fn into_agent_tool(self) -> AgentTool<TCtx> {
         self.into()
     }
@@ -132,7 +132,7 @@ impl<TCtx> From<&AgentTool<TCtx>> for Tool {
             AgentTool::Function(tool) => {
                 FunctionTool::new(tool.name(), tool.description(), tool.parameters()).into()
             }
-            AgentTool::Provider(tool) => Tool::Provider(tool.clone()),
+            AgentTool::WebSearch(tool) => Tool::WebSearch(tool.clone()),
         }
     }
 }

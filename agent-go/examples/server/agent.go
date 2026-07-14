@@ -52,7 +52,7 @@ var availableTools = append(
 		&GetCoordinatesTool{},
 		&GetWeatherTool{},
 	),
-	llmagent.NewAgentProviderTool[*MyContext](llmsdk.ProviderTool{Name: "web_search"}),
+	llmagent.NewAgentWebSearchTool[*MyContext](llmsdk.WebSearchTool{}),
 )
 
 type AgentOptions struct {
@@ -76,13 +76,7 @@ func createAgent(model llmsdk.LanguageModel, options *AgentOptions) *llmagent.Ag
 			toolNameSet[name] = true
 		}
 		for _, tool := range availableTools {
-			toolName := ""
-			if functionTool := tool.AsFunctionTool(); functionTool != nil {
-				toolName = functionTool.Name()
-			} else if tool.ProviderTool != nil {
-				toolName = tool.ProviderTool.Name
-			}
-			if toolNameSet[toolName] {
+			if toolNameSet[tool.Name()] {
 				tools = append(tools, tool)
 			}
 		}

@@ -460,11 +460,7 @@ func convertToGoogleTools(tools []llmsdk.Tool) ([]googleapi.Tool, error) {
 				ParametersJsonSchema: tool.FunctionTool.Parameters,
 			})
 		default:
-			providerToolName := ""
-			if tool.ProviderTool != nil {
-				providerToolName = tool.ProviderTool.Name
-			}
-			return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("provider tool %q is not supported", providerToolName))
+			return nil, llmsdk.NewUnsupportedError(Provider, "web search tool is not supported")
 		}
 	}
 

@@ -278,11 +278,7 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 		var tools []openaichatapi.CreateChatCompletionRequestToolsItem
 		for _, tool := range input.Tools {
 			if tool.FunctionTool == nil {
-				providerToolName := ""
-				if tool.ProviderTool != nil {
-					providerToolName = tool.ProviderTool.Name
-				}
-				return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("provider tool %q is not supported", providerToolName))
+				return nil, llmsdk.NewUnsupportedError(Provider, "web search tool is not supported")
 			}
 			functionTool := tool.FunctionTool
 			openAITool := openaichatapi.ChatCompletionTool{

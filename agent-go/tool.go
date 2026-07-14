@@ -26,18 +26,18 @@ type AgentFunctionTool[C any] interface {
 }
 
 // AgentTool is the union of agent-executed function tools and provider-hosted
-// tools forwarded to the model.
+// web search tools.
 type AgentTool[C any] struct {
-	FunctionTool AgentFunctionTool[C] `json:"-"`
-	ProviderTool *llmsdk.ProviderTool `json:"-"`
+	FunctionTool  AgentFunctionTool[C]  `json:"-"`
+	WebSearchTool *llmsdk.WebSearchTool `json:"-"`
 }
 
 func NewAgentFunctionTool[C any](tool AgentFunctionTool[C]) AgentTool[C] {
 	return AgentTool[C]{FunctionTool: tool}
 }
 
-func NewAgentProviderTool[C any](tool llmsdk.ProviderTool) AgentTool[C] {
-	return AgentTool[C]{ProviderTool: &tool}
+func NewAgentWebSearchTool[C any](tool llmsdk.WebSearchTool) AgentTool[C] {
+	return AgentTool[C]{WebSearchTool: &tool}
 }
 
 func FunctionTools[C any](tools ...AgentFunctionTool[C]) []AgentTool[C] {
@@ -48,12 +48,15 @@ func FunctionTools[C any](tools ...AgentFunctionTool[C]) []AgentTool[C] {
 	return agentTools
 }
 
-func ProviderTools[C any](tools ...llmsdk.ProviderTool) []AgentTool[C] {
-	agentTools := make([]AgentTool[C], 0, len(tools))
-	for _, tool := range tools {
-		agentTools = append(agentTools, NewAgentProviderTool[C](tool))
+// Name returns the canonical tool name used for selection and display.
+func (t AgentTool[C]) Name() string {
+	if t.FunctionTool != nil {
+		return t.FunctionTool.Name()
 	}
-	return agentTools
+	if t.WebSearchTool != nil {
+		return "web_search"
+	}
+	return ""
 }
 
 func (t AgentTool[C]) ToLanguageModelTool() llmsdk.Tool {
@@ -64,8 +67,8 @@ func (t AgentTool[C]) ToLanguageModelTool() llmsdk.Tool {
 			t.FunctionTool.Parameters(),
 		)
 	}
-	if t.ProviderTool != nil {
-		return llmsdk.Tool{ProviderTool: t.ProviderTool}
+	if t.WebSearchTool != nil {
+		return llmsdk.Tool{WebSearchTool: t.WebSearchTool}
 	}
 	return llmsdk.Tool{}
 }

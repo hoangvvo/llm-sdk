@@ -632,10 +632,10 @@ fn convert_tool_message(
 fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<CreateChatCompletionRequestToolsItem> {
     let tool = match tool {
         Tool::Function(tool) => tool,
-        Tool::Provider(tool) => {
+        Tool::WebSearch(_) => {
             return Err(LanguageModelError::Unsupported(
                 PROVIDER,
-                format!("provider tool {:?} is not supported", tool.name),
+                "web search tool is not supported".to_string(),
             ));
         }
     };

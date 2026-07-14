@@ -400,10 +400,7 @@ function convertToGoogleTools(tools: Tool[]): GoogleTool[] {
       continue;
     }
 
-    throw new UnsupportedError(
-      PROVIDER,
-      `Provider tool ${tool.name} is not supported`,
-    );
+    throw new UnsupportedError(PROVIDER, "Web search tool is not supported");
   }
 
   if (functionDeclarations.length > 0) {

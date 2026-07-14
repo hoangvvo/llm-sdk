@@ -748,23 +748,23 @@ type JSONSchema map[string]any
 
 // Tool represents a tool that can be used by the model.
 type Tool struct {
-	FunctionTool *FunctionTool `json:"-"`
-	ProviderTool *ProviderTool `json:"-"`
+	FunctionTool  *FunctionTool  `json:"-"`
+	WebSearchTool *WebSearchTool `json:"-"`
 }
 
 type ToolType string
 
 const (
-	ToolTypeFunction ToolType = "function"
-	ToolTypeProvider ToolType = "provider"
+	ToolTypeFunction  ToolType = "function"
+	ToolTypeWebSearch ToolType = "web_search"
 )
 
 func (t Tool) Type() ToolType {
 	switch {
 	case t.FunctionTool != nil:
 		return ToolTypeFunction
-	case t.ProviderTool != nil:
-		return ToolTypeProvider
+	case t.WebSearchTool != nil:
+		return ToolTypeWebSearch
 	default:
 		return ""
 	}
@@ -780,10 +780,24 @@ type FunctionTool struct {
 	Parameters JSONSchema `json:"parameters"`
 }
 
-// ProviderTool represents a provider-hosted tool that is forwarded to the model provider for execution.
-type ProviderTool struct {
-	// The provider tool name.
-	Name string `json:"name"`
+// WebSearchTool represents a provider-hosted web search tool.
+type WebSearchTool struct {
+	// Restricts search results to these domains when supported by the provider.
+	AllowedDomains []string `json:"allowed_domains,omitempty"`
+	// An approximate user location used to localize web search results.
+	UserLocation *WebSearchUserLocation `json:"user_location,omitempty"`
+}
+
+// WebSearchUserLocation is an approximate user location used to localize web search results.
+type WebSearchUserLocation struct {
+	// The city of the user.
+	City *string `json:"city,omitempty"`
+	// The region or state of the user.
+	Region *string `json:"region,omitempty"`
+	// The two-letter ISO 3166-1 country code of the user.
+	Country *string `json:"country,omitempty"`
+	// The IANA timezone of the user.
+	Timezone *string `json:"timezone,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Tool.
@@ -797,13 +811,13 @@ func (t Tool) MarshalJSON() ([]byte, error) {
 			FunctionTool: t.FunctionTool,
 		})
 	}
-	if t.ProviderTool != nil {
+	if t.WebSearchTool != nil {
 		return json.Marshal(struct {
 			Type ToolType `json:"type"`
-			*ProviderTool
+			*WebSearchTool
 		}{
-			Type:         ToolTypeProvider,
-			ProviderTool: t.ProviderTool,
+			Type:          ToolTypeWebSearch,
+			WebSearchTool: t.WebSearchTool,
 		})
 	}
 	return nil, fmt.Errorf("tool has no content")
@@ -825,12 +839,12 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		t.FunctionTool = &tool
-	case ToolTypeProvider:
-		var tool ProviderTool
+	case ToolTypeWebSearch:
+		var tool WebSearchTool
 		if err := json.Unmarshal(data, &tool); err != nil {
 			return err
 		}
-		t.ProviderTool = &tool
+		t.WebSearchTool = &tool
 	default:
 		return fmt.Errorf("unknown tool type: %s", temp.Type)
 	}

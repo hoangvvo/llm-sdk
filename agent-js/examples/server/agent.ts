@@ -31,7 +31,7 @@ Keep chat replies brief and put the full document content into artifacts via the
 ];
 
 export const availableTools: AgentTool<MyContext>[] = [
-  { type: "provider", name: "web_search" },
+  { type: "web_search" },
   ...getArtifactTools(),
   getStockPriceTool,
   getCryptoPriceTool,
@@ -66,7 +66,9 @@ export function createAgent(
   const tools =
     toolNameSet === null
       ? availableTools
-      : availableTools.filter((tool) => toolNameSet.has(tool.name));
+      : availableTools.filter((tool) =>
+          toolNameSet.has(tool.type === "function" ? tool.name : "web_search"),
+        );
   const mcpToolkits = createMcpToolkits(mcpServers);
 
   return new Agent<MyContext>({

@@ -104,7 +104,9 @@ class LostAndFoundToolkitSession implements ToolkitSession<RiftContext> {
     const tools = this.#buildTools();
     console.log(
       `[Toolkit] Tools for phase ${this.#phase.toUpperCase()}: ${
-        tools.map((tool) => tool.name).join(", ") || "<none>"
+        tools
+          .map((tool) => (tool.type === "function" ? tool.name : "web_search"))
+          .join(", ") || "<none>"
       }`,
     );
     return tools;
