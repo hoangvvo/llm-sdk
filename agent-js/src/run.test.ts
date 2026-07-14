@@ -908,7 +908,7 @@ suite("RunSession#run", () => {
   });
 
   test("handles tool returning error result", async (t: TestContext) => {
-    const toolExecute = t.mock.fn<AgentTool<any>["execute"]>(() => ({
+    const toolExecute = t.mock.fn(() => ({
       content: [{ type: "text", text: "Error: Invalid parameters" }],
       is_error: true,
     }));
@@ -1533,7 +1533,7 @@ suite("RunSession#runStream", () => {
   });
 
   test("handles multiple turns in streaming mode", async (t: TestContext) => {
-    const toolExecute = t.mock.fn<AgentTool<any>["execute"]>(() => ({
+    const toolExecute = t.mock.fn(() => ({
       content: [{ type: "text", text: "Calculation done" }],
       is_error: false,
     }));

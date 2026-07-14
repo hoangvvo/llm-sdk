@@ -33,7 +33,7 @@ test("zodTool returns AgentTool", (t: TestContext) => {
       required: ["message", "option"],
       additionalProperties: false,
     },
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+
     execute: tool.execute,
   };
 
