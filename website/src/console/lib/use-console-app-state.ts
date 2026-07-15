@@ -19,6 +19,7 @@ import type {
   McpServerConfig,
   ModelInfo,
   ToolInfo,
+  WebSearchSettings,
 } from "../types.ts";
 import { normalizeBaseUrl, parseExampleServerUrls } from "./example-server.ts";
 import { useFetchInitialData } from "./use-fetch-initial-data.ts";
@@ -48,6 +49,7 @@ export const STORAGE_KEY_MODEL = "console-selected-model";
 export const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
 export const STORAGE_KEY_CONTEXT = "console-user-context";
 export const STORAGE_KEY_ENABLED_TOOLS = "console-enabled-tools";
+export const STORAGE_KEY_WEB_SEARCH = "console-web-search";
 export const STORAGE_KEY_AGENT_BEHAVIOR = "console-agent-behavior";
 export const STORAGE_KEY_MCP_SERVERS = "console-mcp-servers";
 
@@ -104,6 +106,26 @@ function readProviderApiKeys(modelOptions: ModelOption[]): ApiKeys {
   return next;
 }
 
+function createInitialWebSearchSettings(): WebSearchSettings {
+  if (typeof window === "undefined") {
+    return { enabled: true };
+  }
+
+  const storedTools = window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLS);
+  if (storedTools === null) {
+    return { enabled: true };
+  }
+
+  try {
+    const parsed = JSON.parse(storedTools) as unknown;
+    return {
+      enabled: Array.isArray(parsed) && parsed.includes("web_search"),
+    };
+  } catch {
+    return { enabled: true };
+  }
+}
+
 function getModelSelectionKey(
   selection: ModelSelection | null | undefined,
 ): string | null {
@@ -158,6 +180,8 @@ export interface ConsoleAppState<Context> {
   toolsInitialized: boolean;
   enabledTools: string[];
   handleEnabledToolsChange: (tools: string[]) => void;
+  webSearch: WebSearchSettings;
+  setWebSearch: Dispatch<SetStateAction<WebSearchSettings>>;
   mcpServers: McpServerConfig[];
   handleMcpServersChange: (servers: McpServerConfig[]) => void;
   agentBehavior: AgentBehaviorSettings;
@@ -221,6 +245,10 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
   const [enabledTools, setEnabledTools] = useLocalStorageState<string[]>(
     STORAGE_KEY_ENABLED_TOOLS,
     () => [],
+  );
+  const [webSearch, setWebSearch] = useLocalStorageState<WebSearchSettings>(
+    STORAGE_KEY_WEB_SEARCH,
+    createInitialWebSearchSettings,
   );
   const [agentBehavior, setAgentBehavior] =
     useLocalStorageState<AgentBehaviorSettings>(
@@ -430,6 +458,8 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     toolsInitialized,
     enabledTools: normalizedEnabledTools,
     handleEnabledToolsChange,
+    webSearch,
+    setWebSearch,
     mcpServers,
     handleMcpServersChange,
     agentBehavior,

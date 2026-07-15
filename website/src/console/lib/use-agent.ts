@@ -25,6 +25,11 @@ import type {
   ApiKeys,
   LoggedEvent,
   McpServerConfig,
+  WebSearchSettings,
+} from "../types.ts";
+import {
+  WEB_SEARCH_OPTIONS_PROVIDERS,
+  WEB_SEARCH_PROVIDERS,
 } from "../types.ts";
 import type { ModelOption, ModelSelection } from "./use-console-app-state.ts";
 import { useLocalStorageState } from "./use-local-storage-state.ts";
@@ -37,6 +42,7 @@ interface UseAgentConfig<Context> {
   providerApiKeys: ApiKeys;
   userContext: Context;
   enabledTools: string[];
+  webSearch: WebSearchSettings;
   mcpServers: McpServerConfig[];
   agentBehavior: AgentBehaviorSettings;
   toolsInitialized: boolean;
@@ -100,6 +106,7 @@ export function useAgent<Context>(
     providerApiKeys,
     userContext,
     enabledTools,
+    webSearch,
     mcpServers,
     agentBehavior,
     toolsInitialized,
@@ -207,6 +214,10 @@ export function useAgent<Context>(
             context: userContext,
           } satisfies AgentRequest<Context>,
           enabled_tools: toolsInitialized ? enabledTools : undefined,
+          web_search: prepareWebSearchPayload(
+            webSearch,
+            modelSelection.provider,
+          ),
           mcp_servers: prepareMcpServerPayload(mcpServers),
           temperature: agentBehavior.temperature,
           top_p: agentBehavior.top_p,
@@ -354,6 +365,7 @@ export function useAgent<Context>(
       runStreamUrl,
       toolsInitialized,
       userContext,
+      webSearch,
       setItems,
     ],
   );
@@ -410,6 +422,36 @@ export function useAgent<Context>(
       streamingParts,
     ],
   );
+}
+
+function prepareWebSearchPayload(
+  settings: WebSearchSettings,
+  provider: string,
+): Omit<WebSearchSettings, "enabled"> | undefined {
+  if (!settings.enabled || !WEB_SEARCH_PROVIDERS.includes(provider)) {
+    return undefined;
+  }
+
+  if (!WEB_SEARCH_OPTIONS_PROVIDERS.includes(provider)) {
+    return {};
+  }
+
+  const allowedDomains = settings.allowed_domains
+    ?.map((domain) => domain.trim())
+    .filter((domain) => domain.length > 0);
+  const locationEntries = Object.entries(settings.user_location ?? {})
+    .map(([key, value]) => [key, value?.trim()] as const)
+    .filter((entry): entry is [string, string] => Boolean(entry[1]));
+  const userLocation = Object.fromEntries(locationEntries) as NonNullable<
+    WebSearchSettings["user_location"]
+  >;
+
+  return {
+    ...(allowedDomains && allowedDomains.length > 0
+      ? { allowed_domains: allowedDomains }
+      : {}),
+    ...(locationEntries.length > 0 ? { user_location: userLocation } : {}),
+  };
 }
 
 function prepareMcpServerPayload(

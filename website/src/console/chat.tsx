@@ -34,6 +34,8 @@ export function ChatApp() {
     toolsInitialized,
     enabledTools,
     handleEnabledToolsChange,
+    webSearch,
+    setWebSearch,
     mcpServers,
     handleMcpServersChange,
     agentBehavior,
@@ -80,6 +82,7 @@ export function ChatApp() {
       providerApiKeys,
       userContext,
       enabledTools,
+      webSearch,
       mcpServers,
       agentBehavior,
       toolsInitialized,
@@ -224,6 +227,8 @@ export function ChatApp() {
           enabledTools={enabledTools}
           onEnabledToolsChange={handleEnabledToolsChange}
           toolErrorMessage={toolsError}
+          webSearch={webSearch}
+          onWebSearchChange={setWebSearch}
           mcpServers={mcpServers}
           onMcpServersChange={handleMcpServersChange}
           toolsInitialized={toolsInitialized}

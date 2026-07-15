@@ -17,7 +17,9 @@ import type {
   McpServerConfig,
   MyContext,
   ToolInfo,
+  WebSearchSettings,
 } from "../types";
+import { WEB_SEARCH_OPTIONS_PROVIDERS, WEB_SEARCH_PROVIDERS } from "../types";
 
 const MODALITY_OPTIONS: Modality[] = ["text", "image", "audio"];
 const CAPABILITY_ORDER = [
@@ -76,6 +78,8 @@ interface SidebarProps {
   enabledTools: string[];
   onEnabledToolsChange: (tools: string[]) => void;
   toolErrorMessage?: string | null;
+  webSearch: WebSearchSettings;
+  onWebSearchChange: Dispatch<SetStateAction<WebSearchSettings>>;
   mcpServers: McpServerConfig[];
   onMcpServersChange: (servers: McpServerConfig[]) => void;
   toolsInitialized: boolean;
@@ -147,6 +151,8 @@ function Sidebar({
   enabledTools,
   onEnabledToolsChange,
   toolErrorMessage,
+  webSearch,
+  onWebSearchChange,
   mcpServers,
   onMcpServersChange,
   toolsInitialized,
@@ -170,6 +176,7 @@ function Sidebar({
     );
   }, [models, selection]);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [webSearchOpen, setWebSearchOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [behaviorOpen, setBehaviorOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
@@ -205,6 +212,19 @@ function Sidebar({
             onReasoningChange={onModelReasoningChange}
             modalities={modelModalities}
             onModalitiesChange={onModelModalitiesChange}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          title="Web Search"
+          isOpen={webSearchOpen}
+          onToggle={() => {
+            setWebSearchOpen((prev) => !prev);
+          }}
+        >
+          <WebSearchSection
+            provider={selection?.provider}
+            settings={webSearch}
+            onChange={onWebSearchChange}
           />
         </CollapsibleSection>
         <CollapsibleSection
@@ -257,6 +277,163 @@ function Sidebar({
         </CollapsibleSection>
       </div>
     </aside>
+  );
+}
+
+interface WebSearchSectionProps {
+  provider: string | undefined;
+  settings: WebSearchSettings;
+  onChange: Dispatch<SetStateAction<WebSearchSettings>>;
+}
+
+function WebSearchSection({
+  provider,
+  settings,
+  onChange,
+}: WebSearchSectionProps) {
+  const supported =
+    provider !== undefined && WEB_SEARCH_PROVIDERS.includes(provider);
+  const optionsSupported =
+    provider !== undefined && WEB_SEARCH_OPTIONS_PROVIDERS.includes(provider);
+  const inputsDisabled = !supported || !settings.enabled || !optionsSupported;
+
+  const updateLocation = (
+    field: keyof NonNullable<WebSearchSettings["user_location"]>,
+    value: string,
+  ) => {
+    onChange((current) => ({
+      ...current,
+      user_location: {
+        ...current.user_location,
+        [field]: value,
+      },
+    }));
+  };
+
+  return (
+    <div className="console-surface space-y-3">
+      <p className="text-xs text-slate-500">
+        Let the model use its provider-hosted search service for current
+        information.
+      </p>
+      <label className="console-label flex! items-center gap-2 text-xs">
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+          checked={settings.enabled && supported}
+          disabled={!supported}
+          onChange={(event) => {
+            onChange((current) => ({
+              ...current,
+              enabled: event.target.checked,
+            }));
+          }}
+        />
+        Enable web search
+      </label>
+      {!supported ? (
+        <p className="text-[11px] leading-snug text-amber-600">
+          Web search is not available for the selected provider.
+        </p>
+      ) : !optionsSupported ? (
+        <p className="text-[11px] leading-snug text-slate-500">
+          This provider supports web search without domain or location filters.
+        </p>
+      ) : null}
+      <label className="console-label">
+        Allowed domains
+        <input
+          type="text"
+          className="console-field mt-2 w-full"
+          placeholder="e.g. example.com, docs.example.com"
+          value={(settings.allowed_domains ?? []).join(",")}
+          disabled={inputsDisabled}
+          onChange={(event) => {
+            onChange((current) => ({
+              ...current,
+              allowed_domains: event.target.value.split(","),
+            }));
+          }}
+        />
+        <span className="mt-1 block text-[10px] font-normal tracking-normal text-slate-400 normal-case">
+          Comma-separated hostnames.
+        </span>
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <WebSearchLocationField
+          label="City"
+          placeholder="San Francisco"
+          value={settings.user_location?.city}
+          disabled={inputsDisabled}
+          onChange={(value) => {
+            updateLocation("city", value);
+          }}
+        />
+        <WebSearchLocationField
+          label="Region"
+          placeholder="California"
+          value={settings.user_location?.region}
+          disabled={inputsDisabled}
+          onChange={(value) => {
+            updateLocation("region", value);
+          }}
+        />
+        <WebSearchLocationField
+          label="Country"
+          placeholder="US"
+          value={settings.user_location?.country}
+          disabled={inputsDisabled}
+          maxLength={2}
+          onChange={(value) => {
+            updateLocation("country", value);
+          }}
+        />
+        <WebSearchLocationField
+          label="Timezone"
+          placeholder="America/Los_Angeles"
+          value={settings.user_location?.timezone}
+          disabled={inputsDisabled}
+          onChange={(value) => {
+            updateLocation("timezone", value);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface WebSearchLocationFieldProps {
+  label: string;
+  placeholder: string;
+  value: string | undefined;
+  disabled: boolean;
+  maxLength?: number;
+  onChange: (value: string) => void;
+}
+
+function WebSearchLocationField({
+  label,
+  placeholder,
+  value,
+  disabled,
+  maxLength,
+  onChange,
+}: WebSearchLocationFieldProps) {
+  return (
+    <label className="console-label">
+      {label}
+      <input
+        type="text"
+        className="console-field mt-2 w-full"
+        placeholder={placeholder}
+        value={value ?? ""}
+        disabled={disabled}
+        maxLength={maxLength}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </label>
   );
 }
 

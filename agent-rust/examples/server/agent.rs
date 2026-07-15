@@ -19,6 +19,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AgentOptions {
     pub enabled_tools: Option<Vec<String>>,
+    pub web_search: Option<WebSearchTool>,
     pub mcp_servers: Option<Vec<MCPParams>>,
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
@@ -148,8 +149,8 @@ pub fn create_agent(
     {
         builder = builder.add_tool(ArtifactDeleteTool);
     }
-    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"web_search".to_string()) {
-        builder = builder.add_tool(WebSearchTool::new());
+    if let Some(web_search) = &options.web_search {
+        builder = builder.add_tool(web_search.clone());
     }
 
     builder = builder.max_turns(5);

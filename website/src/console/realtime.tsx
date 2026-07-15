@@ -84,6 +84,8 @@ export function RealtimeApp() {
     toolsInitialized,
     enabledTools,
     handleEnabledToolsChange,
+    webSearch,
+    setWebSearch,
     mcpServers,
     handleMcpServersChange,
     agentBehavior,
@@ -120,6 +122,7 @@ export function RealtimeApp() {
       providerApiKeys,
       userContext,
       enabledTools,
+      webSearch,
       mcpServers,
       agentBehavior,
       toolsInitialized,
@@ -396,6 +399,8 @@ export function RealtimeApp() {
         enabledTools={enabledTools}
         onEnabledToolsChange={handleEnabledToolsChange}
         toolErrorMessage={toolsError}
+        webSearch={webSearch}
+        onWebSearchChange={setWebSearch}
         mcpServers={mcpServers}
         onMcpServersChange={handleMcpServersChange}
         toolsInitialized={toolsInitialized}

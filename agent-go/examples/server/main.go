@@ -22,6 +22,7 @@ type RunStreamBody struct {
 	Metadata         llmsdk.LanguageModelMetadata      `json:"metadata"`
 	Input            llmagent.AgentRequest[*MyContext] `json:"input"`
 	EnabledTools     []string                          `json:"enabled_tools,omitempty"`
+	WebSearch        *llmsdk.WebSearchTool             `json:"web_search,omitempty"`
 	MCPServers       []llmmcp.MCPParams                `json:"mcp_servers,omitempty"`
 	Temperature      *float64                          `json:"temperature,omitempty"`
 	TopP             *float64                          `json:"top_p,omitempty"`
@@ -74,6 +75,7 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 
 	options := &AgentOptions{
 		EnabledTools:     enabledTools,
+		WebSearch:        req.WebSearch,
 		MCPServers:       req.MCPServers,
 		Temperature:      req.Temperature,
 		TopP:             req.TopP,
@@ -132,12 +134,6 @@ func listToolsHandler(w http.ResponseWriter) {
 			tools = append(tools, ToolInfo{
 				Name:        functionTool.Name(),
 				Description: functionTool.Description(),
-			})
-		} else if tool.WebSearchTool != nil {
-			tools = append(tools, ToolInfo{
-				Name:        "web_search",
-				Description: "Search the web using the model provider's hosted search tool.",
-				Providers:   []string{"openai", "google", "anthropic"},
 			})
 		}
 	}

@@ -11,7 +11,7 @@ use context::MyContext;
 use dotenvy::dotenv;
 use futures::{stream::Stream, StreamExt};
 use llm_agent::{mcp::MCPParams, AgentRequest, BoxedError};
-use llm_sdk::{AudioOptions, LanguageModelMetadata, Modality, ReasoningOptions};
+use llm_sdk::{AudioOptions, LanguageModelMetadata, Modality, ReasoningOptions, WebSearchTool};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Duration};
 use tower_http::cors::CorsLayer;
@@ -32,6 +32,7 @@ struct RunStreamBody {
     metadata: LanguageModelMetadata,
     input: AgentRequest<MyContext>,
     enabled_tools: Option<Vec<String>>,
+    web_search: Option<WebSearchTool>,
     mcp_servers: Option<Vec<MCPParams>>,
     temperature: Option<f64>,
     top_p: Option<f64>,
@@ -71,6 +72,7 @@ async fn run_stream_handler(
         metadata,
         input,
         enabled_tools,
+        web_search,
         mcp_servers,
         temperature,
         top_p,
@@ -101,6 +103,7 @@ async fn run_stream_handler(
 
     let options = AgentOptions {
         enabled_tools,
+        web_search,
         mcp_servers,
         temperature,
         top_p,
@@ -176,7 +179,7 @@ async fn main() -> Result<(), BoxedError> {
     // Load environment variables
     dotenv().ok();
 
-    let mut available_tools = agent::get_available_tools()
+    let available_tools = agent::get_available_tools()
         .iter()
         .map(|tool| ToolInfo {
             name: tool.name(),
@@ -184,16 +187,6 @@ async fn main() -> Result<(), BoxedError> {
             providers: None,
         })
         .collect::<Vec<_>>();
-    available_tools.push(ToolInfo {
-        name: "web_search".to_string(),
-        description: "Search the web using the model provider's hosted search tool.".to_string(),
-        providers: Some(
-            ["openai", "google", "anthropic"]
-                .map(str::to_string)
-                .to_vec(),
-        ),
-    });
-
     let state = AppState { available_tools };
 
     let app_url = env::var("APP_URL").unwrap_or_else(|_| "http://localhost:4321".to_string());

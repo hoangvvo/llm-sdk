@@ -38,25 +38,23 @@ The user speaks %s language.`, name, location, language), nil
 Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`)},
 }
 
-var availableTools = append(
-	llmagent.FunctionTools[*MyContext](
-		&ArtifactCreateTool{},
-		&ArtifactUpdateTool{},
-		&ArtifactGetTool{},
-		&ArtifactListTool{},
-		&ArtifactDeleteTool{},
-		&GetStockPriceTool{},
-		&GetCryptoPriceTool{},
-		&SearchWikipediaTool{},
-		&GetNewsTool{},
-		&GetCoordinatesTool{},
-		&GetWeatherTool{},
-	),
-	llmagent.NewAgentWebSearchTool[*MyContext](llmsdk.WebSearchTool{}),
+var availableTools = llmagent.FunctionTools[*MyContext](
+	&ArtifactCreateTool{},
+	&ArtifactUpdateTool{},
+	&ArtifactGetTool{},
+	&ArtifactListTool{},
+	&ArtifactDeleteTool{},
+	&GetStockPriceTool{},
+	&GetCryptoPriceTool{},
+	&SearchWikipediaTool{},
+	&GetNewsTool{},
+	&GetCoordinatesTool{},
+	&GetWeatherTool{},
 )
 
 type AgentOptions struct {
 	EnabledTools     []string
+	WebSearch        *llmsdk.WebSearchTool
 	MCPServers       []llmmcp.MCPParams
 	Temperature      *float64
 	TopP             *float64
@@ -81,7 +79,11 @@ func createAgent(model llmsdk.LanguageModel, options *AgentOptions) *llmagent.Ag
 			}
 		}
 	} else {
-		tools = availableTools
+		tools = append(tools, availableTools...)
+	}
+
+	if options.WebSearch != nil {
+		tools = append(tools, llmagent.NewAgentWebSearchTool[*MyContext](*options.WebSearch))
 	}
 
 	opts := []llmagent.AgentParamsOption[*MyContext]{

@@ -25,6 +25,7 @@ async function runStreamHandler(
       metadata,
       input,
       enabled_tools,
+      web_search,
       mcp_servers,
       ...params
     } = json;
@@ -55,6 +56,7 @@ async function runStreamHandler(
 
     agent = createAgent(model, {
       ...(enabledToolsParam ? { enabledTools: enabledToolsParam } : {}),
+      ...(web_search ? { webSearch: web_search } : {}),
       mcpServers: mcpServersParam,
       ...params,
     });
@@ -98,15 +100,10 @@ function listToolsHandler(
   _req: http.IncomingMessage,
   res: http.ServerResponse,
 ) {
-  const tools = availableTools.map((tool) =>
+  const tools = availableTools.flatMap((tool) =>
     tool.type === "function"
-      ? { name: tool.name, description: tool.description }
-      : {
-          name: "web_search",
-          description:
-            "Search the web using the model provider's hosted search tool.",
-          providers: ["openai", "google", "anthropic"],
-        },
+      ? [{ name: tool.name, description: tool.description }]
+      : [],
   );
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify(tools));
