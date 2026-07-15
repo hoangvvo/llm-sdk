@@ -10,7 +10,7 @@ use llm_agent::{
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
-    PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta,
+    PartDelta, PartialModelResponse, TextPartDelta, Tool, ToolCallPartDelta, WebSearchTool,
 };
 use serde_json::{json, Value};
 
@@ -1004,6 +1004,37 @@ async fn run_passes_sampling_parameters_to_model() {
 }
 
 #[tokio::test]
+async fn run_passes_provider_hosted_tools_to_model() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Search complete")],
+        ..Default::default()
+    });
+    let web_search = WebSearchTool {
+        allowed_domains: Some(vec!["example.com".to_string()]),
+        ..Default::default()
+    };
+    let session = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model.clone()).add_tool(web_search.clone())),
+        (),
+    )
+    .await;
+
+    session
+        .run(RunSessionRequest {
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Find an example",
+            )]))],
+        })
+        .await
+        .expect("run succeeds");
+
+    let inputs = model.tracked_generate_inputs();
+    assert_eq!(inputs.len(), 1);
+    assert_eq!(inputs[0].tools, Some(vec![Tool::WebSearch(web_search)]));
+}
+
+#[tokio::test]
 async fn run_throws_language_model_error_when_generation_fails() {
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(MockGenerateResult::error(LanguageModelError::InvalidInput(
@@ -1796,4 +1827,25 @@ async fn run_stream_throws_language_model_error() {
     }
 
     close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_session_reports_instruction_resolution_as_init_error() {
+    let model = Arc::new(MockLanguageModel::new());
+    let params = Arc::new(AgentParams::new("test_agent", model).add_instruction(
+        |(): &()| -> Result<String, DynError> {
+            Err(std::io::Error::other("could not load tenant instructions").into())
+        },
+    ));
+
+    let result = RunSession::new(params, ()).await;
+
+    match result {
+        Err(AgentError::Init(err)) => {
+            assert!(err
+                .to_string()
+                .contains("could not load tenant instructions"));
+        }
+        _ => panic!("expected agent initialization error"),
+    }
 }

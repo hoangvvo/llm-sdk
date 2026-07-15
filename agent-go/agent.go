@@ -80,20 +80,19 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 		defer close(eventChan)
 		defer close(errChan)
 
-		var streamErr error
-		defer func() {
-			if closeErr := session.Close(ctx); closeErr != nil && streamErr == nil {
-				errChan <- closeErr
-			}
-		}()
-
 		for agentStream.Next() {
 			event := agentStream.Current()
 			eventChan <- event
 		}
-		if streamErr = agentStream.Err(); streamErr != nil {
+
+		streamErr := agentStream.Err()
+		closeErr := session.Close(ctx)
+		if streamErr != nil {
 			errChan <- streamErr
 			return
+		}
+		if closeErr != nil {
+			errChan <- closeErr
 		}
 	}()
 	return stream.New(eventChan, errChan), nil

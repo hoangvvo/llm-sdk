@@ -64,8 +64,21 @@ where
         let wrapped_stream = async_stream::stream! {
             let run_session = run_session;
             while let Some(item) = stream.next().await {
-                yield item;
+                match item {
+                    Ok(event) => yield Ok(event),
+                    Err(err) => {
+                        // Drop the inner stream before closing so its cloned toolkit
+                        // session handles no longer keep the resources alive.
+                        drop(stream);
+                        if let Ok(session) = Arc::try_unwrap(run_session) {
+                            let _ = session.close().await;
+                        }
+                        yield Err(err);
+                        return;
+                    }
+                }
             }
+            drop(stream);
             if let Ok(session) = Arc::try_unwrap(run_session) {
                 if let Err(close_err) = session.close().await {
                     yield Err(close_err);

@@ -29,7 +29,7 @@ type AgentResponse struct {
 func (r *AgentResponse) Text() string {
 	var texts []string
 	for _, part := range r.Content {
-		if part.TextPart != nil {
+		if part.TextPart != nil && part.TextPart.Text != "" {
 			texts = append(texts, part.TextPart.Text)
 		}
 	}
@@ -84,12 +84,25 @@ const (
 
 func (r AgentItem) MarshalJSON() ([]byte, error) {
 	if r.Message != nil {
+		var content []llmsdk.Part
+		switch {
+		case r.Message.UserMessage != nil:
+			content = r.Message.UserMessage.Content
+		case r.Message.AssistantMessage != nil:
+			content = r.Message.AssistantMessage.Content
+		case r.Message.ToolMessage != nil:
+			content = r.Message.ToolMessage.Content
+		default:
+			return nil, errors.New("invalid message item")
+		}
 		return json.Marshal(struct {
-			Type AgentItemType `json:"type"`
-			*llmsdk.Message
+			Type    AgentItemType `json:"type"`
+			Role    llmsdk.Role   `json:"role"`
+			Content []llmsdk.Part `json:"content"`
 		}{
 			Type:    AgentItemTypeMessage,
-			Message: r.Message,
+			Role:    r.Message.Role(),
+			Content: content,
 		})
 	}
 	if r.Model != nil {
@@ -126,19 +139,19 @@ func (r *AgentItem) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &msg); err != nil {
 			return err
 		}
-		r.Message = &msg
+		*r = AgentItem{Message: &msg}
 	case AgentItemTypeModel:
 		var response AgentItemModelResponse
 		if err := json.Unmarshal(data, &response); err != nil {
 			return err
 		}
-		r.Model = &response
+		*r = AgentItem{Model: &response}
 	case AgentItemTypeTool:
 		var tool AgentItemTool
 		if err := json.Unmarshal(data, &tool); err != nil {
 			return err
 		}
-		r.Tool = &tool
+		*r = AgentItem{Tool: &tool}
 	default:
 		return fmt.Errorf("unknown AgentItem type: %s", aux.Type)
 	}
@@ -197,19 +210,19 @@ func (e *AgentStreamEvent) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &partial); err != nil {
 			return err
 		}
-		e.Partial = &partial
+		*e = AgentStreamEvent{Partial: &partial}
 	case AgentStreamEventTypeItem:
 		var item AgentStreamItemEvent
 		if err := json.Unmarshal(data, &item); err != nil {
 			return err
 		}
-		e.Item = &item
+		*e = AgentStreamEvent{Item: &item}
 	case AgentStreamEventTypeResponse:
 		var resp AgentResponse
 		if err := json.Unmarshal(data, &resp); err != nil {
 			return err
 		}
-		e.Response = &resp
+		*e = AgentStreamEvent{Response: &resp}
 	default:
 		return fmt.Errorf("unknown AgentStreamEvent event: %s", aux.Event)
 	}

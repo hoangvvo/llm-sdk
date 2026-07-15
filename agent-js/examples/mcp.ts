@@ -2,6 +2,7 @@ import { Agent } from "@hoangvvo/llm-agent";
 import { mcpToolkit } from "@hoangvvo/llm-agent/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { createServer, type IncomingMessage } from "node:http";
@@ -135,7 +136,9 @@ async function startStubMcpServer(): Promise<() => Promise<void>> {
     enableJsonResponse: true,
   });
 
-  await server.connect(transport);
+  // MCP SDK 1.29 declares the class callbacks as explicit `| undefined`
+  // properties while Transport declares them optional. They are runtime-compatible.
+  await server.connect(transport as Transport);
 
   const httpServer = createServer((req, res) => {
     if (req.url === "/status" && req.method === "GET") {

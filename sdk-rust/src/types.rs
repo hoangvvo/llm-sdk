@@ -530,8 +530,11 @@ pub struct ModelResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct PartialModelResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub delta: Option<ContentDelta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<ModelUsage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cost: Option<f64>,
 }
 

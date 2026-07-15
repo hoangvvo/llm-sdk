@@ -28,7 +28,7 @@ impl AgentResponse {
         self.content
             .iter()
             .filter_map(|part| match part {
-                Part::Text(part) => Some(part.text.as_str()),
+                Part::Text(part) if !part.text.is_empty() => Some(part.text.as_str()),
                 _ => None,
             })
             .collect::<Vec<_>>()

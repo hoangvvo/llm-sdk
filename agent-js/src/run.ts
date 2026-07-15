@@ -79,25 +79,25 @@ export class RunSession<TContext> {
 
   // Initialize any resources needed for the run session
   async #initialize() {
-    // Resolve the instructions using the provided context
-    if (this.#params.instructions.length > 0) {
-      const systemPrompt = await getPromptForInstructionParams(
-        this.#params.instructions,
-        this.#context,
-      );
-      this.#static_system_prompt = systemPrompt;
-    }
+    try {
+      // Resolve the instructions using the provided context
+      if (this.#params.instructions.length > 0) {
+        const systemPrompt = await getPromptForInstructionParams(
+          this.#params.instructions,
+          this.#context,
+        );
+        this.#static_system_prompt = systemPrompt;
+      }
 
-    if (this.#params.toolkits.length > 0) {
-      try {
+      if (this.#params.toolkits.length > 0) {
         this.#toolkit_sessions = await Promise.all(
           this.#params.toolkits.map((toolkit) =>
             toolkit.createSession(this.#context),
           ),
         );
-      } catch (error) {
-        throw new AgentInitError(error);
       }
+    } catch (error) {
+      throw new AgentInitError(error);
     }
 
     this.#initialized = true;

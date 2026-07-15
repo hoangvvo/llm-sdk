@@ -14,6 +14,7 @@ import { mcpToolkit } from "./toolkit.ts";
 import { MockLanguageModel } from "@hoangvvo/llm-sdk/test";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
 import type { AgentResponse } from "../types.ts";
 
@@ -100,7 +101,9 @@ async function startStubMcpServer(): Promise<{
     enableJsonResponse: true,
   });
 
-  await server.connect(transport);
+  // MCP SDK 1.29 declares the class callbacks as explicit `| undefined`
+  // properties while Transport declares them optional. They are runtime-compatible.
+  await server.connect(transport as Transport);
 
   const httpServer = createServer(
     // eslint-disable-next-line @typescript-eslint/no-misused-promises

@@ -11,6 +11,7 @@ import {
 import { MockLanguageModel } from "@hoangvvo/llm-sdk/test";
 import test, { suite, type TestContext } from "node:test";
 import {
+  AgentInitError,
   AgentInvariantError,
   AgentLanguageModelError,
   AgentMaxTurnsExceededError,
@@ -1074,6 +1075,38 @@ suite("RunSession#run", () => {
     ]);
   });
 
+  test("passes provider-hosted tools to the model", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: { content: [{ type: "text", text: "Search complete" }] },
+    });
+    const webSearchTool = {
+      type: "web_search" as const,
+      allowed_domains: ["example.com"],
+    };
+
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      tools: [webSearchTool],
+      context: {},
+    });
+
+    await session.run({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Find an example" }],
+        },
+      ],
+    });
+
+    t.assert.deepStrictEqual(model.trackedGenerateInputs[0]?.tools, [
+      webSearchTool,
+    ]);
+  });
+
   test("throws LanguageModelError when non-streaming generation fails", async (t: TestContext) => {
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -2038,6 +2071,26 @@ suite("RunSession#runStream", () => {
 });
 
 suite("RunSession lifecycle", () => {
+  test("reports instruction resolution failures as initialization errors", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    const cause = new Error("could not load tenant instructions");
+
+    await t.assert.rejects(
+      () =>
+        RunSession.create({
+          name: "test_agent",
+          model,
+          instructions: [() => Promise.reject(cause)],
+          context: {},
+        }),
+      (err: unknown) => {
+        t.assert.strictEqual(err instanceof AgentInitError, true);
+        t.assert.strictEqual((err as AgentInitError).cause, cause);
+        return true;
+      },
+    );
+  });
+
   test("close() cleans up session resources", async (t: TestContext) => {
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({

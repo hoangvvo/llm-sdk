@@ -9,6 +9,7 @@ void test("getContentText concatenates text parts", (t: TestContext) => {
     content: [
       { type: "text", text: "Hello" },
       { type: "image", data: "...", mime_type: "image/png" },
+      { type: "text", text: "" },
       { type: "text", text: "world" },
     ],
   };

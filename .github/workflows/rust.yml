@@ -40,8 +40,8 @@ jobs:
       - name: Build
         run: cargo build
 
-      - name: Test
-        run: cargo test --lib agent-sdk
+      - name: Test agent library
+        run: cargo test --package llm-agent
 
       - name: Run live SDK tests
         id: live-sdk-tests
