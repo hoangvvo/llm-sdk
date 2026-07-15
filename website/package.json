@@ -41,6 +41,6 @@
     "tree-sitter-rust": "^0.24.0",
     "tree-sitter-typescript": "^0.23.2",
     "web-tree-sitter": "^0.26.11",
-    "wrangler": "^4.110.0"
+    "wrangler": "^4.111.0"
   }
 }
