@@ -19,9 +19,6 @@ export function ChatApp() {
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
 
   const {
-    serverOptions,
-    serverUrl,
-    handleServerUrlChange,
     runStreamUrl,
     modelOptions,
     modelSelection,
@@ -120,7 +117,6 @@ export function ChatApp() {
     [setUserContext],
   );
 
-  const hasServerOptions = serverOptions.length > 0;
   const artifacts = userContext.artifacts ?? [];
 
   const handleNewChat = useCallback(() => {
@@ -209,11 +205,6 @@ export function ChatApp() {
           />
         </section>
         <ResponsiveSidebar
-          serverOptions={hasServerOptions ? serverOptions : undefined}
-          serverUrl={hasServerOptions ? serverUrl : undefined}
-          onServerUrlChange={
-            hasServerOptions ? handleServerUrlChange : undefined
-          }
           models={modelOptions}
           selection={modelSelection}
           onModelSelectionChange={setModelSelection}

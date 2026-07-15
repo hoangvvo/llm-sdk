@@ -464,30 +464,15 @@ function prepareMcpServerPayload(
   const sanitized: McpServerConfig[] = [];
 
   for (const server of servers) {
-    if (server.type === "streamable-http") {
-      const url = server.url.trim();
-      if (!url) {
-        continue;
-      }
-      const authorization = server.authorization?.trim();
-      if (authorization) {
-        sanitized.push({ type: "streamable-http", url, authorization });
-      } else {
-        sanitized.push({ type: "streamable-http", url });
-      }
+    const url = server.url.trim();
+    if (!url) {
+      continue;
+    }
+    const authorization = server.authorization?.trim();
+    if (authorization) {
+      sanitized.push({ type: "streamable-http", url, authorization });
     } else {
-      const command = server.command.trim();
-      if (!command) {
-        continue;
-      }
-      const args = server.args
-        ?.map((arg) => arg.trim())
-        .filter((arg) => arg.length > 0);
-      if (args && args.length > 0) {
-        sanitized.push({ type: "stdio", command, args });
-      } else {
-        sanitized.push({ type: "stdio", command });
-      }
+      sanitized.push({ type: "streamable-http", url });
     }
   }
 

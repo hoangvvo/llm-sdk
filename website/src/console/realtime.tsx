@@ -11,11 +11,7 @@ import { base64ToArrayBuffer } from "./lib/utils.ts";
 import type { MyContext } from "./types.ts";
 
 type SessionPhase =
-  | "idle"
-  | "capturing"
-  | "listening"
-  | "processing"
-  | "responding";
+  "idle" | "capturing" | "listening" | "processing" | "responding";
 type SpeakerState = "idle" | "user" | "assistant";
 const SESSION_THEMES: Record<
   SessionPhase,
@@ -69,9 +65,6 @@ export function RealtimeApp() {
   const [visualVolume, setVisualVolume] = useState(0.12);
   const [turnCount, setTurnCount] = useState(0);
   const {
-    serverOptions,
-    serverUrl,
-    handleServerUrlChange,
     runStreamUrl,
     modelOptions,
     modelSelection,
@@ -101,8 +94,6 @@ export function RealtimeApp() {
   } = useConsoleAppState<MyContext>();
 
   const { add16BitPCM, interruptPlayback, isPlaying } = useAudio();
-
-  const hasServerOptions = serverOptions.length > 0;
 
   const {
     isStreaming: agentIsStreaming,
@@ -383,9 +374,6 @@ export function RealtimeApp() {
         </div>
       </section>
       <ResponsiveSidebar
-        serverOptions={hasServerOptions ? serverOptions : undefined}
-        serverUrl={hasServerOptions ? serverUrl : undefined}
-        onServerUrlChange={hasServerOptions ? handleServerUrlChange : undefined}
         models={modelOptions}
         selection={modelSelection}
         onModelSelectionChange={setModelSelection}

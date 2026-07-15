@@ -1,5 +1,6 @@
 // @ts-check
 import react from "@astrojs/react";
+import cloudflare from "@astrojs/cloudflare";
 import starlight from "@astrojs/starlight";
 import tailwindcss from "@tailwindcss/vite";
 import mermaid from "astro-mermaid";
@@ -9,6 +10,7 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 // https://astro.build/config
 export default defineConfig({
   site: "https://llm-sdk.hoangvvo.com",
+  adapter: cloudflare({ prerenderEnvironment: "node" }),
   trailingSlash: "always",
   integrations: [
     starlight({
@@ -103,20 +105,24 @@ export default defineConfig({
       viteStaticCopy({
         targets: [
           {
-            src: "../node_modules/onnxruntime-web/dist/*.wasm",
+            src: "../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
             dest: "src/onnxruntime-web/",
+            rename: { stripBase: true },
+          },
+          {
+            src: "../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs",
+            dest: "src/onnxruntime-web/",
+            rename: { stripBase: true },
           },
           {
             src: "../node_modules/@ricky0123/vad-web/dist/vad.worklet.bundle.min.js",
             dest: "src/vad-web/",
+            rename: { stripBase: true },
           },
           {
-            src: "../node_modules/@ricky0123/vad-web/dist/*.onnx",
+            src: "../node_modules/@ricky0123/vad-web/dist/silero_vad_v5.onnx",
             dest: "src/vad-web/",
-          },
-          {
-            src: "../node_modules/onnxruntime-web/dist/*.mjs",
-            dest: "src/onnxruntime-web/",
+            rename: { stripBase: true },
           },
         ],
       }),

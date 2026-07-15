@@ -12,7 +12,7 @@ const gitignorePath = join(import.meta.dirname, ".gitignore");
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
-  globalIgnores(["**/node_modules/**", "**/dist/**", "**/*.d.ts"]),
+  globalIgnores(["**/node_modules/**", "**/dist/**", "**/*.d.{ts,mts,cts}"]),
   includeIgnoreFile(gitignorePath, "Imported .gitignore patterns"),
   {
     files: ["**/*.{js,mjs,cjs,ts}"],
@@ -43,7 +43,7 @@ export default [
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["*.js", "*.mjs"],
+          allowDefaultProject: ["*.js", "*.mjs", "sdk-tests/*.mjs"],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -51,7 +51,7 @@ export default [
   },
   {
     ...tseslint.configs.disableTypeChecked,
-    files: ["**/*.js"],
+    files: ["**/*.js", "sdk-tests/*.mjs"],
   },
   {
     rules: {

@@ -16,14 +16,10 @@ This will start a local development server, and you can view the website in your
 
 ![Console Chat Application screenshot](./assets/console-chat.png)
 
-To use the demo console application, start one of the example backend servers in a separate terminal window:
+The demo console API is included in the Astro application. Start the website:
 
 ```bash
-cd ../agent-js && node examples/server.js
-# or
-cd ../agent-rust && cargo run --example server
-# or
-cd ../agent-go && go run ./examples/server
+npm run dev
 ```
 
 Visit `http://localhost:4321/console/chat` in your web browser to access the console application.
@@ -42,4 +38,4 @@ Visit http://localhost:4321/console/realtime in your web browser to access the r
 
 ## Model list
 
-A list of models selectable in the console is provided in [models.json](../example-server/models.json). You can modify this file to add or remove models as needed.
+A list of models selectable in the console is provided in [models.json](../models/models.json). You can modify this file to add or remove models as needed.
