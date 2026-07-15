@@ -66,3 +66,4 @@ jobs:
           file: coverage-rust.xml
           language: Rust
           label: code-coverage/agent-rust
+          fail-on-error: false

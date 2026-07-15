@@ -67,3 +67,4 @@ jobs:
           file: agent-js/coverage/cobertura-coverage.xml
           language: TypeScript
           label: code-coverage/agent-js
+          fail-on-error: false
