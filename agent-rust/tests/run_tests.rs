@@ -40,15 +40,13 @@ impl MockTool {
         }
     }
 
-    fn with_execute_fn<F>(name: &str, result: AgentToolResult, execute: F) -> Self
+    fn with_execute_fn<F>(name: &str, execute: F) -> Self
     where
         F: for<'a> Fn(Value, &'a RunState) -> Result<AgentToolResult, DynError>
             + Send
             + Sync
             + 'static,
     {
-        let _ = result;
-
         Self {
             name: name.to_string(),
             execute: Arc::new(execute),
@@ -273,7 +271,10 @@ where
         Ok(run_session) => {
             run_session.close().await.expect("close session succeeds");
         }
-        Err(_) => panic!("session should not be shared at close"),
+        Err(session) => panic!(
+            "session should not be shared at close (strong count: {})",
+            Arc::strong_count(&session)
+        ),
     }
 }
 
@@ -500,19 +501,12 @@ async fn run_returns_existing_assistant_response_without_new_model_output() {
 
 #[tokio::test]
 async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
-    let resume_tool = MockTool::with_execute_fn(
-        "resume_tool",
-        AgentToolResult {
-            content: vec![],
+    let resume_tool = MockTool::with_execute_fn("resume_tool", |_args, _state| {
+        Ok(AgentToolResult {
+            content: vec![Part::text("call_2 result")],
             is_error: false,
-        },
-        |_args, _state| {
-            Ok(AgentToolResult {
-                content: vec![Part::text("call_2 result")],
-                is_error: false,
-            })
-        },
-    );
+        })
+    });
 
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
@@ -574,19 +568,12 @@ async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
 
 #[tokio::test]
 async fn run_resumes_tool_processing_when_trailing_items_are_tool_entries() {
-    let resume_tool = MockTool::with_execute_fn(
-        "resume_tool",
-        AgentToolResult {
-            content: vec![],
+    let resume_tool = MockTool::with_execute_fn("resume_tool", |_args, _state| {
+        Ok(AgentToolResult {
+            content: vec![Part::text("call_2 via item")],
             is_error: false,
-        },
-        |_args, _state| {
-            Ok(AgentToolResult {
-                content: vec![Part::text("call_2 via item")],
-                is_error: false,
-            })
-        },
-    );
+        })
+    });
 
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
@@ -865,14 +852,9 @@ async fn run_throws_invariant_error_when_tool_not_found() {
 
 #[tokio::test]
 async fn run_throws_tool_execution_error() {
-    let failing_tool = MockTool::with_execute_fn(
-        "failing_tool",
-        AgentToolResult {
-            content: vec![],
-            is_error: false,
-        },
-        |_args, _state| Err("Tool execution failed".into()),
-    );
+    let failing_tool = MockTool::with_execute_fn("failing_tool", |_args, _state| {
+        Err("Tool execution failed".into())
+    });
 
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
@@ -1379,6 +1361,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn run_stream_streams_tool_call_execution_and_response() {
     let tool = MockTool::new(
         "test_tool",
@@ -1521,6 +1504,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn run_stream_handles_multiple_turns() {
     let tool = MockTool::new(
         "calculator",

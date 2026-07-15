@@ -124,6 +124,7 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
     let stub = start_stub_mcp_server()
         .await

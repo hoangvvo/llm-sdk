@@ -70,7 +70,7 @@ fn recorded_model(base_url: &str) -> OpenAIModel {
     )
 }
 
-fn completed_response(output: Value, usage: Value) -> Value {
+fn completed_response(output: &Value, usage: &Value) -> Value {
     json!({
         "created_at": 0,
         "error": null,
@@ -97,7 +97,7 @@ async fn generate_handler(
         .map(str::to_string);
 
     Json(completed_response(
-        json!([{
+        &json!([{
             "type": "message",
             "id": "msg_1",
             "role": "assistant",
@@ -109,7 +109,7 @@ async fn generate_handler(
                 "logprobs": []
             }]
         }]),
-        json!({
+        &json!({
             "input_tokens": 4,
             "output_tokens": 2,
             "total_tokens": 6,
@@ -140,8 +140,8 @@ async fn fragmented_stream_handler(body: Bytes) -> Response {
         "type": "response.completed",
         "sequence_number": 3,
         "response": completed_response(
-            json!([]),
-            json!({
+            &json!([]),
+            &json!({
                 "input_tokens": 7,
                 "output_tokens": 3,
                 "total_tokens": 10,

@@ -5,6 +5,7 @@ use serde_json::Value;
 mod common;
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() {
     dotenv().ok();
 

@@ -242,22 +242,6 @@ fn strip_bearer_prefix(token: &str) -> Option<String> {
     Some(trimmed.to_string())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::strip_bearer_prefix;
-
-    #[test]
-    fn normalizes_bearer_tokens_for_rmcp() {
-        assert_eq!(strip_bearer_prefix("token"), Some("token".to_string()));
-        assert_eq!(
-            strip_bearer_prefix("  BEARER   token  "),
-            Some("token".to_string())
-        );
-        assert_eq!(strip_bearer_prefix("  "), None);
-        assert_eq!(strip_bearer_prefix("Bearer "), None);
-    }
-}
-
 #[allow(clippy::type_complexity)]
 struct MCPToolkitState<TCtx>
 where
@@ -361,5 +345,21 @@ where
                 state.record_error(err);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_bearer_prefix;
+
+    #[test]
+    fn normalizes_bearer_tokens_for_rmcp() {
+        assert_eq!(strip_bearer_prefix("token"), Some("token".to_string()));
+        assert_eq!(
+            strip_bearer_prefix("  BEARER   token  "),
+            Some("token".to_string())
+        );
+        assert_eq!(strip_bearer_prefix("  "), None);
+        assert_eq!(strip_bearer_prefix("Bearer "), None);
     }
 }

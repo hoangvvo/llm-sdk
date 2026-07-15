@@ -47,9 +47,11 @@ async fn main() {
         if let Some(delta) = chunk.delta {
             if let PartDelta::Audio(audio) = delta.part {
                 if let Some(format) = audio.format {
-                    if format != AudioFormat::Linear16 {
-                        panic!("unsupported audio format: {format:?}");
-                    }
+                    assert_eq!(
+                        format,
+                        AudioFormat::Linear16,
+                        "unsupported audio format: {format:?}"
+                    );
                 }
                 if let Some(b64) = audio.data {
                     let bytes = BASE64_STANDARD
@@ -124,9 +126,7 @@ fn finish_ffplay(mut child: Child, mut stdin: ChildStdin) {
     drop(stdin);
 
     let status = child.wait().expect("failed to wait for ffplay");
-    if !status.success() {
-        panic!("ffplay exited with error");
-    }
+    assert!(status.success(), "ffplay exited with error");
 }
 
 fn log_partial(partial: &llm_sdk::PartialModelResponse) {

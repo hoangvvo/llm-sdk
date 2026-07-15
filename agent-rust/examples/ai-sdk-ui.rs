@@ -44,6 +44,7 @@ enum UIMessageRole {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct UIMessage {
     id: Option<String>,
     role: UIMessageRole,
@@ -55,6 +56,7 @@ struct UIMessage {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct ChatRequestBody {
     id: Option<String>,
     trigger: Option<String>,
@@ -109,6 +111,7 @@ struct ToolUIPart {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct FileUIPart {
     url: String,
     media_type: String,
@@ -500,7 +503,9 @@ impl DataStreamProtocolAdapter {
                 events.extend(self.write_delta(delta));
                 events
             }
-            llm_agent::AgentStreamEvent::Partial(_) => Vec::new(),
+            llm_agent::AgentStreamEvent::Partial(_) | llm_agent::AgentStreamEvent::Response(_) => {
+                Vec::new()
+            }
             llm_agent::AgentStreamEvent::Item(item_event) => {
                 let mut events = self.finish_step();
                 if let AgentItem::Tool(tool) = &item_event.item {
@@ -512,7 +517,6 @@ impl DataStreamProtocolAdapter {
                 }
                 events
             }
-            llm_agent::AgentStreamEvent::Response(_) => Vec::new(),
         }
     }
 
@@ -524,7 +528,7 @@ impl DataStreamProtocolAdapter {
             PartDelta::Reasoning(reasoning_delta) => self.write_for_reasoning_part(
                 delta.index,
                 reasoning_delta.text.clone().unwrap_or_default(),
-                reasoning_delta.id.clone(),
+                reasoning_delta.id.as_deref(),
             ),
             PartDelta::ToolCall(tool_delta) => {
                 self.write_for_tool_call_part(delta.index, tool_delta)
@@ -554,13 +558,13 @@ impl DataStreamProtocolAdapter {
         &mut self,
         index: usize,
         text: String,
-        id: Option<String>,
+        id: Option<&str>,
     ) -> Vec<UIMessageChunk> {
         let mut events = Vec::new();
         let identifier = if let Some(existing) = self.reasoning_state.get(&index) {
             existing.clone()
         } else {
-            let identifier = self.allocate_reasoning_id(id.as_deref());
+            let identifier = self.allocate_reasoning_id(id);
             self.reasoning_state.insert(index, identifier.clone());
             events.push(UIMessageChunk::ReasoningStart {
                 id: identifier.clone(),
@@ -642,7 +646,7 @@ impl DataStreamProtocolAdapter {
         events
     }
 
-    fn emit_error(&self, error_text: &str) -> UIMessageChunk {
+    fn emit_error(error_text: &str) -> UIMessageChunk {
         UIMessageChunk::Error {
             error_text: error_text.to_string(),
         }
@@ -767,7 +771,7 @@ fn ui_messages_to_messages(messages: &[UIMessage]) -> Result<Vec<Message>, Strin
                             | Part::Audio(_)
                             | Part::Image(_)
                             | Part::ToolCall(_) => {
-                                append_assistant_message(&mut history, converted)
+                                append_assistant_message(&mut history, converted);
                             }
                             Part::ToolResult(_) => append_tool_message(&mut history, converted),
                             Part::Source(_) => {}
@@ -835,8 +839,7 @@ fn map_mime_type_to_audio_format(mime_type: &str) -> Option<AudioFormat> {
 
 fn extract_data_payload(url: &str) -> String {
     url.split_once(',')
-        .map(|(_, data)| data.to_string())
-        .unwrap_or_else(|| url.to_string())
+        .map_or_else(|| url.to_string(), |(_, data)| data.to_string())
 }
 
 // ==== HTTP handlers ====
@@ -880,7 +883,7 @@ async fn chat_handler(
                     }
                 }
                 Err(err) => {
-                    let error_event = adapter.emit_error(&err.to_string());
+                    let error_event = DataStreamProtocolAdapter::emit_error(&err.to_string());
                     yield Ok::<Event, Infallible>(
                         Event::default().data(error_event.to_json_string()),
                     );

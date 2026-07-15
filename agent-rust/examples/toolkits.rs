@@ -7,6 +7,7 @@ use llm_agent::{
 use llm_sdk::{Message, Part};
 use serde::Deserialize;
 use std::{
+    fmt::Write as _,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -363,7 +364,8 @@ impl AgentFunctionTool<RiftContext> for StabilizeRiftTool {
             let mut sentence =
                 format!("I cycle the containment field to damp {turbulence} turbulence");
             if !technique.is_empty() {
-                sentence.push_str(&format!(" using {technique}"));
+                write!(&mut sentence, " using {technique}")
+                    .expect("writing to a String should not fail");
             }
             sentence.push('.');
 
@@ -649,7 +651,8 @@ impl AgentFunctionTool<RiftContext> for ConsultProphetTool {
                 .filter(|s| !s.is_empty())
             {
                 println!("[tool] consult_prophet_agent requested topic={topic}");
-                sentence.push_str(&format!(" while considering {topic}."));
+                write!(&mut sentence, " while considering {topic}.")
+                    .expect("writing to a String should not fail");
             } else {
                 println!("[tool] consult_prophet_agent requested topic=<none>");
                 sentence.push('.');

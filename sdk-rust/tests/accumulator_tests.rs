@@ -85,7 +85,7 @@ fn reconstructs_interleaved_multipart_stream_and_metadata() {
             output_tokens: 5,
             ..Default::default()
         }),
-        cost: Some(0.30000000000000004),
+        cost: Some(0.300_000_000_000_000_04),
     };
     assert_eq!(response, expected);
 }
