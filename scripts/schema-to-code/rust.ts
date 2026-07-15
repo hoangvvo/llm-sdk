@@ -25,7 +25,7 @@ export function renderRustDocument(document: CodegenDocument): string {
       (declaration) =>
         declaration.kind === "union" &&
         (declaration.representation === "untagged" ||
-          declaration.untaggedDeserializeStrategy === "placeholder"),
+          declaration.untaggedDeserializeStrategy === "custom"),
     );
   const attributes = [
     "#![allow(dead_code)]",
@@ -175,10 +175,10 @@ function renderRustUnion(declaration: UnionDeclaration): string {
   if (comments) {
     lines.push(comments);
   }
-  const usesPlaceholderDeserialize =
+  const usesCustomDeserialize =
     declaration.representation === "untagged" &&
-    declaration.untaggedDeserializeStrategy === "placeholder";
-  if (!usesPlaceholderDeserialize) {
+    declaration.untaggedDeserializeStrategy === "custom";
+  if (!usesCustomDeserialize) {
     lines.push("#[derive(Serialize, Deserialize)]");
   } else {
     lines.push("#[derive(Serialize)]");

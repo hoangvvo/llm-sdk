@@ -26,6 +26,7 @@ const targets: GenerationTarget[] = [
     language: "go",
     output: "sdk-go/openai/openaichatapi/api.go",
     packageName: "openaichatapi",
+    overrides: "schema/providers/openai-chat.override.json",
   },
   {
     input: "schema/providers/anthropic.json",
@@ -50,6 +51,7 @@ const targets: GenerationTarget[] = [
     input: "schema/providers/openai-chat.json",
     language: "rust",
     output: "sdk-rust/src/openai/chat_api.rs",
+    overrides: "schema/providers/openai-chat.override.json",
   },
   {
     input: "schema/providers/anthropic.json",

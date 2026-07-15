@@ -4582,7 +4582,8 @@ pub enum InputTextContentType {
 pub struct InputImageContent {
     /// The detail level of the image to be sent to the model. One of `high`,
     /// `low`, `auto`, or `original`. Defaults to `auto`.
-    pub detail: ImageDetail,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<ImageDetail>,
     /// The ID of the file to be sent to the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,

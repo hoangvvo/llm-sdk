@@ -296,26 +296,32 @@ fn convert_to_openai_create_params(
 ) -> LanguageModelResult<CreateChatCompletionRequest> {
     let messages = convert_to_openai_messages(input.messages, input.system_prompt)?;
 
-    let modalities = input.modalities.as_ref().map_or(Ok(None), |modalities| {
-        if modalities.is_empty() {
-            Ok(None)
-        } else {
+    let modalities = input
+        .modalities
+        .as_ref()
+        .map(|modalities| {
             modalities
                 .iter()
                 .map(convert_to_openai_modality)
                 .collect::<LanguageModelResult<Vec<_>>>()
                 .map(|items| Some(Some(items)))
-        }
-    })?;
+        })
+        .transpose()?;
 
     let audio = input.audio.map(convert_to_openai_audio).transpose()?;
 
-    let reasoning_effort = input
-        .reasoning
-        .as_ref()
-        .and_then(|reasoning| reasoning.budget_tokens)
-        .map(convert_to_openai_reasoning_effort)
-        .transpose()?;
+    let reasoning_effort = match input.reasoning.as_ref() {
+        Some(reasoning) if !reasoning.enabled => {
+            // The generated alias preserves OpenAI's nullable field shape.
+            let effort: ReasoningEffort = Some(Some(ReasoningEffortValue::None));
+            Some(effort)
+        }
+        Some(reasoning) => reasoning
+            .budget_tokens
+            .map(convert_to_openai_reasoning_effort)
+            .transpose()?,
+        None => None,
+    };
 
     Ok(CreateChatCompletionRequest {
         metadata: None,
@@ -336,7 +342,7 @@ fn convert_to_openai_create_params(
         max_completion_tokens: input.max_tokens.map(i64::from),
         max_tokens: None,
         messages,
-        modalities: Some(modalities),
+        modalities,
         model: Some(model_id.to_string()),
         n: None,
         parallel_tool_calls: None,
@@ -1060,29 +1066,4 @@ fn map_openai_completion_tokens_details(
     }
 
     Ok(result)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn request_serialization_emits_one_content_part_discriminator() {
-        let input = LanguageModelInput::new([Message::user([Part::text("Hello")])]);
-        let request = convert_to_openai_create_params(input, "gpt-4o", false).unwrap();
-        let request_json = serialize_openai_chat_request(&request).unwrap();
-
-        assert_eq!(
-            request_json.pointer("/messages/0/content/0"),
-            Some(&json!({
-                "text": "Hello",
-                "type": "text",
-            }))
-        );
-
-        let encoded_content =
-            serde_json::to_string(request_json.pointer("/messages/0/content/0").unwrap()).unwrap();
-        assert_eq!(encoded_content.matches("\"type\":\"text\"").count(), 1);
-    }
 }

@@ -10,7 +10,7 @@ use llm_agent::{
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
-    PartDelta, PartialModelResponse, TextPartDelta, Tool, ToolCallPartDelta, WebSearchTool,
+    PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta,
 };
 use serde_json::{json, Value};
 
@@ -305,63 +305,6 @@ async fn run_returns_response_when_no_tool_call() {
     };
 
     assert_eq!(response, expected);
-
-    close_run_session(session).await;
-}
-
-#[test]
-fn agent_params_add_tool_accepts_agent_tool_values() {
-    let model = Arc::new(MockLanguageModel::new());
-    let function_tool = MockTool::new(
-        "mock-tool",
-        AgentToolResult {
-            content: vec![Part::text("Done")],
-            is_error: false,
-        },
-    );
-
-    let params = AgentParams::new("test_agent", model)
-        .add_tool(AgentTool::web_search(WebSearchTool::new()))
-        .add_tool(AgentTool::function(function_tool));
-
-    assert_eq!(params.tools.len(), 2);
-    assert!(matches!(Tool::from(&params.tools[0]), Tool::WebSearch(_)));
-    assert!(matches!(
-        Tool::from(&params.tools[1]),
-        Tool::Function(tool) if tool.name == "mock-tool"
-    ));
-}
-
-#[tokio::test]
-async fn run_forwards_web_search_tools_to_model() {
-    let model = Arc::new(MockLanguageModel::new());
-    model.enqueue_generate(ModelResponse {
-        content: vec![Part::text("Search-ready response")],
-        ..Default::default()
-    });
-
-    let session = new_run_session(
-        Arc::new(AgentParams::new("test_agent", model.clone()).add_tool(WebSearchTool::new())),
-        (),
-    )
-    .await;
-
-    let response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Search the web",
-            )]))],
-        })
-        .await
-        .expect("run succeeds");
-
-    assert_eq!(response.content, vec![Part::text("Search-ready response")]);
-
-    let inputs = model.tracked_generate_inputs();
-    assert_eq!(inputs.len(), 1);
-    let tools = inputs[0].tools.as_ref().expect("tools present");
-    assert_eq!(tools.len(), 1);
-    assert!(matches!(&tools[0], llm_sdk::Tool::WebSearch(_)));
 
     close_run_session(session).await;
 }

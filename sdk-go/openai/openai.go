@@ -533,7 +533,7 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.InputCont
 	case part.ImagePart != nil:
 		return &openaiapi.InputContent{
 			InputImage: &openaiapi.InputImageContent{
-				Detail:   openaiapi.ImageDetailAuto,
+				Detail:   ptr.To(openaiapi.ImageDetailAuto),
 				ImageUrl: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data)),
 				Type:     openaiapi.InputImageContentTypeInputImage,
 			},

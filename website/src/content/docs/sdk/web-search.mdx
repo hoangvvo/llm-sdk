@@ -3,8 +3,11 @@ title: Web search
 ---
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goStreamWebSearchCode from "../../../../../sdk-go/examples/stream-web-search/main.go?raw";
 import goWebSearchCode from "../../../../../sdk-go/examples/web-search/main.go?raw";
+import jsStreamWebSearchCode from "../../../../../sdk-js/examples/stream-web-search.ts?raw";
 import jsWebSearchCode from "../../../../../sdk-js/examples/web-search.ts?raw";
+import rustStreamWebSearchCode from "../../../../../sdk-rust/examples/stream-web-search.rs?raw";
 import rustWebSearchCode from "../../../../../sdk-rust/examples/web-search.rs?raw";
 import {
   extractGoTypes,
@@ -57,5 +60,29 @@ The example defaults to OpenAI. Set `PROVIDER` and `MODEL` to run the same code 
   </TabItem>
   <TabItem label="Go">
     <Code code={goWebSearchCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Stream with web search
+
+Streaming returns citation deltas with the text deltas. The accumulator combines them into citations on the final text parts.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsStreamWebSearchCode}
+      lang="typescript"
+      title="stream-web-search.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={rustStreamWebSearchCode}
+      lang="rust"
+      title="stream-web-search.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goStreamWebSearchCode} lang="go" title="main.go" />
   </TabItem>
 </Tabs>

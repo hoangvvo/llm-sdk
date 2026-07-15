@@ -123,6 +123,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio/main.go)
 - [`tool-use`: Function calling](./examples/tool-use/main.go)
 - [`web-search`: Web search](./examples/web-search/main.go)
+- [`stream-web-search`: Stream web search](./examples/stream-web-search/main.go)
 - [`structured-output`: Structured output](./examples/structured-output/main.go)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning/main.go)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning/main.go)

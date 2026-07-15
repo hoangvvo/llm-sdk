@@ -19,9 +19,16 @@ suite("AnthropicModel", () => {
       ...input,
       reasoning: {
         enabled: true,
-        budget_tokens: 3000,
       },
     }),
+    // Adaptive thinking may be returned as a redacted, signature-only block.
+    customOutputContent: () => [
+      {
+        type: "reasoning",
+        text: /.*/s,
+        signature: true,
+      },
+    ],
   };
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {

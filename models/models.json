@@ -136,24 +136,22 @@
       "model_id": "gpt-4.1",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.000005,
-          "input_cost_per_image_token": 0.00001,
-          "output_cost_per_image_token": 0.00004
+          "input_cost_per_text_token": 0.000002,
+          "output_cost_per_text_token": 0.000008
         },
         "capabilities": {
           "text_input": true,
-          "text_output": false,
+          "text_output": true,
           "image_input": true,
-          "image_output": true,
+          "image_output": false,
           "audio_input": false,
           "audio_output": false,
-          "function_calling": false,
-          "structured_output": false,
+          "function_calling": true,
+          "structured_output": true,
           "citation": false,
           "reasoning": false
         }
-      },
-      "default_modalities": ["image"]
+      }
     },
     {
       "provider": "anthropic",

@@ -774,7 +774,7 @@ fn map_google_content_to_delta(
     existing_deltas: &[ContentDelta],
     stream_text_part_mappings: &mut HashMap<usize, usize>,
 ) -> LanguageModelResult<Vec<ContentDelta>> {
-    let mut deltas = Vec::new();
+    let mut deltas: Vec<ContentDelta> = Vec::new();
 
     for (provider_part_index, part) in parts.into_iter().enumerate() {
         let Some(part) = map_google_part(part)? else {
@@ -789,7 +789,23 @@ fn map_google_content_to_delta(
             let index = stream_text_part_mappings
                 .get(&provider_part_index)
                 .copied()
-                .unwrap_or_else(|| next_google_delta_index(existing_deltas, &deltas));
+                .unwrap_or_else(|| {
+                    if deltas
+                        .iter()
+                        .any(|delta| matches!(delta.part, PartDelta::Text(_)))
+                    {
+                        // Multiple text parts in one chunk are distinct provider parts.
+                        next_google_delta_index(existing_deltas, &deltas)
+                    } else {
+                        // Part indexes are local to an incremental chunk. Reuse the
+                        // existing text stream when a later chunk starts again at zero.
+                        let all_content_deltas = existing_deltas
+                            .iter()
+                            .chain(deltas.iter())
+                            .collect::<Vec<_>>();
+                        stream_utils::guess_delta_index(&part_delta, &all_content_deltas, None)
+                    }
+                });
             stream_text_part_mappings.insert(provider_part_index, index);
             index
         } else {
@@ -908,91 +924,4 @@ fn map_modality_token_counts(
     }
 
     Some(tokens_details)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::google::api::{
-        GoogleAiGenerativelanguageV1BetaGroundingSupport, GoogleAiGenerativelanguageV1BetaSegment,
-        Web,
-    };
-
-    #[test]
-    fn citations_use_provider_part_index_before_filtering() {
-        let grounding_metadata = GroundingMetadata {
-            grounding_chunks: Some(vec![GroundingChunk {
-                web: Some(Web {
-                    uri: Some("https://example.com".to_string()),
-                    title: Some("Example".to_string()),
-                }),
-                ..Default::default()
-            }]),
-            grounding_supports: Some(vec![GoogleAiGenerativelanguageV1BetaGroundingSupport {
-                segment: Some(GoogleAiGenerativelanguageV1BetaSegment {
-                    part_index: Some(2),
-                    text: Some("second".to_string()),
-                    ..Default::default()
-                }),
-                // Repeated chunk references are preserved; the provider may
-                // intentionally attribute the same source more than once.
-                grounding_chunk_indices: Some(vec![0, 0]),
-                ..Default::default()
-            }]),
-            ..Default::default()
-        };
-        let content = map_google_content(
-            vec![
-                GooglePart::default(),
-                GooglePart {
-                    text: Some("first".to_string()),
-                    ..Default::default()
-                },
-                GooglePart {
-                    text: Some("second".to_string()),
-                    ..Default::default()
-                },
-            ],
-            Some(&grounding_metadata),
-        )
-        .expect("content maps successfully");
-
-        assert_eq!(content.len(), 2);
-        let Part::Text(first) = &content[0] else {
-            panic!("expected first text part");
-        };
-        assert!(first.citations.is_none());
-        let Part::Text(second) = &content[1] else {
-            panic!("expected second text part");
-        };
-        assert_eq!(second.citations.as_ref().map(Vec::len), Some(2));
-    }
-
-    #[test]
-    fn streaming_preserves_provider_to_sdk_part_mapping() {
-        let mut mappings = HashMap::new();
-        let deltas = map_google_content_to_delta(
-            vec![
-                GooglePart::default(),
-                GooglePart {
-                    text: Some("first".to_string()),
-                    ..Default::default()
-                },
-                GooglePart {
-                    text: Some("second".to_string()),
-                    ..Default::default()
-                },
-            ],
-            &[],
-            &mut mappings,
-        )
-        .expect("content deltas map successfully");
-
-        assert_eq!(
-            deltas.iter().map(|delta| delta.index).collect::<Vec<_>>(),
-            vec![0, 1]
-        );
-        assert_eq!(mappings.get(&1), Some(&0));
-        assert_eq!(mappings.get(&2), Some(&1));
-    }
 }

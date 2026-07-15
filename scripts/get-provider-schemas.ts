@@ -468,7 +468,10 @@ async function main(): Promise<void> {
     requestedProviders.size === 0
       ? providers
       : providers.filter((config) => requestedProviders.has(config.provider));
-  if (selectedProviders.length !== requestedProviders.size) {
+  if (
+    requestedProviders.size > 0 &&
+    selectedProviders.length !== requestedProviders.size
+  ) {
     const knownProviders = new Set(providers.map((config) => config.provider));
     const unknownProviders = [...requestedProviders].filter(
       (provider) => !knownProviders.has(provider),

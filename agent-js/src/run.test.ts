@@ -17,7 +17,7 @@ import {
   AgentToolExecutionError,
 } from "./errors.ts";
 import { RunSession, type RunState } from "./run.ts";
-import type { AgentTool } from "./tool.ts";
+import type { AgentFunctionTool, AgentTool } from "./tool.ts";
 import type { Toolkit, ToolkitSession } from "./toolkit.ts";
 import type { AgentResponse, AgentStreamEvent } from "./types.ts";
 
@@ -908,7 +908,9 @@ suite("RunSession#run", () => {
   });
 
   test("handles tool returning error result", async (t: TestContext) => {
-    const toolExecute = t.mock.fn(() => ({
+    const toolExecute = t.mock.fn<
+      AgentFunctionTool<object, Record<string, unknown>>["execute"]
+    >(() => ({
       content: [{ type: "text", text: "Error: Invalid parameters" }],
       is_error: true,
     }));
@@ -1533,7 +1535,9 @@ suite("RunSession#runStream", () => {
   });
 
   test("handles multiple turns in streaming mode", async (t: TestContext) => {
-    const toolExecute = t.mock.fn(() => ({
+    const toolExecute = t.mock.fn<
+      AgentFunctionTool<object, Record<string, unknown>>["execute"]
+    >(() => ({
       content: [{ type: "text", text: "Calculation done" }],
       is_error: false,
     }));

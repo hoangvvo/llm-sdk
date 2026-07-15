@@ -727,7 +727,21 @@ func mapGoogleContentToDelta(
 			var ok bool
 			index, ok = streamTextPartMappings[providerPartIndex]
 			if !ok {
-				index = nextGoogleDeltaIndex(existingContentDeltas, contentDeltas)
+				hasIncomingText := false
+				for _, delta := range contentDeltas {
+					if delta.Part.TextPartDelta != nil {
+						hasIncomingText = true
+						break
+					}
+				}
+				if hasIncomingText {
+					// Multiple text parts in one chunk are distinct provider parts.
+					index = nextGoogleDeltaIndex(existingContentDeltas, contentDeltas)
+				} else {
+					// Part indexes are local to an incremental chunk. Reuse the existing
+					// text stream when a later chunk starts again at provider index zero.
+					index = partutil.GuessDeltaIndex(partDelta, append(existingContentDeltas, contentDeltas...), nil)
+				}
 				streamTextPartMappings[providerPartIndex] = index
 			}
 		} else {

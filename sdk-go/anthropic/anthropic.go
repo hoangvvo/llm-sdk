@@ -185,11 +185,12 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 
 				if event.ContentBlockStart != nil {
 					block := event.ContentBlockStart.ContentBlock
-					isWebSearchProviderBlock := (block.ServerToolUse != nil && block.ServerToolUse.Name == "web_search") ||
+					isProviderToolBlock := block.ServerToolUse != nil ||
 						block.WebSearchToolResult != nil
-					if isWebSearchProviderBlock {
-						// Hosted-search arguments use the same input_json_delta shape as client
-						// tools. Suppress them so callers do not receive a function call to run.
+					if isProviderToolBlock {
+						// Provider-hosted tool arguments use the same input_json_delta shape as
+						// client tools. Suppress every server tool so future hosted tools are not
+						// exposed as function calls the client must execute.
 						providerToolBlockIndexes[event.ContentBlockStart.Index] = true
 						continue
 					}
@@ -327,7 +328,7 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 	}
 
 	if input.Reasoning != nil {
-		params.Thinking = convertToAnthropicThinkingConfigParam(*input.Reasoning, maxTokens)
+		params.Thinking = convertToAnthropicThinkingConfigParam(*input.Reasoning)
 	}
 
 	return params, nil
@@ -403,10 +404,28 @@ func convertPartsToAnthropicContentBlocks(parts []llmsdk.Part) ([]anthropicapi.I
 func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputContentBlock, error) {
 	switch {
 	case part.TextPart != nil:
+		citations := make([]anthropicapi.RequestTextBlockCitationsItem, 0, len(part.TextPart.Citations))
+		for _, citation := range part.TextPart.Citations {
+			if citation.Signature == nil {
+				continue
+			}
+			citedText := ""
+			if citation.CitedText != nil {
+				citedText = *citation.CitedText
+			}
+			citations = append(citations, anthropicapi.RequestTextBlockCitationsItem{
+				WebSearchResultLocation: &anthropicapi.RequestWebSearchResultLocationCitation{
+					CitedText: citedText, EncryptedIndex: *citation.Signature,
+					Title: citation.Title, Url: citation.Source,
+				},
+			})
+		}
 		return anthropicapi.InputContentBlock{
 			Text: &anthropicapi.RequestTextBlock{
-				Type: "text",
-				Text: part.TextPart.Text,
+				Type: "text", Text: part.TextPart.Text,
+				// EncryptedIndex is the provider state Anthropic accepts when a
+				// web-search citation is returned in a later assistant message.
+				Citations: citations,
 			},
 		}, nil
 
@@ -528,22 +547,19 @@ func convertToAnthropicToolChoice(option llmsdk.ToolChoiceOption) *anthropicapi.
 	return nil
 }
 
-func convertToAnthropicThinkingConfigParam(reasoning llmsdk.ReasoningOptions, maxTokens int) *anthropicapi.ThinkingConfigParam {
+func convertToAnthropicThinkingConfigParam(reasoning llmsdk.ReasoningOptions) *anthropicapi.ThinkingConfigParam {
 	if !reasoning.Enabled {
 		return &anthropicapi.ThinkingConfigParam{Disabled: &anthropicapi.ThinkingConfigDisabled{}}
 	}
 
-	budget := maxTokens - 1
-	if reasoning.BudgetTokens != nil {
-		budget = int(*reasoning.BudgetTokens)
-	}
-	if budget < 1 {
-		budget = maxTokens - 1
+	// Without an explicit token budget, let Anthropic choose the thinking depth.
+	if reasoning.BudgetTokens == nil {
+		return &anthropicapi.ThinkingConfigParam{Adaptive: &anthropicapi.ThinkingConfigAdaptive{}}
 	}
 
 	return &anthropicapi.ThinkingConfigParam{
 		Enabled: &anthropicapi.ThinkingConfigEnabled{
-			BudgetTokens: budget,
+			BudgetTokens: int(*reasoning.BudgetTokens),
 		},
 	}
 }

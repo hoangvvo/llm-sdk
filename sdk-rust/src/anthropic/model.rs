@@ -6,9 +6,10 @@ use crate::{
         InputContentBlock, InputMessage, InputMessageContent, InputMessageRole,
         Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage, MessageStartEvent,
         MessageStreamEvent, OutputConfig, RequestCitationsConfig, RequestImageBlock,
-        RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock, RequestThinkingBlock,
-        RequestToolResultBlock, RequestToolResultBlockContent,
-        RequestToolResultBlockContentArrayItem, RequestToolUseBlock, ThinkingConfigDisabled,
+        RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock,
+        RequestTextBlockCitationsItem, RequestThinkingBlock, RequestToolResultBlock,
+        RequestToolResultBlockContent, RequestToolResultBlockContentArrayItem, RequestToolUseBlock,
+        RequestWebSearchResultLocationCitation, ThinkingConfigAdaptive, ThinkingConfigDisabled,
         ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage, UserLocation,
         WebSearchTool20250305,
     },
@@ -243,20 +244,16 @@ impl LanguageModel for AnthropicModel {
                                     };
                                 }
                                 MessageStreamEvent::ContentBlockStart(ContentBlockStartEvent { content_block, index }) => {
-                                    let is_web_search_provider_block = match &content_block {
-                                        ContentBlockStartEventContentBlock::ServerToolUse(block) => {
-                                            matches!(
-                                                block.name,
-                                                api::ResponseServerToolUseBlockName::WebSearch
-                                            )
-                                        }
-                                        ContentBlockStartEventContentBlock::WebSearchToolResult(_) => true,
-                                        _ => false,
-                                    };
-                                    if is_web_search_provider_block {
-                                        // Hosted-search arguments use the same input_json_delta
-                                        // shape as client tools. Suppress those indexes so callers
-                                        // do not receive a function call they are expected to run.
+                                    let is_provider_tool_block = matches!(
+                                        &content_block,
+                                        ContentBlockStartEventContentBlock::ServerToolUse(_)
+                                            | ContentBlockStartEventContentBlock::WebSearchToolResult(_)
+                                    );
+                                    if is_provider_tool_block {
+                                        // Provider-hosted tool arguments use the same
+                                        // input_json_delta shape as client tools. Suppress every
+                                        // server tool so future hosted tools are not exposed as
+                                        // function calls the client is expected to run.
                                         provider_tool_block_indexes.insert(index);
                                         continue;
                                     }
@@ -355,8 +352,7 @@ fn convert_to_anthropic_create_params(
         system: system_prompt
             .map(|prompt| CreateMessageParamsSystem::CreateMessageParamsSystemString(Some(prompt))),
         temperature,
-        thinking: reasoning
-            .map(|options| convert_to_anthropic_thinking_config(&options, max_tokens)),
+        thinking: reasoning.map(|options| convert_to_anthropic_thinking_config(&options)),
         tool_choice: tool_choice.map(convert_to_anthropic_tool_choice),
         tools: tools.map(|tool_list| tool_list.into_iter().map(convert_tool).collect()),
         top_k: top_k.map(i64::from),
@@ -466,7 +462,7 @@ fn convert_parts_to_content_blocks(
 fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContentBlock> {
     match part {
         Part::Text(text_part) => Ok(InputContentBlock::Text(create_request_text_block(
-            text_part.text,
+            text_part,
         ))),
         Part::Image(image_part) => Ok(InputContentBlock::Image(create_request_image_block(
             image_part,
@@ -535,7 +531,7 @@ fn convert_part_to_tool_result_content_block(
 ) -> LanguageModelResult<RequestToolResultBlockContentArrayItem> {
     match part {
         Part::Text(text_part) => Ok(RequestToolResultBlockContentArrayItem::Text(
-            create_request_text_block(text_part.text),
+            create_request_text_block(text_part),
         )),
         Part::Image(image_part) => Ok(RequestToolResultBlockContentArrayItem::Image(
             create_request_image_block(image_part)?,
@@ -550,11 +546,30 @@ fn convert_part_to_tool_result_content_block(
     }
 }
 
-fn create_request_text_block(text: String) -> RequestTextBlock {
+fn create_request_text_block(text_part: TextPart) -> RequestTextBlock {
+    let citations = text_part.citations.and_then(|citations| {
+        let citations = citations
+            .into_iter()
+            .filter_map(|citation| {
+                Some(RequestTextBlockCitationsItem::WebSearchResultLocation(
+                    RequestWebSearchResultLocationCitation {
+                        cited_text: citation.cited_text.unwrap_or_default(),
+                        encrypted_index: citation.signature?,
+                        title: citation.title,
+                        url: citation.source,
+                    },
+                ))
+            })
+            .collect::<Vec<_>>();
+        (!citations.is_empty()).then_some(citations)
+    });
+
     RequestTextBlock {
         cache_control: None,
-        citations: None,
-        text,
+        // encrypted_index is the provider state Anthropic accepts when a
+        // web-search citation is returned in a later assistant message.
+        citations,
+        text: text_part.text,
         r#type: "text".to_string(),
     }
 }
@@ -575,7 +590,7 @@ fn convert_source_part(
     let mut content = Vec::new();
     for part in source_part.content {
         match part {
-            Part::Text(text_part) => content.push(create_request_text_block(text_part.text)),
+            Part::Text(text_part) => content.push(create_request_text_block(text_part)),
             _ => {
                 return Err(LanguageModelError::Unsupported(
                     PROVIDER,
@@ -622,21 +637,18 @@ fn convert_to_anthropic_tool_choice(choice: ToolChoiceOption) -> api::ToolChoice
     }
 }
 
-fn convert_to_anthropic_thinking_config(
-    reasoning: &ReasoningOptions,
-    max_tokens: i64,
-) -> ThinkingConfigParam {
+fn convert_to_anthropic_thinking_config(reasoning: &ReasoningOptions) -> ThinkingConfigParam {
     if !reasoning.enabled {
         return ThinkingConfigParam::Disabled(ThinkingConfigDisabled {});
     }
 
-    let fallback = (max_tokens - 1).max(1);
-    let budget = reasoning
-        .budget_tokens
-        .map_or(fallback, |value| i64::from(value.max(1)));
+    // Without an explicit token budget, let Anthropic choose the thinking depth.
+    let Some(budget_tokens) = reasoning.budget_tokens else {
+        return ThinkingConfigParam::Adaptive(ThinkingConfigAdaptive::default());
+    };
 
     ThinkingConfigParam::Enabled(ThinkingConfigEnabled {
-        budget_tokens: budget,
+        budget_tokens: i64::from(budget_tokens),
         display: None,
     })
 }

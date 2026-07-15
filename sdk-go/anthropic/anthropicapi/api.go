@@ -3788,10 +3788,10 @@ func (u *ResponseToolSearchToolResultBlockContent) UnmarshalJSON(data []byte) er
 }
 
 type ResponseToolUseBlock struct {
-	Caller ResponseToolUseBlockCaller `json:"caller"`
-	Id     string                     `json:"id"`
-	Input  any                        `json:"input"`
-	Name   string                     `json:"name"`
+	Caller *ResponseToolUseBlockCaller `json:"caller,omitempty"`
+	Id     string                      `json:"id"`
+	Input  any                         `json:"input"`
+	Name   string                      `json:"name"`
 }
 
 type ResponseToolUseBlockCaller struct {
@@ -3871,7 +3871,7 @@ func (u *ResponseToolUseBlockCaller) UnmarshalJSON(data []byte) error {
 }
 
 type ResponseWebFetchToolResultBlock struct {
-	Caller    ResponseWebFetchToolResultBlockCaller  `json:"caller"`
+	Caller    *ResponseWebFetchToolResultBlockCaller `json:"caller,omitempty"`
 	Content   ResponseWebFetchToolResultBlockContent `json:"content"`
 	ToolUseId string                                 `json:"tool_use_id"`
 }

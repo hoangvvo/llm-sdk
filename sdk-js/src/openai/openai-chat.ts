@@ -183,8 +183,10 @@ function convertToOpenAICreateParams(
     presence_penalty: presence_penalty ?? null,
     frequency_penalty: frequency_penalty ?? null,
     seed: seed ?? null,
-    modalities: modalities?.map(convertToOpenAIModality) ?? null,
   };
+  if (modalities) {
+    params.modalities = modalities.map(convertToOpenAIModality);
+  }
   if (typeof max_tokens === "number") {
     params.max_completion_tokens = max_tokens;
   }
@@ -200,7 +202,9 @@ function convertToOpenAICreateParams(
   if (audio) {
     params.audio = convertToOpenAIAudio(audio);
   }
-  if (reasoning?.budget_tokens) {
+  if (reasoning && !reasoning.enabled) {
+    params.reasoning_effort = "none";
+  } else if (reasoning?.budget_tokens !== undefined) {
     switch (reasoning.budget_tokens) {
       case OpenAIReasoningEffort.Minimal:
         params.reasoning_effort = "minimal";

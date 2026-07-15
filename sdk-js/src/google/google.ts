@@ -654,9 +654,20 @@ function mapGoogleContentToDelta(
       // Google's citation partIndex addresses the provider's parts array. Keep
       // a text-only mapping because provider slots are not stable for separate
       // tool calls, which must retain the existing index-matching behavior.
-      index =
-        streamTextPartMappings.get(providerPartIndex) ??
-        nextGoogleDeltaIndex(existingContentDeltas, contentDeltas);
+      const mappedIndex = streamTextPartMappings.get(providerPartIndex);
+      if (mappedIndex !== undefined) {
+        index = mappedIndex;
+      } else if (contentDeltas.some((delta) => delta.part.type === "text")) {
+        // Multiple text parts in one chunk are distinct provider parts.
+        index = nextGoogleDeltaIndex(existingContentDeltas, contentDeltas);
+      } else {
+        // Part indexes are local to an incremental chunk. Reuse the existing
+        // text stream when a later chunk starts again at provider index zero.
+        index = guessDeltaIndex(partDelta, [
+          ...existingContentDeltas,
+          ...contentDeltas,
+        ]);
+      }
       streamTextPartMappings.set(providerPartIndex, index);
     } else {
       index = guessDeltaIndex(partDelta, [

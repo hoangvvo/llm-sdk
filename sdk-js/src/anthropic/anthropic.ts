@@ -106,14 +106,13 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
         case "content_block_start": {
-          const isWebSearchProviderBlock =
-            (chunk.content_block.type === "server_tool_use" &&
-              chunk.content_block.name === "web_search") ||
+          const isProviderToolBlock =
+            chunk.content_block.type === "server_tool_use" ||
             chunk.content_block.type === "web_search_tool_result";
-          if (isWebSearchProviderBlock) {
-            // Anthropic streams hosted-search arguments with the same
-            // input_json_delta shape as client tools. Track these indexes so
-            // they are not exposed as function calls the client must execute.
+          if (isProviderToolBlock) {
+            // Anthropic streams provider-hosted tool arguments with the same
+            // input_json_delta shape as client tools. Track every server tool
+            // index so future hosted tools are not exposed as client calls.
             providerToolBlockIndexes.add(chunk.index);
             break;
           }
@@ -189,10 +188,7 @@ function convertToAnthropicCreateParams(
     params.tool_choice = convertToAnthropicToolChoice(tool_choice);
   }
   if (reasoning) {
-    params.thinking = convertToAnthropicThinkingConfigParam(
-      reasoning,
-      maxTokens,
-    );
+    params.thinking = convertToAnthropicThinkingConfigParam(reasoning);
   }
 
   return params;
@@ -248,10 +244,30 @@ function convertToAnthropicContentBlockParam(
 function convertToAnthropicTextBlockParam(
   part: TextPart,
 ): Anthropic.TextBlockParam {
-  return {
+  const block: Anthropic.TextBlockParam = {
     type: "text",
     text: part.text,
   };
+  const citations = part.citations?.flatMap(
+    (citation): Anthropic.Messages.CitationWebSearchResultLocationParam[] =>
+      citation.signature
+        ? [
+            {
+              type: "web_search_result_location",
+              cited_text: citation.cited_text ?? "",
+              encrypted_index: citation.signature,
+              title: citation.title ?? null,
+              url: citation.source,
+            },
+          ]
+        : [],
+  );
+  // encrypted_index is the provider state Anthropic accepts when a web-search
+  // citation is returned in a later assistant message.
+  if (citations && citations.length > 0) {
+    block.citations = citations;
+  }
+  return block;
 }
 
 function convertToAnthropicImageBlockParam(
@@ -421,16 +437,21 @@ function convertToAnthropicOutputConfig(
 
 function convertToAnthropicThinkingConfigParam(
   reasoning: ReasoningOptions,
-  maxTokens: number,
 ): Anthropic.ThinkingConfigParam {
   if (!reasoning.enabled) {
     return {
       type: "disabled",
     };
   }
+  // Without an explicit token budget, let Anthropic choose the thinking depth.
+  if (reasoning.budget_tokens === undefined) {
+    return {
+      type: "adaptive",
+    };
+  }
   return {
     type: "enabled",
-    budget_tokens: reasoning.budget_tokens ?? maxTokens - 1,
+    budget_tokens: reasoning.budget_tokens,
   };
 }
 

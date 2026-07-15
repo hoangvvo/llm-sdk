@@ -318,12 +318,17 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 		params.ResponseFormat = responseFormat
 	}
 
-	if input.Reasoning != nil && input.Reasoning.BudgetTokens != nil {
-		effort, err := convertToOpenAIChatReasoningEffort(*input.Reasoning.BudgetTokens)
-		if err != nil {
-			return nil, err
+	if input.Reasoning != nil {
+		if !input.Reasoning.Enabled {
+			effort := openaichatapi.ReasoningEffortNone
+			params.ReasoningEffort = &effort
+		} else if input.Reasoning.BudgetTokens != nil {
+			effort, err := convertToOpenAIChatReasoningEffort(*input.Reasoning.BudgetTokens)
+			if err != nil {
+				return nil, err
+			}
+			params.ReasoningEffort = effort
 		}
-		params.ReasoningEffort = effort
 	}
 
 	if len(input.Metadata) > 0 {

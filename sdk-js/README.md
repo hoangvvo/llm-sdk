@@ -121,6 +121,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio.ts)
 - [`function-calling`: Function calling](./examples/tool-use.ts)
 - [`web-search`: Web search](./examples/web-search.ts)
+- [`stream-web-search`: Stream web search](./examples/stream-web-search.ts)
 - [`structured-output`: Structured output](./examples/structured-output.ts)
 - [`generate-reasoning`: Generate reasoning](./examples/generate-reasoning.ts)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.ts)

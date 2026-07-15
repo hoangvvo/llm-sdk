@@ -1938,7 +1938,8 @@ pub enum ResponseToolSearchToolResultBlockContent {
 
 #[derive(Serialize, Deserialize)]
 pub struct ResponseToolUseBlock {
-    pub caller: ResponseToolUseBlockCaller,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caller: Option<ResponseToolUseBlockCaller>,
     pub id: String,
     pub input: Value,
     pub name: String,
@@ -1961,7 +1962,8 @@ pub enum ResponseToolUseBlockCaller {
 
 #[derive(Serialize, Deserialize)]
 pub struct ResponseWebFetchToolResultBlock {
-    pub caller: ResponseWebFetchToolResultBlockCaller,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caller: Option<ResponseWebFetchToolResultBlockCaller>,
     pub content: ResponseWebFetchToolResultBlockContent,
     pub tool_use_id: String,
 }

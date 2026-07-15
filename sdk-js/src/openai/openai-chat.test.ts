@@ -15,6 +15,13 @@ suite("OpenAIChatModel", () => {
     apiKey: process.env["OPENAI_API_KEY"],
   });
 
+  const noReasoningOptions = {
+    additionalInputs: (input: Parameters<typeof model.generate>[0]) => ({
+      ...input,
+      reasoning: { enabled: false },
+    }),
+  };
+
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TEXT);
   });
@@ -28,11 +35,21 @@ suite("OpenAIChatModel", () => {
   });
 
   test(TEST_CASE_NAMES.GENERATE_TOOL_CALL, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TOOL_CALL);
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.GENERATE_TOOL_CALL,
+      noReasoningOptions,
+    );
   });
 
   test(TEST_CASE_NAMES.STREAM_TOOL_CALL, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TOOL_CALL);
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.STREAM_TOOL_CALL,
+      noReasoningOptions,
+    );
   });
 
   test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT, (t) => {
@@ -40,19 +57,35 @@ suite("OpenAIChatModel", () => {
       t,
       model,
       TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT,
+      noReasoningOptions,
     );
   });
 
   test(TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT);
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT,
+      noReasoningOptions,
+    );
   });
 
   test(TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS);
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS,
+      noReasoningOptions,
+    );
   });
 
   test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS);
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS,
+      noReasoningOptions,
+    );
   });
 
   test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME, (t) => {
@@ -60,6 +93,7 @@ suite("OpenAIChatModel", () => {
       t,
       model,
       TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
+      noReasoningOptions,
     );
   });
 
@@ -68,7 +102,12 @@ suite("OpenAIChatModel", () => {
   });
 
   test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.SOURCE_PART_INPUT,
+      noReasoningOptions,
+    );
   });
 
   test(

@@ -374,7 +374,7 @@ impl TryFrom<UserMessage> for InputItem {
                                 }
                                 Part::Image(image_part) => {
                                     InputContent::InputImage(InputImageContent {
-                                        detail: ImageDetail::Auto,
+                                        detail: Some(ImageDetail::Auto),
                                         file_id: None,
                                         image_url: Some(format!(
                                             "data:{};base64,{}",

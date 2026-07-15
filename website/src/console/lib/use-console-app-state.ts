@@ -236,7 +236,7 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     () => [],
   );
 
-  const [hasStoredToolPreference] = useState(() => {
+  const [hasStoredToolPreference, setHasStoredToolPreference] = useState(() => {
     if (typeof window === "undefined") {
       return false;
     }
@@ -297,17 +297,38 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
 
   const handleEnabledToolsChange = useCallback(
     (next: string[]) => {
-      const toolNames = toolOptions.map((tool) => tool.name);
-      const toolNameSet = new Set(toolNames);
-      const allowed = new Set(next.filter((name) => toolNameSet.has(name)));
-      const normalized = toolNames.filter((name) => allowed.has(name));
+      const allToolNames = (toolsData ?? []).map((tool) => tool.name);
+      const visibleToolNames = new Set(toolOptions.map((tool) => tool.name));
+      const nextVisibleTools = new Set(next);
+      const selectedTools = new Set(
+        enabledTools.length > 0 || hasStoredToolPreference
+          ? enabledTools
+          : allToolNames,
+      );
+
+      for (const name of visibleToolNames) {
+        if (nextVisibleTools.has(name)) {
+          selectedTools.add(name);
+        } else {
+          selectedTools.delete(name);
+        }
+      }
+
+      const normalized = allToolNames.filter((name) => selectedTools.has(name));
       setEnabledTools(normalized);
+      setHasStoredToolPreference(true);
       localStorage.setItem(
         STORAGE_KEY_ENABLED_TOOLS,
         JSON.stringify(normalized),
       );
     },
-    [toolOptions, setEnabledTools],
+    [
+      enabledTools,
+      hasStoredToolPreference,
+      setEnabledTools,
+      toolOptions,
+      toolsData,
+    ],
   );
 
   const handleMcpServersChange = useCallback(

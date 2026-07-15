@@ -208,6 +208,12 @@ node examples/agent.ts
 
 An example server that exposes an API to interact with the agent can be found in [examples/server](./examples/server). This can be used to test the agent with the [console application](../website).
 
+## Migration
+
+### To 0.3.0
+
+- Rename directly implemented function tools from `AgentTool` to `AgentFunctionTool` and add `type: "function"`. The `tool(...)` helper adds the type automatically.
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)

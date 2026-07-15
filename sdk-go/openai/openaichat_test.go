@@ -8,6 +8,10 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
+var noReasoning = testcommon.WithAdditionalInput(func(input *llmsdk.LanguageModelInput) {
+	input.Reasoning = &llmsdk.ReasoningOptions{Enabled: false}
+})
+
 func TestChatGenerateText(t *testing.T) {
 	testcommon.RunTestCase(t, chatModel, "generate_text")
 }
@@ -21,31 +25,31 @@ func TestChatGenerateWithSystemPrompt(t *testing.T) {
 }
 
 func TestChatGenerateToolCall(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_tool_call")
+	testcommon.RunTestCase(t, chatModel, "generate_tool_call", noReasoning)
 }
 
 func TestChatStreamToolCall(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_tool_call")
+	testcommon.RunTestCase(t, chatModel, "stream_tool_call", noReasoning)
 }
 
 func TestChatGenerateTextWithToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_text_from_tool_result")
+	testcommon.RunTestCase(t, chatModel, "generate_text_from_tool_result", noReasoning)
 }
 
 func TestChatStreamTextWithToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_text_from_tool_result")
+	testcommon.RunTestCase(t, chatModel, "stream_text_from_tool_result", noReasoning)
 }
 
 func TestChatGenerateParallelToolCalls(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_parallel_tool_calls")
+	testcommon.RunTestCase(t, chatModel, "generate_parallel_tool_calls", noReasoning)
 }
 
 func TestChatStreamParallelToolCalls(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_parallel_tool_calls")
+	testcommon.RunTestCase(t, chatModel, "stream_parallel_tool_calls", noReasoning)
 }
 
 func TestChatStreamParallelToolCallsOfSameName(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_parallel_tool_calls_of_same_name")
+	testcommon.RunTestCase(t, chatModel, "stream_parallel_tool_calls_of_same_name", noReasoning)
 }
 
 func TestChatStructuredResponseFormat(t *testing.T) {
@@ -53,7 +57,7 @@ func TestChatStructuredResponseFormat(t *testing.T) {
 }
 
 func TestChatSourcePartInput(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "source_part_input")
+	testcommon.RunTestCase(t, chatModel, "source_part_input", noReasoning)
 }
 
 func TestChatGenerateImage(t *testing.T) {

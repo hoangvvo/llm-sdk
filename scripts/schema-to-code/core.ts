@@ -13,6 +13,7 @@ export interface CodegenDocument {
 }
 
 export interface CodegenOverrides {
+  customUntaggedDeserializers?: string[];
   optionalProperties?: Record<string, string[]>;
   untaggedUnions?: string[];
 }
@@ -74,7 +75,7 @@ export interface UnionDeclaration {
   name: string;
   description: string | undefined;
   discriminator: string | undefined;
-  untaggedDeserializeStrategy?: "derive" | "placeholder";
+  untaggedDeserializeStrategy?: "derive" | "custom";
   variants: UnionVariant[];
 }
 
@@ -536,6 +537,7 @@ class SchemaDocumentBuilder {
   private readonly language: TargetLanguage;
   private readonly optionalProperties: ReadonlyMap<string, ReadonlySet<string>>;
   private readonly untaggedUnions: ReadonlySet<string>;
+  private readonly customUntaggedDeserializers: ReadonlySet<string>;
   private readonly reservedNames = new Set<string>();
   // When a named definition is referenced as a tagged-union variant via $ref,
   // we record the discriminator metadata here so the lowered struct can omit
@@ -562,6 +564,9 @@ class SchemaDocumentBuilder {
       ),
     );
     this.untaggedUnions = new Set(overrides.untaggedUnions ?? []);
+    this.customUntaggedDeserializers = new Set(
+      overrides.customUntaggedDeserializers ?? [],
+    );
   }
 
   build(): CodegenDocument {
@@ -1317,20 +1322,23 @@ class SchemaDocumentBuilder {
         name: ownerTypeName,
         description: schema.description,
         discriminator: undefined,
-        untaggedDeserializeStrategy:
-          this.shouldUsePlaceholderDeserializeForUntaggedUnion(
-            schema,
-            path,
-            ownerTypeName,
-          )
-            ? "placeholder"
-            : "derive",
+        untaggedDeserializeStrategy: this.requiresCustomUntaggedDeserializer(
+          schema,
+          path,
+          ownerTypeName,
+        )
+          ? this.customUntaggedDeserializers.has(ownerTypeName)
+            ? "custom"
+            : fail(
+                `Untagged union ${ownerTypeName} requires a custom deserializer override`,
+              )
+          : "derive",
         variants,
       },
     ];
   }
 
-  private shouldUsePlaceholderDeserializeForUntaggedUnion(
+  private requiresCustomUntaggedDeserializer(
     schema: JSONSchema7,
     path: string[],
     ownerTypeName: string,

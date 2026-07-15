@@ -6566,7 +6566,7 @@ const (
 // An image input to the model. Learn about [image inputs](/docs/guides/vision).
 type InputImageContent struct {
 	// The detail level of the image to be sent to the model. One of `high`, `low`, `auto`, or `original`. Defaults to `auto`.
-	Detail ImageDetail `json:"detail"`
+	Detail *ImageDetail `json:"detail,omitempty"`
 	// The ID of the file to be sent to the model.
 	FileId *string `json:"file_id,omitempty"`
 	// The URL of the image to be sent to the model. A fully qualified URL or base64 encoded image in a data URL.
