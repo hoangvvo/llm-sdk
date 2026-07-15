@@ -2,14 +2,7 @@
  * Loosely describe audio format. Some values (e.g., 'wav') denote containers; others (e.g., 'linear16') specify encoding only; cannot describe containers that can contain different audio encodings.
  */
 export type AudioFormat =
-  | "wav"
-  | "mp3"
-  | "linear16"
-  | "flac"
-  | "mulaw"
-  | "alaw"
-  | "aac"
-  | "opus";
+  "wav" | "mp3" | "linear16" | "flac" | "mulaw" | "alaw" | "aac" | "opus";
 /**
  * A part of the message.
  */
@@ -46,10 +39,7 @@ export type Modality = "text" | "image" | "audio";
  * - { type: "tool", toolName: "toolName" }: The model will use the specified tool.
  */
 export type ToolChoiceOption =
-  | ToolChoiceAuto
-  | ToolChoiceNone
-  | ToolChoiceRequired
-  | ToolChoiceTool;
+  ToolChoiceAuto | ToolChoiceNone | ToolChoiceRequired | ToolChoiceTool;
 /**
  * The format that the model must output.
  */

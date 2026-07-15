@@ -48,19 +48,19 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
       case "streamable-http": {
         const url = new URL(params.url);
         const transportOptions:
-          | StreamableHTTPClientTransportOptions
-          | undefined = params.authorization
-          ? {
-              requestInit: {
-                headers: {
-                  // Caller supplies bearer token; OAuth negotiation is not handled here.
-                  Authorization: params.authorization.startsWith("Bearer ")
-                    ? params.authorization
-                    : `Bearer ${params.authorization}`,
+          StreamableHTTPClientTransportOptions | undefined =
+          params.authorization
+            ? {
+                requestInit: {
+                  headers: {
+                    // Caller supplies bearer token; OAuth negotiation is not handled here.
+                    Authorization: params.authorization.startsWith("Bearer ")
+                      ? params.authorization
+                      : `Bearer ${params.authorization}`,
+                  },
                 },
-              },
-            }
-          : undefined;
+              }
+            : undefined;
         this.#transport = new StreamableHTTPClientTransport(
           url,
           transportOptions,

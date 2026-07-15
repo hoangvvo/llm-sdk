@@ -19,10 +19,7 @@ export interface CodegenOverrides {
 }
 
 export type Declaration =
-  | AliasDeclaration
-  | EnumDeclaration
-  | StructDeclaration
-  | UnionDeclaration;
+  AliasDeclaration | EnumDeclaration | StructDeclaration | UnionDeclaration;
 
 export interface AliasDeclaration {
   kind: "alias";
