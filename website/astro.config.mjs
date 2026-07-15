@@ -6,15 +6,21 @@ import tailwindcss from "@tailwindcss/vite";
 import mermaid from "astro-mermaid";
 import { defineConfig } from "astro/config";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { typeSnippets } from "./plugins/type-snippets.mjs";
 
 // https://astro.build/config
 export default defineConfig({
   site: "https://llm-sdk.hoangvvo.com",
-  adapter: cloudflare({ prerenderEnvironment: "node" }),
+  adapter: cloudflare(),
   trailingSlash: "always",
   integrations: [
     starlight({
       title: "llm-sdk",
+      expressiveCode: {
+        shiki: {
+          engine: "javascript",
+        },
+      },
       logo: {
         light: "./public/logo-light.svg",
         dark: "./public/logo-dark.svg",
@@ -100,7 +106,32 @@ export default defineConfig({
     }),
   ],
   vite: {
+    // The Cloudflare dev runtime executes ESM and does not expose CommonJS
+    // `require`. Pre-bundle the CommonJS dependencies used by Astro's React
+    // renderer and Expressive Code before either Worker environment evaluates
+    // them.
+    environments: {
+      ssr: {
+        optimizeDeps: {
+          include: [
+            "@astrojs/internal-helpers > picomatch",
+            "postcss",
+            "postcss-nested",
+          ],
+        },
+      },
+      prerender: {
+        optimizeDeps: {
+          include: [
+            "@astrojs/internal-helpers > picomatch",
+            "postcss",
+            "postcss-nested",
+          ],
+        },
+      },
+    },
     plugins: [
+      typeSnippets(),
       tailwindcss(),
       viteStaticCopy({
         targets: [

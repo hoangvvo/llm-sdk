@@ -1,97 +1,88 @@
-import goAgentInstructionTypes from "../../../agent-go/instruction.go?raw";
-import goAgentParamsTypes from "../../../agent-go/params.go?raw";
-import goAgentRunTypes from "../../../agent-go/run.go?raw";
-import goAgentToolTypes from "../../../agent-go/tool.go?raw";
-import goAgentToolkitTypes from "../../../agent-go/toolkit.go?raw";
-import goAgentMcpTypesSource from "../../../agent-go/mcp/types.go?raw";
-import goAgentTypes from "../../../agent-go/types.go?raw";
-import jsAgentInstructionTypes from "../../../agent-js/src/instruction.ts?raw";
-import jsAgentParamsTypes from "../../../agent-js/src/params.ts?raw";
-import jsAgentRunTypes from "../../../agent-js/src/run.ts?raw";
-import jsAgentToolTypes from "../../../agent-js/src/tool.ts?raw";
-import jsAgentToolkitTypes from "../../../agent-js/src/toolkit.ts?raw";
-import jsAgentMcpTypesSource from "../../../agent-js/src/mcp/types.ts?raw";
-import jsAgentTypes from "../../../agent-js/src/types.ts?raw";
-import rustAgentInstructionTypes from "../../../agent-rust/src/instruction.rs?raw";
-import rustAgentParamsTypes from "../../../agent-rust/src/params.rs?raw";
-import rustAgentRunTypes from "../../../agent-rust/src/run.rs?raw";
-import rustAgentToolTypes from "../../../agent-rust/src/tool.rs?raw";
-import rustAgentToolkitTypes from "../../../agent-rust/src/toolkit.rs?raw";
-import rustAgentMcpTypesSource from "../../../agent-rust/src/mcp/types.rs?raw";
-import rustAgentTypes from "../../../agent-rust/src/types.rs?raw";
-import goTypes from "../../../sdk-go/types.go?raw";
-import jsTypes from "../../../sdk-js/src/types.ts?raw";
-import rustTypes from "../../../sdk-rust/src/types.rs?raw";
-import { extractCombined } from "./treesitter-extract";
+import snippets from "virtual:type-snippets";
+
+type Language = "ts" | "rust" | "go";
+type SourceGroup = keyof typeof snippets;
+
+function extractCombined(
+  sourceGroup: SourceGroup,
+  typeNames: string[],
+  language: Language,
+): string {
+  const declarations = snippets[sourceGroup][language];
+  return typeNames
+    .map((name) => declarations[name])
+    .filter((snippet): snippet is string => snippet !== undefined)
+    .join("\n\n");
+}
 
 export const extractGoTypes = (typeNames: string[]) =>
-  extractCombined(goTypes, typeNames, "go");
+  extractCombined("sdk", typeNames, "go");
 
 export const extractRustTypes = (typeNames: string[]) =>
-  extractCombined(rustTypes, typeNames, "rust");
+  extractCombined("sdk", typeNames, "rust");
 
 export const extractTypescriptTypes = (typeNames: string[]) =>
-  extractCombined(jsTypes, typeNames, "ts");
+  extractCombined("sdk", typeNames, "ts");
 
 export const extractGoAgentTypes = (typeNames: string[]) =>
-  extractCombined(goAgentTypes, typeNames, "go");
+  extractCombined("agentTypes", typeNames, "go");
 
 export const extractRustAgentTypes = (typeNames: string[]) =>
-  extractCombined(rustAgentTypes, typeNames, "rust");
+  extractCombined("agentTypes", typeNames, "rust");
 
 export const extractTypescriptAgentParamsTypes = (typeNames: string[]) =>
-  extractCombined(jsAgentParamsTypes, typeNames, "ts");
+  extractCombined("agentParams", typeNames, "ts");
 
 export const extractGoAgentParamsTypes = (typeNames: string[]) =>
-  extractCombined(goAgentParamsTypes, typeNames, "go");
+  extractCombined("agentParams", typeNames, "go");
 
 export const extractRustAgentParamsTypes = (typeNames: string[]) =>
-  extractCombined(rustAgentParamsTypes, typeNames, "rust");
+  extractCombined("agentParams", typeNames, "rust");
 
 export const extractTypescriptAgentTypes = (typeNames: string[]) =>
-  extractCombined(jsAgentTypes, typeNames, "ts");
+  extractCombined("agentTypes", typeNames, "ts");
 
 export const extractGoAgentToolTypes = (typeNames: string[]) =>
-  extractCombined(goAgentToolTypes, typeNames, "go");
+  extractCombined("agentTool", typeNames, "go");
 
 export const extractRustAgentToolTypes = (typeNames: string[]) =>
-  extractCombined(rustAgentToolTypes, typeNames, "rust");
+  extractCombined("agentTool", typeNames, "rust");
 
 export const extractTypescriptAgentToolTypes = (typeNames: string[]) =>
-  extractCombined(jsAgentToolTypes, typeNames, "ts");
+  extractCombined("agentTool", typeNames, "ts");
 
 export const extractGoAgentToolkitTypes = (typeNames: string[]) =>
-  extractCombined(goAgentToolkitTypes, typeNames, "go");
+  extractCombined("agentToolkit", typeNames, "go");
 
 export const extractRustAgentToolkitTypes = (typeNames: string[]) =>
-  extractCombined(rustAgentToolkitTypes, typeNames, "rust");
+  extractCombined("agentToolkit", typeNames, "rust");
 
 export const extractTypescriptAgentToolkitTypes = (typeNames: string[]) =>
-  extractCombined(jsAgentToolkitTypes, typeNames, "ts");
+  extractCombined("agentToolkit", typeNames, "ts");
 
 export const extractGoAgentMcpTypes = (typeNames: string[]) =>
-  extractCombined(goAgentMcpTypesSource, typeNames, "go");
+  extractCombined("agentMcp", typeNames, "go");
 
 export const extractRustAgentMcpTypes = (typeNames: string[]) =>
-  extractCombined(rustAgentMcpTypesSource, typeNames, "rust");
+  extractCombined("agentMcp", typeNames, "rust");
 
 export const extractTypescriptAgentMcpTypes = (typeNames: string[]) =>
-  extractCombined(jsAgentMcpTypesSource, typeNames, "ts");
+  extractCombined("agentMcp", typeNames, "ts");
 
 export const extractTypescriptAgentInstructionTypes = (typeNames: string[]) =>
-  extractCombined(jsAgentInstructionTypes, typeNames, "ts");
+  extractCombined("agentInstruction", typeNames, "ts");
 
 export const extractGoAgentInstructionTypes = (typeNames: string[]) =>
-  extractCombined(goAgentInstructionTypes, typeNames, "go");
+  extractCombined("agentInstruction", typeNames, "go");
 
 export const extractRustAgentInstructionTypes = (typeNames: string[]) =>
-  extractCombined(rustAgentInstructionTypes, typeNames, "rust");
+  extractCombined("agentInstruction", typeNames, "rust");
 
 export const extractTypescriptAgentRunTypes = (typeNames: string[]) =>
-  extractCombined(jsAgentRunTypes, typeNames, "ts");
+  extractCombined("agentRun", typeNames, "ts");
 
 export const extractGoAgentRunTypes = (typeNames: string[]) =>
-  extractCombined(goAgentRunTypes, typeNames, "go");
+  extractCombined("agentRun", typeNames, "go");
 
 export const extractRustAgentRunTypes = (typeNames: string[]) =>
-  extractCombined(rustAgentRunTypes, typeNames, "rust");
+  extractCombined("agentRun", typeNames, "rust");

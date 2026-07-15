@@ -4,5 +4,5 @@ import ConsoleLayout from "../../layouts/console-layout.astro";
 ---
 
 <ConsoleLayout title="Realtime Console">
-  <RealtimeApp client:load />
+  <RealtimeApp client:only="react" />
 </ConsoleLayout>
