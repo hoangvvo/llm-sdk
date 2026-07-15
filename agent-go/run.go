@@ -60,6 +60,7 @@ func (s *RunSession[C]) initialize(ctx context.Context) error {
 
 	if len(s.params.Toolkits) > 0 {
 		sessions := make([]ToolkitSession[C], len(s.params.Toolkits))
+		cleanupCtx := context.WithoutCancel(ctx)
 		g, ctx := errgroup.WithContext(ctx)
 		for i, toolkit := range s.params.Toolkits {
 			g.Go(func() error {
@@ -72,6 +73,13 @@ func (s *RunSession[C]) initialize(ctx context.Context) error {
 			})
 		}
 		if err := g.Wait(); err != nil {
+			var cleanupGroup errgroup.Group
+			for _, session := range sessions {
+				if session != nil {
+					cleanupGroup.Go(func() error { return session.Close(cleanupCtx) })
+				}
+			}
+			_ = cleanupGroup.Wait()
 			return NewInitError(err)
 		}
 		s.toolkitSessions = sessions
@@ -238,6 +246,15 @@ func (s *RunSession[C]) process(
 		if len(toolCallParts) == 0 {
 			currCh <- ProcessEvents{Response: &content}
 			return
+		}
+
+		seenToolCallIDs := make(map[string]struct{}, len(toolCallParts))
+		for _, toolCallPart := range toolCallParts {
+			if _, exists := seenToolCallIDs[toolCallPart.ToolCallID]; exists {
+				errCh <- NewInvariantError(fmt.Sprintf("duplicate tool call ID: %s", toolCallPart.ToolCallID))
+				return
+			}
+			seenToolCallIDs[toolCallPart.ToolCallID] = struct{}{}
 		}
 
 		for _, toolCallPart := range toolCallParts {
@@ -434,7 +451,7 @@ func (s *RunSession[C]) Close(ctx context.Context) error {
 	s.staticSystemPrompt = nil
 	s.staticTools = nil
 
-	g, ctx := errgroup.WithContext(ctx)
+	var g errgroup.Group
 	for _, toolkitSession := range s.toolkitSessions {
 		if toolkitSession == nil {
 			continue
@@ -443,14 +460,11 @@ func (s *RunSession[C]) Close(ctx context.Context) error {
 			return toolkitSession.Close(ctx)
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
+	err := g.Wait()
 	s.toolkitSessions = nil
 	s.initialized = false
 
-	return nil
+	return err
 }
 
 func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInput, []AgentFunctionTool[C]) {

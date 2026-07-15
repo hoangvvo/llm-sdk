@@ -56,6 +56,7 @@ type mockToolkitSession[C any] struct {
 	toolsCalls        int
 	closeCalls        int
 	closeErr          error
+	closeFn           func(context.Context) error
 }
 
 func (m *mockToolkitSession[C]) SystemPrompt() *string {
@@ -68,8 +69,11 @@ func (m *mockToolkitSession[C]) Tools() []llmagent.AgentTool[C] {
 	return m.tools
 }
 
-func (m *mockToolkitSession[C]) Close(context.Context) error {
+func (m *mockToolkitSession[C]) Close(ctx context.Context) error {
 	m.closeCalls++
+	if m.closeFn != nil {
+		return m.closeFn(ctx)
+	}
 	return m.closeErr
 }
 

@@ -240,7 +240,7 @@ suite("RunSession#run", () => {
     });
   });
 
-  test("executes multiple tool calls in parallel", async (t: TestContext) => {
+  test("executes multiple tool calls from one model response", async (t: TestContext) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const tool1Execute = t.mock.fn((_args) => ({
       content: [{ type: "text", text: "Tool 1 result" }],

@@ -466,6 +466,7 @@ func (s *StreamAccumulator) IsEmpty() bool {
 func (s *StreamAccumulator) Clear() {
 	s.accumulatedParts = make(map[int]accumulatedData)
 	s.accumulatedUsage = nil
+	s.cost = 0
 }
 
 // processDelta processes a single delta, either merging with existing or creating new

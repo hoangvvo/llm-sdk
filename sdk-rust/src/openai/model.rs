@@ -138,7 +138,8 @@ impl LanguageModel for OpenAIModel {
                 &self.model_id(),
                 input,
                 |input| async move {
-                    let params = convert_to_response_create_params(input, &self.model_id())?;
+                    let mut params = convert_to_response_create_params(input, &self.model_id())?;
+                    params.stream = Some(false);
                     let header_map = self.request_headers()?;
 
                     let json: Response = client_utils::send_json(

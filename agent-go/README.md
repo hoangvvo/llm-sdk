@@ -259,6 +259,12 @@ An example server that exposes an API to interact with the agent can be found in
 
 - Wrap function tools passed to `WithTools` with `NewAgentFunctionTool`.
 
+# Testing
+
+```bash
+go test ./agent-go/...
+```
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)

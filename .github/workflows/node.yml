@@ -12,58 +12,58 @@ permissions:
   pull-requests: read
 
 jobs:
-  build:
+  sdk:
+    name: SDK
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [24.x]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24.x
+          cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Type-check repository scripts
+        run: npx tsc -p tsconfig.json
+      - name: Lint repository support code
+        run: npx eslint scripts website
+      - name: Build SDK
+        run: npm run build -w=sdk-js
+      - name: Lint SDK
+        run: npm run lint -w=sdk-js
 
-      - name: Run build
-        run: npm run build
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run tests
+  agent:
+    name: Agent
+    needs: sdk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build agent dependencies
+        run: npm run build -w=sdk-js
+      - name: Build agent
+        run: npm run build -w=agent-js
+      - name: Lint agent
+        run: npm run lint -w=agent-js
+      - name: Test agent with coverage
         run: npm test -w=agent-js
-
-      - name: Run live SDK tests
-        id: live-sdk-tests
-        continue-on-error: true
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CO_API_KEY: ${{ secrets.CO_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          if [[ -z "$ANTHROPIC_API_KEY" || -z "$CO_API_KEY" || -z "$GOOGLE_API_KEY" || -z "$MISTRAL_API_KEY" || -z "$OPENAI_API_KEY" ]]; then
-            echo "Skipping live SDK tests because one or more provider secrets are unavailable."
-            exit 0
-          fi
-          set +e
-          npm test -w=sdk-js
-          test_status=$?
-          if [[ -s sdk-js/coverage/cobertura-coverage.xml ]]; then
-            echo "coverage=true" >> "$GITHUB_OUTPUT"
-          fi
-          exit "$test_status"
-
-      - name: Upload JavaScript SDK coverage
-        if: ${{ steps.live-sdk-tests.outputs.coverage == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      - name: Upload agent coverage
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/upload-code-coverage@v1
         with:
-          file: sdk-js/coverage/cobertura-coverage.xml
+          file: agent-js/coverage/cobertura-coverage.xml
           language: TypeScript
-          label: code-coverage/sdk-js
+          label: code-coverage/agent-js

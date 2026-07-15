@@ -20,6 +20,7 @@ import type { AgentResponse } from "../types.ts";
 
 const IMAGE_DATA = Buffer.from([0x00, 0x01, 0x02]).toString("base64");
 const AUDIO_DATA = Buffer.from([0x03, 0x04]).toString("base64");
+const AUTH_TOKEN = "mcp-test-token";
 
 type ToolResponder = (params: { shift: "evening" | "overnight" }) => {
   content: (
@@ -108,6 +109,10 @@ async function startStubMcpServer(): Promise<{
   const httpServer = createServer(
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     async (req: IncomingMessage, res: ServerResponse) => {
+      if (req.headers.authorization !== `Bearer ${AUTH_TOKEN}`) {
+        res.writeHead(401).end();
+        return;
+      }
       try {
         const parsedBody = await readJsonBody(req);
         await transport.handleRequest(req, res, parsedBody);
@@ -190,6 +195,7 @@ suite("MCP toolkit", () => {
           mcpToolkit(() => ({
             type: "streamable-http",
             url: stub.url,
+            authorization: ` bearer ${AUTH_TOKEN} `,
           })),
         ],
       });
@@ -309,6 +315,7 @@ suite("MCP toolkit", () => {
           mcpToolkit(() => ({
             type: "streamable-http",
             url: stub.url,
+            authorization: AUTH_TOKEN,
           })),
         ],
       });

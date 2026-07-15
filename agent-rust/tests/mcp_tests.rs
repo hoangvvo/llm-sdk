@@ -1,4 +1,10 @@
-use axum::Router;
+use axum::{
+    extract::Request,
+    http::{header::AUTHORIZATION, StatusCode},
+    middleware::{self, Next},
+    response::Response,
+    Router,
+};
 use llm_agent::{
     mcp::{MCPParams, MCPStreamableHTTPParams, MCPToolkit},
     Agent, AgentItem, AgentParams, AgentResponse, BoxedError, RunSessionRequest,
@@ -28,6 +34,7 @@ use tokio::{
 
 const IMAGE_DATA: &str = "AAEC";
 const AUDIO_DATA: &str = "AwQ=";
+const AUTH_TOKEN: &str = "mcp-test-token";
 
 #[tokio::test]
 async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedError> {
@@ -57,7 +64,7 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
             move |(): &()| {
                 Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
                     url: stub_url.clone(),
-                    authorization: None,
+                    authorization: Some(format!(" bearer {AUTH_TOKEN} ")),
                 }))
             }
         }),
@@ -157,7 +164,7 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
             move |(): &()| {
                 Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
                     url: stub_url.clone(),
-                    authorization: None,
+                    authorization: Some(AUTH_TOKEN.to_string()),
                 }))
             }
         }),
@@ -527,7 +534,9 @@ async fn start_stub_mcp_server() -> Result<StubServer, BoxedError> {
         StreamableHttpServerConfig::default(),
     );
 
-    let app = Router::new().fallback_service(service);
+    let app = Router::new()
+        .fallback_service(service)
+        .layer(middleware::from_fn(require_auth));
 
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -555,4 +564,17 @@ async fn start_stub_mcp_server() -> Result<StubServer, BoxedError> {
         shutdown: Some(shutdown_tx),
         handle,
     })
+}
+
+async fn require_auth(request: Request, next: Next) -> Result<Response, StatusCode> {
+    let expected = format!("Bearer {AUTH_TOKEN}");
+    if request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        != Some(expected.as_str())
+    {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    Ok(next.run(request).await)
 }

@@ -58,8 +58,10 @@ func (rt *authHeaderRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 
 // ensureBearerPrefix normalises tokens so the Authorization header always carries the Bearer prefix.
 func ensureBearerPrefix(token string) string {
-	if strings.HasPrefix(strings.ToLower(token), "bearer ") {
-		return token
+	trimmed := strings.TrimSpace(token)
+	parts := strings.Fields(trimmed)
+	if len(parts) > 1 && strings.EqualFold(parts[0], "bearer") {
+		return "Bearer " + strings.Join(parts[1:], " ")
 	}
-	return "Bearer " + token
+	return "Bearer " + trimmed
 }

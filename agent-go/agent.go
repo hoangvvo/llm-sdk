@@ -50,7 +50,7 @@ func (a *Agent[C]) Run(ctx context.Context, request AgentRequest[C]) (*AgentResp
 		return nil, err
 	}
 	result, runErr := session.Run(ctx, RunSessionRequest{Input: request.Input})
-	closeErr := session.Close(ctx)
+	closeErr := session.Close(context.WithoutCancel(ctx))
 	if runErr != nil {
 		return nil, runErr
 	}
@@ -69,7 +69,7 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 	}
 	agentStream, err := session.RunStream(ctx, RunSessionRequest{Input: request.Input})
 	if err != nil {
-		_ = session.Close(ctx)
+		_ = session.Close(context.WithoutCancel(ctx))
 		return nil, err
 	}
 
@@ -86,7 +86,7 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 		}
 
 		streamErr := agentStream.Err()
-		closeErr := session.Close(ctx)
+		closeErr := session.Close(context.WithoutCancel(ctx))
 		if streamErr != nil {
 			errChan <- streamErr
 			return

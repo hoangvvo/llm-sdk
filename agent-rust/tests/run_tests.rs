@@ -382,7 +382,7 @@ async fn run_executes_single_tool_call_and_returns_response() {
 }
 
 #[tokio::test]
-async fn run_executes_multiple_tool_calls_in_parallel() {
+async fn run_executes_multiple_tool_calls_from_one_model_response() {
     let tool1 = MockTool::new(
         "tool_1",
         AgentToolResult {

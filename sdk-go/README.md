@@ -144,6 +144,12 @@ go run ./examples/generate-text
 
 - `ImageData` and `AudioData` have been renamed to just `Data` in `ImagePart` and `AudioPart`.
 
+# Testing
+
+```bash
+go test ./sdk-go/...
+```
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)

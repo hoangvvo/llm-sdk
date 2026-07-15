@@ -239,6 +239,12 @@ An example server that exposes an API to interact with the agent can be found in
 
 - Rename `AgentTool` trait implementations to `AgentFunctionTool`.
 
+# Testing
+
+```bash
+cargo test --package llm-agent
+```
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)

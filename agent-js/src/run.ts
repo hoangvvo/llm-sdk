@@ -90,10 +90,31 @@ export class RunSession<TContext> {
       }
 
       if (this.#params.toolkits.length > 0) {
-        this.#toolkit_sessions = await Promise.all(
+        const results = await Promise.allSettled(
           this.#params.toolkits.map((toolkit) =>
             toolkit.createSession(this.#context),
           ),
+        );
+        const failed = results.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        );
+        if (failed) {
+          await Promise.allSettled(
+            results
+              .filter(
+                (
+                  result,
+                ): result is PromiseFulfilledResult<ToolkitSession<TContext>> =>
+                  result.status === "fulfilled",
+              )
+              .map(async (result) => result.value.close()),
+          );
+          throw failed.reason;
+        }
+        this.#toolkit_sessions = results.map(
+          (result) =>
+            (result as PromiseFulfilledResult<ToolkitSession<TContext>>).value,
         );
       }
     } catch (error) {
@@ -234,6 +255,16 @@ export class RunSession<TContext> {
         content,
       };
       return;
+    }
+
+    const toolCallIds = new Set<string>();
+    for (const toolCallPart of toolCallParts) {
+      if (toolCallIds.has(toolCallPart.tool_call_id)) {
+        throw new AgentInvariantError(
+          `Duplicate tool call ID: ${toolCallPart.tool_call_id}`,
+        );
+      }
+      toolCallIds.add(toolCallPart.tool_call_id);
     }
 
     for (const toolCallPart of toolCallParts) {
@@ -466,10 +497,16 @@ export class RunSession<TContext> {
     this.#static_system_prompt = "";
     this.#static_tools = [];
 
-    await Promise.all(this.#toolkit_sessions.map((session) => session.close()));
+    const results = await Promise.allSettled(
+      this.#toolkit_sessions.map(async (session) => session.close()),
+    );
     this.#toolkit_sessions = [];
-
     this.#initialized = false;
+
+    const failed = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    if (failed) throw failed.reason;
   }
 
   /**

@@ -125,6 +125,12 @@ cargo run --example generate-text
 
 - `image_data` and `audio_data` have been renamed to just `data` in `ImagePart` and `AudioPart`.
 
+# Testing
+
+```bash
+cargo test --package llm-sdk-rs
+```
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)
