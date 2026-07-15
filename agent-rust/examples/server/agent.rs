@@ -11,14 +11,15 @@ use crate::{
 use chrono::Utc;
 use llm_agent::{
     mcp::{MCPInit, MCPParams, MCPToolkit},
-    Agent, AgentTool,
+    Agent, AgentFunctionTool,
 };
-use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions};
+use llm_sdk::{AudioOptions, LanguageModel, Modality, ReasoningOptions, WebSearchTool};
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AgentOptions {
     pub enabled_tools: Option<Vec<String>>,
+    pub web_search: Option<WebSearchTool>,
     pub mcp_servers: Option<Vec<MCPParams>>,
     pub temperature: Option<f64>,
     pub top_p: Option<f64>,
@@ -30,7 +31,7 @@ pub struct AgentOptions {
     pub modalities: Option<Vec<Modality>>,
 }
 
-pub fn get_available_tools() -> Vec<Box<dyn AgentTool<MyContext> + Send + Sync>> {
+pub fn get_available_tools() -> Vec<Box<dyn AgentFunctionTool<MyContext> + Send + Sync>> {
     vec![
         Box::new(ArtifactCreateTool),
         Box::new(ArtifactUpdateTool),
@@ -147,6 +148,9 @@ pub fn create_agent(
             .contains(&"artifact_delete".to_string())
     {
         builder = builder.add_tool(ArtifactDeleteTool);
+    }
+    if let Some(web_search) = &options.web_search {
+        builder = builder.add_tool(web_search.clone());
     }
 
     builder = builder.max_turns(5);

@@ -42,10 +42,16 @@ interface StageOutputJSON {
   content: {
     type: "text" | "tool_call" | "audio" | "image" | "reasoning";
     text?: string;
+    citation?: {
+      source?: string;
+      title?: string;
+      cited_text?: string;
+    };
     tool_name?: string;
     args?: string;
     id?: boolean;
     transcript?: string;
+    signature?: boolean;
   }[];
 }
 
@@ -64,7 +70,7 @@ const testData: TestDataJSON = JSON.parse(testDataContent) as TestDataJSON;
 // Create tool map from JSON
 const toolsMap = new Map<string, Tool>();
 for (const tool of testData.tools) {
-  toolsMap.set(tool.name, tool);
+  toolsMap.set(tool.type === "function" ? tool.name : "web_search", tool);
 }
 
 // Helper function to resolve tools from names
@@ -81,10 +87,25 @@ function convertOutput(output: StageOutputJSON, testCaseName: string) {
   return {
     content: output.content.map((part): PartAssertion => {
       if (part.type === "text" && part.text) {
-        return {
+        const assertion: PartAssertion = {
           type: "text",
           text: compilePattern(part.text),
-        } as PartAssertion;
+        };
+        if (part.citation) {
+          assertion.citation = {};
+          if (part.citation.source) {
+            assertion.citation.source = compilePattern(part.citation.source);
+          }
+          if (part.citation.title) {
+            assertion.citation.title = compilePattern(part.citation.title);
+          }
+          if (part.citation.cited_text) {
+            assertion.citation.cited_text = compilePattern(
+              part.citation.cited_text,
+            );
+          }
+        }
+        return assertion;
       } else if (part.type === "tool_call" && part.tool_name) {
         return {
           type: "tool_call",
@@ -108,6 +129,7 @@ function convertOutput(output: StageOutputJSON, testCaseName: string) {
         return {
           type: "reasoning",
           text: compilePattern(part.text),
+          signature: part.signature ?? false,
         } as PartAssertion;
       }
       throw new Error(`Invalid part assertion in test case ${testCaseName}`);
@@ -214,6 +236,8 @@ export const TEST_CASE_NAMES = {
   GENERATE_IMAGE_INPUT: "generate_image_input",
   STREAM_IMAGE_INPUT: "stream_image_input",
   GENERATE_REASONING: "generate_reasoning",
+  GENERATE_WEB_SEARCH: "generate_web_search",
+  STREAM_WEB_SEARCH: "stream_web_search",
   STREAM_REASONING: "stream_reasoning",
 } as const;
 

@@ -177,7 +177,7 @@ function convertToMistralRequest(
     request.responseFormat = convertToMistralResponseFormat(response_format);
   }
   if (reasoning) {
-    request.promptMode = reasoning.enabled ? "reasoning" : null;
+    request.reasoningEffort = reasoning.enabled ? "high" : "none";
   }
 
   return request;
@@ -362,6 +362,13 @@ function convertToMistralToolCall(
 // MARK: To Provider Tools
 
 function convertToMistralTool(tool: Tool): MistralComponents.Tool {
+  if (tool.type === "web_search") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "Hosted web search is not supported by Mistral Chat Completions; Mistral exposes it through Agents/Conversations",
+    );
+  }
+
   return {
     type: "function",
     function: {

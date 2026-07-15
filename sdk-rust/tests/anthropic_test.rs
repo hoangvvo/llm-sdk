@@ -1,7 +1,20 @@
 mod common;
 use llm_sdk::{anthropic::*, *};
+use regex::Regex;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
+
+fn adaptive_reasoning_output(
+    _content: &mut Vec<crate::common::assert::PartAssertion>,
+) -> Vec<crate::common::assert::PartAssertion> {
+    // Adaptive thinking may be returned as a redacted, signature-only block.
+    vec![crate::common::assert::PartAssertion::Reasoning(
+        crate::common::assert::ReasoningPartAssertion {
+            text: Regex::new("(?s).*").expect("valid reasoning pattern"),
+            signature: true,
+        },
+    )]
+}
 
 fn anthropic_api_key() -> &'static String {
     static KEY: OnceLock<String> = OnceLock::new();
@@ -14,7 +27,7 @@ fn anthropic_api_key() -> &'static String {
 
 fn anthropic_model() -> AnthropicModel {
     AnthropicModel::new(
-        "claude-sonnet-4-6".to_string(),
+        "claude-sonnet-5".to_string(),
         AnthropicModelOptions {
             api_key: anthropic_api_key().clone(),
             ..Default::default()
@@ -47,6 +60,10 @@ test_set!(anthropic_model(), stream_parallel_tool_calls_same_name);
 test_set!(anthropic_model(), structured_response_format);
 
 test_set!(anthropic_model(), source_part_input);
+
+test_set!(anthropic_model(), generate_web_search);
+
+test_set!(anthropic_model(), stream_web_search);
 
 test_set!(
     ignore = "model does not support image generation",
@@ -83,9 +100,10 @@ test_set!(
         additional_input: Some(|input| {
             input.reasoning = Some(ReasoningOptions {
                 enabled: true,
-                budget_tokens: Some(3000),
+                budget_tokens: None,
             });
         }),
+        custom_output_content: Some(adaptive_reasoning_output),
         ..Default::default()
     })
 );
@@ -97,9 +115,10 @@ test_set!(
         additional_input: Some(|input| {
             input.reasoning = Some(ReasoningOptions {
                 enabled: true,
-                budget_tokens: Some(3000),
+                budget_tokens: None,
             });
         }),
+        custom_output_content: Some(adaptive_reasoning_output),
         ..Default::default()
     })
 );

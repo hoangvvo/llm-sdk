@@ -8,6 +8,34 @@ pub fn compile_pattern(pattern: &str) -> Regex {
 #[derive(Debug, Clone)]
 pub struct TextPartAssertion {
     pub text: Regex,
+    pub citation: Option<CitationAssertion>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CitationAssertion {
+    pub source: Option<Regex>,
+    pub title: Option<Regex>,
+    pub cited_text: Option<Regex>,
+}
+
+impl CitationAssertion {
+    fn matches(&self, citation: &llm_sdk::Citation) -> bool {
+        self.source
+            .as_ref()
+            .is_none_or(|pattern| pattern.is_match(&citation.source))
+            && self.title.as_ref().is_none_or(|pattern| {
+                citation
+                    .title
+                    .as_ref()
+                    .is_some_and(|title| pattern.is_match(title))
+            })
+            && self.cited_text.as_ref().is_none_or(|pattern| {
+                citation
+                    .cited_text
+                    .as_ref()
+                    .is_some_and(|text| pattern.is_match(text))
+            })
+    }
 }
 
 impl TextPartAssertion {
@@ -15,6 +43,11 @@ impl TextPartAssertion {
         let found_part = content.iter().find(|part| {
             if let Part::Text(text_part) = part {
                 self.text.is_match(&text_part.text)
+                    && self.citation.as_ref().is_none_or(|assertion| {
+                        text_part.citations.as_ref().is_some_and(|citations| {
+                            citations.iter().any(|citation| assertion.matches(citation))
+                        })
+                    })
             } else {
                 false
             }
@@ -144,6 +177,7 @@ impl ImagePartAssertion {
 #[derive(Debug, Clone)]
 pub struct ReasoningPartAssertion {
     pub text: Regex,
+    pub signature: bool,
 }
 
 impl ReasoningPartAssertion {
@@ -151,6 +185,11 @@ impl ReasoningPartAssertion {
         let found_part = content.iter().find(|part| {
             if let Part::Reasoning(reasoning_part) = part {
                 self.text.is_match(&reasoning_part.text)
+                    && (!self.signature
+                        || reasoning_part
+                            .signature
+                            .as_ref()
+                            .is_some_and(|signature| !signature.is_empty()))
             } else {
                 false
             }

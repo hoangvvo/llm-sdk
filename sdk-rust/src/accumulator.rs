@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 struct AccumulatedTextData {
     text: String,
     citations: BTreeMap<usize, CitationDelta>,
+    signature: Option<String>,
 }
 
 /// Internal representation of accumulated image data
@@ -50,6 +51,7 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
     match delta.part {
         PartDelta::Text(text_delta) => AccumulatedData::Text(AccumulatedTextData {
             text: text_delta.text,
+            signature: text_delta.signature,
             citations: text_delta
                 .citation
                 .map(|citation| {
@@ -87,6 +89,9 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             if let Some(citation) = text_delta.citation {
                 let index = existing_text.citations.len();
                 existing_text.citations.insert(index, citation);
+            }
+            if text_delta.signature.is_some() {
+                existing_text.signature = text_delta.signature;
             }
         }
         (AccumulatedData::ToolCall(ref mut existing_tool), PartDelta::ToolCall(tool_delta)) => {
@@ -177,6 +182,7 @@ fn create_text_part(data: AccumulatedTextData, index: usize) -> LanguageModelRes
     let mut text_part = TextPart {
         text: data.text,
         citations: None,
+        signature: data.signature,
     };
 
     if !data.citations.is_empty() {
@@ -191,6 +197,7 @@ fn create_text_part(data: AccumulatedTextData, index: usize) -> LanguageModelRes
                 cited_text,
                 start_index,
                 end_index,
+                signature,
             } = citation_delta;
 
             if !r#type.is_empty() && r#type != "citation" {
@@ -201,17 +208,12 @@ fn create_text_part(data: AccumulatedTextData, index: usize) -> LanguageModelRes
             }
 
             let source_dbg = source.clone();
-            let start_dbg = start_index;
-            let end_dbg = end_index;
-
-            let (Some(source), Some(start_index), Some(end_index)) =
-                (source, start_index, end_index)
-            else {
+            let Some(source) = source else {
                 return Err(LanguageModelError::Invariant(
                     "",
                     format!(
                         "Incomplete citation data for text part at index {index}: \
-                         source={source_dbg:?}, start_index={start_dbg:?}, end_index={end_dbg:?}"
+                         source={source_dbg:?}"
                     ),
                 ));
             };
@@ -222,6 +224,7 @@ fn create_text_part(data: AccumulatedTextData, index: usize) -> LanguageModelRes
                 cited_text,
                 start_index,
                 end_index,
+                signature,
             });
         }
 

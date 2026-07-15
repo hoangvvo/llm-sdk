@@ -104,7 +104,9 @@ class LostAndFoundToolkitSession implements ToolkitSession<RiftContext> {
     const tools = this.#buildTools();
     console.log(
       `[Toolkit] Tools for phase ${this.#phase.toUpperCase()}: ${
-        tools.map((tool) => tool.name).join(", ") || "<none>"
+        tools
+          .map((tool) => (tool.type === "function" ? tool.name : "web_search"))
+          .join(", ") || "<none>"
       }`,
     );
     return tools;
@@ -528,10 +530,13 @@ const instructions: InstructionParam<RiftContext>[] = [
 ];
 
 // Traditional Agent setup still works: we wire static tools, instructions, and our custom toolkit together.
+const provider = process.env["PROVIDER"] ?? "openai";
+const modelId = process.env["MODEL"] ?? "gpt-5.6-luna";
+
 const archivist = new Agent<RiftContext>({
   name: "WaypointArchivist",
   instructions,
-  model: getModel("openai", "gpt-5.4-mini"),
+  model: getModel(provider, modelId),
   tools: [pageSecurityTool],
   toolkits: [new LostAndFoundToolkit()],
 });

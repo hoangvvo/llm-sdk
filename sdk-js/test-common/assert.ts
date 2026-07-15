@@ -1,9 +1,30 @@
 import { type TestContext } from "node:test";
-import type { Part } from "../src/types.ts";
+import type { Citation, Part } from "../src/types.ts";
 
 interface TextPartAssertion {
   type: "text";
   text: RegExp;
+  citation?: CitationAssertion;
+}
+
+interface CitationAssertion {
+  source?: RegExp;
+  title?: RegExp;
+  cited_text?: RegExp;
+}
+
+function matchesCitation(
+  citation: Citation,
+  assertion: CitationAssertion,
+): boolean {
+  return (
+    (!assertion.source || assertion.source.test(citation.source)) &&
+    (!assertion.title ||
+      (citation.title !== undefined && assertion.title.test(citation.title))) &&
+    (!assertion.cited_text ||
+      (citation.cited_text !== undefined &&
+        assertion.cited_text.test(citation.cited_text)))
+  );
 }
 
 export type PartAssertion =
@@ -33,6 +54,7 @@ export interface ImagePartAssertion {
 export interface ReasoningPartAssertion {
   type: "reasoning";
   text: RegExp;
+  signature?: boolean;
 }
 
 export function assertContentPart(
@@ -72,7 +94,13 @@ export function assertTextPart(
   assertion: TextPartAssertion,
 ) {
   const foundPart = content.find(
-    (part) => part.type === "text" && assertion.text.test(part.text),
+    (part) =>
+      part.type === "text" &&
+      assertion.text.test(part.text) &&
+      (!assertion.citation ||
+        part.citations?.some((citation) =>
+          matchesCitation(citation, assertion.citation!),
+        )),
   );
   t.assert.ok(
     foundPart,
@@ -161,7 +189,10 @@ export function assertReasoningPart(
   assertion: ReasoningPartAssertion,
 ) {
   const foundPart = content.find(
-    (part) => part.type === "reasoning" && assertion.text.test(part.text),
+    (part) =>
+      part.type === "reasoning" &&
+      assertion.text.test(part.text) &&
+      (assertion.signature !== true || Boolean(part.signature)),
   );
   t.assert.ok(
     foundPart,

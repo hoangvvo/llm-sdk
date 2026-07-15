@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 	"github.com/sanity-io/litter"
 )
@@ -171,11 +171,18 @@ func (t *ArchivalUpdateTool) Execute(ctx context.Context, params json.RawMessage
 func main() {
 	godotenv.Load("../.env")
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY must be set")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
 	}
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		log.Fatalf("Failed to create model: %v", err)
+	}
 
 	store := NewStore()
 
@@ -203,9 +210,9 @@ For less important or long-tail info, use archival_memory_search before answerin
 			llmagent.InstructionParam[Ctx]{Func: coreInstr},
 		),
 		llmagent.WithTools(
-			&CoreMemoryUpdateTool{S: store},
-			&ArchivalSearchTool{S: store},
-			&ArchivalUpdateTool{S: store},
+			llmagent.NewAgentFunctionTool(&CoreMemoryUpdateTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArchivalSearchTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArchivalUpdateTool{S: store}),
 		),
 	)
 

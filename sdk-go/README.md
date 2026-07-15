@@ -86,7 +86,7 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("openai", "gpt-4o")
+	model := examples.GetModel("openai", "gpt-5.6-terra")
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{
@@ -122,6 +122,8 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`describe-image`: Describe image](./examples/describe-image/main.go)
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio/main.go)
 - [`tool-use`: Function calling](./examples/tool-use/main.go)
+- [`web-search`: Web search](./examples/web-search/main.go)
+- [`stream-web-search`: Stream web search](./examples/stream-web-search/main.go)
 - [`structured-output`: Structured output](./examples/structured-output/main.go)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning/main.go)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning/main.go)
@@ -133,6 +135,10 @@ go run ./examples/generate-text
 ```
 
 ## Migration
+
+### To 0.3.0
+
+- Replace `Tool{Name, Description, Parameters}` literals with `NewFunctionTool(...)`.
 
 ### To 0.2.0
 

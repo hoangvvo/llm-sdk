@@ -1,6 +1,5 @@
 use crate::{errors::BoxedError, AgentTool};
 use futures::future::BoxFuture;
-use std::sync::Arc;
 
 /// Toolkit produces a per-session toolkit session that can provide dynamic
 /// prompt and tool data.
@@ -21,7 +20,7 @@ pub trait ToolkitSession<TCtx>: Send + Sync {
     fn system_prompt(&self) -> Option<String>;
     /// Retrieve the current set of tools that should be available to the
     /// session.
-    fn tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>>;
+    fn tools(&self) -> Vec<AgentTool<TCtx>>;
     /// Release any resources that were allocated for the session.
     fn close(self: Box<Self>) -> BoxFuture<'static, Result<(), BoxedError>>;
 }

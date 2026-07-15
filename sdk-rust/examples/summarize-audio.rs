@@ -17,7 +17,9 @@ async fn main() {
 
     let audio_b64 = BASE64_STANDARD.encode(&audio_bytes);
 
-    let model = common::get_model("google", "gemini-3.1-flash-lite-preview");
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "google".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gemini-3.1-flash-lite".to_string());
+    let model = common::get_model(&provider, &model_id);
 
     let response = model
         .generate(LanguageModelInput {

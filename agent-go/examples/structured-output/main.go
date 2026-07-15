@@ -9,8 +9,8 @@ import (
 	"time"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 )
 
@@ -165,14 +165,18 @@ func (t *SearchHotelsTool) Execute(ctx context.Context, paramsJSON json.RawMessa
 func main() {
 	godotenv.Load("../.env")
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable must be set")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
 	}
-
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{
-		APIKey: apiKey,
-	})
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		log.Fatalf("Failed to create model: %v", err)
+	}
 
 	// Define the response format
 	responseSchema := llmsdk.JSONSchema{
@@ -245,8 +249,8 @@ func main() {
 		),
 		llmagent.WithResponseFormat[struct{}](*responseFormat),
 		llmagent.WithTools(
-			&SearchFlightsTool{},
-			&SearchHotelsTool{},
+			llmagent.NewAgentFunctionTool(&SearchFlightsTool{}),
+			llmagent.NewAgentFunctionTool(&SearchHotelsTool{}),
 		),
 	)
 

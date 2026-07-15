@@ -96,6 +96,10 @@
         "citations": {
           "type": "array",
           "items": { "$ref": "#/definitions/Citation" }
+        },
+        "signature": {
+          "type": "string",
+          "description": "An opaque provider signature used to preserve text-part continuity when returning the part to the same provider."
         }
       },
       "required": ["type", "text"],
@@ -274,9 +278,13 @@
         "end_index": {
           "type": "number",
           "description": "The end index of the document content part being cited."
+        },
+        "signature": {
+          "type": "string",
+          "description": "An opaque provider signature used to preserve citation continuity when returning it to the same provider."
         }
       },
-      "required": ["source", "start_index", "end_index"],
+      "required": ["source"],
       "additionalProperties": false
     },
     "UserMessage": {
@@ -324,7 +332,11 @@
       "properties": {
         "type": { "const": "text" },
         "text": { "type": "string" },
-        "citation": { "$ref": "#/definitions/CitationDelta" }
+        "citation": { "$ref": "#/definitions/CitationDelta" },
+        "signature": {
+          "type": "string",
+          "description": "An opaque provider signature used to preserve text-part continuity when returning the part to the same provider."
+        }
       },
       "required": ["type", "text"],
       "additionalProperties": false
@@ -353,6 +365,10 @@
         "end_index": {
           "type": "number",
           "description": "The end index of the document content part being cited."
+        },
+        "signature": {
+          "type": "string",
+          "description": "An opaque provider signature used to preserve citation continuity when returning it to the same provider."
         }
       },
       "required": ["type"],
@@ -478,9 +494,17 @@
       "additionalProperties": true
     },
     "Tool": {
-      "type": "object",
       "description": "Represents a tool that can be used by the model.",
+      "oneOf": [
+        { "$ref": "#/definitions/FunctionTool" },
+        { "$ref": "#/definitions/WebSearchTool" }
+      ]
+    },
+    "FunctionTool": {
+      "type": "object",
+      "description": "Represents a client-executed function tool that can be used by the model.",
       "properties": {
+        "type": { "const": "function" },
         "name": {
           "type": "string",
           "description": "The name of the tool."
@@ -501,7 +525,47 @@
           ]
         }
       },
-      "required": ["name", "description", "parameters"],
+      "required": ["type", "name", "description", "parameters"],
+      "additionalProperties": false
+    },
+    "WebSearchTool": {
+      "type": "object",
+      "description": "Represents a provider-hosted web search tool.",
+      "properties": {
+        "type": { "const": "web_search" },
+        "allowed_domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Restricts search results to these domains when supported by the provider."
+        },
+        "user_location": {
+          "$ref": "#/definitions/WebSearchUserLocation"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "WebSearchUserLocation": {
+      "type": "object",
+      "description": "An approximate user location used to localize web search results.",
+      "properties": {
+        "city": {
+          "type": "string",
+          "description": "The city of the user."
+        },
+        "region": {
+          "type": "string",
+          "description": "The region or state of the user."
+        },
+        "country": {
+          "type": "string",
+          "description": "The two-letter ISO 3166-1 country code of the user."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "The IANA timezone of the user."
+        }
+      },
       "additionalProperties": false
     },
     "ModelTokensDetails": {

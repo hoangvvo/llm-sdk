@@ -1,20 +1,18 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
 use llm_agent::{
-    Agent, AgentItem, AgentParams, AgentResponse, AgentTool, AgentToolResult, RunSessionRequest,
-    Toolkit, ToolkitSession,
+    Agent, AgentFunctionTool, AgentItem, AgentParams, AgentResponse, AgentTool, AgentToolResult,
+    RunSessionRequest, Toolkit, ToolkitSession,
 };
-use llm_sdk::{
-    openai::{OpenAIModel, OpenAIModelOptions},
-    Message, Part,
-};
+use llm_sdk::{Message, Part};
 use serde::Deserialize;
 use std::{
-    env,
     sync::{Arc, Mutex},
     time::Duration,
 };
 use tokio::time::sleep;
+
+mod common;
 
 type VisitorId = &'static str;
 
@@ -122,7 +120,7 @@ impl ToolkitSession<RiftContext> for LostAndFoundToolkitSession {
         Some(build_prompt(&state))
     }
 
-    fn tools(&self) -> Vec<Arc<dyn AgentTool<RiftContext>>> {
+    fn tools(&self) -> Vec<AgentTool<RiftContext>> {
         let snapshot = {
             let state = self.state.lock().expect("state poisoned");
             (
@@ -139,41 +137,41 @@ impl ToolkitSession<RiftContext> for LostAndFoundToolkitSession {
             return Vec::new();
         }
 
-        let mut tools: Vec<Arc<dyn AgentTool<RiftContext>>> = vec![
-            Arc::new(StabilizeRiftTool {
+        let mut tools: Vec<AgentTool<RiftContext>> = vec![
+            AgentTool::function(StabilizeRiftTool {
                 state: Arc::clone(&self.state),
             }),
-            Arc::new(LogItemTool {
+            AgentTool::function(LogItemTool {
                 state: Arc::clone(&self.state),
             }),
         ];
 
         if !pass_verified {
-            tools.push(Arc::new(VerifyPassTool {
+            tools.push(AgentTool::function(VerifyPassTool {
                 state: Arc::clone(&self.state),
             }));
         }
 
         if phase == Phase::Recovery && pass_verified {
-            tools.push(Arc::new(SummonRetrievalDroneTool {
+            tools.push(AgentTool::function(SummonRetrievalDroneTool {
                 state: Arc::clone(&self.state),
             }));
 
             if prophecy_count == 0 {
-                tools.push(Arc::new(ConsultProphetTool {
+                tools.push(AgentTool::function(ConsultProphetTool {
                     state: Arc::clone(&self.state),
                 }));
             }
 
             if tagged_len > 0 {
-                tools.push(Arc::new(IssueQuantumReceiptTool {
+                tools.push(AgentTool::function(IssueQuantumReceiptTool {
                     state: Arc::clone(&self.state),
                 }));
             }
         }
 
         if phase == Phase::Handoff {
-            tools.push(Arc::new(CloseManifestTool {
+            tools.push(AgentTool::function(CloseManifestTool {
                 state: Arc::clone(&self.state),
             }));
         }
@@ -183,7 +181,7 @@ impl ToolkitSession<RiftContext> for LostAndFoundToolkitSession {
         } else {
             tools
                 .iter()
-                .map(|tool| tool.name())
+                .map(AgentTool::name)
                 .collect::<Vec<_>>()
                 .join(", ")
         };
@@ -321,7 +319,7 @@ struct StabilizeArgs {
     technique: Option<String>,
 }
 
-impl AgentTool<RiftContext> for StabilizeRiftTool {
+impl AgentFunctionTool<RiftContext> for StabilizeRiftTool {
     fn name(&self) -> String {
         "stabilize_rift".into()
     }
@@ -397,7 +395,7 @@ struct LogItemArgs {
     timeline: Option<String>,
 }
 
-impl AgentTool<RiftContext> for LogItemTool {
+impl AgentFunctionTool<RiftContext> for LogItemTool {
     fn name(&self) -> String {
         "log_item".into()
     }
@@ -459,7 +457,7 @@ struct VerifyPassArgs {
     clearance_code: String,
 }
 
-impl AgentTool<RiftContext> for VerifyPassTool {
+impl AgentFunctionTool<RiftContext> for VerifyPassTool {
     fn name(&self) -> String {
         "verify_pass".into()
     }
@@ -522,7 +520,7 @@ struct SummonDroneArgs {
     target: Option<String>,
 }
 
-impl AgentTool<RiftContext> for SummonRetrievalDroneTool {
+impl AgentFunctionTool<RiftContext> for SummonRetrievalDroneTool {
     fn name(&self) -> String {
         "summon_retrieval_drone".into()
     }
@@ -603,7 +601,7 @@ struct ConsultProphetArgs {
     topic: Option<String>,
 }
 
-impl AgentTool<RiftContext> for ConsultProphetTool {
+impl AgentFunctionTool<RiftContext> for ConsultProphetTool {
     fn name(&self) -> String {
         "consult_prophet_agent".into()
     }
@@ -675,7 +673,7 @@ struct IssueReceiptArgs {
     recipient: Option<String>,
 }
 
-impl AgentTool<RiftContext> for IssueQuantumReceiptTool {
+impl AgentFunctionTool<RiftContext> for IssueQuantumReceiptTool {
     fn name(&self) -> String {
         "issue_quantum_receipt".into()
     }
@@ -741,7 +739,7 @@ struct CloseManifestTool {
     state: Arc<Mutex<LostAndFoundState>>,
 }
 
-impl AgentTool<RiftContext> for CloseManifestTool {
+impl AgentFunctionTool<RiftContext> for CloseManifestTool {
     fn name(&self) -> String {
         "close_manifest".into()
     }
@@ -794,7 +792,7 @@ struct PageSecurityArgs {
     reason: String,
 }
 
-impl AgentTool<RiftContext> for PageSecurityTool {
+impl AgentFunctionTool<RiftContext> for PageSecurityTool {
     fn name(&self) -> String {
         "page_security".into()
     }
@@ -836,14 +834,14 @@ impl AgentTool<RiftContext> for PageSecurityTool {
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
     dotenv().ok();
-    let api_key = env::var("OPENAI_API_KEY")?;
-    let model = Arc::new(OpenAIModel::new(
-        "gpt-5.4-mini",
-        OpenAIModelOptions {
-            api_key,
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-luna".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )?;
 
     let agent = Agent::new(
         AgentParams::new("WaypointArchivist", model)

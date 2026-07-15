@@ -77,6 +77,10 @@ export interface TextPart {
   type: "text";
   text: string;
   citations?: Citation[];
+  /**
+   * An opaque provider signature used to preserve text-part continuity when returning the part to the same provider.
+   */
+  signature?: string;
 }
 /**
  * A part of the message that contains an image.
@@ -242,11 +246,16 @@ export interface Citation {
   /**
    * The start index of the document content part being cited.
    */
-  start_index: number;
+  start_index?: number;
   /**
    * The end index of the document content part being cited.
    */
-  end_index: number;
+  end_index?: number;
+
+  /**
+   * An opaque provider signature used to preserve citation continuity when returning it to the same provider.
+   */
+  signature?: string;
 }
 /**
  * Represents a message sent by the user.
@@ -269,6 +278,10 @@ export interface TextPartDelta {
   type: "text";
   text: string;
   citation?: CitationDelta;
+  /**
+   * An opaque provider signature used to preserve text-part continuity when returning the part to the same provider.
+   */
+  signature?: string;
 }
 /**
  * A delta update for a tool call part, used in streaming of a tool invocation.
@@ -395,6 +408,10 @@ export interface CitationDelta {
    * The end index of the document content part being cited.
    */
   end_index?: number;
+  /**
+   * An opaque provider signature used to preserve citation continuity when returning it to the same provider.
+   */
+  signature?: string;
 }
 /**
  * Represents a delta update in a message's content, enabling partial streaming updates in LLM responses.
@@ -410,7 +427,12 @@ export type JSONSchema = Record<string, unknown>;
 /**
  * Represents a tool that can be used by the model.
  */
-export interface Tool {
+export type Tool = FunctionTool | WebSearchTool;
+/**
+ * Represents a client-executed function tool that can be used by the model.
+ */
+export interface FunctionTool {
+  type: "function";
   /**
    * The name of the tool.
    */
@@ -423,6 +445,41 @@ export interface Tool {
    * The JSON schema of the parameters that the tool accepts. The type must be "object".
    */
   parameters: JSONSchema;
+}
+/**
+ * Represents a provider-hosted web search tool.
+ */
+export interface WebSearchTool {
+  type: "web_search";
+  /**
+   * Restricts search results to these domains when supported by the provider.
+   */
+  allowed_domains?: string[];
+  /**
+   * An approximate user location used to localize web search results.
+   */
+  user_location?: WebSearchUserLocation;
+}
+/**
+ * An approximate user location used to localize web search results.
+ */
+export interface WebSearchUserLocation {
+  /**
+   * The city of the user.
+   */
+  city?: string;
+  /**
+   * The region or state of the user.
+   */
+  region?: string;
+  /**
+   * The two-letter ISO 3166-1 country code of the user.
+   */
+  country?: string;
+  /**
+   * The IANA timezone of the user.
+   */
+  timezone?: string;
 }
 /**
  * Represents tool result in the message history.

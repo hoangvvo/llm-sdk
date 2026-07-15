@@ -7,7 +7,6 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/anthropic"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
-	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/joho/godotenv"
 )
 
@@ -20,19 +19,24 @@ func TestMain(m *testing.M) {
 		panic("ANTHROPIC_API_KEY must be set")
 	}
 
-	model = anthropic.NewAnthropicModel("claude-sonnet-4-6", anthropic.AnthropicModelOptions{
+	model = anthropic.NewAnthropicModel("claude-sonnet-5", anthropic.AnthropicModelOptions{
 		APIKey: apiKey,
 	})
 
 	m.Run()
 }
 
-var reasoningOptions = testcommon.WithAdditionalInput(func(input *llmsdk.LanguageModelInput) {
-	input.Reasoning = &llmsdk.ReasoningOptions{
-		Enabled:      true,
-		BudgetTokens: ptr.To[uint32](3000),
-	}
-})
+var reasoningOptions = []testcommon.TestCaseOption{
+	testcommon.WithAdditionalInput(func(input *llmsdk.LanguageModelInput) {
+		input.Reasoning = &llmsdk.ReasoningOptions{
+			Enabled: true,
+		}
+	}),
+	// Adaptive thinking may be returned as a redacted, signature-only block.
+	testcommon.WithCustomOutputContent(func(_ []testcommon.PartAssertion) []testcommon.PartAssertion {
+		return []testcommon.PartAssertion{testcommon.NewReasoningAssertion(".*", true)}
+	}),
+}
 
 func TestGenerateText(t *testing.T) {
 	testcommon.RunTestCase(t, model, "generate_text")
@@ -86,6 +90,14 @@ func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
 }
 
+func TestGenerateWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_web_search")
+}
+
+func TestStreamWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_web_search")
+}
+
 func TestGenerateImage(t *testing.T) {
 	t.Skip("model does not support image generation")
 	testcommon.RunTestCase(t, model, "generate_image")
@@ -115,9 +127,9 @@ func TestStreamAudio(t *testing.T) {
 }
 
 func TestGenerateReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, model, "generate_reasoning", reasoningOptions)
+	testcommon.RunTestCase(t, model, "generate_reasoning", reasoningOptions...)
 }
 
 func TestStreamReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, model, "stream_reasoning", reasoningOptions)
+	testcommon.RunTestCase(t, model, "stream_reasoning", reasoningOptions...)
 }

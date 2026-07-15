@@ -147,12 +147,17 @@ impl LanguageModel for OpenAIChatModel {
                 input,
                 |input| async move {
                     let request = convert_to_openai_create_params(input, &self.model_id(), false)?;
+                    let audio_format = request
+                        .audio
+                        .as_ref()
+                        .map(|audio| map_openai_audio_format(&audio.format));
+                    let request_json = serialize_openai_chat_request(&request)?;
                     let headers = self.request_headers()?;
 
                     let response: CreateChatCompletionResponse = client_utils::send_json(
                         &self.client,
                         &format!("{}/chat/completions", self.base_url),
-                        &request,
+                        &request_json,
                         headers,
                     )
                     .await?;
@@ -172,13 +177,7 @@ impl LanguageModel for OpenAIChatModel {
                         }
                     }
 
-                    let content = map_openai_message(
-                        message,
-                        request
-                            .audio
-                            .as_ref()
-                            .map(|audio| map_openai_audio_format(&audio.format)),
-                    )?;
+                    let content = map_openai_message(message, audio_format)?;
 
                     let usage = response.usage.map(map_openai_usage).transpose()?;
 
@@ -218,19 +217,18 @@ impl LanguageModel for OpenAIChatModel {
                         .audio
                         .as_ref()
                         .map(|audio| map_openai_audio_format(&audio.format));
+                    let request_json = serialize_openai_chat_request(&request)?;
                     let headers = self.request_headers()?;
 
-                    let mut stream = client_utils::send_sse_stream::<
-                        CreateChatCompletionRequest,
-                        CreateChatCompletionStreamResponse,
-                    >(
-                        &self.client,
-                        &format!("{}/chat/completions", self.base_url),
-                        &request,
-                        headers,
-                        PROVIDER,
-                    )
-                    .await?;
+                    let mut stream =
+                        client_utils::send_sse_stream::<Value, CreateChatCompletionStreamResponse>(
+                            &self.client,
+                            &format!("{}/chat/completions", self.base_url),
+                            &request_json,
+                            headers,
+                            PROVIDER,
+                        )
+                        .await?;
 
                     let mut refusal = String::new();
                     let mut content_deltas: Vec<ContentDelta> = Vec::new();
@@ -298,26 +296,32 @@ fn convert_to_openai_create_params(
 ) -> LanguageModelResult<CreateChatCompletionRequest> {
     let messages = convert_to_openai_messages(input.messages, input.system_prompt)?;
 
-    let modalities = input.modalities.as_ref().map_or(Ok(None), |modalities| {
-        if modalities.is_empty() {
-            Ok(None)
-        } else {
+    let modalities = input
+        .modalities
+        .as_ref()
+        .map(|modalities| {
             modalities
                 .iter()
                 .map(convert_to_openai_modality)
                 .collect::<LanguageModelResult<Vec<_>>>()
                 .map(|items| Some(Some(items)))
-        }
-    })?;
+        })
+        .transpose()?;
 
     let audio = input.audio.map(convert_to_openai_audio).transpose()?;
 
-    let reasoning_effort = input
-        .reasoning
-        .as_ref()
-        .and_then(|reasoning| reasoning.budget_tokens)
-        .map(convert_to_openai_reasoning_effort)
-        .transpose()?;
+    let reasoning_effort = match input.reasoning.as_ref() {
+        Some(reasoning) if !reasoning.enabled => {
+            // The generated alias preserves OpenAI's nullable field shape.
+            let effort: ReasoningEffort = Some(Some(ReasoningEffortValue::None));
+            Some(effort)
+        }
+        Some(reasoning) => reasoning
+            .budget_tokens
+            .map(convert_to_openai_reasoning_effort)
+            .transpose()?,
+        None => None,
+    };
 
     Ok(CreateChatCompletionRequest {
         metadata: None,
@@ -338,7 +342,7 @@ fn convert_to_openai_create_params(
         max_completion_tokens: input.max_tokens.map(i64::from),
         max_tokens: None,
         messages,
-        modalities: Some(modalities),
+        modalities,
         model: Some(model_id.to_string()),
         n: None,
         parallel_tool_calls: None,
@@ -361,9 +365,29 @@ fn convert_to_openai_create_params(
         tool_choice: input.tool_choice.map(convert_to_openai_tool_choice),
         tools: input
             .tools
-            .map(|tools| tools.into_iter().map(convert_to_openai_tool).collect()),
+            .map(|tools| {
+                tools
+                    .into_iter()
+                    .map(convert_to_openai_tool)
+                    .collect::<LanguageModelResult<Vec<_>>>()
+            })
+            .transpose()?,
         verbosity: None,
         web_search_options: None,
+    })
+}
+
+fn serialize_openai_chat_request(
+    request: &CreateChatCompletionRequest,
+) -> LanguageModelResult<Value> {
+    // OpenAI reuses content-part schemas both directly and inside tagged unions.
+    // Serializing through Value canonicalizes the union discriminator to one key
+    // before reqwest writes the request body.
+    serde_json::to_value(request).map_err(|error| {
+        LanguageModelError::Invariant(
+            PROVIDER,
+            format!("Failed to serialize OpenAI chat request: {error}"),
+        )
     })
 }
 
@@ -611,14 +635,28 @@ fn convert_tool_message(
     Ok(result)
 }
 
-fn convert_to_openai_tool(tool: Tool) -> CreateChatCompletionRequestToolsItem {
+fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<CreateChatCompletionRequestToolsItem> {
+    let tool = match tool {
+        Tool::Function(tool) => tool,
+        Tool::WebSearch(_) => {
+            return Err(LanguageModelError::Unsupported(
+                PROVIDER,
+                "Hosted web search is not supported by this OpenAI Chat Completions adapter; use \
+                 OpenAIModel (Responses API)"
+                    .to_string(),
+            ));
+        }
+    };
+
     let function = FunctionObject {
         description: Some(tool.description),
         name: tool.name,
         parameters: Some(Some(tool.parameters)),
         strict: Some(true),
     };
-    CreateChatCompletionRequestToolsItem::Function(ChatCompletionTool { function })
+    Ok(CreateChatCompletionRequestToolsItem::Function(
+        ChatCompletionTool { function },
+    ))
 }
 
 fn convert_to_openai_tool_call(
@@ -781,6 +819,7 @@ fn map_openai_message(
             parts.push(Part::Text(crate::TextPart {
                 text: content,
                 citations: None,
+                signature: None,
             }));
         }
     }
@@ -878,6 +917,7 @@ fn map_openai_delta(
             let part = PartDelta::Text(crate::TextPartDelta {
                 text: content,
                 citation: None,
+                signature: None,
             });
             let combined = existing_content_deltas
                 .iter()

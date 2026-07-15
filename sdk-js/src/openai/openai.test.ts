@@ -7,7 +7,7 @@ suite("OpenAIModel", () => {
   assert(process.env["OPENAI_API_KEY"], "OPENAI_API_KEY must be set");
   const model = new OpenAIModel({
     apiKey: process.env["OPENAI_API_KEY"],
-    modelId: "gpt-5.4",
+    modelId: "gpt-5.6-sol",
   });
   const reasoningModel = new OpenAIModel({
     apiKey: process.env["OPENAI_API_KEY"],
@@ -81,6 +81,14 @@ suite("OpenAIModel", () => {
 
   test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.GENERATE_WEB_SEARCH, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_WEB_SEARCH);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_WEB_SEARCH, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_WEB_SEARCH);
   });
 
   test(TEST_CASE_NAMES.GENERATE_IMAGE, { timeout: 60 * 1000 }, (t) => {

@@ -121,6 +121,10 @@ pub struct TextPart {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citations: Option<Vec<Citation>>,
+    /// An opaque provider signature used to preserve text-part continuity when
+    /// returning the part to the same provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// A part of the message that contains an image.
@@ -249,11 +253,19 @@ pub struct Citation {
     /**
      * The start index of the document content part being cited.
      */
-    pub start_index: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_index: Option<usize>,
     /**
      * The end index of the document content part being cited.
      */
-    pub end_index: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_index: Option<usize>,
+    /**
+     * An opaque provider signature used to preserve citation continuity
+     * when returning it to the same provider.
+     */
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// Represents a message sent by the user.
@@ -278,6 +290,10 @@ pub struct TextPartDelta {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citation: Option<CitationDelta>,
+    /// An opaque provider signature used to preserve text-part continuity when
+    /// returning the part to the same provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// A delta update for a citation part, used in streaming of citation messages.
@@ -302,6 +318,10 @@ pub struct CitationDelta {
     /// The end index of the document content part being cited.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_index: Option<usize>,
+    /// An opaque provider signature used to preserve citation continuity when
+    /// returning it to the same provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 /// A delta update for a tool call part, used in streaming of a tool invocation.
@@ -403,7 +423,18 @@ pub type JSONSchema = Value;
 /// Represents a tool that can be used by the model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-pub struct Tool {
+#[serde(tag = "type")]
+pub enum Tool {
+    #[serde(rename = "function")]
+    Function(FunctionTool),
+    #[serde(rename = "web_search")]
+    WebSearch(WebSearchTool),
+}
+
+/// Represents a client-executed function tool that can be used by the model.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct FunctionTool {
     /// The name of the tool.
     pub name: String,
     /// A description of the tool.
@@ -411,6 +442,37 @@ pub struct Tool {
     /// The JSON schema of the parameters that the tool accepts. The type must
     /// be "object".
     pub parameters: JSONSchema,
+}
+
+/// Represents a provider-hosted web search tool.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct WebSearchTool {
+    /// Restricts search results to these domains when supported by the
+    /// provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_domains: Option<Vec<String>>,
+    /// An approximate user location used to localize web search results.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_location: Option<WebSearchUserLocation>,
+}
+
+/// An approximate user location used to localize web search results.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct WebSearchUserLocation {
+    /// The city of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    /// The region or state of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    /// The two-letter ISO 3166-1 country code of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    /// The IANA timezone of the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
 }
 
 /// Represents tool result in the message history.

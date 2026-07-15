@@ -12,14 +12,46 @@ import (
 
 // TextPartAssertion represents an assertion for text parts
 type TextPartAssertion struct {
-	Text *regexp.Regexp
+	Text     *regexp.Regexp
+	Citation *CitationAssertion
+}
+
+type CitationAssertion struct {
+	Source    *regexp.Regexp
+	Title     *regexp.Regexp
+	CitedText *regexp.Regexp
+}
+
+func (a CitationAssertion) matches(citation llmsdk.Citation) bool {
+	if a.Source != nil && !a.Source.MatchString(citation.Source) {
+		return false
+	}
+	if a.Title != nil && (citation.Title == nil || !a.Title.MatchString(*citation.Title)) {
+		return false
+	}
+	if a.CitedText != nil && (citation.CitedText == nil || !a.CitedText.MatchString(*citation.CitedText)) {
+		return false
+	}
+	return true
+}
+
+func (a TextPartAssertion) matchesCitation(citations []llmsdk.Citation) bool {
+	if a.Citation == nil {
+		return true
+	}
+	for _, citation := range citations {
+		if a.Citation.matches(citation) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a TextPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 	t.Helper()
 
 	for _, part := range content {
-		if part.TextPart != nil && a.Text.MatchString(part.TextPart.Text) {
+		if part.TextPart != nil && a.Text.MatchString(part.TextPart.Text) && a.matchesCitation(part.TextPart.Citations) {
 			return
 		}
 	}
@@ -125,20 +157,21 @@ func (a ImagePartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 }
 
 type ReasoningPartAssertion struct {
-	Text *regexp.Regexp
+	Text      *regexp.Regexp
+	Signature bool
+}
+
+func (a ReasoningPartAssertion) matches(part *llmsdk.ReasoningPart) bool {
+	textMatches := a.Text.MatchString(part.Text)
+	signatureMatches := !a.Signature || (part.Signature != nil && *part.Signature != "")
+	return textMatches && signatureMatches
 }
 
 func (a ReasoningPartAssertion) Assert(t *testing.T, content []llmsdk.Part) {
 	t.Helper()
 
 	for _, part := range content {
-		if part.ReasoningPart != nil {
-			if !a.Text.MatchString(part.ReasoningPart.Text) {
-				t.Errorf("Expected matching reasoning text:\nExpected: %s\nReceived: %s", a.Text.String(), part.ReasoningPart.Text)
-				return
-			}
-
-			// pass
+		if part.ReasoningPart != nil && a.matches(part.ReasoningPart) {
 			return
 		}
 	}
@@ -210,6 +243,12 @@ func NewTextAssertion(pattern string) PartAssertion {
 	}
 }
 
+func NewTextAssertionWithCitation(pattern string, citation CitationAssertion) PartAssertion {
+	assertion := NewTextAssertion(pattern)
+	assertion.TextPart.Citation = &citation
+	return assertion
+}
+
 // NewToolCallAssertion creates a new tool call part assertion
 func NewToolCallAssertion(toolName string, argsPattern string) PartAssertion {
 	var args *regexp.Regexp
@@ -224,10 +263,12 @@ func NewToolCallAssertion(toolName string, argsPattern string) PartAssertion {
 	}
 }
 
-func NewReasoningAssertion(textPattern string) PartAssertion {
+func NewReasoningAssertion(textPattern string, signature ...bool) PartAssertion {
+	hasSignature := len(signature) > 0 && signature[0]
 	return PartAssertion{
 		ReasoningPart: &ReasoningPartAssertion{
-			Text: regexp.MustCompile("(?s)" + textPattern),
+			Text:      regexp.MustCompile("(?s)" + textPattern),
+			Signature: hasSignature,
 		},
 	}
 }

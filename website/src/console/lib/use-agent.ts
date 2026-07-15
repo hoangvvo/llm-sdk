@@ -9,6 +9,7 @@ import type {
   AudioOptions,
   AudioPart,
   AudioPartDelta,
+  Citation,
   ImagePart,
   Modality,
   Part,
@@ -24,6 +25,11 @@ import type {
   ApiKeys,
   LoggedEvent,
   McpServerConfig,
+  WebSearchSettings,
+} from "../types.ts";
+import {
+  WEB_SEARCH_OPTIONS_PROVIDERS,
+  WEB_SEARCH_PROVIDERS,
 } from "../types.ts";
 import type { ModelOption, ModelSelection } from "./use-console-app-state.ts";
 import { useLocalStorageState } from "./use-local-storage-state.ts";
@@ -36,6 +42,7 @@ interface UseAgentConfig<Context> {
   providerApiKeys: ApiKeys;
   userContext: Context;
   enabledTools: string[];
+  webSearch: WebSearchSettings;
   mcpServers: McpServerConfig[];
   agentBehavior: AgentBehaviorSettings;
   toolsInitialized: boolean;
@@ -99,6 +106,7 @@ export function useAgent<Context>(
     providerApiKeys,
     userContext,
     enabledTools,
+    webSearch,
     mcpServers,
     agentBehavior,
     toolsInitialized,
@@ -206,6 +214,10 @@ export function useAgent<Context>(
             context: userContext,
           } satisfies AgentRequest<Context>,
           enabled_tools: toolsInitialized ? enabledTools : undefined,
+          web_search: prepareWebSearchPayload(
+            webSearch,
+            modelSelection.provider,
+          ),
           mcp_servers: prepareMcpServerPayload(mcpServers),
           temperature: agentBehavior.temperature,
           top_p: agentBehavior.top_p,
@@ -353,6 +365,7 @@ export function useAgent<Context>(
       runStreamUrl,
       toolsInitialized,
       userContext,
+      webSearch,
       setItems,
     ],
   );
@@ -409,6 +422,36 @@ export function useAgent<Context>(
       streamingParts,
     ],
   );
+}
+
+function prepareWebSearchPayload(
+  settings: WebSearchSettings,
+  provider: string,
+): Omit<WebSearchSettings, "enabled"> | undefined {
+  if (!settings.enabled || !WEB_SEARCH_PROVIDERS.includes(provider)) {
+    return undefined;
+  }
+
+  if (!WEB_SEARCH_OPTIONS_PROVIDERS.includes(provider)) {
+    return {};
+  }
+
+  const allowedDomains = settings.allowed_domains
+    ?.map((domain) => domain.trim())
+    .filter((domain) => domain.length > 0);
+  const locationEntries = Object.entries(settings.user_location ?? {})
+    .map(([key, value]) => [key, value?.trim()] as const)
+    .filter((entry): entry is [string, string] => Boolean(entry[1]));
+  const userLocation = Object.fromEntries(locationEntries) as NonNullable<
+    WebSearchSettings["user_location"]
+  >;
+
+  return {
+    ...(allowedDomains && allowedDomains.length > 0
+      ? { allowed_domains: allowedDomains }
+      : {}),
+    ...(locationEntries.length > 0 ? { user_location: userLocation } : {}),
+  };
 }
 
 function prepareMcpServerPayload(
@@ -470,15 +513,40 @@ function reduceContentDelta(
 
   switch (part.type) {
     case "text": {
-      const previousText =
-        next[index]?.type === "text" && typeof next[index].text === "string"
-          ? next[index].text
-          : "";
-      const text = `${previousText}${part.text}`;
-      next[index] = {
+      const previousPart: TextPart =
+        next[index]?.type === "text" ? next[index] : { type: "text", text: "" };
+      const citations = [...(previousPart.citations ?? [])];
+      if (part.citation?.source) {
+        const citation: Citation = { source: part.citation.source };
+        if (part.citation.title !== undefined) {
+          citation.title = part.citation.title;
+        }
+        if (part.citation.cited_text !== undefined) {
+          citation.cited_text = part.citation.cited_text;
+        }
+        if (part.citation.start_index !== undefined) {
+          citation.start_index = part.citation.start_index;
+        }
+        if (part.citation.end_index !== undefined) {
+          citation.end_index = part.citation.end_index;
+        }
+        if (part.citation.signature !== undefined) {
+          citation.signature = part.citation.signature;
+        }
+        citations.push(citation);
+      }
+      const textPart: TextPart = {
         type: "text",
-        text,
-      } satisfies TextPart;
+        text: `${previousPart.text}${part.text}`,
+      };
+      if (citations.length > 0) {
+        textPart.citations = citations;
+      }
+      const signature = part.signature ?? previousPart.signature;
+      if (signature !== undefined) {
+        textPart.signature = signature;
+      }
+      next[index] = textPart;
       break;
     }
     case "image": {

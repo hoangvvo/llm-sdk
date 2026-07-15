@@ -7,17 +7,17 @@ suite("GoogleModel", () => {
   assert(process.env["GOOGLE_API_KEY"], "GOOGLE_API_KEY must be set");
   const model = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-3.1-flash-lite-preview",
+    modelId: "gemini-3.1-flash-lite",
   });
 
   const audioModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-2.5-flash-preview-tts",
+    modelId: "gemini-3.1-flash-tts-preview",
   });
 
   const imageModel = new GoogleModel({
     apiKey: process.env["GOOGLE_API_KEY"],
-    modelId: "gemini-3.1-flash-image-preview",
+    modelId: "gemini-3.1-flash-image",
   });
 
   const multimodalToolModel = new GoogleModel({
@@ -92,6 +92,34 @@ suite("GoogleModel", () => {
 
   test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
+  });
+
+  const googleWebSearchOptions = {
+    additionalInputs: (input: Parameters<typeof model.generate>[0]) => ({
+      ...input,
+      tools:
+        input.tools?.map((tool) =>
+          tool.type === "web_search" ? { type: "web_search" as const } : tool,
+        ) ?? [],
+    }),
+  };
+
+  test(TEST_CASE_NAMES.GENERATE_WEB_SEARCH, (t) => {
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.GENERATE_WEB_SEARCH,
+      googleWebSearchOptions,
+    );
+  });
+
+  test(TEST_CASE_NAMES.STREAM_WEB_SEARCH, (t) => {
+    return runTestCase(
+      t,
+      model,
+      TEST_CASE_NAMES.STREAM_WEB_SEARCH,
+      googleWebSearchOptions,
+    );
   });
 
   test(TEST_CASE_NAMES.GENERATE_IMAGE, { timeout: 60 * 1000 }, (t) => {

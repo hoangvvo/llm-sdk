@@ -1,0 +1,7 @@
+{
+  "customUntaggedDeserializers": ["Item"],
+  "optionalProperties": {
+    "InputImageContent": ["detail"]
+  },
+  "untaggedUnions": ["InputContent", "FunctionAndCustomToolCallOutput"]
+}

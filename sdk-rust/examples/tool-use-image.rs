@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use llm_sdk::{LanguageModelInput, Message, Part, Tool, ToolCallPart};
+use llm_sdk::{FunctionTool, LanguageModelInput, Message, Part, ToolCallPart};
 use serde_json::json;
 
 mod common;
@@ -24,17 +24,9 @@ fn get_color_sample() -> ColorSample {
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai", "gpt-4o");
-
-    let tools: Vec<Tool> = vec![Tool {
-        name: "get_color_sample".into(),
-        description: "Get a color sample image".into(),
-        parameters: json!({
-          "type": "object",
-          "properties": {},
-          "additionalProperties": false
-        }),
-    }];
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(&provider, &model_id);
 
     let mut messages = vec![Message::user(vec![Part::text(
         "What color is the image returned by the tool? Answer with one word.",
@@ -45,11 +37,17 @@ async fn main() {
 
     loop {
         response = model
-            .generate(LanguageModelInput {
-                messages: messages.clone(),
-                tools: Some(tools.clone()),
-                ..Default::default()
-            })
+            .generate(
+                LanguageModelInput::new(messages.clone()).add_tool(FunctionTool::new(
+                    "get_color_sample",
+                    "Get a color sample image",
+                    json!({
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    }),
+                )),
+            )
             .await
             .unwrap();
 

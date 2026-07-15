@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
@@ -10,7 +11,15 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("anthropic", "claude-opus-4-6")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "anthropic"
+	}
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "claude-opus-4-8"
+	}
+	model := examples.GetModel(provider, modelID)
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Messages: []llmsdk.Message{

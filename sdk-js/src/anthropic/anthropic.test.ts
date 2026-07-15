@@ -11,7 +11,7 @@ suite("AnthropicModel", () => {
   assert(process.env["ANTHROPIC_API_KEY"], "ANTHROPIC_API_KEY must be set");
   const model = new AnthropicModel({
     apiKey: process.env["ANTHROPIC_API_KEY"],
-    modelId: "claude-sonnet-4-6",
+    modelId: "claude-sonnet-5",
   });
 
   const reasoningOptions: RunTestCaseOptions = {
@@ -19,9 +19,16 @@ suite("AnthropicModel", () => {
       ...input,
       reasoning: {
         enabled: true,
-        budget_tokens: 3000,
       },
     }),
+    // Adaptive thinking may be returned as a redacted, signature-only block.
+    customOutputContent: () => [
+      {
+        type: "reasoning",
+        text: /.*/s,
+        signature: true,
+      },
+    ],
   };
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
@@ -86,6 +93,14 @@ suite("AnthropicModel", () => {
 
   test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
+  });
+
+  test(TEST_CASE_NAMES.GENERATE_WEB_SEARCH, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_WEB_SEARCH);
+  });
+
+  test(TEST_CASE_NAMES.STREAM_WEB_SEARCH, (t) => {
+    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_WEB_SEARCH);
   });
 
   test(

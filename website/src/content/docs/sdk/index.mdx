@@ -8,12 +8,11 @@ We provide SDKs to interact with various LLM providers in the following programm
 - [Rust](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-rust)
 - [Go](https://github.com/hoangvvo/llm-sdk/tree/main/sdk-go)
 
-
 Each SDK wraps the same core model abstractions so you can:
 
 - Call text, image, audio, and reasoning models with a unified [`LanguageModel`](../language-model/) interface.
 - Stream partial responses and accumulate them into final outputs.
-- Register tools/function calls and handle tool-call responses consistently.
+- Register function tools or provider-hosted web search consistently.
 - Parse structured output schemas when you need typed results.
 
 ```mermaid

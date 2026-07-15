@@ -12,7 +12,9 @@ interface MyContext {
 }
 
 // Define the model to use for the Agent
-const model = getModel("openai", "gpt-4o");
+const provider = process.env["PROVIDER"] ?? "openai";
+const modelId = process.env["MODEL"] ?? "gpt-5.6-terra";
+const model = getModel(provider, modelId);
 
 // Define the agent tools
 const getTimeTool = tool({

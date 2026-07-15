@@ -15,7 +15,10 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai-chat-completion", "gpt-audio-1.5");
+    let provider =
+        std::env::var("PROVIDER").unwrap_or_else(|_| "openai-chat-completion".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-audio-1.5".to_string());
+    let model = common::get_model(&provider, &model_id);
 
     let mut stream = model
         .stream(LanguageModelInput {

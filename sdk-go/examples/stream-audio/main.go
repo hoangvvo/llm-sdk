@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"strconv"
 
@@ -18,7 +19,15 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("openai-chat-completion", "gpt-audio-1.5")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai-chat-completion"
+	}
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-audio-1.5"
+	}
+	model := examples.GetModel(provider, modelID)
 
 	stream, err := model.Stream(context.Background(), &llmsdk.LanguageModelInput{
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},

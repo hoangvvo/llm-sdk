@@ -83,6 +83,7 @@ export class AnthropicModel implements LanguageModel {
     const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
     const stream = this.#anthropic.messages.stream(createParams);
+    const providerToolBlockIndexes = new Set<number>();
 
     for await (const chunk of stream) {
       switch (chunk.type) {
@@ -105,6 +106,16 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
         case "content_block_start": {
+          const isProviderToolBlock =
+            chunk.content_block.type === "server_tool_use" ||
+            chunk.content_block.type === "web_search_tool_result";
+          if (isProviderToolBlock) {
+            // Anthropic streams provider-hosted tool arguments with the same
+            // input_json_delta shape as client tools. Track every server tool
+            // index so future hosted tools are not exposed as client calls.
+            providerToolBlockIndexes.add(chunk.index);
+            break;
+          }
           const incomingContentDeltas =
             mapAnthropicRawContentBlockStartEvent(chunk);
           for (const delta of incomingContentDeltas) {
@@ -114,6 +125,7 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
         case "content_block_delta": {
+          if (providerToolBlockIndexes.has(chunk.index)) break;
           const incomingContentDeltas =
             mapAnthropicRawContentBlockDeltaEvent(chunk);
           for (const delta of incomingContentDeltas) {
@@ -176,10 +188,7 @@ function convertToAnthropicCreateParams(
     params.tool_choice = convertToAnthropicToolChoice(tool_choice);
   }
   if (reasoning) {
-    params.thinking = convertToAnthropicThinkingConfigParam(
-      reasoning,
-      maxTokens,
-    );
+    params.thinking = convertToAnthropicThinkingConfigParam(reasoning);
   }
 
   return params;
@@ -235,10 +244,30 @@ function convertToAnthropicContentBlockParam(
 function convertToAnthropicTextBlockParam(
   part: TextPart,
 ): Anthropic.TextBlockParam {
-  return {
+  const block: Anthropic.TextBlockParam = {
     type: "text",
     text: part.text,
   };
+  const citations = part.citations?.flatMap(
+    (citation): Anthropic.Messages.CitationWebSearchResultLocationParam[] =>
+      citation.signature
+        ? [
+            {
+              type: "web_search_result_location",
+              cited_text: citation.cited_text ?? "",
+              encrypted_index: citation.signature,
+              title: citation.title ?? null,
+              url: citation.source,
+            },
+          ]
+        : [],
+  );
+  // encrypted_index is the provider state Anthropic accepts when a web-search
+  // citation is returned in a later assistant message.
+  if (citations && citations.length > 0) {
+    block.citations = citations;
+  }
+  return block;
 }
 
 function convertToAnthropicImageBlockParam(
@@ -333,7 +362,26 @@ export function convertToAnthropicThinkingBlockParam(
 
 // MARK: To Provider Tools
 
-function convertToAnthropicTool(tool: Tool): Anthropic.Tool {
+function convertToAnthropicTool(tool: Tool): Anthropic.Messages.ToolUnion {
+  if (tool.type === "web_search") {
+    // Use Anthropic's basic hosted-search version: it supports both common
+    // options without enabling the newer code-execution filtering flow.
+    const webSearchTool: Anthropic.Messages.WebSearchTool20250305 = {
+      type: "web_search_20250305",
+      name: "web_search",
+    };
+    if (tool.allowed_domains) {
+      webSearchTool.allowed_domains = tool.allowed_domains;
+    }
+    if (tool.user_location) {
+      webSearchTool.user_location = {
+        type: "approximate",
+        ...tool.user_location,
+      };
+    }
+    return webSearchTool;
+  }
+
   return {
     name: tool.name,
     description: tool.description,
@@ -389,16 +437,21 @@ function convertToAnthropicOutputConfig(
 
 function convertToAnthropicThinkingConfigParam(
   reasoning: ReasoningOptions,
-  maxTokens: number,
 ): Anthropic.ThinkingConfigParam {
   if (!reasoning.enabled) {
     return {
       type: "disabled",
     };
   }
+  // Without an explicit token budget, let Anthropic choose the thinking depth.
+  if (reasoning.budget_tokens === undefined) {
+    return {
+      type: "adaptive",
+    };
+  }
   return {
     type: "enabled",
-    budget_tokens: reasoning.budget_tokens ?? maxTokens - 1,
+    budget_tokens: reasoning.budget_tokens,
   };
 }
 
@@ -455,6 +508,17 @@ function mapAnthropicTextBlock(block: Anthropic.Messages.TextBlock): TextPart {
             cited_text: textCitation.cited_text,
             start_index: textCitation.start_block_index,
             end_index: textCitation.end_block_index,
+          };
+          if (textCitation.title) {
+            citation.title = textCitation.title;
+          }
+          return citation;
+        }
+        if (textCitation.type === "web_search_result_location") {
+          const citation: Citation = {
+            source: textCitation.url,
+            cited_text: textCitation.cited_text,
+            signature: textCitation.encrypted_index,
           };
           if (textCitation.title) {
             citation.title = textCitation.title;
@@ -537,6 +601,22 @@ function mapAnthropicRawContentBlockDelta(
           end_index: delta.citation.end_block_index,
           source: delta.citation.source,
           cited_text: delta.citation.cited_text,
+        };
+        if (delta.citation.title) {
+          citation.title = delta.citation.title;
+        }
+        return {
+          type: "text",
+          text: "",
+          citation,
+        };
+      }
+      if (delta.citation.type === "web_search_result_location") {
+        const citation: CitationDelta = {
+          type: "citation",
+          source: delta.citation.url,
+          cited_text: delta.citation.cited_text,
+          signature: delta.citation.encrypted_index,
         };
         if (delta.citation.title) {
           citation.title = delta.citation.title;

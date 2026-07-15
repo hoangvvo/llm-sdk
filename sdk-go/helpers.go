@@ -25,6 +25,12 @@ func WithTextCitations(citations []Citation) TextPartOption {
 	}
 }
 
+func WithTextSignature(signature string) TextPartOption {
+	return func(p *TextPart) {
+		p.Signature = &signature
+	}
+}
+
 // NewImagePart creates a new image part
 func NewImagePart(data, mimeType string, opts ...ImagePartOption) Part {
 	imagePart := &ImagePart{
@@ -228,6 +234,12 @@ func WithTextPartDeltaCitation(citation *CitationDelta) TextPartDeltaOption {
 	}
 }
 
+func WithTextPartDeltaSignature(signature string) TextPartDeltaOption {
+	return func(p *TextPartDelta) {
+		p.Signature = &signature
+	}
+}
+
 // NewCitationDelta constructs a citation delta for streaming updates.
 func NewCitationDelta(opts ...CitationDeltaOption) *CitationDelta {
 	citation := &CitationDelta{}
@@ -268,6 +280,12 @@ func WithCitationDeltaStartIndex(start int) CitationDeltaOption {
 func WithCitationDeltaEndIndex(end int) CitationDeltaOption {
 	return func(c *CitationDelta) {
 		c.EndIndex = &end
+	}
+}
+
+func WithCitationDeltaSignature(signature string) CitationDeltaOption {
+	return func(c *CitationDelta) {
+		c.Signature = &signature
 	}
 }
 
@@ -470,6 +488,160 @@ func NewToolChoiceRequired() *ToolChoiceOption {
 // NewToolChoiceTool creates a specific tool choice
 func NewToolChoiceTool(toolName string) *ToolChoiceOption {
 	return &ToolChoiceOption{Tool: &ToolChoiceTool{ToolName: toolName}}
+}
+
+// NewFunctionTool creates a function tool.
+func NewFunctionTool(name string, description string, parameters JSONSchema) Tool {
+	return Tool{
+		FunctionTool: &FunctionTool{
+			Name:        name,
+			Description: description,
+			Parameters:  parameters,
+		},
+	}
+}
+
+// WebSearchToolOption configures a web search tool.
+type WebSearchToolOption func(*WebSearchTool)
+
+// WithWebSearchAllowedDomains restricts search results to the given domains.
+func WithWebSearchAllowedDomains(allowedDomains ...string) WebSearchToolOption {
+	return func(tool *WebSearchTool) {
+		tool.AllowedDomains = append([]string(nil), allowedDomains...)
+	}
+}
+
+// WithWebSearchUserLocation localizes search results using an approximate user location.
+func WithWebSearchUserLocation(userLocation WebSearchUserLocation) WebSearchToolOption {
+	return func(tool *WebSearchTool) {
+		tool.UserLocation = &userLocation
+	}
+}
+
+// NewWebSearchTool creates a provider-hosted web search tool.
+func NewWebSearchTool(opts ...WebSearchToolOption) Tool {
+	webSearchTool := &WebSearchTool{}
+	for _, opt := range opts {
+		opt(webSearchTool)
+	}
+	return Tool{WebSearchTool: webSearchTool}
+}
+
+// LanguageModelInputOption configures a LanguageModelInput.
+type LanguageModelInputOption func(*LanguageModelInput)
+
+// NewLanguageModelInput creates a language model input with functional options.
+func NewLanguageModelInput(messages []Message, opts ...LanguageModelInputOption) *LanguageModelInput {
+	input := &LanguageModelInput{
+		Messages: append([]Message(nil), messages...),
+	}
+	for _, opt := range opts {
+		opt(input)
+	}
+	return input
+}
+
+func WithInputSystemPrompt(systemPrompt string) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.SystemPrompt = &systemPrompt
+	}
+}
+
+func WithInputMessages(messages ...Message) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Messages = append([]Message(nil), messages...)
+	}
+}
+
+func WithInputTools(tools ...Tool) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Tools = append([]Tool(nil), tools...)
+	}
+}
+
+func WithInputToolChoice(toolChoice *ToolChoiceOption) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.ToolChoice = toolChoice
+	}
+}
+
+func WithInputResponseFormat(responseFormat *ResponseFormatOption) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.ResponseFormat = responseFormat
+	}
+}
+
+func WithInputMaxTokens(maxTokens uint32) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.MaxTokens = &maxTokens
+	}
+}
+
+func WithInputTemperature(temperature float64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Temperature = &temperature
+	}
+}
+
+func WithInputTopP(topP float64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.TopP = &topP
+	}
+}
+
+func WithInputTopK(topK int32) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.TopK = &topK
+	}
+}
+
+func WithInputPresencePenalty(presencePenalty float64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.PresencePenalty = &presencePenalty
+	}
+}
+
+func WithInputFrequencyPenalty(frequencyPenalty float64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.FrequencyPenalty = &frequencyPenalty
+	}
+}
+
+func WithInputSeed(seed int64) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Seed = &seed
+	}
+}
+
+func WithInputModalities(modalities ...Modality) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Modalities = append([]Modality(nil), modalities...)
+	}
+}
+
+func WithInputMetadata(metadata map[string]string) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		if metadata == nil {
+			input.Metadata = nil
+			return
+		}
+		input.Metadata = make(map[string]string, len(metadata))
+		for k, v := range metadata {
+			input.Metadata[k] = v
+		}
+	}
+}
+
+func WithInputAudio(audio *AudioOptions) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Audio = audio
+	}
+}
+
+func WithInputReasoning(reasoning *ReasoningOptions) LanguageModelInputOption {
+	return func(input *LanguageModelInput) {
+		input.Reasoning = reasoning
+	}
 }
 
 // NewResponseFormatText creates a text response format

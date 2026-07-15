@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use llm_sdk::{LanguageModelInput, Message, Part, Tool, ToolCallPart, ToolResultPart};
+use llm_sdk::{FunctionTool, LanguageModelInput, Message, Part, ToolCallPart, ToolResultPart};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -50,32 +50,9 @@ async fn main() {
 
     let mut account = Account::new(1000);
 
-    let model = common::get_model("openai", "gpt-4o");
-
-    let tools: Vec<Tool> = vec![Tool {
-        name: "trade".into(),
-        description: "Trade stocks".into(),
-        parameters: json!({
-          "type": "object",
-          "properties": {
-              "action": {
-                  "type": "string",
-                  "enum": ["buy", "sell"],
-                  "description": "The action to perform"
-              },
-              "quantity": {
-                  "type": "number",
-                  "description": "The number of stocks to trade"
-              },
-              "symbol": {
-                  "type": "string",
-                  "description": "The stock symbol"
-              }
-          },
-          "required": ["action", "quantity", "symbol"],
-          "additionalProperties": false
-        }),
-    }];
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(&provider, &model_id);
 
     let mut messages = vec![Message::user(vec![Part::text(
         "I would like to buy 50 NVDA stocks.",
@@ -86,11 +63,32 @@ async fn main() {
 
     loop {
         response = model
-            .generate(LanguageModelInput {
-                messages: messages.clone(),
-                tools: Some(tools.clone()),
-                ..Default::default()
-            })
+            .generate(
+                LanguageModelInput::new(messages.clone()).add_tool(FunctionTool::new(
+                    "trade",
+                    "Trade stocks",
+                    json!({
+                      "type": "object",
+                      "properties": {
+                          "action": {
+                              "type": "string",
+                              "enum": ["buy", "sell"],
+                              "description": "The action to perform"
+                          },
+                          "quantity": {
+                              "type": "number",
+                              "description": "The number of stocks to trade"
+                          },
+                          "symbol": {
+                              "type": "string",
+                              "description": "The stock symbol"
+                          }
+                      },
+                      "required": ["action", "quantity", "symbol"],
+                      "additionalProperties": false
+                    }),
+                )),
+            )
             .await
             .unwrap();
 

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 	"github.com/sanity-io/litter"
 )
@@ -311,14 +311,18 @@ func (t *DeliverOrderTool) Execute(ctx context.Context, paramsJSON json.RawMessa
 func main() {
 	godotenv.Load("../.env")
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable must be set")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
 	}
-
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{
-		APIKey: apiKey,
-	})
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		log.Fatalf("Failed to create model: %v", err)
+	}
 
 	// Order processing agent
 	orderInst := "You are an order processing agent. Your job is to handle customer orders efficiently and accurately."
@@ -327,8 +331,8 @@ func main() {
 			llmagent.InstructionParam[*MyContext]{String: &orderInst},
 		),
 		llmagent.WithTools(
-			&CreateOrderTool{},
-			&GetOrdersTool{},
+			llmagent.NewAgentFunctionTool(&CreateOrderTool{}),
+			llmagent.NewAgentFunctionTool(&GetOrdersTool{}),
 		),
 	)
 
@@ -339,7 +343,7 @@ func main() {
 			llmagent.InstructionParam[*MyContext]{String: &deliveryInst},
 		),
 		llmagent.WithTools(
-			&DeliverOrderTool{},
+			llmagent.NewAgentFunctionTool(&DeliverOrderTool{}),
 		),
 	)
 
@@ -358,8 +362,8 @@ You should also poll the order status in every turn to send them for delivery on
 			llmagent.InstructionParam[*MyContext]{String: &coordInst3},
 		),
 		llmagent.WithTools(
-			NewAgentTransferTool(orderAgent, "handling customer orders and get order statuses"),
-			NewAgentTransferTool(deliveryAgent, "delivering processed orders"),
+			llmagent.NewAgentFunctionTool(NewAgentTransferTool(orderAgent, "handling customer orders and get order statuses")),
+			llmagent.NewAgentFunctionTool(NewAgentTransferTool(deliveryAgent, "delivering processed orders")),
 		),
 	)
 

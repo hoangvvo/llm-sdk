@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 )
 
@@ -228,12 +228,18 @@ func (issueReceiptTool) Execute(_ context.Context, raw json.RawMessage, ctx *Los
 func main() {
 	godotenv.Load("../.env")
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable must be set")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
 	}
-
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		log.Fatalf("Failed to create model: %v", err)
+	}
 
 	agent := llmagent.NewAgent(
 		"WaypointClerk",
@@ -243,7 +249,11 @@ func main() {
 			llmagent.InstructionParam[*LostAndFoundContext]{String: ptr("When travellers report belongings, call the available tools to mutate the manifest and then summarise your actions.")},
 			llmagent.InstructionParam[*LostAndFoundContext]{String: ptr("If a tool reports an error, acknowledge the issue and guide the traveller appropriately.")},
 		),
-		llmagent.WithTools(intakeItemTool{}, flagContrabandTool{}, issueReceiptTool{}),
+		llmagent.WithTools(
+			llmagent.NewAgentFunctionTool(intakeItemTool{}),
+			llmagent.NewAgentFunctionTool(flagContrabandTool{}),
+			llmagent.NewAgentFunctionTool(issueReceiptTool{}),
+		),
 	)
 
 	// Successful run exercises multiple tools in a single turn.

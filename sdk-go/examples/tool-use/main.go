@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
@@ -47,15 +48,23 @@ func trade(args tradeArgs) tradeResult {
 }
 
 func main() {
-	model := examples.GetModel("openai", "gpt-4o")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
+	}
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model := examples.GetModel(provider, modelID)
 
 	maxTurnLeft := 10
 
 	tools := []llmsdk.Tool{
-		{
-			Name:        "trade",
-			Description: "Trade stocks",
-			Parameters: llmsdk.JSONSchema{
+		llmsdk.NewFunctionTool(
+			"trade",
+			"Trade stocks",
+			llmsdk.JSONSchema{
 				"type": "object",
 				"properties": map[string]any{
 					"action": map[string]any{
@@ -75,7 +84,7 @@ func main() {
 				"required":             []string{"action", "quantity", "symbol"},
 				"additionalProperties": false,
 			},
-		},
+		),
 	}
 
 	messages := []llmsdk.Message{

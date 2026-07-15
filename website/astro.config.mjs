@@ -39,6 +39,7 @@ export default defineConfig({
             { slug: "sdk/image-understanding" },
             { slug: "sdk/audio-understanding" },
             { slug: "sdk/function-calling" },
+            { slug: "sdk/web-search" },
             { slug: "sdk/structured-output" },
             { slug: "sdk/reasoning" },
             { slug: "sdk/citations" },

@@ -19,6 +19,7 @@ test("typeboxTool returns AgentTool", (t: TestContext) => {
   });
 
   const expected: AgentTool<object> = {
+    type: "function",
     name: "echo",
     description: "Echo input",
     parameters: {
@@ -30,7 +31,6 @@ test("typeboxTool returns AgentTool", (t: TestContext) => {
       additionalProperties: false,
     },
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     execute: tool.execute,
   };
 

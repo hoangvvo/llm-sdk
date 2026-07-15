@@ -15,7 +15,7 @@ fn openai_api_key() -> &'static String {
 
 fn openai_model() -> OpenAIChatModel {
     OpenAIChatModel::new(
-        "gpt-4o".to_string(),
+        "gpt-5.6-terra".to_string(),
         OpenAIChatModelOptions {
             api_key: openai_api_key().clone(),
             ..Default::default()
@@ -33,29 +33,75 @@ fn openai_audio_model() -> OpenAIChatModel {
     )
 }
 
+fn disable_reasoning(input: &mut LanguageModelInput) {
+    input.reasoning = Some(ReasoningOptions {
+        enabled: false,
+        budget_tokens: None,
+    });
+}
+
+fn no_reasoning_options() -> Option<RunTestCaseOptions> {
+    Some(RunTestCaseOptions {
+        additional_input: Some(disable_reasoning),
+        ..Default::default()
+    })
+}
+
 test_set!(openai_model(), generate_text);
 
 test_set!(openai_model(), stream_text);
 
 test_set!(openai_model(), generate_with_system_prompt);
 
-test_set!(openai_model(), generate_tool_call);
+test_set!(openai_model(), generate_tool_call, no_reasoning_options());
 
-test_set!(openai_model(), stream_tool_call);
+test_set!(openai_model(), stream_tool_call, no_reasoning_options());
 
-test_set!(openai_model(), generate_text_from_tool_result);
+test_set!(
+    openai_model(),
+    generate_text_from_tool_result,
+    no_reasoning_options()
+);
 
-test_set!(openai_model(), stream_text_from_tool_result);
+test_set!(
+    openai_model(),
+    stream_text_from_tool_result,
+    no_reasoning_options()
+);
 
-test_set!(openai_model(), generate_parallel_tool_calls);
+test_set!(
+    openai_model(),
+    generate_parallel_tool_calls,
+    no_reasoning_options()
+);
 
-test_set!(openai_model(), stream_parallel_tool_calls);
+test_set!(
+    openai_model(),
+    stream_parallel_tool_calls,
+    no_reasoning_options()
+);
 
-test_set!(openai_model(), stream_parallel_tool_calls_same_name);
+test_set!(
+    openai_model(),
+    stream_parallel_tool_calls_same_name,
+    no_reasoning_options()
+);
 
 test_set!(openai_model(), structured_response_format);
 
-test_set!(openai_model(), source_part_input);
+test_set!(openai_model(), source_part_input, no_reasoning_options());
+
+test_set!(
+    ignore = "chat completion api does not support hosted web search",
+    openai_model(),
+    generate_web_search
+);
+
+test_set!(
+    ignore = "chat completion api does not support hosted web search",
+    openai_model(),
+    stream_web_search
+);
 
 test_set!(
     ignore = "chat completion api does not support image generation",

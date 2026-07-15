@@ -20,10 +20,13 @@ function getColorSample() {
 
 let maxTurnLeft = 10;
 
-const model = getModel("openai", "gpt-4o");
+const provider = process.env["PROVIDER"] ?? "openai";
+const modelId = process.env["MODEL"] ?? "gpt-5.6-terra";
+const model = getModel(provider, modelId);
 
 const tools: Tool[] = [
   {
+    type: "function",
     name: "get_color_sample",
     description: "Get a color sample image",
     parameters: {

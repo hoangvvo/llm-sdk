@@ -22,6 +22,7 @@ type RunStreamBody struct {
 	Metadata         llmsdk.LanguageModelMetadata      `json:"metadata"`
 	Input            llmagent.AgentRequest[*MyContext] `json:"input"`
 	EnabledTools     []string                          `json:"enabled_tools,omitempty"`
+	WebSearch        *llmsdk.WebSearchTool             `json:"web_search,omitempty"`
 	MCPServers       []llmmcp.MCPParams                `json:"mcp_servers,omitempty"`
 	Temperature      *float64                          `json:"temperature,omitempty"`
 	TopP             *float64                          `json:"top_p,omitempty"`
@@ -31,6 +32,12 @@ type RunStreamBody struct {
 	Audio            *llmsdk.AudioOptions              `json:"audio,omitempty"`
 	Reasoning        *llmsdk.ReasoningOptions          `json:"reasoning,omitempty"`
 	Modalities       []llmsdk.Modality                 `json:"modalities,omitempty"`
+}
+
+type ToolInfo struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Providers   []string `json:"providers,omitempty"`
 }
 
 func runStreamHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +75,7 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 
 	options := &AgentOptions{
 		EnabledTools:     enabledTools,
+		WebSearch:        req.WebSearch,
 		MCPServers:       req.MCPServers,
 		Temperature:      req.Temperature,
 		TopP:             req.TopP,
@@ -119,12 +127,15 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func listToolsHandler(w http.ResponseWriter) {
-	tools := make([]map[string]string, 0, len(availableTools))
+	tools := make([]ToolInfo, 0, len(availableTools))
 	for _, tool := range availableTools {
-		tools = append(tools, map[string]string{
-			"name":        tool.Name(),
-			"description": tool.Description(),
-		})
+		functionTool := tool.AsFunctionTool()
+		if functionTool != nil {
+			tools = append(tools, ToolInfo{
+				Name:        functionTool.Name(),
+				Description: functionTool.Description(),
+			})
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -10,7 +10,9 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
 use futures::{future::BoxFuture, StreamExt};
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, BoxedError, RunState};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, BoxedError, RunState,
+};
 use llm_sdk::{
     AudioFormat, LanguageModelMetadata, Message, Part, PartDelta, PartialModelResponse,
     ToolResultPart,
@@ -183,7 +185,7 @@ struct ChatContext;
 
 struct TimeTool;
 
-impl AgentTool<ChatContext> for TimeTool {
+impl AgentFunctionTool<ChatContext> for TimeTool {
     fn name(&self) -> String {
         "get_current_time".to_string()
     }
@@ -223,7 +225,7 @@ struct WeatherParams {
 
 struct WeatherTool;
 
-impl AgentTool<ChatContext> for WeatherTool {
+impl AgentFunctionTool<ChatContext> for WeatherTool {
     fn name(&self) -> String {
         "get_local_weather".to_string()
     }
@@ -843,7 +845,7 @@ async fn chat_handler(
     Json(body): Json<ChatRequestBody>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     let provider = body.provider.unwrap_or_else(|| "openai".to_string());
-    let model_id = body.model_id.unwrap_or_else(|| "gpt-5.4-mini".to_string());
+    let model_id = body.model_id.unwrap_or_else(|| "gpt-5.6-luna".to_string());
     let metadata = body.metadata.unwrap_or_default();
 
     let agent = create_agent(&provider, &model_id, metadata)

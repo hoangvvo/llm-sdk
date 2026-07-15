@@ -1,0 +1,5 @@
+{
+  "optionalProperties": {
+    "CreateChatCompletionResponseChoicesItem": ["finish_reason"]
+  }
+}

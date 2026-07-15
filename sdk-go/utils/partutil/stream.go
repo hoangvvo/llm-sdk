@@ -99,7 +99,8 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 	case part.TextPart != nil:
 		return llmsdk.PartDelta{
 			TextPartDelta: &llmsdk.TextPartDelta{
-				Text: part.TextPart.Text,
+				Text:      part.TextPart.Text,
+				Signature: part.TextPart.Signature,
 			},
 		}
 	case part.ToolCallPart != nil:

@@ -2,7 +2,7 @@ import test, { type TestContext } from "node:test";
 
 import { tool, type AgentToolResult } from "./tool.ts";
 
-void test("tool returns the same definition object", (t: TestContext) => {
+void test("tool returns an agent function tool", (t: TestContext) => {
   const definition = {
     name: "echo",
     description: "Echoes input",
@@ -15,5 +15,8 @@ void test("tool returns the same definition object", (t: TestContext) => {
 
   const toolDefinition = tool(definition);
 
-  t.assert.strictEqual(toolDefinition, definition);
+  t.assert.deepStrictEqual(toolDefinition, {
+    type: "function",
+    ...definition,
+  });
 });

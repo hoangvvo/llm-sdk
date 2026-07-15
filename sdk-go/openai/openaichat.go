@@ -277,16 +277,20 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 	if input.Tools != nil {
 		var tools []openaichatapi.CreateChatCompletionRequestToolsItem
 		for _, tool := range input.Tools {
+			if tool.FunctionTool == nil {
+				return nil, llmsdk.NewUnsupportedError(Provider, "hosted web search is not supported by this OpenAI Chat Completions adapter; use OpenAIModel (Responses API)")
+			}
+			functionTool := tool.FunctionTool
 			openAITool := openaichatapi.ChatCompletionTool{
 				Function: openaichatapi.FunctionObject{
-					Name: tool.Name,
+					Name: functionTool.Name,
 				},
 			}
-			if tool.Description != "" {
-				openAITool.Function.Description = &tool.Description
+			if functionTool.Description != "" {
+				openAITool.Function.Description = &functionTool.Description
 			}
-			if tool.Parameters != nil {
-				parameters := openaichatapi.FunctionParameters(tool.Parameters)
+			if functionTool.Parameters != nil {
+				parameters := openaichatapi.FunctionParameters(functionTool.Parameters)
 				openAITool.Function.Parameters = &parameters
 			}
 			strict := true
@@ -314,12 +318,17 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 		params.ResponseFormat = responseFormat
 	}
 
-	if input.Reasoning != nil && input.Reasoning.BudgetTokens != nil {
-		effort, err := convertToOpenAIChatReasoningEffort(*input.Reasoning.BudgetTokens)
-		if err != nil {
-			return nil, err
+	if input.Reasoning != nil {
+		if !input.Reasoning.Enabled {
+			effort := openaichatapi.ReasoningEffortNone
+			params.ReasoningEffort = &effort
+		} else if input.Reasoning.BudgetTokens != nil {
+			effort, err := convertToOpenAIChatReasoningEffort(*input.Reasoning.BudgetTokens)
+			if err != nil {
+				return nil, err
+			}
+			params.ReasoningEffort = effort
 		}
-		params.ReasoningEffort = effort
 	}
 
 	if len(input.Metadata) > 0 {

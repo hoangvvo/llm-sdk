@@ -11,10 +11,7 @@ use llm_agent::{
     mcp::{MCPParams, MCPStreamableHTTPParams, MCPToolkit},
     Agent, AgentItem, AgentRequest, BoxedError,
 };
-use llm_sdk::{
-    openai::{OpenAIModel, OpenAIModelOptions},
-    Message, Part,
-};
+use llm_sdk::{Message, Part};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{Implementation, ServerCapabilities, ServerInfo},
@@ -27,13 +24,10 @@ use rmcp::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use std::{
-    env,
-    io::{Error as IoError, ErrorKind},
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle, time::sleep};
+
+mod common;
 
 // This example demonstrates:
 // 1. Launching a minimal streamable HTTP MCP server using the official Rust
@@ -62,15 +56,14 @@ async fn main() -> Result<(), BoxedError> {
 }
 
 async fn run_agent_demo() -> Result<(), BoxedError> {
-    let api_key = env::var("OPENAI_API_KEY").map_err(|_| missing_env("OPENAI_API_KEY"))?;
-
-    let model = Arc::new(OpenAIModel::new(
-        "gpt-5.4-mini",
-        OpenAIModelOptions {
-            api_key,
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-luna".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )?;
 
     let agent = Agent::<SessionContext>::builder("Sage", model)
         .add_instruction("You are Sage, the shuttle concierge for the Transit Hub.")
@@ -267,11 +260,4 @@ impl ServerGuard {
             Err(err) => Err(Box::new(err) as BoxedError),
         }
     }
-}
-
-fn missing_env(var: &str) -> BoxedError {
-    Box::new(IoError::new(
-        ErrorKind::NotFound,
-        format!("{var} environment variable must be set"),
-    ))
 }

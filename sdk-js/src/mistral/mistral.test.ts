@@ -13,7 +13,12 @@ suite("MistralModel", () => {
 
   const reasoningModel = new MistralModel({
     apiKey: process.env["MISTRAL_API_KEY"],
-    modelId: "magistral-small-latest",
+    modelId: "mistral-small-latest",
+  });
+
+  const visionModel = new MistralModel({
+    apiKey: process.env["MISTRAL_API_KEY"],
+    modelId: "mistral-medium-latest",
   });
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
@@ -101,11 +106,11 @@ suite("MistralModel", () => {
   );
 
   test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
+    return runTestCase(t, visionModel, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
   });
 
   test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
+    return runTestCase(t, visionModel, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
   });
 
   test(

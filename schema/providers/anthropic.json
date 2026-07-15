@@ -439,9 +439,6 @@
         },
         {
           "$ref": "#/definitions/ContentBlockStopEvent"
-        },
-        {
-          "$ref": "#/definitions/PingEvent"
         }
       ],
       "title": "MessageStreamEvent",
@@ -450,21 +447,6 @@
           "model_name": "MessageStreamEvent"
         }
       }
-    },
-    "PingEvent": {
-      "properties": {
-        "type": {
-          "const": "ping",
-          "description": "Event type.",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type"
-      ],
-      "title": "PingEvent",
-      "type": "object"
     },
     "CacheControlEphemeral": {
       "additionalProperties": false,
@@ -568,6 +550,21 @@
       "anyOf": [
         {
           "type": "string"
+        },
+        {
+          "const": "claude-opus-4-8",
+          "description": "Most capable Opus for long-running agents and coding",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-sonnet-5",
+          "description": "Best combination of speed and intelligence",
+          "x-stainless-nominal": false
+        },
+        {
+          "const": "claude-fable-5",
+          "description": "Most capable model for the most demanding reasoning and long-horizon agentic work",
+          "x-stainless-nominal": false
         },
         {
           "const": "claude-opus-4-7",

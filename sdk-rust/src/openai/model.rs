@@ -1,7 +1,7 @@
 use crate::{
     client_utils, id_utils,
     openai::responses_api::{
-        self, CreateResponse, DetailEnum, FunctionCallOutputItemParam,
+        self, Annotation, CreateResponse, DetailEnum, FunctionCallOutputItemParam,
         FunctionCallOutputItemParamOutput, FunctionCallOutputItemParamOutputArrayItem,
         FunctionCallOutputItemParamType, FunctionTool, FunctionToolCall, FunctionToolCallType,
         FunctionToolType, ImageDetail, ImageGenTool, ImageGenToolCall, ImageGenToolCallType,
@@ -14,14 +14,16 @@ use crate::{
         ResponseFormatText, ResponseStreamEvent, ResponseTextParam, ResponseUsage,
         SummaryTextContent, SummaryTextContentType, TextResponseFormatConfiguration,
         TextResponseFormatJsonSchema, Tool as OpenAITool, ToolChoiceFunction,
-        ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam,
+        ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam, UrlCitationBody,
+        WebSearchApproximateLocationValue, WebSearchApproximateLocationValueType,
+        WebSearchTool as OpenAIWebSearchTool, WebSearchToolFilters, WebSearchToolType,
     },
-    source_part_utils, AssistantMessage, ContentDelta, ImagePart, ImagePartDelta, LanguageModel,
-    LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
-    LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption,
-    TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
-    ToolResultPart, UserMessage,
+    source_part_utils, AssistantMessage, Citation, CitationDelta, ContentDelta, ImagePart,
+    ImagePartDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
+    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta,
+    PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
+    ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
+    ToolChoiceOption, ToolMessage, ToolResultPart, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -372,7 +374,7 @@ impl TryFrom<UserMessage> for InputItem {
                                 }
                                 Part::Image(image_part) => {
                                     InputContent::InputImage(InputImageContent {
-                                        detail: ImageDetail::Auto,
+                                        detail: Some(ImageDetail::Auto),
                                         file_id: None,
                                         image_url: Some(format!(
                                             "data:{};base64,{}",
@@ -550,14 +552,37 @@ fn convert_tool_message_to_response_input_items(
 }
 
 fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<OpenAITool> {
-    Ok(OpenAITool::FunctionTool(FunctionTool {
-        defer_loading: None,
-        description: Some(tool.description),
-        name: tool.name,
-        parameters: Some(convert_json_object(tool.parameters)?),
-        strict: Some(true),
-        r#type: FunctionToolType::Function,
-    }))
+    match tool {
+        Tool::Function(tool) => Ok(OpenAITool::FunctionTool(FunctionTool {
+            defer_loading: None,
+            description: Some(tool.description),
+            name: tool.name,
+            parameters: Some(convert_json_object(tool.parameters)?),
+            strict: Some(true),
+            r#type: FunctionToolType::Function,
+        })),
+        Tool::WebSearch(tool) => {
+            let user_location = tool.user_location.map(|location| {
+                Some(Some(WebSearchApproximateLocationValue {
+                    city: location.city,
+                    country: location.country,
+                    region: location.region,
+                    timezone: location.timezone,
+                    r#type: Some(WebSearchApproximateLocationValueType::Approximate),
+                }))
+            });
+            Ok(OpenAITool::WebSearchTool(OpenAIWebSearchTool {
+                filters: tool
+                    .allowed_domains
+                    .map(|allowed_domains| WebSearchToolFilters {
+                        allowed_domains: Some(allowed_domains),
+                    }),
+                search_context_size: None,
+                r#type: WebSearchToolType::WebSearch,
+                user_location,
+            }))
+        }
+    }
 }
 
 fn convert_to_openai_response_tool_choice(tool_choice: ToolChoiceOption) -> ToolChoiceParam {
@@ -632,7 +657,21 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                     |mut parts, content| -> LanguageModelResult<Vec<Part>> {
                         match content {
                             OutputMessageContent::OutputText(output_text) => {
-                                parts.push(Part::text(output_text.text));
+                                let citations = output_text
+                                    .annotations
+                                    .into_iter()
+                                    .filter_map(|annotation| match annotation {
+                                        Annotation::UrlCitation(citation) => {
+                                            Some(map_openai_url_citation(citation))
+                                        }
+                                        _ => None,
+                                    })
+                                    .collect::<Vec<_>>();
+                                parts.push(Part::Text(TextPart {
+                                    text: output_text.text,
+                                    citations: (!citations.is_empty()).then_some(citations),
+                                    signature: None,
+                                }));
                             }
                             OutputMessageContent::Refusal(refusal) => {
                                 return Err(LanguageModelError::Refusal(refusal.refusal));
@@ -705,6 +744,7 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
         })
 }
 
+#[allow(clippy::too_many_lines)]
 fn map_openai_stream_event(
     event: ResponseStreamEvent,
 ) -> LanguageModelResult<Option<ContentDelta>> {
@@ -752,11 +792,44 @@ fn map_openai_stream_event(
             let text_part = PartDelta::Text(TextPartDelta {
                 text: text_delta_event.delta,
                 citation: None,
+                signature: None,
             });
             Ok(Some(ContentDelta {
                 index: usize::try_from(text_delta_event.output_index).unwrap_or(0),
                 part: text_part,
             }))
+        }
+        ResponseStreamEvent::ResponseOutputTextAnnotationAdded(annotation_event) => {
+            // The generated API represents streaming annotations as JSON, so
+            // validate the tagged annotation before mapping a citation delta.
+            let annotation = serde_json::from_value::<Annotation>(annotation_event.annotation)
+                .map_err(|error| {
+                    LanguageModelError::Invariant(
+                        PROVIDER,
+                        format!("Failed to parse OpenAI citation annotation: {error}"),
+                    )
+                })?;
+            if let Annotation::UrlCitation(citation) = annotation {
+                let citation = map_openai_url_citation(citation);
+                Ok(Some(ContentDelta {
+                    index: usize::try_from(annotation_event.output_index).unwrap_or(0),
+                    part: PartDelta::Text(TextPartDelta {
+                        text: String::new(),
+                        citation: Some(CitationDelta {
+                            r#type: "citation".to_string(),
+                            source: Some(citation.source),
+                            title: citation.title,
+                            cited_text: citation.cited_text,
+                            start_index: citation.start_index,
+                            end_index: citation.end_index,
+                            signature: citation.signature,
+                        }),
+                        signature: None,
+                    }),
+                }))
+            } else {
+                Ok(None)
+            }
         }
         ResponseStreamEvent::ResponseFunctionCallArgumentsDelta(
             function_call_arguments_delta_event,
@@ -806,6 +879,17 @@ fn map_openai_stream_event(
             }))
         }
         _ => Ok(None),
+    }
+}
+
+fn map_openai_url_citation(value: UrlCitationBody) -> Citation {
+    Citation {
+        source: value.url,
+        title: Some(value.title),
+        cited_text: None,
+        start_index: usize::try_from(value.start_index).ok(),
+        end_index: usize::try_from(value.end_index).ok(),
+        signature: None,
     }
 }
 

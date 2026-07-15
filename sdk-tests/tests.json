@@ -1,6 +1,7 @@
 {
   "tools": [
     {
+      "type": "function",
       "name": "get_weather",
       "description": "Get the weather",
       "parameters": {
@@ -15,6 +16,7 @@
       }
     },
     {
+      "type": "function",
       "name": "get_stock_price",
       "description": "Get the stock price",
       "parameters": {
@@ -29,6 +31,7 @@
       }
     },
     {
+      "type": "function",
       "name": "get_first_secret_number",
       "description": "Get the first secret number",
       "parameters": {
@@ -38,12 +41,23 @@
       }
     },
     {
+      "type": "function",
       "name": "get_color_sample",
       "description": "Get a color sample image",
       "parameters": {
         "type": "object",
         "properties": {},
         "additionalProperties": false
+      }
+    },
+    {
+      "type": "web_search",
+      "allowed_domains": ["iana.org"],
+      "user_location": {
+        "city": "San Francisco",
+        "region": "California",
+        "country": "US",
+        "timezone": "America/Los_Angeles"
       }
     }
   ],
@@ -619,6 +633,7 @@
             ],
             "tools": [
               {
+                "type": "function",
                 "name": "get_first_secret_number",
                 "description": "Get the first secret number",
                 "parameters": {
@@ -670,6 +685,7 @@
             ],
             "tools": [
               {
+                "type": "function",
                 "name": "get_first_secret_number",
                 "description": "Get the first secret number",
                 "parameters": {
@@ -716,6 +732,7 @@
             ],
             "tools": [
               {
+                "type": "function",
                 "name": "get_first_secret_number",
                 "description": "Get the first secret number",
                 "parameters": {
@@ -925,6 +942,74 @@
               {
                 "type": "text",
                 "text": "red|Red"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_web_search",
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use web search to find the official IANA page about reserved domains. Reply with one sentence containing the word IANA and cite the source."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search"],
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "IANA",
+                "citation": {
+                  "source": "^https?://",
+                  "title": "IANA|iana|Reserved|reserved"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stream_web_search",
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use web search to find the official IANA page about reserved domains. Reply with one sentence containing the word IANA and cite the source."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search"],
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "IANA",
+                "citation": {
+                  "source": "^https?://",
+                  "title": "IANA|iana|Reserved|reserved"
+                }
               }
             ]
           }

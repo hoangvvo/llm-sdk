@@ -2639,7 +2639,7 @@
           "description": "The unique identifier of the image generation item being processed.",
           "type": "string"
         },
-         "output_format": {
+        "output_format": {
           "description": "The output format of the generated image.\n",
           "type": "string"
         },

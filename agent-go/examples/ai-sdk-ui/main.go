@@ -307,7 +307,10 @@ func createAgent(provider, modelID string, metadata llmsdk.LanguageModelMetadata
 			llmagent.InstructionParam[chatContext]{String: &instruction1},
 			llmagent.InstructionParam[chatContext]{String: &instruction2},
 		),
-		llmagent.WithTools(&timeTool{}, &weatherTool{}),
+		llmagent.WithTools(
+			llmagent.NewAgentFunctionTool(&timeTool{}),
+			llmagent.NewAgentFunctionTool(&weatherTool{}),
+		),
 	)
 }
 
@@ -1015,7 +1018,7 @@ func handleChatRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	modelID := body.ModelID
 	if modelID == "" {
-		modelID = "gpt-5.4-mini"
+		modelID = "gpt-5.6-luna"
 	}
 
 	var metadata llmsdk.LanguageModelMetadata

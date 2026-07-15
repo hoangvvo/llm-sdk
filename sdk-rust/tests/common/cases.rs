@@ -1,6 +1,6 @@
 use crate::common::assert::{
-    compile_pattern, AudioPartAssertion, ImagePartAssertion, OutputAssertion, PartAssertion,
-    ReasoningPartAssertion, TextPartAssertion, ToolCallPartAssertion,
+    compile_pattern, AudioPartAssertion, CitationAssertion, ImagePartAssertion, OutputAssertion,
+    PartAssertion, ReasoningPartAssertion, TextPartAssertion, ToolCallPartAssertion,
 };
 use futures::stream::StreamExt;
 use json_dotpath::DotPaths;
@@ -60,7 +60,14 @@ static TEST_DATA: LazyLock<TestDataJSON> = LazyLock::new(|| {
 static TOOLS_MAP: LazyLock<HashMap<String, Tool>> = LazyLock::new(|| {
     let mut map = HashMap::new();
     for tool in &TEST_DATA.tools {
-        map.insert(tool.name.clone(), tool.clone());
+        match tool {
+            Tool::Function(function_tool) => {
+                map.insert(function_tool.name.clone(), tool.clone());
+            }
+            Tool::WebSearch(_) => {
+                map.insert("web_search".to_string(), tool.clone());
+            }
+        }
     }
     map
 });
@@ -145,6 +152,22 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
                     if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {
                         assertions.push(PartAssertion::Text(TextPartAssertion {
                             text: compile_pattern(text),
+                            citation: part_obj.get("citation").and_then(Value::as_object).map(
+                                |citation| CitationAssertion {
+                                    source: citation
+                                        .get("source")
+                                        .and_then(Value::as_str)
+                                        .map(compile_pattern),
+                                    title: citation
+                                        .get("title")
+                                        .and_then(Value::as_str)
+                                        .map(compile_pattern),
+                                    cited_text: citation
+                                        .get("cited_text")
+                                        .and_then(Value::as_str)
+                                        .map(compile_pattern),
+                                },
+                            ),
                         }));
                     }
                 }
@@ -179,6 +202,10 @@ fn convert_output_assertions(content: &[Value]) -> Vec<PartAssertion> {
                     if let Some(text) = part_obj.get("text").and_then(|v| v.as_str()) {
                         assertions.push(PartAssertion::Reasoning(ReasoningPartAssertion {
                             text: compile_pattern(text),
+                            signature: part_obj
+                                .get("signature")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false),
                         }));
                     }
                 }
@@ -424,6 +451,20 @@ pub async fn test_source_part_input(
     options: Option<RunTestCaseOptions>,
 ) -> Result<(), Box<dyn Error>> {
     run_test_case(model, "source_part_input", options).await
+}
+
+pub async fn test_generate_web_search(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "generate_web_search", options).await
+}
+
+pub async fn test_stream_web_search(
+    model: &dyn LanguageModel,
+    options: Option<RunTestCaseOptions>,
+) -> Result<(), Box<dyn Error>> {
+    run_test_case(model, "stream_web_search", options).await
 }
 
 pub async fn test_generate_image(

@@ -24,13 +24,13 @@ func TestMain(m *testing.M) {
 		panic("GOOGLE_API_KEY must be set")
 	}
 
-	model = google.NewGoogleModel("gemini-3.1-flash-lite-preview", google.GoogleModelOptions{
+	model = google.NewGoogleModel("gemini-3.1-flash-lite", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	audioModel = google.NewGoogleModel("gemini-2.5-flash-preview-tts", google.GoogleModelOptions{
+	audioModel = google.NewGoogleModel("gemini-3.1-flash-tts-preview", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	imageModel = google.NewGoogleModel("gemini-3.1-flash-image-preview", google.GoogleModelOptions{
+	imageModel = google.NewGoogleModel("gemini-3.1-flash-image", google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
 	multimodalToolModel = google.NewGoogleModel("gemini-3.1-pro-preview", google.GoogleModelOptions{
@@ -93,6 +93,23 @@ func TestStructuredResponseFormat(t *testing.T) {
 
 func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
+}
+
+var clearWebSearchOptions = testcommon.WithAdditionalInput(func(input *llmsdk.LanguageModelInput) {
+	for i := range input.Tools {
+		if input.Tools[i].WebSearchTool != nil {
+			input.Tools[i].WebSearchTool.AllowedDomains = nil
+			input.Tools[i].WebSearchTool.UserLocation = nil
+		}
+	}
+})
+
+func TestGenerateWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_web_search", clearWebSearchOptions)
+}
+
+func TestStreamWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_web_search", clearWebSearchOptions)
 }
 
 func TestGenerateImage(t *testing.T) {

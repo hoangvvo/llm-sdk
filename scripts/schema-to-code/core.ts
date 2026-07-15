@@ -12,6 +12,12 @@ export interface CodegenDocument {
   usesJsonValue: boolean;
 }
 
+export interface CodegenOverrides {
+  customUntaggedDeserializers?: string[];
+  optionalProperties?: Record<string, string[]>;
+  untaggedUnions?: string[];
+}
+
 export type Declaration =
   | AliasDeclaration
   | EnumDeclaration
@@ -69,7 +75,7 @@ export interface UnionDeclaration {
   name: string;
   description: string | undefined;
   discriminator: string | undefined;
-  untaggedDeserializeStrategy?: "derive" | "placeholder";
+  untaggedDeserializeStrategy?: "derive" | "custom";
   variants: UnionVariant[];
 }
 
@@ -200,6 +206,11 @@ function toCamelCase(value: string): string {
   return /^[0-9]/.test(identifier) ? `N${identifier}` : identifier;
 }
 
+function toPropertyTypeName(value: string): string {
+  const leadingUnderscores = value.match(/^_+/)?.[0].length ?? 0;
+  return `${"Underscore".repeat(leadingUnderscores)}${toCamelCase(value)}`;
+}
+
 function toSnakeCase(value: string): string {
   const words = splitIntoWords(value);
   if (words.length === 0) {
@@ -213,6 +224,42 @@ function unwrapNullableSchema(
   schema: JSONSchema7,
   path: string,
 ): { schema: JSONSchema7; nullable: boolean } {
+  const openApiSchema = schema as JSONSchema7 & { nullable?: boolean };
+  const unionOptions = schema.oneOf ?? schema.anyOf;
+  const hasNullableUnionOption =
+    unionOptions?.some(
+      (option) =>
+        isSchemaObject(option) &&
+        (option as JSONSchema7 & { nullable?: boolean }).nullable === true,
+    ) ?? false;
+  if (openApiSchema.nullable === true || hasNullableUnionOption) {
+    const nonNullableSchema = {
+      ...schema,
+    } as JSONSchema7 & { nullable?: boolean };
+    delete nonNullableSchema.nullable;
+    const stripOptionNullable = (
+      option: JSONSchema7Definition,
+    ): JSONSchema7Definition => {
+      if (!isSchemaObject(option)) {
+        return option;
+      }
+      const nonNullableOption = {
+        ...option,
+      } as JSONSchema7 & { nullable?: boolean };
+      delete nonNullableOption.nullable;
+      return nonNullableOption;
+    };
+    if (nonNullableSchema.oneOf) {
+      nonNullableSchema.oneOf =
+        nonNullableSchema.oneOf.map(stripOptionNullable);
+    }
+    if (nonNullableSchema.anyOf) {
+      nonNullableSchema.anyOf =
+        nonNullableSchema.anyOf.map(stripOptionNullable);
+    }
+    return { schema: nonNullableSchema, nullable: true };
+  }
+
   if (Array.isArray(schema.type)) {
     if (schema.type.length !== 2 || !schema.type.includes("null")) {
       throw new Error(`Unsupported nullable type union at ${path}`);
@@ -479,14 +526,18 @@ function rewriteRecursiveRefs(value: unknown, definitionName: string): unknown {
 export function buildCodegenDocument(
   definitions: Record<string, JSONSchema7Definition>,
   language: TargetLanguage,
+  overrides: CodegenOverrides = {},
 ): CodegenDocument {
-  const builder = new SchemaDocumentBuilder(definitions, language);
+  const builder = new SchemaDocumentBuilder(definitions, language, overrides);
   return builder.build();
 }
 
 class SchemaDocumentBuilder {
   private readonly definitions: Record<string, JSONSchema7Definition>;
   private readonly language: TargetLanguage;
+  private readonly optionalProperties: ReadonlyMap<string, ReadonlySet<string>>;
+  private readonly untaggedUnions: ReadonlySet<string>;
+  private readonly customUntaggedDeserializers: ReadonlySet<string>;
   private readonly reservedNames = new Set<string>();
   // When a named definition is referenced as a tagged-union variant via $ref,
   // we record the discriminator metadata here so the lowered struct can omit
@@ -503,9 +554,19 @@ class SchemaDocumentBuilder {
   constructor(
     definitions: Record<string, JSONSchema7Definition>,
     language: TargetLanguage,
+    overrides: CodegenOverrides,
   ) {
     this.definitions = definitions;
     this.language = language;
+    this.optionalProperties = new Map(
+      Object.entries(overrides.optionalProperties ?? {}).map(
+        ([typeName, properties]) => [typeName, new Set(properties)],
+      ),
+    );
+    this.untaggedUnions = new Set(overrides.untaggedUnions ?? []);
+    this.customUntaggedDeserializers = new Set(
+      overrides.customUntaggedDeserializers ?? [],
+    );
   }
 
   build(): CodegenDocument {
@@ -824,7 +885,7 @@ class SchemaDocumentBuilder {
         property.nullable
           ? wrapNullableSchema(property.schema)
           : property.schema,
-        `${typeName}${toCamelCase(property.propertyName)}`,
+        `${typeName}${toPropertyTypeName(property.propertyName)}`,
         property.path,
       );
       const fieldName = this.makeStructFieldName(
@@ -1089,6 +1150,9 @@ class SchemaDocumentBuilder {
     const requiredProperties = new Set(
       Array.isArray(schema.required) ? schema.required : [],
     );
+    for (const propertyName of this.optionalProperties.get(typeName) ?? []) {
+      requiredProperties.delete(propertyName);
+    }
     // If this definition was recorded as a tagged-union variant, omit the
     // discriminator field from the lowered struct because the generated union
     // serializer emits it on the outer wrapper object. If the same definition
@@ -1118,7 +1182,7 @@ class SchemaDocumentBuilder {
 
       const lowered = this.lowerAnonymousType(
         propertySchema,
-        `${typeName}${toCamelCase(propertyName)}`,
+        `${typeName}${toPropertyTypeName(propertyName)}`,
         propertyPath,
       );
 
@@ -1161,6 +1225,7 @@ class SchemaDocumentBuilder {
     union: UnionAnalysis,
     path: string[],
   ): Declaration[] {
+    const useUntaggedRepresentation = this.untaggedUnions.has(typeName);
     const declarations: Declaration[] = [];
     for (const variant of union.variants) {
       if (!variant.inlineSchema) {
@@ -1175,10 +1240,15 @@ class SchemaDocumentBuilder {
     }
     declarations.push({
       kind: "union",
-      representation: "tagged",
+      representation: useUntaggedRepresentation ? "untagged" : "tagged",
       name: typeName,
       description: schema.description,
-      discriminator: union.discriminator,
+      discriminator: useUntaggedRepresentation
+        ? undefined
+        : union.discriminator,
+      ...(useUntaggedRepresentation
+        ? { untaggedDeserializeStrategy: "derive" as const }
+        : {}),
       variants: union.variants.map((variant) => ({
         name: getNamedVariantName(variant.typeName, variant.discriminatorValue),
         typeName: variant.typeName,
@@ -1252,20 +1322,23 @@ class SchemaDocumentBuilder {
         name: ownerTypeName,
         description: schema.description,
         discriminator: undefined,
-        untaggedDeserializeStrategy:
-          this.shouldUsePlaceholderDeserializeForUntaggedUnion(
-            schema,
-            path,
-            ownerTypeName,
-          )
-            ? "placeholder"
-            : "derive",
+        untaggedDeserializeStrategy: this.requiresCustomUntaggedDeserializer(
+          schema,
+          path,
+          ownerTypeName,
+        )
+          ? this.customUntaggedDeserializers.has(ownerTypeName)
+            ? "custom"
+            : fail(
+                `Untagged union ${ownerTypeName} requires a custom deserializer override`,
+              )
+          : "derive",
         variants,
       },
     ];
   }
 
-  private shouldUsePlaceholderDeserializeForUntaggedUnion(
+  private requiresCustomUntaggedDeserializer(
     schema: JSONSchema7,
     path: string[],
     ownerTypeName: string,
@@ -2021,10 +2094,8 @@ class SchemaDocumentBuilder {
       error instanceof Error && error.message.length > 0
         ? ` (${error.message})`
         : "";
-    // We intentionally warn instead of throwing here because some upstream
-    // schemas are still representable as untagged unions, and some generated
-    // outputs are currently patched manually after codegen. The warning makes
-    // that silent downgrade visible during generation.
+    // Ambiguous upstream unions can remain representable without a
+    // discriminator. Surface that representation downgrade during generation.
     console.warn(
       `[schema-to-code] Falling back from tagged union for ${ownerTypeName} at ${formatPath(path)}: ${reason}${errorSuffix}`,
     );
@@ -2219,7 +2290,7 @@ class SchemaDocumentBuilder {
   ): string {
     const name =
       this.language === "go"
-        ? toCamelCase(propertyName)
+        ? toPropertyTypeName(propertyName)
         : this.makeRustFieldName(propertyName, seenNames, path);
     if (this.language === "go") {
       if (seenNames.has(name)) {
@@ -2235,7 +2306,8 @@ class SchemaDocumentBuilder {
     seenNames: Set<string>,
     path: string,
   ): string {
-    const snake = toSnakeCase(rawName);
+    const leadingUnderscores = rawName.match(/^_+/)?.[0] ?? "";
+    const snake = `${leadingUnderscores}${toSnakeCase(rawName)}`;
     const identifier = RUST_KEYWORDS.has(snake) ? `r#${snake}` : snake;
     if (seenNames.has(identifier)) {
       throw new Error(`Duplicate field name ${identifier} at ${path}`);

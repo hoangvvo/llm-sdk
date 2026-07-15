@@ -17,7 +17,7 @@ import {
   AgentToolExecutionError,
 } from "./errors.ts";
 import { RunSession, type RunState } from "./run.ts";
-import type { AgentTool } from "./tool.ts";
+import type { AgentFunctionTool, AgentTool } from "./tool.ts";
 import type { Toolkit, ToolkitSession } from "./toolkit.ts";
 import type { AgentResponse, AgentStreamEvent } from "./types.ts";
 
@@ -27,6 +27,7 @@ function createMockTool<TContext = any>(
   executeFn?: (args: any, ctx: TContext, state: RunState) => any,
 ): AgentTool<TContext> {
   return {
+    type: "function",
     name,
     description: `Mock tool ${name}`,
     parameters: { type: "object", properties: {} },
@@ -907,7 +908,9 @@ suite("RunSession#run", () => {
   });
 
   test("handles tool returning error result", async (t: TestContext) => {
-    const toolExecute = t.mock.fn<AgentTool<any>["execute"]>(() => ({
+    const toolExecute = t.mock.fn<
+      AgentFunctionTool<object, Record<string, unknown>>["execute"]
+    >(() => ({
       content: [{ type: "text", text: "Error: Invalid parameters" }],
       is_error: true,
     }));
@@ -1180,6 +1183,7 @@ suite("RunSession#run", () => {
     }[] = [];
 
     const dynamicTool: AgentTool<Context, { orderId: string }> = {
+      type: "function",
       name: "lookup-order",
       description: "Lookup an order by ID",
       parameters: {
@@ -1259,6 +1263,7 @@ suite("RunSession#run", () => {
       t.assert.strictEqual(input.system_prompt, "Toolkit prompt");
       t.assert.deepStrictEqual(input.tools, [
         {
+          type: "function",
           name: "lookup-order",
           description: "Lookup an order by ID",
           parameters: dynamicTool.parameters,
@@ -1530,7 +1535,9 @@ suite("RunSession#runStream", () => {
   });
 
   test("handles multiple turns in streaming mode", async (t: TestContext) => {
-    const toolExecute = t.mock.fn<AgentTool<any>["execute"]>(() => ({
+    const toolExecute = t.mock.fn<
+      AgentFunctionTool<object, Record<string, unknown>>["execute"]
+    >(() => ({
       content: [{ type: "text", text: "Calculation done" }],
       is_error: false,
     }));
@@ -1900,6 +1907,7 @@ suite("RunSession#runStream", () => {
     let closeCalls = 0;
 
     const dynamicTool: AgentTool<Context> = {
+      type: "function",
       name: "noop",
       description: "No operation",
       parameters: {
@@ -2007,6 +2015,7 @@ suite("RunSession#runStream", () => {
       [
         [
           {
+            type: "function",
             name: "noop",
             description: "No operation",
             parameters: dynamicTool.parameters,
@@ -2016,6 +2025,7 @@ suite("RunSession#runStream", () => {
     );
     t.assert.deepStrictEqual(model.trackedStreamInputs[0]?.tools, [
       {
+        type: "function",
         name: "noop",
         description: "No operation",
         parameters: dynamicTool.parameters,

@@ -1,14 +1,13 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, RunState};
-use llm_sdk::{
-    openai::{OpenAIModel, OpenAIModelOptions},
-    JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption,
-};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
+use llm_sdk::{JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{env, error::Error, sync::Arc};
+use std::error::Error;
+
+mod common;
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -23,7 +22,7 @@ struct SearchFlightsParams {
 
 struct SearchFlightsTool;
 
-impl AgentTool<()> for SearchFlightsTool {
+impl AgentFunctionTool<()> for SearchFlightsTool {
     fn name(&self) -> String {
         "search_flights".to_string()
     }
@@ -82,7 +81,7 @@ struct SearchHotelsParams {
 
 struct SearchHotelsTool;
 
-impl AgentTool<()> for SearchHotelsTool {
+impl AgentFunctionTool<()> for SearchHotelsTool {
     fn name(&self) -> String {
         "search_hotels".to_string()
     }
@@ -133,14 +132,15 @@ impl AgentTool<()> for SearchHotelsTool {
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
-    let model = Arc::new(OpenAIModel::new(
-        "gpt-4o",
-        OpenAIModelOptions {
-            api_key: env::var("OPENAI_API_KEY")
-                .expect("OPENAI_API_KEY environment variable must be set"),
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )
+    .expect("failed to create model");
 
     // Define the response format
     let response_format = ResponseFormatOption::Json(ResponseFormatJson {

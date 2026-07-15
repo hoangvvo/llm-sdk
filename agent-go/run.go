@@ -103,7 +103,7 @@ func (s *RunSession[C]) initialize(ctx context.Context) error {
 func (s *RunSession[C]) process(
 	ctx context.Context,
 	runState *RunState,
-	tools []AgentTool[C],
+	tools []AgentFunctionTool[C],
 ) *stream.Stream[ProcessEvents] {
 	currCh := make(chan ProcessEvents)
 	errCh := make(chan error, 1)
@@ -246,7 +246,7 @@ func (s *RunSession[C]) process(
 				continue
 			}
 
-			var agentTool AgentTool[C]
+			var agentTool AgentFunctionTool[C]
 			for _, tool := range tools {
 				if tool.Name() == toolCallPart.ToolName {
 					agentTool = tool
@@ -303,7 +303,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*Ag
 
 	return traceRun(ctx, s.params.Name, "run", func(ctx context.Context) (*AgentResponse, error) {
 		state := NewRunState(request.Input, s.params.MaxTurns)
-		tools := s.getTools()
+		tools := s.getFunctionTools()
 
 		for {
 			processStream := s.process(ctx, state, tools)
@@ -355,7 +355,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 			defer close(eventChan)
 			defer close(errChan)
 
-			tools := s.getTools()
+			tools := s.getFunctionTools()
 
 			for {
 				processStream := s.process(ctx, state, tools)
@@ -453,7 +453,7 @@ func (s *RunSession[C]) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInput, []AgentTool[C]) {
+func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInput, []AgentFunctionTool[C]) {
 	input := &llmsdk.LanguageModelInput{
 		Messages:         state.getTurnMessages(),
 		ResponseFormat:   s.params.ResponseFormat,
@@ -481,26 +481,21 @@ func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInp
 		}
 	}
 
-	if len(systemPrompts) > 0 {
-		joined := strings.Join(systemPrompts, "\n")
-		input.SystemPrompt = ptr.To(joined)
-	}
-
 	tools := s.getTools()
+	functionTools := s.getFunctionToolsFrom(tools)
 
+	if len(systemPrompts) > 0 {
+		input.SystemPrompt = ptr.To(strings.Join(systemPrompts, "\n"))
+	}
 	if len(tools) > 0 {
 		sdkTools := make([]llmsdk.Tool, 0, len(tools))
 		for _, tool := range tools {
-			sdkTools = append(sdkTools, llmsdk.Tool{
-				Name:        tool.Name(),
-				Description: tool.Description(),
-				Parameters:  tool.Parameters(),
-			})
+			sdkTools = append(sdkTools, tool.ToLanguageModelTool())
 		}
 		input.Tools = sdkTools
 	}
 
-	return input, tools
+	return input, functionTools
 }
 
 func (s *RunSession[C]) getTools() []AgentTool[C] {
@@ -515,6 +510,20 @@ func (s *RunSession[C]) getTools() []AgentTool[C] {
 		}
 	}
 	return tools
+}
+
+func (s *RunSession[C]) getFunctionTools() []AgentFunctionTool[C] {
+	return s.getFunctionToolsFrom(s.getTools())
+}
+
+func (s *RunSession[C]) getFunctionToolsFrom(tools []AgentTool[C]) []AgentFunctionTool[C] {
+	functionTools := make([]AgentFunctionTool[C], 0, len(tools))
+	for _, tool := range tools {
+		if functionTool := tool.AsFunctionTool(); functionTool != nil {
+			functionTools = append(functionTools, functionTool)
+		}
+	}
+	return functionTools
 }
 
 // RunSessionRequest contains the input used for a run.

@@ -1,7 +1,7 @@
 use crate::context::{Artifact, ArtifactKind, MyContext};
 use chrono::Utc;
 use futures::future::BoxFuture;
-use llm_agent::{AgentTool, AgentToolResult};
+use llm_agent::{AgentFunctionTool, AgentToolResult};
 use llm_sdk::{JSONSchema, Part};
 use rand::RngExt;
 use serde::Deserialize;
@@ -30,7 +30,7 @@ struct ArtifactCreateParams {
 
 pub struct ArtifactCreateTool;
 
-impl AgentTool<MyContext> for ArtifactCreateTool {
+impl AgentFunctionTool<MyContext> for ArtifactCreateTool {
     fn name(&self) -> String {
         "artifact_create".to_string()
     }
@@ -88,7 +88,7 @@ struct ArtifactUpdateParams {
 
 pub struct ArtifactUpdateTool;
 
-impl AgentTool<MyContext> for ArtifactUpdateTool {
+impl AgentFunctionTool<MyContext> for ArtifactUpdateTool {
     fn name(&self) -> String {
         "artifact_update".to_string()
     }
@@ -142,7 +142,7 @@ struct ArtifactGetParams {
 }
 pub struct ArtifactGetTool;
 
-impl AgentTool<MyContext> for ArtifactGetTool {
+impl AgentFunctionTool<MyContext> for ArtifactGetTool {
     fn name(&self) -> String {
         "artifact_get".to_string()
     }
@@ -179,7 +179,7 @@ impl AgentTool<MyContext> for ArtifactGetTool {
 // artifact_list
 pub struct ArtifactListTool;
 
-impl AgentTool<MyContext> for ArtifactListTool {
+impl AgentFunctionTool<MyContext> for ArtifactListTool {
     fn name(&self) -> String {
         "artifact_list".to_string()
     }
@@ -213,7 +213,7 @@ struct ArtifactDeleteParams {
 }
 pub struct ArtifactDeleteTool;
 
-impl AgentTool<MyContext> for ArtifactDeleteTool {
+impl AgentFunctionTool<MyContext> for ArtifactDeleteTool {
     fn name(&self) -> String {
         "artifact_delete".to_string()
     }

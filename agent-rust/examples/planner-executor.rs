@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult};
+use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -8,6 +8,8 @@ use std::{
     io::Write,
     sync::{Arc, Mutex},
 };
+
+mod common;
 
 #[derive(Clone, Serialize, Deserialize)]
 struct PlanItem {
@@ -72,7 +74,7 @@ type Ctx = ();
 struct UpdatePlan {
     s: Store,
 }
-impl AgentTool<Ctx> for UpdatePlan {
+impl AgentFunctionTool<Ctx> for UpdatePlan {
     fn name(&self) -> String {
         "update_plan".into()
     }
@@ -128,13 +130,15 @@ impl AgentTool<Ctx> for UpdatePlan {
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    let model = Arc::new(llm_sdk::openai::OpenAIModel::new(
-        "gpt-4o",
-        llm_sdk::openai::OpenAIModelOptions {
-            api_key: std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set"),
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )
+    .expect("failed to create model");
 
     let store = Store::default();
     let overview = "You are a planner–executor assistant.\nBreak the user's goal into clear, \

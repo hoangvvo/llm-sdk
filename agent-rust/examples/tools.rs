@@ -1,18 +1,16 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentRequest, AgentTool, AgentToolResult};
-use llm_sdk::{
-    openai::{OpenAIModel, OpenAIModelOptions},
-    Message, Part,
-};
+use llm_agent::{Agent, AgentFunctionTool, AgentRequest, AgentToolResult};
+use llm_sdk::{Message, Part};
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
-    env,
     error::Error,
     sync::{Arc, Mutex},
 };
+
+mod common;
 
 /// Context shared across tool invocations. Tools mutate this state directly so
 /// we can showcase how agents can maintain memory without involving toolkits.
@@ -52,7 +50,7 @@ struct IntakeItemParams {
     priority: Option<String>,
 }
 
-impl AgentTool<LostAndFoundContext> for IntakeItemTool {
+impl AgentFunctionTool<LostAndFoundContext> for IntakeItemTool {
     fn name(&self) -> String {
         "intake_item".into()
     }
@@ -144,7 +142,7 @@ struct FlagContrabandParams {
     reason: String,
 }
 
-impl AgentTool<LostAndFoundContext> for FlagContrabandTool {
+impl AgentFunctionTool<LostAndFoundContext> for FlagContrabandTool {
     fn name(&self) -> String {
         "flag_contraband".into()
     }
@@ -221,7 +219,7 @@ struct IssueReceiptParams {
     traveller: String,
 }
 
-impl AgentTool<LostAndFoundContext> for IssueReceiptTool {
+impl AgentFunctionTool<LostAndFoundContext> for IssueReceiptTool {
     fn name(&self) -> String {
         "issue_receipt".into()
     }
@@ -328,14 +326,15 @@ impl AgentTool<LostAndFoundContext> for IssueReceiptTool {
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
-    let api_key = env::var("OPENAI_API_KEY")?;
-    let model = Arc::new(OpenAIModel::new(
-        "gpt-4o",
-        OpenAIModelOptions {
-            api_key,
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )
+    .expect("failed to create model");
 
     let agent = Agent::builder("WaypointClerk", model)
         .add_instruction(

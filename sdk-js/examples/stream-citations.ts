@@ -1,7 +1,9 @@
 import { StreamAccumulator } from "@hoangvvo/llm-sdk";
 import { getModel } from "./get-model.ts";
 
-const model = getModel("anthropic", "claude-opus-4-6");
+const provider = process.env["PROVIDER"] ?? "anthropic";
+const modelId = process.env["MODEL"] ?? "claude-opus-4-8";
+const model = getModel(provider, modelId);
 
 const stream = await model.stream({
   messages: [

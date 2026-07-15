@@ -1,15 +1,18 @@
-import type { JSONSchema, Part } from "@hoangvvo/llm-sdk";
+import type { JSONSchema, Part, WebSearchTool } from "@hoangvvo/llm-sdk";
 import type { RunState } from "./run.ts";
 
 /**
- * Agent tool that can be used by the agent to perform specific tasks. Any object
- * that implements the `AgentTool` interface can be used as a tool.
+ * Agent function tool that can be executed by the agent runtime.
  */
-export interface AgentTool<
+export interface AgentFunctionTool<
   TContext,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TArgs extends Record<string, unknown> = any,
 > {
+  /**
+   * Discriminator for agent-executed function tools.
+   */
+  type: "function";
   /**
    * Name of the tool.
    */
@@ -34,6 +37,16 @@ export interface AgentTool<
     state: RunState,
   ) => AgentToolResult | Promise<AgentToolResult>;
 }
+
+/**
+ * Agent tool available to the model. This can either be an agent-executed
+ * function tool or a provider-hosted web search tool.
+ */
+export type AgentTool<
+  TContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  TArgs extends Record<string, unknown> = any,
+> = AgentFunctionTool<TContext, TArgs> | WebSearchTool;
 
 export interface AgentToolResult {
   content: Part[];
@@ -66,6 +79,9 @@ export function tool<TContext, TArgs extends Record<string, unknown>>(params: {
     args: TArgs,
     ctx: TContext,
   ) => AgentToolResult | Promise<AgentToolResult>;
-}): AgentTool<TContext, TArgs> {
-  return params;
+}): AgentFunctionTool<TContext, TArgs> {
+  return {
+    type: "function",
+    ...params,
+  };
 }

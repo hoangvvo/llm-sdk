@@ -1,6 +1,8 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentItem, AgentRequest, AgentTool, AgentToolResult, InstructionParam};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, InstructionParam,
+};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -8,6 +10,9 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+mod common;
+
 // Memory pattern example: core + archival memory tools and instructions.
 
 #[derive(Clone, Default)]
@@ -73,7 +78,7 @@ type Ctx = ();
 struct CoreMemoryUpdate {
     store: Store,
 }
-impl AgentTool<Ctx> for CoreMemoryUpdate {
+impl AgentFunctionTool<Ctx> for CoreMemoryUpdate {
     fn name(&self) -> String {
         "core_memory_update".into()
     }
@@ -125,7 +130,7 @@ impl AgentTool<Ctx> for CoreMemoryUpdate {
 struct ArchivalSearch {
     store: Store,
 }
-impl AgentTool<Ctx> for ArchivalSearch {
+impl AgentFunctionTool<Ctx> for ArchivalSearch {
     fn name(&self) -> String {
         "archival_memory_search".into()
     }
@@ -167,7 +172,7 @@ impl AgentTool<Ctx> for ArchivalSearch {
 struct ArchivalUpdate {
     store: Store,
 }
-impl AgentTool<Ctx> for ArchivalUpdate {
+impl AgentFunctionTool<Ctx> for ArchivalUpdate {
     fn name(&self) -> String {
         "archival_memory_update".into()
     }
@@ -228,14 +233,15 @@ fn rand_id() -> String {
 async fn main() {
     dotenv().ok();
 
-    // Use OpenAI gpt-4o via env var OPENAI_API_KEY
-    let model = Arc::new(llm_sdk::openai::OpenAIModel::new(
-        "gpt-4o",
-        llm_sdk::openai::OpenAIModelOptions {
-            api_key: std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set"),
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )
+    .expect("failed to create model");
 
     let store = Store::default();
 

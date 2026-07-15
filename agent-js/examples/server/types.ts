@@ -3,6 +3,7 @@ import type {
   LanguageModelMetadata,
   Modality,
   ReasoningOptions,
+  WebSearchTool,
 } from "@hoangvvo/llm-sdk";
 import type { AgentRequest } from "../../src/types.ts";
 import type { MyContext } from "./context.ts";
@@ -25,6 +26,7 @@ export interface RunStreamBody {
   metadata?: LanguageModelMetadata;
   input: AgentRequest<MyContext>;
   enabled_tools?: string[];
+  web_search?: Omit<WebSearchTool, "type">;
   mcp_servers?: McpServerConfig[];
   temperature?: number;
   top_p?: number;

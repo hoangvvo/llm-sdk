@@ -150,6 +150,7 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 			defer close(errCh)
 			defer sseStream.Close()
 
+			providerToolBlockIndexes := map[int]bool{}
 			for sseStream.Next() {
 				event, err := sseStream.Current()
 				if err != nil {
@@ -183,6 +184,16 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 				}
 
 				if event.ContentBlockStart != nil {
+					block := event.ContentBlockStart.ContentBlock
+					isProviderToolBlock := block.ServerToolUse != nil ||
+						block.WebSearchToolResult != nil
+					if isProviderToolBlock {
+						// Provider-hosted tool arguments use the same input_json_delta shape as
+						// client tools. Suppress every server tool so future hosted tools are not
+						// exposed as function calls the client must execute.
+						providerToolBlockIndexes[event.ContentBlockStart.Index] = true
+						continue
+					}
 					deltas, err := mapAnthropicRawContentBlockStartEvent(*event.ContentBlockStart)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content block start: %w", err)
@@ -196,6 +207,9 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 				}
 
 				if event.ContentBlockDelta != nil {
+					if providerToolBlockIndexes[event.ContentBlockDelta.Index] {
+						continue
+					}
 					deltas, err := mapAnthropicRawContentBlockDeltaEvent(*event.ContentBlockDelta)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content block delta: %w", err)
@@ -275,14 +289,36 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 	if len(input.Tools) > 0 {
 		tools := make([]anthropicapi.CreateMessageParamsToolsItem, 0, len(input.Tools))
 		for _, tool := range input.Tools {
+			if tool.WebSearchTool != nil {
+				// The basic version supports both common options without enabling
+				// Anthropic's newer code-execution filtering flow.
+				webSearch := tool.WebSearchTool
+				anthropicWebSearch := &anthropicapi.WebSearchTool20250305{
+					Name: "web_search", Type: "web_search_20250305",
+					AllowedDomains: webSearch.AllowedDomains,
+				}
+				if webSearch.UserLocation != nil {
+					anthropicWebSearch.UserLocation = &anthropicapi.UserLocation{
+						City: webSearch.UserLocation.City, Country: webSearch.UserLocation.Country,
+						Region: webSearch.UserLocation.Region, Timezone: webSearch.UserLocation.Timezone,
+						Type: "approximate",
+					}
+				}
+				tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{WebSearchTool20250305: anthropicWebSearch})
+				continue
+			}
+			if tool.FunctionTool == nil {
+				continue
+			}
+			functionTool := tool.FunctionTool
 			strict := true
 			anthropicTool := anthropicapi.Tool{
-				Name:        tool.Name,
-				InputSchema: anthropicapi.InputSchema(tool.Parameters),
+				Name:        functionTool.Name,
+				InputSchema: anthropicapi.InputSchema(functionTool.Parameters),
 				Strict:      &strict,
 			}
-			if tool.Description != "" {
-				anthropicTool.Description = ptr.To(tool.Description)
+			if functionTool.Description != "" {
+				anthropicTool.Description = ptr.To(functionTool.Description)
 			}
 			tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{
 				Tool: &anthropicTool,
@@ -292,7 +328,7 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 	}
 
 	if input.Reasoning != nil {
-		params.Thinking = convertToAnthropicThinkingConfigParam(*input.Reasoning, maxTokens)
+		params.Thinking = convertToAnthropicThinkingConfigParam(*input.Reasoning)
 	}
 
 	return params, nil
@@ -368,10 +404,28 @@ func convertPartsToAnthropicContentBlocks(parts []llmsdk.Part) ([]anthropicapi.I
 func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputContentBlock, error) {
 	switch {
 	case part.TextPart != nil:
+		citations := make([]anthropicapi.RequestTextBlockCitationsItem, 0, len(part.TextPart.Citations))
+		for _, citation := range part.TextPart.Citations {
+			if citation.Signature == nil {
+				continue
+			}
+			citedText := ""
+			if citation.CitedText != nil {
+				citedText = *citation.CitedText
+			}
+			citations = append(citations, anthropicapi.RequestTextBlockCitationsItem{
+				WebSearchResultLocation: &anthropicapi.RequestWebSearchResultLocationCitation{
+					CitedText: citedText, EncryptedIndex: *citation.Signature,
+					Title: citation.Title, Url: citation.Source,
+				},
+			})
+		}
 		return anthropicapi.InputContentBlock{
 			Text: &anthropicapi.RequestTextBlock{
-				Type: "text",
-				Text: part.TextPart.Text,
+				Type: "text", Text: part.TextPart.Text,
+				// EncryptedIndex is the provider state Anthropic accepts when a
+				// web-search citation is returned in a later assistant message.
+				Citations: citations,
 			},
 		}, nil
 
@@ -493,22 +547,19 @@ func convertToAnthropicToolChoice(option llmsdk.ToolChoiceOption) *anthropicapi.
 	return nil
 }
 
-func convertToAnthropicThinkingConfigParam(reasoning llmsdk.ReasoningOptions, maxTokens int) *anthropicapi.ThinkingConfigParam {
+func convertToAnthropicThinkingConfigParam(reasoning llmsdk.ReasoningOptions) *anthropicapi.ThinkingConfigParam {
 	if !reasoning.Enabled {
 		return &anthropicapi.ThinkingConfigParam{Disabled: &anthropicapi.ThinkingConfigDisabled{}}
 	}
 
-	budget := maxTokens - 1
-	if reasoning.BudgetTokens != nil {
-		budget = int(*reasoning.BudgetTokens)
-	}
-	if budget < 1 {
-		budget = maxTokens - 1
+	// Without an explicit token budget, let Anthropic choose the thinking depth.
+	if reasoning.BudgetTokens == nil {
+		return &anthropicapi.ThinkingConfigParam{Adaptive: &anthropicapi.ThinkingConfigAdaptive{}}
 	}
 
 	return &anthropicapi.ThinkingConfigParam{
 		Enabled: &anthropicapi.ThinkingConfigEnabled{
-			BudgetTokens: budget,
+			BudgetTokens: int(*reasoning.BudgetTokens),
 		},
 	}
 }
@@ -572,6 +623,17 @@ func mapAnthropicTextCitations(raw []anthropicapi.ResponseTextBlockCitationsItem
 	citations := make([]llmsdk.Citation, 0, len(raw))
 
 	for _, item := range raw {
+		if item.WebSearchResultLocation != nil {
+			web := item.WebSearchResultLocation
+			if web.Url != "" {
+				citation := llmsdk.Citation{Source: web.Url, Title: web.Title, Signature: ptr.To(web.EncryptedIndex)}
+				if web.CitedText != "" {
+					citation.CitedText = ptr.To(web.CitedText)
+				}
+				citations = append(citations, citation)
+			}
+			continue
+		}
 		if item.SearchResultLocation == nil {
 			continue
 		}
@@ -582,8 +644,8 @@ func mapAnthropicTextCitations(raw []anthropicapi.ResponseTextBlockCitationsItem
 
 		citation := llmsdk.Citation{
 			Source:     source,
-			StartIndex: item.SearchResultLocation.StartBlockIndex,
-			EndIndex:   item.SearchResultLocation.EndBlockIndex,
+			StartIndex: ptr.To(item.SearchResultLocation.StartBlockIndex),
+			EndIndex:   ptr.To(item.SearchResultLocation.EndBlockIndex),
 		}
 		if item.SearchResultLocation.CitedText != "" {
 			citation.CitedText = ptr.To(item.SearchResultLocation.CitedText)
@@ -664,6 +726,20 @@ func mapAnthropicRawContentBlockDelta(raw anthropicapi.ContentBlockDeltaEventDel
 
 func mapAnthropicCitationDelta(raw anthropicapi.CitationsDeltaCitation) (*llmsdk.CitationDelta, error) {
 	citation := &llmsdk.CitationDelta{}
+	if raw.WebSearchResultLocation != nil {
+		web := raw.WebSearchResultLocation
+		if web.Url != "" {
+			citation.Source = ptr.To(web.Url)
+		}
+		if web.Title != nil && *web.Title != "" {
+			citation.Title = web.Title
+		}
+		if web.CitedText != "" {
+			citation.CitedText = ptr.To(web.CitedText)
+		}
+		citation.Signature = ptr.To(web.EncryptedIndex)
+		return citation, nil
+	}
 	if raw.SearchResultLocation != nil {
 		if raw.SearchResultLocation.Source != "" {
 			citation.Source = ptr.To(raw.SearchResultLocation.Source)

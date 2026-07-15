@@ -108,6 +108,7 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
 
       this.#tools = mcpTools.map((mcpTool) => {
         return {
+          type: "function",
           name: mcpTool.name,
           parameters: mcpTool.inputSchema,
           description: mcpTool.description ?? "",

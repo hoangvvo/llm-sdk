@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 )
 
@@ -125,12 +125,18 @@ func (t *UpdatePlanTool) Execute(_ context.Context, params json.RawMessage, _ Ct
 
 func main() {
 	godotenv.Load("../.env")
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		panic("OPENAI_API_KEY must be set")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
 	}
-
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		panic(err)
+	}
 
 	store := NewStore()
 
@@ -159,7 +165,7 @@ When the work is complete, respond with the final deliverable and a brief one-pa
 				return b.String(), nil
 			}},
 		),
-		llmagent.WithTools(&UpdatePlanTool{S: store}),
+		llmagent.WithTools(llmagent.NewAgentFunctionTool(&UpdatePlanTool{S: store})),
 		llmagent.WithMaxTurns[Ctx](20),
 	)
 

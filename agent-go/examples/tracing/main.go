@@ -9,8 +9,8 @@ import (
 	"time"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -168,12 +168,18 @@ func main() {
 		_ = tp.Shutdown(ctx)
 	}()
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable must be set")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
 	}
-
-	model := openai.NewOpenAIModel("gpt-5.4-mini", openai.OpenAIModelOptions{APIKey: apiKey})
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-luna"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		log.Fatalf("Failed to create model: %v", err)
+	}
 
 	agent := llmagent.NewAgent("Trace Assistant", model,
 		llmagent.WithInstructions(
@@ -184,7 +190,10 @@ func main() {
 				return fmt.Sprintf("When asked to contact someone, include a friendly note from %s.", c.CustomerName), nil
 			}},
 		),
-		llmagent.WithTools(&weatherTool{}, &notifyTool{}),
+		llmagent.WithTools(
+			llmagent.NewAgentFunctionTool(&weatherTool{}),
+			llmagent.NewAgentFunctionTool(&notifyTool{}),
+		),
 	)
 
 	// Run a single turn that forces both tools to execute.

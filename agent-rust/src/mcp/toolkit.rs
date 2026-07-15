@@ -3,7 +3,7 @@ use super::{
 };
 use crate::{
     errors::BoxedError,
-    tool::{AgentTool, AgentToolResult},
+    tool::{AgentFunctionTool, AgentTool, AgentToolResult},
     toolkit::{Toolkit, ToolkitSession},
     RunState,
 };
@@ -113,7 +113,7 @@ where
         None
     }
 
-    fn tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
+    fn tools(&self) -> Vec<AgentTool<TCtx>> {
         self.state.tools()
     }
 
@@ -162,7 +162,7 @@ where
     }
 }
 
-impl<TCtx> AgentTool<TCtx> for MCPRemoteTool<TCtx>
+impl<TCtx> AgentFunctionTool<TCtx> for MCPRemoteTool<TCtx>
 where
     TCtx: Send + Sync + 'static,
 {
@@ -245,7 +245,7 @@ where
     TCtx: Send + Sync + 'static,
 {
     service: Arc<OnceLock<Weak<MCPRunningService<TCtx>>>>,
-    tools: Arc<RwLock<Result<Vec<Arc<dyn AgentTool<TCtx>>>, String>>>,
+    tools: Arc<RwLock<Result<Vec<AgentTool<TCtx>>, String>>>,
 }
 
 impl<TCtx> Clone for MCPToolkitState<TCtx>
@@ -287,10 +287,10 @@ where
             .await
             .map_err(|err| Box::new(err) as BoxedError)?;
 
-        let mut new_tools: Vec<Arc<dyn AgentTool<TCtx>>> = Vec::with_capacity(specs.len());
+        let mut new_tools: Vec<AgentTool<TCtx>> = Vec::with_capacity(specs.len());
         for spec in specs {
             let remote = MCPRemoteTool::new(service, spec);
-            new_tools.push(Arc::new(remote));
+            new_tools.push(AgentTool::function(remote));
         }
 
         let mut guard = self.tools.write().expect("tool registry lock poisoned");
@@ -298,7 +298,7 @@ where
         Ok(())
     }
 
-    fn tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
+    fn tools(&self) -> Vec<AgentTool<TCtx>> {
         let guard = self.tools.read().expect("tool registry lock poisoned");
         match guard.as_ref() {
             Ok(tools) => tools.clone(),

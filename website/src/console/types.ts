@@ -3,6 +3,7 @@ import type {
   LanguageModelMetadata,
   Modality,
   ReasoningOptions,
+  WebSearchTool,
 } from "@hoangvvo/llm-sdk";
 
 export interface LoggedEvent {
@@ -37,7 +38,15 @@ export interface MyContext {
 export interface ToolInfo {
   name: string;
   description?: string;
+  providers?: string[];
 }
+
+export type WebSearchSettings = Omit<WebSearchTool, "type"> & {
+  enabled: boolean;
+};
+
+export const WEB_SEARCH_PROVIDERS = ["openai", "google", "anthropic"];
+export const WEB_SEARCH_OPTIONS_PROVIDERS = ["openai", "anthropic"];
 
 export type McpServerConfig =
   | {

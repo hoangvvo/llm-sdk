@@ -71,7 +71,7 @@ mod common;
 async fn main() {
     dotenv().ok();
 
-    let model = common::get_model("openai", "gpt-4o");
+    let model = common::get_model("openai", "gpt-5.6-terra");
 
     let response = model
         .generate(LanguageModelInput {
@@ -103,6 +103,8 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`describe-image`: Describe image](./examples/describe-image.rs)
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio.rs)
 - [`tool-use`: Function calling](./examples/tool-use.rs)
+- [`web-search`: Web search](./examples/web-search.rs)
+- [`stream-web-search`: Stream web search](./examples/stream-web-search.rs)
 - [`structured-output`: Structured output](./examples/structured-output.rs)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning.rs)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.rs)
@@ -114,6 +116,10 @@ cargo run --example generate-text
 ```
 
 ## Migration
+
+### To 0.3.0
+
+- Replace `Tool { name, description, parameters }` with `FunctionTool::new(...)`.
 
 ### To 0.2.0
 

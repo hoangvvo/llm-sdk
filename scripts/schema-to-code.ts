@@ -1,8 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import {
   buildCodegenDocument,
+  type CodegenOverrides,
   loadSchemaDocument,
   type TargetLanguage,
 } from "./schema-to-code/core.ts";
@@ -14,12 +15,20 @@ interface CliOptions {
   language: TargetLanguage;
   output: string | undefined;
   packageName: string | undefined;
+  overrides: string | undefined;
 }
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   const definitions = await loadSchemaDocument(resolve(options.input));
-  const document = buildCodegenDocument(definitions, options.language);
+  const overrides = options.overrides
+    ? await loadCodegenOverrides(resolve(options.overrides))
+    : undefined;
+  const document = buildCodegenDocument(
+    definitions,
+    options.language,
+    overrides,
+  );
 
   const rendered =
     options.language === "go"
@@ -78,7 +87,15 @@ function parseArgs(args: string[]): CliOptions {
     language,
     output: values.get("output"),
     packageName: values.get("package"),
+    overrides: values.get("overrides"),
   };
+}
+
+async function loadCodegenOverrides(
+  filePath: string,
+): Promise<CodegenOverrides> {
+  const raw = await readFile(filePath, "utf8");
+  return JSON.parse(raw) as CodegenOverrides;
 }
 
 function fail(message: string): never {

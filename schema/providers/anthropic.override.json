@@ -1,0 +1,8 @@
+{
+  "optionalProperties": {
+    "ResponseServerToolUseBlock": ["caller"],
+    "ResponseToolUseBlock": ["caller"],
+    "ResponseWebFetchToolResultBlock": ["caller"],
+    "ResponseWebSearchToolResultBlock": ["caller"]
+  }
+}

@@ -191,7 +191,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 			Name:           "test_agent",
 			Model:          model,
 			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:          llmagent.FunctionTools(tool),
 			ResponseFormat: llmsdk.NewResponseFormatText(),
 			MaxTurns:       10,
 		},
@@ -310,7 +310,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 			Name:           "test_agent",
 			Model:          model,
 			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool1, tool2},
+			Tools:          llmagent.FunctionTools(tool1, tool2),
 			ResponseFormat: llmsdk.NewResponseFormatText(),
 			MaxTurns:       10,
 		},
@@ -432,7 +432,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 			Name:           "test_agent",
 			Model:          model,
 			Instructions:   []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:          llmagent.FunctionTools(tool),
 			ResponseFormat: llmsdk.NewResponseFormatText(),
 			MaxTurns:       10,
 		},
@@ -602,7 +602,7 @@ func TestRun_ResumesToolProcessingFromToolMessageWithPartialResults(t *testing.T
 		&llmagent.AgentParams[map[string]interface{}]{
 			Name:           "resumable",
 			Model:          model,
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:          llmagent.FunctionTools(tool),
 			ResponseFormat: llmsdk.NewResponseFormatText(),
 			MaxTurns:       10,
 		},
@@ -671,7 +671,7 @@ func TestRun_ResumesToolProcessingWhenTrailingToolEntries(t *testing.T) {
 		&llmagent.AgentParams[map[string]interface{}]{
 			Name:           "resumable_tool_items",
 			Model:          model,
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:          llmagent.FunctionTools(tool),
 			ResponseFormat: llmsdk.NewResponseFormatText(),
 			MaxTurns:       10,
 		},
@@ -733,7 +733,7 @@ func TestRun_ReturnsErrorWhenToolResultsLackPrecedingAssistantContent(t *testing
 		&llmagent.AgentParams[map[string]interface{}]{
 			Name:           "resumable_error",
 			Model:          model,
-			Tools:          []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:          llmagent.FunctionTools(tool),
 			ResponseFormat: llmsdk.NewResponseFormatText(),
 			MaxTurns:       10,
 		},
@@ -803,7 +803,7 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 			Name:         "test_agent",
 			Model:        model,
 			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:        llmagent.FunctionTools(tool),
 			MaxTurns:     2,
 		},
 		map[string]interface{}{},
@@ -891,7 +891,7 @@ func TestRun_ThrowsAgentToolExecutionError_WhenToolExecutionFails(t *testing.T) 
 			Name:         "test_agent",
 			Model:        model,
 			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:        llmagent.FunctionTools(tool),
 			MaxTurns:     10,
 		},
 		map[string]interface{}{},
@@ -949,7 +949,7 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 			Name:         "test_agent",
 			Model:        model,
 			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:        llmagent.FunctionTools(tool),
 			MaxTurns:     10,
 		},
 		map[string]interface{}{},
@@ -1154,7 +1154,7 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 		Turn    uint
 	}{}
 
-	dynamicTool := NewMockTool[customerContext](
+	dynamicTool := NewMockTool(
 		"lookup-order",
 		llmagent.AgentToolResult{},
 		func(ctx context.Context, params json.RawMessage, contextVal customerContext, runState *llmagent.RunState) (llmagent.AgentToolResult, error) {
@@ -1184,7 +1184,7 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 	toolkitPrompt := "Toolkit prompt"
 	toolkitSession := &mockToolkitSession[customerContext]{
 		systemPrompt: &toolkitPrompt,
-		tools:        []llmagent.AgentTool[customerContext]{dynamicTool},
+		tools:        llmagent.FunctionTools(dynamicTool),
 	}
 
 	var createdContexts []customerContext
@@ -1247,8 +1247,8 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 		if len(input.Tools) != 1 {
 			t.Fatalf("expected 1 tool, got %d", len(input.Tools))
 		}
-		if input.Tools[0].Name != "lookup-order" {
-			t.Fatalf("unexpected tool name: %s", input.Tools[0].Name)
+		if input.Tools[0].FunctionTool == nil || input.Tools[0].FunctionTool.Name != "lookup-order" {
+			t.Fatalf("unexpected tools: %v", input.Tools)
 		}
 	}
 
@@ -1418,7 +1418,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 			Name:         "test_agent",
 			Model:        model,
 			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:        llmagent.FunctionTools(tool),
 			MaxTurns:     10,
 		},
 		map[string]interface{}{},
@@ -1609,7 +1609,7 @@ func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 			Name:         "test_agent",
 			Model:        model,
 			Instructions: []llmagent.InstructionParam[map[string]interface{}]{},
-			Tools:        []llmagent.AgentTool[map[string]interface{}]{tool},
+			Tools:        llmagent.FunctionTools(tool),
 			MaxTurns:     2,
 		},
 		map[string]interface{}{},
@@ -1665,7 +1665,7 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 	toolkitPrompt := "Streaming toolkit prompt"
 	toolkitSession := &mockToolkitSession[customerContext]{
 		systemPrompt: &toolkitPrompt,
-		tools:        []llmagent.AgentTool[customerContext]{dynamicTool},
+		tools:        llmagent.FunctionTools(dynamicTool),
 	}
 
 	var createdContexts []customerContext
@@ -1747,7 +1747,7 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 	if inputs[0].SystemPrompt == nil || *inputs[0].SystemPrompt != toolkitPrompt {
 		t.Fatalf("unexpected system prompt: %v", inputs[0].SystemPrompt)
 	}
-	if len(inputs[0].Tools) != 1 || inputs[0].Tools[0].Name != "noop" {
+	if len(inputs[0].Tools) != 1 || inputs[0].Tools[0].FunctionTool == nil || inputs[0].Tools[0].FunctionTool.Name != "noop" {
 		t.Fatalf("unexpected tools: %v", inputs[0].Tools)
 	}
 

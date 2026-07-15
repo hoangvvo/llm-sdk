@@ -11,7 +11,7 @@ use context::MyContext;
 use dotenvy::dotenv;
 use futures::{stream::Stream, StreamExt};
 use llm_agent::{mcp::MCPParams, AgentRequest, BoxedError};
-use llm_sdk::{AudioOptions, LanguageModelMetadata, Modality, ReasoningOptions};
+use llm_sdk::{AudioOptions, LanguageModelMetadata, Modality, ReasoningOptions, WebSearchTool};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Duration};
 use tower_http::cors::CorsLayer;
@@ -32,6 +32,7 @@ struct RunStreamBody {
     metadata: LanguageModelMetadata,
     input: AgentRequest<MyContext>,
     enabled_tools: Option<Vec<String>>,
+    web_search: Option<WebSearchTool>,
     mcp_servers: Option<Vec<MCPParams>>,
     temperature: Option<f64>,
     top_p: Option<f64>,
@@ -47,6 +48,8 @@ struct RunStreamBody {
 struct ToolInfo {
     name: String,
     description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    providers: Option<Vec<String>>,
 }
 
 #[derive(Clone)]
@@ -69,6 +72,7 @@ async fn run_stream_handler(
         metadata,
         input,
         enabled_tools,
+        web_search,
         mcp_servers,
         temperature,
         top_p,
@@ -99,6 +103,7 @@ async fn run_stream_handler(
 
     let options = AgentOptions {
         enabled_tools,
+        web_search,
         mcp_servers,
         temperature,
         top_p,
@@ -179,9 +184,9 @@ async fn main() -> Result<(), BoxedError> {
         .map(|tool| ToolInfo {
             name: tool.name(),
             description: tool.description(),
+            providers: None,
         })
-        .collect();
-
+        .collect::<Vec<_>>();
     let state = AppState { available_tools };
 
     let app_url = env::var("APP_URL").unwrap_or_else(|_| "http://localhost:4321".to_string());

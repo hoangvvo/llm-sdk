@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/examples"
@@ -115,7 +116,15 @@ Tags: breakfast, easy, kid-friendly`
 		"additionalProperties": false,
 	}
 
-	model := examples.GetModel("openai", "gpt-4o")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
+	}
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model := examples.GetModel(provider, modelID)
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		SystemPrompt: ptr.To("You are a helpful assistant that extracts structured data from text according to a provided JSON schema."),

@@ -12,8 +12,8 @@ import (
 	dmp "github.com/sergi/go-diff/diffmatchpatch"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 	"github.com/sanity-io/litter"
 )
@@ -245,11 +245,18 @@ func (t *ArtifactDeleteTool) Execute(_ context.Context, params json.RawMessage, 
 
 func main() {
 	godotenv.Load("../.env")
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY must be set")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
 	}
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		log.Fatalf("Failed to create model: %v", err)
+	}
 
 	store := NewStore()
 
@@ -262,11 +269,11 @@ func main() {
 			llmagent.InstructionParam[Ctx]{String: &rules},
 		),
 		llmagent.WithTools(
-			&ArtifactCreateTool{S: store},
-			&ArtifactUpdateTool{S: store},
-			&ArtifactGetTool{S: store},
-			&ArtifactListTool{S: store},
-			&ArtifactDeleteTool{S: store},
+			llmagent.NewAgentFunctionTool(&ArtifactCreateTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArtifactUpdateTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArtifactGetTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArtifactListTool{S: store}),
+			llmagent.NewAgentFunctionTool(&ArtifactDeleteTool{S: store}),
 		),
 	)
 

@@ -10,6 +10,7 @@ import type {
   LanguageModel,
   Modality,
   ReasoningOptions,
+  WebSearchTool,
 } from "@hoangvvo/llm-sdk";
 import { getArtifactTools } from "./artifacts.tools.ts";
 import type { MyContext } from "./context.ts";
@@ -42,6 +43,7 @@ export const availableTools: AgentTool<MyContext>[] = [
 
 export interface AgentOptions {
   enabledTools?: string[];
+  webSearch?: Omit<WebSearchTool, "type">;
   temperature?: number;
   top_p?: number;
   top_k?: number;
@@ -59,13 +61,18 @@ export function createAgent(
   model: LanguageModel,
   options?: AgentOptions,
 ): Agent<MyContext> {
-  const { enabledTools, mcpServers, ...agentParams } = options ?? {};
+  const { enabledTools, webSearch, mcpServers, ...agentParams } = options ?? {};
 
   const toolNameSet = enabledTools ? new Set(enabledTools) : null;
-  const tools =
+  const tools: AgentTool<MyContext>[] =
     toolNameSet === null
-      ? availableTools
-      : availableTools.filter((tool) => toolNameSet.has(tool.name));
+      ? [...availableTools]
+      : availableTools.filter(
+          (tool) => tool.type === "function" && toolNameSet.has(tool.name),
+        );
+  if (webSearch) {
+    tools.push({ ...webSearch, type: "web_search" });
+  }
   const mcpToolkits = createMcpToolkits(mcpServers);
 
   return new Agent<MyContext>({

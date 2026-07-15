@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
+	"github.com/hoangvvo/llm-sdk/agent-go/examples"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 	"github.com/sanity-io/litter"
 )
@@ -101,11 +101,11 @@ func (unlockArtifactTool) Execute(ctx context.Context, raw json.RawMessage, stat
 
 func newAgent(model llmsdk.LanguageModel) *llmagent.Agent[*vaultContext] {
 	instruction := "You supervise the Eon Vault, safeguarding experimental expedition technology."
-	return llmagent.NewAgent[*vaultContext](
+	return llmagent.NewAgent(
 		"VaultSentinel",
 		model,
 		llmagent.WithInstructions(llmagent.InstructionParam[*vaultContext]{String: &instruction}),
-		llmagent.WithTools(unlockArtifactTool{}),
+		llmagent.WithTools(llmagent.NewAgentFunctionTool(unlockArtifactTool{})),
 	)
 }
 
@@ -196,12 +196,18 @@ func main() {
 		log.Fatalf("load env: %v", err)
 	}
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable must be set")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai"
 	}
-
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{APIKey: apiKey})
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-5.6-terra"
+	}
+	model, err := examples.GetModel(provider, modelID, llmsdk.LanguageModelMetadata{}, "")
+	if err != nil {
+		log.Fatalf("Failed to create model: %v", err)
+	}
 	agent := newAgent(model)
 
 	initialText := "We have an emergency launch window in four hours. Please unlock the Starlight Compass for the Horizon survey team."

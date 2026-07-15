@@ -1,0 +1,88 @@
+---
+title: Web search
+---
+
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goStreamWebSearchCode from "../../../../../sdk-go/examples/stream-web-search/main.go?raw";
+import goWebSearchCode from "../../../../../sdk-go/examples/web-search/main.go?raw";
+import jsStreamWebSearchCode from "../../../../../sdk-js/examples/stream-web-search.ts?raw";
+import jsWebSearchCode from "../../../../../sdk-js/examples/web-search.ts?raw";
+import rustStreamWebSearchCode from "../../../../../sdk-rust/examples/stream-web-search.rs?raw";
+import rustWebSearchCode from "../../../../../sdk-rust/examples/web-search.rs?raw";
+import {
+  extractGoTypes,
+  extractRustTypes,
+  extractTypescriptTypes,
+} from "../../../utils/extract-types.ts";
+
+Web search lets a model retrieve current information with a provider-hosted tool. Add a `WebSearchTool` to the request; the provider executes the search and the SDK returns the answer as text with normalized [`Citation`](../language-model/#citation) metadata.
+
+## Configure web search
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["WebSearchTool", "WebSearchUserLocation"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes(["WebSearchTool", "WebSearchUserLocation"])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes(["WebSearchTool", "WebSearchUserLocation"])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
+
+`allowed_domains` restricts results to specific domains, while `user_location` provides an approximate location for localized results. OpenAI and Anthropic support both options. Google supports the base web search tool and rejects these options rather than silently ignoring them.
+
+Web search is supported by OpenAI Responses, Anthropic Messages, and Google GenerateContent. It is not supported by the OpenAI Chat Completions, Cohere V2 Chat, or Mistral Chat Completions adapters.
+
+## Generate with web search
+
+The example defaults to OpenAI. Set `PROVIDER` and `MODEL` to run the same code with another supported provider and model.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsWebSearchCode} lang="typescript" title="web-search.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustWebSearchCode} lang="rust" title="web-search.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goWebSearchCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Stream with web search
+
+Streaming returns citation deltas with the text deltas. The accumulator combines them into citations on the final text parts.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsStreamWebSearchCode}
+      lang="typescript"
+      title="stream-web-search.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={rustStreamWebSearchCode}
+      lang="rust"
+      title="stream-web-search.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goStreamWebSearchCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>

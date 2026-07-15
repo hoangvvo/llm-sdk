@@ -159,7 +159,7 @@ func main() {
 		log.Fatal("OPENAI_API_KEY environment variable must be set")
 	}
 
-	model := openai.NewOpenAIModel("gpt-4o", openai.OpenAIModelOptions{
+	model := openai.NewOpenAIModel("gpt-5.6-terra", openai.OpenAIModelOptions{
 		APIKey: apiKey,
 	})
 
@@ -184,8 +184,8 @@ func main() {
 			llmagent.InstructionParam[MyContext]{Func: dynamicInstruction},
 		),
 		llmagent.WithTools(
-			&GetWeatherTool{},
-			&SendMessageTool{},
+			llmagent.NewAgentFunctionTool(&GetWeatherTool{}),
+			llmagent.NewAgentFunctionTool(&SendMessageTool{}),
 		),
 	)
 
@@ -252,6 +252,12 @@ go run ./examples/agent
 ```
 
 An example server that exposes an API to interact with the agent can be found in [examples/server](./examples/server). This can be used to test the agent with the [console application](../website).
+
+## Migration
+
+### To 0.3.0
+
+- Wrap function tools passed to `WithTools` with `NewAgentFunctionTool`.
 
 ## License
 

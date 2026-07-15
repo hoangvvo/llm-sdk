@@ -67,6 +67,8 @@ func (p Part) Type() PartType {
 type TextPart struct {
 	Text      string     `json:"text"`
 	Citations []Citation `json:"citations,omitempty"`
+	// An opaque provider signature used to preserve text-part continuity when returning the part to the same provider.
+	Signature *string `json:"signature,omitempty"`
 }
 
 // ImagePart represents a part of the message that contains an image.
@@ -155,9 +157,11 @@ type Citation struct {
 	// The text snippet from the document being cited.
 	CitedText *string `json:"cited_text,omitempty"`
 	// The start index of the document content part being cited.
-	StartIndex int `json:"start_index"`
+	StartIndex *int `json:"start_index,omitempty"`
 	// The end index of the document content part being cited.
-	EndIndex int `json:"end_index"`
+	EndIndex *int `json:"end_index,omitempty"`
+	// An opaque provider signature used to preserve citation continuity when returning it to the same provider.
+	Signature *string `json:"signature,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Part
@@ -298,8 +302,9 @@ type PartDelta struct {
 
 // TextPartDelta represents a delta update for a text part, used in streaming or incremental updates of a message.
 type TextPartDelta struct {
-	Text     string         `json:"text"`
-	Citation *CitationDelta `json:"citation,omitempty"`
+	Text      string         `json:"text"`
+	Citation  *CitationDelta `json:"citation,omitempty"`
+	Signature *string        `json:"signature,omitempty"`
 }
 
 // CitationDelta represents a delta update for a citation part, used in streaming of citation messages.
@@ -309,6 +314,7 @@ type CitationDelta struct {
 	CitedText  *string `json:"cited_text,omitempty"`
 	StartIndex *int    `json:"start_index,omitempty"`
 	EndIndex   *int    `json:"end_index,omitempty"`
+	Signature  *string `json:"signature,omitempty"`
 }
 
 func (c CitationDelta) MarshalJSON() ([]byte, error) {
@@ -742,12 +748,108 @@ type JSONSchema map[string]any
 
 // Tool represents a tool that can be used by the model.
 type Tool struct {
+	FunctionTool  *FunctionTool  `json:"-"`
+	WebSearchTool *WebSearchTool `json:"-"`
+}
+
+type ToolType string
+
+const (
+	ToolTypeFunction  ToolType = "function"
+	ToolTypeWebSearch ToolType = "web_search"
+)
+
+func (t Tool) Type() ToolType {
+	switch {
+	case t.FunctionTool != nil:
+		return ToolTypeFunction
+	case t.WebSearchTool != nil:
+		return ToolTypeWebSearch
+	default:
+		return ""
+	}
+}
+
+// FunctionTool represents a client-executed function tool that can be used by the model.
+type FunctionTool struct {
 	// The name of the tool.
 	Name string `json:"name"`
 	// A description of the tool.
 	Description string `json:"description"`
 	// The JSON schema of the parameters that the tool accepts. The type must be "object".
 	Parameters JSONSchema `json:"parameters"`
+}
+
+// WebSearchTool represents a provider-hosted web search tool.
+type WebSearchTool struct {
+	// Restricts search results to these domains when supported by the provider.
+	AllowedDomains []string `json:"allowed_domains,omitempty"`
+	// An approximate user location used to localize web search results.
+	UserLocation *WebSearchUserLocation `json:"user_location,omitempty"`
+}
+
+// WebSearchUserLocation is an approximate user location used to localize web search results.
+type WebSearchUserLocation struct {
+	// The city of the user.
+	City *string `json:"city,omitempty"`
+	// The region or state of the user.
+	Region *string `json:"region,omitempty"`
+	// The two-letter ISO 3166-1 country code of the user.
+	Country *string `json:"country,omitempty"`
+	// The IANA timezone of the user.
+	Timezone *string `json:"timezone,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for Tool.
+func (t Tool) MarshalJSON() ([]byte, error) {
+	if t.FunctionTool != nil {
+		return json.Marshal(struct {
+			Type ToolType `json:"type"`
+			*FunctionTool
+		}{
+			Type:         ToolTypeFunction,
+			FunctionTool: t.FunctionTool,
+		})
+	}
+	if t.WebSearchTool != nil {
+		return json.Marshal(struct {
+			Type ToolType `json:"type"`
+			*WebSearchTool
+		}{
+			Type:          ToolTypeWebSearch,
+			WebSearchTool: t.WebSearchTool,
+		})
+	}
+	return nil, fmt.Errorf("tool has no content")
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Tool.
+func (t *Tool) UnmarshalJSON(data []byte) error {
+	var temp struct {
+		Type ToolType `json:"type"`
+	}
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	switch temp.Type {
+	case ToolTypeFunction:
+		var tool FunctionTool
+		if err := json.Unmarshal(data, &tool); err != nil {
+			return err
+		}
+		t.FunctionTool = &tool
+	case ToolTypeWebSearch:
+		var tool WebSearchTool
+		if err := json.Unmarshal(data, &tool); err != nil {
+			return err
+		}
+		t.WebSearchTool = &tool
+	default:
+		return fmt.Errorf("unknown tool type: %s", temp.Type)
+	}
+
+	return nil
 }
 
 // ModelTokensDetails represents the token usage details of the model.

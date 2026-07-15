@@ -83,9 +83,12 @@ const unlockArtifact = zodTool({
   },
 });
 
+const provider = process.env["PROVIDER"] ?? "openai";
+const modelId = process.env["MODEL"] ?? "gpt-5.6-terra";
+
 const sentinel = new Agent<VaultContext>({
   name: "VaultSentinel",
-  model: getModel("openai", "gpt-4o"),
+  model: getModel(provider, modelId),
   instructions: [
     "You supervise the Eon Vault, safeguarding experimental expedition technology.",
   ],

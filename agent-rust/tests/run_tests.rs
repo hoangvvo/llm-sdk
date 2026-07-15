@@ -3,9 +3,9 @@ use std::sync::Arc;
 type DynError = Box<dyn std::error::Error + Send + Sync>;
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use llm_agent::{
-    AgentError, AgentItem, AgentItemTool, AgentParams, AgentResponse, AgentStreamEvent,
-    AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam, RunSession,
-    RunSessionRequest, RunState, Toolkit, ToolkitSession,
+    AgentError, AgentFunctionTool, AgentItem, AgentItemTool, AgentParams, AgentResponse,
+    AgentStreamEvent, AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam,
+    RunSession, RunSessionRequest, RunState, Toolkit, ToolkitSession,
 };
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
@@ -63,14 +63,14 @@ impl MockTool {
 
 struct MockToolkitSessionState<TCtx> {
     system_prompt: Option<String>,
-    tools: Vec<Arc<dyn AgentTool<TCtx>>>,
+    tools: Vec<AgentTool<TCtx>>,
     system_prompt_calls: std::sync::Mutex<usize>,
     tools_calls: std::sync::Mutex<usize>,
     close_calls: std::sync::Mutex<usize>,
 }
 
 impl<TCtx> MockToolkitSessionState<TCtx> {
-    fn new(system_prompt: Option<String>, tools: Vec<Arc<dyn AgentTool<TCtx>>>) -> Arc<Self> {
+    fn new(system_prompt: Option<String>, tools: Vec<AgentTool<TCtx>>) -> Arc<Self> {
         Arc::new(Self {
             system_prompt,
             tools,
@@ -99,7 +99,7 @@ where
         self.state.system_prompt.clone()
     }
 
-    fn tools(&self) -> Vec<Arc<dyn AgentTool<TCtx>>> {
+    fn tools(&self) -> Vec<AgentTool<TCtx>> {
         let mut calls = self.state.tools_calls.lock().unwrap();
         *calls += 1;
         self.state.tools.clone()
@@ -176,7 +176,7 @@ impl LookupOrderTool {
     }
 }
 
-impl AgentTool<CustomerContext> for LookupOrderTool {
+impl AgentFunctionTool<CustomerContext> for LookupOrderTool {
     fn name(&self) -> String {
         "lookup-order".to_string()
     }
@@ -225,7 +225,7 @@ impl AgentTool<CustomerContext> for LookupOrderTool {
     }
 }
 
-impl AgentTool<()> for MockTool {
+impl AgentFunctionTool<()> for MockTool {
     fn name(&self) -> String {
         self.name.clone()
     }
@@ -1090,10 +1090,10 @@ async fn run_merges_toolkit_prompts_and_tools() {
         ..Default::default()
     });
 
-    let lookup_tool = Arc::new(LookupOrderTool::new());
+    let lookup_tool = LookupOrderTool::new();
     let toolkit_session_state = MockToolkitSessionState::new(
         Some("Toolkit prompt".to_string()),
-        vec![lookup_tool.clone()],
+        vec![AgentTool::function(lookup_tool.clone())],
     );
     let toolkit = MockToolkit::new(toolkit_session_state.clone());
     let contexts_handle = toolkit.created_contexts.clone();
@@ -1134,7 +1134,10 @@ async fn run_merges_toolkit_prompts_and_tools() {
         assert_eq!(input.system_prompt, Some("Toolkit prompt".to_string()));
         let tools = input.tools.expect("tools present");
         assert_eq!(tools.len(), 1);
-        assert_eq!(tools[0].name, "lookup-order");
+        assert!(matches!(
+            &tools[0],
+            llm_sdk::Tool::Function(tool) if tool.name == "lookup-order"
+        ));
     }
 
     let expected = AgentResponse {
@@ -1266,10 +1269,10 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
         ..Default::default()
     }]);
 
-    let lookup_tool = Arc::new(LookupOrderTool::new());
+    let lookup_tool = LookupOrderTool::new();
     let toolkit_session_state = MockToolkitSessionState::new(
         Some("Streaming toolkit prompt".to_string()),
-        vec![lookup_tool.clone()],
+        vec![AgentTool::function(lookup_tool.clone())],
     );
     let toolkit = MockToolkit::new(toolkit_session_state.clone());
     let contexts_handle = toolkit.created_contexts.clone();
@@ -1334,7 +1337,10 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
     );
     let tools = input.tools.clone().expect("tools present");
     assert_eq!(tools.len(), 1);
-    assert_eq!(tools[0].name, "lookup-order");
+    assert!(matches!(
+        &tools[0],
+        llm_sdk::Tool::Function(tool) if tool.name == "lookup-order"
+    ));
 
     close_run_session(session).await;
 

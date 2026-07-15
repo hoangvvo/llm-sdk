@@ -1,6 +1,6 @@
 import type { JSONSchema } from "@hoangvvo/llm-sdk";
 import { type Static, type TObject } from "typebox";
-import { type AgentToolResult } from "../tool.ts";
+import { type AgentFunctionTool, type AgentToolResult } from "../tool.ts";
 
 export function typeboxTool<TContext, TSchema extends TObject>(params: {
   /**
@@ -25,14 +25,10 @@ export function typeboxTool<TContext, TSchema extends TObject>(params: {
     args: Static<TSchema>,
     context: TContext,
   ): AgentToolResult | Promise<AgentToolResult>;
-}) {
-  return params as {
-    name: string;
-    description: string;
-    parameters: JSONSchema;
-    execute(
-      args: Static<TSchema>,
-      context: TContext,
-    ): AgentToolResult | Promise<AgentToolResult>;
+}): AgentFunctionTool<TContext, Static<TSchema>> {
+  return {
+    type: "function",
+    ...params,
+    parameters: params.parameters as JSONSchema,
   };
 }

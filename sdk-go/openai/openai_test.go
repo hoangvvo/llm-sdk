@@ -22,20 +22,19 @@ func TestMain(m *testing.M) {
 		panic("OPENAI_API_KEY must be set")
 	}
 
-	model = openai.NewOpenAIModel("gpt-5.4", openai.OpenAIModelOptions{
+	model = openai.NewOpenAIModel("gpt-5.6-sol", openai.OpenAIModelOptions{
 		APIKey: apiKey,
 	})
 	reasoningModel = openai.NewOpenAIModel("o1", openai.OpenAIModelOptions{
 		APIKey: apiKey,
 	})
 
-	chatModel = openai.NewOpenAIChatModel("gpt-4o", openai.OpenAIChatModelOptions{
+	chatModel = openai.NewOpenAIChatModel("gpt-5.6-terra", openai.OpenAIChatModelOptions{
 		APIKey: apiKey,
 	})
 	audioChatModel = openai.NewOpenAIChatModel("gpt-audio-1.5", openai.OpenAIChatModelOptions{
 		APIKey: apiKey,
 	})
-
 	m.Run()
 }
 
@@ -89,6 +88,14 @@ func TestStructuredResponseFormat(t *testing.T) {
 
 func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
+}
+
+func TestGenerateWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "generate_web_search")
+}
+
+func TestStreamWebSearch(t *testing.T) {
+	testcommon.RunTestCase(t, model, "stream_web_search")
 }
 func TestGenerateImage(t *testing.T) {
 	testcommon.RunTestCase(t, model, "generate_image")

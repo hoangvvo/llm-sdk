@@ -14,7 +14,7 @@ fn openai_api_key() -> &'static String {
 
 fn openai_model() -> OpenAIModel {
     OpenAIModel::new(
-        "gpt-5.4".to_string(),
+        "gpt-5.6-sol".to_string(),
         OpenAIModelOptions {
             api_key: openai_api_key().clone(),
             ..Default::default()
@@ -57,6 +57,10 @@ test_set!(openai_model(), stream_parallel_tool_calls_same_name);
 test_set!(openai_model(), structured_response_format);
 
 test_set!(openai_model(), source_part_input);
+
+test_set!(openai_model(), generate_web_search);
+
+test_set!(openai_model(), stream_web_search);
 
 test_set!(openai_model(), generate_image);
 

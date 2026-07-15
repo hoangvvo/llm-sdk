@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"log"
+	"os"
 	"os/exec"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
@@ -14,7 +15,15 @@ import (
 )
 
 func main() {
-	model := examples.GetModel("openai-chat-completion", "gpt-audio-1.5")
+	provider := os.Getenv("PROVIDER")
+	if provider == "" {
+		provider = "openai-chat-completion"
+	}
+	modelID := os.Getenv("MODEL")
+	if modelID == "" {
+		modelID = "gpt-audio-1.5"
+	}
+	model := examples.GetModel(provider, modelID)
 
 	response, err := model.Generate(context.Background(), &llmsdk.LanguageModelInput{
 		Modalities: []llmsdk.Modality{llmsdk.ModalityText, llmsdk.ModalityAudio},

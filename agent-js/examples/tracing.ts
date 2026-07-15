@@ -12,14 +12,14 @@ import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { getModel } from "./get-model.ts";
 
-const provider = new NodeTracerProvider({
+const telemetryProvider = new NodeTracerProvider({
   resource: resourceFromAttributes({
     "service.name": "agent-js-tracing-example",
   }),
   spanProcessors: [new SimpleSpanProcessor(new OTLPTraceExporter())],
 });
 
-provider.register();
+telemetryProvider.register();
 
 // We'll use this tracer inside tool implementations for nested spans.
 const tracer = trace.getTracer("examples/agent-js/tracing");
@@ -28,7 +28,9 @@ interface AgentContext {
   customer_name: string;
 }
 
-const model = getModel("openai", "gpt-5.4-mini");
+const provider = process.env["PROVIDER"] ?? "openai";
+const modelId = process.env["MODEL"] ?? "gpt-5.6-luna";
+const model = getModel(provider, modelId);
 
 const getWeatherTool = tool({
   name: "get_weather",
@@ -162,6 +164,6 @@ const response: AgentResponse = await agent.run({
 
 console.log(JSON.stringify(response.content, null, 2));
 
-await provider.forceFlush();
+await telemetryProvider.forceFlush();
 
-await provider.shutdown();
+await telemetryProvider.shutdown();

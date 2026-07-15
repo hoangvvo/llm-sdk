@@ -31,7 +31,7 @@ func MapMimeTypeToAudioFormat(mimeType string) (llmsdk.AudioFormat, error) {
 		mimeType = strings.TrimSpace(mimeType[:idx])
 	}
 	for format, mt := range audioFormatToMimeTypeMap {
-		if mimeType == mt {
+		if strings.EqualFold(mimeType, mt) {
 			return format, nil
 		}
 	}

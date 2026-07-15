@@ -12,6 +12,7 @@ import (
 type accumulatedTextData struct {
 	Text      string
 	Citations map[int]CitationDelta
+	Signature *string
 }
 
 // accumulatedImageData represents accumulated image data
@@ -48,7 +49,8 @@ func newDelta(delta ContentDelta) *accumulatedData {
 	case delta.Part.TextPartDelta != nil:
 		textDelta := delta.Part.TextPartDelta
 		textData := &accumulatedTextData{
-			Text: textDelta.Text,
+			Text:      textDelta.Text,
+			Signature: textDelta.Signature,
 		}
 		if textDelta.Citation != nil {
 			textData.Citations = make(map[int]CitationDelta)
@@ -119,6 +121,9 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 			}
 			citationIndex := len(existingData.Citations)
 			existingData.Citations[citationIndex] = *textPartDelta.Citation
+		}
+		if textPartDelta.Signature != nil {
+			existingData.Signature = textPartDelta.Signature
 		}
 	case existing.ToolCall != nil:
 		toolCallPartDelta := delta.Part.ToolCallPartDelta
@@ -227,23 +232,22 @@ func createTextPart(data *accumulatedTextData, index int) (Part, error) {
 		citations := make([]Citation, 0, len(indices))
 		for _, citationIndex := range indices {
 			citationDelta := data.Citations[citationIndex]
-			if citationDelta.Source == nil || citationDelta.StartIndex == nil || citationDelta.EndIndex == nil {
+			if citationDelta.Source == nil {
 				return Part{}, NewInvariantError(
 					"",
 					fmt.Sprintf(
-						"Incomplete citation data for text part at index %d: source=%v, start_index=%v, end_index=%v",
+						"Incomplete citation data for text part at index %d: source=%v",
 						index,
 						citationDelta.Source,
-						citationDelta.StartIndex,
-						citationDelta.EndIndex,
 					),
 				)
 			}
 
 			citation := Citation{
 				Source:     *citationDelta.Source,
-				StartIndex: *citationDelta.StartIndex,
-				EndIndex:   *citationDelta.EndIndex,
+				StartIndex: citationDelta.StartIndex,
+				EndIndex:   citationDelta.EndIndex,
+				Signature:  citationDelta.Signature,
 			}
 			if citationDelta.Title != nil {
 				citation.Title = citationDelta.Title
@@ -257,6 +261,9 @@ func createTextPart(data *accumulatedTextData, index int) (Part, error) {
 		if len(citations) > 0 {
 			opts = append(opts, WithTextCitations(citations))
 		}
+	}
+	if data.Signature != nil {
+		opts = append(opts, WithTextSignature(*data.Signature))
 	}
 
 	return NewTextPart(data.Text, opts...), nil

@@ -1,22 +1,21 @@
 use dotenvy::dotenv;
 use futures::{future::BoxFuture, StreamExt};
 use llm_agent::{
-    Agent, AgentError, AgentItem, AgentRequest, AgentStreamEvent, AgentTool, AgentToolResult,
+    Agent, AgentError, AgentFunctionTool, AgentItem, AgentRequest, AgentStreamEvent,
+    AgentToolResult,
 };
-use llm_sdk::{
-    openai::{OpenAIModel, OpenAIModelOptions},
-    Message, Part,
-};
+use llm_sdk::{Message, Part};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    env,
     error::Error,
     fmt,
     io::{self, Write},
     sync::{Arc, Mutex},
 };
+
+mod common;
 
 // Human-in-the-loop outline with agent primitives:
 // 1. Seed the run with a user `AgentItem` and call `Agent::run_stream` so we
@@ -86,7 +85,7 @@ struct UnlockArtifactArgs {
     artifact: String,
 }
 
-impl AgentTool<VaultContext> for UnlockArtifactTool {
+impl AgentFunctionTool<VaultContext> for UnlockArtifactTool {
     fn name(&self) -> String {
         "unlock_artifact".into()
     }
@@ -271,14 +270,15 @@ fn message_role(message: &Message) -> &'static str {
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     dotenv().ok();
 
-    let api_key = env::var("OPENAI_API_KEY")?;
-    let model = Arc::new(OpenAIModel::new(
-        "gpt-4o",
-        OpenAIModelOptions {
-            api_key,
-            ..Default::default()
-        },
-    ));
+    let provider = std::env::var("PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    let model_id = std::env::var("MODEL").unwrap_or_else(|_| "gpt-5.6-terra".to_string());
+    let model = common::get_model(
+        &provider,
+        &model_id,
+        llm_sdk::LanguageModelMetadata::default(),
+        None,
+    )
+    .expect("failed to create model");
 
     let agent = build_agent(model);
     let mut transcript = initial_transcript();

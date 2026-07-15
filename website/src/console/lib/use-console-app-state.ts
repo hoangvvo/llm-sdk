@@ -19,6 +19,7 @@ import type {
   McpServerConfig,
   ModelInfo,
   ToolInfo,
+  WebSearchSettings,
 } from "../types.ts";
 import { normalizeBaseUrl, parseExampleServerUrls } from "./example-server.ts";
 import { useFetchInitialData } from "./use-fetch-initial-data.ts";
@@ -48,6 +49,7 @@ export const STORAGE_KEY_MODEL = "console-selected-model";
 export const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
 export const STORAGE_KEY_CONTEXT = "console-user-context";
 export const STORAGE_KEY_ENABLED_TOOLS = "console-enabled-tools";
+export const STORAGE_KEY_WEB_SEARCH = "console-web-search";
 export const STORAGE_KEY_AGENT_BEHAVIOR = "console-agent-behavior";
 export const STORAGE_KEY_MCP_SERVERS = "console-mcp-servers";
 
@@ -104,6 +106,26 @@ function readProviderApiKeys(modelOptions: ModelOption[]): ApiKeys {
   return next;
 }
 
+function createInitialWebSearchSettings(): WebSearchSettings {
+  if (typeof window === "undefined") {
+    return { enabled: true };
+  }
+
+  const storedTools = window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLS);
+  if (storedTools === null) {
+    return { enabled: true };
+  }
+
+  try {
+    const parsed = JSON.parse(storedTools) as unknown;
+    return {
+      enabled: Array.isArray(parsed) && parsed.includes("web_search"),
+    };
+  } catch {
+    return { enabled: true };
+  }
+}
+
 function getModelSelectionKey(
   selection: ModelSelection | null | undefined,
 ): string | null {
@@ -158,6 +180,8 @@ export interface ConsoleAppState<Context> {
   toolsInitialized: boolean;
   enabledTools: string[];
   handleEnabledToolsChange: (tools: string[]) => void;
+  webSearch: WebSearchSettings;
+  setWebSearch: Dispatch<SetStateAction<WebSearchSettings>>;
   mcpServers: McpServerConfig[];
   handleMcpServersChange: (servers: McpServerConfig[]) => void;
   agentBehavior: AgentBehaviorSettings;
@@ -222,6 +246,10 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     STORAGE_KEY_ENABLED_TOOLS,
     () => [],
   );
+  const [webSearch, setWebSearch] = useLocalStorageState<WebSearchSettings>(
+    STORAGE_KEY_WEB_SEARCH,
+    createInitialWebSearchSettings,
+  );
   const [agentBehavior, setAgentBehavior] =
     useLocalStorageState<AgentBehaviorSettings>(
       STORAGE_KEY_AGENT_BEHAVIOR,
@@ -236,7 +264,7 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     () => [],
   );
 
-  const [hasStoredToolPreference] = useState(() => {
+  const [hasStoredToolPreference, setHasStoredToolPreference] = useState(() => {
     if (typeof window === "undefined") {
       return false;
     }
@@ -283,22 +311,52 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     [],
   );
 
-  const toolOptions = useMemo(() => toolsData ?? [], [toolsData]);
+  const toolOptions = useMemo(
+    () =>
+      (toolsData ?? []).filter(
+        (tool) =>
+          !tool.providers ||
+          !modelSelection ||
+          tool.providers.includes(modelSelection.provider),
+      ),
+    [modelSelection, toolsData],
+  );
   const toolsInitialized = toolsData !== null || toolsError !== null;
 
   const handleEnabledToolsChange = useCallback(
     (next: string[]) => {
-      const toolNames = toolOptions.map((tool) => tool.name);
-      const toolNameSet = new Set(toolNames);
-      const allowed = new Set(next.filter((name) => toolNameSet.has(name)));
-      const normalized = toolNames.filter((name) => allowed.has(name));
+      const allToolNames = (toolsData ?? []).map((tool) => tool.name);
+      const visibleToolNames = new Set(toolOptions.map((tool) => tool.name));
+      const nextVisibleTools = new Set(next);
+      const selectedTools = new Set(
+        enabledTools.length > 0 || hasStoredToolPreference
+          ? enabledTools
+          : allToolNames,
+      );
+
+      for (const name of visibleToolNames) {
+        if (nextVisibleTools.has(name)) {
+          selectedTools.add(name);
+        } else {
+          selectedTools.delete(name);
+        }
+      }
+
+      const normalized = allToolNames.filter((name) => selectedTools.has(name));
       setEnabledTools(normalized);
+      setHasStoredToolPreference(true);
       localStorage.setItem(
         STORAGE_KEY_ENABLED_TOOLS,
         JSON.stringify(normalized),
       );
     },
-    [toolOptions, setEnabledTools],
+    [
+      enabledTools,
+      hasStoredToolPreference,
+      setEnabledTools,
+      toolOptions,
+      toolsData,
+    ],
   );
 
   const handleMcpServersChange = useCallback(
@@ -400,6 +458,8 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     toolsInitialized,
     enabledTools: normalizedEnabledTools,
     handleEnabledToolsChange,
+    webSearch,
+    setWebSearch,
     mcpServers,
     handleMcpServersChange,
     agentBehavior,
