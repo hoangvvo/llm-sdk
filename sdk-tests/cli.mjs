@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
-import { getTestCaseInfo, prepareStage, validateOutput } from "./protocol.mjs";
+import {
+  getTestCaseInfo,
+  getTestCasesByGroup,
+  prepareStage,
+  validateError,
+  validateOutput,
+} from "./protocol.mjs";
 
 async function readRequest() {
   let body = "";
@@ -15,11 +21,17 @@ try {
     case "case_info":
       response = getTestCaseInfo(request.test_case);
       break;
+    case "list_cases":
+      response = getTestCasesByGroup(request.group);
+      break;
     case "prepare_stage":
       response = prepareStage(request);
       break;
     case "validate_output":
       response = validateOutput(request);
+      break;
+    case "validate_error":
+      response = validateError(request);
       break;
     default:
       throw new Error(`Unknown sdk-tests command: ${String(request.command)}`);

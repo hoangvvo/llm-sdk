@@ -39,21 +39,50 @@ function validateTestData() {
     if (!Array.isArray(testCase.stages) || testCase.stages.length === 0) {
       fail(`Test case "${testCase.name}" must contain at least one stage`);
     }
+    if (
+      testCase.groups !== undefined &&
+      (!Array.isArray(testCase.groups) ||
+        testCase.groups.some((group) => typeof group !== "string"))
+    ) {
+      fail(`Test case "${testCase.name}" has invalid groups`);
+    }
     for (const [index, stage] of testCase.stages.entries()) {
       if (stage.type !== "generate" && stage.type !== "stream") {
         fail(`Invalid method for ${testCase.name} stage ${index}`);
       }
-      if (!isObject(stage.input) || !Array.isArray(stage.expect?.content)) {
+      const expectsOutput = Array.isArray(stage.expect?.content);
+      const expectsError = isObject(stage.expect?.error);
+      if (
+        !isObject(stage.input) ||
+        !isObject(stage.expect) ||
+        expectsOutput === expectsError
+      ) {
         fail(
           `Invalid input or expectation for ${testCase.name} stage ${index}`,
         );
       }
-      for (const assertion of stage.expect.content) {
+      if (
+        expectsError &&
+        (typeof stage.expect.error.kind !== "string" ||
+          (stage.expect.error.message !== undefined &&
+            typeof stage.expect.error.message !== "string"))
+      ) {
+        fail(`Invalid error expectation for ${testCase.name} stage ${index}`);
+      }
+      if (expectsError && index !== testCase.stages.length - 1) {
+        fail(`Error expectation must be the final stage for ${testCase.name}`);
+      }
+      for (const assertion of stage.expect.content ?? []) {
         if (!PART_TYPES.has(assertion.type)) {
           fail(
             `Unsupported assertion type "${String(assertion.type)}" in ${testCase.name} stage ${index}`,
           );
         }
+      }
+      if (stage.expect.stream !== undefined && stage.type !== "stream") {
+        fail(
+          `Stream expectations require a stream stage for ${testCase.name} stage ${index}`,
+        );
       }
     }
   }
@@ -151,9 +180,30 @@ function resolveRefs(value, context) {
     return value.map((child) => resolveRefs(child, context));
   }
   if (isObject(value)) {
-    const keys = Object.keys(value);
-    if (keys.length === 1 && typeof value.$ref === "string") {
-      return resolvePath(value.$ref, context);
+    if (typeof value.$ref === "string") {
+      let resolved = resolvePath(value.$ref, context);
+      if (value.$where !== undefined) {
+        if (!Array.isArray(resolved) || !isObject(value.$where)) {
+          fail(`Invalid filtered stage ref "${value.$ref}"`);
+        }
+        resolved = resolved.find(
+          (candidate) =>
+            isObject(candidate) &&
+            Object.entries(value.$where).every(([key, expected]) =>
+              Object.is(candidate[key], expected),
+            ),
+        );
+        if (resolved === undefined) {
+          fail(`No stage ref match for "${value.$ref}"`);
+        }
+      }
+      if (value.$path !== undefined) {
+        if (typeof value.$path !== "string") {
+          fail(`Invalid relative stage ref path for "${value.$ref}"`);
+        }
+        resolved = resolvePath(value.$path, resolved);
+      }
+      return clone(resolved);
     }
     return Object.fromEntries(
       Object.entries(value).map(([key, child]) => [
@@ -178,6 +228,17 @@ function resolveTools(input, names) {
 export function getTestCaseInfo(testCaseName) {
   const testCase = getTestCase(testCaseName);
   return { name: testCase.name, stage_count: testCase.stages.length };
+}
+
+export function getTestCasesByGroup(group) {
+  if (typeof group !== "string" || group.length === 0) {
+    fail("Test case group must be a non-empty string");
+  }
+  const testCases = TEST_DATA.test_cases
+    .filter((testCase) => testCase.groups?.includes(group))
+    .map((testCase) => testCase.name);
+  if (testCases.length === 0) fail(`Test case group "${group}" not found`);
+  return testCases;
 }
 
 export function prepareStage({
@@ -351,10 +412,96 @@ function formatValidationFailure(testCaseName, stageIndex, expected, content) {
   ].join("\n");
 }
 
+function validateUsage(testCaseName, stageIndex, usage) {
+  if (!isObject(usage)) {
+    fail(
+      `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected usage metadata.`,
+    );
+  }
+  for (const key of ["input_tokens", "output_tokens"]) {
+    if (!Number.isInteger(usage[key]) || usage[key] < 0) {
+      fail(
+        `Output validation failed for "${testCaseName}" stage ${stageIndex}: usage.${key} must be a non-negative integer.`,
+      );
+    }
+  }
+  if (usage.input_tokens === 0 && usage.output_tokens === 0) {
+    fail(
+      `Output validation failed for "${testCaseName}" stage ${stageIndex}: usage must contain at least one token.`,
+    );
+  }
+  for (const detailsKey of ["input_tokens_details", "output_tokens_details"]) {
+    const details = usage[detailsKey];
+    if (details === undefined) continue;
+    if (
+      !isObject(details) ||
+      Object.values(details).some(
+        (value) => !Number.isInteger(value) || value < 0,
+      )
+    ) {
+      fail(
+        `Output validation failed for "${testCaseName}" stage ${stageIndex}: usage.${detailsKey} values must be non-negative integers.`,
+      );
+    }
+  }
+}
+
+function validateResponseMetadata({
+  testCaseName,
+  stageIndex,
+  expected,
+  response,
+  stream,
+}) {
+  if (response !== undefined) {
+    if (!isObject(response) || !Array.isArray(response.content)) {
+      fail(
+        `Output validation failed for "${testCaseName}" stage ${stageIndex}: response must contain a content array.`,
+      );
+    }
+    if (
+      response.cost !== undefined &&
+      (typeof response.cost !== "number" ||
+        !Number.isFinite(response.cost) ||
+        response.cost < 0)
+    ) {
+      fail(
+        `Output validation failed for "${testCaseName}" stage ${stageIndex}: cost must be a non-negative finite number.`,
+      );
+    }
+  }
+
+  if (expected.usage === true) {
+    validateUsage(testCaseName, stageIndex, response?.usage);
+  }
+
+  if (expected.stream !== undefined) {
+    if (!isObject(stream)) {
+      fail(
+        `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected stream metrics.`,
+      );
+    }
+    for (const [metric, minimum] of Object.entries(expected.stream)) {
+      if (
+        !Number.isInteger(minimum) ||
+        minimum < 0 ||
+        !Number.isInteger(stream[metric]) ||
+        stream[metric] < minimum
+      ) {
+        fail(
+          `Output validation failed for "${testCaseName}" stage ${stageIndex}: stream.${metric} must be at least ${String(minimum)}.`,
+        );
+      }
+    }
+  }
+}
+
 export function validateOutput({
   test_case: testCaseName,
   stage: stageIndex,
   content,
+  response,
+  stream,
   profile: profileName,
 }) {
   const testCase = getTestCase(testCaseName);
@@ -363,7 +510,24 @@ export function validateOutput({
     fail(`Stage ${stageIndex} not found in test case "${testCaseName}"`);
   if (!Array.isArray(content)) fail("Model output content must be an array");
   const profile = getProfile(profileName, testCaseName);
-  const expected = profile?.expect ?? stage.expect;
+  const expected = clone(profile?.expect ?? stage.expect);
+  for (const rule of profile?.expect_omit ?? []) {
+    if (rule.method === undefined || rule.method === stage.type) {
+      omitPath(expected, rule.path.split("."));
+    }
+  }
+  if (expected.error !== undefined) {
+    fail(
+      `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected ${expected.error.kind} error, received model output.`,
+    );
+  }
+  validateResponseMetadata({
+    testCaseName,
+    stageIndex,
+    expected,
+    response,
+    stream,
+  });
   const aggregateAssertions = expected.content.filter(
     (assertion) => assertion.type === "text" && assertion.aggregate === true,
   );
@@ -404,5 +568,39 @@ export function validateOutput({
     );
   }
 
+  return { ok: true };
+}
+
+export function validateError({
+  test_case: testCaseName,
+  stage: stageIndex,
+  error,
+  profile: profileName,
+}) {
+  const testCase = getTestCase(testCaseName);
+  const stage = testCase.stages[stageIndex];
+  if (!stage)
+    fail(`Stage ${stageIndex} not found in test case "${testCaseName}"`);
+  const profile = getProfile(profileName, testCaseName);
+  const expected = clone(profile?.expect ?? stage.expect);
+  if (!isObject(expected.error)) {
+    fail(
+      `Unexpected model error for "${testCaseName}" stage ${stageIndex}: ${String(error?.kind)}: ${String(error?.message)}`,
+    );
+  }
+  if (
+    !isObject(error) ||
+    error.kind !== expected.error.kind ||
+    (expected.error.message !== undefined &&
+      !regexMatches(expected.error.message, error.message))
+  ) {
+    fail(
+      [
+        `Error validation failed for "${testCaseName}" stage ${stageIndex}.`,
+        `Expected: ${JSON.stringify(expected.error)}`,
+        `Received: ${JSON.stringify(error)}`,
+      ].join("\n"),
+    );
+  }
   return { ok: true };
 }

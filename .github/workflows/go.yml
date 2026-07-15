@@ -65,7 +65,8 @@ jobs:
             exit 0
           fi
           set +e
-          go test -v -covermode=atomic -coverpkg=./sdk-go/... -coverprofile=coverage-go.out ./sdk-go/...
+          cover_packages=$(go list ./sdk-go/... | grep -Ev '/(examples|anthropicapi|googleapi|openaiapi|openaichatapi|internal/testcommon)(/|$)' | paste -sd, -)
+          go test -v -covermode=atomic -coverpkg="$cover_packages" -coverprofile=coverage-go.out ./sdk-go/...
           test_status=$?
           if [[ -s coverage-go.out ]]; then
             gocover-cobertura < coverage-go.out > coverage-go.xml

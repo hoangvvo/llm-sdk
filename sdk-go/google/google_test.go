@@ -41,101 +41,54 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestGenerateText(t *testing.T) {
-	testcommon.RunTestCase(t, model, "generate_text")
+func TestTextGeneration(t *testing.T) {
+	testcommon.RunTestGroup(t, model, "text_generation")
 }
 
-func TestStreamText(t *testing.T) {
-	testcommon.RunTestCase(t, model, "stream_text")
+func TestConversation(t *testing.T) {
+	testcommon.RunTestGroup(t, model, "conversation")
 }
 
-func TestGenerateWithSystemPrompt(t *testing.T) {
-	testcommon.RunTestCase(t, model, "generate_with_system_prompt")
+func TestToolUse(t *testing.T) {
+	testcommon.RunTestGroup(t, model, "tool_use")
 }
 
-func TestGenerateToolCall(t *testing.T) {
-	testcommon.RunTestCase(t, model, "generate_tool_call")
+func TestStructuredOutput(t *testing.T) {
+	testcommon.RunTestGroup(t, model, "structured_output")
 }
 
-func TestStreamToolCall(t *testing.T) {
-	testcommon.RunTestCase(t, model, "stream_tool_call")
+func TestGenerationOptions(t *testing.T) {
+	testcommon.RunTestGroup(t, model, "generation_options")
 }
 
-func TestGenerateTextWithToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, model, "generate_text_from_tool_result")
+func TestSourceInput(t *testing.T) {
+	testcommon.RunTestGroup(t, model, "source_input")
 }
 
-func TestStreamTextWithToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, model, "stream_text_from_tool_result")
+func TestMultimodalToolResult(t *testing.T) {
+	testcommon.RunTestGroup(t, multimodalToolModel, "multimodal_tool_result")
 }
 
-func TestGenerateTextWithImageToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, multimodalToolModel, "generate_text_from_image_tool_result")
+func TestWebSearch(t *testing.T) {
+	testcommon.RunTestGroup(t, model, "web_search", testcommon.WithProfile("google_web_search"))
 }
 
-func TestGenerateParallelToolCalls(t *testing.T) {
-	testcommon.RunTestCase(t, model, "generate_parallel_tool_calls")
+func TestImageGeneration(t *testing.T) {
+	testcommon.RunTestGroup(t, imageModel, "image_generation")
 }
 
-func TestStreamParallelToolCalls(t *testing.T) {
-	testcommon.RunTestCase(t, model, "stream_parallel_tool_calls")
+func TestImageInput(t *testing.T) {
+	testcommon.RunTestGroup(t, imageModel, "image_input")
 }
 
-func TestStreamParallelToolCallsOfSameName(t *testing.T) {
-	testcommon.RunTestCase(t, model, "stream_parallel_tool_calls_of_same_name")
+func TestAudioGeneration(t *testing.T) {
+	testcommon.RunTestGroup(t, audioModel, "audio_generation", testcommon.WithProfile("google_audio"))
 }
 
-func TestStructuredResponseFormat(t *testing.T) {
-	testcommon.RunTestCase(t, model, "structured_response_format")
+func TestReasoning(t *testing.T) {
+	testcommon.RunTestGroup(t, reasoningModel, "reasoning")
 }
 
-func TestSourcePartInput(t *testing.T) {
-	testcommon.RunTestCase(t, model, "source_part_input")
-}
-
-var clearWebSearchOptions = testcommon.WithProfile("google_web_search")
-
-func TestGenerateWebSearch(t *testing.T) {
-	testcommon.RunTestCase(t, model, "generate_web_search", clearWebSearchOptions)
-}
-
-func TestStreamWebSearch(t *testing.T) {
-	testcommon.RunTestCase(t, model, "stream_web_search", clearWebSearchOptions)
-}
-
-func TestGenerateImage(t *testing.T) {
-	testcommon.RunTestCase(t, imageModel, "generate_image")
-}
-
-func TestStreamImage(t *testing.T) {
-	testcommon.RunTestCase(t, imageModel, "stream_image")
-}
-
-func TestGenerateImageInput(t *testing.T) {
-	testcommon.RunTestCase(t, imageModel, "generate_image_input")
-}
-
-func TestStreamImageInput(t *testing.T) {
-	testcommon.RunTestCase(t, imageModel, "stream_image_input")
-}
-
-func TestGenerateAudio(t *testing.T) {
-	testcommon.RunTestCase(t, audioModel, "generate_audio",
-		testcommon.WithProfile("google_audio"),
-	)
-}
-
-func TestStreamAudio(t *testing.T) {
-	testcommon.RunTestCase(
-		t, audioModel, "stream_audio",
-		testcommon.WithProfile("google_audio"),
-	)
-}
-
-func TestGenerateReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, "generate_reasoning")
-}
-
-func TestStreamReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
+func TestReasoningToolUse(t *testing.T) {
+	testcommon.RunTestGroup(t, reasoningModel, "reasoning_tool_use")
 }

@@ -8,70 +8,32 @@ import (
 
 var noReasoning = testcommon.WithProfile("reasoning_disabled")
 
-func TestChatGenerateText(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_text")
+func TestChatTextGeneration(t *testing.T) {
+	testcommon.RunTestGroup(t, chatModel, "text_generation", noReasoning)
 }
 
-func TestChatStreamText(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_text")
+func TestChatConversation(t *testing.T) {
+	testcommon.RunTestGroup(t, chatModel, "conversation", noReasoning)
 }
 
-func TestChatGenerateWithSystemPrompt(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_with_system_prompt")
+func TestChatToolUse(t *testing.T) {
+	testcommon.RunTestGroup(t, chatModel, "tool_use", noReasoning)
 }
 
-func TestChatGenerateToolCall(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_tool_call", noReasoning)
+func TestChatStructuredOutput(t *testing.T) {
+	testcommon.RunTestGroup(t, chatModel, "structured_output", noReasoning)
 }
 
-func TestChatStreamToolCall(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_tool_call", noReasoning)
+func TestChatGenerationOptions(t *testing.T) {
+	testcommon.RunTestGroup(t, chatModel, "generation_options", noReasoning)
 }
 
-func TestChatGenerateTextWithToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_text_from_tool_result", noReasoning)
+func TestChatSourceInput(t *testing.T) {
+	testcommon.RunTestGroup(t, chatModel, "source_input", noReasoning)
 }
 
-func TestChatStreamTextWithToolResult(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_text_from_tool_result", noReasoning)
-}
-
-func TestChatGenerateParallelToolCalls(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_parallel_tool_calls", noReasoning)
-}
-
-func TestChatStreamParallelToolCalls(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_parallel_tool_calls", noReasoning)
-}
-
-func TestChatStreamParallelToolCallsOfSameName(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_parallel_tool_calls_of_same_name", noReasoning)
-}
-
-func TestChatStructuredResponseFormat(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "structured_response_format")
-}
-
-func TestChatSourcePartInput(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "source_part_input", noReasoning)
-}
-
-func TestChatGenerateImage(t *testing.T) {
-	t.Skip("chat completion api does not support image generation")
-	testcommon.RunTestCase(t, chatModel, "generate_image")
-}
-
-func TestChatStreamImage(t *testing.T) {
-	t.Skip("chat completion api does not support image generation")
-	testcommon.RunTestCase(t, chatModel, "stream_image")
-}
-
-func TestChatGenerateImageInput(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "generate_image_input")
-}
-
-func TestChatStreamImageInput(t *testing.T) {
-	testcommon.RunTestCase(t, chatModel, "stream_image_input")
+func TestChatImageInput(t *testing.T) {
+	testcommon.RunTestGroup(t, chatModel, "image_input")
 }
 
 func TestChatGenerateAudio(t *testing.T) {
@@ -82,14 +44,4 @@ func TestChatGenerateAudio(t *testing.T) {
 func TestChatStreamAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioChatModel, "stream_audio",
 		testcommon.WithProfile("openai_audio_linear16"))
-}
-
-func TestChatGenerateReasoning(t *testing.T) {
-	t.Skip("reasoning not supported in chat completion api")
-	testcommon.RunTestCase(t, model, "generate_reasoning")
-}
-
-func TestChatStreamReasoning(t *testing.T) {
-	t.Skip("reasoning not supported in chat completion api")
-	testcommon.RunTestCase(t, model, "stream_reasoning")
 }

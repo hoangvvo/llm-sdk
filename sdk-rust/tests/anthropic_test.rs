@@ -22,76 +22,21 @@ fn anthropic_model() -> AnthropicModel {
     )
 }
 
-test_set!(anthropic_model(), generate_text);
-
-test_set!(anthropic_model(), stream_text);
-
-test_set!(anthropic_model(), generate_with_system_prompt);
-
-test_set!(anthropic_model(), generate_tool_call);
-
-test_set!(anthropic_model(), stream_tool_call);
-
-test_set!(anthropic_model(), generate_text_from_tool_result);
-
-test_set!(anthropic_model(), stream_text_from_tool_result);
-
-test_set!(anthropic_model(), generate_text_from_image_tool_result);
-
-test_set!(anthropic_model(), generate_parallel_tool_calls);
-
-test_set!(anthropic_model(), stream_parallel_tool_calls);
-
-test_set!(anthropic_model(), stream_parallel_tool_calls_of_same_name);
-
-test_set!(anthropic_model(), structured_response_format);
-
-test_set!(anthropic_model(), source_part_input);
-
-test_set!(anthropic_model(), generate_web_search);
-
-test_set!(anthropic_model(), stream_web_search);
-
-test_set!(
-    ignore = "model does not support image generation",
+test_group!(anthropic_model(), text_generation);
+test_group!(anthropic_model(), conversation);
+test_group!(anthropic_model(), tool_use);
+test_group!(anthropic_model(), structured_output);
+test_group!(anthropic_model(), generation_options);
+test_group!(anthropic_model(), source_input);
+test_group!(anthropic_model(), multimodal_tool_result);
+test_group!(anthropic_model(), web_search);
+test_group!(anthropic_model(), image_input);
+test_group!(
     anthropic_model(),
-    generate_image
-);
-
-test_set!(
-    ignore = "model does not support image generation",
-    anthropic_model(),
-    stream_image
-);
-
-test_set!(anthropic_model(), generate_image_input);
-
-test_set!(anthropic_model(), stream_image_input);
-
-test_set!(
-    ignore = "model does not support audio generation",
-    anthropic_model(),
-    generate_audio
-);
-
-test_set!(
-    ignore = "model does not support audio generation",
-    anthropic_model(),
-    stream_audio
-);
-
-test_set!(
-    anthropic_model(),
-    generate_reasoning,
+    reasoning,
     Some(crate::common::cases::RunTestCaseOptions {
         profile: Some("anthropic_adaptive_reasoning"),
     })
 );
-
-test_set!(
-    anthropic_model(),
-    stream_reasoning,
-    Some(crate::common::cases::RunTestCaseOptions {
-        profile: Some("anthropic_adaptive_reasoning"),
-    })
-);
+test_group!(anthropic_model(), reasoning_tool_use);
+test_group!(anthropic_model(), anthropic_refusal);

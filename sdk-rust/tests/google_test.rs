@@ -63,75 +63,28 @@ fn google_reasoning_model() -> GoogleModel {
     )
 }
 
-test_set!(google_model(), generate_text);
-
-test_set!(google_model(), stream_text);
-
-test_set!(google_model(), generate_with_system_prompt);
-
-test_set!(google_model(), generate_tool_call);
-
-test_set!(google_model(), stream_tool_call);
-
-test_set!(google_model(), generate_text_from_tool_result);
-
-test_set!(google_model(), stream_text_from_tool_result);
-
-test_set!(
-    google_multimodal_tool_model(),
-    generate_text_from_image_tool_result
-);
-
-test_set!(google_model(), generate_parallel_tool_calls);
-
-test_set!(google_model(), stream_parallel_tool_calls);
-
-test_set!(google_model(), stream_parallel_tool_calls_of_same_name);
-
-test_set!(google_model(), structured_response_format);
-
-test_set!(google_model(), source_part_input);
-
-test_set!(
+test_group!(google_model(), text_generation);
+test_group!(google_model(), conversation);
+test_group!(google_model(), tool_use);
+test_group!(google_model(), structured_output);
+test_group!(google_model(), generation_options);
+test_group!(google_model(), source_input);
+test_group!(google_multimodal_tool_model(), multimodal_tool_result);
+test_group!(
     google_model(),
-    generate_web_search,
+    web_search,
     Some(RunTestCaseOptions {
         profile: Some("google_web_search"),
     })
 );
-
-test_set!(
-    google_model(),
-    stream_web_search,
-    Some(RunTestCaseOptions {
-        profile: Some("google_web_search"),
-    })
-);
-
-test_set!(google_image_model(), generate_image);
-
-test_set!(google_image_model(), stream_image);
-
-test_set!(google_image_model(), generate_image_input);
-
-test_set!(google_image_model(), stream_image_input);
-
-test_set!(
+test_group!(google_image_model(), image_generation);
+test_group!(google_image_model(), image_input);
+test_group!(
     google_audio_model(),
-    generate_audio,
+    audio_generation,
     Some(RunTestCaseOptions {
         profile: Some("google_audio"),
     })
 );
-
-test_set!(
-    google_audio_model(),
-    stream_audio,
-    Some(RunTestCaseOptions {
-        profile: Some("google_audio"),
-    })
-);
-
-test_set!(google_reasoning_model(), generate_reasoning);
-
-test_set!(google_reasoning_model(), stream_reasoning);
+test_group!(google_reasoning_model(), reasoning);
+test_group!(google_reasoning_model(), reasoning_tool_use);

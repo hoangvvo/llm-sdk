@@ -16,6 +16,7 @@
     "checkJs": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "lib": ["ESNext", "DOM"],
     "target": "ES2022",
     "moduleResolution": "NodeNext",

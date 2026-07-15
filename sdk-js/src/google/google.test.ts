@@ -1,4 +1,4 @@
-import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
+import { runTestGroup, SHARED_BEHAVIOR_TEST_GROUPS } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
 import { GoogleModel } from "./google.ts";
@@ -30,123 +30,30 @@ suite("GoogleModel", () => {
     modelId: "gemini-3.1-pro-preview",
   });
 
-  test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TEXT);
-  });
-
-  test(TEST_CASE_NAMES.STREAM_TEXT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_WITH_SYSTEM_PROMPT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_WITH_SYSTEM_PROMPT);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_TOOL_CALL, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TOOL_CALL);
-  });
-
-  test(TEST_CASE_NAMES.STREAM_TOOL_CALL, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TOOL_CALL);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT,
-    );
-  });
-
-  test(TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT, (t) => {
-    return runTestCase(
-      t,
-      multimodalToolModel,
-      TEST_CASE_NAMES.GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT,
-    );
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS);
-  });
-
-  test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS);
-  });
-
-  test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
-    );
-  });
-
-  test(TEST_CASE_NAMES.STRUCTURED_RESPONSE_FORMAT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STRUCTURED_RESPONSE_FORMAT);
-  });
-
-  test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
-  });
-
-  const googleWebSearchOptions = { profile: "google_web_search" };
-
-  test(TEST_CASE_NAMES.GENERATE_WEB_SEARCH, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.GENERATE_WEB_SEARCH,
-      googleWebSearchOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.STREAM_WEB_SEARCH, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.STREAM_WEB_SEARCH,
-      googleWebSearchOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_IMAGE, { timeout: 60 * 1000 }, (t) => {
-    return runTestCase(t, imageModel, TEST_CASE_NAMES.GENERATE_IMAGE);
-  });
-
-  test(TEST_CASE_NAMES.STREAM_IMAGE, { timeout: 60 * 1000 }, (t) => {
-    return runTestCase(t, imageModel, TEST_CASE_NAMES.STREAM_IMAGE);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, { timeout: 60 * 1000 }, (t) => {
-    return runTestCase(t, imageModel, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
-  });
-
-  test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, { timeout: 60 * 1000 }, (t) => {
-    return runTestCase(t, imageModel, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
-    return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
-      profile: "google_audio",
+  for (const group of SHARED_BEHAVIOR_TEST_GROUPS) {
+    test(group, { timeout: 120 * 1000 }, (t) => {
+      return runTestGroup(t, model, group);
     });
-  });
+  }
 
-  test(TEST_CASE_NAMES.STREAM_AUDIO, (t) => {
-    return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
+  test("multimodal_tool_result", (t) =>
+    runTestGroup(t, multimodalToolModel, "multimodal_tool_result"));
+  test("web_search", (t) =>
+    runTestGroup(t, model, "web_search", { profile: "google_web_search" }));
+  test("image_generation", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, imageModel, "image_generation"),
+  );
+  test("image_input", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, imageModel, "image_input"),
+  );
+  test("audio_generation", (t) =>
+    runTestGroup(t, audioModel, "audio_generation", {
       profile: "google_audio",
-    });
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_REASONING, (t) => {
-    return runTestCase(t, thinkingModel, TEST_CASE_NAMES.GENERATE_REASONING);
-  });
-
-  test(TEST_CASE_NAMES.STREAM_REASONING, (t) => {
-    return runTestCase(t, thinkingModel, TEST_CASE_NAMES.STREAM_REASONING);
-  });
+    }));
+  test("reasoning", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, thinkingModel, "reasoning"),
+  );
+  test("reasoning_tool_use", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, thinkingModel, "reasoning_tool_use"),
+  );
 });

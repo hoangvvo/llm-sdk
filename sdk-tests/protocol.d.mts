@@ -35,12 +35,31 @@ export const TEST_CASE_NAMES: Readonly<{
   STREAM_WEB_SEARCH: "stream_web_search";
   GENERATE_REASONING: "generate_reasoning";
   STREAM_REASONING: "stream_reasoning";
+  MIXED_CONTENT_CONVERSATION: "mixed_content_conversation";
+  MULTI_STEP_TOOL_WORKFLOW: "multi_step_tool_workflow";
+  STREAM_NESTED_TOOL_ARGUMENTS: "stream_nested_tool_arguments";
+  STREAM_NESTED_STRUCTURED_RESPONSE: "stream_nested_structured_response";
+  GENERATE_EXPLICIT_TEXT_OPTIONS: "generate_explicit_text_options";
+  CONSECUTIVE_USER_MESSAGES: "consecutive_user_messages";
+  ASSISTANT_MESSAGE_HISTORY: "assistant_message_history";
+  AUTO_TOOL_CHOICE_TEXT_RESPONSE: "auto_tool_choice_text_response";
+  PARALLEL_TOOL_RESULTS: "parallel_tool_results";
+  SEQUENTIAL_TOOL_CHAIN: "sequential_tool_chain";
+  STRUCTURED_DATA_EXTRACTION: "structured_data_extraction";
+  MULTIPLE_SOURCE_DOCUMENTS: "multiple_source_documents";
+  STREAM_UNICODE_TEXT: "stream_unicode_text";
+  MULTI_PART_TOOL_RESULT: "multi_part_tool_result";
+  REASONING_TOOL_CONTINUATION: "reasoning_tool_continuation";
+  ANTHROPIC_GENERATE_REFUSAL: "anthropic_generate_refusal";
+  ANTHROPIC_STREAM_REFUSAL: "anthropic_stream_refusal";
 }>;
 
 export function getTestCaseInfo(testCaseName: string): {
   name: string;
   stage_count: number;
 };
+
+export function getTestCasesByGroup(group: string): string[];
 
 export function prepareStage(options: {
   test_case: string;
@@ -53,5 +72,14 @@ export function validateOutput(options: {
   test_case: string;
   stage: number;
   content: unknown[];
+  response?: unknown;
+  stream?: unknown;
+  profile?: string;
+}): { ok: true };
+
+export function validateError(options: {
+  test_case: string;
+  stage: number;
+  error: { kind: string; message: string };
   profile?: string;
 }): { ok: true };

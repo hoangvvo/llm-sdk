@@ -39,89 +39,25 @@ fn no_reasoning_options() -> RunTestCaseOptions {
     }
 }
 
-test_set!(openai_model(), generate_text);
-
-test_set!(openai_model(), stream_text);
-
-test_set!(openai_model(), generate_with_system_prompt);
-
-test_set!(
+test_group!(
     openai_model(),
-    generate_tool_call,
+    text_generation,
     Some(no_reasoning_options())
 );
-
-test_set!(
+test_group!(openai_model(), conversation, Some(no_reasoning_options()));
+test_group!(openai_model(), tool_use, Some(no_reasoning_options()));
+test_group!(
     openai_model(),
-    stream_tool_call,
+    structured_output,
     Some(no_reasoning_options())
 );
-
-test_set!(
+test_group!(
     openai_model(),
-    generate_text_from_tool_result,
+    generation_options,
     Some(no_reasoning_options())
 );
-
-test_set!(
-    openai_model(),
-    stream_text_from_tool_result,
-    Some(no_reasoning_options())
-);
-
-test_set!(
-    openai_model(),
-    generate_parallel_tool_calls,
-    Some(no_reasoning_options())
-);
-
-test_set!(
-    openai_model(),
-    stream_parallel_tool_calls,
-    Some(no_reasoning_options())
-);
-
-test_set!(
-    openai_model(),
-    stream_parallel_tool_calls_of_same_name,
-    Some(no_reasoning_options())
-);
-
-test_set!(openai_model(), structured_response_format);
-
-test_set!(
-    openai_model(),
-    source_part_input,
-    Some(no_reasoning_options())
-);
-
-test_set!(
-    ignore = "chat completion api does not support hosted web search",
-    openai_model(),
-    generate_web_search
-);
-
-test_set!(
-    ignore = "chat completion api does not support hosted web search",
-    openai_model(),
-    stream_web_search
-);
-
-test_set!(
-    ignore = "chat completion api does not support image generation",
-    openai_model(),
-    generate_image
-);
-
-test_set!(
-    ignore = "chat completion api does not support image generation",
-    openai_model(),
-    stream_image
-);
-
-test_set!(openai_model(), generate_image_input);
-
-test_set!(openai_model(), stream_image_input);
+test_group!(openai_model(), source_input, Some(no_reasoning_options()));
+test_group!(openai_model(), image_input);
 
 test_set!(
     openai_audio_model(),
@@ -137,16 +73,4 @@ test_set!(
     Some(RunTestCaseOptions {
         profile: Some("openai_audio_linear16"),
     })
-);
-
-test_set!(
-    ignore = "reasoning is not supported in chat completion api",
-    openai_model(),
-    generate_reasoning
-);
-
-test_set!(
-    ignore = "reasoning is not supported in chat completion api",
-    openai_model(),
-    stream_reasoning
 );

@@ -19,24 +19,27 @@ func New[T any](c <-chan T, errC <-chan error) *Stream[T] {
 // Next advances the stream to the next item.
 // It returns false if there are no more items or an error occurred.
 func (s *Stream[T]) Next() bool {
-	select {
-	case event, ok := <-s.C:
-		if !ok {
-			// Channel closed, check for error (non-blocking)
-			select {
-			case err := <-s.errC:
-				s.err = err
-			default:
-				// No error available
+	for s.C != nil || s.errC != nil {
+		select {
+		case event, ok := <-s.C:
+			if !ok {
+				s.C = nil
+				continue
 			}
-			return false
+			s.curr = event
+			return true
+		case err, ok := <-s.errC:
+			if !ok {
+				s.errC = nil
+				continue
+			}
+			if err != nil {
+				s.err = err
+				return false
+			}
 		}
-		s.curr = event
-		return true
-	case err := <-s.errC:
-		s.err = err
-		return false
 	}
+	return false
 }
 
 // Current returns the current item in the stream.

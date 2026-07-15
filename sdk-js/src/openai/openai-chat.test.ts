@@ -1,4 +1,9 @@
-import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
+import {
+  runTestCase,
+  runTestGroup,
+  SHARED_BEHAVIOR_TEST_GROUPS,
+  TEST_CASE_NAMES,
+} from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
 import { OpenAIChatModel } from "./openai-chat.ts";
@@ -17,143 +22,21 @@ suite("OpenAIChatModel", () => {
 
   const noReasoningOptions = { profile: "reasoning_disabled" };
 
-  test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TEXT);
-  });
+  for (const group of SHARED_BEHAVIOR_TEST_GROUPS) {
+    test(group, { timeout: 120 * 1000 }, (t) => {
+      return runTestGroup(t, model, group, noReasoningOptions);
+    });
+  }
 
-  test(TEST_CASE_NAMES.STREAM_TEXT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_TEXT);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_WITH_SYSTEM_PROMPT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_WITH_SYSTEM_PROMPT);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_TOOL_CALL, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.GENERATE_TOOL_CALL,
-      noReasoningOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.STREAM_TOOL_CALL, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.STREAM_TOOL_CALL,
-      noReasoningOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.GENERATE_TEXT_FROM_TOOL_RESULT,
-      noReasoningOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.STREAM_TEXT_FROM_TOOL_RESULT,
-      noReasoningOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.GENERATE_PARALLEL_TOOL_CALLS,
-      noReasoningOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS,
-      noReasoningOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME,
-      noReasoningOptions,
-    );
-  });
-
-  test(TEST_CASE_NAMES.STRUCTURED_RESPONSE_FORMAT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STRUCTURED_RESPONSE_FORMAT);
-  });
-
-  test(TEST_CASE_NAMES.SOURCE_PART_INPUT, (t) => {
-    return runTestCase(
-      t,
-      model,
-      TEST_CASE_NAMES.SOURCE_PART_INPUT,
-      noReasoningOptions,
-    );
-  });
-
-  test(
-    TEST_CASE_NAMES.GENERATE_IMAGE,
-    { skip: "chat completion does not support image generation" },
-    (t) => {
-      return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE);
-    },
-  );
-
-  test(
-    TEST_CASE_NAMES.STREAM_IMAGE,
-    { skip: "chat completion does not support image generation" },
-    (t) => {
-      return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE);
-    },
-  );
-
-  test(TEST_CASE_NAMES.GENERATE_IMAGE_INPUT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_IMAGE_INPUT);
-  });
-
-  test(TEST_CASE_NAMES.STREAM_IMAGE_INPUT, (t) => {
-    return runTestCase(t, model, TEST_CASE_NAMES.STREAM_IMAGE_INPUT);
-  });
-
-  test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
-    return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
+  test("image_input", (t) => runTestGroup(t, model, "image_input"));
+  test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) =>
+    runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
       profile: "openai_audio_mp3",
-    });
-  });
-
-  test(TEST_CASE_NAMES.STREAM_AUDIO, (t) => {
-    return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
-      profile: "openai_audio_linear16",
-    });
-  });
-
-  test(
-    TEST_CASE_NAMES.GENERATE_REASONING,
-    { skip: "chat completion does not support reasoning" },
-    (t) => {
-      return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_REASONING);
-    },
+    }),
   );
-
-  test(
-    TEST_CASE_NAMES.STREAM_REASONING,
-    { skip: "chat completion does not support reasoning" },
-    (t) => {
-      return runTestCase(t, model, TEST_CASE_NAMES.STREAM_REASONING);
-    },
+  test(TEST_CASE_NAMES.STREAM_AUDIO, (t) =>
+    runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
+      profile: "openai_audio_linear16",
+    }),
   );
 });

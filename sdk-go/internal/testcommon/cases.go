@@ -3,6 +3,7 @@ package testcommon
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +23,12 @@ type preparedStage struct {
 	Input  json.RawMessage `json:"input"`
 }
 
+type streamMetrics struct {
+	Partials     int `json:"partials"`
+	Deltas       int `json:"deltas"`
+	UsageUpdates int `json:"usage_updates"`
+}
+
 type stageResult struct {
 	Assistant []llmsdk.Part `json:"assistant"`
 	ToolCalls []llmsdk.Part `json:"tool_calls"`
@@ -31,13 +38,33 @@ type stageContext struct {
 	Stages []stageResult `json:"stages"`
 }
 
+type protocolError struct {
+	Kind    string `json:"kind"`
+	Message string `json:"message"`
+}
+
 type protocolRequest struct {
-	Command  string        `json:"command"`
-	TestCase string        `json:"test_case"`
-	Stage    int           `json:"stage"`
-	Context  *stageContext `json:"context,omitempty"`
-	Content  []llmsdk.Part `json:"content,omitempty"`
-	Profile  string        `json:"profile,omitempty"`
+	Command  string                `json:"command"`
+	TestCase string                `json:"test_case"`
+	Stage    int                   `json:"stage"`
+	Context  *stageContext         `json:"context,omitempty"`
+	Content  []llmsdk.Part         `json:"content,omitempty"`
+	Response *llmsdk.ModelResponse `json:"response,omitempty"`
+	Stream   *streamMetrics        `json:"stream,omitempty"`
+	Error    *protocolError        `json:"error,omitempty"`
+	Group    string                `json:"group,omitempty"`
+	Profile  string                `json:"profile,omitempty"`
+}
+
+func getTestCasesByGroup(group string) ([]string, error) {
+	var testCases []string
+	if err := callProtocol(protocolRequest{
+		Command: "list_cases",
+		Group:   group,
+	}, &testCases); err != nil {
+		return nil, err
+	}
+	return testCases, nil
 }
 
 func protocolPath() string {
@@ -104,6 +131,24 @@ func appendMessages(history []llmsdk.Message, next ...llmsdk.Message) []llmsdk.M
 	return combined
 }
 
+func normalizeError(err error) *protocolError {
+	var modelErr *llmsdk.LanguageModelError
+	if errors.As(err, &modelErr) {
+		return &protocolError{Kind: string(modelErr.Kind), Message: modelErr.Error()}
+	}
+	return &protocolError{Kind: "error", Message: err.Error()}
+}
+
+func validateExecutionError(testCaseName string, stageIndex int, profile string, err error) error {
+	return callProtocol(protocolRequest{
+		Command:  "validate_error",
+		TestCase: testCaseName,
+		Stage:    stageIndex,
+		Error:    normalizeError(err),
+		Profile:  profile,
+	}, nil)
+}
+
 // RunTestCase executes a shared sdk-tests case through the Go SDK adapter.
 func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCaseName string, opts ...TestCaseOption) {
 	t.Helper()
@@ -144,42 +189,62 @@ func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCaseName string, 
 		stageMessages := append([]llmsdk.Message(nil), input.Messages...)
 		input.Messages = appendMessages(history, stageMessages...)
 
-		var assistantContent []llmsdk.Part
+		var response *llmsdk.ModelResponse
+		var streamStats *streamMetrics
+		var executionErr error
 		switch stage.Method {
 		case "generate":
 			result, err := model.Generate(ctx, &input)
-			if err != nil {
-				t.Fatalf("generate failed: %v", err)
-			}
-			assistantContent = result.Content
+			executionErr = err
+			response = result
 		case "stream":
 			stream, err := model.Stream(ctx, &input)
 			if err != nil {
-				t.Fatalf("stream failed: %v", err)
+				executionErr = err
+				break
 			}
 			accumulator := llmsdk.NewStreamAccumulator()
+			streamStats = &streamMetrics{}
 			for stream.Next() {
-				if err := accumulator.AddPartial(*stream.Current()); err != nil {
-					t.Fatalf("add stream partial: %v", err)
+				partial := stream.Current()
+				streamStats.Partials++
+				if partial.Delta != nil {
+					streamStats.Deltas++
+				}
+				if partial.Usage != nil {
+					streamStats.UsageUpdates++
+				}
+				if err := accumulator.AddPartial(*partial); err != nil {
+					executionErr = err
+					break
 				}
 			}
-			if err := stream.Err(); err != nil {
-				t.Fatalf("stream failed: %v", err)
+			if executionErr == nil {
+				executionErr = stream.Err()
 			}
-			result, err := accumulator.ComputeResponse()
-			if err != nil {
-				t.Fatalf("compute stream response: %v", err)
+			if executionErr == nil {
+				result, err := accumulator.ComputeResponse()
+				executionErr = err
+				response = &result
 			}
-			assistantContent = result.Content
 		default:
 			t.Fatalf("unsupported shared test method %q", stage.Method)
 		}
+		if executionErr != nil {
+			if err := validateExecutionError(testCaseName, stageIndex, config.Profile, executionErr); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		assistantContent := response.Content
 
 		if err := callProtocol(protocolRequest{
 			Command:  "validate_output",
 			TestCase: testCaseName,
 			Stage:    stageIndex,
 			Content:  assistantContent,
+			Response: response,
+			Stream:   streamStats,
 			Profile:  config.Profile,
 		}, nil); err != nil {
 			t.Fatal(err)
@@ -189,6 +254,20 @@ func RunTestCase(t *testing.T, model llmsdk.LanguageModel, testCaseName string, 
 		context.Stages = append(context.Stages, stageResult{
 			Assistant: assistantContent,
 			ToolCalls: getToolCalls(assistantContent),
+		})
+	}
+}
+
+// RunTestGroup executes each shared behavioral case in a named group as a subtest.
+func RunTestGroup(t *testing.T, model llmsdk.LanguageModel, group string, opts ...TestCaseOption) {
+	t.Helper()
+	testCases, err := getTestCasesByGroup(group)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, testCaseName := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			RunTestCase(t, model, testCaseName, opts...)
 		})
 	}
 }
