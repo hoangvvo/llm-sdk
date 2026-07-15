@@ -15,12 +15,7 @@ suite("OpenAIChatModel", () => {
     apiKey: process.env["OPENAI_API_KEY"],
   });
 
-  const noReasoningOptions = {
-    additionalInputs: (input: Parameters<typeof model.generate>[0]) => ({
-      ...input,
-      reasoning: { enabled: false },
-    }),
-  };
+  const noReasoningOptions = { profile: "reasoning_disabled" };
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TEXT);
@@ -136,25 +131,13 @@ suite("OpenAIChatModel", () => {
 
   test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
-      additionalInputs: (input) => ({
-        ...input,
-        audio: {
-          format: "linear16",
-          voice: "alloy",
-        },
-      }),
+      profile: "openai_audio_mp3",
     });
   });
 
   test(TEST_CASE_NAMES.STREAM_AUDIO, (t) => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
-      additionalInputs: (input) => ({
-        ...input,
-        audio: {
-          format: "linear16",
-          voice: "alloy",
-        },
-      }),
+      profile: "openai_audio_linear16",
     });
   });
 

@@ -1,20 +1,7 @@
 mod common;
-use llm_sdk::{anthropic::*, *};
-use regex::Regex;
+use llm_sdk::anthropic::*;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
-
-fn adaptive_reasoning_output(
-    _content: &mut Vec<crate::common::assert::PartAssertion>,
-) -> Vec<crate::common::assert::PartAssertion> {
-    // Adaptive thinking may be returned as a redacted, signature-only block.
-    vec![crate::common::assert::PartAssertion::Reasoning(
-        crate::common::assert::ReasoningPartAssertion {
-            text: Regex::new("(?s).*").expect("valid reasoning pattern"),
-            signature: true,
-        },
-    )]
-}
 
 fn anthropic_api_key() -> &'static String {
     static KEY: OnceLock<String> = OnceLock::new();
@@ -55,7 +42,7 @@ test_set!(anthropic_model(), generate_parallel_tool_calls);
 
 test_set!(anthropic_model(), stream_parallel_tool_calls);
 
-test_set!(anthropic_model(), stream_parallel_tool_calls_same_name);
+test_set!(anthropic_model(), stream_parallel_tool_calls_of_same_name);
 
 test_set!(anthropic_model(), structured_response_format);
 
@@ -97,14 +84,7 @@ test_set!(
     anthropic_model(),
     generate_reasoning,
     Some(crate::common::cases::RunTestCaseOptions {
-        additional_input: Some(|input| {
-            input.reasoning = Some(ReasoningOptions {
-                enabled: true,
-                budget_tokens: None,
-            });
-        }),
-        custom_output_content: Some(adaptive_reasoning_output),
-        ..Default::default()
+        profile: Some("anthropic_adaptive_reasoning"),
     })
 );
 
@@ -112,13 +92,6 @@ test_set!(
     anthropic_model(),
     stream_reasoning,
     Some(crate::common::cases::RunTestCaseOptions {
-        additional_input: Some(|input| {
-            input.reasoning = Some(ReasoningOptions {
-                enabled: true,
-                budget_tokens: None,
-            });
-        }),
-        custom_output_content: Some(adaptive_reasoning_output),
-        ..Default::default()
+        profile: Some("anthropic_adaptive_reasoning"),
     })
 );

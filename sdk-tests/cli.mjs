@@ -1,10 +1,6 @@
 #!/usr/bin/env node
 
-import {
-  getTestCaseInfo,
-  prepareStage,
-  validateOutput,
-} from "./protocol.mjs";
+import { getTestCaseInfo, prepareStage, validateOutput } from "./protocol.mjs";
 
 async function readRequest() {
   let body = "";
@@ -30,6 +26,8 @@ try {
   }
   process.stdout.write(`${JSON.stringify(response)}\n`);
 } catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.stderr.write(
+    `${error instanceof Error ? error.message : String(error)}\n`,
+  );
   process.exitCode = 1;
 }

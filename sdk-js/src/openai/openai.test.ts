@@ -112,13 +112,7 @@ suite("OpenAIModel", () => {
     { skip: "responses api does not support audio" },
     (t) => {
       return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
-        additionalInputs: (input) => ({
-          ...input,
-          audio: {
-            format: "mp3",
-            voice: "alloy",
-          },
-        }),
+        profile: "openai_audio_mp3",
       });
     },
   );
@@ -128,22 +122,20 @@ suite("OpenAIModel", () => {
     { skip: "responses api does not support audio" },
     (t) => {
       return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
-        additionalInputs: (input) => ({
-          ...input,
-          audio: {
-            format: "linear16",
-            voice: "alloy",
-          },
-        }),
+        profile: "openai_audio_linear16",
       });
     },
   );
 
   test(TEST_CASE_NAMES.GENERATE_REASONING, (t) => {
-    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.GENERATE_REASONING);
+    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.GENERATE_REASONING, {
+      profile: "openai_opaque_reasoning",
+    });
   });
 
   test(TEST_CASE_NAMES.STREAM_REASONING, (t) => {
-    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.STREAM_REASONING);
+    return runTestCase(t, reasoningModel, TEST_CASE_NAMES.STREAM_REASONING, {
+      profile: "openai_opaque_reasoning",
+    });
   });
 });

@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/anthropic"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
 	"github.com/joho/godotenv"
@@ -27,15 +26,7 @@ func TestMain(m *testing.M) {
 }
 
 var reasoningOptions = []testcommon.TestCaseOption{
-	testcommon.WithAdditionalInput(func(input *llmsdk.LanguageModelInput) {
-		input.Reasoning = &llmsdk.ReasoningOptions{
-			Enabled: true,
-		}
-	}),
-	// Adaptive thinking may be returned as a redacted, signature-only block.
-	testcommon.WithCustomOutputContent(func(_ []testcommon.PartAssertion) []testcommon.PartAssertion {
-		return []testcommon.PartAssertion{testcommon.NewReasoningAssertion(".*", true)}
-	}),
+	testcommon.WithProfile("anthropic_adaptive_reasoning"),
 }
 
 func TestGenerateText(t *testing.T) {

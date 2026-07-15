@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  code-quality: write
+  pull-requests: read
 
 jobs:
   build:
@@ -17,7 +19,9 @@ jobs:
         node-version: [24.x]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -33,3 +37,33 @@ jobs:
 
       - name: Run tests
         run: npm test -w=agent-js
+
+      - name: Run live SDK tests
+        id: live-sdk-tests
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CO_API_KEY: ${{ secrets.CO_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "$ANTHROPIC_API_KEY" || -z "$CO_API_KEY" || -z "$GOOGLE_API_KEY" || -z "$MISTRAL_API_KEY" || -z "$OPENAI_API_KEY" ]]; then
+            echo "Skipping live SDK tests because one or more provider secrets are unavailable."
+            exit 0
+          fi
+          set +e
+          npm test -w=sdk-js
+          test_status=$?
+          if [[ -s sdk-js/coverage/cobertura-coverage.xml ]]; then
+            echo "coverage=true" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$test_status"
+
+      - name: Upload JavaScript SDK coverage
+        if: ${{ steps.live-sdk-tests.outputs.coverage == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: sdk-js/coverage/cobertura-coverage.xml
+          language: TypeScript
+          label: code-coverage/sdk-js

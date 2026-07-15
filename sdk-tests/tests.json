@@ -61,6 +61,119 @@
       }
     }
   ],
+  "profiles": {
+    "reasoning_disabled": {
+      "applies_to": [
+        "generate_tool_call",
+        "stream_tool_call",
+        "generate_text_from_tool_result",
+        "stream_text_from_tool_result",
+        "generate_parallel_tool_calls",
+        "stream_parallel_tool_calls",
+        "stream_parallel_tool_calls_of_same_name",
+        "source_part_input"
+      ],
+      "input_merge": {
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    "openai_audio_mp3": {
+      "applies_to": ["generate_audio"],
+      "input_merge": {
+        "audio": {
+          "format": "mp3",
+          "voice": "alloy"
+        }
+      }
+    },
+    "openai_audio_linear16": {
+      "applies_to": ["stream_audio"],
+      "input_merge": {
+        "audio": {
+          "format": "linear16",
+          "voice": "alloy"
+        }
+      }
+    },
+    "google_web_search": {
+      "applies_to": ["generate_web_search", "stream_web_search"],
+      "input_omit": ["tools.*.allowed_domains", "tools.*.user_location"],
+      "expect": {
+        "content": [
+          {
+            "type": "text",
+            "text": "IANA",
+            "citation": {
+              "source": "^https://vertexaisearch\\.cloud\\.google\\.com/grounding-api-redirect/",
+              "any_of": [
+                {
+                  "title": "iana\\.org"
+                },
+                {
+                  "cited_text": "https://www\\.iana\\.org/"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "google_audio": {
+      "applies_to": ["generate_audio", "stream_audio"],
+      "input_merge": {
+        "modalities": ["audio"],
+        "audio": {
+          "voice": "Zephyr"
+        }
+      },
+      "expect": {
+        "content": [
+          {
+            "type": "audio"
+          }
+        ]
+      }
+    },
+    "anthropic_adaptive_reasoning": {
+      "applies_to": ["generate_reasoning", "stream_reasoning"],
+      "input_merge": {
+        "reasoning": {
+          "enabled": true
+        }
+      },
+      "expect": {
+        "content": [
+          {
+            "type": "reasoning",
+            "text": ".*",
+            "signature": true
+          },
+          {
+            "type": "text",
+            "text": "16|[Ss]ixteen"
+          }
+        ]
+      }
+    },
+    "openai_opaque_reasoning": {
+      "applies_to": ["generate_reasoning", "stream_reasoning"],
+      "expect": {
+        "content": [
+          {
+            "type": "reasoning",
+            "text": ".*",
+            "signature": true
+          },
+          {
+            "type": "text",
+            "text": "16|[Ss]ixteen"
+          }
+        ]
+      }
+    }
+  },
   "test_cases": [
     {
       "name": "generate_text",
@@ -174,7 +287,11 @@
               {
                 "type": "tool_call",
                 "tool_name": "get_weather",
-                "args": "Boston"
+                "args": {
+                  "location": {
+                    "$regex": "^Boston(?:, MA)?$"
+                  }
+                }
               }
             ]
           }
@@ -205,7 +322,11 @@
               {
                 "type": "tool_call",
                 "tool_name": "get_weather",
-                "args": "Boston"
+                "args": {
+                  "location": {
+                    "$regex": "^Boston(?:, MA)?$"
+                  }
+                }
               }
             ]
           }
@@ -236,7 +357,11 @@
               {
                 "type": "tool_call",
                 "tool_name": "get_weather",
-                "args": "Boston"
+                "args": {
+                  "location": {
+                    "$regex": "^Boston(?:, MA)?$"
+                  }
+                }
               }
             ]
           }
@@ -301,7 +426,11 @@
               {
                 "type": "tool_call",
                 "tool_name": "get_weather",
-                "args": "Boston"
+                "args": {
+                  "location": {
+                    "$regex": "^Boston(?:, MA)?$"
+                  }
+                }
               }
             ]
           }
@@ -368,7 +497,8 @@
             "content": [
               {
                 "type": "tool_call",
-                "tool_name": "get_color_sample"
+                "tool_name": "get_color_sample",
+                "args": {}
               }
             ]
           }
@@ -434,12 +564,18 @@
               {
                 "type": "tool_call",
                 "tool_name": "get_weather",
-                "args": "Boston"
+                "args": {
+                  "location": {
+                    "$regex": "^Boston(?:, MA)?$"
+                  }
+                }
               },
               {
                 "type": "tool_call",
                 "tool_name": "get_stock_price",
-                "args": "AAPL"
+                "args": {
+                  "symbol": "AAPL"
+                }
               }
             ]
           }
@@ -470,12 +606,18 @@
               {
                 "type": "tool_call",
                 "tool_name": "get_weather",
-                "args": "Boston"
+                "args": {
+                  "location": {
+                    "$regex": "^Boston(?:, MA)?$"
+                  }
+                }
               },
               {
                 "type": "tool_call",
                 "tool_name": "get_stock_price",
-                "args": "AAPL"
+                "args": {
+                  "symbol": "AAPL"
+                }
               }
             ]
           }
@@ -506,12 +648,18 @@
               {
                 "type": "tool_call",
                 "tool_name": "get_weather",
-                "args": "Boston"
+                "args": {
+                  "location": {
+                    "$regex": "^Boston(?:, MA)?$"
+                  }
+                }
               },
               {
                 "type": "tool_call",
                 "tool_name": "get_weather",
-                "args": "New York"
+                "args": {
+                  "location": "New York"
+                }
               }
             ]
           }
@@ -598,16 +746,20 @@
           "expect": {
             "content": [
               {
-                "type": "text",
-                "text": "\"id\"\\s*:\\s*\"a1b2c3\""
-              },
-              {
-                "type": "text",
-                "text": "\"name\"\\s*:\\s*\"John Doe\""
-              },
-              {
-                "type": "text",
-                "text": "\"email\"\\s*:\\s*\"john\\.doe@example\\.com\""
+                "type": "json",
+                "value": {
+                  "id": "a1b2c3",
+                  "name": "John Doe",
+                  "email": "john.doe@example.com",
+                  "birthDate": "1990-05-15",
+                  "age": 34,
+                  "isActive": true,
+                  "role": "user",
+                  "accountBalance": 500.75,
+                  "phoneNumber": "+1234567890123",
+                  "tags": ["developer", "gamer"],
+                  "lastLogin": "2024-11-09T10:30:00Z"
+                }
               }
             ]
           }
@@ -648,7 +800,8 @@
             "content": [
               {
                 "type": "tool_call",
-                "tool_name": "get_first_secret_number"
+                "tool_name": "get_first_secret_number",
+                "args": {}
               }
             ]
           }
@@ -747,11 +900,8 @@
             "content": [
               {
                 "type": "text",
-                "text": "24"
-              },
-              {
-                "type": "text",
-                "text": "42"
+                "contains_all": ["24", "42"],
+                "aggregate": true
               }
             ]
           }
@@ -973,7 +1123,7 @@
                 "type": "text",
                 "text": "IANA",
                 "citation": {
-                  "source": "^https?://",
+                  "source": "^https?://(?:www\\.)?iana\\.org/",
                   "title": "IANA|iana|Reserved|reserved"
                 }
               }
@@ -1007,7 +1157,7 @@
                 "type": "text",
                 "text": "IANA",
                 "citation": {
-                  "source": "^https?://",
+                  "source": "^https?://(?:www\\.)?iana\\.org/",
                   "title": "IANA|iana|Reserved|reserved"
                 }
               }
@@ -1042,6 +1192,10 @@
               {
                 "type": "reasoning",
                 "text": "John"
+              },
+              {
+                "type": "text",
+                "text": "16|[Ss]ixteen"
               }
             ]
           }
@@ -1074,6 +1228,10 @@
               {
                 "type": "reasoning",
                 "text": "John"
+              },
+              {
+                "type": "text",
+                "text": "16|[Ss]ixteen"
               }
             ]
           }

@@ -124,9 +124,11 @@ func TestStreamAudio(t *testing.T) {
 }
 
 func TestGenerateReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, "generate_reasoning")
+	testcommon.RunTestCase(t, reasoningModel, "generate_reasoning",
+		testcommon.WithProfile("openai_opaque_reasoning"))
 }
 
 func TestStreamReasoning(t *testing.T) {
-	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning")
+	testcommon.RunTestCase(t, reasoningModel, "stream_reasoning",
+		testcommon.WithProfile("openai_opaque_reasoning"))
 }

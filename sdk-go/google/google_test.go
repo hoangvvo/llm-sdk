@@ -4,10 +4,8 @@ import (
 	"os"
 	"testing"
 
-	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/google"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
-	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/joho/godotenv"
 )
 
@@ -95,14 +93,7 @@ func TestSourcePartInput(t *testing.T) {
 	testcommon.RunTestCase(t, model, "source_part_input")
 }
 
-var clearWebSearchOptions = testcommon.WithAdditionalInput(func(input *llmsdk.LanguageModelInput) {
-	for i := range input.Tools {
-		if input.Tools[i].WebSearchTool != nil {
-			input.Tools[i].WebSearchTool.AllowedDomains = nil
-			input.Tools[i].WebSearchTool.UserLocation = nil
-		}
-	}
-})
+var clearWebSearchOptions = testcommon.WithProfile("google_web_search")
 
 func TestGenerateWebSearch(t *testing.T) {
 	testcommon.RunTestCase(t, model, "generate_web_search", clearWebSearchOptions)
@@ -130,42 +121,14 @@ func TestStreamImageInput(t *testing.T) {
 
 func TestGenerateAudio(t *testing.T) {
 	testcommon.RunTestCase(t, audioModel, "generate_audio",
-		testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
-			lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
-			lmi.Audio = &llmsdk.AudioOptions{Voice: ptr.To("Zephyr")}
-		}),
-		testcommon.WithCustomOutputContent(func(content []testcommon.PartAssertion) []testcommon.PartAssertion {
-			newContent := []testcommon.PartAssertion{}
-			for _, part := range content {
-				if part.AudioPart != nil {
-					part.AudioPart.AudioID = false
-					part.AudioPart.Transcript = nil
-				}
-				newContent = append(newContent, part)
-			}
-			return newContent
-		}),
+		testcommon.WithProfile("google_audio"),
 	)
 }
 
 func TestStreamAudio(t *testing.T) {
 	testcommon.RunTestCase(
 		t, audioModel, "stream_audio",
-		testcommon.WithAdditionalInput(func(lmi *llmsdk.LanguageModelInput) {
-			lmi.Modalities = []llmsdk.Modality{llmsdk.ModalityAudio}
-			lmi.Audio = &llmsdk.AudioOptions{Voice: ptr.To("Zephyr")}
-		}),
-		testcommon.WithCustomOutputContent(func(content []testcommon.PartAssertion) []testcommon.PartAssertion {
-			newContent := []testcommon.PartAssertion{}
-			for _, part := range content {
-				if part.AudioPart != nil {
-					part.AudioPart.AudioID = false
-					part.AudioPart.Transcript = nil
-				}
-				newContent = append(newContent, part)
-			}
-			return newContent
-		}),
+		testcommon.WithProfile("google_audio"),
 	)
 }
 

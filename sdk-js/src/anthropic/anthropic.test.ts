@@ -1,8 +1,4 @@
-import {
-  runTestCase,
-  TEST_CASE_NAMES,
-  type RunTestCaseOptions,
-} from "#test-common/cases";
+import { runTestCase, TEST_CASE_NAMES } from "#test-common/cases";
 import assert from "node:assert";
 import test, { suite } from "node:test";
 import { AnthropicModel } from "./anthropic.ts";
@@ -14,22 +10,7 @@ suite("AnthropicModel", () => {
     modelId: "claude-sonnet-5",
   });
 
-  const reasoningOptions: RunTestCaseOptions = {
-    additionalInputs: (input) => ({
-      ...input,
-      reasoning: {
-        enabled: true,
-      },
-    }),
-    // Adaptive thinking may be returned as a redacted, signature-only block.
-    customOutputContent: () => [
-      {
-        type: "reasoning",
-        text: /.*/s,
-        signature: true,
-      },
-    ],
-  };
+  const reasoningOptions = { profile: "anthropic_adaptive_reasoning" };
 
   test(TEST_CASE_NAMES.GENERATE_TEXT, (t) => {
     return runTestCase(t, model, TEST_CASE_NAMES.GENERATE_TEXT);

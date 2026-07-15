@@ -8,17 +8,26 @@ on:
 
 permissions:
   contents: read
+  code-quality: write
+  pull-requests: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js for shared SDK tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.23"
+          go-version: "1.25.x"
           cache: true
           cache-dependency-path: |
             **/go.sum
@@ -26,6 +35,9 @@ jobs:
 
       - name: Install dependencies
         run: go mod download
+
+      - name: Install coverage converter
+        run: go install github.com/boumenot/gocover-cobertura@v1.5.0
 
       - name: Vet
         run: |
@@ -39,3 +51,34 @@ jobs:
 
       - name: Test
         run: go test -v ./agent-go/...
+
+      - name: Run live SDK tests
+        id: live-sdk-tests
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "$ANTHROPIC_API_KEY" || -z "$GOOGLE_API_KEY" || -z "$OPENAI_API_KEY" ]]; then
+            echo "Skipping live SDK tests because one or more provider secrets are unavailable."
+            exit 0
+          fi
+          set +e
+          go test -v -covermode=atomic -coverpkg=./sdk-go/... -coverprofile=coverage-go.out ./sdk-go/...
+          test_status=$?
+          if [[ -s coverage-go.out ]]; then
+            gocover-cobertura < coverage-go.out > coverage-go.xml
+          fi
+          if [[ -s coverage-go.xml ]]; then
+            echo "coverage=true" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$test_status"
+
+      - name: Upload Go SDK coverage
+        if: ${{ steps.live-sdk-tests.outputs.coverage == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage-go.xml
+          language: Go
+          label: code-coverage/sdk-go

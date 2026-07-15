@@ -3,14 +3,10 @@ package openai_test
 import (
 	"testing"
 
-	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
-	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
-var noReasoning = testcommon.WithAdditionalInput(func(input *llmsdk.LanguageModelInput) {
-	input.Reasoning = &llmsdk.ReasoningOptions{Enabled: false}
-})
+var noReasoning = testcommon.WithProfile("reasoning_disabled")
 
 func TestChatGenerateText(t *testing.T) {
 	testcommon.RunTestCase(t, chatModel, "generate_text")
@@ -79,23 +75,13 @@ func TestChatStreamImageInput(t *testing.T) {
 }
 
 func TestChatGenerateAudio(t *testing.T) {
-	testcommon.RunTestCase(t, audioChatModel, "generate_audio", testcommon.WithAdditionalInput(
-		func(input *llmsdk.LanguageModelInput) {
-			input.Audio = &llmsdk.AudioOptions{
-				Format: ptr.To(llmsdk.AudioFormatMP3),
-				Voice:  ptr.To("alloy"),
-			}
-		}))
+	testcommon.RunTestCase(t, audioChatModel, "generate_audio",
+		testcommon.WithProfile("openai_audio_mp3"))
 }
 
 func TestChatStreamAudio(t *testing.T) {
-	testcommon.RunTestCase(t, audioChatModel, "stream_audio", testcommon.WithAdditionalInput(
-		func(input *llmsdk.LanguageModelInput) {
-			input.Audio = &llmsdk.AudioOptions{
-				Format: ptr.To(llmsdk.AudioFormatLinear16),
-				Voice:  ptr.To("alloy"),
-			}
-		}))
+	testcommon.RunTestCase(t, audioChatModel, "stream_audio",
+		testcommon.WithProfile("openai_audio_linear16"))
 }
 
 func TestChatGenerateReasoning(t *testing.T) {

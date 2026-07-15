@@ -94,15 +94,7 @@ suite("GoogleModel", () => {
     return runTestCase(t, model, TEST_CASE_NAMES.SOURCE_PART_INPUT);
   });
 
-  const googleWebSearchOptions = {
-    additionalInputs: (input: Parameters<typeof model.generate>[0]) => ({
-      ...input,
-      tools:
-        input.tools?.map((tool) =>
-          tool.type === "web_search" ? { type: "web_search" as const } : tool,
-        ) ?? [],
-    }),
-  };
+  const googleWebSearchOptions = { profile: "google_web_search" };
 
   test(TEST_CASE_NAMES.GENERATE_WEB_SEARCH, (t) => {
     return runTestCase(
@@ -140,39 +132,13 @@ suite("GoogleModel", () => {
 
   test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
-      additionalInputs: (input) => ({
-        ...input,
-        modalities: ["audio"],
-        audio: {
-          voice: "Zephyr",
-        },
-      }),
-      customOutputContent: (content) =>
-        content.map((part) => {
-          if (part.type === "audio") {
-            return { ...part, id: false, transcript: undefined };
-          }
-          return part;
-        }),
+      profile: "google_audio",
     });
   });
 
   test(TEST_CASE_NAMES.STREAM_AUDIO, (t) => {
     return runTestCase(t, audioModel, TEST_CASE_NAMES.STREAM_AUDIO, {
-      additionalInputs: (input) => ({
-        ...input,
-        modalities: ["audio"],
-        audio: {
-          voice: "Zephyr",
-        },
-      }),
-      customOutputContent: (content) =>
-        content.map((part) => {
-          if (part.type === "audio") {
-            return { ...part, id: false, transcript: undefined };
-          }
-          return part;
-        }),
+      profile: "google_audio",
     });
   });
 
