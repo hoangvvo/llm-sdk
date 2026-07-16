@@ -16,7 +16,8 @@ This will start a local development server, and you can view the website in your
 
 ![Console Chat Application screenshot](./assets/console-chat.png)
 
-The demo console API is included in the Astro application. Start the website:
+The demo console runs entirely in the browser and sends API requests directly
+to the selected model provider. Start the website:
 
 ```bash
 npm run dev

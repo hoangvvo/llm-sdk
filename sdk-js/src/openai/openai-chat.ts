@@ -61,6 +61,7 @@ export class OpenAIChatModel implements LanguageModel {
     this.#openai = new OpenAI({
       baseURL: options.baseURL,
       apiKey: options.apiKey,
+      dangerouslyAllowBrowser: options.dangerouslyAllowBrowser,
     });
 
     traceLanguageModel(this);

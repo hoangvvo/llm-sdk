@@ -12,6 +12,10 @@ import {
   type SetStateAction,
 } from "react";
 import modelsJson from "../../../../models/models.json" with { type: "json" };
+import {
+  availableToolkits,
+  availableTools,
+} from "../../../../agent-js/examples/server/agent.ts";
 import type {
   AgentBehaviorSettings,
   ApiKeys,
@@ -22,7 +26,6 @@ import type {
   WebSearchSettings,
 } from "../types.ts";
 import { getCredentialProvider } from "../types.ts";
-import { useFetchInitialData } from "./use-fetch-initial-data.ts";
 import { useLocalStorageState } from "./use-local-storage-state.ts";
 export interface ModelSelection {
   provider: string;
@@ -37,10 +40,6 @@ export interface ModelOption extends ModelSelection {
   modalities?: Modality[];
 }
 
-const RUN_STREAM_URL = "/api/run-stream/";
-const TOOLS_URL = "/api/tools/";
-const TOOLKITS_URL = "/api/toolkits/";
-
 export const STORAGE_KEY_MODEL = "console-selected-model";
 export const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
 export const STORAGE_KEY_CONTEXT = "console-user-context";
@@ -52,6 +51,14 @@ export const STORAGE_KEY_MCP_SERVERS = "console-mcp-servers";
 
 const RAW_MODEL_LIST = (modelsJson.models ?? []) as ModelInfo[];
 const MODEL_OPTIONS: ModelOption[] = RAW_MODEL_LIST.map(mapModelDefinition);
+const TOOL_OPTIONS: ToolInfo[] = availableTools.flatMap((tool) =>
+  tool.type === "function"
+    ? [{ name: tool.name, description: tool.description }]
+    : [],
+);
+const TOOLKIT_OPTIONS: ToolkitInfo[] = availableToolkits.map(
+  ({ name, description }) => ({ name, description }),
+);
 
 function mapModelDefinition(info: ModelInfo): ModelOption {
   return {
@@ -162,7 +169,6 @@ function createModelFeatureState(selectedModelOption: ModelOption | undefined) {
 }
 
 export interface ConsoleAppState<Context> {
-  runStreamUrl: string;
   modelOptions: ModelOption[];
   modelSelection: ModelSelection | null;
   setModelSelection: Dispatch<SetStateAction<ModelSelection | null>>;
@@ -170,13 +176,9 @@ export interface ConsoleAppState<Context> {
   providerApiKeys: ApiKeys;
   handleSaveProviderApiKey: (provider: string, apiKey: string) => void;
   toolOptions: ToolInfo[];
-  toolsError: string | null;
-  toolsInitialized: boolean;
   enabledTools: string[];
   handleEnabledToolsChange: (tools: string[]) => void;
   toolkitOptions: ToolkitInfo[];
-  toolkitsError: string | null;
-  toolkitsInitialized: boolean;
   enabledToolkits: string[];
   handleEnabledToolkitsChange: (toolkits: string[]) => void;
   webSearch: WebSearchSettings;
@@ -252,28 +254,6 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     },
   );
 
-  const fetchTools = useCallback(async (signal: AbortSignal) => {
-    const response = await fetch(TOOLS_URL, { signal });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tools (${String(response.status)})`);
-    }
-    return (await response.json()) as ToolInfo[];
-  }, []);
-
-  const { data: toolsData, error: toolsError } =
-    useFetchInitialData(fetchTools);
-
-  const fetchToolkits = useCallback(async (signal: AbortSignal) => {
-    const response = await fetch(TOOLKITS_URL, { signal });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch toolkits (${String(response.status)})`);
-    }
-    return (await response.json()) as ToolkitInfo[];
-  }, []);
-
-  const { data: toolkitsData, error: toolkitsError } =
-    useFetchInitialData(fetchToolkits);
-
   const handleSaveProviderApiKey = useCallback(
     (provider: string, apiKey: string) => {
       const credentialProvider = getCredentialProvider(provider);
@@ -296,21 +276,19 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
 
   const toolOptions = useMemo(
     () =>
-      (toolsData ?? []).filter(
+      TOOL_OPTIONS.filter(
         (tool) =>
           !tool.providers ||
           !modelSelection ||
           tool.providers.includes(modelSelection.provider),
       ),
-    [modelSelection, toolsData],
+    [modelSelection],
   );
-  const toolsInitialized = toolsData !== null || toolsError !== null;
-  const toolkitOptions = useMemo(() => toolkitsData ?? [], [toolkitsData]);
-  const toolkitsInitialized = toolkitsData !== null || toolkitsError !== null;
+  const toolkitOptions = TOOLKIT_OPTIONS;
 
   const handleEnabledToolsChange = useCallback(
     (next: string[]) => {
-      const allToolNames = (toolsData ?? []).map((tool) => tool.name);
+      const allToolNames = TOOL_OPTIONS.map((tool) => tool.name);
       const visibleToolNames = new Set(toolOptions.map((tool) => tool.name));
       const nextVisibleTools = new Set(next);
       const selectedTools = new Set(
@@ -335,24 +313,18 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
         JSON.stringify(normalized),
       );
     },
-    [
-      enabledTools,
-      hasStoredToolPreference,
-      setEnabledTools,
-      toolOptions,
-      toolsData,
-    ],
+    [enabledTools, hasStoredToolPreference, setEnabledTools, toolOptions],
   );
 
   const handleEnabledToolkitsChange = useCallback(
     (next: string[]) => {
-      const toolkitNames = (toolkitsData ?? []).map((toolkit) => toolkit.name);
+      const toolkitNames = TOOLKIT_OPTIONS.map((toolkit) => toolkit.name);
       const nextSet = new Set(next);
       const normalized = toolkitNames.filter((name) => nextSet.has(name));
       setEnabledToolkits(normalized);
       setHasStoredToolkitPreference(true);
     },
-    [setEnabledToolkits, toolkitsData],
+    [setEnabledToolkits],
   );
 
   const handleMcpServersChange = useCallback(
@@ -451,7 +423,6 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
   }, []);
 
   return {
-    runStreamUrl: RUN_STREAM_URL,
     modelOptions,
     modelSelection,
     setModelSelection,
@@ -459,13 +430,9 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     providerApiKeys,
     handleSaveProviderApiKey,
     toolOptions,
-    toolsError,
-    toolsInitialized,
     enabledTools: normalizedEnabledTools,
     handleEnabledToolsChange,
     toolkitOptions,
-    toolkitsError,
-    toolkitsInitialized,
     enabledToolkits: normalizedEnabledToolkits,
     handleEnabledToolkitsChange,
     webSearch,

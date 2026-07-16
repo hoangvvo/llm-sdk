@@ -79,17 +79,13 @@ interface SidebarProps {
   tools: ToolInfo[];
   enabledTools: string[];
   onEnabledToolsChange: (tools: string[]) => void;
-  toolErrorMessage?: string | null;
   toolkits: ToolkitInfo[];
   enabledToolkits: string[];
   onEnabledToolkitsChange: (toolkits: string[]) => void;
-  toolkitErrorMessage?: string | null;
   webSearch: WebSearchSettings;
   onWebSearchChange: Dispatch<SetStateAction<WebSearchSettings>>;
   mcpServers: McpServerConfig[];
   onMcpServersChange: (servers: McpServerConfig[]) => void;
-  toolsInitialized: boolean;
-  toolkitsInitialized: boolean;
   modelAudio: AudioOptions | undefined;
   onModelAudioChange: (audio: AudioOptions | undefined) => void;
   modelReasoning: ReasoningOptions | undefined;
@@ -154,17 +150,13 @@ function Sidebar({
   tools,
   enabledTools,
   onEnabledToolsChange,
-  toolErrorMessage,
   toolkits,
   enabledToolkits,
   onEnabledToolkitsChange,
-  toolkitErrorMessage,
   webSearch,
   onWebSearchChange,
   mcpServers,
   onMcpServersChange,
-  toolsInitialized,
-  toolkitsInitialized,
   modelAudio,
   onModelAudioChange,
   modelReasoning,
@@ -243,8 +235,6 @@ function Sidebar({
             tools={tools}
             enabledTools={enabledTools}
             onEnabledToolsChange={onEnabledToolsChange}
-            errorMessage={toolErrorMessage}
-            initialized={toolsInitialized}
           />
         </CollapsibleSection>
         <CollapsibleSection
@@ -258,8 +248,6 @@ function Sidebar({
             toolkits={toolkits}
             enabledToolkits={enabledToolkits}
             onEnabledToolkitsChange={onEnabledToolkitsChange}
-            errorMessage={toolkitErrorMessage}
-            initialized={toolkitsInitialized}
           />
         </CollapsibleSection>
         <CollapsibleSection
@@ -788,24 +776,18 @@ function ModelSelectionSection({
         <div className="console-surface text-xs text-slate-600">
           <h3 className="console-subheading">Provider API Keys</h3>
           {providers.length > 0 ? (
-            <div className="mt-3 space-y-3">
+            <div className="mt-3 divide-y divide-slate-200">
               {providers.map((provider) => {
                 const savedValue = apiKeys[provider];
                 return (
-                  <div key={provider} className="console-surface p-3">
-                    <div className="console-microcaps flex items-center justify-between text-slate-500">
-                      <span>{formatProviderLabel(provider)}</span>
-                      <span
-                        className={`text-[10px] ${
-                          savedValue ? "text-emerald-600" : "text-slate-400"
-                        }`}
-                      >
-                        {savedValue ? "Saved" : "Not set"}
-                      </span>
-                    </div>
+                  <label
+                    key={provider}
+                    className="console-label block py-3 first:pt-0 last:pb-0"
+                  >
+                    {formatProviderLabel(provider)}
                     <input
                       type="text"
-                      className="console-field mt-2 w-full"
+                      className="console-field mt-1.5 w-full"
                       placeholder={`Enter your ${formatProviderLabel(
                         provider,
                       )} API key`}
@@ -814,7 +796,7 @@ function ModelSelectionSection({
                         onSaveApiKey(provider, event.target.value);
                       }}
                     />
-                  </div>
+                  </label>
                 );
               })}
             </div>
@@ -918,16 +900,12 @@ interface ToolSectionProps {
   tools: ToolInfo[];
   enabledTools: string[];
   onEnabledToolsChange: (tools: string[]) => void;
-  errorMessage?: string | null;
-  initialized: boolean;
 }
 
 function ToolSection({
   tools,
   enabledTools,
   onEnabledToolsChange,
-  errorMessage,
-  initialized,
 }: ToolSectionProps) {
   const orderedToolNames = useMemo(
     () => tools.map((tool) => tool.name),
@@ -976,10 +954,7 @@ function ToolSection({
           })}
         </ul>
       ) : (
-        <p className="mt-2 text-xs text-slate-500">
-          {errorMessage ??
-            (initialized ? "No tools available." : "Loading tools…")}
-        </p>
+        <p className="mt-2 text-xs text-slate-500">No tools available.</p>
       )}
     </div>
   );
@@ -989,16 +964,12 @@ interface ToolkitSectionProps {
   toolkits: ToolkitInfo[];
   enabledToolkits: string[];
   onEnabledToolkitsChange: (toolkits: string[]) => void;
-  errorMessage?: string | null;
-  initialized: boolean;
 }
 
 function ToolkitSection({
   toolkits,
   enabledToolkits,
   onEnabledToolkitsChange,
-  errorMessage,
-  initialized,
 }: ToolkitSectionProps) {
   const handleToggleToolkit = (toolkitName: string, isChecked: boolean) => {
     const next = new Set(enabledToolkits);
@@ -1041,10 +1012,7 @@ function ToolkitSection({
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-xs text-slate-500">
-          {errorMessage ??
-            (initialized ? "No toolkits available." : "Loading toolkits…")}
-        </p>
+        <p className="mt-2 text-xs text-slate-500">No toolkits available.</p>
       )}
     </div>
   );

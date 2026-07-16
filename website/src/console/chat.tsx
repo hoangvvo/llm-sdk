@@ -19,7 +19,6 @@ export function ChatApp() {
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
 
   const {
-    runStreamUrl,
     modelOptions,
     modelSelection,
     setModelSelection,
@@ -27,13 +26,9 @@ export function ChatApp() {
     providerApiKeys,
     handleSaveProviderApiKey,
     toolOptions,
-    toolsError,
-    toolsInitialized,
     enabledTools,
     handleEnabledToolsChange,
     toolkitOptions,
-    toolkitsError,
-    toolkitsInitialized,
     enabledToolkits,
     handleEnabledToolkitsChange,
     webSearch,
@@ -76,9 +71,8 @@ export function ChatApp() {
     sendUserMessage,
     abort,
     resetConversation,
-  } = useAgent<MyContext>(
+  } = useAgent(
     {
-      runStreamUrl,
       modelSelection,
       model: selectedModelOption ?? null,
       providerApiKeys,
@@ -88,7 +82,6 @@ export function ChatApp() {
       webSearch,
       mcpServers,
       agentBehavior,
-      toolsInitialized,
       audio: modelAudio,
       reasoning: modelReasoning,
       modalities: modelModalities,
@@ -239,17 +232,13 @@ export function ChatApp() {
           tools={toolOptions}
           enabledTools={enabledTools}
           onEnabledToolsChange={handleEnabledToolsChange}
-          toolErrorMessage={toolsError}
           toolkits={toolkitOptions}
           enabledToolkits={enabledToolkits}
           onEnabledToolkitsChange={handleToolkitSelectionChange}
-          toolkitErrorMessage={toolkitsError}
           webSearch={webSearch}
           onWebSearchChange={setWebSearch}
           mcpServers={mcpServers}
           onMcpServersChange={handleMcpServersChange}
-          toolsInitialized={toolsInitialized}
-          toolkitsInitialized={toolkitsInitialized}
           modelAudio={modelAudio}
           onModelAudioChange={setModelAudio}
           modelReasoning={modelReasoning}

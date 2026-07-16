@@ -8,7 +8,7 @@ import type {
 
 export interface LoggedEvent {
   id: string;
-  direction: "client" | "server";
+  direction: "console" | "agent";
   name: string;
   timestamp: string;
   payload: unknown;
