@@ -34,6 +34,12 @@ jobs:
         run: RUSTFLAGS="-Dwarnings" cargo clippy --package llm-sdk-rs
       - name: Build SDK
         run: cargo build --package llm-sdk-rs
+      - name: Test SDK offline suites
+        run: >-
+          cargo test --package llm-sdk-rs
+          --test accumulator_tests
+          --test llm_sdk_test_test
+          --test openai_transport_tests
 
   agent:
     name: Agent
@@ -56,14 +62,17 @@ jobs:
       - name: Build agent
         run: cargo build --package llm-agent
       - name: Test agent with coverage
+        env:
+          CARGO_TARGET_DIR: coverage/rust/target
         run: |
-          cargo llvm-cov --no-report --package llm-agent
-          cargo llvm-cov report --package llm-agent --cobertura --output-path coverage-rust.xml
+          mkdir -p coverage/rust
+          cargo llvm-cov --no-report --package llm-agent --no-fail-fast
+          cargo llvm-cov report --package llm-agent --cobertura --output-path coverage/rust/cobertura.xml
       - name: Upload agent coverage
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/upload-code-coverage@v1
         with:
-          file: coverage-rust.xml
+          file: coverage/rust/cobertura.xml
           language: Rust
           label: code-coverage/agent-rust
           fail-on-error: false

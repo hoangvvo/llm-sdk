@@ -136,7 +136,7 @@ go run ./examples/generate-text
 
 ## Migration
 
-### To 0.3.0
+### To 0.4.0
 
 - Replace `Tool{Name, Description, Parameters}` literals with `NewFunctionTool(...)`.
 

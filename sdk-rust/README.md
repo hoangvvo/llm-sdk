@@ -117,7 +117,7 @@ cargo run --example generate-text
 
 ## Migration
 
-### To 0.3.0
+### To 0.4.0
 
 - Replace `Tool { name, description, parameters }` with `FunctionTool::new(...)`.
 

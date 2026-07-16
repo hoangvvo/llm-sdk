@@ -134,7 +134,7 @@ node examples/generate-text.ts
 
 ## Migration
 
-### To 0.5.0
+### To 0.6.0
 
 - Function tools now require `type: "function"`.
 
