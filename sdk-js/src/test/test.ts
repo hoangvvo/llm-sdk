@@ -16,8 +16,7 @@ export type MockGenerateResult = { response: ModelResponse } | { error: Error };
  * It can either be a set of partial responses or an error to throw.
  */
 export type MockStreamResult =
-  | { partials: PartialModelResponse[] }
-  | { error: Error };
+  { partials: PartialModelResponse[] } | { error: Error };
 
 /**
  * A mock language model for testing purposes

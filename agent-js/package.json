@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
-    "test": "node --test --experimental-test-coverage --test-coverage-include=src/**/*.ts \"**/*.test.ts\" "
+    "test": "c8 --all --include='src/**/*.ts' --exclude='**/*.test.ts' --exclude='src/**/index.ts' --exclude='src/**/types.ts' --exclude='src/toolkit.ts' --reporter=text --reporter=cobertura node --test \"**/*.test.ts\""
   },
   "files": [
     "dist"

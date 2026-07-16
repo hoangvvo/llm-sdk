@@ -108,13 +108,13 @@ impl AgentFunctionTool<()> for SearchHotelsTool {
                     json!([
                         {
                             "name": "The Plaza",
-                            "location": params.city.to_string(),
+                            "location": params.city.clone(),
                             "pricePerNight": 150,
                             "rating": 4.8
                         },
                         {
                             "name": "Hotel Ritz",
-                            "location": params.city.to_string(),
+                            "location": params.city.clone(),
                             "pricePerNight": 200,
                             "rating": 4.7
                         }

@@ -6,12 +6,16 @@ use llm_sdk::{JSONSchema, Part};
 use rand::RngExt;
 use serde::Deserialize;
 use serde_json::Value;
+use std::fmt::Write as _;
 
 fn rand_id(n_bytes: usize) -> String {
     let mut b = vec![0u8; n_bytes];
     rand::rng().fill(&mut b[..]);
-    // hex encode
-    b.iter().map(|x| format!("{x:02x}")).collect::<String>()
+    let mut id = String::with_capacity(n_bytes * 2);
+    for byte in b {
+        write!(&mut id, "{byte:02x}").expect("writing to a String should not fail");
+    }
+    id
 }
 
 fn find_artifact<'a>(ctx: &'a MyContext, id: &str) -> Option<&'a Artifact> {

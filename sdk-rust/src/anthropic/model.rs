@@ -9,9 +9,9 @@ use crate::{
         RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock,
         RequestTextBlockCitationsItem, RequestThinkingBlock, RequestToolResultBlock,
         RequestToolResultBlockContent, RequestToolResultBlockContentArrayItem, RequestToolUseBlock,
-        RequestWebSearchResultLocationCitation, ThinkingConfigAdaptive, ThinkingConfigDisabled,
-        ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage, UserLocation,
-        WebSearchTool20250305,
+        RequestWebSearchResultLocationCitation, StopReason, ThinkingConfigAdaptive,
+        ThinkingConfigDisabled, ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage,
+        UserLocation, WebSearchTool20250305,
     },
     client_utils, stream_utils, Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
@@ -164,6 +164,12 @@ impl LanguageModel for AnthropicModel {
                     )
                     .await?;
 
+                    if matches!(response.stop_reason, Some(StopReason::Refusal)) {
+                        return Err(LanguageModelError::Refusal(anthropic_refusal_message(
+                            response.stop_details.as_ref(),
+                        )));
+                    }
+
                     let content = map_anthropic_message(response.content);
                     let usage = Some(map_anthropic_usage(&response.usage));
 
@@ -229,8 +235,13 @@ impl LanguageModel for AnthropicModel {
                                         usage: Some(usage),
                                         cost,
                                     };
+                                    if matches!(message.stop_reason, Some(StopReason::Refusal)) {
+                                        Err(LanguageModelError::Refusal(anthropic_refusal_message(
+                                            message.stop_details.as_ref(),
+                                        )))?;
+                                    }
                                 }
-                                MessageStreamEvent::MessageDelta(MessageDeltaEvent { usage, .. }) => {
+                                MessageStreamEvent::MessageDelta(MessageDeltaEvent { delta, usage }) => {
                                     let usage = map_anthropic_message_delta_usage(&usage);
                                     let cost = metadata
                                         .as_ref()
@@ -242,6 +253,11 @@ impl LanguageModel for AnthropicModel {
                                         usage: Some(usage),
                                         cost,
                                     };
+                                    if matches!(delta.stop_reason, Some(StopReason::Refusal)) {
+                                        Err(LanguageModelError::Refusal(anthropic_refusal_message(
+                                            delta.stop_details.as_ref(),
+                                        )))?;
+                                    }
                                 }
                                 MessageStreamEvent::ContentBlockStart(ContentBlockStartEvent { content_block, index }) => {
                                     let is_provider_tool_block = matches!(
@@ -307,6 +323,19 @@ impl LanguageModel for AnthropicModel {
             .await
         })
     }
+}
+
+fn anthropic_refusal_message(details: Option<&api::RefusalStopDetails>) -> String {
+    details
+        .and_then(|details| {
+            details.explanation.clone().or_else(|| {
+                details
+                    .category
+                    .as_ref()
+                    .map(|_| "Anthropic policy category refusal".to_string())
+            })
+        })
+        .unwrap_or_else(|| "Anthropic refused the request".to_string())
 }
 
 fn convert_to_anthropic_create_params(

@@ -48,17 +48,11 @@ export type WebSearchSettings = Omit<WebSearchTool, "type"> & {
 export const WEB_SEARCH_PROVIDERS = ["openai", "google", "anthropic"];
 export const WEB_SEARCH_OPTIONS_PROVIDERS = ["openai", "anthropic"];
 
-export type McpServerConfig =
-  | {
-      type: "streamable-http";
-      url: string;
-      authorization?: string;
-    }
-  | {
-      type: "stdio";
-      command: string;
-      args?: string[];
-    };
+export interface McpServerConfig {
+  type: "streamable-http";
+  url: string;
+  authorization?: string;
+}
 
 export interface AgentBehaviorSettings {
   temperature?: number;

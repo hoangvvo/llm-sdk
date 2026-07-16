@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { UnsupportedError } from "../errors.ts";
+import { RefusalError, UnsupportedError } from "../errors.ts";
 import type {
   LanguageModel,
   LanguageModelMetadata,
@@ -65,6 +65,10 @@ export class AnthropicModel implements LanguageModel {
 
     const response = await this.#anthropic.messages.create(createParams);
 
+    if (response.stop_reason === "refusal") {
+      throw new RefusalError(anthropicRefusalMessage(response.stop_details));
+    }
+
     const content = mapAnthropicMessage(response.content);
     const usage = mapAnthropicUsage(response.usage);
 
@@ -94,6 +98,11 @@ export class AnthropicModel implements LanguageModel {
             event.cost = calculateCost(usage, this.metadata.pricing);
           }
           yield event;
+          if (chunk.message.stop_reason === "refusal") {
+            throw new RefusalError(
+              anthropicRefusalMessage(chunk.message.stop_details),
+            );
+          }
           break;
         }
         case "message_delta": {
@@ -103,6 +112,11 @@ export class AnthropicModel implements LanguageModel {
             event.cost = calculateCost(usage, this.metadata.pricing);
           }
           yield event;
+          if (chunk.delta.stop_reason === "refusal") {
+            throw new RefusalError(
+              anthropicRefusalMessage(chunk.delta.stop_details),
+            );
+          }
           break;
         }
         case "content_block_start": {
@@ -139,6 +153,17 @@ export class AnthropicModel implements LanguageModel {
   }
 }
 
+function anthropicRefusalMessage(
+  details: Anthropic.Messages.RefusalStopDetails | null | undefined,
+): string {
+  return (
+    details?.explanation ??
+    (details?.category
+      ? `Anthropic policy category: ${details.category}`
+      : "Anthropic refused the request")
+  );
+}
+
 function convertToAnthropicCreateParams(
   input: LanguageModelInput,
   modelId: string,
@@ -167,12 +192,18 @@ function convertToAnthropicCreateParams(
     params.system = system_prompt;
   }
   if (typeof temperature === "number") {
+    // Kept for Anthropic models that still support this common generation option.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     params.temperature = temperature;
   }
   if (typeof top_p === "number") {
+    // Kept for Anthropic models that still support this common generation option.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     params.top_p = top_p;
   }
   if (typeof top_k === "number") {
+    // Kept for Anthropic models that still support this common generation option.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     params.top_k = top_k;
   }
   if (response_format) {

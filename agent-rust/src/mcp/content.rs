@@ -27,3 +27,21 @@ pub(super) fn convert_mcp_content(contents: Vec<Content>) -> Result<Vec<Part>, B
 
     Ok(parts)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_unsupported_audio_format() {
+        let content = Content {
+            raw: RawContent::Audio(rmcp::model::RawAudioContent {
+                data: "AAEC".to_string(),
+                mime_type: "audio/unknown".to_string(),
+            }),
+            annotations: None,
+        };
+
+        assert!(convert_mcp_content(vec![content]).is_err());
+    }
+}

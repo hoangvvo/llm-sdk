@@ -2,40 +2,79 @@ name: Go
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
+    branches: [main]
 
 permissions:
   contents: read
+  code-quality: write
+  pull-requests: read
 
 jobs:
-  build:
+  sdk:
+    name: SDK
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
-          go-version: "1.23"
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
           cache: true
           cache-dependency-path: |
             **/go.sum
             go.work.sum
-
       - name: Install dependencies
         run: go mod download
-
-      - name: Vet
+      - name: Vet SDK
+        run: go vet ./sdk-go/...
+      - name: Build SDK
+        run: go build ./sdk-go/...
+      - name: Test SDK offline suites
         run: |
-          go vet ./sdk-go/...
-          go vet ./agent-go/...
+          go test ./sdk-go ./sdk-go/llmsdktest
+          OPENAI_API_KEY=offline-test-only go test ./sdk-go/openai -run '^TestOpenAIRecordedTransport'
 
-      - name: Build
+  agent:
+    name: Agent
+    needs: sdk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+          cache: true
+          cache-dependency-path: |
+            **/go.sum
+            go.work.sum
+      - name: Install dependencies
+        run: go mod download
+      - name: Install coverage converter
+        run: go install github.com/boumenot/gocover-cobertura@v1.5.0
+      - name: Vet agent
+        run: go vet ./agent-go/...
+      - name: Build agent
+        run: go build ./agent-go/...
+      - name: Test agent with coverage
         run: |
-          go build ./sdk-go/...
-          go build ./agent-go/...
-
-      - name: Test
-        run: go test -v ./agent-go/...
+          mkdir -p coverage/go
+          cover_packages=$(go list ./agent-go ./agent-go/mcp | paste -sd, -)
+          go test -v -covermode=atomic -coverpkg="$cover_packages" -coverprofile=coverage/go/coverage.out ./agent-go ./agent-go/mcp
+          gocover-cobertura < coverage/go/coverage.out > coverage/go/cobertura.xml
+      - name: Upload agent coverage
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage/go/cobertura.xml
+          language: Go
+          label: code-coverage/agent-go
+          fail-on-error: false

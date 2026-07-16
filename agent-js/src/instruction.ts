@@ -3,9 +3,7 @@
  * to be called with the agent context and return a string.
  */
 export type InstructionParam<TContext> =
-  | string
-  | ((ctx: TContext) => string)
-  | ((ctx: TContext) => Promise<string>);
+  string | ((ctx: TContext) => string) | ((ctx: TContext) => Promise<string>);
 
 export async function getPromptForInstructionParams<TContext>(
   instructions: InstructionParam<TContext>[],

@@ -412,6 +412,8 @@ impl StreamAccumulator {
     /// Clears all accumulated data
     pub fn clear(&mut self) {
         self.accumulated_parts.clear();
+        self.accumulated_usage = None;
+        self.cost = None;
     }
 
     /// Gets the number of accumulated parts

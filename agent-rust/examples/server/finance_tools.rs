@@ -80,8 +80,8 @@ impl AgentFunctionTool<MyContext> for GetStockPriceTool {
                                                 "low": meta.get("regularMarketDayLow"),
                                                 "previous_close": meta.get("previousClose"),
                                                 "timestamp": meta.get("regularMarketTime")
-                                                    .and_then(serde_json::Value::as_f64)
-                                                    .map(|t| chrono::DateTime::from_timestamp(t as i64, 0)
+                                                    .and_then(serde_json::Value::as_i64)
+                                                    .map(|t| chrono::DateTime::from_timestamp(t, 0)
                                                         .map(|dt| dt.to_rfc3339())
                                                         .unwrap_or_default())
                                             });

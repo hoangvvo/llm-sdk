@@ -104,6 +104,9 @@ func (m *AnthropicModel) Generate(ctx context.Context, input *llmsdk.LanguageMod
 		if err != nil {
 			return nil, err
 		}
+		if response.StopReason != nil && *response.StopReason == anthropicapi.StopReasonRefusal {
+			return nil, llmsdk.NewRefusalError(anthropicRefusalMessage(response.StopDetails))
+		}
 
 		content, err := mapAnthropicMessage(response.Content)
 		if err != nil {
@@ -169,6 +172,10 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 						partial.Cost = &cost
 					}
 					responseCh <- partial
+					if event.MessageStart.Message.StopReason != nil && *event.MessageStart.Message.StopReason == anthropicapi.StopReasonRefusal {
+						errCh <- llmsdk.NewRefusalError(anthropicRefusalMessage(event.MessageStart.Message.StopDetails))
+						return
+					}
 					continue
 				}
 
@@ -180,6 +187,10 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 						partial.Cost = &cost
 					}
 					responseCh <- partial
+					if event.MessageDelta.Delta.StopReason != nil && *event.MessageDelta.Delta.StopReason == anthropicapi.StopReasonRefusal {
+						errCh <- llmsdk.NewRefusalError(anthropicRefusalMessage(event.MessageDelta.Delta.StopDetails))
+						return
+					}
 					continue
 				}
 
@@ -230,6 +241,18 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 
 		return stream.New(responseCh, errCh), nil
 	})
+}
+
+func anthropicRefusalMessage(details *anthropicapi.RefusalStopDetails) string {
+	if details != nil {
+		if details.Explanation != nil {
+			return *details.Explanation
+		}
+		if details.Category != nil {
+			return fmt.Sprintf("Anthropic policy category: %s", *details.Category)
+		}
+	}
+	return "Anthropic refused the request"
 }
 
 func (m *AnthropicModel) requestHeaders() map[string]string {

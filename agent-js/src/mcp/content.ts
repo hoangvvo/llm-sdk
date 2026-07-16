@@ -7,10 +7,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 
 export type MCPContent =
-  | TextContent
-  | ImageContent
-  | AudioContent
-  | ResourceLink;
+  TextContent | ImageContent | AudioContent | ResourceLink;
 
 export function convertMCPContentToParts(contents: MCPContent[]): Part[] {
   const parts: Part[] = [];

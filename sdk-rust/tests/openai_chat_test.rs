@@ -1,6 +1,6 @@
 mod common;
 use crate::common::cases::RunTestCaseOptions;
-use llm_sdk::{openai::*, *};
+use llm_sdk::openai::*;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
 
@@ -33,104 +33,37 @@ fn openai_audio_model() -> OpenAIChatModel {
     )
 }
 
-fn disable_reasoning(input: &mut LanguageModelInput) {
-    input.reasoning = Some(ReasoningOptions {
-        enabled: false,
-        budget_tokens: None,
-    });
+fn no_reasoning_options() -> RunTestCaseOptions {
+    RunTestCaseOptions {
+        profile: Some("reasoning_disabled"),
+    }
 }
 
-fn no_reasoning_options() -> Option<RunTestCaseOptions> {
-    Some(RunTestCaseOptions {
-        additional_input: Some(disable_reasoning),
-        ..Default::default()
-    })
-}
-
-test_set!(openai_model(), generate_text);
-
-test_set!(openai_model(), stream_text);
-
-test_set!(openai_model(), generate_with_system_prompt);
-
-test_set!(openai_model(), generate_tool_call, no_reasoning_options());
-
-test_set!(openai_model(), stream_tool_call, no_reasoning_options());
-
-test_set!(
+test_group!(
     openai_model(),
-    generate_text_from_tool_result,
-    no_reasoning_options()
+    text_generation,
+    Some(no_reasoning_options())
 );
-
-test_set!(
+test_group!(openai_model(), conversation, Some(no_reasoning_options()));
+test_group!(openai_model(), tool_use, Some(no_reasoning_options()));
+test_group!(
     openai_model(),
-    stream_text_from_tool_result,
-    no_reasoning_options()
+    structured_output,
+    Some(no_reasoning_options())
 );
-
-test_set!(
+test_group!(
     openai_model(),
-    generate_parallel_tool_calls,
-    no_reasoning_options()
+    generation_options,
+    Some(no_reasoning_options())
 );
-
-test_set!(
-    openai_model(),
-    stream_parallel_tool_calls,
-    no_reasoning_options()
-);
-
-test_set!(
-    openai_model(),
-    stream_parallel_tool_calls_same_name,
-    no_reasoning_options()
-);
-
-test_set!(openai_model(), structured_response_format);
-
-test_set!(openai_model(), source_part_input, no_reasoning_options());
-
-test_set!(
-    ignore = "chat completion api does not support hosted web search",
-    openai_model(),
-    generate_web_search
-);
-
-test_set!(
-    ignore = "chat completion api does not support hosted web search",
-    openai_model(),
-    stream_web_search
-);
-
-test_set!(
-    ignore = "chat completion api does not support image generation",
-    openai_model(),
-    generate_image
-);
-
-test_set!(
-    ignore = "chat completion api does not support image generation",
-    openai_model(),
-    stream_image
-);
-
-test_set!(openai_model(), generate_image_input);
-
-test_set!(openai_model(), stream_image_input);
+test_group!(openai_model(), source_input, Some(no_reasoning_options()));
+test_group!(openai_model(), image_input);
 
 test_set!(
     openai_audio_model(),
     generate_audio,
     Some(RunTestCaseOptions {
-        additional_input: Some(|input| {
-            input.audio = Some(AudioOptions {
-                format: Some(AudioFormat::Mp3),
-                voice: Some("alloy".to_string()),
-                ..Default::default()
-            });
-        }),
-        ..Default::default()
+        profile: Some("openai_audio_mp3"),
     })
 );
 
@@ -138,25 +71,6 @@ test_set!(
     openai_audio_model(),
     stream_audio,
     Some(RunTestCaseOptions {
-        additional_input: Some(|input| {
-            input.audio = Some(AudioOptions {
-                format: Some(AudioFormat::Linear16),
-                voice: Some("alloy".to_string()),
-                ..Default::default()
-            });
-        }),
-        ..Default::default()
+        profile: Some("openai_audio_linear16"),
     })
-);
-
-test_set!(
-    ignore = "reasoning is not supported in chat completion api",
-    openai_model(),
-    generate_reasoning
-);
-
-test_set!(
-    ignore = "reasoning is not supported in chat completion api",
-    openai_model(),
-    stream_reasoning
 );

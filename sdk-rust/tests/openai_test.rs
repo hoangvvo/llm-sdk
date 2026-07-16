@@ -1,5 +1,6 @@
 mod common;
-use llm_sdk::{openai::*, *};
+use crate::common::cases::RunTestCaseOptions;
+use llm_sdk::openai::*;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
 
@@ -32,56 +33,21 @@ fn openai_reasoning_model() -> OpenAIModel {
     )
 }
 
-test_set!(openai_model(), generate_text);
-
-test_set!(openai_model(), stream_text);
-
-test_set!(openai_model(), generate_with_system_prompt);
-
-test_set!(openai_model(), generate_tool_call);
-
-test_set!(openai_model(), stream_tool_call);
-
-test_set!(openai_model(), generate_text_from_tool_result);
-
-test_set!(openai_model(), stream_text_from_tool_result);
-
-test_set!(openai_model(), generate_text_from_image_tool_result);
-
-test_set!(openai_model(), generate_parallel_tool_calls);
-
-test_set!(openai_model(), stream_parallel_tool_calls);
-
-test_set!(openai_model(), stream_parallel_tool_calls_same_name);
-
-test_set!(openai_model(), structured_response_format);
-
-test_set!(openai_model(), source_part_input);
-
-test_set!(openai_model(), generate_web_search);
-
-test_set!(openai_model(), stream_web_search);
-
-test_set!(openai_model(), generate_image);
-
-test_set!(openai_model(), stream_image);
-
-test_set!(openai_model(), generate_image_input);
-
-test_set!(openai_model(), stream_image_input);
-
-test_set!(
-    ignore = "audio is not supported in responses api",
-    openai_model(),
-    generate_audio
+test_group!(openai_model(), text_generation);
+test_group!(openai_model(), conversation);
+test_group!(openai_model(), tool_use);
+test_group!(openai_model(), structured_output);
+test_group!(openai_model(), generation_options);
+test_group!(openai_model(), source_input);
+test_group!(openai_model(), multimodal_tool_result);
+test_group!(openai_model(), web_search);
+test_group!(openai_model(), image_generation);
+test_group!(openai_model(), image_input);
+test_group!(
+    openai_reasoning_model(),
+    reasoning,
+    Some(RunTestCaseOptions {
+        profile: Some("openai_opaque_reasoning"),
+    })
 );
-
-test_set!(
-    ignore = "audio is not supported in responses api",
-    openai_model(),
-    stream_audio
-);
-
-test_set!(openai_reasoning_model(), generate_reasoning);
-
-test_set!(openai_reasoning_model(), stream_reasoning);
+test_group!(openai_model(), reasoning_tool_use);

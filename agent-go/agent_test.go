@@ -2,6 +2,7 @@ package llmagent_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,6 +13,7 @@ import (
 
 func TestAgent_Run(t *testing.T) {
 	t.Run("creates session, runs, and closes", func(t *testing.T) {
+		toolkitSession := &mockToolkitSession[map[string]interface{}]{}
 		model := llmsdktest.NewMockLanguageModel()
 		model.EnqueueGenerateResult(
 			llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
@@ -20,7 +22,15 @@ func TestAgent_Run(t *testing.T) {
 				},
 			}),
 		)
-		agent := llmagent.NewAgent[map[string]interface{}]("test-agent", model)
+		agent := llmagent.NewAgent(
+			"test-agent",
+			model,
+			llmagent.WithToolkits(&mockToolkit[map[string]interface{}]{
+				createFn: func(context.Context, map[string]interface{}) (llmagent.ToolkitSession[map[string]interface{}], error) {
+					return toolkitSession, nil
+				},
+			}),
+		)
 
 		response, err := agent.Run(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 			Context: map[string]interface{}{},
@@ -49,11 +59,44 @@ func TestAgent_Run(t *testing.T) {
 		if diff := cmp.Diff(expectedResponse, response); diff != "" {
 			t.Errorf("response mismatch (-want +got): %s", diff)
 		}
+		if toolkitSession.closeCalls != 1 {
+			t.Fatalf("expected toolkit session to close once, got %d", toolkitSession.closeCalls)
+		}
+	})
+
+	t.Run("closes session when generation fails", func(t *testing.T) {
+		toolkitSession := &mockToolkitSession[map[string]interface{}]{}
+		model := llmsdktest.NewMockLanguageModel()
+		modelErr := llmsdk.NewInvalidInputError("generation failed")
+		model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultError(modelErr))
+		agent := llmagent.NewAgent(
+			"test-agent",
+			model,
+			llmagent.WithToolkits(&mockToolkit[map[string]interface{}]{
+				createFn: func(context.Context, map[string]interface{}) (llmagent.ToolkitSession[map[string]interface{}], error) {
+					return toolkitSession, nil
+				},
+			}),
+		)
+
+		_, err := agent.Run(t.Context(), llmagent.AgentRequest[map[string]interface{}]{
+			Context: map[string]interface{}{},
+			Input: []llmagent.AgentItem{
+				llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
+			},
+		})
+		if !errors.Is(err, modelErr) {
+			t.Fatalf("expected wrapped model error, got %v", err)
+		}
+		if toolkitSession.closeCalls != 1 {
+			t.Fatalf("expected toolkit session to close once, got %d", toolkitSession.closeCalls)
+		}
 	})
 }
 
 func TestAgent_RunStream(t *testing.T) {
 	t.Run("creates session, streams, and closes", func(t *testing.T) {
+		toolkitSession := &mockToolkitSession[map[string]interface{}]{}
 		model := llmsdktest.NewMockLanguageModel()
 		model.EnqueueStreamResult(
 			llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
@@ -65,7 +108,15 @@ func TestAgent_RunStream(t *testing.T) {
 				},
 			}),
 		)
-		agent := llmagent.NewAgent[map[string]interface{}]("test-agent", model)
+		agent := llmagent.NewAgent(
+			"test-agent",
+			model,
+			llmagent.WithToolkits(&mockToolkit[map[string]interface{}]{
+				createFn: func(context.Context, map[string]interface{}) (llmagent.ToolkitSession[map[string]interface{}], error) {
+					return toolkitSession, nil
+				},
+			}),
+		)
 
 		stream, err := agent.RunStream(context.Background(), llmagent.AgentRequest[map[string]interface{}]{
 			Context: map[string]interface{}{},
@@ -122,6 +173,43 @@ func TestAgent_RunStream(t *testing.T) {
 
 		if diff := cmp.Diff(expectedEvents, events); diff != "" {
 			t.Errorf("stream events mismatch (-want +got):\n%s", diff)
+		}
+		if toolkitSession.closeCalls != 1 {
+			t.Fatalf("expected toolkit session to close once, got %d", toolkitSession.closeCalls)
+		}
+	})
+
+	t.Run("closes session when streaming fails", func(t *testing.T) {
+		toolkitSession := &mockToolkitSession[map[string]interface{}]{}
+		model := llmsdktest.NewMockLanguageModel()
+		modelErr := llmsdk.NewInvalidInputError("stream failed")
+		model.EnqueueStreamResult(llmsdktest.NewMockStreamResultError(modelErr))
+		agent := llmagent.NewAgent(
+			"test-agent",
+			model,
+			llmagent.WithToolkits(&mockToolkit[map[string]interface{}]{
+				createFn: func(context.Context, map[string]interface{}) (llmagent.ToolkitSession[map[string]interface{}], error) {
+					return toolkitSession, nil
+				},
+			}),
+		)
+
+		stream, err := agent.RunStream(t.Context(), llmagent.AgentRequest[map[string]interface{}]{
+			Context: map[string]interface{}{},
+			Input: []llmagent.AgentItem{
+				llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
+			},
+		})
+		if err != nil {
+			t.Fatalf("create stream: %v", err)
+		}
+		for stream.Next() {
+		}
+		if !errors.Is(stream.Err(), modelErr) {
+			t.Fatalf("expected wrapped model error, got %v", stream.Err())
+		}
+		if toolkitSession.closeCalls != 1 {
+			t.Fatalf("expected toolkit session to close once, got %d", toolkitSession.closeCalls)
 		}
 	})
 }

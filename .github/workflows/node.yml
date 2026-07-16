@@ -8,28 +8,65 @@ on:
 
 permissions:
   contents: read
+  code-quality: write
+  pull-requests: read
 
 jobs:
-  build:
+  sdk:
+    name: SDK
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [24.x]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/checkout@v6
         with:
-          node-version: ${{ matrix.node-version }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Type-check repository scripts
+        run: npx tsc -p tsconfig.json
+      - name: Lint repository support code
+        run: npx eslint scripts website
+      - name: Build SDK
+        run: npm run build -w=sdk-js
+      - name: Lint SDK
+        run: npm run lint -w=sdk-js
+      - name: Test SDK offline suites
+        run: npm run test:offline -w=sdk-js
 
-      - name: Run build
-        run: npm run build
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run tests
+  agent:
+    name: Agent
+    needs: sdk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build agent dependencies
+        run: npm run build -w=sdk-js
+      - name: Build agent
+        run: npm run build -w=agent-js
+      - name: Lint agent
+        run: npm run lint -w=agent-js
+      - name: Test agent with coverage
         run: npm test -w=agent-js
+      - name: Upload agent coverage
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: agent-js/coverage/cobertura-coverage.xml
+          language: TypeScript
+          label: code-coverage/agent-js
+          fail-on-error: false

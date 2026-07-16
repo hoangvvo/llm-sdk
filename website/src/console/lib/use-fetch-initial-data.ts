@@ -1,9 +1,9 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
-  useEffectEvent,
 } from "react";
 
 interface UseFetchInitialDataResult<T> {
@@ -53,6 +53,7 @@ export function useFetchInitialData<T>(
   });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     onInitialFetch();
     return () => {
       abortControllerRef.current?.abort();

@@ -214,6 +214,12 @@ An example server that exposes an API to interact with the agent can be found in
 
 - Rename directly implemented function tools from `AgentTool` to `AgentFunctionTool` and add `type: "function"`. The `tool(...)` helper adds the type automatically.
 
+# Testing
+
+```bash
+npm test -w=agent-js
+```
+
 ## License
 
 [MIT](https://github.com/hoangvvo/llm-sdk/blob/main/LICENSE)

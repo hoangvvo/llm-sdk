@@ -6,7 +6,6 @@ import type {
 } from "@hoangvvo/llm-sdk";
 import {
   useCallback,
-  useEffect,
   useMemo,
   useState,
   type Dispatch,
@@ -21,7 +20,6 @@ import type {
   ToolInfo,
   WebSearchSettings,
 } from "../types.ts";
-import { normalizeBaseUrl, parseExampleServerUrls } from "./example-server.ts";
 import { useFetchInitialData } from "./use-fetch-initial-data.ts";
 import { useLocalStorageState } from "./use-local-storage-state.ts";
 export interface ModelSelection {
@@ -37,14 +35,9 @@ export interface ModelOption extends ModelSelection {
   modalities?: Modality[];
 }
 
-const env = import.meta.env as Record<string, string | undefined>;
+const RUN_STREAM_URL = "/api/run-stream/";
+const TOOLS_URL = "/api/tools/";
 
-export const DEFAULT_API_BASE_URL = normalizeBaseUrl("http://localhost:4000");
-export const EXAMPLE_SERVER_URL_OPTIONS = parseExampleServerUrls(
-  env.EXAMPLE_SERVER_URLS ?? env.PUBLIC_EXAMPLE_SERVER_URLS,
-);
-
-export const STORAGE_KEY_SERVER_URL = "console-example-server-url";
 export const STORAGE_KEY_MODEL = "console-selected-model";
 export const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
 export const STORAGE_KEY_CONTEXT = "console-user-context";
@@ -165,9 +158,6 @@ function createModelFeatureState(selectedModelOption: ModelOption | undefined) {
 }
 
 export interface ConsoleAppState<Context> {
-  serverOptions: string[];
-  serverUrl: string;
-  handleServerUrlChange: (value: string) => void;
   runStreamUrl: string;
   modelOptions: ModelOption[];
   modelSelection: ModelSelection | null;
@@ -197,40 +187,6 @@ export interface ConsoleAppState<Context> {
 }
 
 export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
-  const serverOptions = EXAMPLE_SERVER_URL_OPTIONS;
-  const hasServerOptions = serverOptions.length > 0;
-
-  const [apiBaseUrl, setApiBaseUrl] = useLocalStorageState<string>(
-    STORAGE_KEY_SERVER_URL,
-    () => serverOptions[0] ?? DEFAULT_API_BASE_URL,
-  );
-  const normalizedApiBaseUrl = useMemo(
-    () => normalizeBaseUrl(apiBaseUrl),
-    [apiBaseUrl],
-  );
-  const effectiveApiBaseUrl = hasServerOptions
-    ? normalizedApiBaseUrl
-    : DEFAULT_API_BASE_URL;
-
-  useEffect(() => {
-    if (!hasServerOptions) {
-      return;
-    }
-    if (!serverOptions.includes(normalizedApiBaseUrl)) {
-      setApiBaseUrl(serverOptions[0]);
-    }
-  }, [hasServerOptions, normalizedApiBaseUrl, serverOptions, setApiBaseUrl]);
-
-  const handleServerUrlChange = useCallback(
-    (value: string) => {
-      setApiBaseUrl(normalizeBaseUrl(value));
-    },
-    [setApiBaseUrl],
-  );
-
-  const runStreamUrl = `${effectiveApiBaseUrl}/run-stream`;
-  const toolsUrl = `${effectiveApiBaseUrl}/tools`;
-
   const modelOptions = MODEL_OPTIONS;
   const [storedModelSelection, setStoredModelSelection] =
     useLocalStorageState<ModelSelection | null>(STORAGE_KEY_MODEL, null);
@@ -263,6 +219,10 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     STORAGE_KEY_MCP_SERVERS,
     () => [],
   );
+  const supportedMcpServers = useMemo(
+    () => mcpServers.filter((server) => server.type === "streamable-http"),
+    [mcpServers],
+  );
 
   const [hasStoredToolPreference, setHasStoredToolPreference] = useState(() => {
     if (typeof window === "undefined") {
@@ -271,26 +231,16 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     return window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLS) !== null;
   });
 
-  const fetchTools = useCallback(
-    async (signal: AbortSignal) => {
-      const response = await fetch(toolsUrl, { signal });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tools (${String(response.status)})`);
-      }
-      return (await response.json()) as ToolInfo[];
-    },
-    [toolsUrl],
-  );
+  const fetchTools = useCallback(async (signal: AbortSignal) => {
+    const response = await fetch(TOOLS_URL, { signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tools (${String(response.status)})`);
+    }
+    return (await response.json()) as ToolInfo[];
+  }, []);
 
-  const {
-    data: toolsData,
-    error: toolsError,
-    refetch: refetchTools,
-  } = useFetchInitialData(fetchTools);
-
-  useEffect(() => {
-    refetchTools();
-  }, [refetchTools, toolsUrl]);
+  const { data: toolsData, error: toolsError } =
+    useFetchInitialData(fetchTools);
 
   const handleSaveProviderApiKey = useCallback(
     (provider: string, apiKey: string) => {
@@ -443,10 +393,7 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
   }, []);
 
   return {
-    serverOptions,
-    serverUrl: normalizedApiBaseUrl,
-    handleServerUrlChange,
-    runStreamUrl,
+    runStreamUrl: RUN_STREAM_URL,
     modelOptions,
     modelSelection,
     setModelSelection,
@@ -460,7 +407,7 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     handleEnabledToolsChange,
     webSearch,
     setWebSearch,
-    mcpServers,
+    mcpServers: supportedMcpServers,
     handleMcpServersChange,
     agentBehavior,
     setAgentBehavior,

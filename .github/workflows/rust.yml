@@ -2,33 +2,82 @@ name: Rust
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
+    branches: [main]
 
 permissions:
   contents: read
+  code-quality: write
+  pull-requests: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  sdk:
+    name: SDK
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly
           components: clippy, rustfmt
+          cache: true
+      - name: Check formatting
+        run: cargo +nightly fmt --all -- --check
+      - name: Run SDK Clippy
+        run: RUSTFLAGS="-Dwarnings" cargo clippy --package llm-sdk-rs
+      - name: Build SDK
+        run: cargo build --package llm-sdk-rs
+      - name: Test SDK offline suites
+        run: >-
+          cargo test --package llm-sdk-rs
+          --test accumulator_tests
+          --test llm_sdk_test_test
+          --test openai_transport_tests
 
-      - name: Run Clippy
-        run: RUSTFLAGS="-Dwarnings" cargo clippy
-      - name: Run Formatter
-        run: cargo +nightly fmt -- --check
-      - name: Build
-        run: cargo build
-
-      - name: Test
-        run: cargo test --lib agent-sdk
+  agent:
+    name: Agent
+    needs: sdk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: clippy
+          cache: true
+          cache-workspaces: |
+            . -> target
+            . -> coverage/rust/target
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Run agent Clippy
+        run: RUSTFLAGS="-Dwarnings" cargo clippy --package llm-agent
+      - name: Build agent
+        run: cargo build --package llm-agent
+      - name: Test agent with coverage
+        env:
+          CARGO_TARGET_DIR: coverage/rust/target
+        run: |
+          mkdir -p coverage/rust
+          cargo llvm-cov --no-report --package llm-agent --no-fail-fast
+          cargo llvm-cov report --package llm-agent --cobertura --output-path coverage/rust/cobertura.xml
+      - name: Upload agent coverage
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage/rust/cobertura.xml
+          language: Rust
+          label: code-coverage/agent-rust
+          fail-on-error: false

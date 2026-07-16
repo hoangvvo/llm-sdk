@@ -17,6 +17,7 @@ mod common;
 #[derive(Default, Clone)]
 struct LostAndFoundContext {
     manifest_id: String,
+    #[allow(dead_code)]
     archivist: String,
     intake_ledger: Arc<Mutex<HashMap<String, ItemRecord>>>,
     flagged_contraband: Arc<Mutex<HashSet<String>>>,
@@ -26,6 +27,7 @@ struct LostAndFoundContext {
 #[derive(Clone)]
 struct ItemRecord {
     description: String,
+    #[allow(dead_code)]
     priority: String,
 }
 

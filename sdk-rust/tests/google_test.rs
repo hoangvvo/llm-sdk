@@ -1,6 +1,6 @@
 mod common;
-use crate::common::{assert::PartAssertion, cases::RunTestCaseOptions};
-use llm_sdk::{google::*, *};
+use crate::common::cases::RunTestCaseOptions;
+use llm_sdk::google::*;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
 
@@ -11,15 +11,6 @@ fn google_api_key() -> &'static String {
         dotenvy::dotenv().ok();
         env::var("GOOGLE_API_KEY").expect("GOOGLE_API_KEY must be set")
     })
-}
-
-fn clear_web_search_options(input: &mut LanguageModelInput) {
-    for tool in input.tools.iter_mut().flatten() {
-        if let Tool::WebSearch(web_search) = tool {
-            web_search.allowed_domains = None;
-            web_search.user_location = None;
-        }
-    }
 }
 
 fn google_model() -> GoogleModel {
@@ -72,117 +63,28 @@ fn google_reasoning_model() -> GoogleModel {
     )
 }
 
-test_set!(google_model(), generate_text);
-
-test_set!(google_model(), stream_text);
-
-test_set!(google_model(), generate_with_system_prompt);
-
-test_set!(google_model(), generate_tool_call);
-
-test_set!(google_model(), stream_tool_call);
-
-test_set!(google_model(), generate_text_from_tool_result);
-
-test_set!(google_model(), stream_text_from_tool_result);
-
-test_set!(
-    google_multimodal_tool_model(),
-    generate_text_from_image_tool_result
-);
-
-test_set!(google_model(), generate_parallel_tool_calls);
-
-test_set!(google_model(), stream_parallel_tool_calls);
-
-test_set!(google_model(), stream_parallel_tool_calls_same_name);
-
-test_set!(google_model(), structured_response_format);
-
-test_set!(google_model(), source_part_input);
-
-test_set!(
+test_group!(google_model(), text_generation);
+test_group!(google_model(), conversation);
+test_group!(google_model(), tool_use);
+test_group!(google_model(), structured_output);
+test_group!(google_model(), generation_options);
+test_group!(google_model(), source_input);
+test_group!(google_multimodal_tool_model(), multimodal_tool_result);
+test_group!(
     google_model(),
-    generate_web_search,
+    web_search,
     Some(RunTestCaseOptions {
-        additional_input: Some(clear_web_search_options),
-        ..Default::default()
+        profile: Some("google_web_search"),
     })
 );
-
-test_set!(
-    google_model(),
-    stream_web_search,
-    Some(RunTestCaseOptions {
-        additional_input: Some(clear_web_search_options),
-        ..Default::default()
-    })
-);
-
-test_set!(google_image_model(), generate_image);
-
-test_set!(google_image_model(), stream_image);
-
-test_set!(google_image_model(), generate_image_input);
-
-test_set!(google_image_model(), stream_image_input);
-
-test_set!(
+test_group!(google_image_model(), image_generation);
+test_group!(google_image_model(), image_input);
+test_group!(
     google_audio_model(),
-    generate_audio,
+    audio_generation,
     Some(RunTestCaseOptions {
-        additional_input: Some(|input| {
-            input.modalities = Some(vec![Modality::Audio]);
-            input.audio = Some(AudioOptions {
-                voice: Some("Zephyr".to_string()),
-                ..Default::default()
-            });
-        }),
-        custom_output_content: Some(|content| {
-            content
-                .iter_mut()
-                .map(|part| {
-                    if let PartAssertion::Audio(part) = part {
-                        part.id = false;
-                        part.transcript = None;
-                        PartAssertion::Audio(part.clone())
-                    } else {
-                        part.clone()
-                    }
-                })
-                .collect()
-        })
+        profile: Some("google_audio"),
     })
 );
-
-test_set!(
-    google_audio_model(),
-    stream_audio,
-    Some(RunTestCaseOptions {
-        additional_input: Some(|input| {
-            input.modalities = Some(vec![Modality::Audio]);
-            input.audio = Some(AudioOptions {
-                voice: Some("Zephyr".to_string()),
-                ..Default::default()
-            });
-        }),
-        custom_output_content: Some(|content| {
-            content
-                .iter_mut()
-                .map(|part| {
-                    if let PartAssertion::Audio(part) = part {
-                        part.id = false;
-                        part.transcript = None;
-                        PartAssertion::Audio(part.clone())
-                    } else {
-                        part.clone()
-                    }
-                })
-                .collect()
-        })
-    })
-);
-
-test_set!(google_reasoning_model(), generate_reasoning);
-
-test_set!(google_reasoning_model(), stream_reasoning);
+test_group!(google_reasoning_model(), reasoning);
+test_group!(google_reasoning_model(), reasoning_tool_use);

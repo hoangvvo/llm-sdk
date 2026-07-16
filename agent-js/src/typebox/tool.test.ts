@@ -1,9 +1,12 @@
 import test, { type TestContext } from "node:test";
 import { Type } from "typebox";
+import { RunState } from "../run.ts";
 import type { AgentTool } from "../tool.ts";
 import { typeboxTool } from "./tool.ts";
 
-test("typeboxTool returns AgentTool", (t: TestContext) => {
+test("typeboxTool exposes its schema and executes typed arguments", async (t: TestContext) => {
+  const context = { prefix: "typed:" };
+  let receivedContext: typeof context | undefined;
   const tool = typeboxTool({
     name: "echo",
     description: "Echo input",
@@ -11,11 +14,13 @@ test("typeboxTool returns AgentTool", (t: TestContext) => {
       { message: Type.String() },
       { additionalProperties: false },
     ),
-    execute: ({ message }) =>
-      Promise.resolve({
-        content: [{ type: "text", text: message }],
+    execute: ({ message }, ctx: typeof context) => {
+      receivedContext = ctx;
+      return Promise.resolve({
+        content: [{ type: "text", text: `${ctx.prefix}${message}` }],
         is_error: false,
-      }),
+      });
+    },
   });
 
   const expected: AgentTool<object> = {
@@ -35,4 +40,14 @@ test("typeboxTool returns AgentTool", (t: TestContext) => {
   };
 
   t.assert.deepStrictEqual(tool, expected);
+  const result = await tool.execute(
+    { message: "hello" },
+    context,
+    new RunState([], 1),
+  );
+  t.assert.strictEqual(receivedContext, context);
+  t.assert.deepStrictEqual(result, {
+    content: [{ type: "text", text: "typed:hello" }],
+    is_error: false,
+  });
 });

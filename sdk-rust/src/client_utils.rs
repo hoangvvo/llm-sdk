@@ -14,13 +14,13 @@ pub async fn send_json<T: Serialize, R: DeserializeOwned>(
     headers: reqwest::header::HeaderMap,
 ) -> Result<R, LanguageModelError> {
     let response = client.post(url).headers(headers).json(data).send().await?;
-    if response.status().is_client_error() {
+    if response.status().is_success() {
+        Ok(response.json::<R>().await?)
+    } else {
         Err(LanguageModelError::StatusCode(
             response.status(),
             response.text().await.unwrap_or_default(),
         ))
-    } else {
-        Ok(response.json::<R>().await?)
     }
 }
 
@@ -42,13 +42,13 @@ async fn send_sse<T: Serialize>(
 > {
     let response = client.post(url).headers(headers).json(data).send().await?;
 
-    if response.status().is_client_error() {
+    if response.status().is_success() {
+        Ok(response.bytes_stream().eventsource())
+    } else {
         Err(LanguageModelError::StatusCode(
             response.status(),
             response.text().await.unwrap_or_default(),
         ))
-    } else {
-        Ok(response.bytes_stream().eventsource())
     }
 }
 

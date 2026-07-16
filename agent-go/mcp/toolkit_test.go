@@ -39,6 +39,8 @@ var (
 	audioBase64 = base64.StdEncoding.EncodeToString(audioBytes)
 )
 
+const authToken = "mcp-test-token"
+
 func startStubMCPServer() (*stubServer, error) {
 	server := gomcp.NewServer(&gomcp.Implementation{Name: "stub-mcp", Version: "1.0.0"}, nil)
 
@@ -80,7 +82,14 @@ func startStubMCPServer() (*stubServer, error) {
 	addr := listener.Addr().(*net.TCPAddr)
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d", addr.Port)
 
-	srv := &http.Server{Handler: handler}
+	authenticatedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+authToken {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
+	srv := &http.Server{Handler: authenticatedHandler}
 	go func() {
 		_ = srv.Serve(listener)
 	}()
@@ -139,7 +148,7 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 		"mcp-test",
 		model,
 		llmagent.WithToolkits(
-			llmmcp.NewMCPToolkit(llmmcp.StaticMCPInit[struct{}](llmmcp.NewMCPStreamableHTTPParams(stub.url, ""))),
+			llmmcp.NewMCPToolkit(llmmcp.StaticMCPInit[struct{}](llmmcp.NewMCPStreamableHTTPParams(stub.url, " bearer "+authToken+" "))),
 		),
 	)
 
@@ -228,7 +237,7 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 		"mcp-test",
 		model,
 		llmagent.WithToolkits(
-			llmmcp.NewMCPToolkit(llmmcp.StaticMCPInit[struct{}](llmmcp.NewMCPStreamableHTTPParams(stub.url, ""))),
+			llmmcp.NewMCPToolkit(llmmcp.StaticMCPInit[struct{}](llmmcp.NewMCPStreamableHTTPParams(stub.url, authToken))),
 		),
 	)
 

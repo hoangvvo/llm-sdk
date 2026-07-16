@@ -47,16 +47,16 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
         break;
       case "streamable-http": {
         const url = new URL(params.url);
+        const authorization = normalizeBearerAuthorization(
+          params.authorization,
+        );
         const transportOptions:
-          | StreamableHTTPClientTransportOptions
-          | undefined = params.authorization
+          StreamableHTTPClientTransportOptions | undefined = authorization
           ? {
               requestInit: {
                 headers: {
                   // Caller supplies bearer token; OAuth negotiation is not handled here.
-                  Authorization: params.authorization.startsWith("Bearer ")
-                    ? params.authorization
-                    : `Bearer ${params.authorization}`,
+                  Authorization: authorization,
                 },
               },
             }
@@ -147,6 +147,18 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
     await this.#client.connect(this.#transport);
     await this.#loadTools();
   }
+}
+
+function normalizeBearerAuthorization(
+  authorization: string | undefined,
+): string | undefined {
+  const value = authorization?.trim();
+  if (!value) return undefined;
+  const [scheme, ...tokenParts] = value.split(/\s+/u);
+  if (scheme?.toLowerCase() === "bearer" && tokenParts.length > 0) {
+    return `Bearer ${tokenParts.join(" ")}`;
+  }
+  return `Bearer ${value}`;
 }
 
 // Build a Toolkit implementation that sources tools from MCP so agent sessions

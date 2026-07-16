@@ -5,7 +5,8 @@ use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    io::Write,
+    fmt::Write as _,
+    io::Write as _,
     sync::{Arc, Mutex},
 };
 
@@ -38,10 +39,11 @@ impl Store {
 fn format_todos(s: &Store) -> String {
     let list = s.list();
     let mut out = String::new();
-    out.push_str(&format!("\n─ PLAN (internal) · {} items\n", list.len()));
+    writeln!(&mut out, "\n─ PLAN (internal) · {} items", list.len())
+        .expect("writing to a String should not fail");
     let expl = s.explanation();
     if !expl.is_empty() {
-        out.push_str(&format!("Explanation: {expl}\n"));
+        writeln!(&mut out, "Explanation: {expl}").expect("writing to a String should not fail");
     }
     if list.is_empty() {
         out.push_str("(empty)\n");
@@ -53,7 +55,7 @@ fn format_todos(s: &Store) -> String {
             "complete" => "✓",
             _ => "○",
         };
-        out.push_str(&format!("{} {}\n", sym, t.step));
+        writeln!(&mut out, "{} {}", sym, t.step).expect("writing to a String should not fail");
     }
     out
 }

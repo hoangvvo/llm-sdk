@@ -753,7 +753,7 @@ function mapOpenAIUsage(
   };
   if (usage.prompt_tokens_details) {
     result.input_tokens_details = mapOpenAIPromptTokensDetails(
-      usage.prompt_tokens_details as OpenAIPatchedPromptTokensDetails,
+      usage.prompt_tokens_details,
       input,
     );
     result.output_tokens_details = mapOpenAICompletionTokenDetails(

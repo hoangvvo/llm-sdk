@@ -138,9 +138,8 @@ async fn mock_language_model_tracks_stream_inputs_and_yields_partials() {
     assert_eq!(tracked[0].messages, stream_input1.messages.clone());
 
     let stream_input2 = user_input("Error");
-    let err = match model.stream(stream_input2.clone()).await {
-        Ok(_) => panic!("expected stream error"),
-        Err(err) => err,
+    let Err(err) = model.stream(stream_input2.clone()).await else {
+        panic!("expected stream error");
     };
     match err {
         LanguageModelError::InvalidInput(msg) => assert_eq!(msg, "stream error"),
@@ -171,9 +170,8 @@ async fn mock_language_model_tracks_stream_inputs_and_yields_partials() {
     model.restore();
     assert!(model.tracked_stream_inputs().is_empty());
 
-    let err = match model.stream(stream_input1.clone()).await {
-        Ok(_) => panic!("expected stream failure"),
-        Err(err) => err,
+    let Err(err) = model.stream(stream_input1.clone()).await else {
+        panic!("expected stream failure");
     };
     match err {
         LanguageModelError::Invariant(provider, message) => {

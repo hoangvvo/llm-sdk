@@ -4,5 +4,5 @@ import ConsoleLayout from "../../layouts/console-layout.astro";
 ---
 
 <ConsoleLayout title="Chat Console">
-  <ChatApp client:load />
+  <ChatApp client:only="react" />
 </ConsoleLayout>

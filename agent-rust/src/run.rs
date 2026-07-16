@@ -7,11 +7,7 @@ use crate::{
     AgentTool,
 };
 use async_stream::try_stream;
-use futures::{
-    future::{join_all, try_join_all},
-    lock::Mutex,
-    stream::StreamExt,
-};
+use futures::{future::join_all, lock::Mutex, stream::StreamExt};
 use llm_sdk::{
     boxed_stream::BoxedStream, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
     Tool, ToolCallPart, ToolResultPart,
@@ -227,6 +223,16 @@ where
                 return;
             }
 
+            let mut seen_tool_call_ids = HashSet::new();
+            for tool_call_part in &tool_call_parts {
+                if !seen_tool_call_ids.insert(tool_call_part.tool_call_id.clone()) {
+                    Err(AgentError::Invariant(format!(
+                        "Duplicate tool call ID: {}",
+                        tool_call_part.tool_call_id
+                    )))?;
+                }
+            }
+
             for tool_call_part in tool_call_parts {
                 if processed_tool_call_ids.contains(&tool_call_part.tool_call_id)
                 {
@@ -380,12 +386,15 @@ where
 
     pub async fn close(self) -> Result<(), AgentError> {
         if let Ok(toolkit_sessions) = Arc::try_unwrap(self.toolkit_sessions) {
-            let _ = join_all(
+            let results = join_all(
                 toolkit_sessions
                     .into_iter()
                     .map(super::toolkit::ToolkitSession::close),
             )
             .await;
+            if let Some(error) = results.into_iter().find_map(Result::err) {
+                return Err(AgentError::Cleanup(error));
+            }
         }
 
         Ok(())
@@ -395,19 +404,31 @@ where
         params: &AgentParams<TCtx>,
         context: &TCtx,
     ) -> Result<Vec<Box<dyn ToolkitSession<TCtx> + Send + Sync>>, AgentError> {
-        let toolkit_sessions = if params.toolkits.is_empty() {
-            Vec::new()
-        } else {
-            let futures = params.toolkits.iter().map(|toolkit| async move {
-                toolkit
-                    .create_session(context)
-                    .await
-                    .map_err(AgentError::Init)
-            });
+        if params.toolkits.is_empty() {
+            return Ok(Vec::new());
+        }
 
-            try_join_all(futures).await?
-        };
-        Ok(toolkit_sessions)
+        let results = join_all(
+            params
+                .toolkits
+                .iter()
+                .map(|toolkit| toolkit.create_session(context)),
+        )
+        .await;
+        let mut sessions = Vec::new();
+        let mut first_error = None;
+        for result in results {
+            match result {
+                Ok(session) => sessions.push(session),
+                Err(error) if first_error.is_none() => first_error = Some(error),
+                Err(_) => {}
+            }
+        }
+        if let Some(error) = first_error {
+            let _ = join_all(sessions.into_iter().map(ToolkitSession::close)).await;
+            return Err(AgentError::Init(error));
+        }
+        Ok(sessions)
     }
 
     async fn get_turn_params(

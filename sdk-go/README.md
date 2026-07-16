@@ -136,13 +136,19 @@ go run ./examples/generate-text
 
 ## Migration
 
-### To 0.3.0
+### To 0.4.0
 
 - Replace `Tool{Name, Description, Parameters}` literals with `NewFunctionTool(...)`.
 
 ### To 0.2.0
 
 - `ImageData` and `AudioData` have been renamed to just `Data` in `ImagePart` and `AudioPart`.
+
+# Testing
+
+```bash
+go test ./sdk-go/...
+```
 
 ## License
 

@@ -23,12 +23,19 @@ export class Agent<TContext> {
     context,
   }: AgentRequest<TContext>): Promise<AgentResponse> {
     const runSession = await this.createSession(context);
+    let response: AgentResponse;
     try {
-      const res = await runSession.run({ input });
-      return res;
-    } finally {
-      await runSession.close();
+      response = await runSession.run({ input });
+    } catch (error) {
+      try {
+        await runSession.close();
+      } catch {
+        // Preserve the primary run error when cleanup also fails.
+      }
+      throw error;
     }
+    await runSession.close();
+    return response;
   }
 
   /**
@@ -40,6 +47,7 @@ export class Agent<TContext> {
     context,
   }: AgentRequest<TContext>): AsyncGenerator<AgentStreamEvent, AgentResponse> {
     const runSession = await this.createSession(context);
+    let streamFailed = false;
     try {
       const stream = runSession.runStream({ input });
 
@@ -50,8 +58,19 @@ export class Agent<TContext> {
       }
 
       return current.value;
+    } catch (error) {
+      streamFailed = true;
+      throw error;
     } finally {
-      await runSession.close();
+      if (!streamFailed) {
+        await runSession.close();
+      } else {
+        try {
+          await runSession.close();
+        } catch {
+          // Preserve the primary stream error when cleanup also fails.
+        }
+      }
     }
   }
 

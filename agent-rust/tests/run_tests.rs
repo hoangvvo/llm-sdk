@@ -10,7 +10,7 @@ use llm_agent::{
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
-    PartDelta, PartialModelResponse, TextPartDelta, ToolCallPartDelta,
+    PartDelta, PartialModelResponse, TextPartDelta, Tool, ToolCallPartDelta, WebSearchTool,
 };
 use serde_json::{json, Value};
 
@@ -40,15 +40,13 @@ impl MockTool {
         }
     }
 
-    fn with_execute_fn<F>(name: &str, result: AgentToolResult, execute: F) -> Self
+    fn with_execute_fn<F>(name: &str, execute: F) -> Self
     where
         F: for<'a> Fn(Value, &'a RunState) -> Result<AgentToolResult, DynError>
             + Send
             + Sync
             + 'static,
     {
-        let _ = result;
-
         Self {
             name: name.to_string(),
             execute: Arc::new(execute),
@@ -273,7 +271,10 @@ where
         Ok(run_session) => {
             run_session.close().await.expect("close session succeeds");
         }
-        Err(_) => panic!("session should not be shared at close"),
+        Err(session) => panic!(
+            "session should not be shared at close (strong count: {})",
+            Arc::strong_count(&session)
+        ),
     }
 }
 
@@ -382,7 +383,7 @@ async fn run_executes_single_tool_call_and_returns_response() {
 }
 
 #[tokio::test]
-async fn run_executes_multiple_tool_calls_in_parallel() {
+async fn run_executes_multiple_tool_calls_from_one_model_response() {
     let tool1 = MockTool::new(
         "tool_1",
         AgentToolResult {
@@ -500,19 +501,12 @@ async fn run_returns_existing_assistant_response_without_new_model_output() {
 
 #[tokio::test]
 async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
-    let resume_tool = MockTool::with_execute_fn(
-        "resume_tool",
-        AgentToolResult {
-            content: vec![],
+    let resume_tool = MockTool::with_execute_fn("resume_tool", |_args, _state| {
+        Ok(AgentToolResult {
+            content: vec![Part::text("call_2 result")],
             is_error: false,
-        },
-        |_args, _state| {
-            Ok(AgentToolResult {
-                content: vec![Part::text("call_2 result")],
-                is_error: false,
-            })
-        },
-    );
+        })
+    });
 
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
@@ -574,19 +568,12 @@ async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
 
 #[tokio::test]
 async fn run_resumes_tool_processing_when_trailing_items_are_tool_entries() {
-    let resume_tool = MockTool::with_execute_fn(
-        "resume_tool",
-        AgentToolResult {
-            content: vec![],
+    let resume_tool = MockTool::with_execute_fn("resume_tool", |_args, _state| {
+        Ok(AgentToolResult {
+            content: vec![Part::text("call_2 via item")],
             is_error: false,
-        },
-        |_args, _state| {
-            Ok(AgentToolResult {
-                content: vec![Part::text("call_2 via item")],
-                is_error: false,
-            })
-        },
-    );
+        })
+    });
 
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
@@ -865,14 +852,9 @@ async fn run_throws_invariant_error_when_tool_not_found() {
 
 #[tokio::test]
 async fn run_throws_tool_execution_error() {
-    let failing_tool = MockTool::with_execute_fn(
-        "failing_tool",
-        AgentToolResult {
-            content: vec![],
-            is_error: false,
-        },
-        |_args, _state| Err("Tool execution failed".into()),
-    );
+    let failing_tool = MockTool::with_execute_fn("failing_tool", |_args, _state| {
+        Err("Tool execution failed".into())
+    });
 
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
@@ -1001,6 +983,37 @@ async fn run_passes_sampling_parameters_to_model() {
     assert_eq!(input.top_k, Some(40));
     assert_eq!(input.presence_penalty, Some(0.1));
     assert_eq!(input.frequency_penalty, Some(0.2));
+}
+
+#[tokio::test]
+async fn run_passes_provider_hosted_tools_to_model() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("Search complete")],
+        ..Default::default()
+    });
+    let web_search = WebSearchTool {
+        allowed_domains: Some(vec!["example.com".to_string()]),
+        ..Default::default()
+    };
+    let session = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model.clone()).add_tool(web_search.clone())),
+        (),
+    )
+    .await;
+
+    session
+        .run(RunSessionRequest {
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Find an example",
+            )]))],
+        })
+        .await
+        .expect("run succeeds");
+
+    let inputs = model.tracked_generate_inputs();
+    assert_eq!(inputs.len(), 1);
+    assert_eq!(inputs[0].tools, Some(vec![Tool::WebSearch(web_search)]));
 }
 
 #[tokio::test]
@@ -1348,6 +1361,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn run_stream_streams_tool_call_execution_and_response() {
     let tool = MockTool::new(
         "test_tool",
@@ -1490,6 +1504,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn run_stream_handles_multiple_turns() {
     let tool = MockTool::new(
         "calculator",
@@ -1796,4 +1811,25 @@ async fn run_stream_throws_language_model_error() {
     }
 
     close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_session_reports_instruction_resolution_as_init_error() {
+    let model = Arc::new(MockLanguageModel::new());
+    let params = Arc::new(AgentParams::new("test_agent", model).add_instruction(
+        |(): &()| -> Result<String, DynError> {
+            Err(std::io::Error::other("could not load tenant instructions").into())
+        },
+    ));
+
+    let result = RunSession::new(params, ()).await;
+
+    match result {
+        Err(AgentError::Init(err)) => {
+            assert!(err
+                .to_string()
+                .contains("could not load tenant instructions"));
+        }
+        _ => panic!("expected agent initialization error"),
+    }
 }

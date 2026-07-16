@@ -1,8 +1,7 @@
 // Either a fixed MCP config or a function that derives params from agent context
 // (e.g., look up user-specific credentials).
 export type MCPInit<TContext> =
-  | MCPParams
-  | ((context: TContext) => MCPParams | Promise<MCPParams>);
+  MCPParams | ((context: TContext) => MCPParams | Promise<MCPParams>);
 
 export type MCPParams = MCPStdioParams | MCPStreamableHTTPParams;
 

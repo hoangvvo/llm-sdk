@@ -56,6 +56,7 @@ type mockToolkitSession[C any] struct {
 	toolsCalls        int
 	closeCalls        int
 	closeErr          error
+	closeFn           func(context.Context) error
 }
 
 func (m *mockToolkitSession[C]) SystemPrompt() *string {
@@ -68,8 +69,11 @@ func (m *mockToolkitSession[C]) Tools() []llmagent.AgentTool[C] {
 	return m.tools
 }
 
-func (m *mockToolkitSession[C]) Close(context.Context) error {
+func (m *mockToolkitSession[C]) Close(ctx context.Context) error {
 	m.closeCalls++
+	if m.closeFn != nil {
+		return m.closeFn(ctx)
+	}
 	return m.closeErr
 }
 
@@ -1073,6 +1077,66 @@ func TestRun_PassesSamplingParametersToModel(t *testing.T) {
 	}
 }
 
+func TestRun_PassesProviderHostedToolsToModel(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Search complete")},
+	}))
+	webSearchTool := llmsdk.WebSearchTool{AllowedDomains: []string{"example.com"}}
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{
+			Name:     "test_agent",
+			Model:    model,
+			Tools:    []llmagent.AgentTool[struct{}]{llmagent.NewAgentWebSearchTool[struct{}](webSearchTool)},
+			MaxTurns: 10,
+		},
+		struct{}{},
+	)
+
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Find an example"))),
+		},
+	})
+	if err != nil {
+		t.Fatalf("run session: %v", err)
+	}
+
+	inputs := model.TrackedGenerateInputs()
+	if len(inputs) != 1 {
+		t.Fatalf("expected one model call, got %d", len(inputs))
+	}
+	expected := []llmsdk.Tool{{WebSearchTool: &webSearchTool}}
+	if diff := cmp.Diff(expected, inputs[0].Tools); diff != "" {
+		t.Fatalf("hosted tools mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestRun_ReturnsLanguageModelErrorWhenGenerationFails(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	modelErr := llmsdk.NewInvalidInputError("API quota exceeded")
+	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultError(modelErr))
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10},
+		struct{}{},
+	)
+
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
+		},
+	})
+	if !errors.Is(err, modelErr) {
+		t.Fatalf("expected wrapped model error, got %v", err)
+	}
+	var agentErr *llmagent.AgentError
+	if !errors.As(err, &agentErr) || agentErr.Kind != llmagent.LanguageModelErrorKind {
+		t.Fatalf("expected language model agent error, got %v", err)
+	}
+}
+
 func TestRun_IncludesStringAndDynamicFunctionInstructionsInSystemPrompt(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
@@ -1558,6 +1622,121 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 	}
 }
 
+func TestRunStream_HandlesMultipleTurns(t *testing.T) {
+	tool := NewMockTool[struct{}]("calculator", llmagent.AgentToolResult{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Calculation done")},
+	}, nil)
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueStreamResult(
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{{
+			Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolName("calculator"),
+				llmsdk.WithToolCallPartDeltaToolCallID("call_1"),
+				llmsdk.WithToolCallPartDeltaArgs(`{"a":1,"b":2}`),
+			)},
+		}}),
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{{
+			Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolName("calculator"),
+				llmsdk.WithToolCallPartDeltaToolCallID("call_2"),
+				llmsdk.WithToolCallPartDeltaArgs(`{"a":3,"b":4}`),
+			)},
+		}}),
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{{
+			Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("All done")},
+		}}),
+	)
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{
+			Name:     "test_agent",
+			Model:    model,
+			Tools:    llmagent.FunctionTools[struct{}](tool),
+			MaxTurns: 10,
+		},
+		struct{}{},
+	)
+
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Calculate"))),
+		},
+	})
+	if err != nil {
+		t.Fatalf("create stream: %v", err)
+	}
+
+	var events []*llmagent.AgentStreamEvent
+	for stream.Next() {
+		events = append(events, stream.Current())
+	}
+	if err := stream.Err(); err != nil {
+		t.Fatalf("consume stream: %v", err)
+	}
+
+	eventTypes := make([]llmagent.AgentStreamEventType, 0, len(events))
+	for _, event := range events {
+		switch {
+		case event.Partial != nil:
+			eventTypes = append(eventTypes, llmagent.AgentStreamEventTypePartial)
+		case event.Item != nil:
+			eventTypes = append(eventTypes, llmagent.AgentStreamEventTypeItem)
+		case event.Response != nil:
+			eventTypes = append(eventTypes, llmagent.AgentStreamEventTypeResponse)
+		}
+	}
+	expectedTypes := []llmagent.AgentStreamEventType{
+		llmagent.AgentStreamEventTypePartial,
+		llmagent.AgentStreamEventTypeItem,
+		llmagent.AgentStreamEventTypeItem,
+		llmagent.AgentStreamEventTypePartial,
+		llmagent.AgentStreamEventTypeItem,
+		llmagent.AgentStreamEventTypeItem,
+		llmagent.AgentStreamEventTypePartial,
+		llmagent.AgentStreamEventTypeItem,
+		llmagent.AgentStreamEventTypeResponse,
+	}
+	if diff := cmp.Diff(expectedTypes, eventTypes); diff != "" {
+		t.Fatalf("event sequence mismatch (-want +got):\n%s", diff)
+	}
+	if len(tool.AllCalls) != 2 {
+		t.Fatalf("expected two tool executions, got %d", len(tool.AllCalls))
+	}
+	finalResponse := events[len(events)-1].Response
+	if finalResponse == nil || finalResponse.Text() != "All done" || len(finalResponse.Output) != 5 {
+		t.Fatalf("unexpected final response: %#v", finalResponse)
+	}
+}
+
+func TestRunStream_ReturnsLanguageModelError(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	modelErr := llmsdk.NewInvalidInputError("stream failed")
+	model.EnqueueStreamResult(llmsdktest.NewMockStreamResultError(modelErr))
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10},
+		struct{}{},
+	)
+
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
+		},
+	})
+	if err != nil {
+		t.Fatalf("create stream: %v", err)
+	}
+	for stream.Next() {
+	}
+	if !errors.Is(stream.Err(), modelErr) {
+		t.Fatalf("expected wrapped model error, got %v", stream.Err())
+	}
+	var agentErr *llmagent.AgentError
+	if !errors.As(stream.Err(), &agentErr) || agentErr.Kind != llmagent.LanguageModelErrorKind {
+		t.Fatalf("expected language model agent error, got %v", stream.Err())
+	}
+}
+
 func TestRunStream_ThrowsErrorWhenMaxTurnsExceeded(t *testing.T) {
 	toolResult := llmagent.AgentToolResult{
 		Content: []llmsdk.Part{
@@ -1760,6 +1939,32 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 }
 
 // -------- Root-level lifecycle test --------
+
+func TestRunSession_ReturnsInitErrorWhenInstructionResolutionFails(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	cause := errors.New("could not load tenant instructions")
+	_, err := llmagent.NewRunSession(
+		t.Context(),
+		&llmagent.AgentParams[struct{}]{
+			Name:  "test_agent",
+			Model: model,
+			Instructions: []llmagent.InstructionParam[struct{}]{{
+				Func: func(context.Context, struct{}) (string, error) {
+					return "", cause
+				},
+			}},
+			MaxTurns: 10,
+		},
+		struct{}{},
+	)
+	if !errors.Is(err, cause) {
+		t.Fatalf("expected wrapped instruction error, got %v", err)
+	}
+	var agentErr *llmagent.AgentError
+	if !errors.As(err, &agentErr) || agentErr.Kind != llmagent.InitErrorKind {
+		t.Fatalf("expected agent initialization error, got %v", err)
+	}
+}
 
 func TestRun_CloseCleansUpSessionResources(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()

@@ -47,6 +47,7 @@ pub fn get_available_tools() -> Vec<Box<dyn AgentFunctionTool<MyContext> + Send 
     ]
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn create_agent(
     model: Arc<dyn LanguageModel + Send + Sync>,
     options: &AgentOptions,

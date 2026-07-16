@@ -38,41 +38,47 @@ export function calculateCost(
 }
 
 export function sumModelUsage(usages: ModelUsage[]): ModelUsage {
-  return usages.reduce<ModelUsage>(
+  const result = usages.reduce<ModelUsage>(
     (acc, curr) => ({
       input_tokens: acc.input_tokens + curr.input_tokens,
       output_tokens: acc.output_tokens + curr.output_tokens,
-      input_tokens_details: sumModelTokensDetails([
-        acc.input_tokens_details ?? {},
-        curr.input_tokens_details ?? {},
-      ]),
-      output_tokens_details: sumModelTokensDetails([
-        acc.output_tokens_details ?? {},
-        curr.output_tokens_details ?? {},
-      ]),
     }),
-    {
-      input_tokens: 0,
-      output_tokens: 0,
-    },
+    { input_tokens: 0, output_tokens: 0 },
   );
+  const inputDetails = usages.flatMap((usage) =>
+    usage.input_tokens_details ? [usage.input_tokens_details] : [],
+  );
+  const outputDetails = usages.flatMap((usage) =>
+    usage.output_tokens_details ? [usage.output_tokens_details] : [],
+  );
+  if (inputDetails.length > 0) {
+    result.input_tokens_details = sumModelTokensDetails(inputDetails);
+  }
+  if (outputDetails.length > 0) {
+    result.output_tokens_details = sumModelTokensDetails(outputDetails);
+  }
+  return result;
 }
 
 export function sumModelTokensDetails(
   detailsArr: ModelTokensDetails[],
 ): ModelTokensDetails {
-  return detailsArr.reduce<ModelTokensDetails>(
-    (acc, curr) => ({
-      text_tokens: (acc.text_tokens ?? 0) + (curr.text_tokens ?? 0),
-      audio_tokens: (acc.audio_tokens ?? 0) + (curr.audio_tokens ?? 0),
-      image_tokens: (acc.image_tokens ?? 0) + (curr.image_tokens ?? 0),
-      cached_text_tokens:
-        (acc.cached_text_tokens ?? 0) + (curr.cached_text_tokens ?? 0),
-      cached_audio_tokens:
-        (acc.cached_audio_tokens ?? 0) + (curr.cached_audio_tokens ?? 0),
-      cached_image_tokens:
-        (acc.cached_image_tokens ?? 0) + (curr.cached_image_tokens ?? 0),
-    }),
-    {},
-  );
+  const result: ModelTokensDetails = {};
+  const keys = [
+    "text_tokens",
+    "audio_tokens",
+    "image_tokens",
+    "cached_text_tokens",
+    "cached_audio_tokens",
+    "cached_image_tokens",
+  ] as const;
+  for (const details of detailsArr) {
+    for (const key of keys) {
+      const value = details[key];
+      if (value !== undefined) {
+        result[key] = (result[key] ?? 0) + value;
+      }
+    }
+  }
+  return result;
 }

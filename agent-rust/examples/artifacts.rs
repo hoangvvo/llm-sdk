@@ -11,13 +11,6 @@ use std::{
 
 mod common;
 
-#[derive(Clone)]
-enum ArtifactKind {
-    Markdown,
-    Text,
-    Code,
-}
-
 #[derive(Clone, Serialize, Debug)]
 struct Artifact {
     id: String,

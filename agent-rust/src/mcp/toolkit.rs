@@ -89,8 +89,8 @@ where
             }
             MCPParams::StreamableHttp(MCPStreamableHTTPParams { url, authorization }) => {
                 let mut config = StreamableHttpClientTransportConfig::with_uri(url.clone());
-                if let Some(token) = authorization.as_deref() {
-                    config = config.auth_header(strip_bearer_prefix(token));
+                if let Some(token) = authorization.as_deref().and_then(strip_bearer_prefix) {
+                    config = config.auth_header(token);
                 }
                 let transport = StreamableHttpClientTransport::from_config(config);
                 serve_client(handler, transport).await?
@@ -228,15 +228,18 @@ where
 
 // Remove "Bearer " or "bearer " prefix if present because the rmcp library
 // already adds it.
-fn strip_bearer_prefix(token: &str) -> String {
+fn strip_bearer_prefix(token: &str) -> Option<String> {
     let trimmed = token.trim();
-    if let Some(rest) = trimmed.strip_prefix("Bearer ") {
-        rest.to_string()
-    } else if let Some(rest) = trimmed.strip_prefix("bearer ") {
-        rest.to_string()
-    } else {
-        trimmed.to_string()
+    if trimmed.is_empty() {
+        return None;
     }
+    let mut parts = trimmed.split_whitespace();
+    let first = parts.next()?;
+    if first.eq_ignore_ascii_case("bearer") {
+        let token = parts.collect::<Vec<_>>().join(" ");
+        return (!token.is_empty()).then_some(token);
+    }
+    Some(trimmed.to_string())
 }
 
 #[allow(clippy::type_complexity)]
@@ -342,5 +345,21 @@ where
                 state.record_error(err);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_bearer_prefix;
+
+    #[test]
+    fn normalizes_bearer_tokens_for_rmcp() {
+        assert_eq!(strip_bearer_prefix("token"), Some("token".to_string()));
+        assert_eq!(
+            strip_bearer_prefix("  BEARER   token  "),
+            Some("token".to_string())
+        );
+        assert_eq!(strip_bearer_prefix("  "), None);
+        assert_eq!(strip_bearer_prefix("Bearer "), None);
     }
 }

@@ -62,9 +62,6 @@ function getCapabilityChipClass(enabled: boolean): string {
 }
 
 interface SidebarProps {
-  serverOptions?: string[];
-  serverUrl?: string;
-  onServerUrlChange?: (value: string) => void;
   models: ModelOption[];
   selection: ModelSelection | null;
   onModelSelectionChange: Dispatch<SetStateAction<ModelSelection | null>>;
@@ -135,9 +132,6 @@ export function ResponsiveSidebar(props: SidebarProps) {
 }
 
 function Sidebar({
-  serverOptions,
-  serverUrl,
-  onServerUrlChange,
   models,
   selection,
   onModelSelectionChange,
@@ -185,11 +179,6 @@ function Sidebar({
   return (
     <aside className="flex h-full w-full flex-col overflow-auto bg-white/60 px-6 py-6 backdrop-blur-sm lg:w-[360px] lg:shrink-0 lg:border-l lg:border-slate-200/70">
       <div className="space-y-6">
-        <ServerSelectionSection
-          options={serverOptions}
-          value={serverUrl}
-          onChange={onServerUrlChange}
-        />
         <ModelSelectionSection
           models={models}
           selection={selection}
@@ -685,43 +674,6 @@ function ModelFeaturesSection({
   );
 }
 
-interface ServerSelectionSectionProps {
-  options?: string[];
-  value?: string;
-  onChange?: (value: string) => void;
-}
-
-function ServerSelectionSection({
-  options,
-  value,
-  onChange,
-}: ServerSelectionSectionProps) {
-  if (!options || options.length === 0 || !value || !onChange) {
-    return null;
-  }
-  return (
-    <div>
-      <h2 className="console-section-title">Example Server</h2>
-      <p className="mt-2 text-xs text-slate-500">
-        Select which example server to use when running the console.
-      </p>
-      <select
-        className="console-field mt-3 w-full"
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 interface ModelSelectionSectionProps {
   models: ModelOption[];
   selection: ModelSelection | null;
@@ -1073,53 +1025,16 @@ function McpServerSection({ servers, onChange }: McpServerSectionProps) {
     onChange(servers.filter((_, currentIndex) => currentIndex !== index));
   };
 
-  const handleTypeChange = (index: number, type: McpServerConfig["type"]) => {
-    updateServer(index, (server) => {
-      if (type === server.type) {
-        return server;
-      }
-      if (type === "streamable-http") {
-        return { type: "streamable-http", url: "", authorization: "" };
-      }
-      return { type: "stdio", command: "", args: [] };
-    });
-  };
-
   const handleStreamableHttpChange = (
     index: number,
     field: "url" | "authorization",
     value: string,
   ) => {
     updateServer(index, (server) => {
-      if (server.type !== "streamable-http") {
-        return server;
-      }
       if (field === "url") {
         return { ...server, url: value };
       }
       return { ...server, authorization: value };
-    });
-  };
-
-  const handleStdioCommandChange = (index: number, value: string) => {
-    updateServer(index, (server) => {
-      if (server.type !== "stdio") {
-        return server;
-      }
-      return { ...server, command: value };
-    });
-  };
-
-  const handleStdioArgsChange = (index: number, value: string) => {
-    const parts = value
-      .split(/\s+/)
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0);
-    updateServer(index, (server) => {
-      if (server.type !== "stdio") {
-        return server;
-      }
-      return { ...server, args: parts };
     });
   };
 
@@ -1151,91 +1066,40 @@ function McpServerSection({ servers, onChange }: McpServerSectionProps) {
                     Remove
                   </button>
                 </div>
-                <label className="console-label mt-3 block">
-                  Connection type
-                  <select
-                    className="console-field mt-2 w-full"
-                    value={server.type}
-                    onChange={(event) => {
-                      handleTypeChange(
-                        index,
-                        event.target.value as McpServerConfig["type"],
-                      );
-                    }}
-                  >
-                    <option value="streamable-http">Streamable HTTP</option>
-                    <option value="stdio">Stdio</option>
-                  </select>
-                </label>
-                {server.type === "streamable-http" ? (
-                  <div className="mt-3 space-y-3">
-                    <label className="console-label">
-                      Server URL
-                      <input
-                        type="text"
-                        className="console-field mt-2 w-full"
-                        placeholder="e.g. https://example.com/mcp"
-                        value={server.url}
-                        onChange={(event) => {
-                          handleStreamableHttpChange(
-                            index,
-                            "url",
-                            event.currentTarget.value,
-                          );
-                        }}
-                      />
-                    </label>
-                    <label className="console-label">
-                      Authorization header (optional)
-                      <input
-                        type="text"
-                        className="console-field mt-2 w-full"
-                        placeholder="Bearer token or other header value"
-                        value={server.authorization ?? ""}
-                        onChange={(event) => {
-                          handleStreamableHttpChange(
-                            index,
-                            "authorization",
-                            event.currentTarget.value,
-                          );
-                        }}
-                      />
-                    </label>
-                  </div>
-                ) : (
-                  <div className="mt-3 space-y-3">
-                    <label className="console-label">
-                      Command
-                      <input
-                        type="text"
-                        className="console-field mt-2 w-full"
-                        placeholder="Executable for the MCP server"
-                        value={server.command}
-                        onChange={(event) => {
-                          handleStdioCommandChange(
-                            index,
-                            event.currentTarget.value,
-                          );
-                        }}
-                      />
-                    </label>
-                    <label className="console-label">
-                      Arguments (optional)
-                      <input
-                        type="text"
-                        className="console-field mt-2 w-full"
-                        placeholder="Space-separated arguments"
-                        value={(server.args ?? []).join(" ")}
-                        onChange={(event) => {
-                          handleStdioArgsChange(
-                            index,
-                            event.currentTarget.value,
-                          );
-                        }}
-                      />
-                    </label>
-                  </div>
-                )}
+                <div className="mt-3 space-y-3">
+                  <label className="console-label">
+                    Server URL
+                    <input
+                      type="text"
+                      className="console-field mt-2 w-full"
+                      placeholder="e.g. https://example.com/mcp"
+                      value={server.url}
+                      onChange={(event) => {
+                        handleStreamableHttpChange(
+                          index,
+                          "url",
+                          event.currentTarget.value,
+                        );
+                      }}
+                    />
+                  </label>
+                  <label className="console-label">
+                    Authorization header (optional)
+                    <input
+                      type="text"
+                      className="console-field mt-2 w-full"
+                      placeholder="Bearer token or other header value"
+                      value={server.authorization ?? ""}
+                      onChange={(event) => {
+                        handleStreamableHttpChange(
+                          index,
+                          "authorization",
+                          event.currentTarget.value,
+                        );
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
             );
           })}

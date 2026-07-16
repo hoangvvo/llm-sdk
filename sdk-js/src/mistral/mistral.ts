@@ -71,7 +71,7 @@ export class MistralModel implements LanguageModel {
     const response = await this.#client.chat.complete(request);
 
     const choice = response.choices[0];
-    if (!choice) {
+    if (!choice?.message) {
       throw new InvariantError(
         PROVIDER,
         "Response does not contain a valid choice",
@@ -361,7 +361,9 @@ function convertToMistralToolCall(
 
 // MARK: To Provider Tools
 
-function convertToMistralTool(tool: Tool): MistralComponents.Tool {
+function convertToMistralTool(
+  tool: Tool,
+): MistralComponents.Tool & { type: "function" } {
   if (tool.type === "web_search") {
     throw new UnsupportedError(
       PROVIDER,

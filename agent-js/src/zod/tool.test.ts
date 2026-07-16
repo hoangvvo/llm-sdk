@@ -1,8 +1,11 @@
 import test, { type TestContext } from "node:test";
 import z from "zod";
+import { RunState } from "../run.ts";
 import { zodTool } from "./tool.ts";
 
-test("zodTool returns AgentTool", (t: TestContext) => {
+test("zodTool exposes its strict schema and executes typed arguments", async (t: TestContext) => {
+  const context = { suffix: "!" };
+  let receivedContext: typeof context | undefined;
   const tool = zodTool({
     name: "echo",
     description: "Echo input",
@@ -10,11 +13,18 @@ test("zodTool returns AgentTool", (t: TestContext) => {
       message: z.string(),
       option: z.number().optional(),
     }),
-    execute: ({ message, option }) =>
-      Promise.resolve({
-        content: [{ type: "text", text: `${message}${String(option)}` }],
+    execute: ({ message, option }, ctx: typeof context) => {
+      receivedContext = ctx;
+      return Promise.resolve({
+        content: [
+          {
+            type: "text",
+            text: `${message}:${String(option)}${ctx.suffix}`,
+          },
+        ],
         is_error: false,
-      }),
+      });
+    },
   });
 
   const expected = {
@@ -38,4 +48,14 @@ test("zodTool returns AgentTool", (t: TestContext) => {
   };
 
   t.assert.deepStrictEqual(tool, expected);
+  const result = await tool.execute(
+    { message: "hello", option: 2 },
+    context,
+    new RunState([], 1),
+  );
+  t.assert.strictEqual(receivedContext, context);
+  t.assert.deepStrictEqual(result, {
+    content: [{ type: "text", text: "hello:2!" }],
+    is_error: false,
+  });
 });

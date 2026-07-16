@@ -236,9 +236,6 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 	params.Instructions = input.SystemPrompt
 	params.Temperature = input.Temperature
 	params.TopP = input.TopP
-	params.Reasoning = &openaiapi.Reasoning{
-		Summary: ptr.To(openaiapi.ReasoningSummaryAuto),
-	}
 	params.Model = ptr.To(openaiapi.ModelIdsResponses(ptr.To(modelID)))
 	params.Input = &openaiapi.InputParam{
 		InputParamArray: (*openaiapi.InputParamArray)(&inputItems),

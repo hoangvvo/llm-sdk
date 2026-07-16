@@ -1,9 +1,19 @@
-use axum::Router;
+use axum::{
+    extract::Request,
+    http::{header::AUTHORIZATION, StatusCode},
+    middleware::{self, Next},
+    response::Response,
+    Router,
+};
 use llm_agent::{
     mcp::{MCPParams, MCPStreamableHTTPParams, MCPToolkit},
     Agent, AgentItem, AgentParams, AgentResponse, BoxedError, RunSessionRequest,
 };
-use llm_sdk::{llm_sdk_test::MockLanguageModel, AudioFormat, Message, ModelResponse, Part};
+use llm_sdk::{
+    llm_sdk_test::MockLanguageModel, AudioFormat, LanguageModel, LanguageModelError,
+    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
+    ModelResponse, Part,
+};
 use rmcp::{
     handler::server::ServerHandler,
     model::{
@@ -19,15 +29,19 @@ use rmcp::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::{
     net::TcpListener,
     sync::{oneshot, RwLock},
-    time::sleep,
+    time::timeout,
 };
 
 const IMAGE_DATA: &str = "AAEC";
 const AUDIO_DATA: &str = "AwQ=";
+const AUTH_TOKEN: &str = "mcp-test-token";
 
 #[tokio::test]
 async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedError> {
@@ -57,7 +71,7 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
             move |(): &()| {
                 Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
                     url: stub_url.clone(),
-                    authorization: None,
+                    authorization: Some(format!(" bearer {AUTH_TOKEN} ")),
                 }))
             }
         }),
@@ -117,38 +131,14 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
     let stub = start_stub_mcp_server()
         .await
         .map_err(|err| format!("Failed to start stub MCP server: {err}"))?;
 
-    let model = Arc::new(MockLanguageModel::new());
+    let model = Arc::new(RefreshAwareModel::new());
     let tool_args = json!({ "shift": "evening" });
-
-    model.enqueue_generate(ModelResponse {
-        content: vec![Part::tool_call(
-            "call_1",
-            "list_shuttles",
-            tool_args.clone(),
-        )],
-        ..Default::default()
-    });
-    model.enqueue_generate(ModelResponse {
-        content: vec![Part::text("Ready to roll.")],
-        ..Default::default()
-    });
-    model.enqueue_generate(ModelResponse {
-        content: vec![Part::tool_call(
-            "call_2",
-            "list_shuttles_v2",
-            tool_args.clone(),
-        )],
-        ..Default::default()
-    });
-    model.enqueue_generate(ModelResponse {
-        content: vec![Part::text("Routes synced.")],
-        ..Default::default()
-    });
 
     let stub_url = stub.url().to_string();
     let agent = Agent::new(AgentParams::new("mcp-test", model.clone()).add_toolkit(
@@ -157,7 +147,7 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
             move |(): &()| {
                 Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
                     url: stub_url.clone(),
-                    authorization: None,
+                    authorization: Some(AUTH_TOKEN.to_string()),
                 }))
             }
         }),
@@ -220,16 +210,26 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
     ))
     .await;
 
-    sleep(Duration::from_millis(20)).await;
+    let second_response = timeout(Duration::from_secs(5), async {
+        loop {
+            let response = session
+                .run(RunSessionRequest {
+                    input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                        "How about now?",
+                    )]))],
+                })
+                .await?;
 
-    let second_response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "How about now?",
-            )]))],
-        })
-        .await
-        .map_err(|err| format!("Failed to run session: {err}"))?;
+            if response.content == vec![Part::text("Routes synced.")] {
+                return Ok::<AgentResponse, llm_agent::AgentError>(response);
+            }
+
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .map_err(|_| "Timed out waiting for the MCP tool list to refresh")?
+    .map_err(|err| format!("Failed to run session: {err}"))?;
 
     let expected_second = AgentResponse {
         content: vec![Part::text("Routes synced.")],
@@ -264,6 +264,125 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
         .map_err(|err| format!("Failed to close session: {err}"))?;
     stub.stop().await?;
     Ok(())
+}
+
+#[derive(Default)]
+struct RefreshAwareModel {
+    phase: Mutex<RefreshModelPhase>,
+}
+
+impl RefreshAwareModel {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[derive(Default)]
+enum RefreshModelPhase {
+    #[default]
+    InitialToolCall,
+    InitialResponse,
+    AwaitingRefresh,
+    UpdatedResponse,
+    Complete,
+}
+
+impl LanguageModel for RefreshAwareModel {
+    fn provider(&self) -> &'static str {
+        "mcp-refresh-test"
+    }
+
+    fn model_id(&self) -> String {
+        "mcp-refresh-test".to_string()
+    }
+
+    fn metadata(&self) -> Option<&LanguageModelMetadata> {
+        None
+    }
+
+    fn generate(
+        &self,
+        input: LanguageModelInput,
+    ) -> futures::future::BoxFuture<'_, LanguageModelResult<ModelResponse>> {
+        Box::pin(async move {
+            let mut phase = self.phase.lock().expect("refresh model state poisoned");
+            let response = match *phase {
+                RefreshModelPhase::InitialToolCall => {
+                    *phase = RefreshModelPhase::InitialResponse;
+                    ModelResponse {
+                        content: vec![Part::tool_call(
+                            "call_1",
+                            "list_shuttles",
+                            json!({ "shift": "evening" }),
+                        )],
+                        ..Default::default()
+                    }
+                }
+                RefreshModelPhase::InitialResponse => {
+                    *phase = RefreshModelPhase::AwaitingRefresh;
+                    ModelResponse {
+                        content: vec![Part::text("Ready to roll.")],
+                        ..Default::default()
+                    }
+                }
+                RefreshModelPhase::AwaitingRefresh => {
+                    let has_updated_tool = input.tools.as_ref().is_some_and(|tools| {
+                        tools.iter().any(|tool| {
+                            matches!(
+                                tool,
+                                llm_sdk::Tool::Function(function)
+                                    if function.name == "list_shuttles_v2"
+                            )
+                        })
+                    });
+
+                    if has_updated_tool {
+                        *phase = RefreshModelPhase::UpdatedResponse;
+                        ModelResponse {
+                            content: vec![Part::tool_call(
+                                "call_2",
+                                "list_shuttles_v2",
+                                json!({ "shift": "evening" }),
+                            )],
+                            ..Default::default()
+                        }
+                    } else {
+                        ModelResponse {
+                            content: vec![Part::text("Tool refresh pending.")],
+                            ..Default::default()
+                        }
+                    }
+                }
+                RefreshModelPhase::UpdatedResponse => {
+                    *phase = RefreshModelPhase::Complete;
+                    ModelResponse {
+                        content: vec![Part::text("Routes synced.")],
+                        ..Default::default()
+                    }
+                }
+                RefreshModelPhase::Complete => {
+                    return Err(LanguageModelError::Invariant(
+                        self.provider(),
+                        "refresh test model called after completion".into(),
+                    ));
+                }
+            };
+
+            Ok(response)
+        })
+    }
+
+    fn stream(
+        &self,
+        _input: LanguageModelInput,
+    ) -> futures::future::BoxFuture<'_, LanguageModelResult<LanguageModelStream>> {
+        Box::pin(async move {
+            Err(LanguageModelError::Invariant(
+                self.provider(),
+                "streaming is not supported by the refresh test model".into(),
+            ))
+        })
+    }
 }
 
 struct StubServer {
@@ -527,7 +646,9 @@ async fn start_stub_mcp_server() -> Result<StubServer, BoxedError> {
         StreamableHttpServerConfig::default(),
     );
 
-    let app = Router::new().fallback_service(service);
+    let app = Router::new()
+        .fallback_service(service)
+        .layer(middleware::from_fn(require_auth));
 
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -555,4 +676,17 @@ async fn start_stub_mcp_server() -> Result<StubServer, BoxedError> {
         shutdown: Some(shutdown_tx),
         handle,
     })
+}
+
+async fn require_auth(request: Request, next: Next) -> Result<Response, StatusCode> {
+    let expected = format!("Bearer {AUTH_TOKEN}");
+    if request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        != Some(expected.as_str())
+    {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    Ok(next.run(request).await)
 }
