@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
-    "test": "c8 --all --include='src/**/*.ts' --exclude='**/*.test.ts' --reporter=text --reporter=cobertura node --test --env-file-if-exists=../.env --test-timeout=20000 \"**/*.test.ts\""
+    "test": "c8 --all --include='src/**/*.ts' --exclude='**/*.test.ts' --reporter=text --reporter=cobertura node --test --env-file-if-exists=../.env --test-timeout=20000 \"**/*.test.ts\"",
+    "test:offline": "node --test --test-timeout=20000 src/accumulator.test.ts src/test/test.test.ts src/openai/openai.transport.test.ts"
   },
   "files": [
     "dist"

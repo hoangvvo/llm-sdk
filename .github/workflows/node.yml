@@ -21,7 +21,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24.x
           cache: npm
@@ -35,6 +35,8 @@ jobs:
         run: npm run build -w=sdk-js
       - name: Lint SDK
         run: npm run lint -w=sdk-js
+      - name: Test SDK offline suites
+        run: npm run test:offline -w=sdk-js
 
   agent:
     name: Agent
@@ -46,7 +48,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24.x
           cache: npm

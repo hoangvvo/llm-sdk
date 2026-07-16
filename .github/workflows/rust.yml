@@ -28,6 +28,7 @@ jobs:
         with:
           toolchain: nightly
           components: clippy, rustfmt
+          cache: true
       - name: Check formatting
         run: cargo +nightly fmt --all -- --check
       - name: Run SDK Clippy
@@ -55,6 +56,10 @@ jobs:
         with:
           toolchain: nightly
           components: clippy
+          cache: true
+          cache-workspaces: |
+            . -> target
+            . -> coverage/rust/target
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run agent Clippy
