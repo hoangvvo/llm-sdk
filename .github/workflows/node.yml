@@ -40,7 +40,6 @@ jobs:
 
   agent:
     name: Agent
-    needs: sdk
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
