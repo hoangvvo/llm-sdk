@@ -46,13 +46,13 @@ impl AgentFunctionTool<MyContext> for GetCoordinatesTool {
         Box::pin(async move {
             let params: GetCoordinatesParams = serde_json::from_value(args)?;
 
-            let env_key = std::env::var("GEO_API_KEY").ok();
             let api_key = context
                 .geo_api_key
-                .as_ref()
-                .or(env_key.as_ref())
+                .as_deref()
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
                 .ok_or(
-                    "API Key not provided. You can also provide the value on the UI with the Context field 'geo_api_key'. Get a free API key at https://geocode.maps.co/",
+                    "API Key not provided. Provide the value on the UI with the Context field 'geo_api_key'. Get a free API key at https://geocode.maps.co/",
                 )?;
 
             let url = format!(
@@ -180,13 +180,13 @@ impl AgentFunctionTool<MyContext> for GetWeatherTool {
         Box::pin(async move {
             let params: GetWeatherParams = serde_json::from_value(args)?;
 
-            let env_key = std::env::var("TOMORROW_API_KEY").ok();
             let api_key = context
                 .tomorrow_api_key
-                .as_ref()
-                .or(env_key.as_ref())
+                .as_deref()
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
                 .ok_or(
-                    "API Key not provided. You can also provide the value on the UI with the Context field 'tomorrow_api_key'. Get a free API key at https://tomorrow.io/",
+                    "API Key not provided. Provide the value on the UI with the Context field 'tomorrow_api_key'. Get a free API key at https://tomorrow.io/",
                 )?;
 
             let fields = "temperature,temperatureApparent,humidity";

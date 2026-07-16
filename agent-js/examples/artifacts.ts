@@ -1,12 +1,18 @@
-import { Agent, type AgentItem } from "@hoangvvo/llm-agent";
+import {
+  Agent,
+  type AgentItem,
+  type AgentTool,
+  type Toolkit,
+  type ToolkitSession,
+} from "@hoangvvo/llm-agent";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
 import { diffLines } from "diff";
 import { z } from "zod";
 import { getModel } from "./get-model.ts";
 
 // Artifacts/Canvas feature example: the agent maintains named deliverables
-// (documents/code/specs) separate from the chat by using tools to create,
-// update, retrieve, list, and delete artifacts.
+// (documents/code/specs) separate from the chat through one toolkit that
+// provides create, update, retrieve, list, and delete operations together.
 
 type ArtifactKind = "markdown" | "text" | "code";
 
@@ -103,90 +109,111 @@ function renderDiff(oldText: string, newText: string): string {
   return lines.join("\n");
 }
 
+const artifactTools: AgentTool<void>[] = [
+  zodTool({
+    name: "artifact_create",
+    description:
+      "Create a new artifact (document/canvas) and return the created artifact",
+    parameters: z.object({
+      title: z.string(),
+      kind: z.enum(["markdown", "text", "code"]),
+      content: z.string(),
+    }),
+    async execute(args) {
+      console.log(
+        `[artifacts.create] id=(auto) title=${args.title} kind=${args.kind}`,
+      );
+      const artifact = store.create(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ artifact }) }],
+        is_error: false,
+      };
+    },
+  }),
+  zodTool({
+    name: "artifact_update",
+    description: "Replace the content of an existing artifact and return it",
+    parameters: z.object({ id: z.string(), content: z.string() }),
+    async execute({ id, content }) {
+      const before = store.get(id).content;
+      console.log(`[artifacts.update] id=${id} len=${content.length}`);
+      const artifact = store.update({ id, content });
+      console.log(
+        "\n=== Diff (old → new) ===\n" +
+          renderDiff(before, artifact.content) +
+          "\n========================\n",
+      );
+      return {
+        content: [{ type: "text", text: JSON.stringify({ artifact }) }],
+        is_error: false,
+      };
+    },
+  }),
+  zodTool({
+    name: "artifact_get",
+    description: "Fetch a single artifact by id",
+    parameters: z.object({ id: z.string() }),
+    async execute({ id }) {
+      console.log(`[artifacts.get] id=${id}`);
+      const artifact = store.get(id);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ artifact }) }],
+        is_error: false,
+      };
+    },
+  }),
+  zodTool({
+    name: "artifact_list",
+    description: "List all artifacts",
+    parameters: z.object({}),
+    async execute() {
+      console.log(`[artifacts.list]`);
+      const artifacts = store.list();
+      return {
+        content: [{ type: "text", text: JSON.stringify({ artifacts }) }],
+        is_error: false,
+      };
+    },
+  }),
+  zodTool({
+    name: "artifact_delete",
+    description: "Delete an artifact by id",
+    parameters: z.object({ id: z.string() }),
+    async execute({ id }) {
+      console.log(`[artifacts.delete] id=${id}`);
+      const result = store.delete(id);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        is_error: false,
+      };
+    },
+  }),
+];
+
+class ArtifactsToolkitSession implements ToolkitSession<void> {
+  getSystemPrompt(): string {
+    return `${overviewPrompt}\n${rulesPrompt}`;
+  }
+
+  getTools(): AgentTool<void>[] {
+    return artifactTools;
+  }
+
+  async close(): Promise<void> {
+    // No resources to release.
+  }
+}
+
+class ArtifactsToolkit implements Toolkit<void> {
+  async createSession(): Promise<ToolkitSession<void>> {
+    return new ArtifactsToolkitSession();
+  }
+}
+
 const artifactsAgent = new Agent<void>({
   name: "artifacts",
   model,
-  instructions: [overviewPrompt, rulesPrompt],
-  tools: [
-    zodTool({
-      name: "artifact_create",
-      description:
-        "Create a new artifact (document/canvas) and return the created artifact",
-      parameters: z.object({
-        title: z.string(),
-        kind: z.enum(["markdown", "text", "code"]),
-        content: z.string(),
-      }),
-      async execute(args) {
-        console.log(
-          `[artifacts.create] id=(auto) title=${args.title} kind=${args.kind}`,
-        );
-        const artifact = store.create(args);
-        return {
-          content: [{ type: "text", text: JSON.stringify({ artifact }) }],
-          is_error: false,
-        };
-      },
-    }),
-    zodTool({
-      name: "artifact_update",
-      description: "Replace the content of an existing artifact and return it",
-      parameters: z.object({ id: z.string(), content: z.string() }),
-      async execute({ id, content }) {
-        const before = store.get(id).content;
-        console.log(`[artifacts.update] id=${id} len=${content.length}`);
-        const artifact = store.update({ id, content });
-        console.log(
-          "\n=== Diff (old → new) ===\n" +
-            renderDiff(before, artifact.content) +
-            "\n========================\n",
-        );
-        return {
-          content: [{ type: "text", text: JSON.stringify({ artifact }) }],
-          is_error: false,
-        };
-      },
-    }),
-    zodTool({
-      name: "artifact_get",
-      description: "Fetch a single artifact by id",
-      parameters: z.object({ id: z.string() }),
-      async execute({ id }) {
-        console.log(`[artifacts.get] id=${id}`);
-        const artifact = store.get(id);
-        return {
-          content: [{ type: "text", text: JSON.stringify({ artifact }) }],
-          is_error: false,
-        };
-      },
-    }),
-    zodTool({
-      name: "artifact_list",
-      description: "List all artifacts",
-      parameters: z.object({}),
-      async execute() {
-        console.log(`[artifacts.list]`);
-        const artifacts = store.list();
-        return {
-          content: [{ type: "text", text: JSON.stringify({ artifacts }) }],
-          is_error: false,
-        };
-      },
-    }),
-    zodTool({
-      name: "artifact_delete",
-      description: "Delete an artifact by id",
-      parameters: z.object({ id: z.string() }),
-      async execute({ id }) {
-        console.log(`[artifacts.delete] id=${id}`);
-        const result = store.delete(id);
-        return {
-          content: [{ type: "text", text: JSON.stringify(result) }],
-          is_error: false,
-        };
-      },
-    }),
-  ],
+  toolkits: [new ArtifactsToolkit()],
 });
 
 // Demo: ask the agent to create an artifact, then revise it.

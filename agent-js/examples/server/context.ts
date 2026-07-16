@@ -4,7 +4,6 @@ export interface MyContext {
   language?: string;
   geo_api_key?: string;
   tomorrow_api_key?: string;
-  news_api_key?: string;
   // Client-managed artifacts store (server reads only)
   artifacts?: {
     id: string;

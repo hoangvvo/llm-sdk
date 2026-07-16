@@ -1,7 +1,9 @@
 use crate::context::{Artifact, ArtifactKind, MyContext};
 use chrono::Utc;
 use futures::future::BoxFuture;
-use llm_agent::{AgentFunctionTool, AgentToolResult};
+use llm_agent::{
+    AgentFunctionTool, AgentTool, AgentToolResult, BoxedError, Toolkit, ToolkitSession,
+};
 use llm_sdk::{JSONSchema, Part};
 use rand::RngExt;
 use serde::Deserialize;
@@ -32,7 +34,7 @@ struct ArtifactCreateParams {
     content: String,
 }
 
-pub struct ArtifactCreateTool;
+struct ArtifactCreateTool;
 
 impl AgentFunctionTool<MyContext> for ArtifactCreateTool {
     fn name(&self) -> String {
@@ -90,7 +92,7 @@ struct ArtifactUpdateParams {
     content: String,
 }
 
-pub struct ArtifactUpdateTool;
+struct ArtifactUpdateTool;
 
 impl AgentFunctionTool<MyContext> for ArtifactUpdateTool {
     fn name(&self) -> String {
@@ -144,7 +146,7 @@ impl AgentFunctionTool<MyContext> for ArtifactUpdateTool {
 struct ArtifactGetParams {
     id: String,
 }
-pub struct ArtifactGetTool;
+struct ArtifactGetTool;
 
 impl AgentFunctionTool<MyContext> for ArtifactGetTool {
     fn name(&self) -> String {
@@ -181,7 +183,7 @@ impl AgentFunctionTool<MyContext> for ArtifactGetTool {
 }
 
 // artifact_list
-pub struct ArtifactListTool;
+struct ArtifactListTool;
 
 impl AgentFunctionTool<MyContext> for ArtifactListTool {
     fn name(&self) -> String {
@@ -215,7 +217,7 @@ impl AgentFunctionTool<MyContext> for ArtifactListTool {
 struct ArtifactDeleteParams {
     id: String,
 }
-pub struct ArtifactDeleteTool;
+struct ArtifactDeleteTool;
 
 impl AgentFunctionTool<MyContext> for ArtifactDeleteTool {
     fn name(&self) -> String {
@@ -246,5 +248,47 @@ impl AgentFunctionTool<MyContext> for ArtifactDeleteTool {
                 is_error: false,
             })
         })
+    }
+}
+
+const ARTIFACTS_SYSTEM_PROMPT: &str = "For substantive deliverables (documents/specs/code), use \
+the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, \
+artifact_delete).\nKeep chat replies brief and put the full document content into artifacts via \
+these tools, rather than pasting large content into chat. Reference documents by their id.";
+
+pub struct ArtifactsToolkit;
+
+impl Toolkit<MyContext> for ArtifactsToolkit {
+    fn create_session<'a>(
+        &'a self,
+        _context: &'a MyContext,
+    ) -> BoxFuture<'a, Result<Box<dyn ToolkitSession<MyContext> + Send + Sync>, BoxedError>> {
+        Box::pin(async move {
+            let session: Box<dyn ToolkitSession<MyContext> + Send + Sync> =
+                Box::new(ArtifactsToolkitSession);
+            Ok(session)
+        })
+    }
+}
+
+struct ArtifactsToolkitSession;
+
+impl ToolkitSession<MyContext> for ArtifactsToolkitSession {
+    fn system_prompt(&self) -> Option<String> {
+        Some(ARTIFACTS_SYSTEM_PROMPT.to_string())
+    }
+
+    fn tools(&self) -> Vec<AgentTool<MyContext>> {
+        vec![
+            AgentTool::function(ArtifactCreateTool),
+            AgentTool::function(ArtifactUpdateTool),
+            AgentTool::function(ArtifactGetTool),
+            AgentTool::function(ArtifactListTool),
+            AgentTool::function(ArtifactDeleteTool),
+        ]
+    }
+
+    fn close(self: Box<Self>) -> BoxFuture<'static, Result<(), BoxedError>> {
+        Box::pin(async move { Ok(()) })
     }
 }

@@ -34,26 +34,31 @@ The user speaks %s language.`, name, location, language), nil
 	{Func: func(ctx context.Context, context *MyContext) (string, error) {
 		return fmt.Sprintf("The current date is %s.", time.Now().Format("Mon Jan 2 2006")), nil
 	}},
-	{String: ptr(`For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).
-Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`)},
 }
 
 var availableTools = llmagent.FunctionTools[*MyContext](
-	&ArtifactCreateTool{},
-	&ArtifactUpdateTool{},
-	&ArtifactGetTool{},
-	&ArtifactListTool{},
-	&ArtifactDeleteTool{},
 	&GetStockPriceTool{},
-	&GetCryptoPriceTool{},
-	&SearchWikipediaTool{},
-	&GetNewsTool{},
 	&GetCoordinatesTool{},
 	&GetWeatherTool{},
 )
 
+type availableToolkit struct {
+	Name        string
+	Description string
+	Toolkit     llmagent.Toolkit[*MyContext]
+}
+
+var availableToolkits = []availableToolkit{
+	{
+		Name:        "artifacts",
+		Description: "Create and manage documents in the Artifacts pane",
+		Toolkit:     ArtifactsToolkit{},
+	},
+}
+
 type AgentOptions struct {
 	EnabledTools     []string
+	EnabledToolkits  []string
 	WebSearch        *llmsdk.WebSearchTool
 	MCPServers       []llmmcp.MCPParams
 	Temperature      *float64
@@ -90,6 +95,16 @@ func createAgent(model llmsdk.LanguageModel, options *AgentOptions) *llmagent.Ag
 		llmagent.WithInstructions(instructions...),
 		llmagent.WithTools(tools...),
 		llmagent.WithMaxTurns[*MyContext](5),
+	}
+
+	enabledToolkitNames := make(map[string]bool)
+	for _, name := range options.EnabledToolkits {
+		enabledToolkitNames[name] = true
+	}
+	for _, available := range availableToolkits {
+		if options.EnabledToolkits == nil || enabledToolkitNames[available.Name] {
+			opts = append(opts, llmagent.WithToolkits(available.Toolkit))
+		}
 	}
 
 	if mcpToolkits := createMcpToolkits(options.MCPServers); len(mcpToolkits) > 0 {

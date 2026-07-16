@@ -77,6 +77,11 @@ export function RealtimeApp() {
     toolsInitialized,
     enabledTools,
     handleEnabledToolsChange,
+    toolkitOptions,
+    toolkitsError,
+    toolkitsInitialized,
+    enabledToolkits,
+    handleEnabledToolkitsChange,
     webSearch,
     setWebSearch,
     mcpServers,
@@ -113,6 +118,7 @@ export function RealtimeApp() {
       providerApiKeys,
       userContext,
       enabledTools,
+      enabledToolkits,
       webSearch,
       mcpServers,
       agentBehavior,
@@ -387,11 +393,16 @@ export function RealtimeApp() {
         enabledTools={enabledTools}
         onEnabledToolsChange={handleEnabledToolsChange}
         toolErrorMessage={toolsError}
+        toolkits={toolkitOptions}
+        enabledToolkits={enabledToolkits}
+        onEnabledToolkitsChange={handleEnabledToolkitsChange}
+        toolkitErrorMessage={toolkitsError}
         webSearch={webSearch}
         onWebSearchChange={setWebSearch}
         mcpServers={mcpServers}
         onMcpServersChange={handleMcpServersChange}
         toolsInitialized={toolsInitialized}
+        toolkitsInitialized={toolkitsInitialized}
         modelAudio={modelAudio}
         onModelAudioChange={setModelAudio}
         modelReasoning={modelReasoning}

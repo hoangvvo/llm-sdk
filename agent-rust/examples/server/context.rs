@@ -7,7 +7,6 @@ pub struct MyContext {
     pub language: Option<String>,
     pub geo_api_key: Option<String>,
     pub tomorrow_api_key: Option<String>,
-    pub news_api_key: Option<String>,
     // Client-managed artifacts store (server reads only)
     pub artifacts: Option<Vec<Artifact>>,
 }

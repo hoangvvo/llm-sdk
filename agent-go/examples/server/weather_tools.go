@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
+	"strings"
 
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
@@ -49,16 +49,13 @@ func (t *GetCoordinatesTool) Execute(ctx context.Context, paramsJSON json.RawMes
 
 	apiKey := ""
 	if context.GeoAPIKey != nil {
-		apiKey = *context.GeoAPIKey
-	}
-	if apiKey == "" {
-		apiKey = os.Getenv("GEO_API_KEY")
+		apiKey = strings.TrimSpace(*context.GeoAPIKey)
 	}
 
 	if apiKey == "" {
 		return llmagent.AgentToolResult{
 			Content: []llmsdk.Part{
-				llmsdk.NewTextPart("API Key not provided. You can also provide the value on the UI with the Context field 'geo_api_key'. Get a free API key at https://geocode.maps.co/"),
+				llmsdk.NewTextPart("API Key not provided. Provide the value on the UI with the Context field 'geo_api_key'. Get a free API key at https://geocode.maps.co/"),
 			},
 			IsError: true,
 		}, nil
@@ -195,16 +192,13 @@ func (t *GetWeatherTool) Execute(ctx context.Context, paramsJSON json.RawMessage
 
 	apiKey := ""
 	if context.TomorrowAPIKey != nil {
-		apiKey = *context.TomorrowAPIKey
-	}
-	if apiKey == "" {
-		apiKey = os.Getenv("TOMORROW_API_KEY")
+		apiKey = strings.TrimSpace(*context.TomorrowAPIKey)
 	}
 
 	if apiKey == "" {
 		return llmagent.AgentToolResult{
 			Content: []llmsdk.Part{
-				llmsdk.NewTextPart("API Key not provided. You can also provide the value on the UI with the Context field 'tomorrow_api_key'. Get a free API key at https://tomorrow.io/"),
+				llmsdk.NewTextPart("API Key not provided. Provide the value on the UI with the Context field 'tomorrow_api_key'. Get a free API key at https://tomorrow.io/"),
 			},
 			IsError: true,
 		}, nil

@@ -27,6 +27,7 @@ import type {
   McpServerConfig,
   WebSearchSettings,
 } from "../types.ts";
+import { getCredentialProvider } from "../types.ts";
 import {
   WEB_SEARCH_OPTIONS_PROVIDERS,
   WEB_SEARCH_PROVIDERS,
@@ -42,6 +43,7 @@ interface UseAgentConfig<Context> {
   providerApiKeys: ApiKeys;
   userContext: Context;
   enabledTools: string[];
+  enabledToolkits: string[];
   webSearch: WebSearchSettings;
   mcpServers: McpServerConfig[];
   agentBehavior: AgentBehaviorSettings;
@@ -106,6 +108,7 @@ export function useAgent<Context>(
     providerApiKeys,
     userContext,
     enabledTools,
+    enabledToolkits,
     webSearch,
     mcpServers,
     agentBehavior,
@@ -214,6 +217,7 @@ export function useAgent<Context>(
             context: userContext,
           } satisfies AgentRequest<Context>,
           enabled_tools: toolsInitialized ? enabledTools : undefined,
+          enabled_toolkits: enabledToolkits,
           web_search: prepareWebSearchPayload(
             webSearch,
             modelSelection.provider,
@@ -235,8 +239,13 @@ export function useAgent<Context>(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(providerApiKeys[modelSelection.provider]
-              ? { Authorization: providerApiKeys[modelSelection.provider] }
+            ...(providerApiKeys[getCredentialProvider(modelSelection.provider)]
+              ? {
+                  Authorization:
+                    providerApiKeys[
+                      getCredentialProvider(modelSelection.provider)
+                    ],
+                }
               : {}),
           },
           body: JSON.stringify(inputPayload),
@@ -353,6 +362,7 @@ export function useAgent<Context>(
       audio,
       agentBehavior,
       enabledTools,
+      enabledToolkits,
       logEvent,
       modelSelection,
       model,

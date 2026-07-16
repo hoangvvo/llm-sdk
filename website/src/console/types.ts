@@ -31,7 +31,6 @@ export interface MyContext {
   language?: string;
   geo_api_key?: string;
   tomorrow_api_key?: string;
-  news_api_key?: string;
   artifacts?: Artifact[];
 }
 
@@ -39,6 +38,15 @@ export interface ToolInfo {
   name: string;
   description?: string;
   providers?: string[];
+}
+
+export interface ToolkitInfo {
+  name: string;
+  description?: string;
+}
+
+export function getCredentialProvider(provider: string): string {
+  return provider === "openai-chat-completion" ? "openai" : provider;
 }
 
 export type WebSearchSettings = Omit<WebSearchTool, "type"> & {

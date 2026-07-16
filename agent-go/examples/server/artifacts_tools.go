@@ -188,3 +188,31 @@ func (t *ArtifactDeleteTool) Execute(_ context.Context, paramsJSON json.RawMessa
 	payload, _ := json.Marshal(map[string]any{"op": "artifact_delete", "id": p.ID})
 	return llmagent.AgentToolResult{Content: []llmsdk.Part{llmsdk.NewTextPart(string(payload))}}, nil
 }
+
+const artifactsSystemPrompt = `For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).
+Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`
+
+type ArtifactsToolkit struct{}
+
+func (ArtifactsToolkit) CreateSession(context.Context, *MyContext) (llmagent.ToolkitSession[*MyContext], error) {
+	return &artifactsToolkitSession{}, nil
+}
+
+type artifactsToolkitSession struct{}
+
+func (*artifactsToolkitSession) SystemPrompt() *string {
+	prompt := artifactsSystemPrompt
+	return &prompt
+}
+
+func (*artifactsToolkitSession) Tools() []llmagent.AgentTool[*MyContext] {
+	return llmagent.FunctionTools[*MyContext](
+		&ArtifactCreateTool{},
+		&ArtifactUpdateTool{},
+		&ArtifactGetTool{},
+		&ArtifactListTool{},
+		&ArtifactDeleteTool{},
+	)
+}
+
+func (*artifactsToolkitSession) Close(context.Context) error { return nil }

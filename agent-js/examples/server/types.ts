@@ -26,6 +26,7 @@ export interface RunStreamBody {
   metadata?: LanguageModelMetadata;
   input: AgentRequest<MyContext>;
   enabled_tools?: string[];
+  enabled_toolkits?: string[];
   web_search?: Omit<WebSearchTool, "type">;
   mcp_servers?: McpServerConfig[];
   temperature?: number;

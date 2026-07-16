@@ -17,9 +17,11 @@ import type {
   ApiKeys,
   McpServerConfig,
   ModelInfo,
+  ToolkitInfo,
   ToolInfo,
   WebSearchSettings,
 } from "../types.ts";
+import { getCredentialProvider } from "../types.ts";
 import { useFetchInitialData } from "./use-fetch-initial-data.ts";
 import { useLocalStorageState } from "./use-local-storage-state.ts";
 export interface ModelSelection {
@@ -37,11 +39,13 @@ export interface ModelOption extends ModelSelection {
 
 const RUN_STREAM_URL = "/api/run-stream/";
 const TOOLS_URL = "/api/tools/";
+const TOOLKITS_URL = "/api/toolkits/";
 
 export const STORAGE_KEY_MODEL = "console-selected-model";
 export const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
 export const STORAGE_KEY_CONTEXT = "console-user-context";
 export const STORAGE_KEY_ENABLED_TOOLS = "console-enabled-tools";
+export const STORAGE_KEY_ENABLED_TOOLKITS = "console-enabled-toolkits";
 export const STORAGE_KEY_WEB_SEARCH = "console-web-search";
 export const STORAGE_KEY_AGENT_BEHAVIOR = "console-agent-behavior";
 export const STORAGE_KEY_MCP_SERVERS = "console-mcp-servers";
@@ -77,7 +81,7 @@ function formatProviderName(provider: string): string {
 }
 
 function getProviderApiKeyStorageKey(provider: string): string {
-  return `${STORAGE_KEY_PROVIDER_PREFIX}${provider}`;
+  return `${STORAGE_KEY_PROVIDER_PREFIX}${getCredentialProvider(provider)}`;
 }
 
 function resolveStateUpdate<T>(update: SetStateAction<T>, current: T): T {
@@ -92,9 +96,9 @@ function readProviderApiKeys(modelOptions: ModelOption[]): ApiKeys {
     return next;
   }
   for (const option of modelOptions) {
-    const storageKey = getProviderApiKeyStorageKey(option.provider);
-    next[option.provider] =
-      window.localStorage.getItem(storageKey) ?? undefined;
+    const provider = getCredentialProvider(option.provider);
+    const storageKey = getProviderApiKeyStorageKey(provider);
+    next[provider] = window.localStorage.getItem(storageKey) ?? undefined;
   }
   return next;
 }
@@ -170,6 +174,11 @@ export interface ConsoleAppState<Context> {
   toolsInitialized: boolean;
   enabledTools: string[];
   handleEnabledToolsChange: (tools: string[]) => void;
+  toolkitOptions: ToolkitInfo[];
+  toolkitsError: string | null;
+  toolkitsInitialized: boolean;
+  enabledToolkits: string[];
+  handleEnabledToolkitsChange: (toolkits: string[]) => void;
   webSearch: WebSearchSettings;
   setWebSearch: Dispatch<SetStateAction<WebSearchSettings>>;
   mcpServers: McpServerConfig[];
@@ -202,6 +211,10 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     STORAGE_KEY_ENABLED_TOOLS,
     () => [],
   );
+  const [enabledToolkits, setEnabledToolkits] = useLocalStorageState<string[]>(
+    STORAGE_KEY_ENABLED_TOOLKITS,
+    () => ["artifacts"],
+  );
   const [webSearch, setWebSearch] = useLocalStorageState<WebSearchSettings>(
     STORAGE_KEY_WEB_SEARCH,
     createInitialWebSearchSettings,
@@ -230,6 +243,14 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     }
     return window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLS) !== null;
   });
+  const [hasStoredToolkitPreference, setHasStoredToolkitPreference] = useState(
+    () => {
+      if (typeof window === "undefined") {
+        return false;
+      }
+      return window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLKITS) !== null;
+    },
+  );
 
   const fetchTools = useCallback(async (signal: AbortSignal) => {
     const response = await fetch(TOOLS_URL, { signal });
@@ -242,17 +263,29 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
   const { data: toolsData, error: toolsError } =
     useFetchInitialData(fetchTools);
 
+  const fetchToolkits = useCallback(async (signal: AbortSignal) => {
+    const response = await fetch(TOOLKITS_URL, { signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch toolkits (${String(response.status)})`);
+    }
+    return (await response.json()) as ToolkitInfo[];
+  }, []);
+
+  const { data: toolkitsData, error: toolkitsError } =
+    useFetchInitialData(fetchToolkits);
+
   const handleSaveProviderApiKey = useCallback(
     (provider: string, apiKey: string) => {
+      const credentialProvider = getCredentialProvider(provider);
       const trimmed = apiKey.trim();
       setProviderApiKeys((prev) => {
         const next = { ...prev };
-        const storageKey = getProviderApiKeyStorageKey(provider);
+        const storageKey = getProviderApiKeyStorageKey(credentialProvider);
         if (trimmed) {
-          next[provider] = trimmed;
+          next[credentialProvider] = trimmed;
           localStorage.setItem(storageKey, trimmed);
         } else {
-          next[provider] = undefined;
+          next[credentialProvider] = undefined;
           localStorage.removeItem(storageKey);
         }
         return next;
@@ -272,6 +305,8 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     [modelSelection, toolsData],
   );
   const toolsInitialized = toolsData !== null || toolsError !== null;
+  const toolkitOptions = useMemo(() => toolkitsData ?? [], [toolkitsData]);
+  const toolkitsInitialized = toolkitsData !== null || toolkitsError !== null;
 
   const handleEnabledToolsChange = useCallback(
     (next: string[]) => {
@@ -307,6 +342,17 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
       toolOptions,
       toolsData,
     ],
+  );
+
+  const handleEnabledToolkitsChange = useCallback(
+    (next: string[]) => {
+      const toolkitNames = (toolkitsData ?? []).map((toolkit) => toolkit.name);
+      const nextSet = new Set(next);
+      const normalized = toolkitNames.filter((name) => nextSet.has(name));
+      setEnabledToolkits(normalized);
+      setHasStoredToolkitPreference(true);
+    },
+    [setEnabledToolkits, toolkitsData],
   );
 
   const handleMcpServersChange = useCallback(
@@ -364,6 +410,18 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     );
     return toolNames.filter((name) => allowed.has(name));
   }, [enabledTools, hasStoredToolPreference, toolOptions]);
+  const normalizedEnabledToolkits = useMemo(() => {
+    const toolkitNames = toolkitOptions.map((toolkit) => toolkit.name);
+    if (toolkitNames.length === 0) {
+      return enabledToolkits;
+    }
+
+    const baseSelection = hasStoredToolkitPreference
+      ? enabledToolkits
+      : toolkitNames;
+    const allowed = new Set(baseSelection);
+    return toolkitNames.filter((name) => allowed.has(name));
+  }, [enabledToolkits, hasStoredToolkitPreference, toolkitOptions]);
 
   const setModelAudio = useCallback<
     Dispatch<SetStateAction<AudioOptions | undefined>>
@@ -405,6 +463,11 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     toolsInitialized,
     enabledTools: normalizedEnabledTools,
     handleEnabledToolsChange,
+    toolkitOptions,
+    toolkitsError,
+    toolkitsInitialized,
+    enabledToolkits: normalizedEnabledToolkits,
+    handleEnabledToolkitsChange,
     webSearch,
     setWebSearch,
     mcpServers: supportedMcpServers,

@@ -1,5 +1,6 @@
 import type { Agent } from "@hoangvvo/llm-agent";
 import {
+  availableToolkits,
   availableTools,
   createAgent,
 } from "../../../agent-js/examples/server/agent.ts";
@@ -18,6 +19,12 @@ export function listTools(): Response {
   return Response.json(tools);
 }
 
+export function listToolkits(): Response {
+  return Response.json(
+    availableToolkits.map(({ name, description }) => ({ name, description })),
+  );
+}
+
 export async function runStream(request: Request): Promise<Response> {
   let agent: Agent<MyContext>;
   let input: RunStreamBody["input"];
@@ -29,6 +36,7 @@ export async function runStream(request: Request): Promise<Response> {
       model_id: modelId,
       metadata,
       enabled_tools: enabledTools,
+      enabled_toolkits: enabledToolkits,
       web_search: webSearch,
       mcp_servers: mcpServers = [],
       input: requestInput,
@@ -62,10 +70,23 @@ export async function runStream(request: Request): Promise<Response> {
           ),
         )
       : undefined;
+    const normalizedEnabledToolkits = Array.isArray(enabledToolkits)
+      ? Array.from(
+          new Set(
+            enabledToolkits.filter(
+              (toolkitName): toolkitName is string =>
+                typeof toolkitName === "string",
+            ),
+          ),
+        )
+      : undefined;
 
     agent = createAgent(model, {
       ...(normalizedEnabledTools
         ? { enabledTools: normalizedEnabledTools }
+        : {}),
+      ...(normalizedEnabledToolkits
+        ? { enabledToolkits: normalizedEnabledToolkits }
         : {}),
       ...(webSearch ? { webSearch } : {}),
       mcpServers,
