@@ -16,10 +16,15 @@ import type {
   ApiKeys,
   McpServerConfig,
   MyContext,
+  ToolkitInfo,
   ToolInfo,
   WebSearchSettings,
 } from "../types";
-import { WEB_SEARCH_OPTIONS_PROVIDERS, WEB_SEARCH_PROVIDERS } from "../types";
+import {
+  getCredentialProvider,
+  WEB_SEARCH_OPTIONS_PROVIDERS,
+  WEB_SEARCH_PROVIDERS,
+} from "../types";
 
 const MODALITY_OPTIONS: Modality[] = ["text", "image", "audio"];
 const CAPABILITY_ORDER = [
@@ -74,12 +79,13 @@ interface SidebarProps {
   tools: ToolInfo[];
   enabledTools: string[];
   onEnabledToolsChange: (tools: string[]) => void;
-  toolErrorMessage?: string | null;
+  toolkits: ToolkitInfo[];
+  enabledToolkits: string[];
+  onEnabledToolkitsChange: (toolkits: string[]) => void;
   webSearch: WebSearchSettings;
   onWebSearchChange: Dispatch<SetStateAction<WebSearchSettings>>;
   mcpServers: McpServerConfig[];
   onMcpServersChange: (servers: McpServerConfig[]) => void;
-  toolsInitialized: boolean;
   modelAudio: AudioOptions | undefined;
   onModelAudioChange: (audio: AudioOptions | undefined) => void;
   modelReasoning: ReasoningOptions | undefined;
@@ -144,12 +150,13 @@ function Sidebar({
   tools,
   enabledTools,
   onEnabledToolsChange,
-  toolErrorMessage,
+  toolkits,
+  enabledToolkits,
+  onEnabledToolkitsChange,
   webSearch,
   onWebSearchChange,
   mcpServers,
   onMcpServersChange,
-  toolsInitialized,
   modelAudio,
   onModelAudioChange,
   modelReasoning,
@@ -170,6 +177,7 @@ function Sidebar({
     );
   }, [models, selection]);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [toolkitsOpen, setToolkitsOpen] = useState(false);
   const [webSearchOpen, setWebSearchOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [behaviorOpen, setBehaviorOpen] = useState(false);
@@ -227,8 +235,19 @@ function Sidebar({
             tools={tools}
             enabledTools={enabledTools}
             onEnabledToolsChange={onEnabledToolsChange}
-            errorMessage={toolErrorMessage}
-            initialized={toolsInitialized}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          title={`Toolkits (${toolkits.length})`}
+          isOpen={toolkitsOpen}
+          onToggle={() => {
+            setToolkitsOpen((prev) => !prev);
+          }}
+        >
+          <ToolkitSection
+            toolkits={toolkits}
+            enabledToolkits={enabledToolkits}
+            onEnabledToolkitsChange={onEnabledToolkitsChange}
           />
         </CollapsibleSection>
         <CollapsibleSection
@@ -697,39 +716,17 @@ function ModelSelectionSection({
       )
     : null;
   const providers = useMemo(
-    () => Array.from(new Set(models.map((item) => item.provider))).sort(),
+    () =>
+      Array.from(
+        new Set(models.map((item) => getCredentialProvider(item.provider))),
+      ).sort(),
     [models],
   );
 
   const [showApiKeyManager, setShowApiKeyManager] = useState(false);
-  const [apiKeyDrafts, setApiKeyDrafts] = useState<ApiKeys>({});
 
   const handleToggleApiKeyManager = () => {
-    if (!showApiKeyManager) {
-      const drafts: Record<string, string> = {};
-      for (const provider of providers) {
-        drafts[provider] = apiKeys[provider] ?? "";
-      }
-      setApiKeyDrafts(drafts);
-      setShowApiKeyManager(true);
-      return;
-    }
-    setShowApiKeyManager(false);
-  };
-
-  const handleDraftChange = (provider: string, value: string) => {
-    setApiKeyDrafts((prev) => ({ ...prev, [provider]: value }));
-  };
-
-  const handleSave = (provider: string) => {
-    const value = (apiKeyDrafts[provider] ?? "").trim();
-    onSaveApiKey(provider, value);
-    setApiKeyDrafts((prev) => ({ ...prev, [provider]: value }));
-  };
-
-  const handleClear = (provider: string) => {
-    onSaveApiKey(provider, "");
-    setApiKeyDrafts((prev) => ({ ...prev, [provider]: "" }));
+    setShowApiKeyManager((current) => !current);
   };
 
   return (
@@ -779,54 +776,27 @@ function ModelSelectionSection({
         <div className="console-surface text-xs text-slate-600">
           <h3 className="console-subheading">Provider API Keys</h3>
           {providers.length > 0 ? (
-            <div className="mt-3 space-y-3">
+            <div className="mt-3 divide-y divide-slate-200">
               {providers.map((provider) => {
                 const savedValue = apiKeys[provider];
-                const draftValue = apiKeyDrafts[provider] ?? savedValue ?? "";
                 return (
-                  <div key={provider} className="console-surface p-3">
-                    <div className="console-microcaps flex items-center justify-between text-slate-500">
-                      <span>{formatProviderLabel(provider)}</span>
-                      <span
-                        className={`text-[10px] ${
-                          savedValue ? "text-emerald-600" : "text-slate-400"
-                        }`}
-                      >
-                        {savedValue ? "Saved" : "Not set"}
-                      </span>
-                    </div>
+                  <label
+                    key={provider}
+                    className="console-label block py-3 first:pt-0 last:pb-0"
+                  >
+                    {formatProviderLabel(provider)}
                     <input
                       type="text"
-                      className="console-field mt-2 w-full"
+                      className="console-field mt-1.5 w-full"
                       placeholder={`Enter your ${formatProviderLabel(
                         provider,
                       )} API key`}
-                      value={draftValue}
+                      value={savedValue ?? ""}
                       onChange={(event) => {
-                        handleDraftChange(provider, event.target.value);
+                        onSaveApiKey(provider, event.target.value);
                       }}
                     />
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="console-button"
-                        onClick={() => {
-                          handleSave(provider);
-                        }}
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        className="console-button console-button-quiet"
-                        onClick={() => {
-                          handleClear(provider);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
+                  </label>
                 );
               })}
             </div>
@@ -930,16 +900,12 @@ interface ToolSectionProps {
   tools: ToolInfo[];
   enabledTools: string[];
   onEnabledToolsChange: (tools: string[]) => void;
-  errorMessage?: string | null;
-  initialized: boolean;
 }
 
 function ToolSection({
   tools,
   enabledTools,
   onEnabledToolsChange,
-  errorMessage,
-  initialized,
 }: ToolSectionProps) {
   const orderedToolNames = useMemo(
     () => tools.map((tool) => tool.name),
@@ -988,10 +954,65 @@ function ToolSection({
           })}
         </ul>
       ) : (
-        <p className="mt-2 text-xs text-slate-500">
-          {errorMessage ??
-            (initialized ? "No tools available." : "Loading tools…")}
-        </p>
+        <p className="mt-2 text-xs text-slate-500">No tools available.</p>
+      )}
+    </div>
+  );
+}
+
+interface ToolkitSectionProps {
+  toolkits: ToolkitInfo[];
+  enabledToolkits: string[];
+  onEnabledToolkitsChange: (toolkits: string[]) => void;
+}
+
+function ToolkitSection({
+  toolkits,
+  enabledToolkits,
+  onEnabledToolkitsChange,
+}: ToolkitSectionProps) {
+  const handleToggleToolkit = (toolkitName: string, isChecked: boolean) => {
+    const next = new Set(enabledToolkits);
+    if (isChecked) {
+      next.add(toolkitName);
+    } else {
+      next.delete(toolkitName);
+    }
+    onEnabledToolkitsChange(
+      toolkits.map((toolkit) => toolkit.name).filter((name) => next.has(name)),
+    );
+  };
+
+  return (
+    <div className="console-surface space-y-3">
+      <p className="text-xs text-slate-500">
+        Enable or disable each toolkit as a complete set of capabilities.
+      </p>
+      {toolkits.length > 0 ? (
+        <ul className="mt-2 space-y-2 text-xs text-slate-600">
+          {toolkits.map((toolkit) => (
+            <li key={toolkit.name} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+                checked={enabledToolkits.includes(toolkit.name)}
+                onChange={(event) => {
+                  handleToggleToolkit(toolkit.name, event.target.checked);
+                }}
+              />
+              <div>
+                <p className="font-semibold text-slate-700">{toolkit.name}</p>
+                {toolkit.description ? (
+                  <p className="text-[11px] leading-snug text-slate-500">
+                    {toolkit.description}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-slate-500">No toolkits available.</p>
       )}
     </div>
   );
@@ -1234,21 +1255,6 @@ function ContextSection({ context, onChange }: ContextSectionProps) {
           }}
         />
       </label>
-      <label className="console-label">
-        newsapi.org API key
-        <input
-          type="text"
-          className="console-field mt-2 w-full"
-          placeholder="API key for the news tool"
-          value={context.news_api_key ?? ""}
-          onChange={(event) => {
-            onChange((prev) => ({
-              ...prev,
-              news_api_key: event.target.value,
-            }));
-          }}
-        />
-      </label>
     </div>
   );
 }
@@ -1364,6 +1370,9 @@ function formatCapability(capability: string): string {
 }
 
 function formatProviderLabel(provider: string): string {
+  if (provider === "openai") {
+    return "OpenAI";
+  }
   return provider
     .split("-")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))

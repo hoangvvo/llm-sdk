@@ -65,7 +65,6 @@ export function RealtimeApp() {
   const [visualVolume, setVisualVolume] = useState(0.12);
   const [turnCount, setTurnCount] = useState(0);
   const {
-    runStreamUrl,
     modelOptions,
     modelSelection,
     setModelSelection,
@@ -73,10 +72,11 @@ export function RealtimeApp() {
     providerApiKeys,
     handleSaveProviderApiKey,
     toolOptions,
-    toolsError,
-    toolsInitialized,
     enabledTools,
     handleEnabledToolsChange,
+    toolkitOptions,
+    enabledToolkits,
+    handleEnabledToolkitsChange,
     webSearch,
     setWebSearch,
     mcpServers,
@@ -105,18 +105,17 @@ export function RealtimeApp() {
     nextItems,
     streamingParts,
     resetConversation,
-  } = useAgent<MyContext>(
+  } = useAgent(
     {
-      runStreamUrl,
       modelSelection,
       model: selectedModelOption ?? null,
       providerApiKeys,
       userContext,
       enabledTools,
+      enabledToolkits,
       webSearch,
       mcpServers,
       agentBehavior,
-      toolsInitialized,
       audio: modelAudio,
       reasoning: modelReasoning,
       modalities: modelModalities,
@@ -386,12 +385,13 @@ export function RealtimeApp() {
         tools={toolOptions}
         enabledTools={enabledTools}
         onEnabledToolsChange={handleEnabledToolsChange}
-        toolErrorMessage={toolsError}
+        toolkits={toolkitOptions}
+        enabledToolkits={enabledToolkits}
+        onEnabledToolkitsChange={handleEnabledToolkitsChange}
         webSearch={webSearch}
         onWebSearchChange={setWebSearch}
         mcpServers={mcpServers}
         onMcpServersChange={handleMcpServersChange}
-        toolsInitialized={toolsInitialized}
         modelAudio={modelAudio}
         onModelAudioChange={setModelAudio}
         modelReasoning={modelReasoning}

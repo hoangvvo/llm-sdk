@@ -12,10 +12,9 @@ import type {
   ReasoningOptions,
   WebSearchTool,
 } from "@hoangvvo/llm-sdk";
-import { getArtifactTools } from "./artifacts.tools.ts";
+import { artifactsToolkit } from "./artifacts.tools.ts";
 import type { MyContext } from "./context.ts";
-import { getCryptoPriceTool, getStockPriceTool } from "./finance.tools.ts";
-import { getNewsTool, searchWikipediaTool } from "./information.tools.ts";
+import { getStockPriceTool } from "./finance.tools.ts";
 import type { McpServerConfig } from "./types.ts";
 import { getCoordinatesTool, getWeatherTool } from "./weather.tools.ts";
 
@@ -27,22 +26,29 @@ To access certain tools, the user may have to provide corresponding API keys in 
 The user location is ${context.location ?? "<not provided>"}.
 The user speaks ${context.language ?? "<not provided>"} language.`,
   () => `The current date is ${new Date().toDateString()}.`,
-  `For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).
-Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`,
 ];
 
 export const availableTools: AgentTool<MyContext>[] = [
-  ...getArtifactTools(),
   getStockPriceTool,
-  getCryptoPriceTool,
-  searchWikipediaTool,
-  getNewsTool,
   getCoordinatesTool,
   getWeatherTool,
 ];
 
+export const availableToolkits = [
+  {
+    name: "artifacts",
+    description: "Create and manage documents in the Artifacts pane",
+    toolkit: artifactsToolkit,
+  },
+] satisfies {
+  name: string;
+  description: string;
+  toolkit: Toolkit<MyContext>;
+}[];
+
 export interface AgentOptions {
   enabledTools?: string[];
+  enabledToolkits?: string[];
   webSearch?: Omit<WebSearchTool, "type">;
   temperature?: number;
   top_p?: number;
@@ -61,7 +67,13 @@ export function createAgent(
   model: LanguageModel,
   options?: AgentOptions,
 ): Agent<MyContext> {
-  const { enabledTools, webSearch, mcpServers, ...agentParams } = options ?? {};
+  const {
+    enabledTools,
+    enabledToolkits,
+    webSearch,
+    mcpServers,
+    ...agentParams
+  } = options ?? {};
 
   const toolNameSet = enabledTools ? new Set(enabledTools) : null;
   const tools: AgentTool<MyContext>[] =
@@ -73,14 +85,18 @@ export function createAgent(
   if (webSearch) {
     tools.push({ ...webSearch, type: "web_search" });
   }
-  const mcpToolkits = createMcpToolkits(mcpServers);
+  const toolkitNameSet = enabledToolkits ? new Set(enabledToolkits) : null;
+  const toolkits = availableToolkits
+    .filter(({ name }) => toolkitNameSet === null || toolkitNameSet.has(name))
+    .map(({ toolkit }) => toolkit);
+  toolkits.push(...createMcpToolkits(mcpServers));
 
   return new Agent<MyContext>({
     name: "MyAgent",
     instructions,
     model,
     tools,
-    toolkits: mcpToolkits,
+    toolkits,
     max_turns: 5,
     ...agentParams,
   });

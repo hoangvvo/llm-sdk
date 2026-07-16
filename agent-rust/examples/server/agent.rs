@@ -1,11 +1,7 @@
 use crate::{
-    artifacts_tools::{
-        ArtifactCreateTool, ArtifactDeleteTool, ArtifactGetTool, ArtifactListTool,
-        ArtifactUpdateTool,
-    },
+    artifacts_tools::ArtifactsToolkit,
     context::MyContext,
-    finance_tools::{GetCryptoPriceTool, GetStockPriceTool},
-    information_tools::{GetNewsTool, SearchWikipediaTool},
+    finance_tools::GetStockPriceTool,
     weather_tools::{GetCoordinatesTool, GetWeatherTool},
 };
 use chrono::Utc;
@@ -19,6 +15,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AgentOptions {
     pub enabled_tools: Option<Vec<String>>,
+    pub enabled_toolkits: Option<Vec<String>>,
     pub web_search: Option<WebSearchTool>,
     pub mcp_servers: Option<Vec<MCPParams>>,
     pub temperature: Option<f64>,
@@ -33,15 +30,7 @@ pub struct AgentOptions {
 
 pub fn get_available_tools() -> Vec<Box<dyn AgentFunctionTool<MyContext> + Send + Sync>> {
     vec![
-        Box::new(ArtifactCreateTool),
-        Box::new(ArtifactUpdateTool),
-        Box::new(ArtifactGetTool),
-        Box::new(ArtifactListTool),
-        Box::new(ArtifactDeleteTool),
         Box::new(GetStockPriceTool),
-        Box::new(GetCryptoPriceTool),
-        Box::new(SearchWikipediaTool),
-        Box::new(GetNewsTool),
         Box::new(GetCoordinatesTool),
         Box::new(GetWeatherTool),
     ]
@@ -73,14 +62,7 @@ pub fn create_agent(
                 "The current date is {}.",
                 Utc::now().format("%a %b %d %Y")
             ))
-        })
-        .add_instruction(
-            "For substantive deliverables (documents/specs/code), use the artifact tools \
-             (artifact_create, artifact_update, artifact_get, artifact_list, \
-             artifact_delete).\\nKeep chat replies brief and put the full document content into \
-             artifacts via these tools, rather than pasting large content into chat. Reference \
-             documents by their id.",
-        );
+        });
 
     // Add tools based on enabled_tools filter
     let enabled_tools = options.enabled_tools.as_ref();
@@ -95,23 +77,6 @@ pub fn create_agent(
     if enabled_tools.is_none()
         || enabled_tools
             .unwrap()
-            .contains(&"get_crypto_price".to_string())
-    {
-        builder = builder.add_tool(GetCryptoPriceTool);
-    }
-    if enabled_tools.is_none()
-        || enabled_tools
-            .unwrap()
-            .contains(&"search_wikipedia".to_string())
-    {
-        builder = builder.add_tool(SearchWikipediaTool);
-    }
-    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"get_news".to_string()) {
-        builder = builder.add_tool(GetNewsTool);
-    }
-    if enabled_tools.is_none()
-        || enabled_tools
-            .unwrap()
             .contains(&"get_coordinates".to_string())
     {
         builder = builder.add_tool(GetCoordinatesTool);
@@ -119,39 +84,16 @@ pub fn create_agent(
     if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"get_weather".to_string()) {
         builder = builder.add_tool(GetWeatherTool);
     }
-    if enabled_tools.is_none()
-        || enabled_tools
-            .unwrap()
-            .contains(&"artifact_create".to_string())
-    {
-        builder = builder.add_tool(ArtifactCreateTool);
-    }
-    if enabled_tools.is_none()
-        || enabled_tools
-            .unwrap()
-            .contains(&"artifact_update".to_string())
-    {
-        builder = builder.add_tool(ArtifactUpdateTool);
-    }
-    if enabled_tools.is_none() || enabled_tools.unwrap().contains(&"artifact_get".to_string()) {
-        builder = builder.add_tool(ArtifactGetTool);
-    }
-    if enabled_tools.is_none()
-        || enabled_tools
-            .unwrap()
-            .contains(&"artifact_list".to_string())
-    {
-        builder = builder.add_tool(ArtifactListTool);
-    }
-    if enabled_tools.is_none()
-        || enabled_tools
-            .unwrap()
-            .contains(&"artifact_delete".to_string())
-    {
-        builder = builder.add_tool(ArtifactDeleteTool);
-    }
     if let Some(web_search) = &options.web_search {
         builder = builder.add_tool(web_search.clone());
+    }
+
+    let artifacts_enabled = match options.enabled_toolkits.as_ref() {
+        Some(enabled) => enabled.iter().any(|name| name == "artifacts"),
+        None => true,
+    };
+    if artifacts_enabled {
+        builder = builder.add_toolkit(ArtifactsToolkit);
     }
 
     builder = builder.max_turns(5);

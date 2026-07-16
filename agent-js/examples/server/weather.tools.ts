@@ -11,14 +11,14 @@ export const getCoordinatesTool = zodTool({
   execute: async (input, context: MyContext) => {
     const { location } = input;
 
-    const apiKey = context.geo_api_key ?? process.env["GEO_API_KEY"];
+    const apiKey = context.geo_api_key?.trim();
 
-    if (apiKey === undefined) {
+    if (!apiKey) {
       return {
         content: [
           {
             type: "text",
-            text: "API Key not provided. You can also provide the value on the UI with the Context field 'geo_api_key'. Get a free API key at https://geocode.maps.co/",
+            text: "API Key not provided. Provide the value on the UI with the Context field 'geo_api_key'. Get a free API key at https://geocode.maps.co/",
           },
         ],
         is_error: true,
@@ -85,14 +85,14 @@ export const getWeatherTool = zodTool({
   execute: async (input, context: MyContext) => {
     const { latitude, longitude, units, timesteps, startTime } = input;
 
-    const apiKey = context.tomorrow_api_key ?? process.env["TOMORROW_API_KEY"];
+    const apiKey = context.tomorrow_api_key?.trim();
 
-    if (apiKey === undefined) {
+    if (!apiKey) {
       return {
         content: [
           {
             type: "text",
-            text: "API Key not provided. You can also provide the value on the UI with the Context field 'tomorrow_api_key'. Get a free API key at https://tomorrow.io/",
+            text: "API Key not provided. Provide the value on the UI with the Context field 'tomorrow_api_key'. Get a free API key at https://tomorrow.io/",
           },
         ],
         is_error: true,

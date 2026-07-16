@@ -24,6 +24,29 @@ export default function Page() {
               {message.parts.map((part, index) => {
                 if (part.type === "text") {
                   return <div key={index}>{part.text}</div>;
+                } else if (part.type === "custom") {
+                  return (
+                    <div key={index} className="text-sm text-zinc-500">
+                      {part.kind}
+                    </div>
+                  );
+                } else if (
+                  part.type === "file" ||
+                  part.type === "reasoning-file"
+                ) {
+                  return (
+                    <a
+                      key={index}
+                      href={part.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-blue-600 underline"
+                    >
+                      {part.type === "file" && part.filename
+                        ? part.filename
+                        : part.mediaType}
+                    </a>
+                  );
                 } else if (isToolUIPart(part)) {
                   return (
                     <div

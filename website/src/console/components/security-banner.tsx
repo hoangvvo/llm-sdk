@@ -1,9 +1,8 @@
 export const SecurityBanner = () => {
   return (
     <div className="mx-auto max-w-lg text-[10px] leading-relaxed text-slate-600">
-      Data, including the provided API keys, is not retained by the example
-      servers after the request is completed. API keys and other preferences are
-      stored in the browser's local storage for your convenience.{" "}
+      All API requests are made on the client side. No API keys are transmitted
+      to the backend.{" "}
       <a
         href="https://github.com/hoangvvo/llm-sdk/tree/main/website"
         className="text-sky-600 underline"

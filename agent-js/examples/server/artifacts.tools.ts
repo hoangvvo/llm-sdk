@@ -1,3 +1,4 @@
+import type { AgentTool, Toolkit, ToolkitSession } from "@hoangvvo/llm-agent";
 import { zodTool } from "@hoangvvo/llm-agent/zod";
 import { z } from "zod";
 import type { MyContext } from "./context.ts";
@@ -18,7 +19,7 @@ function findArtifact(ctx: MyContext, id: string): Artifact | undefined {
   return list.find((a) => a.id === id);
 }
 
-export const artifactCreateTool = zodTool({
+const artifactCreateTool = zodTool({
   name: "artifact_create",
   description:
     "Create a new document and return an instruction for the client to persist it",
@@ -50,7 +51,7 @@ export const artifactCreateTool = zodTool({
   },
 });
 
-export const artifactUpdateTool = zodTool({
+const artifactUpdateTool = zodTool({
   name: "artifact_update",
   description:
     "Replace document content and return an instruction for the client to persist changes",
@@ -83,7 +84,7 @@ export const artifactUpdateTool = zodTool({
   },
 });
 
-export const artifactGetTool = zodTool({
+const artifactGetTool = zodTool({
   name: "artifact_get",
   description: "Fetch a document from the current client context",
   parameters: z.object({ id: z.string() }),
@@ -105,7 +106,7 @@ export const artifactGetTool = zodTool({
   },
 });
 
-export const artifactListTool = zodTool({
+const artifactListTool = zodTool({
   name: "artifact_list",
   description: "List documents from the current client context",
   parameters: z.object({}).strict(),
@@ -123,7 +124,7 @@ export const artifactListTool = zodTool({
   },
 });
 
-export const artifactDeleteTool = zodTool({
+const artifactDeleteTool = zodTool({
   name: "artifact_delete",
   description: "Delete a document by id",
   parameters: z.object({ id: z.string() }),
@@ -137,12 +138,31 @@ export const artifactDeleteTool = zodTool({
   },
 });
 
-export function getArtifactTools() {
-  return [
-    artifactCreateTool,
-    artifactUpdateTool,
-    artifactGetTool,
-    artifactListTool,
-    artifactDeleteTool,
-  ];
+const artifactTools: AgentTool<MyContext>[] = [
+  artifactCreateTool,
+  artifactUpdateTool,
+  artifactGetTool,
+  artifactListTool,
+  artifactDeleteTool,
+];
+
+class ArtifactsToolkitSession implements ToolkitSession<MyContext> {
+  getSystemPrompt(): string {
+    return `For substantive deliverables (documents/specs/code), use the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).
+Keep chat replies brief and put the full document content into artifacts via these tools, rather than pasting large content into chat. Reference documents by their id.`;
+  }
+
+  getTools(): AgentTool<MyContext>[] {
+    return artifactTools;
+  }
+
+  async close(): Promise<void> {
+    // No resources to release.
+  }
 }
+
+export const artifactsToolkit: Toolkit<MyContext> = {
+  async createSession(): Promise<ToolkitSession<MyContext>> {
+    return new ArtifactsToolkitSession();
+  },
+};

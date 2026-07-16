@@ -1,5 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { StdioClientTransport as StdioClientTransportClass } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
   StreamableHTTPClientTransport,
   type StreamableHTTPClientTransportOptions,
@@ -19,8 +19,9 @@ import type { MCPInit, MCPParams } from "./types.ts";
 export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
   // Underlying MCP client instance for issuing protocol requests.
   #client: Client;
+  #params: MCPParams;
   // Transport selected for this session (stdio or streamable HTTP).
-  #transport: Transport;
+  #transport?: Transport;
 
   // Captures errors raised during background tool discovery (e.g., when a tool list
   // change notification arrives after the server updates tools on demand) so we can surface them on demand.
@@ -37,38 +38,7 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
       name: params.type,
       version: "1.0.0",
     });
-
-    switch (params.type) {
-      case "stdio":
-        this.#transport = new StdioClientTransport({
-          command: params.command,
-          ...(params.args && { args: params.args }),
-        });
-        break;
-      case "streamable-http": {
-        const url = new URL(params.url);
-        const authorization = normalizeBearerAuthorization(
-          params.authorization,
-        );
-        const transportOptions:
-          StreamableHTTPClientTransportOptions | undefined = authorization
-          ? {
-              requestInit: {
-                headers: {
-                  // Caller supplies bearer token; OAuth negotiation is not handled here.
-                  Authorization: authorization,
-                },
-              },
-            }
-          : undefined;
-        this.#transport = new StreamableHTTPClientTransport(
-          url,
-          transportOptions,
-        ) as Transport;
-        break;
-      }
-    }
-
+    this.#params = params;
     this.#toolListError = null;
   }
 
@@ -88,7 +58,7 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
   // Tear down the MCP wiring once the toolkit session is released by the agent.
   async close(): Promise<void> {
     await this.#client.close();
-    await this.#transport.close();
+    await this.#transport?.close();
   }
 
   // Load remote tools and convert them into AgentTool objects understood by the
@@ -135,6 +105,7 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
   // Connect to the MCP server, perform the initial tool sync, and subscribe to
   // tool change notifications so future updates flow back into this session.
   async initialize(): Promise<void> {
+    this.#transport = await createTransport(this.#params);
     this.#client.setNotificationHandler(
       ToolListChangedNotificationSchema,
       () => {
@@ -147,6 +118,38 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
     await this.#client.connect(this.#transport);
     await this.#loadTools();
   }
+}
+
+async function createTransport(params: MCPParams): Promise<Transport> {
+  if (params.type === "stdio") {
+    const moduleName = "@modelcontextprotocol/sdk/client/stdio.js";
+    const { StdioClientTransport } = (await import(
+      /* @vite-ignore */ moduleName
+    )) as {
+      StdioClientTransport: typeof StdioClientTransportClass;
+    };
+    return new StdioClientTransport({
+      command: params.command,
+      ...(params.args && { args: params.args }),
+    });
+  }
+
+  const authorization = normalizeBearerAuthorization(params.authorization);
+  const transportOptions: StreamableHTTPClientTransportOptions | undefined =
+    authorization
+      ? {
+          requestInit: {
+            headers: {
+              // Caller supplies bearer token; OAuth negotiation is not handled here.
+              Authorization: authorization,
+            },
+          },
+        }
+      : undefined;
+  return new StreamableHTTPClientTransport(
+    new URL(params.url),
+    transportOptions,
+  ) as Transport;
 }
 
 function normalizeBearerAuthorization(

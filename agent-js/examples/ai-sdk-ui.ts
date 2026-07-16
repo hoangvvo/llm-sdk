@@ -26,11 +26,18 @@ import { getModel } from "./get-model.ts";
 type UIMessageRole = "system" | "user" | "assistant";
 
 type ProviderMetadata = unknown;
+type ProviderReference = Record<string, string> & { type?: never };
 
 type TextUIPart = {
   type: "text";
   text: string;
   state?: "streaming" | "done";
+  providerMetadata?: ProviderMetadata;
+};
+
+type CustomContentUIPart = {
+  type: "custom";
+  kind: `${string}.${string}`;
   providerMetadata?: ProviderMetadata;
 };
 
@@ -67,6 +74,14 @@ type FileUIPart = {
   url: string;
   mediaType: string;
   filename?: string;
+  providerReference?: ProviderReference;
+  providerMetadata?: ProviderMetadata;
+};
+
+type ReasoningFileUIPart = {
+  type: "reasoning-file";
+  url: string;
+  mediaType: string;
   providerMetadata?: ProviderMetadata;
 };
 
@@ -128,12 +143,14 @@ type DynamicToolUIPart =
 
 type UIMessagePart =
   | TextUIPart
+  | CustomContentUIPart
   | ReasoningUIPart
   | ToolUIPart
   | DynamicToolUIPart
   | SourceUrlUIPart
   | SourceDocumentUIPart
   | FileUIPart
+  | ReasoningFileUIPart
   | DataUIPart
   | StepStartUIPart;
 
@@ -189,12 +206,21 @@ type ErrorMessageChunk = {
   errorText: string;
 };
 
+type CustomMessageChunk = {
+  type: "custom";
+  kind: `${string}.${string}`;
+  providerMetadata?: ProviderMetadata;
+};
+
 type ToolInputStartMessageChunk = {
   type: "tool-input-start";
   toolCallId: string;
   toolName: string;
   providerExecuted?: boolean;
+  providerMetadata?: ProviderMetadata;
+  toolMetadata?: Record<string, unknown>;
   dynamic?: boolean;
+  title?: string;
 };
 
 type ToolInputDeltaMessageChunk = {
@@ -210,7 +236,9 @@ type ToolInputAvailableMessageChunk = {
   input: unknown;
   providerExecuted?: boolean;
   providerMetadata?: ProviderMetadata;
+  toolMetadata?: Record<string, unknown>;
   dynamic?: boolean;
+  title?: string;
 };
 
 type ToolInputErrorMessageChunk = {
@@ -221,7 +249,26 @@ type ToolInputErrorMessageChunk = {
   errorText: string;
   providerExecuted?: boolean;
   providerMetadata?: ProviderMetadata;
+  toolMetadata?: Record<string, unknown>;
   dynamic?: boolean;
+  title?: string;
+};
+
+type ToolApprovalRequestMessageChunk = {
+  type: "tool-approval-request";
+  approvalId: string;
+  toolCallId: string;
+  isAutomatic?: boolean;
+  signature?: string;
+};
+
+type ToolApprovalResponseMessageChunk = {
+  type: "tool-approval-response";
+  approvalId: string;
+  approved: boolean;
+  reason?: string;
+  providerExecuted?: boolean;
+  providerMetadata?: ProviderMetadata;
 };
 
 type ToolOutputAvailableMessageChunk = {
@@ -229,6 +276,8 @@ type ToolOutputAvailableMessageChunk = {
   toolCallId: string;
   output: unknown;
   providerExecuted?: boolean;
+  providerMetadata?: ProviderMetadata;
+  toolMetadata?: Record<string, unknown>;
   dynamic?: boolean;
   preliminary?: boolean;
 };
@@ -238,7 +287,14 @@ type ToolOutputErrorMessageChunk = {
   toolCallId: string;
   errorText: string;
   providerExecuted?: boolean;
+  providerMetadata?: ProviderMetadata;
+  toolMetadata?: Record<string, unknown>;
   dynamic?: boolean;
+};
+
+type ToolOutputDeniedMessageChunk = {
+  type: "tool-output-denied";
+  toolCallId: string;
 };
 
 type SourceUrlMessageChunk = {
@@ -260,6 +316,13 @@ type SourceDocumentMessageChunk = {
 
 type FileMessageChunk = {
   type: "file";
+  url: string;
+  mediaType: string;
+  providerMetadata?: ProviderMetadata;
+};
+
+type ReasoningFileMessageChunk = {
+  type: "reasoning-file";
   url: string;
   mediaType: string;
   providerMetadata?: ProviderMetadata;
@@ -288,11 +351,14 @@ type StartMessageChunk = {
 
 type FinishMessageChunk = {
   type: "finish";
+  finishReason?:
+    "stop" | "length" | "content-filter" | "tool-calls" | "error" | "other";
   messageMetadata?: unknown;
 };
 
 type AbortMessageChunk = {
   type: "abort";
+  reason?: string;
 };
 
 type MessageMetadataMessageChunk = {
@@ -307,16 +373,21 @@ type UIMessageChunk =
   | ReasoningStartMessageChunk
   | ReasoningDeltaMessageChunk
   | ReasoningEndMessageChunk
+  | CustomMessageChunk
   | ErrorMessageChunk
   | ToolInputStartMessageChunk
   | ToolInputDeltaMessageChunk
   | ToolInputAvailableMessageChunk
   | ToolInputErrorMessageChunk
+  | ToolApprovalRequestMessageChunk
+  | ToolApprovalResponseMessageChunk
   | ToolOutputAvailableMessageChunk
   | ToolOutputErrorMessageChunk
+  | ToolOutputDeniedMessageChunk
   | SourceUrlMessageChunk
   | SourceDocumentMessageChunk
   | FileMessageChunk
+  | ReasoningFileMessageChunk
   | DataUIMessageChunk
   | StepStartMessageChunk
   | StepFinishMessageChunk
@@ -462,6 +533,28 @@ function safeJsonParse(rawText: string): unknown {
   } catch {
     return rawText;
   }
+}
+
+/**
+ * AI SDK 7 allows a top-level media type (for example, `image`) in addition to
+ * a full MIME type. File uploads still carry the full type in their data URL,
+ * so prefer that value when the declared type is only a category.
+ */
+function resolveMediaType(url: string, declaredMediaType: string): string {
+  const normalized = declaredMediaType.split(";", 1)[0]?.trim();
+  if (normalized?.includes("/") && !normalized.endsWith("/*")) {
+    return declaredMediaType;
+  }
+
+  const dataUrlMediaType = /^data:([^;,]+)/i.exec(url)?.[1];
+  return dataUrlMediaType ?? declaredMediaType;
+}
+
+function isMediaType(mediaType: string, topLevelType: string): boolean {
+  const normalized = mediaType.toLowerCase();
+  return (
+    normalized === topLevelType || normalized.startsWith(`${topLevelType}/`)
+  );
 }
 
 /**
@@ -720,6 +813,10 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
       },
     ];
   }
+  if (part.type === "custom") {
+    // Provider-specific custom content has no portable llm-sdk equivalent.
+    return [];
+  }
   if (part.type === "reasoning") {
     return [
       {
@@ -738,9 +835,9 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
       },
     ];
   }
-  if (part.type === "file") {
+  if (part.type === "file" || part.type === "reasoning-file") {
     // part.url is in the format of "data:<mediaType>;base64,<data>"
-    // We only interest in the raw base64 data for our representation
+    // We are only interested in the raw base64 data for our representation.
     let data: string;
     const sepIndex = part.url.indexOf(",");
     if (sepIndex !== -1) {
@@ -748,25 +845,32 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
     } else {
       data = part.url;
     }
-    if (part.mediaType.startsWith("image/")) {
+    const mediaType = resolveMediaType(part.url, part.mediaType);
+    if (isMediaType(mediaType, "image")) {
       return [
         {
           type: "image",
           data: data,
-          mime_type: part.mediaType,
+          mime_type: mediaType,
         },
       ];
     }
-    if (part.mediaType.startsWith("audio/")) {
+    if (isMediaType(mediaType, "audio")) {
+      let format: ReturnType<typeof mapMimeTypeToAudioFormat>;
+      try {
+        format = mapMimeTypeToAudioFormat(mediaType);
+      } catch {
+        return [];
+      }
       return [
         {
           type: "audio",
           data: data,
-          format: mapMimeTypeToAudioFormat(part.mediaType),
+          format,
         },
       ];
     }
-    if (part.mediaType.startsWith("text/")) {
+    if (isMediaType(mediaType, "text")) {
       return [
         {
           type: "text",

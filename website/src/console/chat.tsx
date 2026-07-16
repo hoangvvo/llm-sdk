@@ -19,7 +19,6 @@ export function ChatApp() {
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
 
   const {
-    runStreamUrl,
     modelOptions,
     modelSelection,
     setModelSelection,
@@ -27,10 +26,11 @@ export function ChatApp() {
     providerApiKeys,
     handleSaveProviderApiKey,
     toolOptions,
-    toolsError,
-    toolsInitialized,
     enabledTools,
     handleEnabledToolsChange,
+    toolkitOptions,
+    enabledToolkits,
+    handleEnabledToolkitsChange,
     webSearch,
     setWebSearch,
     mcpServers,
@@ -71,18 +71,17 @@ export function ChatApp() {
     sendUserMessage,
     abort,
     resetConversation,
-  } = useAgent<MyContext>(
+  } = useAgent(
     {
-      runStreamUrl,
       modelSelection,
       model: selectedModelOption ?? null,
       providerApiKeys,
       userContext,
       enabledTools,
+      enabledToolkits,
       webSearch,
       mcpServers,
       agentBehavior,
-      toolsInitialized,
       audio: modelAudio,
       reasoning: modelReasoning,
       modalities: modelModalities,
@@ -118,6 +117,16 @@ export function ChatApp() {
   );
 
   const artifacts = userContext.artifacts ?? [];
+  const artifactsEnabled = enabledToolkits.includes("artifacts");
+  const handleToolkitSelectionChange = useCallback(
+    (toolkits: string[]) => {
+      if (!toolkits.includes("artifacts")) {
+        setIsArtifactsOpen(false);
+      }
+      handleEnabledToolkitsChange(toolkits);
+    },
+    [handleEnabledToolkitsChange],
+  );
 
   const handleNewChat = useCallback(() => {
     resetConversation();
@@ -162,15 +171,21 @@ export function ChatApp() {
           </header>
           {activeTab === "chat" ? (
             <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-3 p-2 lg:grid-cols-3">
-              <div className="col-span-1 flex h-full min-h-0 min-w-0 lg:col-span-2">
+              <div
+                className={`col-span-1 flex h-full min-h-0 min-w-0 ${
+                  artifactsEnabled ? "lg:col-span-2" : "lg:col-span-3"
+                }`}
+              >
                 <ChatPane items={allItems} streamingParts={streamingParts} />
               </div>
-              <div className="col-span-1 hidden h-full min-w-0 flex-col lg:flex">
-                <ArtifactsPane
-                  artifacts={userContext.artifacts}
-                  onDelete={handleArtifactDelete}
-                />
-              </div>
+              {artifactsEnabled ? (
+                <div className="col-span-1 hidden h-full min-w-0 flex-col lg:flex">
+                  <ArtifactsPane
+                    artifacts={userContext.artifacts}
+                    onDelete={handleArtifactDelete}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : (
             <EventsPane events={eventLog} />
@@ -180,7 +195,7 @@ export function ChatApp() {
               {error}
             </div>
           ) : null}
-          {activeTab === "chat" ? (
+          {activeTab === "chat" && artifactsEnabled ? (
             <div className="border-t border-slate-200/70 bg-white/80 px-4 py-3 backdrop-blur-sm lg:hidden">
               <button
                 type="button"
@@ -217,12 +232,13 @@ export function ChatApp() {
           tools={toolOptions}
           enabledTools={enabledTools}
           onEnabledToolsChange={handleEnabledToolsChange}
-          toolErrorMessage={toolsError}
+          toolkits={toolkitOptions}
+          enabledToolkits={enabledToolkits}
+          onEnabledToolkitsChange={handleToolkitSelectionChange}
           webSearch={webSearch}
           onWebSearchChange={setWebSearch}
           mcpServers={mcpServers}
           onMcpServersChange={handleMcpServersChange}
-          toolsInitialized={toolsInitialized}
           modelAudio={modelAudio}
           onModelAudioChange={setModelAudio}
           modelReasoning={modelReasoning}
@@ -231,7 +247,7 @@ export function ChatApp() {
           onModelModalitiesChange={setModelModalities}
         />
       </div>
-      {isArtifactsOpen ? (
+      {artifactsEnabled && isArtifactsOpen ? (
         <div className="fixed inset-0 z-50 flex flex-col bg-white/95 backdrop-blur lg:hidden">
           <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-4">
             <p className="text-xs font-semibold tracking-[0.3em] text-slate-700 uppercase">

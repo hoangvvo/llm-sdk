@@ -243,6 +243,36 @@ func (t *ArtifactDeleteTool) Execute(_ context.Context, params json.RawMessage, 
 	return llmagent.AgentToolResult{Content: []llmsdk.Part{llmsdk.NewTextPart(string(body))}, IsError: false}, nil
 }
 
+const artifactsPrompt = `Use documents (artifacts/canvases) for substantive deliverables like documents, plans, specs, or code. Keep chat replies brief and status-oriented; put the full content into a document via the tools. Always reference documents by id.
+- Prefer creating/updating documents instead of pasting large content into chat
+- When asked to revise or extend prior work, read/update the relevant document
+- Keep the chat response short: what changed, where it lives (document id), and next steps`
+
+type ArtifactsToolkit struct{ S *Store }
+
+func (t ArtifactsToolkit) CreateSession(context.Context, Ctx) (llmagent.ToolkitSession[Ctx], error) {
+	return &ArtifactsToolkitSession{S: t.S}, nil
+}
+
+type ArtifactsToolkitSession struct{ S *Store }
+
+func (s *ArtifactsToolkitSession) SystemPrompt() *string {
+	prompt := artifactsPrompt
+	return &prompt
+}
+
+func (s *ArtifactsToolkitSession) Tools() []llmagent.AgentTool[Ctx] {
+	return llmagent.FunctionTools[Ctx](
+		&ArtifactCreateTool{S: s.S},
+		&ArtifactUpdateTool{S: s.S},
+		&ArtifactGetTool{S: s.S},
+		&ArtifactListTool{S: s.S},
+		&ArtifactDeleteTool{S: s.S},
+	)
+}
+
+func (*ArtifactsToolkitSession) Close(context.Context) error { return nil }
+
 func main() {
 	godotenv.Load("../.env")
 	provider := os.Getenv("PROVIDER")
@@ -260,21 +290,8 @@ func main() {
 
 	store := NewStore()
 
-	overview := "Use documents (artifacts/canvases) for substantive deliverables like documents, plans, specs, or code. Keep chat replies brief and status-oriented; put the full content into a document via the tools. Always reference documents by id."
-	rules := "- Prefer creating/updating documents instead of pasting large content into chat\n- When asked to revise or extend prior work, read/update the relevant document\n- Keep the chat response short: what changed, where it lives (document id), and next steps\n"
-
 	agent := llmagent.NewAgent("artifacts", model,
-		llmagent.WithInstructions(
-			llmagent.InstructionParam[Ctx]{String: &overview},
-			llmagent.InstructionParam[Ctx]{String: &rules},
-		),
-		llmagent.WithTools(
-			llmagent.NewAgentFunctionTool(&ArtifactCreateTool{S: store}),
-			llmagent.NewAgentFunctionTool(&ArtifactUpdateTool{S: store}),
-			llmagent.NewAgentFunctionTool(&ArtifactGetTool{S: store}),
-			llmagent.NewAgentFunctionTool(&ArtifactListTool{S: store}),
-			llmagent.NewAgentFunctionTool(&ArtifactDeleteTool{S: store}),
-		),
+		llmagent.WithToolkits[Ctx](ArtifactsToolkit{S: store}),
 	)
 
 	// Demo: create then revise a product requirements document

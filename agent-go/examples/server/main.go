@@ -22,6 +22,7 @@ type RunStreamBody struct {
 	Metadata         llmsdk.LanguageModelMetadata      `json:"metadata"`
 	Input            llmagent.AgentRequest[*MyContext] `json:"input"`
 	EnabledTools     []string                          `json:"enabled_tools,omitempty"`
+	EnabledToolkits  []string                          `json:"enabled_toolkits,omitempty"`
 	WebSearch        *llmsdk.WebSearchTool             `json:"web_search,omitempty"`
 	MCPServers       []llmmcp.MCPParams                `json:"mcp_servers,omitempty"`
 	Temperature      *float64                          `json:"temperature,omitempty"`
@@ -38,6 +39,11 @@ type ToolInfo struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	Providers   []string `json:"providers,omitempty"`
+}
+
+type ToolkitInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
 }
 
 func runStreamHandler(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +71,10 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 	if req.EnabledTools != nil {
 		enabledTools = slices.Compact(req.EnabledTools)
 	}
+	var enabledToolkits []string
+	if req.EnabledToolkits != nil {
+		enabledToolkits = slices.Compact(req.EnabledToolkits)
+	}
 
 	for _, mcpServer := range req.MCPServers {
 		if _, ok := mcpServer.StdioParams(); ok && os.Getenv("ALLOW_STDIO_MCP") != "true" {
@@ -75,6 +85,7 @@ func runStreamHandler(w http.ResponseWriter, r *http.Request) {
 
 	options := &AgentOptions{
 		EnabledTools:     enabledTools,
+		EnabledToolkits:  enabledToolkits,
 		WebSearch:        req.WebSearch,
 		MCPServers:       req.MCPServers,
 		Temperature:      req.Temperature,
@@ -145,6 +156,21 @@ func listToolsHandler(w http.ResponseWriter) {
 	}
 }
 
+func listToolkitsHandler(w http.ResponseWriter) {
+	toolkits := make([]ToolkitInfo, 0, len(availableToolkits))
+	for _, toolkit := range availableToolkits {
+		toolkits = append(toolkits, ToolkitInfo{
+			Name:        toolkit.Name,
+			Description: toolkit.Description,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(toolkits); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func setCORSHeaders(w http.ResponseWriter) {
 	appUrl := os.Getenv("APP_URL")
 	if appUrl == "" {
@@ -174,6 +200,11 @@ func main() {
 	mux.HandleFunc("GET /tools", func(w http.ResponseWriter, r *http.Request) {
 		setCORSHeaders(w)
 		listToolsHandler(w)
+	})
+
+	mux.HandleFunc("GET /toolkits", func(w http.ResponseWriter, r *http.Request) {
+		setCORSHeaders(w)
+		listToolkitsHandler(w)
 	})
 
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {

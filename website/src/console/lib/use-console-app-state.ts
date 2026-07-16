@@ -12,15 +12,20 @@ import {
   type SetStateAction,
 } from "react";
 import modelsJson from "../../../../models/models.json" with { type: "json" };
+import {
+  availableToolkits,
+  availableTools,
+} from "../../../../agent-js/examples/server/agent.ts";
 import type {
   AgentBehaviorSettings,
   ApiKeys,
   McpServerConfig,
   ModelInfo,
+  ToolkitInfo,
   ToolInfo,
   WebSearchSettings,
 } from "../types.ts";
-import { useFetchInitialData } from "./use-fetch-initial-data.ts";
+import { getCredentialProvider } from "../types.ts";
 import { useLocalStorageState } from "./use-local-storage-state.ts";
 export interface ModelSelection {
   provider: string;
@@ -35,19 +40,25 @@ export interface ModelOption extends ModelSelection {
   modalities?: Modality[];
 }
 
-const RUN_STREAM_URL = "/api/run-stream/";
-const TOOLS_URL = "/api/tools/";
-
 export const STORAGE_KEY_MODEL = "console-selected-model";
 export const STORAGE_KEY_PROVIDER_PREFIX = "console-provider-api-key:";
 export const STORAGE_KEY_CONTEXT = "console-user-context";
 export const STORAGE_KEY_ENABLED_TOOLS = "console-enabled-tools";
+export const STORAGE_KEY_ENABLED_TOOLKITS = "console-enabled-toolkits";
 export const STORAGE_KEY_WEB_SEARCH = "console-web-search";
 export const STORAGE_KEY_AGENT_BEHAVIOR = "console-agent-behavior";
 export const STORAGE_KEY_MCP_SERVERS = "console-mcp-servers";
 
 const RAW_MODEL_LIST = (modelsJson.models ?? []) as ModelInfo[];
 const MODEL_OPTIONS: ModelOption[] = RAW_MODEL_LIST.map(mapModelDefinition);
+const TOOL_OPTIONS: ToolInfo[] = availableTools.flatMap((tool) =>
+  tool.type === "function"
+    ? [{ name: tool.name, description: tool.description }]
+    : [],
+);
+const TOOLKIT_OPTIONS: ToolkitInfo[] = availableToolkits.map(
+  ({ name, description }) => ({ name, description }),
+);
 
 function mapModelDefinition(info: ModelInfo): ModelOption {
   return {
@@ -77,7 +88,7 @@ function formatProviderName(provider: string): string {
 }
 
 function getProviderApiKeyStorageKey(provider: string): string {
-  return `${STORAGE_KEY_PROVIDER_PREFIX}${provider}`;
+  return `${STORAGE_KEY_PROVIDER_PREFIX}${getCredentialProvider(provider)}`;
 }
 
 function resolveStateUpdate<T>(update: SetStateAction<T>, current: T): T {
@@ -92,9 +103,9 @@ function readProviderApiKeys(modelOptions: ModelOption[]): ApiKeys {
     return next;
   }
   for (const option of modelOptions) {
-    const storageKey = getProviderApiKeyStorageKey(option.provider);
-    next[option.provider] =
-      window.localStorage.getItem(storageKey) ?? undefined;
+    const provider = getCredentialProvider(option.provider);
+    const storageKey = getProviderApiKeyStorageKey(provider);
+    next[provider] = window.localStorage.getItem(storageKey) ?? undefined;
   }
   return next;
 }
@@ -158,7 +169,6 @@ function createModelFeatureState(selectedModelOption: ModelOption | undefined) {
 }
 
 export interface ConsoleAppState<Context> {
-  runStreamUrl: string;
   modelOptions: ModelOption[];
   modelSelection: ModelSelection | null;
   setModelSelection: Dispatch<SetStateAction<ModelSelection | null>>;
@@ -166,10 +176,11 @@ export interface ConsoleAppState<Context> {
   providerApiKeys: ApiKeys;
   handleSaveProviderApiKey: (provider: string, apiKey: string) => void;
   toolOptions: ToolInfo[];
-  toolsError: string | null;
-  toolsInitialized: boolean;
   enabledTools: string[];
   handleEnabledToolsChange: (tools: string[]) => void;
+  toolkitOptions: ToolkitInfo[];
+  enabledToolkits: string[];
+  handleEnabledToolkitsChange: (toolkits: string[]) => void;
   webSearch: WebSearchSettings;
   setWebSearch: Dispatch<SetStateAction<WebSearchSettings>>;
   mcpServers: McpServerConfig[];
@@ -202,6 +213,10 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     STORAGE_KEY_ENABLED_TOOLS,
     () => [],
   );
+  const [enabledToolkits, setEnabledToolkits] = useLocalStorageState<string[]>(
+    STORAGE_KEY_ENABLED_TOOLKITS,
+    () => ["artifacts"],
+  );
   const [webSearch, setWebSearch] = useLocalStorageState<WebSearchSettings>(
     STORAGE_KEY_WEB_SEARCH,
     createInitialWebSearchSettings,
@@ -230,29 +245,27 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     }
     return window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLS) !== null;
   });
-
-  const fetchTools = useCallback(async (signal: AbortSignal) => {
-    const response = await fetch(TOOLS_URL, { signal });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tools (${String(response.status)})`);
-    }
-    return (await response.json()) as ToolInfo[];
-  }, []);
-
-  const { data: toolsData, error: toolsError } =
-    useFetchInitialData(fetchTools);
+  const [hasStoredToolkitPreference, setHasStoredToolkitPreference] = useState(
+    () => {
+      if (typeof window === "undefined") {
+        return false;
+      }
+      return window.localStorage.getItem(STORAGE_KEY_ENABLED_TOOLKITS) !== null;
+    },
+  );
 
   const handleSaveProviderApiKey = useCallback(
     (provider: string, apiKey: string) => {
+      const credentialProvider = getCredentialProvider(provider);
       const trimmed = apiKey.trim();
       setProviderApiKeys((prev) => {
         const next = { ...prev };
-        const storageKey = getProviderApiKeyStorageKey(provider);
+        const storageKey = getProviderApiKeyStorageKey(credentialProvider);
         if (trimmed) {
-          next[provider] = trimmed;
+          next[credentialProvider] = trimmed;
           localStorage.setItem(storageKey, trimmed);
         } else {
-          next[provider] = undefined;
+          next[credentialProvider] = undefined;
           localStorage.removeItem(storageKey);
         }
         return next;
@@ -263,19 +276,19 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
 
   const toolOptions = useMemo(
     () =>
-      (toolsData ?? []).filter(
+      TOOL_OPTIONS.filter(
         (tool) =>
           !tool.providers ||
           !modelSelection ||
           tool.providers.includes(modelSelection.provider),
       ),
-    [modelSelection, toolsData],
+    [modelSelection],
   );
-  const toolsInitialized = toolsData !== null || toolsError !== null;
+  const toolkitOptions = TOOLKIT_OPTIONS;
 
   const handleEnabledToolsChange = useCallback(
     (next: string[]) => {
-      const allToolNames = (toolsData ?? []).map((tool) => tool.name);
+      const allToolNames = TOOL_OPTIONS.map((tool) => tool.name);
       const visibleToolNames = new Set(toolOptions.map((tool) => tool.name));
       const nextVisibleTools = new Set(next);
       const selectedTools = new Set(
@@ -300,13 +313,18 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
         JSON.stringify(normalized),
       );
     },
-    [
-      enabledTools,
-      hasStoredToolPreference,
-      setEnabledTools,
-      toolOptions,
-      toolsData,
-    ],
+    [enabledTools, hasStoredToolPreference, setEnabledTools, toolOptions],
+  );
+
+  const handleEnabledToolkitsChange = useCallback(
+    (next: string[]) => {
+      const toolkitNames = TOOLKIT_OPTIONS.map((toolkit) => toolkit.name);
+      const nextSet = new Set(next);
+      const normalized = toolkitNames.filter((name) => nextSet.has(name));
+      setEnabledToolkits(normalized);
+      setHasStoredToolkitPreference(true);
+    },
+    [setEnabledToolkits],
   );
 
   const handleMcpServersChange = useCallback(
@@ -364,6 +382,18 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     );
     return toolNames.filter((name) => allowed.has(name));
   }, [enabledTools, hasStoredToolPreference, toolOptions]);
+  const normalizedEnabledToolkits = useMemo(() => {
+    const toolkitNames = toolkitOptions.map((toolkit) => toolkit.name);
+    if (toolkitNames.length === 0) {
+      return enabledToolkits;
+    }
+
+    const baseSelection = hasStoredToolkitPreference
+      ? enabledToolkits
+      : toolkitNames;
+    const allowed = new Set(baseSelection);
+    return toolkitNames.filter((name) => allowed.has(name));
+  }, [enabledToolkits, hasStoredToolkitPreference, toolkitOptions]);
 
   const setModelAudio = useCallback<
     Dispatch<SetStateAction<AudioOptions | undefined>>
@@ -393,7 +423,6 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
   }, []);
 
   return {
-    runStreamUrl: RUN_STREAM_URL,
     modelOptions,
     modelSelection,
     setModelSelection,
@@ -401,10 +430,11 @@ export function useConsoleAppState<Context>(): ConsoleAppState<Context> {
     providerApiKeys,
     handleSaveProviderApiKey,
     toolOptions,
-    toolsError,
-    toolsInitialized,
     enabledTools: normalizedEnabledTools,
     handleEnabledToolsChange,
+    toolkitOptions,
+    enabledToolkits: normalizedEnabledToolkits,
+    handleEnabledToolkitsChange,
     webSearch,
     setWebSearch,
     mcpServers: supportedMcpServers,

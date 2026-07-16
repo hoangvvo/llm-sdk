@@ -48,12 +48,12 @@ export function EventsPane({ events }: EventsPaneProps) {
                 <div className="flex items-center gap-3 text-xs tracking-[0.15em] text-slate-600">
                   <span
                     className={
-                      event.direction === "client"
+                      event.direction === "console"
                         ? "text-emerald-600"
                         : "text-sky-600"
                     }
                   >
-                    {event.direction === "client" ? "↑" : "↓"}
+                    {event.direction === "console" ? "↑" : "↓"}
                   </span>
                   <span className="font-medium text-slate-700">
                     {event.name}

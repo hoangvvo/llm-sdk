@@ -1,6 +1,9 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentTool, AgentToolResult, BoxedError,
+    Toolkit, ToolkitSession,
+};
 use llm_sdk::{JSONSchema, Message, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -282,6 +285,67 @@ impl AgentFunctionTool<Ctx> for ArtifactDelete {
     }
 }
 
+const ARTIFACTS_PROMPT: &str =
+    "Use documents (artifacts/canvases) for substantive deliverables like documents, plans, \
+     specs, or code. Keep chat replies brief and status-oriented; put the full content into a \
+     document via the tools. Always reference documents by id.\n- Prefer creating/updating \
+     documents instead of pasting large content into chat\n- When asked to revise or extend prior \
+     work, read/update the relevant document\n- Keep the chat response short: what changed, where \
+     it lives (document id), and next steps";
+
+struct ArtifactsToolkit {
+    store: Store,
+}
+
+impl Toolkit<Ctx> for ArtifactsToolkit {
+    fn create_session<'a>(
+        &'a self,
+        _context: &'a Ctx,
+    ) -> BoxFuture<'a, Result<Box<dyn ToolkitSession<Ctx> + Send + Sync>, BoxedError>> {
+        Box::pin(async move {
+            let session: Box<dyn ToolkitSession<Ctx> + Send + Sync> =
+                Box::new(ArtifactsToolkitSession {
+                    store: self.store.clone(),
+                });
+            Ok(session)
+        })
+    }
+}
+
+struct ArtifactsToolkitSession {
+    store: Store,
+}
+
+impl ToolkitSession<Ctx> for ArtifactsToolkitSession {
+    fn system_prompt(&self) -> Option<String> {
+        Some(ARTIFACTS_PROMPT.to_string())
+    }
+
+    fn tools(&self) -> Vec<AgentTool<Ctx>> {
+        vec![
+            AgentTool::function(ArtifactCreate {
+                store: self.store.clone(),
+            }),
+            AgentTool::function(ArtifactUpdate {
+                store: self.store.clone(),
+            }),
+            AgentTool::function(ArtifactGet {
+                store: self.store.clone(),
+            }),
+            AgentTool::function(ArtifactList {
+                store: self.store.clone(),
+            }),
+            AgentTool::function(ArtifactDelete {
+                store: self.store.clone(),
+            }),
+        ]
+    }
+
+    fn close(self: Box<Self>) -> BoxFuture<'static, Result<(), BoxedError>> {
+        Box::pin(async move { Ok(()) })
+    }
+}
+
 #[tokio::main]
 async fn main() {
     dotenv().ok();
@@ -296,35 +360,11 @@ async fn main() {
     .expect("failed to create model");
 
     let store = Store::default();
-    let overview = "Use documents (artifacts/canvases) for substantive deliverables like \
-                    documents, plans, specs, or code. Keep chat replies brief and \
-                    status-oriented; put the full content into a document via the tools. Always \
-                    reference documents by id.";
-    let rules = "- Prefer creating/updating documents instead of pasting large content into \
-                 chat\n- When asked to revise or extend prior work, read/update the relevant \
-                 document\n- Keep the chat response short: what changed, where it lives (document \
-                 id), and next steps\n";
-
-    let agent = Agent::new(
-        llm_agent::AgentParams::new("artifacts", model)
-            .add_instruction(overview)
-            .add_instruction(rules)
-            .add_tool(ArtifactCreate {
-                store: store.clone(),
-            })
-            .add_tool(ArtifactUpdate {
-                store: store.clone(),
-            })
-            .add_tool(ArtifactGet {
-                store: store.clone(),
-            })
-            .add_tool(ArtifactList {
-                store: store.clone(),
-            })
-            .add_tool(ArtifactDelete {
-                store: store.clone(),
-            }),
-    );
+    let agent = Agent::new(llm_agent::AgentParams::new("artifacts", model).add_toolkit(
+        ArtifactsToolkit {
+            store: store.clone(),
+        },
+    ));
 
     let items1: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(
         "We need a product requirements document for a new Todo app. Please draft it in markdown \

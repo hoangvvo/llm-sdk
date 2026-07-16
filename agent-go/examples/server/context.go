@@ -6,7 +6,6 @@ type MyContext struct {
 	Language       *string `json:"language,omitempty"`
 	GeoAPIKey      *string `json:"geo_api_key,omitempty"`
 	TomorrowAPIKey *string `json:"tomorrow_api_key,omitempty"`
-	NewsAPIKey     *string `json:"news_api_key,omitempty"`
 	// Client-managed artifacts store (server reads only)
 	Artifacts []Artifact `json:"artifacts,omitempty"`
 }

@@ -29,12 +29,12 @@ jobs:
           toolchain: nightly
           components: clippy, rustfmt
           cache: true
+          cache-on-failure: false
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Check formatting
         run: cargo +nightly fmt --all -- --check
       - name: Run SDK Clippy
         run: RUSTFLAGS="-Dwarnings" cargo clippy --package llm-sdk-rs
-      - name: Build SDK
-        run: cargo build --package llm-sdk-rs
       - name: Test SDK offline suites
         run: >-
           cargo test --package llm-sdk-rs
@@ -44,7 +44,6 @@ jobs:
 
   agent:
     name: Agent
-    needs: sdk
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -57,6 +56,8 @@ jobs:
           toolchain: nightly
           components: clippy
           cache: true
+          cache-on-failure: false
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
           cache-workspaces: |
             . -> target
             . -> coverage/rust/target
@@ -64,8 +65,6 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run agent Clippy
         run: RUSTFLAGS="-Dwarnings" cargo clippy --package llm-agent
-      - name: Build agent
-        run: cargo build --package llm-agent
       - name: Test agent with coverage
         env:
           CARGO_TARGET_DIR: coverage/rust/target

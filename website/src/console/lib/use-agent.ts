@@ -1,7 +1,6 @@
 import type {
   AgentItem,
   AgentItemMessage,
-  AgentRequest,
   AgentStreamEvent,
   AgentStreamPartialEvent,
 } from "@hoangvvo/llm-agent";
@@ -18,34 +17,36 @@ import type {
   TextPart,
   ToolCallPart,
 } from "@hoangvvo/llm-sdk";
-import { stream as eventStream } from "fetch-event-stream";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AgentBehaviorSettings,
   ApiKeys,
   LoggedEvent,
   McpServerConfig,
+  MyContext,
   WebSearchSettings,
 } from "../types.ts";
+import { getCredentialProvider } from "../types.ts";
 import {
   WEB_SEARCH_OPTIONS_PROVIDERS,
   WEB_SEARCH_PROVIDERS,
 } from "../types.ts";
+import { createAgent } from "../../../../agent-js/examples/server/agent.ts";
+import { createBrowserModel } from "./browser-model.ts";
 import type { ModelOption, ModelSelection } from "./use-console-app-state.ts";
 import { useLocalStorageState } from "./use-local-storage-state.ts";
 import { createId } from "./utils.ts";
 
-interface UseAgentConfig<Context> {
-  runStreamUrl: string;
+interface UseAgentConfig {
   modelSelection: ModelSelection | null;
   model: ModelOption | null | undefined;
   providerApiKeys: ApiKeys;
-  userContext: Context;
+  userContext: MyContext;
   enabledTools: string[];
+  enabledToolkits: string[];
   webSearch: WebSearchSettings;
   mcpServers: McpServerConfig[];
   agentBehavior: AgentBehaviorSettings;
-  toolsInitialized: boolean;
   audio: AudioOptions | undefined;
   reasoning: ReasoningOptions | undefined;
   modalities: Modality[] | undefined;
@@ -83,8 +84,6 @@ interface UseAgentReturn {
   resetConversation: () => void;
 }
 
-type ServerToClientEvent = AgentStreamEvent | { event: "error"; error: string };
-
 function isAbortError(error: unknown): boolean {
   if (error instanceof DOMException) {
     return error.name === "AbortError";
@@ -95,21 +94,20 @@ function isAbortError(error: unknown): boolean {
   return false;
 }
 
-export function useAgent<Context>(
-  config: UseAgentConfig<Context>,
+export function useAgent(
+  config: UseAgentConfig,
   { onAudioDelta, onToolResult }: UseAgentOptions = {},
 ): UseAgentReturn {
   const {
-    runStreamUrl,
     modelSelection,
     model,
     providerApiKeys,
     userContext,
     enabledTools,
+    enabledToolkits,
     webSearch,
     mcpServers,
     agentBehavior,
-    toolsInitialized,
     audio,
     reasoning,
     modalities,
@@ -128,7 +126,10 @@ export function useAgent<Context>(
   const [eventLog, setEventLog] = useState<LoggedEvent[]>([]);
 
   const itemsRef = useRef<AgentItem[]>([]);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const streamRef = useRef<AsyncGenerator<AgentStreamEvent, unknown> | null>(
+    null,
+  );
+  const abortRequestedRef = useRef(false);
   const hasHydratedRef = useRef(!hasHistoryKey);
 
   useEffect(() => {
@@ -137,12 +138,12 @@ export function useAgent<Context>(
 
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort();
+      void streamRef.current?.return(undefined);
     };
   }, []);
 
   const logEvent = useCallback(
-    (direction: "client" | "server", name: string, payload: unknown) => {
+    (direction: "console" | "agent", name: string, payload: unknown) => {
       setEventLog((prev) => [
         ...prev,
         {
@@ -158,7 +159,8 @@ export function useAgent<Context>(
   );
 
   const abort = useCallback(() => {
-    abortControllerRef.current?.abort();
+    abortRequestedRef.current = true;
+    void streamRef.current?.return(undefined);
   }, []);
 
   const resetConversation = useCallback(() => {
@@ -188,8 +190,7 @@ export function useAgent<Context>(
         return;
       }
 
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
+      abortRequestedRef.current = false;
 
       const pendingItems: AgentItem[] = [...pendingUserItems];
       const conversation: AgentItem[] = [
@@ -198,6 +199,7 @@ export function useAgent<Context>(
       ];
 
       let streamingParts: Part[] = [];
+      let iterator: AsyncGenerator<AgentStreamEvent, unknown> | null = null;
 
       setNextItems(pendingUserItems);
       setError(null);
@@ -205,66 +207,55 @@ export function useAgent<Context>(
       setStreamingParts([]);
 
       try {
-        const inputPayload = {
+        const apiKey =
+          providerApiKeys[getCredentialProvider(modelSelection.provider)];
+        if (!apiKey) {
+          throw new Error("Enter an API key for the selected provider");
+        }
+
+        const webSearchOptions = prepareWebSearchPayload(
+          webSearch,
+          modelSelection.provider,
+        );
+        const mcpServerOptions = prepareMcpServerPayload(mcpServers) ?? [];
+        const languageModel = createBrowserModel({
+          provider: modelSelection.provider,
+          modelId: modelSelection.modelId,
+          metadata: model.metadata,
+          apiKey,
+        });
+        const agent = createAgent(languageModel, {
+          enabledTools,
+          enabledToolkits,
+          ...(webSearchOptions ? { webSearch: webSearchOptions } : {}),
+          mcpServers: mcpServerOptions,
+          ...agentBehavior,
+          ...(audio ? { audio } : {}),
+          ...(reasoning ? { reasoning } : {}),
+          ...(modalities ? { modalities } : {}),
+        });
+        const request = { input: conversation, context: userContext };
+
+        logEvent("console", "browser:run", {
+          execution: "browser",
           provider: modelSelection.provider,
           model_id: modelSelection.modelId,
-          metadata: model.metadata,
-          input: {
-            input: conversation,
-            context: userContext,
-          } satisfies AgentRequest<Context>,
-          enabled_tools: toolsInitialized ? enabledTools : undefined,
-          web_search: prepareWebSearchPayload(
-            webSearch,
-            modelSelection.provider,
-          ),
-          mcp_servers: prepareMcpServerPayload(mcpServers),
-          temperature: agentBehavior.temperature,
-          top_p: agentBehavior.top_p,
-          top_k: agentBehavior.top_k,
-          frequency_penalty: agentBehavior.frequency_penalty,
-          presence_penalty: agentBehavior.presence_penalty,
+          input: request,
+          enabled_tools: enabledTools,
+          enabled_toolkits: enabledToolkits,
+          web_search: webSearchOptions,
+          mcp_servers: mcpServerOptions,
+          ...agentBehavior,
           audio,
           reasoning,
           modalities,
-        };
-
-        logEvent("client", "request", inputPayload);
-
-        const iterator = await eventStream(runStreamUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(providerApiKeys[modelSelection.provider]
-              ? { Authorization: providerApiKeys[modelSelection.provider] }
-              : {}),
-          },
-          body: JSON.stringify(inputPayload),
-          signal: controller.signal,
-          credentials: "include",
         });
 
-        for await (const message of iterator) {
-          if (!message.data) {
-            continue;
-          }
-          if (message.data === "[DONE]") {
-            break;
-          }
+        iterator = agent.runStream(request);
+        streamRef.current = iterator;
 
-          let parsed: ServerToClientEvent;
-          try {
-            parsed = JSON.parse(message.data) as ServerToClientEvent;
-          } catch (err) {
-            console.error("Failed to parse stream payload", err, message.data);
-            continue;
-          }
-
-          logEvent("server", `event:${parsed.event}`, parsed);
-
-          if (parsed.event === "error") {
-            throw new Error(parsed.error);
-          }
+        for await (const parsed of iterator) {
+          logEvent("agent", `event:${parsed.event}`, parsed);
 
           if (parsed.event === "partial") {
             const deltaPart = parsed.delta?.part;
@@ -306,6 +297,13 @@ export function useAgent<Context>(
           }
         }
 
+        if (abortRequestedRef.current && streamingParts.length > 0) {
+          pendingItems.push({
+            type: "message",
+            role: "assistant",
+            content: streamingParts,
+          });
+        }
         setItems((prev) => {
           const next = [...prev, ...pendingItems];
           itemsRef.current = next;
@@ -313,7 +311,7 @@ export function useAgent<Context>(
         });
         setNextItems([]);
       } catch (err) {
-        if (isAbortError(err)) {
+        if (abortRequestedRef.current || isAbortError(err)) {
           setItems((prev) => {
             const next = [...prev, ...pendingItems];
 
@@ -344,7 +342,9 @@ export function useAgent<Context>(
           setError("Unknown error while streaming response");
         }
       } finally {
-        abortControllerRef.current = null;
+        if (streamRef.current === iterator) {
+          streamRef.current = null;
+        }
         setStreamingParts([]);
         setIsStreaming(false);
       }
@@ -353,6 +353,7 @@ export function useAgent<Context>(
       audio,
       agentBehavior,
       enabledTools,
+      enabledToolkits,
       logEvent,
       modelSelection,
       model,
@@ -362,8 +363,6 @@ export function useAgent<Context>(
       onToolResult,
       providerApiKeys,
       reasoning,
-      runStreamUrl,
-      toolsInitialized,
       userContext,
       webSearch,
       setItems,
@@ -621,7 +620,16 @@ function sanitizePayload(value: unknown): unknown {
     for (const [key, entry] of Object.entries(
       value as Record<string, unknown>,
     )) {
-      if ((key === "data" || key === "data") && typeof entry === "string") {
+      const normalizedKey = key.toLowerCase();
+      if (
+        normalizedKey === "authorization" ||
+        normalizedKey === "token" ||
+        normalizedKey.endsWith("_token") ||
+        normalizedKey.endsWith("api_key") ||
+        normalizedKey.endsWith("apikey")
+      ) {
+        result[key] = "[redacted]";
+      } else if (key === "data" && typeof entry === "string") {
         result[key] = `[${String(entry.length)} bytes base64]`;
       } else {
         result[key] = sanitizePayload(entry);

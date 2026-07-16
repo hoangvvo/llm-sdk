@@ -22,7 +22,6 @@ mod artifacts_tools;
 mod common;
 mod context;
 mod finance_tools;
-mod information_tools;
 mod weather_tools;
 
 #[derive(Clone, Deserialize)]
@@ -32,6 +31,7 @@ struct RunStreamBody {
     metadata: LanguageModelMetadata,
     input: AgentRequest<MyContext>,
     enabled_tools: Option<Vec<String>>,
+    enabled_toolkits: Option<Vec<String>>,
     web_search: Option<WebSearchTool>,
     mcp_servers: Option<Vec<MCPParams>>,
     temperature: Option<f64>,
@@ -52,9 +52,16 @@ struct ToolInfo {
     providers: Option<Vec<String>>,
 }
 
+#[derive(Clone, Serialize)]
+struct ToolkitInfo {
+    name: String,
+    description: String,
+}
+
 #[derive(Clone)]
 struct AppState {
     available_tools: Vec<ToolInfo>,
+    available_toolkits: Vec<ToolkitInfo>,
 }
 
 async fn run_stream_handler(
@@ -72,6 +79,7 @@ async fn run_stream_handler(
         metadata,
         input,
         enabled_tools,
+        enabled_toolkits,
         web_search,
         mcp_servers,
         temperature,
@@ -103,6 +111,7 @@ async fn run_stream_handler(
 
     let options = AgentOptions {
         enabled_tools,
+        enabled_toolkits,
         web_search,
         mcp_servers,
         temperature,
@@ -170,6 +179,10 @@ async fn list_tools_handler(State(state): State<AppState>) -> Json<Vec<ToolInfo>
     Json(state.available_tools.clone())
 }
 
+async fn list_toolkits_handler(State(state): State<AppState>) -> Json<Vec<ToolkitInfo>> {
+    Json(state.available_toolkits.clone())
+}
+
 async fn home_handler() -> &'static str {
     "Welcome to llm-agent-rust Server!\\nGitHub: https://github.com/hoangvvo/llm-sdk"
 }
@@ -187,7 +200,14 @@ async fn main() -> Result<(), BoxedError> {
             providers: None,
         })
         .collect::<Vec<_>>();
-    let state = AppState { available_tools };
+    let available_toolkits = vec![ToolkitInfo {
+        name: "artifacts".to_string(),
+        description: "Create and manage documents in the Artifacts pane".to_string(),
+    }];
+    let state = AppState {
+        available_tools,
+        available_toolkits,
+    };
 
     let app_url = env::var("APP_URL").unwrap_or_else(|_| "http://localhost:4321".to_string());
 
@@ -196,6 +216,7 @@ async fn main() -> Result<(), BoxedError> {
         .route("/", get(home_handler))
         .route("/run-stream", post(run_stream_handler))
         .route("/tools", get(list_tools_handler))
+        .route("/toolkits", get(list_toolkits_handler))
         .layer(
             CorsLayer::new()
                 .allow_origin([app_url.parse().unwrap()])

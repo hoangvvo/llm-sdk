@@ -34,6 +34,7 @@ export interface AnthropicModelOptions {
   baseURL?: string;
   apiKey: string;
   modelId: string;
+  dangerouslyAllowBrowser?: boolean;
 }
 
 const PROVIDER = "anthropic";
@@ -55,6 +56,7 @@ export class AnthropicModel implements LanguageModel {
     this.#anthropic = new Anthropic({
       baseURL: options.baseURL,
       apiKey: options.apiKey,
+      dangerouslyAllowBrowser: options.dangerouslyAllowBrowser,
     });
 
     traceLanguageModel(this);

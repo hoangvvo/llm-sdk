@@ -32,8 +32,6 @@ jobs:
         run: go mod download
       - name: Vet SDK
         run: go vet ./sdk-go/...
-      - name: Build SDK
-        run: go build ./sdk-go/...
       - name: Test SDK offline suites
         run: |
           go test ./sdk-go ./sdk-go/llmsdktest
@@ -41,7 +39,6 @@ jobs:
 
   agent:
     name: Agent
-    needs: sdk
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -62,8 +59,6 @@ jobs:
         run: go install github.com/boumenot/gocover-cobertura@v1.5.0
       - name: Vet agent
         run: go vet ./agent-go/...
-      - name: Build agent
-        run: go build ./agent-go/...
       - name: Test agent with coverage
         run: |
           mkdir -p coverage/go

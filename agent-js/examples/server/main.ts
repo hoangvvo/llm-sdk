@@ -1,7 +1,7 @@
 import type { Agent } from "@hoangvvo/llm-agent";
 import http from "node:http";
 import { getModel } from "../get-model.ts";
-import { availableTools, createAgent } from "./agent.ts";
+import { availableToolkits, availableTools, createAgent } from "./agent.ts";
 import type { MyContext } from "./context.ts";
 import type { RunStreamBody } from "./types.ts";
 
@@ -25,6 +25,7 @@ async function runStreamHandler(
       metadata,
       input,
       enabled_tools,
+      enabled_toolkits,
       web_search,
       mcp_servers,
       ...params
@@ -43,6 +44,16 @@ async function runStreamHandler(
           ),
         )
       : undefined;
+    const enabledToolkitsParam = Array.isArray(enabled_toolkits)
+      ? Array.from(
+          new Set(
+            enabled_toolkits.filter(
+              (toolkitName): toolkitName is string =>
+                typeof toolkitName === "string",
+            ),
+          ),
+        )
+      : undefined;
 
     const mcpServersParam = Array.isArray(mcp_servers) ? mcp_servers : [];
 
@@ -56,6 +67,9 @@ async function runStreamHandler(
 
     agent = createAgent(model, {
       ...(enabledToolsParam ? { enabledTools: enabledToolsParam } : {}),
+      ...(enabledToolkitsParam
+        ? { enabledToolkits: enabledToolkitsParam }
+        : {}),
       ...(web_search ? { webSearch: web_search } : {}),
       mcpServers: mcpServersParam,
       ...params,
@@ -109,6 +123,18 @@ function listToolsHandler(
   res.end(JSON.stringify(tools));
 }
 
+function listToolkitsHandler(
+  _req: http.IncomingMessage,
+  res: http.ServerResponse,
+) {
+  const toolkits = availableToolkits.map(({ name, description }) => ({
+    name,
+    description,
+  }));
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(toolkits));
+}
+
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let data = "";
@@ -152,6 +178,11 @@ http
 
     if (req.url === "/tools") {
       listToolsHandler(req, res);
+      return;
+    }
+
+    if (req.url === "/toolkits") {
+      listToolkitsHandler(req, res);
       return;
     }
 
