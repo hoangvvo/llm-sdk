@@ -71,16 +71,26 @@ struct ChatRequestBody {
 #[derive(Debug)]
 enum UIMessagePart {
     Text(TextUIPart),
+    Custom,
     Reasoning(ReasoningUIPart),
     DynamicTool(DynamicToolUIPart),
     Tool(ToolUIPart),
     File(FileUIPart),
+    ReasoningFile(ReasoningFileUIPart),
     Unknown,
 }
 
 #[derive(Debug, Deserialize)]
 struct TextUIPart {
     text: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct CustomUIPart {
+    kind: String,
+    provider_metadata: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,6 +127,18 @@ struct FileUIPart {
     media_type: String,
     #[serde(default)]
     filename: Option<String>,
+    #[serde(default)]
+    provider_reference: Option<HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct ReasoningFileUIPart {
+    url: String,
+    media_type: String,
+    #[serde(default)]
+    provider_metadata: Option<Value>,
 }
 
 impl<'de> Deserialize<'de> for UIMessagePart {
@@ -134,6 +156,10 @@ impl<'de> Deserialize<'de> for UIMessagePart {
                 let part: TextUIPart = serde_json::from_value(value).map_err(de::Error::custom)?;
                 Ok(Self::Text(part))
             }
+            "custom" => {
+                let _: CustomUIPart = serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Self::Custom)
+            }
             "reasoning" => {
                 let part: ReasoningUIPart =
                     serde_json::from_value(value).map_err(de::Error::custom)?;
@@ -147,6 +173,11 @@ impl<'de> Deserialize<'de> for UIMessagePart {
             "file" => {
                 let part: FileUIPart = serde_json::from_value(value).map_err(de::Error::custom)?;
                 Ok(Self::File(part))
+            }
+            "reasoning-file" => {
+                let part: ReasoningFileUIPart =
+                    serde_json::from_value(value).map_err(de::Error::custom)?;
+                Ok(Self::ReasoningFile(part))
             }
             _ if type_str.starts_with("tool-") => {
                 let mut part: ToolUIPart =
@@ -666,16 +697,21 @@ impl DataStreamProtocolAdapter {
 // ==== Adapter helpers ====
 
 fn convert_file_part(part: &FileUIPart) -> Result<Vec<Part>, String> {
-    let data = extract_data_payload(&part.url);
-    if part.media_type.starts_with("image/") {
-        Ok(vec![Part::image(data, &part.media_type)])
-    } else if part.media_type.starts_with("audio/") {
-        if let Some(format) = map_mime_type_to_audio_format(&part.media_type) {
+    convert_file_data(&part.url, &part.media_type)
+}
+
+fn convert_file_data(url: &str, declared_media_type: &str) -> Result<Vec<Part>, String> {
+    let data = extract_data_payload(url);
+    let media_type = resolve_media_type(url, declared_media_type);
+    if is_media_type(&media_type, "image") {
+        Ok(vec![Part::image(data, media_type)])
+    } else if is_media_type(&media_type, "audio") {
+        if let Some(format) = map_mime_type_to_audio_format(&media_type) {
             Ok(vec![Part::audio(data, format)])
         } else {
             Ok(Vec::new())
         }
-    } else if part.media_type.starts_with("text/") {
+    } else if is_media_type(&media_type, "text") {
         let decoded = BASE64_STANDARD
             .decode(data.as_bytes())
             .map_err(|err| format!("Failed to decode text data: {err}"))?;
@@ -736,6 +772,10 @@ fn convert_tool_part(part: &ToolUIPart) -> Result<Vec<Part>, String> {
 fn ui_message_part_to_parts(part: &UIMessagePart) -> Result<Vec<Part>, String> {
     match part {
         UIMessagePart::Text(part) => Ok(vec![Part::text(&part.text)]),
+        UIMessagePart::Custom => {
+            // Provider-specific custom content has no portable llm-sdk equivalent.
+            Ok(Vec::new())
+        }
         UIMessagePart::Reasoning(part) => Ok(vec![Part::reasoning(part.text.clone())]),
         UIMessagePart::DynamicTool(part) => Ok(vec![Part::tool_call(
             &part.tool_call_id,
@@ -743,6 +783,7 @@ fn ui_message_part_to_parts(part: &UIMessagePart) -> Result<Vec<Part>, String> {
             part.input.clone().unwrap_or(Value::Null),
         )]),
         UIMessagePart::File(part) => convert_file_part(part),
+        UIMessagePart::ReasoningFile(part) => convert_file_data(&part.url, &part.media_type),
         UIMessagePart::Tool(part) => convert_tool_part(part),
         UIMessagePart::Unknown => Ok(Vec::new()),
     }
@@ -840,6 +881,37 @@ fn map_mime_type_to_audio_format(mime_type: &str) -> Option<AudioFormat> {
 fn extract_data_payload(url: &str) -> String {
     url.split_once(',')
         .map_or_else(|| url.to_string(), |(_, data)| data.to_string())
+}
+
+/// AI SDK 7 accepts top-level media types such as `image`. Uploaded data URLs
+/// still include the full MIME type, so recover it before creating llm-sdk
+/// parts.
+fn resolve_media_type(url: &str, declared_media_type: &str) -> String {
+    let normalized = declared_media_type
+        .split(';')
+        .next()
+        .unwrap_or(declared_media_type)
+        .trim();
+    if normalized.contains('/') && !normalized.ends_with("/*") {
+        return declared_media_type.to_string();
+    }
+
+    if url
+        .get(.."data:".len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("data:"))
+    {
+        if let Some((header, _)) = url["data:".len()..].split_once(',') {
+            if let Some(media_type) = header.split(';').next().filter(|value| !value.is_empty()) {
+                return media_type.to_string();
+            }
+        }
+    }
+    declared_media_type.to_string()
+}
+
+fn is_media_type(media_type: &str, top_level_type: &str) -> bool {
+    let normalized = media_type.to_ascii_lowercase();
+    normalized == top_level_type || normalized.starts_with(&format!("{top_level_type}/"))
 }
 
 // ==== HTTP handlers ====

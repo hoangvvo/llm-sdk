@@ -40,11 +40,13 @@ type uiMessage struct {
 }
 
 type uiPart struct {
-	Text        *textUIPart
-	Reasoning   *reasoningUIPart
-	DynamicTool *dynamicToolUIPart
-	Tool        *toolUIPart
-	File        *fileUIPart
+	Text          *textUIPart
+	Custom        *customUIPart
+	Reasoning     *reasoningUIPart
+	DynamicTool   *dynamicToolUIPart
+	Tool          *toolUIPart
+	File          *fileUIPart
+	ReasoningFile *reasoningFileUIPart
 }
 
 func (p *uiPart) UnmarshalJSON(data []byte) error {
@@ -59,6 +61,12 @@ func (p *uiPart) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.Text = &part
+	case base.Type == "custom":
+		var part customUIPart
+		if err := json.Unmarshal(data, &part); err != nil {
+			return err
+		}
+		p.Custom = &part
 	case base.Type == "reasoning":
 		var part reasoningUIPart
 		if err := json.Unmarshal(data, &part); err != nil {
@@ -77,6 +85,12 @@ func (p *uiPart) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.File = &part
+	case base.Type == "reasoning-file":
+		var part reasoningFileUIPart
+		if err := json.Unmarshal(data, &part); err != nil {
+			return err
+		}
+		p.ReasoningFile = &part
 	default:
 		if strings.HasPrefix(base.Type, "tool-") {
 			var part toolUIPart
@@ -105,6 +119,14 @@ func (p uiPart) MarshalJSON() ([]byte, error) {
 			Type:       "text",
 			textUIPart: p.Text,
 		})
+	case p.Custom != nil:
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*customUIPart
+		}{
+			Type:         "custom",
+			customUIPart: p.Custom,
+		})
 	case p.Reasoning != nil:
 		return json.Marshal(struct {
 			Type string `json:"type"`
@@ -128,6 +150,14 @@ func (p uiPart) MarshalJSON() ([]byte, error) {
 		}{
 			Type:       "file",
 			fileUIPart: p.File,
+		})
+	case p.ReasoningFile != nil:
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*reasoningFileUIPart
+		}{
+			Type:                "reasoning-file",
+			reasoningFileUIPart: p.ReasoningFile,
 		})
 	case p.Tool != nil:
 		typeValue := p.Tool.rawType
@@ -170,6 +200,11 @@ type textUIPart struct {
 	ProviderMetadata providerMetadata `json:"providerMetadata,omitempty"`
 }
 
+type customUIPart struct {
+	Kind             string           `json:"kind"`
+	ProviderMetadata providerMetadata `json:"providerMetadata,omitempty"`
+}
+
 type reasoningUIPart struct {
 	Text             string           `json:"text"`
 	State            *string          `json:"state,omitempty"`
@@ -177,9 +212,16 @@ type reasoningUIPart struct {
 }
 
 type fileUIPart struct {
+	URL               string            `json:"url"`
+	MediaType         string            `json:"mediaType"`
+	Filename          *string           `json:"filename,omitempty"`
+	ProviderReference map[string]string `json:"providerReference,omitempty"`
+	ProviderMetadata  providerMetadata  `json:"providerMetadata,omitempty"`
+}
+
+type reasoningFileUIPart struct {
 	URL              string           `json:"url"`
 	MediaType        string           `json:"mediaType"`
-	Filename         *string          `json:"filename,omitempty"`
 	ProviderMetadata providerMetadata `json:"providerMetadata,omitempty"`
 }
 
@@ -854,6 +896,9 @@ func uiPartToParts(part uiPart) []llmsdk.Part {
 	switch {
 	case part.Text != nil:
 		return []llmsdk.Part{llmsdk.NewTextPart(part.Text.Text)}
+	case part.Custom != nil:
+		// Provider-specific custom content has no portable llm-sdk equivalent.
+		return nil
 	case part.Reasoning != nil:
 		return []llmsdk.Part{llmsdk.NewReasoningPart(part.Reasoning.Text)}
 	case part.DynamicTool != nil:
@@ -863,6 +908,8 @@ func uiPartToParts(part uiPart) []llmsdk.Part {
 		return []llmsdk.Part{llmsdk.NewToolCallPart(part.DynamicTool.ToolCallID, part.DynamicTool.ToolName, part.DynamicTool.Input)}
 	case part.File != nil:
 		return convertFilePart(part.File)
+	case part.ReasoningFile != nil:
+		return convertFileData(part.ReasoningFile.URL, part.ReasoningFile.MediaType)
 	case part.Tool != nil:
 		return convertToolPart(part.Tool)
 	default:
@@ -871,18 +918,23 @@ func uiPartToParts(part uiPart) []llmsdk.Part {
 }
 
 func convertFilePart(part *fileUIPart) []llmsdk.Part {
-	data := extractDataPayload(part.URL)
+	return convertFileData(part.URL, part.MediaType)
+}
+
+func convertFileData(url, declaredMediaType string) []llmsdk.Part {
+	data := extractDataPayload(url)
+	mediaType := resolveMediaType(url, declaredMediaType)
 	switch {
-	case strings.HasPrefix(part.MediaType, "image/"):
-		imagePart := llmsdk.NewImagePart(data, part.MediaType)
+	case isMediaType(mediaType, "image"):
+		imagePart := llmsdk.NewImagePart(data, mediaType)
 		return []llmsdk.Part{imagePart}
-	case strings.HasPrefix(part.MediaType, "audio/"):
-		format, err := partutil.MapMimeTypeToAudioFormat(part.MediaType)
+	case isMediaType(mediaType, "audio"):
+		format, err := partutil.MapMimeTypeToAudioFormat(mediaType)
 		if err != nil {
 			return nil
 		}
 		return []llmsdk.Part{llmsdk.NewAudioPart(data, format)}
-	case strings.HasPrefix(part.MediaType, "text/"):
+	case isMediaType(mediaType, "text"):
 		decoded, err := base64.StdEncoding.DecodeString(data)
 		if err != nil {
 			return nil
@@ -891,6 +943,28 @@ func convertFilePart(part *fileUIPart) []llmsdk.Part {
 	default:
 		return nil
 	}
+}
+
+// resolveMediaType handles the top-level media types accepted by AI SDK 7 by
+// recovering the full MIME type from an uploaded data URL when available.
+func resolveMediaType(url, declaredMediaType string) string {
+	normalized := strings.TrimSpace(strings.SplitN(declaredMediaType, ";", 2)[0])
+	if strings.Contains(normalized, "/") && !strings.HasSuffix(normalized, "/*") {
+		return declaredMediaType
+	}
+
+	if comma := strings.IndexByte(url, ','); comma > len("data:") && strings.EqualFold(url[:len("data:")], "data:") {
+		header := url[len("data:"):comma]
+		if mediaType := strings.SplitN(header, ";", 2)[0]; mediaType != "" {
+			return mediaType
+		}
+	}
+	return declaredMediaType
+}
+
+func isMediaType(mediaType, topLevelType string) bool {
+	normalized := strings.ToLower(mediaType)
+	return normalized == topLevelType || strings.HasPrefix(normalized, topLevelType+"/")
 }
 
 func convertToolPart(part *toolUIPart) []llmsdk.Part {

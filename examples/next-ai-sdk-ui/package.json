@@ -9,9 +9,9 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@ai-sdk/react": "^3",
+    "@ai-sdk/react": "^4",
     "@tailwindcss/postcss": "^4.3.2",
-    "ai": "^6",
+    "ai": "^7",
     "geist": "^1.7.2",
     "next": "^16",
     "react": "^19",
