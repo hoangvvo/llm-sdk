@@ -1,7 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::RunOptions;
-use llm_agent::{Agent, AgentFunctionTool, AgentRequest, AgentToolResult};
+use llm_agent::{Agent, AgentFunctionTool, AgentRequest, AgentToolResult, RunOptions};
 use llm_sdk::{Message, Part};
 use serde::Deserialize;
 use serde_json::Value;
@@ -364,11 +363,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             AgentRequest {
                 context: success_context.clone(),
                 input: vec![llm_agent::AgentItem::Message(Message::user(vec![
-                Part::text(
-                    "Log the Chrono Locket as rush, flag the Folded star chart for contraband, \
-                     then issue a receipt for Captain Lyra Moreno.",
-                ),
-            ]))],
+                    Part::text(
+                        "Log the Chrono Locket as rush, flag the Folded star chart for \
+                         contraband, then issue a receipt for Captain Lyra Moreno.",
+                    ),
+                ]))],
             },
             RunOptions::default(),
         )

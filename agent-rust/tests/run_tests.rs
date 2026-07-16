@@ -1,5 +1,4 @@
-use llm_agent::AgentResponseStatus;
-use llm_agent::RunOptions;
+use llm_agent::{AgentResponseStatus, RunOptions};
 use llm_sdk::ToolResultStatus;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},

@@ -1,9 +1,8 @@
 use dotenvy::dotenv;
 use futures::{future::BoxFuture, StreamExt};
-use llm_agent::RunOptions;
 use llm_agent::{
     Agent, AgentError, AgentFunctionTool, AgentItem, AgentRequest, AgentStreamEvent,
-    AgentToolResult,
+    AgentToolResult, RunOptions,
 };
 use llm_sdk::{Message, Part};
 use serde::Deserialize;

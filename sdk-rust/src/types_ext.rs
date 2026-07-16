@@ -1,10 +1,9 @@
-use crate::ToolResultStatus;
 use crate::{
     AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FunctionTool,
     ImagePart, ImagePartDelta, LanguageModelInput, Message, Modality, Part, ReasoningOptions,
     ReasoningPart, ReasoningPartDelta, ResponseFormatOption, SourcePart, TextPart, TextPartDelta,
     Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart,
-    UserMessage, WebSearchTool, WebSearchUserLocation,
+    ToolResultStatus, UserMessage, WebSearchTool, WebSearchUserLocation,
 };
 
 impl TextPart {

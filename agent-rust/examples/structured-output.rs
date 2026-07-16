@@ -1,7 +1,8 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::RunOptions;
-use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunOptions, RunState,
+};
 use llm_sdk::{JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption};
 use schemars::JsonSchema;
 use serde::Deserialize;

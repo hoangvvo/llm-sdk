@@ -4,8 +4,9 @@ use futures::{
     lock::{Mutex, MutexGuard},
     FutureExt,
 };
-use llm_agent::RunOptions;
-use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunOptions, RunState,
+};
 use llm_sdk::{JSONSchema, Message, Part};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
