@@ -11,6 +11,7 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/toolresultutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/tracing"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaiapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
@@ -471,7 +472,11 @@ func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]op
 
 		toolResultPartContent := partutil.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
 		if len(toolResultPartContent) == 0 {
-			empty := openaiapi.FunctionCallOutputItemParamOutputString(ptr.To(""))
+			content := ""
+			if part.ToolResultPart.Status == llmsdk.ToolResultStatusCancelled {
+				content = toolresultutils.CancelledFallbackContent
+			}
+			empty := openaiapi.FunctionCallOutputItemParamOutputString(ptr.To(content))
 			inputItems = append(inputItems, openaiapi.InputItem{
 				Item: &openaiapi.Item{
 					FunctionCallOutputItemParam: &openaiapi.FunctionCallOutputItemParam{

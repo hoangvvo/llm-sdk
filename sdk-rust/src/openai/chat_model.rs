@@ -25,11 +25,13 @@ use super::chat_api::{
     ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
 };
 use crate::{
-    client_utils, source_part_utils, stream_utils, AssistantMessage, AudioFormat, AudioOptions,
-    ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
-    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta,
-    PartialModelResponse, ResponseFormatJson, ResponseFormatOption, Tool, ToolCallPart,
-    ToolChoiceOption, ToolChoiceTool, ToolMessage, UserMessage,
+    client_utils, source_part_utils, stream_utils,
+    tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AssistantMessage, AudioFormat,
+    AudioOptions, ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput,
+    LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
+    ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatJson, ResponseFormatOption,
+    Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool, ToolMessage, ToolResultStatus,
+    UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -599,7 +601,13 @@ fn convert_tool_message(
                 );
                 if converted_parts.is_empty() {
                     result.push(ChatCompletionRequestToolMessage {
-                        content: ChatCompletionRequestToolMessageContent::ChatCompletionRequestToolMessageContentString(Some(String::new())),
+                        content: ChatCompletionRequestToolMessageContent::ChatCompletionRequestToolMessageContentString(Some(
+                            if tool_result_part.status == ToolResultStatus::Cancelled {
+                                CANCELLED_TOOL_RESULT_FALLBACK_CONTENT.to_string()
+                            } else {
+                                String::new()
+                            },
+                        )),
                         tool_call_id: tool_result_part.tool_call_id,
                     });
                     continue;

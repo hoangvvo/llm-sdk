@@ -13,6 +13,7 @@ import type {
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import type {
   AssistantMessage,
   Citation,
@@ -338,7 +339,10 @@ function convertToolMessageToResponseInputItems(
           {
             type: "function_call_output",
             call_id: part.tool_call_id,
-            output: "",
+            output:
+              part.status === "cancelled"
+                ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+                : "",
           },
         ];
       }

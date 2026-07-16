@@ -28,6 +28,7 @@ import type {
   ToolCallPartDelta,
   ToolChoiceOption,
 } from "../types.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import { calculateCost } from "../usage.utils.ts";
 import type { PatchedAssistantMessageV2ContentItem } from "./types.ts";
 
@@ -291,7 +292,9 @@ function convertToCohereMessages(
             toolCallId: part.tool_call_id,
             content:
               part.content.length === 0
-                ? ""
+                ? part.status === "cancelled"
+                  ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+                  : ""
                 : part.content.map(convertToCohereToolMessageContent),
           });
         });

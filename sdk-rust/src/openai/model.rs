@@ -18,12 +18,14 @@ use crate::{
         WebSearchApproximateLocationValue, WebSearchApproximateLocationValueType,
         WebSearchTool as OpenAIWebSearchTool, WebSearchToolFilters, WebSearchToolType,
     },
-    source_part_utils, AssistantMessage, Citation, CitationDelta, ContentDelta, ImagePart,
-    ImagePartDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
+    source_part_utils,
+    tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
+    AssistantMessage, Citation, CitationDelta, ContentDelta, ImagePart, ImagePartDelta,
+    LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
     LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta,
     PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
     ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
-    ToolChoiceOption, ToolMessage, ToolResultPart, UserMessage,
+    ToolChoiceOption, ToolMessage, ToolResultPart, ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -491,6 +493,7 @@ fn convert_tool_message_to_response_input_items(
             if let Part::ToolResult(ToolResultPart {
                 content,
                 tool_call_id,
+                status,
                 ..
             }) = part
             {
@@ -502,7 +505,13 @@ fn convert_tool_message_to_response_input_items(
                         responses_api::Item::FunctionCallOutputItemParam(
                             FunctionCallOutputItemParam {
                                 call_id: tool_call_id,
-                                output: FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputString(Some(String::new())),
+                                output: FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputString(Some(
+                                    if status == ToolResultStatus::Cancelled {
+                                        CANCELLED_TOOL_RESULT_FALLBACK_CONTENT.to_string()
+                                    } else {
+                                        String::new()
+                                    },
+                                )),
                                 id: None,
                                 status: None,
                                 r#type: FunctionCallOutputItemParamType::FunctionCallOutput,

@@ -1,0 +1,1 @@
+export const CANCELLED_TOOL_RESULT_FALLBACK_CONTENT = "cancelled";

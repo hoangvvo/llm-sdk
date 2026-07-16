@@ -10,6 +10,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/anthropic/anthropicapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/toolresultutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/tracing"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
@@ -521,11 +522,19 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 				SearchResult: block.SearchResult,
 			})
 		}
+		toolResultContent := &anthropicapi.RequestToolResultBlockContent{
+			RequestToolResultBlockContentArray: &content,
+		}
+		if len(contentBlocks) == 0 && part.ToolResultPart.Status == llmsdk.ToolResultStatusCancelled {
+			emptyContent := toolresultutils.CancelledFallbackContent
+			contentString := anthropicapi.RequestToolResultBlockContentString(&emptyContent)
+			toolResultContent = &anthropicapi.RequestToolResultBlockContent{
+				RequestToolResultBlockContentString: &contentString,
+			}
+		}
 		toolResult := anthropicapi.RequestToolResultBlock{
 			ToolUseId: part.ToolResultPart.ToolCallID,
-			Content: &anthropicapi.RequestToolResultBlockContent{
-				RequestToolResultBlockContentArray: &content,
-			},
+			Content:   toolResultContent,
 		}
 		if part.ToolResultPart.Status != llmsdk.ToolResultStatusCompleted {
 			toolResult.IsError = ptr.To(true)

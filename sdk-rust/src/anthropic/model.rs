@@ -13,11 +13,13 @@ use crate::{
         ThinkingConfigDisabled, ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage,
         UserLocation, WebSearchTool20250305,
     },
-    client_utils, stream_utils, Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel,
-    LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
-    LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption,
-    TextPart, TextPartDelta, Tool as SdkTool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
+    client_utils, stream_utils,
+    tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
+    Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel, LanguageModelError,
+    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
+    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningOptions,
+    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
+    TextPartDelta, Tool as SdkTool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
     ToolResultPart, ToolResultStatus,
 };
 use async_stream::try_stream;
@@ -540,7 +542,14 @@ fn convert_tool_result_part(
     }
 
     let content = if content_blocks.is_empty() {
-        None
+        match tool_result.status {
+            ToolResultStatus::Completed | ToolResultStatus::Failed => None,
+            ToolResultStatus::Cancelled => Some(
+                RequestToolResultBlockContent::RequestToolResultBlockContentString(Some(
+                    CANCELLED_TOOL_RESULT_FALLBACK_CONTENT.to_string(),
+                )),
+            ),
+        }
     } else {
         Some(
             RequestToolResultBlockContent::RequestToolResultBlockContentArray(Some(content_blocks)),

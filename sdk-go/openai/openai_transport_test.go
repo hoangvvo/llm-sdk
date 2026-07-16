@@ -106,7 +106,7 @@ func TestOpenAIRecordedTransportGenerateRequestAndResponse(t *testing.T) {
 	}
 }
 
-func TestOpenAIRecordedTransportEmptyToolResult(t *testing.T) {
+func TestOpenAIRecordedTransportCancelledToolResult(t *testing.T) {
 	var requestBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		requestBody = readRequestJSON(t, request)
@@ -142,7 +142,7 @@ func TestOpenAIRecordedTransportEmptyToolResult(t *testing.T) {
 	expected := []any{map[string]any{
 		"type":    "function_call_output",
 		"call_id": "call_1",
-		"output":  "",
+		"output":  "cancelled",
 	}}
 	if !reflect.DeepEqual(outputs, expected) {
 		t.Fatalf("unexpected tool outputs: %#v", outputs)

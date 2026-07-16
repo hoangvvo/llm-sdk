@@ -14,6 +14,7 @@ import type {
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import { guessDeltaIndex } from "../stream.utils.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import type {
   AudioFormat,
   AudioOptions,
@@ -330,7 +331,9 @@ function convertToOpenAIMessages(
             tool_call_id: part.tool_call_id,
             content:
               toolResultPartContent.length === 0
-                ? ""
+                ? part.status === "cancelled"
+                  ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+                  : ""
                 : toolResultPartContent.map(
                     convertToOpenAIToolMessageParamContent,
                   ),

@@ -55,7 +55,7 @@ const input = {
 };
 
 suite("OpenAI recorded transport", () => {
-  test("sends one neutral output for an empty tool result", async (t) => {
+  test("sends a fallback output for an empty cancelled tool result", async (t) => {
     let requestBody: unknown;
     const baseURL = await startServer(t, async (request, response) => {
       requestBody = await readJSON(request);
@@ -103,7 +103,7 @@ suite("OpenAI recorded transport", () => {
         {
           type: "function_call_output",
           call_id: "call_1",
-          output: "",
+          output: "cancelled",
         },
       ],
     );

@@ -17,6 +17,7 @@ import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
 } from "../stream.utils.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import type {
   AssistantMessage,
   ContentDelta,
@@ -312,7 +313,9 @@ function convertToMistralToolMessages(
       name: part.tool_name,
       content:
         toolResultContent.length === 0
-          ? ""
+          ? part.status === "cancelled"
+            ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+            : ""
           : toolResultContent.map(convertToMistralContentChunk),
     };
   });

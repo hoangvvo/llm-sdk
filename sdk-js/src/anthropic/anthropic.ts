@@ -7,6 +7,7 @@ import type {
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { looselyConvertPartToPartDelta } from "../stream.utils.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import type {
   Citation,
   CitationDelta,
@@ -382,20 +383,23 @@ function convertToAnthropicToolResultBlockParam(
   return {
     type: "tool_result",
     tool_use_id: part.tool_call_id,
-    content: part.content.map((part) => {
-      const blockParam = convertToAnthropicContentBlockParam(part);
-      if (
-        blockParam.type !== "text" &&
-        blockParam.type !== "image" &&
-        blockParam.type !== "search_result"
-      ) {
-        throw new UnsupportedError(
-          PROVIDER,
-          `Cannot convert tool result part to Anthropic ToolResultBlockParam content for type ${blockParam.type}`,
-        );
-      }
-      return blockParam;
-    }),
+    content:
+      part.content.length === 0 && part.status === "cancelled"
+        ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+        : part.content.map((part) => {
+            const blockParam = convertToAnthropicContentBlockParam(part);
+            if (
+              blockParam.type !== "text" &&
+              blockParam.type !== "image" &&
+              blockParam.type !== "search_result"
+            ) {
+              throw new UnsupportedError(
+                PROVIDER,
+                `Cannot convert tool result part to Anthropic ToolResultBlockParam content for type ${blockParam.type}`,
+              );
+            }
+            return blockParam;
+          }),
     is_error: part.status !== "completed",
   };
 }

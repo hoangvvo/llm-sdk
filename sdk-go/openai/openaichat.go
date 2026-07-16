@@ -8,6 +8,7 @@ import (
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/toolresultutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/tracing"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai/openaichatapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
@@ -500,7 +501,11 @@ func convertToolMessageToOpenAIChatMessages(message *llmsdk.ToolMessage) ([]open
 
 		toolResultParts := partutil.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
 		if len(toolResultParts) == 0 {
-			empty := openaichatapi.ChatCompletionRequestToolMessageContentString(ptr.To(""))
+			content := ""
+			if part.ToolResultPart.Status == llmsdk.ToolResultStatusCancelled {
+				content = toolresultutils.CancelledFallbackContent
+			}
+			empty := openaichatapi.ChatCompletionRequestToolMessageContentString(ptr.To(content))
 			result = append(result, openaichatapi.ChatCompletionRequestMessage{
 				Tool: &openaichatapi.ChatCompletionRequestToolMessage{
 					ToolCallId: part.ToolResultPart.ToolCallID,

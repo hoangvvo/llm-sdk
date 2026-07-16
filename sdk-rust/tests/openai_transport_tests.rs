@@ -244,7 +244,7 @@ async fn sends_exact_generate_request_and_maps_recorded_response() {
 }
 
 #[tokio::test]
-async fn sends_one_neutral_output_for_an_empty_tool_result() {
+async fn sends_a_fallback_output_for_an_empty_cancelled_tool_result() {
     let capture = RequestCapture::default();
     let server = start_server(
         Router::new()
@@ -282,7 +282,7 @@ async fn sends_one_neutral_output_for_an_empty_tool_result() {
         vec![json!({
             "type": "function_call_output",
             "call_id": "call_1",
-            "output": ""
+            "output": "cancelled"
         })]
     );
 }

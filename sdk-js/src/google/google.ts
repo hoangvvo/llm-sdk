@@ -43,6 +43,7 @@ import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
 } from "../stream.utils.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import type {
   AudioOptions,
   Citation,
@@ -62,6 +63,7 @@ import type {
   TextPart,
   Tool,
   ToolChoiceOption,
+  ToolResultStatus,
 } from "../types.ts";
 import { calculateCost, sumModelTokensDetails } from "../usage.utils.ts";
 
@@ -358,7 +360,7 @@ function convertToGoogleParts(part: Part): GooglePart[] {
     case "tool-result": {
       const functionResponse = convertToGoogleFunctionResponse(
         part.content,
-        part.status !== "completed",
+        part.status,
       );
       const googleFunctionResponse: FunctionResponse = {
         id: part.tool_call_id,
@@ -379,7 +381,7 @@ function convertToGoogleParts(part: Part): GooglePart[] {
 
 function convertToGoogleFunctionResponse(
   parts: Part[],
-  isError: boolean,
+  status: ToolResultStatus,
 ): {
   response: Record<string, unknown>;
   parts?: FunctionResponsePart[];
@@ -414,7 +416,7 @@ function convertToGoogleFunctionResponse(
   const responses = textParts.map((part) => maybeParseJSON(part.text));
   // Use "output" key to specify function output and "error" key to specify error details,
   // as per Google API specification
-  const key = isError ? "error" : "output";
+  const key = status === "completed" ? "output" : "error";
   const functionResponse: {
     response: Record<string, unknown>;
     parts?: FunctionResponsePart[];
@@ -422,7 +424,9 @@ function convertToGoogleFunctionResponse(
     response: {
       [key]:
         responses.length === 0
-          ? {}
+          ? status === "cancelled"
+            ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+            : {}
           : responses.length === 1
             ? responses[0]
             : responses,
