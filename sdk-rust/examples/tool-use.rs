@@ -127,7 +127,6 @@ async fn main() {
                     call.tool_name.clone(),
                     vec![Part::text(result_str)],
                 )
-                .with_is_error(false)
                 .into(),
             );
         }

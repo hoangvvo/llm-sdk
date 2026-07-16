@@ -255,6 +255,10 @@ An example server that exposes an API to interact with the agent can be found in
 
 ## Migration
 
+### To 0.4.0
+
+- `AgentItemTool.IsError` has been replaced with the required `Status` field, and `AgentResponse` now includes a terminal `Status`.
+
 ### To 0.3.0
 
 - Wrap function tools passed to `WithTools` with `NewAgentFunctionTool`.

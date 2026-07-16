@@ -1,7 +1,7 @@
 use crate::{
-    run::{RunSession, RunSessionRequest},
+    run::{RunOptions, RunSession, RunSessionRequest},
     types::AgentStream,
-    AgentError, AgentParams, AgentRequest, AgentResponse,
+    AgentError, AgentParams, AgentRequest, AgentResponse, AgentStreamEvent,
 };
 use futures::stream::StreamExt;
 use llm_sdk::LanguageModel;
@@ -27,31 +27,34 @@ where
     }
     /// Create a one-time run of the agent and generate a response.
     /// A session is created for the run and cleaned up afterwards.
-    pub async fn run(&self, request: AgentRequest<TCtx>) -> Result<AgentResponse, AgentError> {
+    pub async fn run(
+        &self,
+        request: AgentRequest<TCtx>,
+        options: RunOptions,
+    ) -> Result<AgentResponse, AgentError> {
         let AgentRequest { input, context } = request;
         let run_session = self.create_session(context).await?;
-        let result = run_session.run(RunSessionRequest { input }).await;
+        let result = run_session.run(RunSessionRequest { input }, options).await;
+        let close_result = run_session.close().await;
         match result {
-            Ok(response) => {
-                if let Err(close_err) = run_session.close().await {
-                    Err(close_err)
-                } else {
-                    Ok(response)
-                }
-            }
-            Err(err) => {
-                let _ = run_session.close().await;
-                Err(err)
-            }
+            Ok(response) => close_result.map(|()| response),
+            Err(error) => Err(error),
         }
     }
 
     /// Create a one-time streaming run of the agent and generate a response.
     /// A session is created for the run and cleaned up afterwards.
-    pub async fn run_stream(&self, request: AgentRequest<TCtx>) -> Result<AgentStream, AgentError> {
+    pub async fn run_stream(
+        &self,
+        request: AgentRequest<TCtx>,
+        options: RunOptions,
+    ) -> Result<AgentStream, AgentError> {
         let AgentRequest { input, context } = request;
         let run_session = Arc::new(self.create_session(context).await?);
-        let mut stream = match run_session.clone().run_stream(RunSessionRequest { input }) {
+        let mut stream = match run_session
+            .clone()
+            .run_stream(RunSessionRequest { input }, options)
+        {
             Ok(stream) => stream,
             Err(err) => {
                 if let Ok(session) = Arc::try_unwrap(run_session) {
@@ -63,8 +66,12 @@ where
 
         let wrapped_stream = async_stream::stream! {
             let run_session = run_session;
+            let mut response = None;
             while let Some(item) = stream.next().await {
                 match item {
+                    Ok(AgentStreamEvent::Response(run_response)) => {
+                        response = Some(run_response);
+                    }
                     Ok(event) => yield Ok(event),
                     Err(err) => {
                         // Drop the inner stream before closing so its cloned toolkit
@@ -79,10 +86,16 @@ where
                 }
             }
             drop(stream);
+            let mut close_error = None;
             if let Ok(session) = Arc::try_unwrap(run_session) {
                 if let Err(close_err) = session.close().await {
-                    yield Err(close_err);
+                    close_error = Some(close_err);
                 }
+            }
+            if let Some(close_err) = close_error {
+                yield Err(close_err);
+            } else if let Some(response) = response {
+                yield Ok(AgentStreamEvent::Response(response));
             }
         };
 

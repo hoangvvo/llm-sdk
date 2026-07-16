@@ -3,7 +3,7 @@ use crate::{
     ImagePart, ImagePartDelta, LanguageModelInput, Message, Modality, Part, ReasoningOptions,
     ReasoningPart, ReasoningPartDelta, ResponseFormatOption, SourcePart, TextPart, TextPartDelta,
     Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart,
-    UserMessage, WebSearchTool, WebSearchUserLocation,
+    ToolResultStatus, UserMessage, WebSearchTool, WebSearchUserLocation,
 };
 
 impl TextPart {
@@ -185,13 +185,13 @@ impl ToolResultPart {
             tool_call_id: tool_call_id.into(),
             tool_name: tool_name.into(),
             content,
-            is_error: None,
+            status: ToolResultStatus::Completed,
         }
     }
 
     #[must_use]
-    pub fn with_is_error(mut self, is_error: bool) -> Self {
-        self.is_error = Some(is_error);
+    pub fn with_status(mut self, status: ToolResultStatus) -> Self {
+        self.status = status;
         self
     }
 }

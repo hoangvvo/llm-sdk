@@ -245,7 +245,6 @@ func (t *agentTool[C]) Execute(ctx context.Context, params json.RawMessage, _ C,
 	if err != nil {
 		return llmagent.AgentToolResult{}, err
 	}
-
 	return llmagent.AgentToolResult{
 		Content: parts,
 		IsError: result.IsError,

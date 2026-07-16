@@ -12,6 +12,7 @@ pub mod openai;
 mod opentelemetry;
 mod source_part_utils;
 mod stream_utils;
+mod tool_result_utils;
 mod types;
 pub mod types_ext;
 pub mod usage_ext;

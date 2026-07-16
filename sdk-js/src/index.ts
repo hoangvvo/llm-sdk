@@ -6,6 +6,7 @@ export {
 export * from "./errors.ts";
 export {
   type LanguageModel,
+  type LanguageModelCallOptions,
   type LanguageModelMetadata,
 } from "./language-model.ts";
 export * from "./types.ts";

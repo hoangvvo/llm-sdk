@@ -89,6 +89,7 @@ do {
 
     toolMessage.content.push({
       type: "tool-result",
+      status: "completed",
       tool_name,
       tool_call_id,
       content: [

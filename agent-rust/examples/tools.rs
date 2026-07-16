@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentFunctionTool, AgentRequest, AgentToolResult};
+use llm_agent::{Agent, AgentFunctionTool, AgentRequest, AgentToolResult, RunOptions};
 use llm_sdk::{Message, Part};
 use serde::Deserialize;
 use serde_json::Value;
@@ -359,15 +359,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Success path: multiple tools fired in one turn.
     let success_context = create_context();
     let success_response = agent
-        .run(AgentRequest {
-            context: success_context.clone(),
-            input: vec![llm_agent::AgentItem::Message(Message::user(vec![
-                Part::text(
-                    "Log the Chrono Locket as rush, flag the Folded star chart for contraband, \
-                     then issue a receipt for Captain Lyra Moreno.",
-                ),
-            ]))],
-        })
+        .run(
+            AgentRequest {
+                context: success_context.clone(),
+                input: vec![llm_agent::AgentItem::Message(Message::user(vec![
+                    Part::text(
+                        "Log the Chrono Locket as rush, flag the Folded star chart for \
+                         contraband, then issue a receipt for Captain Lyra Moreno.",
+                    ),
+                ]))],
+            },
+            RunOptions::default(),
+        )
         .await?;
 
     println!("\n=== SUCCESS RUN ===");
@@ -377,12 +380,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Failure path: illustrate tool error handling.
     let failure_context = create_context();
     let failure_response = agent
-        .run(AgentRequest {
-            context: failure_context,
-            input: vec![llm_agent::AgentItem::Message(Message::user(vec![
-                Part::text("Issue a receipt immediately without logging anything."),
-            ]))],
-        })
+        .run(
+            AgentRequest {
+                context: failure_context,
+                input: vec![llm_agent::AgentItem::Message(Message::user(vec![
+                    Part::text("Issue a receipt immediately without logging anything."),
+                ]))],
+            },
+            RunOptions::default(),
+        )
         .await?;
 
     println!("\n=== FAILURE RUN ===");

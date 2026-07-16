@@ -49,9 +49,9 @@ func TestAgentItem_JSONContractAndRoundTrip(t *testing.T) {
 				"lookup",
 				json.RawMessage(`{"id":42}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("found")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
-			expected: `{"type":"tool","tool_call_id":"call_1","tool_name":"lookup","input":{"id":42},"output":[{"type":"text","text":"found"}],"is_error":false}`,
+			expected: `{"type":"tool","tool_call_id":"call_1","tool_name":"lookup","input":{"id":42},"output":[{"type":"text","text":"found"}],"status":"completed"}`,
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestAgentItem_JSONContractAndRoundTrip(t *testing.T) {
 func TestAgentItem_UnmarshalReplacesPreviousVariant(t *testing.T) {
 	item := llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("old")))
 	if err := json.Unmarshal(
-		[]byte(`{"type":"tool","tool_call_id":"call_1","tool_name":"lookup","input":{},"output":[],"is_error":false}`),
+		[]byte(`{"type":"tool","tool_call_id":"call_1","tool_name":"lookup","input":{},"output":[],"status":"completed"}`),
 		&item,
 	); err != nil {
 		t.Fatalf("unmarshal replacement: %v", err)
@@ -114,10 +114,11 @@ func TestAgentStreamEvent_JSONContractAndRoundTrip(t *testing.T) {
 		{
 			name: "response",
 			event: llmagent.NewAgentStreamEventResponse(&llmagent.AgentResponse{
+				Status:  llmagent.AgentResponseStatusCompleted,
 				Output:  []llmagent.AgentItem{},
 				Content: []llmsdk.Part{llmsdk.NewTextPart("Done")},
 			}),
-			expected: `{"event":"response","output":[],"content":[{"type":"text","text":"Done"}]}`,
+			expected: `{"event":"response","output":[],"content":[{"type":"text","text":"Done"}],"status":"completed"}`,
 		},
 	}
 

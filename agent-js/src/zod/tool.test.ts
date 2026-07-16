@@ -5,7 +5,9 @@ import { zodTool } from "./tool.ts";
 
 test("zodTool exposes its strict schema and executes typed arguments", async (t: TestContext) => {
   const context = { suffix: "!" };
+  const signal = new AbortController().signal;
   let receivedContext: typeof context | undefined;
+  let receivedSignal: AbortSignal | undefined;
   const tool = zodTool({
     name: "echo",
     description: "Echo input",
@@ -13,8 +15,9 @@ test("zodTool exposes its strict schema and executes typed arguments", async (t:
       message: z.string(),
       option: z.number().optional(),
     }),
-    execute: ({ message, option }, ctx: typeof context) => {
+    execute: ({ message, option }, ctx: typeof context, state) => {
       receivedContext = ctx;
+      receivedSignal = state.signal;
       return Promise.resolve({
         content: [
           {
@@ -51,9 +54,10 @@ test("zodTool exposes its strict schema and executes typed arguments", async (t:
   const result = await tool.execute(
     { message: "hello", option: 2 },
     context,
-    new RunState([], 1),
+    new RunState([], 1, signal),
   );
   t.assert.strictEqual(receivedContext, context);
+  t.assert.strictEqual(receivedSignal, signal);
   t.assert.deepStrictEqual(result, {
     content: [{ type: "text", text: "hello:2!" }],
     is_error: false,

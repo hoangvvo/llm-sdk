@@ -22,18 +22,18 @@ It exposes three entry points: `run`, `run_stream`, and `create_session`. The fi
 
 <Code
   code={`export class Agent<TContext> {
-  readonly name: string;
+\treadonly name: string;
 
-  constructor(params: AgentParams<TContext>);
+\tconstructor(params: AgentParams<TContext>);
 
-  run(request: AgentRequest<TContext>): Promise<AgentResponse>;
+\trun(request: AgentRequest<TContext>, options?: RunOptions): Promise<AgentResponse>;
 
-  runStream(request: AgentRequest<TContext>): AsyncGenerator<AgentStreamEvent, AgentResponse>;
+\trunStream(request: AgentRequest<TContext>, options?: RunOptions): AsyncGenerator<AgentStreamEvent, AgentResponse>;
 
-  createSession(context: TContext): Promise<RunSession<TContext>>;
+\tcreateSession(context: TContext): Promise<RunSession<TContext>>;
 }`}
-  lang="typescript"
-  title="Agent (TypeScript)"
+lang="typescript"
+title="Agent (TypeScript)"
 />
 
 Because the agent stays stateless, every request must provide its own `context`. That value feeds dynamic instructions, toolkit factories, and tool executions without leaking across users or tenants.
@@ -43,25 +43,26 @@ Because the agent stays stateless, every request must provide its own `context`.
 A run session binds an agent to a specific context. When it is created, the session applies parameter defaults, resolves all context-aware instructions, and asks each toolkit for a per-session instance with personalized prompts and tools. Static tools from the agent configuration are combined with toolkit-provided tools into a single roster for the run. Each call to `run` or `run_stream` starts from a clean `RunState` made from the `AgentItem[]` you pass in.
 
 <Aside type="caution">
-  Despite the name "session", a run session does not persist `AgentItem`s between calls. Every `run` or `run_stream` starts fresh from the `input` you provide.
-  If you want to continue a conversation, the `output` from one call must be appended to the `input` of the next.
+  Despite the name "session", a run session does not persist `AgentItem`s
+  between calls. Every `run` or `run_stream` starts fresh from the `input` you
+  provide. If you want to continue a conversation, the `output` from one call
+  must be appended to the `input` of the next.
 </Aside>
 
 <Code
-  code={`
-class RunSession<TContext> {
-  run(request: RunSessionRequest): Promise<AgentResponse>;
+  code={`class RunSession<TContext> {
+\trun(request: RunSessionRequest, options?: RunOptions): Promise<AgentResponse>;
 
-  runStream(request: RunSessionRequest): AsyncGenerator<AgentStreamEvent, AgentResponse>;
+\trunStream(request: RunSessionRequest, options?: RunOptions): AsyncGenerator<AgentStreamEvent, AgentResponse>;
 
-  close(): Promise<void>;
+\tclose(): Promise<void>;
 }
 
 interface RunSessionRequest {
-  input: AgentItem[];
+\tinput: AgentItem[];
 }`}
-  lang="typescript"
-  title="run.ts"
+lang="typescript"
+title="run.ts"
 />
 
 Within a run session the bound context is passed to every toolkit session and tool invocation, keeping the runtime consistent for the lifetime of that session. When your workflow ends, call `close` to release toolkit resources and clear cached prompts. If you only need a single answer or do not have any stateful components, stick with `agent.run` or `agent.run_stream`; otherwise reuse the session for as many runs as you need before closing it.

@@ -2,6 +2,7 @@ package llmagent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,6 +13,36 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 	"golang.org/x/sync/errgroup"
 )
+
+func attachRunSnapshot(err error, snapshot *AgentRunSnapshot) error {
+	var agentErr *AgentError
+	if errors.As(err, &agentErr) {
+		agentErr.withSnapshot(snapshot)
+		return err
+	}
+	return (&AgentError{
+		Kind:    InvariantErrorKind,
+		Message: "agent run error",
+		Err:     err,
+	}).withSnapshot(snapshot)
+}
+
+func emitToolCancellationEvents(currCh chan<- ProcessEvent, pendingToolCalls []*llmsdk.ToolCallPart) {
+	for _, toolCall := range pendingToolCalls {
+		item := NewAgentItemTool(
+			toolCall.ToolCallID,
+			toolCall.ToolName,
+			toolCall.Args,
+			[]llmsdk.Part{},
+			llmsdk.ToolResultStatusCancelled,
+		)
+		currCh <- ProcessEvent{Item: &item}
+	}
+	currCh <- ProcessEvent{Response: &ProcessResponse{
+		Content: []llmsdk.Part{},
+		Status:  AgentResponseStatusCancelled,
+	}}
+}
 
 // RunSession manages the run session for an agent.
 // It initializes all necessary components for the agent to run
@@ -112,8 +143,8 @@ func (s *RunSession[C]) process(
 	ctx context.Context,
 	runState *RunState,
 	tools []AgentFunctionTool[C],
-) *stream.Stream[ProcessEvents] {
-	currCh := make(chan ProcessEvents)
+) *stream.Stream[ProcessEvent] {
+	currCh := make(chan ProcessEvent)
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -146,7 +177,7 @@ func (s *RunSession[C]) process(
 			case lastItem.Message.UserMessage != nil:
 				// ========== Case: User Message ==========
 				// last item is a user message, so we need to generate a model response
-				currCh <- ProcessEvents{Next: &struct{}{}}
+				currCh <- ProcessEvent{Next: &struct{}{}}
 				return
 			case lastItem.Message.ToolMessage != nil:
 				// ========== Case: Tool Results (from AgentItemMessage) ==========
@@ -244,7 +275,14 @@ func (s *RunSession[C]) process(
 		}
 
 		if len(toolCallParts) == 0 {
-			currCh <- ProcessEvents{Response: &content}
+			status := AgentResponseStatusCompleted
+			if ctx.Err() != nil {
+				status = AgentResponseStatusCancelled
+			}
+			currCh <- ProcessEvent{Response: &ProcessResponse{
+				Content: content,
+				Status:  status,
+			}}
 			return
 		}
 
@@ -257,10 +295,17 @@ func (s *RunSession[C]) process(
 			seenToolCallIDs[toolCallPart.ToolCallID] = struct{}{}
 		}
 
+		pendingToolCalls := make([]*llmsdk.ToolCallPart, 0, len(toolCallParts))
 		for _, toolCallPart := range toolCallParts {
-			if _, exists := processedToolCallIDs[toolCallPart.ToolCallID]; exists {
-				// Tool call has already been processed
-				continue
+			if _, exists := processedToolCallIDs[toolCallPart.ToolCallID]; !exists {
+				pendingToolCalls = append(pendingToolCalls, toolCallPart)
+			}
+		}
+
+		for index, toolCallPart := range pendingToolCalls {
+			if ctx.Err() != nil {
+				emitToolCancellationEvents(currCh, pendingToolCalls[index:])
+				return
 			}
 
 			var agentTool AgentFunctionTool[C]
@@ -292,21 +337,34 @@ func (s *RunSession[C]) process(
 				},
 			)
 			if err != nil {
+				if ctx.Err() != nil {
+					emitToolCancellationEvents(currCh, pendingToolCalls[index:])
+					return
+				}
 				errCh <- err
 				return
 			}
 
+			status := llmsdk.ToolResultStatusCompleted
+			if toolRes.IsError {
+				status = llmsdk.ToolResultStatusFailed
+			}
 			item := NewAgentItemTool(
 				toolCallPart.ToolCallID,
 				toolCallPart.ToolName,
 				toolCallPart.Args,
 				toolRes.Content,
-				toolRes.IsError,
+				status,
 			)
-			currCh <- ProcessEvents{Item: &item}
+			currCh <- ProcessEvent{Item: &item}
+
+			if ctx.Err() != nil {
+				emitToolCancellationEvents(currCh, pendingToolCalls[index+1:])
+				return
+			}
 		}
 
-		currCh <- ProcessEvents{Next: &struct{}{}}
+		currCh <- ProcessEvent{Next: &struct{}{}}
 	}()
 
 	return stream.New(currCh, errCh)
@@ -327,7 +385,7 @@ func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*Ag
 			for processStream.Next() {
 				event := processStream.Current()
 				if event.Response != nil {
-					response := state.createResponse(*event.Response)
+					response := state.createResponse(event.Response.Content, event.Response.Status)
 					return response, nil
 				}
 				if event.Item != nil {
@@ -335,20 +393,27 @@ func (s *RunSession[C]) Run(ctx context.Context, request RunSessionRequest) (*Ag
 				}
 				if event.Next != nil {
 					if err := state.turn(); err != nil {
-						return nil, err
+						return nil, attachRunSnapshot(err, state.createSnapshot())
 					}
 					break
 				}
 			}
 			if err := processStream.Err(); err != nil {
-				return nil, err
+				return nil, attachRunSnapshot(err, state.createSnapshot())
 			}
 
 			input, nextTools := s.getTurnParams(state)
 			tools = nextTools
+
+			if ctx.Err() != nil {
+				return state.createCancelledResponse(), nil
+			}
 			modelResponse, err := s.params.Model.Generate(ctx, input)
 			if err != nil {
-				return nil, NewLanguageModelError(err)
+				if ctx.Err() != nil {
+					return state.createCancelledResponse(), nil
+				}
+				return nil, NewLanguageModelError(err).withSnapshot(state.createSnapshot())
 			}
 
 			state.appendModelResponse(*modelResponse)
@@ -380,7 +445,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 				for processStream.Next() {
 					event := processStream.Current()
 					if event.Response != nil {
-						response := state.createResponse(*event.Response)
+						response := state.createResponse(event.Response.Content, event.Response.Status)
 						eventChan <- NewAgentStreamEventResponse(response)
 						return
 					}
@@ -390,47 +455,85 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 					}
 					if event.Next != nil {
 						if err := state.turn(); err != nil {
-							errChan <- err
+							errChan <- attachRunSnapshot(err, state.createSnapshot())
 							return
 						}
 						break
 					}
 				}
 				if err := processStream.Err(); err != nil {
-					errChan <- err
+					errChan <- attachRunSnapshot(err, state.createSnapshot())
 					return
 				}
 
 				input, nextTools := s.getTurnParams(state)
 				tools = nextTools
 
+				if ctx.Err() != nil {
+					eventChan <- NewAgentStreamEventResponse(state.createCancelledResponse())
+					return
+				}
 				modelStream, err := s.params.Model.Stream(ctx, input)
 				if err != nil {
-					errChan <- NewLanguageModelError(err)
+					if ctx.Err() != nil {
+						eventChan <- NewAgentStreamEventResponse(state.createCancelledResponse())
+						return
+					}
+					errChan <- NewLanguageModelError(err).withSnapshot(state.createSnapshot())
 					return
 				}
 
 				accumulator := llmsdk.NewStreamAccumulator()
+				commitModelSnapshot := func(snapshot llmsdk.ModelResponse) bool {
+					if item, index, ok := state.appendModelSnapshot(snapshot); ok {
+						eventChan <- NewAgentStreamItemEvent(index, item)
+						return true
+					}
+					return false
+				}
 
 				for modelStream.Next() {
 					partial := modelStream.Current()
 
 					if err := accumulator.AddPartial(*partial); err != nil {
-						errChan <- NewInvariantError(fmt.Sprintf("failed to accumulate stream: %v", err))
+						snapshot := accumulator.Snapshot()
+						commitModelSnapshot(snapshot)
+						errChan <- NewInvariantError(fmt.Sprintf("failed to accumulate stream: %v", err)).withSnapshot(
+							state.createSnapshot(),
+						)
 						return
 					}
 
 					eventChan <- NewAgentStreamEventPartial(partial)
 				}
 
+				if ctx.Err() != nil {
+					snapshot := accumulator.Snapshot()
+					if commitModelSnapshot(snapshot) {
+						continue
+					}
+					eventChan <- NewAgentStreamEventResponse(
+						state.createResponse(snapshot.Content, AgentResponseStatusCancelled),
+					)
+					return
+				}
+
 				if err := modelStream.Err(); err != nil {
-					errChan <- NewLanguageModelError(err)
+					snapshot := accumulator.Snapshot()
+					commitModelSnapshot(snapshot)
+					errChan <- NewLanguageModelError(err).withSnapshot(
+						state.createSnapshot(),
+					)
 					return
 				}
 
 				modelResponse, err := accumulator.ComputeResponse()
 				if err != nil {
-					errChan <- err
+					snapshot := accumulator.Snapshot()
+					commitModelSnapshot(snapshot)
+					errChan <- NewInvariantError(fmt.Sprintf("failed to compute stream response: %v", err)).withSnapshot(
+						state.createSnapshot(),
+					)
 					return
 				}
 
@@ -464,7 +567,10 @@ func (s *RunSession[C]) Close(ctx context.Context) error {
 	s.toolkitSessions = nil
 	s.initialized = false
 
-	return err
+	if err != nil {
+		return NewCleanupError(err)
+	}
+	return nil
 }
 
 func (s *RunSession[C]) getTurnParams(state *RunState) (*llmsdk.LanguageModelInput, []AgentFunctionTool[C]) {
@@ -546,14 +652,19 @@ type RunSessionRequest struct {
 	Input []AgentItem
 }
 
-// ProcessEvents represents the sum type of events returned by the process function.
-type ProcessEvents struct {
+// ProcessEvent represents an event returned by the process function.
+type ProcessEvent struct {
 	// Emit when a new item is generated
 	Item *AgentItem
 	// Emit when the final response is ready
-	Response *[]llmsdk.Part
+	Response *ProcessResponse
 	// Emit when the loop should continue to the next iteration
 	Next *struct{}
+}
+
+type ProcessResponse struct {
+	Content []llmsdk.Part
+	Status  AgentResponseStatus
 }
 
 type RunState struct {
@@ -607,6 +718,16 @@ func (s *RunState) appendModelResponse(resp llmsdk.ModelResponse) (AgentItem, in
 	return item, len(s.output) - 1
 }
 
+// appendModelSnapshot appends the independently materializable portion of an
+// interrupted model stream. An empty snapshot does not represent an output item.
+func (s *RunState) appendModelSnapshot(resp llmsdk.ModelResponse) (AgentItem, int, bool) {
+	if len(resp.Content) == 0 {
+		return AgentItem{}, 0, false
+	}
+	item, index := s.appendModelResponse(resp)
+	return item, index, true
+}
+
 func (s *RunState) Items() []AgentItem {
 	return slices.Concat(s.input, s.output)
 }
@@ -631,7 +752,7 @@ func (s *RunState) getTurnMessages() []llmsdk.Message {
 				tool.ToolCallID,
 				tool.ToolName,
 				tool.Output,
-				llmsdk.WithToolResultIsError(tool.IsError),
+				llmsdk.WithToolResultStatus(tool.Status),
 			)
 
 			if len(messages) == 0 || messages[len(messages)-1].ToolMessage == nil {
@@ -647,12 +768,26 @@ func (s *RunState) getTurnMessages() []llmsdk.Message {
 	return messages
 }
 
-func (s *RunState) createResponse(finalContent []llmsdk.Part) *AgentResponse {
+func (s *RunState) createResponse(finalContent []llmsdk.Part, status AgentResponseStatus) *AgentResponse {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return &AgentResponse{
 		Content: finalContent,
 		Output:  s.output,
+		Status:  status,
 	}
+}
+
+func (s *RunState) createSnapshot() *AgentRunSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return &AgentRunSnapshot{
+		Output: slices.Clone(s.output),
+	}
+}
+
+func (s *RunState) createCancelledResponse() *AgentResponse {
+	return s.createResponse([]llmsdk.Part{}, AgentResponseStatusCancelled)
 }

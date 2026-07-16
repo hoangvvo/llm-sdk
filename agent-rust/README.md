@@ -6,13 +6,16 @@ The agent library to build LLM applications that work with any LLM providers.
 
 ```bash
 cargo add llm-agent
+cargo add tokio-util
 ```
 
 ## Usage
 
 ```rust
 use dotenvy::dotenv;
-use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunOptions, RunState,
+};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     JSONSchema, Message, Part,
@@ -187,10 +190,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // Call assistant
         let response = my_assistant
-            .run(AgentRequest {
-                context: context.clone(),
-                input: items.clone(),
-            })
+            .run(
+                AgentRequest {
+                    context: context.clone(),
+                    input: items.clone(),
+                },
+                RunOptions::default(),
+            )
             .await?;
 
         // Append items with the output items
@@ -234,6 +240,10 @@ cargo run --example agent
 An example server that exposes an API to interact with the agent can be found in [examples/server](./examples/server). This can be used to test the agent with the [console application](../website).
 
 ## Migration
+
+### To 0.4.0
+
+- `AgentItemTool::is_error` has been replaced with the required `status` field, `AgentResponse` now includes a terminal `status`, and `run`/`run_stream` now require `RunOptions`.
 
 ### To 0.3.0
 

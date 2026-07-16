@@ -2,10 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { RefusalError, UnsupportedError } from "../errors.ts";
 import type {
   LanguageModel,
+  LanguageModelCallOptions,
   LanguageModelMetadata,
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { looselyConvertPartToPartDelta } from "../stream.utils.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import type {
   Citation,
   CitationDelta,
@@ -62,10 +64,15 @@ export class AnthropicModel implements LanguageModel {
     traceLanguageModel(this);
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): Promise<ModelResponse> {
     const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    const response = await this.#anthropic.messages.create(createParams);
+    const response = await this.#anthropic.messages.create(createParams, {
+      signal: options?.signal,
+    });
 
     if (response.stop_reason === "refusal") {
       throw new RefusalError(anthropicRefusalMessage(response.stop_details));
@@ -85,10 +92,13 @@ export class AnthropicModel implements LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): AsyncGenerator<PartialModelResponse> {
     const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    const stream = this.#anthropic.messages.stream(createParams);
+    const stream = this.#anthropic.messages.stream(createParams, {
+      signal: options?.signal,
+    });
     const providerToolBlockIndexes = new Set<number>();
 
     for await (const chunk of stream) {
@@ -308,13 +318,29 @@ function convertToAnthropicImageBlockParam(
 ): Anthropic.ImageBlockParam {
   return {
     type: "image",
-    source: {
-      data: part.data,
-      type: "base64",
-      media_type:
-        part.mime_type as Anthropic.Messages.Base64ImageSource["media_type"],
-    },
+    source: convertToAnthropicImageSource(part),
   };
+}
+
+function convertToAnthropicImageSource(
+  part: ImagePart,
+): Anthropic.Messages.Base64ImageSource {
+  switch (part.mime_type) {
+    case "image/jpeg":
+    case "image/png":
+    case "image/gif":
+    case "image/webp":
+      return {
+        data: part.data,
+        type: "base64",
+        media_type: part.mime_type,
+      };
+    default:
+      throw new UnsupportedError(
+        PROVIDER,
+        `Cannot convert image MIME type ${part.mime_type} to Anthropic image source`,
+      );
+  }
 }
 
 function convertToAnthropicSearchResultBlockParam(
@@ -357,21 +383,24 @@ function convertToAnthropicToolResultBlockParam(
   return {
     type: "tool_result",
     tool_use_id: part.tool_call_id,
-    content: part.content.map((part) => {
-      const blockParam = convertToAnthropicContentBlockParam(part);
-      if (
-        blockParam.type !== "text" &&
-        blockParam.type !== "image" &&
-        blockParam.type !== "search_result"
-      ) {
-        throw new UnsupportedError(
-          PROVIDER,
-          `Cannot convert tool result part to Anthropic ToolResultBlockParam content for type ${blockParam.type}`,
-        );
-      }
-      return blockParam;
-    }),
-    is_error: part.is_error ?? false,
+    content:
+      part.content.length === 0 && part.status === "cancelled"
+        ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+        : part.content.map((part) => {
+            const blockParam = convertToAnthropicContentBlockParam(part);
+            if (
+              blockParam.type !== "text" &&
+              blockParam.type !== "image" &&
+              blockParam.type !== "search_result"
+            ) {
+              throw new UnsupportedError(
+                PROVIDER,
+                `Cannot convert tool result part to Anthropic ToolResultBlockParam content for type ${blockParam.type}`,
+              );
+            }
+            return blockParam;
+          }),
+    is_error: part.status !== "completed",
   };
 }
 

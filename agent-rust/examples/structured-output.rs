@@ -1,6 +1,8 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
-use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunOptions, RunState,
+};
 use llm_sdk::{JSONSchema, Message, Part, ResponseFormatJson, ResponseFormatOption};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -229,10 +231,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let prompt = "Plan a trip from Paris to Tokyo next week";
 
     let response = travel_agent
-        .run(AgentRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(prompt)]))],
-            context: (),
-        })
+        .run(
+            AgentRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(prompt)]))],
+                context: (),
+            },
+            RunOptions::default(),
+        )
         .await?;
 
     let val: Value = serde_json::from_str(&response.text()).expect("Invalid JSON response");

@@ -47,6 +47,7 @@ impl From<LanguageModelResult<ModelResponse>> for MockGenerateResult {
 /// It can either be a set of partial responses or an error to return.
 pub enum MockStreamResult {
     Partials(Vec<PartialModelResponse>),
+    PartialsThenError(Vec<PartialModelResponse>, LanguageModelError),
     Error(LanguageModelError),
 }
 
@@ -55,6 +56,15 @@ impl MockStreamResult {
     #[must_use]
     pub fn partials(partials: Vec<PartialModelResponse>) -> Self {
         Self::Partials(partials)
+    }
+
+    /// Construct a result that yields partial responses followed by an error.
+    #[must_use]
+    pub fn partials_then_error(
+        partials: Vec<PartialModelResponse>,
+        error: LanguageModelError,
+    ) -> Self {
+        Self::PartialsThenError(partials, error)
     }
 
     /// Construct a result that yields the provided error.
@@ -291,6 +301,13 @@ impl LanguageModel for MockLanguageModel {
                 MockStreamResult::Partials(partials) => {
                     let stream = stream_from_partials(partials);
                     Ok(stream)
+                }
+                MockStreamResult::PartialsThenError(partials, error) => {
+                    let iter = partials
+                        .into_iter()
+                        .map(Ok)
+                        .chain(std::iter::once(Err(error)));
+                    Ok(BoxedStream::from_stream(stream::iter(iter)))
                 }
             }
         })

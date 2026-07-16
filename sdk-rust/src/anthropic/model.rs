@@ -13,12 +13,14 @@ use crate::{
         ThinkingConfigDisabled, ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage,
         UserLocation, WebSearchTool20250305,
     },
-    client_utils, stream_utils, Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel,
-    LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
-    LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
-    ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption,
-    TextPart, TextPartDelta, Tool as SdkTool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
-    ToolResultPart,
+    client_utils, stream_utils,
+    tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
+    Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel, LanguageModelError,
+    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
+    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningOptions,
+    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
+    TextPartDelta, Tool as SdkTool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
+    ToolResultPart, ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -540,7 +542,14 @@ fn convert_tool_result_part(
     }
 
     let content = if content_blocks.is_empty() {
-        None
+        match tool_result.status {
+            ToolResultStatus::Completed | ToolResultStatus::Failed => None,
+            ToolResultStatus::Cancelled => Some(
+                RequestToolResultBlockContent::RequestToolResultBlockContentString(Some(
+                    CANCELLED_TOOL_RESULT_FALLBACK_CONTENT.to_string(),
+                )),
+            ),
+        }
     } else {
         Some(
             RequestToolResultBlockContent::RequestToolResultBlockContentArray(Some(content_blocks)),
@@ -550,7 +559,7 @@ fn convert_tool_result_part(
     Ok(RequestToolResultBlock {
         cache_control: None,
         content,
-        is_error: tool_result.is_error,
+        is_error: (tool_result.status != ToolResultStatus::Completed).then_some(true),
         tool_use_id: tool_result.tool_call_id,
     })
 }

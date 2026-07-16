@@ -1,9 +1,10 @@
 import type {
   AudioOptions,
   LanguageModelCapabilities,
-  LanguageModelMetadata,
+  LanguageModelPricing,
   Modality,
   ReasoningOptions,
+  WebSearchUserLocation,
 } from "@hoangvvo/llm-sdk";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -57,7 +58,7 @@ const EXTRA_CAPABILITIES = CAPABILITY_ORDER.filter(
 
 function isCapabilityEnabled(
   capabilities: LanguageModelCapabilities,
-  capability: (typeof CAPABILITY_ORDER)[number],
+  capability: keyof LanguageModelCapabilities,
 ): boolean {
   return capabilities[capability];
 }
@@ -306,7 +307,7 @@ function WebSearchSection({
   const inputsDisabled = !supported || !settings.enabled || !optionsSupported;
 
   const updateLocation = (
-    field: keyof NonNullable<WebSearchSettings["user_location"]>,
+    field: keyof WebSearchUserLocation,
     value: string,
   ) => {
     onChange((current) => ({
@@ -1379,7 +1380,7 @@ function formatProviderLabel(provider: string): string {
     .join(" ");
 }
 
-function hasAnyPricing(pricing: LanguageModelMetadata["pricing"]): boolean {
+function hasAnyPricing(pricing: LanguageModelPricing | undefined): boolean {
   if (!pricing) return false;
   return [
     pricing.input_cost_per_text_token,

@@ -8,10 +8,12 @@ import {
 import { generateString } from "../id.utils.ts";
 import type {
   LanguageModel,
+  LanguageModelCallOptions,
   LanguageModelMetadata,
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import type {
   AssistantMessage,
   Citation,
@@ -77,13 +79,16 @@ export class OpenAIModel implements LanguageModel {
     traceLanguageModel(this);
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): Promise<ModelResponse> {
     const createParams = convertToOpenAICreateParams(input, this.modelId);
 
-    const response = await this.#openai.responses.create({
-      ...createParams,
-      stream: false,
-    });
+    const response = await this.#openai.responses.create(
+      { ...createParams, stream: false },
+      { signal: options?.signal },
+    );
 
     const content = mapOpenAIOutputItems(response.output);
 
@@ -103,12 +108,13 @@ export class OpenAIModel implements LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): AsyncGenerator<PartialModelResponse> {
     const createParams = convertToOpenAICreateParams(input, this.modelId);
-    const stream = await this.#openai.responses.create({
-      ...createParams,
-      stream: true,
-    });
+    const stream = await this.#openai.responses.create(
+      { ...createParams, stream: true },
+      { signal: options?.signal },
+    );
 
     let refusal = "";
 
@@ -328,11 +334,25 @@ function convertToolMessageToResponseInputItems(
         part.content,
       );
 
+      if (toolResultPartContent.length === 0) {
+        return [
+          {
+            type: "function_call_output",
+            call_id: part.tool_call_id,
+            output:
+              part.status === "cancelled"
+                ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+                : "",
+          },
+        ];
+      }
+
       return toolResultPartContent.map(
         (
           toolResultPartPart,
         ): OpenAI.Responses.ResponseInputItem.FunctionCallOutput => {
-          let output: OpenAI.Responses.ResponseInputItem.FunctionCallOutput["output"];
+          let output:
+            string | OpenAI.Responses.ResponseFunctionCallOutputItemList;
 
           switch (toolResultPartPart.type) {
             case "text":
@@ -397,7 +417,7 @@ function convertToOpenAITool(tool: Tool): OpenAI.Responses.Tool {
 
 function convertToOpenAIToolChoice(
   toolChoice: ToolChoiceOption,
-): NonNullable<OpenAI.Responses.ResponseCreateParams["tool_choice"]> {
+): OpenAI.Responses.ToolChoiceOptions | OpenAI.Responses.ToolChoiceFunction {
   switch (toolChoice.type) {
     case "tool": {
       return {

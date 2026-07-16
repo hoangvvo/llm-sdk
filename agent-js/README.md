@@ -210,6 +210,10 @@ An example server that exposes an API to interact with the agent can be found in
 
 ## Migration
 
+### To 0.4.0
+
+- `AgentItemTool.is_error` has been replaced with the required `status` field, and `AgentResponse` now includes a terminal `status`.
+
 ### To 0.3.0
 
 - Rename directly implemented function tools from `AgentTool` to `AgentFunctionTool` and add `type: "function"`. The `tool(...)` helper adds the type automatically.

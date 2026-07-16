@@ -1,10 +1,36 @@
 import type { LanguageModelError } from "@hoangvvo/llm-sdk";
+import type { AgentRunSnapshot } from "./types.ts";
 
 export class AgentError extends Error {
+  /**
+   * A best-effort snapshot of work completed before the run failed.
+   */
+  snapshot?: AgentRunSnapshot;
+
   constructor(message: string) {
     super(message);
     this.name = "AgentError";
   }
+
+  /** @internal */
+  withSnapshot(snapshot: AgentRunSnapshot): this {
+    this.snapshot ??= snapshot;
+    return this;
+  }
+}
+
+export function agentErrorWithSnapshot(
+  error: unknown,
+  snapshot: AgentRunSnapshot,
+): AgentError {
+  if (error instanceof AgentError) {
+    return error.withSnapshot(snapshot);
+  }
+  const wrapped = new AgentError(
+    error instanceof Error ? error.message : String(error),
+  );
+  wrapped.cause = error;
+  return wrapped.withSnapshot(snapshot);
 }
 
 export class AgentLanguageModelError extends AgentError {
@@ -47,6 +73,16 @@ export class AgentInitError extends AgentError {
       `Run initialization error: ${err instanceof Error ? err.message : String(err)}`,
     );
     this.name = "AgentInitError";
+    this.cause = err;
+  }
+}
+
+export class AgentCleanupError extends AgentError {
+  constructor(err: unknown) {
+    super(
+      `Run cleanup error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    this.name = "AgentCleanupError";
     this.cause = err;
   }
 }

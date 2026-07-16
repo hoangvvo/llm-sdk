@@ -452,6 +452,40 @@ func (s *StreamAccumulator) ComputeResponse() (ModelResponse, error) {
 	return r, nil
 }
 
+// Snapshot creates a best-effort response from the accumulated stream.
+// Each part is materialized independently. Parts that cannot yet form a valid
+// response part are omitted, while partial text remains available without
+// incomplete citation metadata.
+func (s *StreamAccumulator) Snapshot() ModelResponse {
+	indices := make([]int, 0, len(s.accumulatedParts))
+	for index := range s.accumulatedParts {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+
+	content := make([]Part, 0, len(indices))
+	for _, index := range indices {
+		data := s.accumulatedParts[index]
+		part, err := createPart(data, index)
+		if err == nil {
+			content = append(content, part)
+			continue
+		}
+		if data.Text != nil {
+			content = append(content, NewTextPart(data.Text.Text))
+		}
+	}
+
+	response := ModelResponse{
+		Content: content,
+		Usage:   s.accumulatedUsage,
+	}
+	if s.cost > 0 {
+		response.Cost = &s.cost
+	}
+	return response
+}
+
 // Size gets the number of accumulated parts
 func (s *StreamAccumulator) Size() int {
 	return len(s.accumulatedParts)

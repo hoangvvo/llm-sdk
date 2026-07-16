@@ -7,11 +7,13 @@ use super::api::{
     SpeechConfig, ThinkingConfig, Tool as GoogleTool, ToolConfig, UsageMetadata, VoiceConfig,
 };
 use crate::{
-    audio_part_utils, client_utils, id_utils, source_part_utils, stream_utils, AudioPart, Citation,
-    CitationDelta, ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
+    audio_part_utils, client_utils, id_utils, source_part_utils, stream_utils,
+    tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AudioPart, Citation, CitationDelta,
+    ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
     LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
     ModelTokensDetails, ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningPart,
     ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool, ToolChoiceOption,
+    ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -518,10 +520,8 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
 fn convert_to_google_function_result(
     tool_result_part: crate::ToolResultPart,
 ) -> LanguageModelResult<FunctionResponse> {
-    let (response, parts) = convert_to_google_function_response(
-        tool_result_part.content,
-        tool_result_part.is_error.unwrap_or(false),
-    )?;
+    let (response, parts) =
+        convert_to_google_function_response(tool_result_part.content, tool_result_part.status)?;
     Ok(FunctionResponse {
         id: Some(tool_result_part.tool_call_id),
         name: Some(tool_result_part.tool_name),
@@ -538,7 +538,7 @@ type GoogleFunctionResponse = (
 
 fn convert_to_google_function_response(
     parts: Vec<Part>,
-    is_error: bool,
+    status: ToolResultStatus,
 ) -> LanguageModelResult<GoogleFunctionResponse> {
     let compatible_parts = source_part_utils::get_compatible_parts_without_source_parts(parts);
     let mut text_parts: Vec<String> = Vec::new();
@@ -577,11 +577,19 @@ fn convert_to_google_function_response(
     // Use "output" key to specify function output and "error" key to specify error
     // details, as per Google API specification
     let mut result = HashMap::new();
-    let key = if is_error { "error" } else { "output" };
+    let key = if status == ToolResultStatus::Completed {
+        "output"
+    } else {
+        "error"
+    };
     let value = if responses.len() == 1 {
         responses.into_iter().next().unwrap_or(json!({}))
     } else if responses.is_empty() {
-        json!({})
+        if status == ToolResultStatus::Cancelled {
+            json!(CANCELLED_TOOL_RESULT_FALLBACK_CONTENT)
+        } else {
+            json!({})
+        }
     } else {
         json!(responses)
     };

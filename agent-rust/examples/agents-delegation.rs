@@ -4,7 +4,9 @@ use futures::{
     lock::{Mutex, MutexGuard},
     FutureExt,
 };
-use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
+use llm_agent::{
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunOptions, RunState,
+};
 use llm_sdk::{JSONSchema, Message, Part};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -71,12 +73,15 @@ where
 
             let result = self
                 .agent
-                .run(AgentRequest {
-                    input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                        params.task,
-                    )]))],
-                    context: (*context).clone(),
-                })
+                .run(
+                    AgentRequest {
+                        input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                            params.task,
+                        )]))],
+                        context: (*context).clone(),
+                    },
+                    RunOptions::default(),
+                )
                 .await?;
             Ok(AgentToolResult {
                 content: result.content,
@@ -345,10 +350,13 @@ You should also poll the order status in every turn to send them for delivery on
         input.push(AgentItem::Message(Message::user(vec![Part::text("Next")])));
 
         let response = coordinator
-            .run(AgentRequest {
-                input: input.clone(),
-                context: MyContext(orders.clone()),
-            })
+            .run(
+                AgentRequest {
+                    input: input.clone(),
+                    context: MyContext(orders.clone()),
+                },
+                RunOptions::default(),
+            )
             .await?;
 
         println!("{response:?}");

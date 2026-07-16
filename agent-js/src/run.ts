@@ -5,8 +5,11 @@ import {
   type Message,
   type ModelResponse,
   type Part,
+  type ToolCallPart,
 } from "@hoangvvo/llm-sdk";
 import {
+  agentErrorWithSnapshot,
+  AgentCleanupError,
   AgentInitError,
   AgentInvariantError,
   AgentLanguageModelError,
@@ -27,8 +30,43 @@ import type {
   AgentItemModelResponse,
   AgentItemTool,
   AgentResponse,
+  AgentResponseStatus,
+  AgentRunSnapshot,
   AgentStreamEvent,
 } from "./types.ts";
+
+function createCancelledToolItem(toolCall: ToolCallPart): AgentItemTool {
+  return {
+    type: "tool",
+    tool_call_id: toolCall.tool_call_id,
+    tool_name: toolCall.tool_name,
+    input: toolCall.args,
+    output: [],
+    status: "cancelled",
+  };
+}
+
+function* createToolCancellationEvents(
+  pendingToolCalls: readonly ToolCallPart[],
+): Generator<ProcessEvent> {
+  for (const pendingToolCall of pendingToolCalls) {
+    yield {
+      type: "item",
+      item: createCancelledToolItem(pendingToolCall),
+    };
+  }
+  yield { type: "response", content: [], status: "cancelled" };
+}
+
+function finishCancelledRun(
+  state: RunState,
+  span: AgentSpan,
+  content: Part[] = [],
+): AgentResponse {
+  const response = state.createResponse(content, "cancelled");
+  span.onResponse(response);
+  return response;
+}
 
 /**
  * Manages the run session for an agent run.
@@ -139,7 +177,7 @@ export class RunSession<TContext> {
   async *#process(
     state: RunState,
     tools: AgentTool<TContext>[],
-  ): AsyncGenerator<ProcessEvents> {
+  ): AsyncGenerator<ProcessEvent> {
     // Examining the last items in the state determines the next step.
     const allItems = state.getItems();
     const lastItem = allItems.at(-1);
@@ -253,6 +291,7 @@ export class RunSession<TContext> {
       yield {
         type: "response",
         content,
+        status: state.signal?.aborted ? "cancelled" : "completed",
       };
       return;
     }
@@ -267,10 +306,14 @@ export class RunSession<TContext> {
       toolCallIds.add(toolCallPart.tool_call_id);
     }
 
-    for (const toolCallPart of toolCallParts) {
-      if (processedToolCallIds.has(toolCallPart.tool_call_id)) {
-        // Tool call has already been processed
-        continue;
+    const pendingToolCalls = toolCallParts.filter(
+      (part) => !processedToolCallIds.has(part.tool_call_id),
+    );
+
+    for (const [index, toolCallPart] of pendingToolCalls.entries()) {
+      if (state.signal?.aborted) {
+        yield* createToolCancellationEvents(pendingToolCalls.slice(index));
+        return;
       }
 
       const agentTool = tools.find(
@@ -284,22 +327,29 @@ export class RunSession<TContext> {
         );
       }
 
-      const toolRes = await startActiveToolSpan(
-        toolCallPart.tool_call_id,
-        agentTool.name,
-        agentTool.description,
-        async () => {
-          try {
-            return await agentTool.execute(
-              toolCallPart.args,
-              this.#context,
-              state,
-            );
-          } catch (e) {
-            throw new AgentToolExecutionError(e);
-          }
-        },
-      );
+      let toolRes;
+      try {
+        toolRes = await startActiveToolSpan(
+          toolCallPart.tool_call_id,
+          agentTool.name,
+          agentTool.description,
+          async () => {
+            try {
+              return await agentTool.execute(
+                toolCallPart.args,
+                this.#context,
+                state,
+              );
+            } catch (e) {
+              throw new AgentToolExecutionError(e);
+            }
+          },
+        );
+      } catch (error) {
+        if (!state.signal?.aborted) throw error;
+        yield* createToolCancellationEvents(pendingToolCalls.slice(index));
+        return;
+      }
 
       const agentItemTool: AgentItemTool = {
         type: "tool",
@@ -307,13 +357,18 @@ export class RunSession<TContext> {
         tool_call_id: toolCallPart.tool_call_id,
         input: toolCallPart.args,
         output: toolRes.content,
-        is_error: toolRes.is_error,
+        status: toolRes.is_error ? "failed" : "completed",
       };
 
       yield {
         type: "item",
         item: agentItemTool,
       };
+
+      if (state.signal?.aborted) {
+        yield* createToolCancellationEvents(pendingToolCalls.slice(index + 1));
+        return;
+      }
     }
 
     yield {
@@ -324,20 +379,27 @@ export class RunSession<TContext> {
   /**
    * Run a non-streaming execution of the agent.
    */
-  async run(request: RunSessionRequest): Promise<AgentResponse> {
+  async run(
+    request: RunSessionRequest,
+    options?: RunOptions,
+  ): Promise<AgentResponse> {
     if (!this.#initialized) {
       throw new AgentInvariantError("RunSession not initialized.");
     }
 
     const span = new AgentSpan(this.#params.name, "run");
+    const state = new RunState(
+      request.input,
+      this.#params.max_turns,
+      options?.signal,
+    );
 
     try {
-      const state = new RunState(request.input, this.#params.max_turns);
       let tools = this.#getTools(); // get initial tool set
 
       for (;;) {
         const processStream = this.#process(state, tools);
-        // Patch next to propogate tracing context
+        // Patch next to propagate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalNext = processStream.next.bind(processStream);
         processStream.next = (...args) =>
@@ -348,7 +410,7 @@ export class RunSession<TContext> {
             state.appendItem(event.item);
           }
           if (event.type === "response") {
-            const response = state.createResponse(event.content);
+            const response = state.createResponse(event.content, event.status);
             span.onResponse(response);
             return response;
           }
@@ -363,28 +425,37 @@ export class RunSession<TContext> {
         const languageModelInput = turnParams.input;
         tools = turnParams.tools;
 
-        const modelResponse: ModelResponse = await span.withContext(
-          async () => {
+        if (state.signal?.aborted) {
+          return finishCancelledRun(state, span);
+        }
+        let modelResponse: ModelResponse;
+        try {
+          modelResponse = await span.withContext(async () => {
             try {
-              const response =
-                await this.#params.model.generate(languageModelInput);
-              return response;
+              return await this.#params.model.generate(
+                languageModelInput,
+                state.signal ? { signal: state.signal } : undefined,
+              );
             } catch (err) {
               if (err instanceof LanguageModelError) {
                 throw new AgentLanguageModelError(err);
               }
               throw err;
             }
-          },
-        );
+          });
+        } catch (error) {
+          if (!state.signal?.aborted) throw error;
+          return finishCancelledRun(state, span);
+        }
 
         state.appendModelResponse(modelResponse);
 
         // Continue to loop to process the model response
       }
     } catch (err) {
-      span.onError(err);
-      throw err;
+      const error = agentErrorWithSnapshot(err, state.createSnapshot());
+      span.onError(error);
+      throw error;
     } finally {
       span.onEnd();
     }
@@ -395,20 +466,25 @@ export class RunSession<TContext> {
    */
   async *runStream(
     request: RunSessionRequest,
+    options?: RunOptions,
   ): AsyncGenerator<AgentStreamEvent, AgentResponse> {
     if (!this.#initialized) {
       throw new AgentInvariantError("RunSession not initialized.");
     }
 
     const span = new AgentSpan(this.#params.name, "run_stream");
+    const state = new RunState(
+      request.input,
+      this.#params.max_turns,
+      options?.signal,
+    );
 
     try {
-      const state = new RunState(request.input, this.#params.max_turns);
       let tools = this.#getTools(); // get initial tool set
 
       for (;;) {
         const processStream = this.#process(state, tools);
-        // Patch next to propogate tracing context
+        // Patch next to propagate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalProcessStreamNext =
           processStream.next.bind(processStream);
@@ -425,7 +501,7 @@ export class RunSession<TContext> {
             };
           }
           if (event.type === "response") {
-            const response = state.createResponse(event.content);
+            const response = state.createResponse(event.content, event.status);
             span.onResponse(response);
             yield {
               event: "response",
@@ -444,8 +520,16 @@ export class RunSession<TContext> {
         const languageModelInput = turnParams.input;
         tools = turnParams.tools;
 
-        const modelStream = this.#params.model.stream(languageModelInput);
-        // Patch next to propogate tracing context
+        if (state.signal?.aborted) {
+          const response = finishCancelledRun(state, span);
+          yield { event: "response", ...response };
+          return response;
+        }
+        const modelStream = this.#params.model.stream(
+          languageModelInput,
+          state.signal ? { signal: state.signal } : undefined,
+        );
+        // Patch next to propagate tracing context
         // See: https://github.com/open-telemetry/opentelemetry-js/issues/2951
         const originalNext = modelStream.next.bind(modelStream);
         modelStream.next = (...args) =>
@@ -462,13 +546,49 @@ export class RunSession<TContext> {
             };
           }
         } catch (err) {
-          if (err instanceof LanguageModelError) {
-            throw new AgentLanguageModelError(err);
+          const snapshot = accumulator.snapshot();
+          const appended = state.appendModelSnapshot(snapshot);
+          if (appended) {
+            yield { event: "item", ...appended };
           }
-          throw err;
+          if (state.signal?.aborted) {
+            if (appended) continue;
+            const response = finishCancelledRun(state, span, snapshot.content);
+            yield { event: "response", ...response };
+            return response;
+          }
+          if (err instanceof LanguageModelError) {
+            throw agentErrorWithSnapshot(
+              new AgentLanguageModelError(err),
+              state.createSnapshot(),
+            );
+          }
+          throw agentErrorWithSnapshot(err, state.createSnapshot());
         }
 
-        const response = accumulator.computeResponse();
+        if (state.signal?.aborted) {
+          const snapshot = accumulator.snapshot();
+          const appended = state.appendModelSnapshot(snapshot);
+          if (appended) {
+            yield { event: "item", ...appended };
+            continue;
+          }
+          const response = finishCancelledRun(state, span, snapshot.content);
+          yield { event: "response", ...response };
+          return response;
+        }
+
+        let response: ModelResponse;
+        try {
+          response = accumulator.computeResponse();
+        } catch (error) {
+          const snapshot = accumulator.snapshot();
+          const appended = state.appendModelSnapshot(snapshot);
+          if (appended) {
+            yield { event: "item", ...appended };
+          }
+          throw agentErrorWithSnapshot(error, state.createSnapshot());
+        }
 
         const { item, index } = state.appendModelResponse(response);
         yield {
@@ -480,8 +600,9 @@ export class RunSession<TContext> {
         // Continue to loop to process the model response
       }
     } catch (err) {
-      span.onError(err);
-      throw err;
+      const error = agentErrorWithSnapshot(err, state.createSnapshot());
+      span.onError(error);
+      throw error;
     } finally {
       span.onEnd();
     }
@@ -506,7 +627,7 @@ export class RunSession<TContext> {
     const failed = results.find(
       (result): result is PromiseRejectedResult => result.status === "rejected",
     );
-    if (failed) throw failed.reason;
+    if (failed) throw new AgentCleanupError(failed.reason);
   }
 
   /**
@@ -629,10 +750,14 @@ export interface RunSessionRequest {
   input: AgentItem[];
 }
 
+export interface RunOptions {
+  signal?: AbortSignal;
+}
+
 /**
- * ProcessEvents represents the sum type of events returned by the process function.
+ * ProcessEvent represents the sum type of events returned by the process function.
  */
-type ProcessEvents = ProcessEventResponse | ProcessEventNext | ProcessEventItem;
+type ProcessEvent = ProcessEventResponse | ProcessEventNext | ProcessEventItem;
 
 /**
  * Emit when a new item is generated
@@ -648,6 +773,7 @@ interface ProcessEventItem {
 interface ProcessEventResponse {
   type: "response";
   content: Part[];
+  status: AgentResponseStatus;
 }
 
 /**
@@ -662,6 +788,11 @@ export class RunState {
   readonly #input: AgentItem[];
 
   /**
+   * The signal used to cancel the current run.
+   */
+  readonly signal: AbortSignal | undefined;
+
+  /**
    * The current turn number in the run.
    */
   currentTurn: number;
@@ -671,9 +802,10 @@ export class RunState {
    */
   readonly #output: AgentItem[];
 
-  constructor(input: AgentItem[], maxTurns: number) {
+  constructor(input: AgentItem[], maxTurns: number, signal?: AbortSignal) {
     this.#input = input;
     this.#maxTurns = maxTurns;
+    this.signal = signal;
 
     this.currentTurn = 0;
     this.#output = [];
@@ -721,6 +853,17 @@ export class RunState {
   }
 
   /**
+   * Append the independently materializable portion of an interrupted model
+   * stream. An empty snapshot does not represent an output item.
+   */
+  appendModelSnapshot(
+    response: ModelResponse,
+  ): { item: AgentItem; index: number } | undefined {
+    if (response.content.length === 0) return undefined;
+    return this.appendModelResponse(response);
+  }
+
+  /**
    * Get LLM messages to use in the LanguageModelInput for the turn
    */
   getTurnMessages(): Message[] {
@@ -742,7 +885,7 @@ export class RunState {
             tool_name: item.tool_name,
             tool_call_id: item.tool_call_id,
             content: item.output,
-            is_error: item.is_error,
+            status: item.status,
           };
 
           const lastMessage = messages[messages.length - 1];
@@ -769,12 +912,25 @@ export class RunState {
   }
 
   /**
+   * Create a best-effort snapshot of the current run.
+   */
+  createSnapshot(): AgentRunSnapshot {
+    return {
+      output: [...this.#output],
+    };
+  }
+
+  /**
    * Create the Agent Response
    */
-  createResponse(finalContent: Part[]): AgentResponse {
+  createResponse(
+    finalContent: Part[],
+    status: AgentResponseStatus,
+  ): AgentResponse {
     return {
       content: finalContent,
       output: this.#output,
+      status,
     };
   }
 }

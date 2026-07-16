@@ -409,6 +409,33 @@ impl StreamAccumulator {
         })
     }
 
+    /// Creates a best-effort snapshot of the accumulated response.
+    ///
+    /// Each part is materialized independently. Parts that cannot yet form a
+    /// valid response part are omitted, while partial text remains available
+    /// without incomplete citation metadata.
+    #[must_use]
+    pub fn snapshot(&self) -> ModelResponse {
+        let content = self
+            .accumulated_parts
+            .iter()
+            .filter_map(|(index, data)| {
+                create_part(data.clone(), *index)
+                    .ok()
+                    .or_else(|| match data {
+                        AccumulatedData::Text(text) => Some(Part::text(text.text.clone())),
+                        _ => None,
+                    })
+            })
+            .collect();
+
+        ModelResponse {
+            content,
+            cost: self.cost,
+            usage: self.accumulated_usage.clone(),
+        }
+    }
+
     /// Clears all accumulated data
     pub fn clear(&mut self) {
         self.accumulated_parts.clear();

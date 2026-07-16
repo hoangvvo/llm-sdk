@@ -1,18 +1,42 @@
 use crate::{
     instruction,
-    opentelemetry::{start_tool_span, trace_agent_run, trace_agent_stream, AgentSpanMethod},
+    opentelemetry::{self, AgentSpanMethod},
     toolkit::ToolkitSession,
-    types::{AgentItemTool, AgentStream, AgentStreamEvent},
-    AgentError, AgentFunctionTool, AgentItem, AgentParams, AgentResponse, AgentStreamItemEvent,
-    AgentTool,
+    types::{AgentItemTool, AgentResponseStatus, AgentStream, AgentStreamEvent},
+    AgentError, AgentFunctionTool, AgentItem, AgentParams, AgentResponse, AgentRunSnapshot,
+    AgentStreamItemEvent, AgentTool,
 };
 use async_stream::try_stream;
-use futures::{future::join_all, lock::Mutex, stream::StreamExt};
+use futures::{future, lock::Mutex, stream::StreamExt};
 use llm_sdk::{
     boxed_stream::BoxedStream, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
-    Tool, ToolCallPart, ToolResultPart,
+    Tool, ToolCallPart, ToolResultPart, ToolResultStatus,
 };
 use std::{collections::HashSet, sync::Arc};
+use tokio_util::sync::CancellationToken;
+
+fn create_cancelled_tool_item(tool_call: &ToolCallPart) -> AgentItem {
+    AgentItem::Tool(AgentItemTool {
+        tool_call_id: tool_call.tool_call_id.clone(),
+        tool_name: tool_call.tool_name.clone(),
+        input: tool_call.args.clone(),
+        output: Vec::new(),
+        status: ToolResultStatus::Cancelled,
+    })
+}
+
+fn create_tool_cancellation_events(
+    pending_tool_calls: &[ToolCallPart],
+) -> impl Iterator<Item = ProcessEvent> + '_ {
+    pending_tool_calls
+        .iter()
+        .map(create_cancelled_tool_item)
+        .map(ProcessEvent::Item)
+        .chain(std::iter::once(ProcessEvent::Response(ProcessResponse {
+            content: Vec::new(),
+            status: AgentResponseStatus::Cancelled,
+        })))
+}
 
 /// Manages the run session for an agent.
 /// It initializes all necessary components for the agent to run
@@ -47,7 +71,7 @@ where
             Some(
                 instruction::get_prompt(&params.instructions, &context)
                     .await
-                    .map_err(AgentError::Init)?,
+                    .map_err(AgentError::init)?,
             )
         };
 
@@ -87,13 +111,13 @@ where
         &'a self,
         run_state: &'a RunState,
         tools: Vec<Arc<dyn AgentFunctionTool<TCtx>>>,
-    ) -> BoxedStream<'a, Result<ProcessEvents, AgentError>> {
+    ) -> BoxedStream<'a, Result<ProcessEvent, AgentError>> {
         let context_val = self.context.clone();
         let stream = try_stream! {
             let items = run_state.items().await;
             // Examining the last items in the state determines the next step.
             let last_item = items.last().cloned().ok_or_else(|| {
-                AgentError::Invariant("No items in the run state.".to_string())
+                AgentError::invariant("No items in the run state.".to_string())
             })?;
 
             let mut content: Option<Vec<Part>> = None;
@@ -114,7 +138,7 @@ where
                     Message::User(_) => {
                         // ========== Case: User Message ==========
                         // last item is a user message, so we need to generate a model response
-                        yield ProcessEvents::Next;
+                        yield ProcessEvent::Next;
                         return;
                     }
                     Message::Tool(tool_message) => {
@@ -133,7 +157,7 @@ where
                             .and_then(|idx| items.get(idx))
                             .cloned()
                             .ok_or_else(|| {
-                                AgentError::Invariant(
+                                AgentError::invariant(
                                     "No preceding assistant content found before tool results.".to_string(),
                                 )
                             })?;
@@ -143,13 +167,13 @@ where
                             AgentItem::Message(prev_message) => match prev_message {
                                 Message::Assistant(assistant_message) => assistant_message.content,
                                 _ => {
-                                    Err(AgentError::Invariant(
+                                    Err(AgentError::invariant(
                                         "Expected a model item or assistant message before tool results.".to_string(),
                                     ))?
                                 }
                             },
                             AgentItem::Tool(_) => {
-                                Err(AgentError::Invariant(
+                                Err(AgentError::invariant(
                                     "Expected a model item or assistant message before tool results.".to_string(),
                                 ))?
                             }
@@ -189,7 +213,7 @@ where
                                     break;
                                 }
                                 Message::User(_) => {
-                                    Err(AgentError::Invariant(
+                                    Err(AgentError::invariant(
                                         "Expected a model item or assistant message before tool results.".to_string(),
                                     ))?;
                                 }
@@ -201,7 +225,7 @@ where
 
             let content = content
                 .filter(|v| !v.is_empty())
-                .ok_or_else(|| AgentError::Invariant(
+                .ok_or_else(|| AgentError::invariant(
                     "No assistant content found to process.".to_string(),
                 ))?;
 
@@ -219,25 +243,38 @@ where
 
             // If no tool calls were found, return the model response as is
             if tool_call_parts.is_empty() {
-                yield ProcessEvents::Response(content);
+                yield ProcessEvent::Response(ProcessResponse {
+                    content,
+                    status: if run_state.cancellation_token().is_cancelled() {
+                        AgentResponseStatus::Cancelled
+                    } else {
+                        AgentResponseStatus::Completed
+                    },
+                });
                 return;
             }
 
             let mut seen_tool_call_ids = HashSet::new();
             for tool_call_part in &tool_call_parts {
                 if !seen_tool_call_ids.insert(tool_call_part.tool_call_id.clone()) {
-                    Err(AgentError::Invariant(format!(
+                    Err(AgentError::invariant(format!(
                         "Duplicate tool call ID: {}",
                         tool_call_part.tool_call_id
                     )))?;
                 }
             }
 
-            for tool_call_part in tool_call_parts {
-                if processed_tool_call_ids.contains(&tool_call_part.tool_call_id)
-                {
-                    // Tool call has already been processed
-                    continue;
+            let pending_tool_calls: Vec<ToolCallPart> = tool_call_parts
+                .into_iter()
+                .filter(|part| !processed_tool_call_ids.contains(&part.tool_call_id))
+                .collect();
+
+            for (index, tool_call_part) in pending_tool_calls.iter().cloned().enumerate() {
+                if run_state.cancellation_token().is_cancelled() {
+                    for event in create_tool_cancellation_events(&pending_tool_calls[index..]) {
+                        yield event;
+                    }
+                    return;
                 }
 
                 let ToolCallPart {
@@ -251,78 +288,128 @@ where
                     .iter()
                     .find(|tool| tool.name() == tool_name)
                     .ok_or_else(|| {
-                        AgentError::Invariant(format!("Tool {tool_name} not found for tool call"))
+                        AgentError::invariant(format!("Tool {tool_name} not found for tool call"))
                     })?;
 
                 let tool_name_value = agent_tool.name();
                 let tool_description = agent_tool.description();
-                let tool_res = start_tool_span(
+                let tool_result = opentelemetry::start_tool_span(
                     &tool_call_id,
                     &tool_name_value,
                     &tool_description,
                     agent_tool.execute(args.clone(), &context_val, run_state),
                 )
-                .await
-                .map_err(AgentError::ToolExecution)?;
+                .await;
+
+                let tool_res = match tool_result {
+                    Ok(result) => result,
+                    Err(_) if run_state.cancellation_token().is_cancelled() => {
+                        for event in create_tool_cancellation_events(&pending_tool_calls[index..]) {
+                            yield event;
+                        }
+                        return;
+                    }
+                    Err(error) => Err(AgentError::tool_execution(error))?,
+                };
 
                 let item = AgentItemTool {
                     tool_call_id,
                     tool_name,
                     input: args,
                     output: tool_res.content,
-                    is_error: tool_res.is_error,
+                    status: if tool_res.is_error {
+                        ToolResultStatus::Failed
+                    } else {
+                        ToolResultStatus::Completed
+                    },
                 };
 
-                yield ProcessEvents::Item(AgentItem::Tool(item));
+                yield ProcessEvent::Item(AgentItem::Tool(item));
+
+                if run_state.cancellation_token().is_cancelled() {
+                    for event in create_tool_cancellation_events(&pending_tool_calls[index + 1..]) {
+                        yield event;
+                    }
+                    return;
+                }
             }
 
-            yield ProcessEvents::Next;
+            yield ProcessEvent::Next;
         };
 
         BoxedStream::from_stream(stream)
     }
 
     /// Run a non-streaming execution of the agent.
-    pub async fn run(&self, request: RunSessionRequest) -> Result<AgentResponse, AgentError> {
+    pub async fn run(
+        &self,
+        request: RunSessionRequest,
+        options: RunOptions,
+    ) -> Result<AgentResponse, AgentError> {
         let RunSessionRequest { input } = request;
 
-        trace_agent_run(&self.params.name, AgentSpanMethod::Run, async move {
-            let state = RunState::new(input, self.params.max_turns);
+        opentelemetry::trace_agent_run(&self.params.name, AgentSpanMethod::Run, async move {
+            let state = RunState::new(input, self.params.max_turns, options.cancellation_token);
             let mut tools = self.get_function_tools();
 
-            loop {
-                let mut process_stream = self.process(&state, tools);
+            let result: Result<AgentResponse, AgentError> = async {
+                loop {
+                    let mut process_stream = self.process(&state, tools);
 
-                while let Some(event) = process_stream.next().await {
-                    let event = event?;
-                    match event {
-                        ProcessEvents::Item(item) => {
-                            state.append_item(item).await;
-                        }
-                        ProcessEvents::Response(final_content) => {
-                            return Ok(state.create_response(final_content).await);
-                        }
-                        ProcessEvents::Next => {
-                            state.turn().await?;
-                            break;
+                    while let Some(event) = process_stream.next().await {
+                        let event = event?;
+                        match event {
+                            ProcessEvent::Item(item) => {
+                                state.append_item(item).await;
+                            }
+                            ProcessEvent::Response(response) => {
+                                return Ok(state
+                                    .create_response(response.content, response.status)
+                                    .await);
+                            }
+                            ProcessEvent::Next => {
+                                state.turn().await?;
+                                break;
+                            }
                         }
                     }
+
+                    let (input, next_tools) = self.get_turn_params(&state).await?;
+                    tools = next_tools;
+
+                    let model_response = tokio::select! {
+                        biased;
+                        () = state.cancellation_token().cancelled() => {
+                            return Ok(state.create_cancelled_response().await);
+                        }
+                        response = self.params.model.generate(input) => response?,
+                    };
+                    state.append_model_response(model_response).await;
                 }
+            }
+            .await;
 
-                let (input, next_tools) = self.get_turn_params(&state).await?;
-                tools = next_tools;
-
-                let model_response = self.params.model.generate(input).await?;
-                state.append_model_response(model_response).await;
+            match result {
+                Ok(response) => Ok(response),
+                Err(error) => Err(error.with_snapshot(state.create_snapshot().await)),
             }
         })
         .await
     }
 
     /// Run a streaming execution of the agent.
-    pub fn run_stream(&self, request: RunSessionRequest) -> Result<AgentStream, AgentError> {
+    #[allow(clippy::too_many_lines)]
+    pub fn run_stream(
+        &self,
+        request: RunSessionRequest,
+        options: RunOptions,
+    ) -> Result<AgentStream, AgentError> {
         let RunSessionRequest { input } = request;
-        let state = Arc::new(RunState::new(input, self.params.max_turns));
+        let state = Arc::new(RunState::new(
+            input,
+            self.params.max_turns,
+            options.cancellation_token,
+        ));
 
         let session = Arc::new(Self {
             params: self.params.clone(),
@@ -334,66 +421,143 @@ where
         let stream = async_stream::try_stream! {
             let mut tools = session.get_function_tools();
 
-            loop {
+            'run: loop {
                 let mut process_stream = session.process(&state, tools);
 
                 while let Some(event) = process_stream.next().await {
-                    let event = event?;
+                    let event = match event {
+                        Ok(event) => event,
+                        Err(error) => Err(error.with_snapshot(
+                            state.create_snapshot().await,
+                        ))?,
+                    };
 
                     match event {
-                        ProcessEvents::Item(item) => {
+                        ProcessEvent::Item(item) => {
                             let index = state.append_item(item.clone()).await;
                             yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
                         }
-                        ProcessEvents::Response(final_content) => {
-                            let response = state.create_response(final_content).await;
+                        ProcessEvent::Response(process_response) => {
+                            let response = state
+                                .create_response(process_response.content, process_response.status)
+                                .await;
                             yield AgentStreamEvent::Response(response);
                             return;
                         }
-                        ProcessEvents::Next => {
-                            state.turn().await?;
+                        ProcessEvent::Next => {
+                            if let Err(error) = state.turn().await {
+                                Err(error.with_snapshot(
+                                    state.create_snapshot().await,
+                                ))?;
+                            }
                             break;
                         }
                     }
                 }
 
-                let (input, next_tools) = session.get_turn_params(&state).await?;
+                let (input, next_tools) = match session.get_turn_params(&state).await {
+                    Ok(params) => params,
+                    Err(error) => Err(error.with_snapshot(
+                        state.create_snapshot().await,
+                    ))?,
+                };
                 tools = next_tools;
 
-                let mut model_stream = session.params.model.stream(input).await?;
+                let model_stream = tokio::select! {
+                    biased;
+                    () = state.cancellation_token().cancelled() => {
+                        yield AgentStreamEvent::Response(state.create_cancelled_response().await);
+                        return;
+                    }
+                    result = session.params.model.stream(input) => result,
+                };
+                let mut model_stream = match model_stream {
+                    Ok(stream) => stream,
+                    Err(error) => Err(AgentError::from(error).with_snapshot(
+                        state.create_snapshot().await,
+                    ))?,
+                };
 
                 let mut accumulator = StreamAccumulator::new();
 
-                while let Some(partial) = model_stream.next().await {
-                    let partial = partial?;
+                loop {
+                    let partial = tokio::select! {
+                        biased;
+                        () = state.cancellation_token().cancelled() => {
+                            let snapshot = accumulator.snapshot();
+                            let content = snapshot.content.clone();
+                            if let Some((item, index)) = state.append_model_snapshot(snapshot).await {
+                                yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
+                                continue 'run;
+                            }
+                            yield AgentStreamEvent::Response(
+                                state.create_response(content, AgentResponseStatus::Cancelled).await,
+                            );
+                            return;
+                        }
+                        partial = model_stream.next() => partial,
+                    };
+                    let Some(partial) = partial else {
+                        break;
+                    };
+                    let partial = match partial {
+                        Ok(partial) => partial,
+                        Err(error) => {
+                            let snapshot = accumulator.snapshot();
+                            if let Some((item, index)) = state.append_model_snapshot(snapshot).await {
+                                yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
+                            }
+                            Err(AgentError::from(error).with_snapshot(
+                                state.create_snapshot().await,
+                            ))?
+                        }
+                    };
 
-                    accumulator.add_partial(partial.clone()).map_err(|e| {
-                        AgentError::Invariant(format!("Failed to accumulate stream: {e}"))
-                    })?;
+                    if let Err(error) = accumulator.add_partial(partial.clone()) {
+                        let snapshot = accumulator.snapshot();
+                        if let Some((item, index)) = state.append_model_snapshot(snapshot).await {
+                            yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
+                        }
+                        Err(AgentError::invariant(format!(
+                            "Failed to accumulate stream: {error}"
+                        ))
+                        .with_snapshot(state.create_snapshot().await))?;
+                    }
 
                     yield AgentStreamEvent::Partial(partial);
                 }
 
-                let model_response = accumulator.compute_response()?;
+                let snapshot = accumulator.snapshot();
+                let model_response = match accumulator.compute_response() {
+                    Ok(response) => response,
+                    Err(error) => {
+                        if let Some((item, index)) = state.append_model_snapshot(snapshot).await {
+                            yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
+                        }
+                        Err(AgentError::from(error).with_snapshot(
+                            state.create_snapshot().await,
+                        ))?
+                    }
+                };
 
                 let (item, index) = state.append_model_response(model_response).await;
                 yield AgentStreamEvent::Item(AgentStreamItemEvent { index, item });
             }
         };
 
-        Ok(trace_agent_stream(&self.params.name, stream))
+        Ok(opentelemetry::trace_agent_stream(&self.params.name, stream))
     }
 
     pub async fn close(self) -> Result<(), AgentError> {
         if let Ok(toolkit_sessions) = Arc::try_unwrap(self.toolkit_sessions) {
-            let results = join_all(
+            let results = future::join_all(
                 toolkit_sessions
                     .into_iter()
                     .map(super::toolkit::ToolkitSession::close),
             )
             .await;
             if let Some(error) = results.into_iter().find_map(Result::err) {
-                return Err(AgentError::Cleanup(error));
+                return Err(AgentError::cleanup(error));
             }
         }
 
@@ -408,7 +572,7 @@ where
             return Ok(Vec::new());
         }
 
-        let results = join_all(
+        let results = future::join_all(
             params
                 .toolkits
                 .iter()
@@ -425,8 +589,8 @@ where
             }
         }
         if let Some(error) = first_error {
-            let _ = join_all(sessions.into_iter().map(ToolkitSession::close)).await;
-            return Err(AgentError::Init(error));
+            let _ = future::join_all(sessions.into_iter().map(ToolkitSession::close)).await;
+            return Err(AgentError::init(error));
         }
         Ok(sessions)
     }
@@ -507,18 +671,37 @@ pub struct RunSessionRequest {
     pub input: Vec<AgentItem>,
 }
 
-enum ProcessEvents {
+#[derive(Clone, Default)]
+pub struct RunOptions {
+    pub cancellation_token: CancellationToken,
+}
+
+impl RunOptions {
+    #[must_use]
+    pub fn with_cancellation_token(mut self, cancellation_token: CancellationToken) -> Self {
+        self.cancellation_token = cancellation_token;
+        self
+    }
+}
+
+enum ProcessEvent {
     // Emit when a new item is generated
     Item(AgentItem),
     //  Emit when the final response is ready
-    Response(Vec<Part>),
+    Response(ProcessResponse),
     // Emit when the loop should continue to the next iteration
     Next,
+}
+
+struct ProcessResponse {
+    content: Vec<Part>,
+    status: AgentResponseStatus,
 }
 
 pub struct RunState {
     max_turns: usize,
     input: Vec<AgentItem>,
+    cancellation_token: CancellationToken,
 
     /// The current turn number in the run.
     pub current_turn: Arc<Mutex<usize>>,
@@ -528,13 +711,20 @@ pub struct RunState {
 
 impl RunState {
     #[must_use]
-    fn new(input: Vec<AgentItem>, max_turns: usize) -> Self {
+    fn new(input: Vec<AgentItem>, max_turns: usize, cancellation_token: CancellationToken) -> Self {
         Self {
             max_turns,
             input,
+            cancellation_token,
             current_turn: Arc::new(Mutex::new(0)),
             output: Arc::new(Mutex::new(vec![])),
         }
+    }
+
+    /// Return the token used to cancel the current run.
+    #[must_use]
+    pub fn cancellation_token(&self) -> &CancellationToken {
+        &self.cancellation_token
     }
 
     /// Mark a new turn in the conversation and throw an error if max turns
@@ -543,7 +733,7 @@ impl RunState {
         let mut current_turn = self.current_turn.lock().await;
         *current_turn += 1;
         if *current_turn > self.max_turns {
-            return Err(AgentError::MaxTurnsExceeded(self.max_turns));
+            return Err(AgentError::max_turns_exceeded(self.max_turns));
         }
         Ok(())
     }
@@ -575,6 +765,15 @@ impl RunState {
         (item, output.len() - 1)
     }
 
+    /// Append the independently materializable portion of an interrupted model
+    /// stream. An empty snapshot does not represent an output item.
+    async fn append_model_snapshot(&self, response: ModelResponse) -> Option<(AgentItem, usize)> {
+        if response.content.is_empty() {
+            return None;
+        }
+        Some(self.append_model_response(response).await)
+    }
+
     /// Get LLM messages to use in the `LanguageModelInput` for the turn
     #[must_use]
     async fn get_turn_messages(&self) -> Vec<Message> {
@@ -591,7 +790,7 @@ impl RunState {
                 AgentItem::Tool(tool) => {
                     let tool_part: Part =
                         ToolResultPart::new(tool.tool_call_id, tool.tool_name, tool.output)
-                            .with_is_error(tool.is_error)
+                            .with_status(tool.status)
                             .into();
 
                     match messages.last_mut() {
@@ -610,11 +809,28 @@ impl RunState {
     }
 
     #[must_use]
-    async fn create_response(&self, final_content: Vec<Part>) -> AgentResponse {
+    async fn create_response(
+        &self,
+        final_content: Vec<Part>,
+        status: AgentResponseStatus,
+    ) -> AgentResponse {
         let output = self.output.lock().await;
         AgentResponse {
             content: final_content,
             output: output.clone(),
+            status,
         }
+    }
+
+    async fn create_snapshot(&self) -> AgentRunSnapshot {
+        let output = self.output.lock().await;
+        AgentRunSnapshot {
+            output: output.clone(),
+        }
+    }
+
+    async fn create_cancelled_response(&self) -> AgentResponse {
+        self.create_response(Vec::new(), AgentResponseStatus::Cancelled)
+            .await
     }
 }

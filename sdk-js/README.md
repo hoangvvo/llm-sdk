@@ -137,6 +137,7 @@ node examples/generate-text.ts
 ### To 0.6.0
 
 - Function tools now require `type: "function"`.
+- `ToolResultPart.is_error` has been replaced with the required `status` field (`"completed"`, `"failed"`, or `"cancelled"`).
 
 ### To 0.4.0
 

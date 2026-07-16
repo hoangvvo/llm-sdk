@@ -16,7 +16,8 @@ export type MockGenerateResult = { response: ModelResponse } | { error: Error };
  * It can either be a set of partial responses or an error to throw.
  */
 export type MockStreamResult =
-  { partials: PartialModelResponse[] } | { error: Error };
+  | { partials: PartialModelResponse[]; error?: Error }
+  | { error: Error; partials?: never };
 
 /**
  * A mock language model for testing purposes
@@ -65,11 +66,15 @@ export class MockLanguageModel implements LanguageModel {
       throw new Error("No mocked stream results available");
     }
     this.trackedStreamInputs.push(input);
-    if ("error" in result) {
+    if ("partials" in result) {
+      for (const partial of result.partials) {
+        yield Promise.resolve(partial);
+      }
+      if (result.error) {
+        throw result.error;
+      }
+    } else {
       throw result.error;
-    }
-    for (const partial of result.partials) {
-      yield Promise.resolve(partial);
     }
   }
 

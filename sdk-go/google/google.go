@@ -11,6 +11,7 @@ import (
 	"github.com/hoangvvo/llm-sdk/sdk-go/google/googleapi"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/clientutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/sliceutils"
+	"github.com/hoangvvo/llm-sdk/sdk-go/internal/toolresultutils"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/tracing"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/partutil"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
@@ -402,7 +403,10 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 		}
 		return []googleapi.Part{googlePart}, nil
 	case part.ToolResultPart != nil:
-		response, parts, err := convertToGoogleFunctionResponse(part.ToolResultPart.Content, part.ToolResultPart.IsError)
+		response, parts, err := convertToGoogleFunctionResponse(
+			part.ToolResultPart.Content,
+			part.ToolResultPart.Status,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -418,7 +422,7 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 	return []googleapi.Part{}, nil
 }
 
-func convertToGoogleFunctionResponse(parts []llmsdk.Part, isError bool) (map[string]any, []googleapi.FunctionResponsePart, error) {
+func convertToGoogleFunctionResponse(parts []llmsdk.Part, status llmsdk.ToolResultStatus) (map[string]any, []googleapi.FunctionResponsePart, error) {
 	compatibleParts := partutil.GetCompatiblePartsWithoutSourceParts(parts)
 	textParts := []llmsdk.TextPart{}
 	functionResponseParts := []googleapi.FunctionResponsePart{}
@@ -459,11 +463,14 @@ func convertToGoogleFunctionResponse(parts []llmsdk.Part, isError bool) (map[str
 	// Use "output" key to specify function output and "error" key to specify error details,
 	// as per Google API specification
 	key := "output"
-	if isError {
+	if status != llmsdk.ToolResultStatusCompleted {
 		key = "error"
 	}
 	response := func() any {
 		if len(responses) == 0 {
+			if status == llmsdk.ToolResultStatusCancelled {
+				return toolresultutils.CancelledFallbackContent
+			}
 			return map[string]any{}
 		}
 		if len(responses) == 1 {

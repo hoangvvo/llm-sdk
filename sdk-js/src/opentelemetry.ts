@@ -1,5 +1,8 @@
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
-import type { LanguageModel } from "./language-model.ts";
+import type {
+  LanguageModel,
+  LanguageModelCallOptions,
+} from "./language-model.ts";
 import type {
   LanguageModelInput,
   ModelResponse,
@@ -112,9 +115,10 @@ export function traceLanguageModel(self: LanguageModel) {
 
   self.generate = function generate(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): Promise<ModelResponse> {
     const span = new LMSpan(self.provider, self.modelId, "generate", input);
-    return originalGenerate(input)
+    return originalGenerate(input, options)
       .then(
         (response) => {
           span.onResponse(response);
@@ -132,13 +136,20 @@ export function traceLanguageModel(self: LanguageModel) {
 
   self.stream = async function* stream(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): AsyncGenerator<PartialModelResponse> {
     const span = new LMSpan(self.provider, self.modelId, "stream", input);
-    const stream = originalStream(input);
-    for await (const partial of stream) {
-      span.onStreamPartial(partial);
-      yield partial;
+    try {
+      const stream = originalStream(input, options);
+      for await (const partial of stream) {
+        span.onStreamPartial(partial);
+        yield partial;
+      }
+    } catch (error: unknown) {
+      span.onError(error);
+      throw error;
+    } finally {
+      span.onEnd();
     }
-    span.onEnd();
   };
 }

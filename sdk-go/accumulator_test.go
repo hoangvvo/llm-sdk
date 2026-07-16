@@ -114,3 +114,52 @@ func TestStreamAccumulator_ClearRemovesContentAndMetadata(t *testing.T) {
 		t.Fatalf("clear retained state: %#v", response)
 	}
 }
+
+func TestStreamAccumulator_SnapshotsIndependentlyMaterializableParts(t *testing.T) {
+	accumulator := llmsdk.NewStreamAccumulator()
+	partials := []llmsdk.PartialModelResponse{
+		{
+			Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("partial")},
+			Usage: &llmsdk.ModelUsage{InputTokens: 2, OutputTokens: 3},
+			Cost:  ptr.To(0.25),
+		},
+		{Delta: &llmsdk.ContentDelta{Index: 1, Part: llmsdk.NewToolCallPartDelta(
+			llmsdk.WithToolCallPartDeltaToolCallID("call_1"),
+			llmsdk.WithToolCallPartDeltaToolName("weather"),
+			llmsdk.WithToolCallPartDeltaArgs(`{"city":"Paris"}`),
+		)}},
+		{Delta: &llmsdk.ContentDelta{Index: 2, Part: llmsdk.NewToolCallPartDelta(
+			llmsdk.WithToolCallPartDeltaArgs("{incomplete"),
+		)}},
+		{Delta: &llmsdk.ContentDelta{Index: 3, Part: llmsdk.NewImagePartDelta(
+			llmsdk.WithImagePartDeltaData("aGVsbG8="),
+			llmsdk.WithImagePartDeltaMimeType("image/png"),
+		)}},
+		{Delta: &llmsdk.ContentDelta{Index: 4, Part: llmsdk.NewAudioPartDelta(
+			llmsdk.WithAudioPartDeltaData("AAABAA=="),
+			llmsdk.WithAudioPartDeltaFormat(llmsdk.AudioFormatLinear16),
+		)}},
+	}
+	for _, partial := range partials {
+		if err := accumulator.AddPartial(partial); err != nil {
+			t.Fatalf("add partial: %v", err)
+		}
+	}
+
+	expected := llmsdk.ModelResponse{
+		Content: []llmsdk.Part{
+			llmsdk.NewTextPart("partial"),
+			llmsdk.NewToolCallPart("call_1", "weather", map[string]any{"city": "Paris"}),
+			llmsdk.NewImagePart("aGVsbG8=", "image/png"),
+			llmsdk.NewAudioPart("AAABAA==", llmsdk.AudioFormatLinear16),
+		},
+		Usage: &llmsdk.ModelUsage{InputTokens: 2, OutputTokens: 3},
+		Cost:  ptr.To(0.25),
+	}
+	if diff := cmp.Diff(expected, accumulator.Snapshot()); diff != "" {
+		t.Fatalf("snapshot mismatch (-want +got):\n%s", diff)
+	}
+	if _, err := accumulator.ComputeResponse(); err == nil {
+		t.Fatal("strict response unexpectedly accepted an incomplete part")
+	}
+}

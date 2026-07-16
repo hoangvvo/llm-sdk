@@ -41,6 +41,11 @@
       "description": "Defines the modality of content (e.g., text or audio) in LLM responses.",
       "enum": ["text", "image", "audio"]
     },
+    "ToolResultStatus": {
+      "type": "string",
+      "description": "The terminal status of a tool call.",
+      "enum": ["completed", "failed", "cancelled"]
+    },
     "ToolChoiceOption": {
       "description": "Determines how the model should choose which tool to use:\n- \"auto\": The model will automatically choose the tool to use or not use any tools.\n- \"none\": The model will not use any tools.\n- \"required\": The model will be forced to use a tool.\n- { type: \"tool\", toolName: \"toolName\" }: The model will use the specified tool.",
       "oneOf": [
@@ -226,12 +231,9 @@
           "description": "The content of the tool result.",
           "items": { "$ref": "#/definitions/Part" }
         },
-        "is_error": {
-          "type": "boolean",
-          "description": "Marks the tool result as an error."
-        }
+        "status": { "$ref": "#/definitions/ToolResultStatus" }
       },
-      "required": ["type", "tool_call_id", "tool_name", "content"],
+      "required": ["type", "tool_call_id", "tool_name", "content", "status"],
       "additionalProperties": false
     },
     "ReasoningPart": {

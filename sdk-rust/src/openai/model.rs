@@ -18,12 +18,14 @@ use crate::{
         WebSearchApproximateLocationValue, WebSearchApproximateLocationValueType,
         WebSearchTool as OpenAIWebSearchTool, WebSearchToolFilters, WebSearchToolType,
     },
-    source_part_utils, AssistantMessage, Citation, CitationDelta, ContentDelta, ImagePart,
-    ImagePartDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
+    source_part_utils,
+    tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
+    AssistantMessage, Citation, CitationDelta, ContentDelta, ImagePart, ImagePartDelta,
+    LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
     LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta,
     PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
     ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
-    ToolChoiceOption, ToolMessage, ToolResultPart, UserMessage,
+    ToolChoiceOption, ToolMessage, ToolResultPart, ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -491,11 +493,33 @@ fn convert_tool_message_to_response_input_items(
             if let Part::ToolResult(ToolResultPart {
                 content,
                 tool_call_id,
+                status,
                 ..
             }) = part
             {
                 let tool_result_part_content =
                     source_part_utils::get_compatible_parts_without_source_parts(content);
+
+                if tool_result_part_content.is_empty() {
+                    acc.push(InputItem::Item(
+                        responses_api::Item::FunctionCallOutputItemParam(
+                            FunctionCallOutputItemParam {
+                                call_id: tool_call_id,
+                                output: FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputString(Some(
+                                    if status == ToolResultStatus::Cancelled {
+                                        CANCELLED_TOOL_RESULT_FALLBACK_CONTENT.to_string()
+                                    } else {
+                                        String::new()
+                                    },
+                                )),
+                                id: None,
+                                status: None,
+                                r#type: FunctionCallOutputItemParamType::FunctionCallOutput,
+                            },
+                        ),
+                    ));
+                    return Ok(acc);
+                }
 
                 let items = tool_result_part_content
                     .into_iter()

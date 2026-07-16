@@ -106,6 +106,49 @@ func TestOpenAIRecordedTransportGenerateRequestAndResponse(t *testing.T) {
 	}
 }
 
+func TestOpenAIRecordedTransportCancelledToolResult(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		requestBody = readRequestJSON(t, request)
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(response, `{"output":[]}`)
+	}))
+	t.Cleanup(server.Close)
+
+	input := &llmsdk.LanguageModelInput{Messages: []llmsdk.Message{
+		llmsdk.NewAssistantMessage(llmsdk.NewToolCallPart("call_1", "wait", map[string]any{})),
+		llmsdk.NewToolMessage(llmsdk.NewToolResultPart(
+			"call_1",
+			"wait",
+			[]llmsdk.Part{},
+			llmsdk.WithToolResultStatus(llmsdk.ToolResultStatusCancelled),
+		)),
+	}}
+	if _, err := recordedModel(server).Generate(t.Context(), input); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+
+	items, ok := requestBody["input"].([]any)
+	if !ok {
+		t.Fatalf("unexpected input: %#v", requestBody["input"])
+	}
+	var outputs []any
+	for _, item := range items {
+		object, ok := item.(map[string]any)
+		if ok && object["type"] == "function_call_output" {
+			outputs = append(outputs, object)
+		}
+	}
+	expected := []any{map[string]any{
+		"type":    "function_call_output",
+		"call_id": "call_1",
+		"output":  "cancelled",
+	}}
+	if !reflect.DeepEqual(outputs, expected) {
+		t.Fatalf("unexpected tool outputs: %#v", outputs)
+	}
+}
+
 func TestOpenAIRecordedTransportFragmentedStream(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		if stream, _ := readRequestJSON(t, request)["stream"].(bool); !stream {

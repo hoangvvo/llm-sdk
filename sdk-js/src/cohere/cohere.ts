@@ -6,6 +6,7 @@ import {
 } from "../errors.ts";
 import type {
   LanguageModel,
+  LanguageModelCallOptions,
   LanguageModelMetadata,
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
@@ -27,6 +28,7 @@ import type {
   ToolCallPartDelta,
   ToolChoiceOption,
 } from "../types.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import { calculateCost } from "../usage.utils.ts";
 import type { PatchedAssistantMessageV2ContentItem } from "./types.ts";
 
@@ -55,9 +57,15 @@ export class CohereModel implements LanguageModel {
     traceLanguageModel(this);
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): Promise<ModelResponse> {
     const request = convertToCohereChatRequest(input, this.modelId);
-    const response = await this.#cohere.chat(request);
+    const response = await this.#cohere.chat(
+      request,
+      options?.signal ? { abortSignal: options.signal } : undefined,
+    );
 
     const content = mapCohereMessageResponse(response.message);
     const result: ModelResponse = { content };
@@ -74,9 +82,13 @@ export class CohereModel implements LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): AsyncGenerator<PartialModelResponse> {
     const request = convertToCohereChatRequest(input, this.modelId);
-    const stream = await this.#cohere.chatStream(request);
+    const stream = await this.#cohere.chatStream(
+      request,
+      options?.signal ? { abortSignal: options.signal } : undefined,
+    );
 
     for await (const event of stream) {
       switch (event.type) {
@@ -278,7 +290,12 @@ function convertToCohereMessages(
           cohereMessages.push({
             role: "tool",
             toolCallId: part.tool_call_id,
-            content: part.content.map(convertToCohereToolMessageContent),
+            content:
+              part.content.length === 0
+                ? part.status === "cancelled"
+                  ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+                  : ""
+                : part.content.map(convertToCohereToolMessageContent),
           });
         });
         break;

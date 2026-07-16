@@ -8,6 +8,7 @@ import {
 } from "../errors.ts";
 import type {
   LanguageModel,
+  LanguageModelCallOptions,
   LanguageModelMetadata,
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
@@ -16,6 +17,7 @@ import {
   guessDeltaIndex,
   looselyConvertPartToPartDelta,
 } from "../stream.utils.ts";
+import { CANCELLED_TOOL_RESULT_FALLBACK_CONTENT } from "../tool-result.utils.ts";
 import type {
   AssistantMessage,
   ContentDelta,
@@ -43,9 +45,6 @@ export interface MistralModelOptions {
   modelId: string;
 }
 
-type MistralChatCompletionRequestMessage =
-  MistralComponents.ChatCompletionRequest["messages"][number];
-
 export class MistralModel implements LanguageModel {
   provider: string;
   modelId: string;
@@ -66,9 +65,15 @@ export class MistralModel implements LanguageModel {
     traceLanguageModel(this);
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): Promise<ModelResponse> {
     const request = convertToMistralRequest(input, this.modelId);
-    const response = await this.#client.chat.complete(request);
+    const response = await this.#client.chat.complete(
+      request,
+      options?.signal ? { signal: options.signal } : undefined,
+    );
 
     const choice = response.choices[0];
     if (!choice?.message) {
@@ -91,9 +96,13 @@ export class MistralModel implements LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): AsyncGenerator<PartialModelResponse> {
     const request = convertToMistralRequest(input, this.modelId);
-    const stream = await this.#client.chat.stream(request);
+    const stream = await this.#client.chat.stream(
+      request,
+      options?.signal ? { signal: options.signal } : undefined,
+    );
 
     const allContentDeltas: ContentDelta[] = [];
 
@@ -188,8 +197,8 @@ function convertToMistralRequest(
 function convertToMistralMessages(
   messages: Message[],
   systemPrompt: string | undefined,
-): MistralComponents.ChatCompletionRequest["messages"] {
-  const mistralMessages: MistralChatCompletionRequestMessage[] = [];
+): MistralComponents.ChatCompletionRequestMessage[] {
+  const mistralMessages: MistralComponents.ChatCompletionRequestMessage[] = [];
 
   if (systemPrompt) {
     mistralMessages.push({
@@ -204,7 +213,7 @@ function convertToMistralMessages(
   }
 
   const convertedMistralMessages = messages.map(
-    (message): MistralChatCompletionRequestMessage[] => {
+    (message): MistralComponents.ChatCompletionRequestMessage[] => {
       switch (message.role) {
         case "user": {
           return [convertToMistralUserMessage(message)];
@@ -302,7 +311,12 @@ function convertToMistralToolMessages(
       role: "tool",
       toolCallId: part.tool_call_id,
       name: part.tool_name,
-      content: toolResultContent.map(convertToMistralContentChunk),
+      content:
+        toolResultContent.length === 0
+          ? part.status === "cancelled"
+            ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
+            : ""
+          : toolResultContent.map(convertToMistralContentChunk),
     };
   });
 }

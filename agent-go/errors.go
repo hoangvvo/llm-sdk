@@ -6,6 +6,8 @@ type AgentError struct {
 	Kind    ErrorKind
 	Message string
 	Err     error
+	// Snapshot contains best-effort work completed before the run failed.
+	Snapshot *AgentRunSnapshot
 }
 
 func (e *AgentError) Error() string {
@@ -19,6 +21,13 @@ func (e *AgentError) Unwrap() error {
 	return e.Err
 }
 
+func (e *AgentError) withSnapshot(snapshot *AgentRunSnapshot) *AgentError {
+	if e.Snapshot == nil {
+		e.Snapshot = snapshot
+	}
+	return e
+}
+
 type ErrorKind string
 
 const (
@@ -27,12 +36,13 @@ const (
 	ToolExecutionErrorKind         ErrorKind = "tool_execution_error"
 	AgentErrorKindMaxTurnsExceeded ErrorKind = "max_turns_exceeded"
 	InitErrorKind                  ErrorKind = "init_error"
+	CleanupErrorKind               ErrorKind = "cleanup_error"
 )
 
 func NewLanguageModelError(err error) *AgentError {
 	return &AgentError{
 		Kind:    LanguageModelErrorKind,
-		Message: fmt.Sprintf("language model error: %v", err),
+		Message: "language model error",
 		Err:     err,
 	}
 }
@@ -47,7 +57,7 @@ func NewInvariantError(msg string) *AgentError {
 func NewToolExecutionError(err error) *AgentError {
 	return &AgentError{
 		Kind:    ToolExecutionErrorKind,
-		Message: fmt.Sprintf("tool execution error: %v", err),
+		Message: "tool execution error",
 		Err:     err,
 	}
 }
@@ -62,7 +72,15 @@ func NewMaxTurnsExceededError(turns int) *AgentError {
 func NewInitError(err error) *AgentError {
 	return &AgentError{
 		Kind:    InitErrorKind,
-		Message: fmt.Sprintf("run initialization error: %v", err),
+		Message: "run initialization error",
+		Err:     err,
+	}
+}
+
+func NewCleanupError(err error) *AgentError {
+	return &AgentError{
+		Kind:    CleanupErrorKind,
+		Message: "run cleanup error",
 		Err:     err,
 	}
 }

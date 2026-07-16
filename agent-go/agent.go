@@ -80,8 +80,13 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 		defer close(eventChan)
 		defer close(errChan)
 
+		var response *AgentResponse
 		for agentStream.Next() {
 			event := agentStream.Current()
+			if event.Response != nil {
+				response = event.Response
+				continue
+			}
 			eventChan <- event
 		}
 
@@ -93,6 +98,10 @@ func (a *Agent[C]) RunStream(ctx context.Context, request AgentRequest[C]) (*Age
 		}
 		if closeErr != nil {
 			errChan <- closeErr
+			return
+		}
+		if response != nil {
+			eventChan <- NewAgentStreamEventResponse(response)
 		}
 	}()
 	return stream.New(eventChan, errChan), nil

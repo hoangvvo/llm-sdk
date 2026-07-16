@@ -9,7 +9,7 @@ use axum::{
 use dotenvy::dotenv;
 use llm_agent::{
     mcp::{MCPParams, MCPStreamableHTTPParams, MCPToolkit},
-    Agent, AgentItem, AgentRequest, BoxedError,
+    Agent, AgentItem, AgentRequest, BoxedError, RunOptions,
 };
 use llm_sdk::{Message, Part};
 use rmcp::{
@@ -99,7 +99,7 @@ async fn run_agent_demo() -> Result<(), BoxedError> {
     };
 
     let response = agent
-        .run(request)
+        .run(request, RunOptions::default())
         .await
         .map_err(|err| Box::new(err) as BoxedError)?;
 

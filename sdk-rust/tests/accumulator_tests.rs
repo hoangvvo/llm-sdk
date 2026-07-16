@@ -1,6 +1,7 @@
 use llm_sdk::{
-    ContentDelta, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningPart,
-    ReasoningPartDelta, StreamAccumulator, TextPartDelta, ToolCallPartDelta,
+    AudioFormat, AudioPartDelta, ContentDelta, ImagePartDelta, ModelResponse, ModelUsage, Part,
+    PartDelta, PartialModelResponse, ReasoningPart, ReasoningPartDelta, StreamAccumulator,
+    TextPartDelta, ToolCallPartDelta,
 };
 use serde_json::json;
 
@@ -143,4 +144,76 @@ fn clear_removes_content_and_metadata() {
         .compute_response()
         .expect("cleared response should compute");
     assert_eq!(response, ModelResponse::default());
+}
+
+#[test]
+fn snapshots_independently_materializable_parts() {
+    let mut accumulator = StreamAccumulator::new();
+    let partials = vec![
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta::new("partial")),
+            }),
+            usage: Some(ModelUsage {
+                input_tokens: 2,
+                output_tokens: 3,
+                ..Default::default()
+            }),
+            cost: Some(0.25),
+        },
+        partial(
+            1,
+            PartDelta::ToolCall(
+                ToolCallPartDelta::default()
+                    .with_tool_call_id("call_1")
+                    .with_tool_name("weather")
+                    .with_args(r#"{"city":"Paris"}"#),
+            ),
+        ),
+        partial(
+            2,
+            PartDelta::ToolCall(ToolCallPartDelta::default().with_args("{incomplete")),
+        ),
+        partial(
+            3,
+            PartDelta::Image(
+                ImagePartDelta::default()
+                    .with_data("aGVsbG8=")
+                    .with_mime_type("image/png"),
+            ),
+        ),
+        partial(
+            4,
+            PartDelta::Audio(
+                AudioPartDelta::default()
+                    .with_data("AAABAA==")
+                    .with_format(AudioFormat::Linear16),
+            ),
+        ),
+    ];
+    for response in partials {
+        accumulator
+            .add_partial(response)
+            .expect("partial should accumulate");
+    }
+
+    assert_eq!(
+        accumulator.snapshot(),
+        ModelResponse {
+            content: vec![
+                Part::text("partial"),
+                Part::tool_call("call_1", "weather", json!({"city": "Paris"})),
+                Part::image("aGVsbG8=", "image/png"),
+                Part::audio("AAABAA==", AudioFormat::Linear16),
+            ],
+            usage: Some(ModelUsage {
+                input_tokens: 2,
+                output_tokens: 3,
+                ..Default::default()
+            }),
+            cost: Some(0.25),
+        }
+    );
+    assert!(accumulator.compute_response().is_err());
 }

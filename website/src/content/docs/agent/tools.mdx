@@ -12,12 +12,16 @@ import {
   extractTypescriptAgentToolTypes,
 } from "../../../utils/extract-types.ts";
 
-Tools let the model delegate work to your code. Each definition bundles a `name`, a short `description` that teaches the model when to call it, a JSON Schema `parameters` object, and an `execute` handler that receives `(args, context, state)`. The handler must return an `AgentToolResult` so the agent can stream success or failure back into the conversation.
+Tools let the model delegate work to your code. Each definition bundles a `name`, a short `description` that teaches the model when to call it, a JSON Schema `parameters` object, and an `execute` handler. The handler receives the tool arguments, application context, and run state. The handler must return an `AgentToolResult` so the agent can stream success or failure back into the conversation.
 
 Use descriptive verbs for names (`search_docs`, `create_ticket`) and write the description as if you were coaching the model. Parameters should only include data the model can realistically supply. If you need to resolve identifiers or fetch additional state, do so inside `execute` where you still have access to the run session `context` and the full `RunState` history.
 
 <Aside type="danger">
-  Avoid exposing immutable data as tool parameters. For example, if a parameter determines access (`current_user_id` or `account_id`), a malicious prompt or jailbreak might coerce the model into supplying a forged value. Instead, keep those values in the context object and read them inside `execute` so the model can never override them.
+  Avoid exposing immutable data as tool parameters. For example, if a parameter
+  determines access (`current_user_id` or `account_id`), a malicious prompt or
+  jailbreak might coerce the model into supplying a forged value. Instead, keep
+  those values in the context object and read them inside `execute` so the model
+  can never override them.
 </Aside>
 
 <Tabs>
@@ -47,9 +51,25 @@ Use descriptive verbs for names (`search_docs`, `create_ticket`) and write the d
 Return structured [`Part[]`](../../sdk/language-model#part) content so multimodal models can relay text, images, or audio results. Set `is_error` to `true` when you want the model to acknowledge a failure instead of halting the run with an exception.
 
 <Aside type="note">
-  If an error is thrown inside `execute`, the run will stop and the error will propagate to your code. This also prevents leaking [internal stack traces, dumps, or other sensitive information](https://owasp.org/www-community/Improper_Error_Handling) to the model and ultimately to the user.
-  If you intend for the model to see your operational errors (for example, "not found" or "permission denied"), return them as `TextPart` inside the `AgentToolResult` and set `is_error: true`.
+  If an error is thrown inside `execute`, the run will stop and the error will
+  propagate to your code. This also prevents leaking [internal stack traces,
+  dumps, or other sensitive
+  information](https://owasp.org/www-community/Improper_Error_Handling) to the
+  model and ultimately to the user. If you intend for the model to see your
+  operational errors (for example, "not found" or "permission denied"), return
+  them as `TextPart` inside the `AgentToolResult` and set `is_error: true`.
 </Aside>
+
+## Cancellation
+
+Pass the cancellation handle directly to database, HTTP, subprocess, and external-system calls. Use explicit checks only for long-running or multi-step code that cannot accept the handle.
+
+<Aside type="danger">
+  The run waits for the active tool to return. If the tool ignores cancellation,
+  the run remains pending.
+</Aside>
+
+See [Cancelling a run](../run/#cancellation) for complete examples in each language.
 
 ## Example
 

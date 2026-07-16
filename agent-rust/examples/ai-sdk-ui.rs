@@ -11,11 +11,12 @@ use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use dotenvy::dotenv;
 use futures::{future::BoxFuture, StreamExt};
 use llm_agent::{
-    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, BoxedError, RunState,
+    Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, BoxedError, RunOptions,
+    RunState,
 };
 use llm_sdk::{
     AudioFormat, LanguageModelMetadata, Message, Part, PartDelta, PartialModelResponse,
-    ToolResultPart,
+    ToolResultPart, ToolResultStatus,
 };
 use serde::{de, Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -761,7 +762,7 @@ fn convert_tool_part(part: &ToolUIPart) -> Result<Vec<Part>, String> {
                 &tool_name,
                 vec![Part::text(part.error_text.clone().unwrap_or_default())],
             )
-            .with_is_error(true)
+            .with_status(ToolResultStatus::Failed)
             .into();
             Ok(vec![call, result])
         }
@@ -934,10 +935,13 @@ async fn chat_handler(
     }
 
     let mut stream = agent
-        .run_stream(AgentRequest {
-            input: items,
-            context: ChatContext,
-        })
+        .run_stream(
+            AgentRequest {
+                input: items,
+                context: ChatContext,
+            },
+            RunOptions::default(),
+        )
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
 

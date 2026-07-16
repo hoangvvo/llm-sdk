@@ -43,6 +43,7 @@ export const TEST_CASE_NAMES: Readonly<{
   CONSECUTIVE_USER_MESSAGES: "consecutive_user_messages";
   ASSISTANT_MESSAGE_HISTORY: "assistant_message_history";
   AUTO_TOOL_CHOICE_TEXT_RESPONSE: "auto_tool_choice_text_response";
+  CANCELLED_TOOL_RESULT: "cancelled_tool_result";
   PARALLEL_TOOL_RESULTS: "parallel_tool_results";
   SEQUENTIAL_TOOL_CHAIN: "sequential_tool_chain";
   STRUCTURED_DATA_EXTRACTION: "structured_data_extraction";

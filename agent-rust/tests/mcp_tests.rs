@@ -7,12 +7,13 @@ use axum::{
 };
 use llm_agent::{
     mcp::{MCPParams, MCPStreamableHTTPParams, MCPToolkit},
-    Agent, AgentItem, AgentParams, AgentResponse, BoxedError, RunSessionRequest,
+    Agent, AgentError, AgentItem, AgentParams, AgentResponse, AgentResponseStatus, BoxedError,
+    RunOptions, RunSessionRequest,
 };
 use llm_sdk::{
     llm_sdk_test::MockLanguageModel, AudioFormat, LanguageModel, LanguageModelError,
     LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
-    ModelResponse, Part,
+    ModelResponse, Part, ToolResultStatus,
 };
 use rmcp::{
     handler::server::ServerHandler,
@@ -30,14 +31,18 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 use tokio::{
     net::TcpListener,
-    sync::{oneshot, RwLock},
+    sync::{oneshot, Notify, RwLock},
     time::timeout,
 };
+use tokio_util::sync::CancellationToken;
 
 const IMAGE_DATA: &str = "AAEC";
 const AUDIO_DATA: &str = "AwQ=";
@@ -83,15 +88,19 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
         .map_err(|err| format!("Failed to create session: {err}"))?;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "What's running tonight?",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "What's running tonight?",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .map_err(|err| format!("Failed to run agent: {err}"))?;
 
     let expected = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("Ready to roll.")],
         output: vec![
             AgentItem::Model(ModelResponse {
@@ -111,7 +120,7 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
                     Part::image(IMAGE_DATA, "image/png"),
                     Part::audio(AUDIO_DATA, AudioFormat::Mp3),
                 ],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Ready to roll.")],
@@ -122,6 +131,132 @@ async fn agent_hydrates_mcp_tools_over_streamable_http() -> Result<(), BoxedErro
 
     assert_eq!(response, expected);
 
+    session
+        .close()
+        .await
+        .map_err(|err| format!("Failed to close session: {err}"))?;
+    stub.stop().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn agent_cancels_in_flight_mcp_tool_requests() -> Result<(), BoxedError> {
+    let stub = start_stub_mcp_server()
+        .await
+        .map_err(|err| format!("Failed to start stub MCP server: {err}"))?;
+    stub.block_tool_calls();
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call(
+            "call_1",
+            "list_shuttles",
+            json!({ "shift": "evening" }),
+        )],
+        ..Default::default()
+    });
+
+    let stub_url = stub.url().to_string();
+    let agent = Agent::new(
+        AgentParams::new("mcp-cancellation-test", model).add_toolkit(MCPToolkit::new(
+            move |(): &()| {
+                Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
+                    url: stub_url.clone(),
+                    authorization: Some(AUTH_TOKEN.to_string()),
+                }))
+            },
+        )),
+    );
+    let session = agent
+        .create_session(())
+        .await
+        .map_err(|err| format!("Failed to create session: {err}"))?;
+    let cancellation_token = CancellationToken::new();
+    let mut run = Box::pin(session.run(
+        RunSessionRequest {
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Wait for the shuttle list",
+            )]))],
+        },
+        RunOptions::default().with_cancellation_token(cancellation_token.clone()),
+    ));
+
+    tokio::select! {
+        () = stub.wait_for_tool_call() => {}
+        result = &mut run => {
+            return Err(format!("Run ended before the MCP tool call started: {result:?}").into());
+        }
+        () = tokio::time::sleep(Duration::from_secs(5)) => {
+            return Err("Timed out waiting for the MCP tool call to start".into());
+        }
+    }
+    cancellation_token.cancel();
+
+    let response = timeout(Duration::from_secs(5), &mut run)
+        .await
+        .map_err(|_| "Timed out waiting for the cancelled run to finish")?
+        .map_err(|err| format!("Cancelled run failed: {err}"))?;
+    assert_eq!(response.status, AgentResponseStatus::Cancelled);
+    timeout(Duration::from_secs(5), stub.wait_for_tool_cancellation())
+        .await
+        .map_err(|_| "MCP server did not receive request cancellation")?;
+    drop(run);
+
+    session
+        .close()
+        .await
+        .map_err(|err| format!("Failed to close session: {err}"))?;
+    stub.stop().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn agent_rejects_unsupported_mcp_audio_content() -> Result<(), BoxedError> {
+    let stub = start_stub_mcp_server()
+        .await
+        .map_err(|err| format!("Failed to start stub MCP server: {err}"))?;
+    stub.set_tool(ToolDefinition::new(
+        "list_shuttles",
+        "List active shuttle routes for a shift",
+        |_| vec![audio_content(AUDIO_DATA, "audio/unknown")],
+    ))
+    .await;
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call(
+            "call_1",
+            "list_shuttles",
+            json!({ "shift": "evening" }),
+        )],
+        ..Default::default()
+    });
+    let stub_url = stub.url().to_string();
+    let agent = Agent::new(
+        AgentParams::new("mcp-test", model).add_toolkit(MCPToolkit::new(move |(): &()| {
+            Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
+                url: stub_url.clone(),
+                authorization: Some(AUTH_TOKEN.to_string()),
+            }))
+        })),
+    );
+    let session = agent
+        .create_session(())
+        .await
+        .map_err(|err| format!("Failed to create session: {err}"))?;
+
+    let result = session
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "What's running tonight?",
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .await;
+
+    assert!(matches!(result, Err(AgentError::ToolExecution { .. })));
     session
         .close()
         .await
@@ -159,15 +294,19 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
         .map_err(|err| format!("Failed to create session: {err}"))?;
 
     let first_response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "What's running tonight?",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "What's running tonight?",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .map_err(|err| format!("Failed to run session: {err}"))?;
 
     let expected_first = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("Ready to roll.")],
         output: vec![
             AgentItem::Model(ModelResponse {
@@ -187,7 +326,7 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
                     Part::image(IMAGE_DATA, "image/png"),
                     Part::audio(AUDIO_DATA, AudioFormat::Mp3),
                 ],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Ready to roll.")],
@@ -213,11 +352,14 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
     let second_response = timeout(Duration::from_secs(5), async {
         loop {
             let response = session
-                .run(RunSessionRequest {
-                    input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                        "How about now?",
-                    )]))],
-                })
+                .run(
+                    RunSessionRequest {
+                        input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                            "How about now?",
+                        )]))],
+                    },
+                    RunOptions::default(),
+                )
                 .await?;
 
             if response.content == vec![Part::text("Routes synced.")] {
@@ -232,6 +374,7 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
     .map_err(|err| format!("Failed to run session: {err}"))?;
 
     let expected_second = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("Routes synced.")],
         output: vec![
             AgentItem::Model(ModelResponse {
@@ -247,7 +390,7 @@ async fn agent_refreshes_tools_on_mcp_list_change() -> Result<(), BoxedError> {
                 tool_name: "list_shuttles_v2".to_string(),
                 input: tool_args.clone(),
                 output: vec![Part::text("Updated shuttle roster for evening shift.")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Routes synced.")],
@@ -402,6 +545,18 @@ impl StubServer {
         self.state.broadcast_tool_list_changed().await;
     }
 
+    fn block_tool_calls(&self) {
+        self.state.block_tool_calls.store(true, Ordering::SeqCst);
+    }
+
+    async fn wait_for_tool_call(&self) {
+        self.state.tool_call_started.notified().await;
+    }
+
+    async fn wait_for_tool_cancellation(&self) {
+        self.state.tool_call_cancelled.notified().await;
+    }
+
     async fn stop(self) -> Result<(), BoxedError> {
         if let Some(tx) = self.shutdown {
             let _ = tx.send(());
@@ -443,6 +598,9 @@ struct SharedState {
     tool: RwLock<ToolDefinition>,
     peers: RwLock<Vec<rmcp::service::Peer<RoleServer>>>,
     input_schema: Arc<JsonObject>,
+    block_tool_calls: AtomicBool,
+    tool_call_started: Notify,
+    tool_call_cancelled: Notify,
 }
 
 impl SharedState {
@@ -458,6 +616,9 @@ impl SharedState {
             tool: RwLock::new(initial_tool),
             peers: RwLock::new(Vec::new()),
             input_schema: Arc::new(schema_map),
+            block_tool_calls: AtomicBool::new(false),
+            tool_call_started: Notify::new(),
+            tool_call_cancelled: Notify::new(),
         }
     }
 
@@ -538,7 +699,7 @@ impl ServerHandler for StubMcpService {
     fn call_tool(
         &self,
         request: CallToolRequestParams,
-        _context: rmcp::service::RequestContext<RoleServer>,
+        context: rmcp::service::RequestContext<RoleServer>,
     ) -> impl std::future::Future<Output = Result<CallToolResult, ErrorData>> + Send + '_ {
         let state = self.state.clone();
         async move {
@@ -552,6 +713,13 @@ impl ServerHandler for StubMcpService {
             let args: ListShuttlesArgs = serde_json::from_value(args_value).map_err(|err| {
                 ErrorData::invalid_params(format!("invalid arguments: {err}"), None)
             })?;
+
+            if state.block_tool_calls.load(Ordering::SeqCst) {
+                state.tool_call_started.notify_one();
+                context.ct.cancelled().await;
+                state.tool_call_cancelled.notify_one();
+                return Err(ErrorData::internal_error("tool call cancelled", None));
+            }
 
             let contents = tool.respond(args);
             Ok(CallToolResult::success(contents))

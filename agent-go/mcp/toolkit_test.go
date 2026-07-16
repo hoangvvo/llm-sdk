@@ -172,6 +172,7 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 	}
 
 	expected := &llmagent.AgentResponse{
+		Status:  llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
@@ -188,7 +189,7 @@ func TestMCPToolkitSessionHydratesToolsAndExecutes(t *testing.T) {
 					llmsdk.NewImagePart(imageBase64, "image/png"),
 					llmsdk.NewAudioPart(audioBase64, llmsdk.AudioFormatMP3),
 				},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
@@ -265,6 +266,7 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 	}
 
 	expectedFirst := &llmagent.AgentResponse{
+		Status:  llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
@@ -281,7 +283,7 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 					llmsdk.NewImagePart(imageBase64, "image/png"),
 					llmsdk.NewAudioPart(audioBase64, llmsdk.AudioFormatMP3),
 				},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{llmsdk.NewTextPart("Ready to roll.")},
@@ -316,6 +318,7 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 	}
 
 	expectedSecond := &llmagent.AgentResponse{
+		Status:  llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Routes synced.")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
@@ -328,7 +331,7 @@ func TestMCPToolkitSessionRefreshesToolsOnChange(t *testing.T) {
 				"list_shuttles_v2",
 				toolCallArgs,
 				[]llmsdk.Part{llmsdk.NewTextPart("Updated shuttle roster for evening shift.")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{llmsdk.NewTextPart("Routes synced.")},

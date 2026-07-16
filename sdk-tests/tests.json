@@ -130,6 +130,7 @@
         "consecutive_user_messages",
         "assistant_message_history",
         "auto_tool_choice_text_response",
+        "cancelled_tool_result",
         "parallel_tool_results",
         "sequential_tool_chain",
         "structured_data_extraction",
@@ -183,6 +184,7 @@
         "consecutive_user_messages",
         "assistant_message_history",
         "auto_tool_choice_text_response",
+        "cancelled_tool_result",
         "parallel_tool_results",
         "sequential_tool_chain",
         "structured_data_extraction",
@@ -489,6 +491,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
@@ -559,6 +562,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
@@ -628,6 +632,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
@@ -938,6 +943,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
@@ -1497,6 +1503,91 @@
       ]
     },
     {
+      "name": "cancelled_tool_result",
+      "groups": ["tool_use"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use the selected tool to check the weather in Boston."
+                  }
+                ]
+              }
+            ],
+            "tool_choice": {
+              "type": "tool",
+              "tool_name": "get_weather"
+            }
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
+            "content": [
+              {
+                "type": "tool_call",
+                "tool_name": "get_weather",
+                "args": {
+                  "location": {
+                    "$regex": "^Boston(?:, MA)?$"
+                  }
+                }
+              }
+            ],
+            "usage": true
+          }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "status": "cancelled",
+                    "tool_call_id": {
+                      "$ref": "stages.0.tool_calls.0.tool_call_id"
+                    },
+                    "tool_name": "get_weather",
+                    "content": []
+                  }
+                ]
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "The previous operation was cancelled. Reply with exactly CONTINUED."
+                  }
+                ]
+              }
+            ],
+            "tool_choice": {
+              "type": "none"
+            }
+          },
+          "input_tools": ["get_weather"],
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^\\s*CONTINUED[.!]?\\s*$",
+                "aggregate": true
+              }
+            ],
+            "usage": true
+          }
+        }
+      ]
+    },
+    {
       "name": "parallel_tool_results",
       "groups": ["tool_use"],
       "stages": [
@@ -1550,6 +1641,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls",
                       "$where": {
@@ -1567,6 +1659,7 @@
                   },
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls",
                       "$where": {
@@ -1656,6 +1749,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
@@ -1697,6 +1791,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.1.tool_calls.0.tool_call_id"
                     },
@@ -1781,6 +1876,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
@@ -1859,6 +1955,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "failed",
                     "tool_call_id": {
                       "$ref": "stages.2.tool_calls.0.tool_call_id"
                     },
@@ -1868,8 +1965,7 @@
                         "type": "text",
                         "text": "weather service unavailable"
                       }
-                    ],
-                    "is_error": true
+                    ]
                   }
                 ]
               }
@@ -2317,6 +2413,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
@@ -2407,6 +2504,7 @@
                 "content": [
                   {
                     "type": "tool-result",
+                    "status": "completed",
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },

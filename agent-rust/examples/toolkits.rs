@@ -2,7 +2,7 @@ use dotenvy::dotenv;
 use futures::future::BoxFuture;
 use llm_agent::{
     Agent, AgentFunctionTool, AgentItem, AgentParams, AgentResponse, AgentTool, AgentToolResult,
-    RunSessionRequest, Toolkit, ToolkitSession,
+    RunOptions, RunSessionRequest, Toolkit, ToolkitSession,
 };
 use llm_sdk::{Message, Part};
 use serde::Deserialize;
@@ -894,9 +894,12 @@ async fn main() -> Result<(), BoxError> {
         transcript.push(AgentItem::Message(Message::user(vec![Part::text(*prompt)])));
 
         let mut response: AgentResponse = session
-            .run(RunSessionRequest {
-                input: transcript.clone(),
-            })
+            .run(
+                RunSessionRequest {
+                    input: transcript.clone(),
+                },
+                RunOptions::default(),
+            )
             .await?;
 
         println!("{}", response.text());
