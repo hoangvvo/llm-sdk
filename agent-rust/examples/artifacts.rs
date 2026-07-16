@@ -285,12 +285,13 @@ impl AgentFunctionTool<Ctx> for ArtifactDelete {
     }
 }
 
-const ARTIFACTS_PROMPT: &str = "Use documents (artifacts/canvases) for substantive deliverables \
-like documents, plans, specs, or code. Keep chat replies brief and status-oriented; put the full \
-content into a document via the tools. Always reference documents by id.\n- Prefer \
-creating/updating documents instead of pasting large content into chat\n- When asked to revise or \
-extend prior work, read/update the relevant document\n- Keep the chat response short: what \
-changed, where it lives (document id), and next steps";
+const ARTIFACTS_PROMPT: &str =
+    "Use documents (artifacts/canvases) for substantive deliverables like documents, plans, \
+     specs, or code. Keep chat replies brief and status-oriented; put the full content into a \
+     document via the tools. Always reference documents by id.\n- Prefer creating/updating \
+     documents instead of pasting large content into chat\n- When asked to revise or extend prior \
+     work, read/update the relevant document\n- Keep the chat response short: what changed, where \
+     it lives (document id), and next steps";
 
 struct ArtifactsToolkit {
     store: Store,

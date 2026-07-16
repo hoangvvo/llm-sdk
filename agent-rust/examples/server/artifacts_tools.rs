@@ -251,10 +251,11 @@ impl AgentFunctionTool<MyContext> for ArtifactDeleteTool {
     }
 }
 
-const ARTIFACTS_SYSTEM_PROMPT: &str = "For substantive deliverables (documents/specs/code), use \
-the artifact tools (artifact_create, artifact_update, artifact_get, artifact_list, \
-artifact_delete).\nKeep chat replies brief and put the full document content into artifacts via \
-these tools, rather than pasting large content into chat. Reference documents by their id.";
+const ARTIFACTS_SYSTEM_PROMPT: &str =
+    "For substantive deliverables (documents/specs/code), use the artifact tools \
+     (artifact_create, artifact_update, artifact_get, artifact_list, artifact_delete).\nKeep chat \
+     replies brief and put the full document content into artifacts via these tools, rather than \
+     pasting large content into chat. Reference documents by their id.";
 
 pub struct ArtifactsToolkit;
 
