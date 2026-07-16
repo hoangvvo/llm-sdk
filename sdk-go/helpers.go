@@ -199,6 +199,7 @@ func NewToolResultPart(toolCallID, toolName string, content []Part, opts ...Tool
 			ToolCallID: toolCallID,
 			ToolName:   toolName,
 			Content:    content,
+			Status:     ToolResultStatusCompleted,
 		},
 	}
 	for _, opt := range opts {
@@ -209,9 +210,9 @@ func NewToolResultPart(toolCallID, toolName string, content []Part, opts ...Tool
 
 type ToolResultPartOption func(*ToolResultPart)
 
-func WithToolResultIsError(isError bool) ToolResultPartOption {
+func WithToolResultStatus(status ToolResultStatus) ToolResultPartOption {
 	return func(p *ToolResultPart) {
-		p.IsError = isError
+		p.Status = status
 	}
 }
 

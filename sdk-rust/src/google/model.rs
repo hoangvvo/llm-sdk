@@ -12,6 +12,7 @@ use crate::{
     LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
     ModelTokensDetails, ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningPart,
     ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool, ToolChoiceOption,
+    ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -520,7 +521,7 @@ fn convert_to_google_function_result(
 ) -> LanguageModelResult<FunctionResponse> {
     let (response, parts) = convert_to_google_function_response(
         tool_result_part.content,
-        tool_result_part.is_error.unwrap_or(false),
+        tool_result_part.status != ToolResultStatus::Completed,
     )?;
     Ok(FunctionResponse {
         id: Some(tool_result_part.tool_call_id),

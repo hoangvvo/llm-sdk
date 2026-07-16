@@ -14,13 +14,13 @@ func NewAgentItemModelResponse(response llmsdk.ModelResponse) AgentItem {
 	return AgentItem{Model: &AgentItemModelResponse{ModelResponse: &response}}
 }
 
-func NewAgentItemTool(toolCallID, toolName string, input json.RawMessage, output []llmsdk.Part, isError bool) AgentItem {
+func NewAgentItemTool(toolCallID, toolName string, input json.RawMessage, output []llmsdk.Part, status llmsdk.ToolResultStatus) AgentItem {
 	return AgentItem{Tool: &AgentItemTool{
 		ToolCallID: toolCallID,
 		ToolName:   toolName,
 		Input:      input,
 		Output:     output,
-		IsError:    isError,
+		Status:     status,
 	}}
 }
 

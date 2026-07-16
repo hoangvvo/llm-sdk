@@ -912,6 +912,7 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
             ],
             tool_call_id: toolUIPart.toolCallId,
             tool_name: toolName,
+            status: "completed",
           },
         ];
       case "output-error":
@@ -932,7 +933,7 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
             ],
             tool_call_id: toolUIPart.toolCallId,
             tool_name: toolName,
-            is_error: true,
+            status: "failed",
           },
         ];
     }

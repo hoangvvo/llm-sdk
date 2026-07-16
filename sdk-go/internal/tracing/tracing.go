@@ -92,7 +92,13 @@ func TraceStream(
 			}
 
 			span.OnStreamPartial(partial)
-			responseCh <- partial
+			select {
+			case responseCh <- partial:
+			case <-ctx.Done():
+				span.OnError(ctx.Err())
+				errCh <- ctx.Err()
+				return
+			}
 		}
 
 		if err := innerStream.Err(); err != nil {

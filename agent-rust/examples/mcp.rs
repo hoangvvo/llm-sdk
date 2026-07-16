@@ -7,6 +7,7 @@ use axum::{
     Json, Router,
 };
 use dotenvy::dotenv;
+use llm_agent::RunOptions;
 use llm_agent::{
     mcp::{MCPParams, MCPStreamableHTTPParams, MCPToolkit},
     Agent, AgentItem, AgentRequest, BoxedError,
@@ -99,7 +100,7 @@ async fn run_agent_demo() -> Result<(), BoxedError> {
     };
 
     let response = agent
-        .run(request)
+        .run(request, RunOptions::default())
         .await
         .map_err(|err| Box::new(err) as BoxedError)?;
 

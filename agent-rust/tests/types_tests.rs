@@ -1,7 +1,9 @@
+use llm_agent::AgentResponseStatus;
 use llm_agent::{
     mcp::{MCPParams, MCPStdioParams, MCPStreamableHTTPParams},
     AgentItem, AgentItemTool, AgentResponse, AgentStreamEvent, AgentStreamItemEvent,
 };
+use llm_sdk::ToolResultStatus;
 use llm_sdk::{
     ContentDelta, Message, ModelResponse, Part, PartDelta, PartialModelResponse, TextPartDelta,
 };
@@ -10,6 +12,7 @@ use serde_json::json;
 #[test]
 fn agent_response_text_returns_only_non_empty_text() {
     let response = AgentResponse {
+        status: AgentResponseStatus::Completed,
         output: Vec::new(),
         content: vec![
             Part::text("Hello"),
@@ -49,7 +52,7 @@ fn agent_items_follow_the_public_json_contract_and_round_trip() {
                 tool_name: "lookup".to_string(),
                 input: json!({"id": 42}),
                 output: vec![Part::text("found")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             json!({
                 "type": "tool",
@@ -57,7 +60,7 @@ fn agent_items_follow_the_public_json_contract_and_round_trip() {
                 "tool_name": "lookup",
                 "input": {"id": 42},
                 "output": [{"type": "text", "text": "found"}],
-                "is_error": false,
+                "status": "completed",
             }),
         ),
     ];
@@ -105,6 +108,7 @@ fn agent_stream_events_follow_the_public_json_contract_and_round_trip() {
         ),
         (
             AgentStreamEvent::Response(AgentResponse {
+                status: AgentResponseStatus::Completed,
                 output: Vec::new(),
                 content: vec![Part::text("Done")],
             }),
@@ -112,6 +116,7 @@ fn agent_stream_events_follow_the_public_json_contract_and_round_trip() {
                 "event": "response",
                 "output": [],
                 "content": [{"type": "text", "text": "Done"}],
+                "status": "completed",
             }),
         ),
     ];

@@ -1,4 +1,12 @@
-use std::sync::Arc;
+use llm_agent::AgentResponseStatus;
+use llm_agent::RunOptions;
+use llm_sdk::ToolResultStatus;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
+use tokio::sync::Notify;
+use tokio_util::sync::CancellationToken;
 
 type DynError = Box<dyn std::error::Error + Send + Sync>;
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
@@ -10,7 +18,8 @@ use llm_agent::{
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
-    PartDelta, PartialModelResponse, TextPartDelta, Tool, ToolCallPartDelta, WebSearchTool,
+    PartDelta, PartialModelResponse, ReasoningPartDelta, TextPartDelta, Tool, ToolCallPartDelta,
+    WebSearchTool,
 };
 use serde_json::{json, Value};
 
@@ -18,6 +27,47 @@ type ExecuteFn = dyn for<'a> Fn(Value, &'a RunState) -> Result<AgentToolResult, 
     + Send
     + Sync
     + 'static;
+
+fn mixed_snapshot_partials() -> Vec<PartialModelResponse> {
+    vec![
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta::new("partial text")),
+            }),
+            ..Default::default()
+        },
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 1,
+                part: PartDelta::ToolCall(
+                    ToolCallPartDelta::default()
+                        .with_tool_call_id("call_1")
+                        .with_tool_name("weather")
+                        .with_args(r#"{"city":"Paris"}"#),
+                ),
+            }),
+            ..Default::default()
+        },
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 2,
+                part: PartDelta::ToolCall(ToolCallPartDelta::default().with_args("{incomplete")),
+            }),
+            ..Default::default()
+        },
+    ]
+}
+
+fn mixed_snapshot_model_response() -> ModelResponse {
+    ModelResponse {
+        content: vec![
+            Part::text("partial text"),
+            Part::tool_call("call_1", "weather", json!({"city": "Paris"})),
+        ],
+        ..Default::default()
+    }
+}
 
 #[derive(Clone)]
 struct MockTool {
@@ -249,6 +299,184 @@ impl AgentFunctionTool<()> for MockTool {
     }
 }
 
+struct WaitingTool {
+    started: Arc<Notify>,
+}
+
+impl AgentFunctionTool<()> for WaitingTool {
+    fn name(&self) -> String {
+        "wait".to_string()
+    }
+
+    fn description(&self) -> String {
+        "wait".to_string()
+    }
+
+    fn parameters(&self) -> JSONSchema {
+        json!({"type": "object", "properties": {}})
+    }
+
+    fn execute<'a>(
+        &'a self,
+        _args: Value,
+        _context: &'a (),
+        state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, DynError>> {
+        Box::pin(async move {
+            self.started.notify_one();
+            state.cancellation_token().cancelled().await;
+            Err(std::io::Error::from(std::io::ErrorKind::Interrupted).into())
+        })
+    }
+}
+
+struct NonCooperativeTool {
+    started: Arc<Notify>,
+    release: Arc<Notify>,
+}
+
+impl AgentFunctionTool<()> for NonCooperativeTool {
+    fn name(&self) -> String {
+        "first".to_string()
+    }
+
+    fn description(&self) -> String {
+        "first".to_string()
+    }
+
+    fn parameters(&self) -> JSONSchema {
+        json!({"type": "object", "properties": {}})
+    }
+
+    fn execute<'a>(
+        &'a self,
+        _args: Value,
+        _context: &'a (),
+        _state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, DynError>> {
+        Box::pin(async move {
+            self.started.notify_one();
+            self.release.notified().await;
+            Ok(AgentToolResult {
+                content: vec![Part::text("first finished")],
+                is_error: false,
+            })
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct RunStateObservation {
+    turn: usize,
+    item_types: Vec<&'static str>,
+}
+
+struct StateInspectingTool {
+    observation: Arc<Mutex<Option<RunStateObservation>>>,
+}
+
+impl AgentFunctionTool<()> for StateInspectingTool {
+    fn name(&self) -> String {
+        "inspect_state".to_string()
+    }
+
+    fn description(&self) -> String {
+        "Inspect run state".to_string()
+    }
+
+    fn parameters(&self) -> JSONSchema {
+        json!({"type": "object", "properties": {}})
+    }
+
+    fn execute<'a>(
+        &'a self,
+        _args: Value,
+        _context: &'a (),
+        state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, DynError>> {
+        Box::pin(async move {
+            let item_types = state
+                .items()
+                .await
+                .iter()
+                .map(|item| match item {
+                    AgentItem::Message(_) => "message",
+                    AgentItem::Model(_) => "model",
+                    AgentItem::Tool(_) => "tool",
+                })
+                .collect();
+            let turn = *state.current_turn.lock().await;
+            *self.observation.lock().expect("observation lock") =
+                Some(RunStateObservation { turn, item_types });
+            Ok(AgentToolResult {
+                content: vec![Part::text("inspected")],
+                is_error: false,
+            })
+        })
+    }
+}
+
+struct ClosingToolkit {
+    create_error: Option<&'static str>,
+    close_error: Option<&'static str>,
+    close_calls: Arc<AtomicUsize>,
+}
+
+impl Toolkit<()> for ClosingToolkit {
+    fn create_session<'a>(
+        &'a self,
+        _context: &'a (),
+    ) -> BoxFuture<'a, Result<Box<dyn ToolkitSession<()> + Send + Sync>, DynError>> {
+        Box::pin(async move {
+            if let Some(message) = self.create_error {
+                return Err(std::io::Error::other(message).into());
+            }
+
+            Ok(Box::new(ClosingToolkitSession {
+                close_error: self.close_error,
+                close_calls: self.close_calls.clone(),
+            }) as Box<dyn ToolkitSession<()> + Send + Sync>)
+        })
+    }
+}
+
+struct ClosingToolkitSession {
+    close_error: Option<&'static str>,
+    close_calls: Arc<AtomicUsize>,
+}
+
+impl ToolkitSession<()> for ClosingToolkitSession {
+    fn system_prompt(&self) -> Option<String> {
+        None
+    }
+
+    fn tools(&self) -> Vec<AgentTool<()>> {
+        Vec::new()
+    }
+
+    fn close(self: Box<Self>) -> BoxFuture<'static, Result<(), DynError>> {
+        Box::pin(async move {
+            self.close_calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(message) = self.close_error {
+                return Err(std::io::Error::other(message).into());
+            }
+            Ok(())
+        })
+    }
+}
+
+fn closing_toolkit(
+    create_error: Option<&'static str>,
+    close_error: Option<&'static str>,
+    close_calls: &Arc<AtomicUsize>,
+) -> ClosingToolkit {
+    ClosingToolkit {
+        create_error,
+        close_error,
+        close_calls: close_calls.clone(),
+    }
+}
+
 async fn new_run_session<TCtx>(
     params: Arc<AgentParams<TCtx>>,
     context: TCtx,
@@ -279,6 +507,384 @@ where
 }
 
 #[tokio::test]
+async fn run_rejects_empty_input_without_calling_model() {
+    let model = Arc::new(MockLanguageModel::new());
+    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model.clone())), ())
+        .await
+        .expect("session should initialize");
+
+    let result = session
+        .run(RunSessionRequest { input: vec![] }, RunOptions::default())
+        .await;
+
+    assert!(matches!(result, Err(AgentError::Invariant { .. })));
+    assert!(model.tracked_generate_inputs().is_empty());
+}
+
+#[tokio::test]
+async fn run_returns_cancelled_without_calling_model_when_token_already_cancelled() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("ignored")],
+        ..Default::default()
+    });
+    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model.clone())), ())
+        .await
+        .expect("session should initialize");
+    let cancellation_token = CancellationToken::new();
+    cancellation_token.cancel();
+
+    let response = session
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+            },
+            RunOptions::default().with_cancellation_token(cancellation_token),
+        )
+        .await
+        .expect("cancellation should return a response");
+
+    assert_eq!(response.status, AgentResponseStatus::Cancelled);
+    assert!(response.content.is_empty());
+    assert!(response.output.is_empty());
+    assert!(model.tracked_generate_inputs().is_empty());
+}
+
+#[tokio::test]
+async fn run_rejects_duplicate_tool_call_ids_before_execution() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![
+            Part::tool_call("duplicate", "first", json!({})),
+            Part::tool_call("duplicate", "second", json!({})),
+        ],
+        ..Default::default()
+    });
+    let first = MockTool::new(
+        "first",
+        AgentToolResult {
+            content: Vec::new(),
+            is_error: false,
+        },
+    );
+    let second = MockTool::new(
+        "second",
+        AgentToolResult {
+            content: Vec::new(),
+            is_error: false,
+        },
+    );
+    let session = RunSession::new(
+        Arc::new(
+            AgentParams::new("test_agent", model)
+                .add_tool(first.clone())
+                .add_tool(second.clone()),
+        ),
+        (),
+    )
+    .await
+    .expect("session should initialize");
+
+    let result = session
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Use tools",
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .await;
+
+    match result {
+        Err(AgentError::Invariant { message, .. }) => {
+            assert!(message.contains("Duplicate tool call ID: duplicate"));
+        }
+        other => panic!("expected duplicate-ID invariant, got {other:?}"),
+    }
+    assert!(first.recorded_calls().is_empty());
+    assert!(second.recorded_calls().is_empty());
+}
+
+#[tokio::test]
+async fn run_records_cancelled_tool_results_for_the_next_run() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![
+            Part::tool_call("call_1", "wait", json!({})),
+            Part::tool_call("call_2", "wait", json!({})),
+        ],
+        ..Default::default()
+    });
+    let started = Arc::new(Notify::new());
+    let session = RunSession::new(
+        Arc::new(
+            AgentParams::new("test_agent", model.clone()).add_tool(WaitingTool {
+                started: started.clone(),
+            }),
+        ),
+        (),
+    )
+    .await
+    .expect("session should initialize");
+    let cancellation_token = CancellationToken::new();
+    let initial = AgentItem::Message(Message::user(vec![Part::text("Wait")]));
+    let run = session.run(
+        RunSessionRequest {
+            input: vec![initial.clone()],
+        },
+        RunOptions::default().with_cancellation_token(cancellation_token.clone()),
+    );
+    tokio::pin!(run);
+
+    tokio::select! {
+        () = started.notified() => {}
+        result = &mut run => panic!("run ended before cancellation: {result:?}"),
+    }
+    cancellation_token.cancel();
+    let response = run.await.expect("cancellation should return a response");
+
+    assert_eq!(response.status, AgentResponseStatus::Cancelled);
+    assert_eq!(response.output.len(), 3);
+    for item in &response.output[1..] {
+        let AgentItem::Tool(tool) = item else {
+            panic!("expected cancelled tool item");
+        };
+        assert_eq!(tool.status, ToolResultStatus::Cancelled);
+        assert!(tool.output.is_empty());
+    }
+
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("continued")],
+        ..Default::default()
+    });
+    let mut next_input = vec![initial];
+    next_input.extend(response.output);
+    next_input.push(AgentItem::Message(Message::user(vec![Part::text(
+        "Continue",
+    )])));
+    let next_session = RunSession::new(Arc::new(AgentParams::new("test_agent", model.clone())), ())
+        .await
+        .expect("next session should initialize");
+    next_session
+        .run(
+            RunSessionRequest { input: next_input },
+            RunOptions::default(),
+        )
+        .await
+        .expect("next run should succeed");
+
+    let inputs = model.tracked_generate_inputs();
+    let Message::Tool(tool_message) = &inputs[1].messages[2] else {
+        panic!("expected tool results before the next user message");
+    };
+    assert_eq!(tool_message.content.len(), 2);
+    for part in &tool_message.content {
+        let Part::ToolResult(result) = part else {
+            panic!("expected tool result");
+        };
+        assert_eq!(result.status, ToolResultStatus::Cancelled);
+        assert!(result.content.is_empty());
+    }
+}
+
+#[tokio::test]
+async fn run_does_not_start_later_tools_after_a_non_cooperative_tool_finishes() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![
+            Part::tool_call("call_1", "first", json!({})),
+            Part::tool_call("call_2", "second", json!({})),
+        ],
+        ..Default::default()
+    });
+    let started = Arc::new(Notify::new());
+    let release = Arc::new(Notify::new());
+    let second = MockTool::new(
+        "second",
+        AgentToolResult {
+            content: vec![Part::text("second finished")],
+            is_error: false,
+        },
+    );
+    let session = RunSession::new(
+        Arc::new(
+            AgentParams::new("test_agent", model)
+                .add_tool(NonCooperativeTool {
+                    started: started.clone(),
+                    release: release.clone(),
+                })
+                .add_tool(second.clone()),
+        ),
+        (),
+    )
+    .await
+    .expect("session should initialize");
+    let cancellation_token = CancellationToken::new();
+    let run = session.run(
+        RunSessionRequest {
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Run both tools",
+            )]))],
+        },
+        RunOptions::default().with_cancellation_token(cancellation_token.clone()),
+    );
+    tokio::pin!(run);
+
+    tokio::select! {
+        () = started.notified() => {}
+        result = &mut run => panic!("run ended before cancellation: {result:?}"),
+    }
+    cancellation_token.cancel();
+    release.notify_one();
+    let response = run.await.expect("cancellation should return a response");
+
+    assert_eq!(response.status, AgentResponseStatus::Cancelled);
+    assert_eq!(response.output.len(), 3);
+    let AgentItem::Tool(first_item) = &response.output[1] else {
+        panic!("expected completed first tool item");
+    };
+    assert_eq!(first_item.status, ToolResultStatus::Completed);
+    let AgentItem::Tool(second_item) = &response.output[2] else {
+        panic!("expected cancelled second tool item");
+    };
+    assert_eq!(second_item.status, ToolResultStatus::Cancelled);
+    assert!(second.recorded_calls().is_empty());
+}
+
+#[tokio::test]
+async fn run_passes_current_turn_and_accumulated_items_to_tool() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::tool_call("call_1", "inspect_state", json!({}))],
+        ..Default::default()
+    });
+    model.enqueue_generate(ModelResponse {
+        content: vec![Part::text("done")],
+        ..Default::default()
+    });
+    let observation = Arc::new(Mutex::new(None));
+    let session = RunSession::new(
+        Arc::new(
+            AgentParams::new("test_agent", model).add_tool(StateInspectingTool {
+                observation: observation.clone(),
+            }),
+        ),
+        (),
+    )
+    .await
+    .expect("session should initialize");
+
+    session
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Inspect",
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .await
+        .expect("run should succeed");
+
+    assert_eq!(
+        *observation.lock().expect("observation lock"),
+        Some(RunStateObservation {
+            turn: 1,
+            item_types: vec!["message", "model"],
+        })
+    );
+}
+
+#[tokio::test]
+async fn run_stream_returns_invariant_error_for_invalid_delta_sequence() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(MockStreamResult::partials(vec![
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Text(TextPartDelta::new("hello")),
+            }),
+            ..Default::default()
+        },
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Reasoning(ReasoningPartDelta::default().with_text("wrong type")),
+            }),
+            ..Default::default()
+        },
+    ]));
+    let session = Arc::new(
+        RunSession::new(Arc::new(AgentParams::new("test_agent", model)), ())
+            .await
+            .expect("session should initialize"),
+    );
+    let mut stream = session
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Stream",
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .expect("stream should initialize");
+
+    let mut error = None;
+    while let Some(event) = stream.next().await {
+        if let Err(stream_error) = event {
+            error = Some(stream_error);
+            break;
+        }
+    }
+    assert!(matches!(error, Some(AgentError::Invariant { .. })));
+}
+
+#[tokio::test]
+async fn run_session_closes_initialized_toolkits_when_creation_fails() {
+    let initialized_close_calls = Arc::new(AtomicUsize::new(0));
+    let failed_close_calls = Arc::new(AtomicUsize::new(0));
+    let model = Arc::new(MockLanguageModel::new());
+    let params = AgentParams::new("test-agent", model)
+        .add_toolkit(closing_toolkit(None, None, &initialized_close_calls))
+        .add_toolkit(closing_toolkit(
+            Some("second toolkit failed"),
+            None,
+            &failed_close_calls,
+        ));
+
+    let result = RunSession::new(Arc::new(params), ()).await;
+
+    assert!(matches!(result, Err(AgentError::Init { .. })));
+    assert_eq!(initialized_close_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(failed_close_calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn run_session_close_attempts_every_toolkit_and_reports_failure() {
+    let failing_close_calls = Arc::new(AtomicUsize::new(0));
+    let successful_close_calls = Arc::new(AtomicUsize::new(0));
+    let model = Arc::new(MockLanguageModel::new());
+    let params = AgentParams::new("test-agent", model)
+        .add_toolkit(closing_toolkit(
+            None,
+            Some("cleanup failed"),
+            &failing_close_calls,
+        ))
+        .add_toolkit(closing_toolkit(None, None, &successful_close_calls));
+    let session = RunSession::new(Arc::new(params), ())
+        .await
+        .expect("session initializes");
+
+    let result = session.close().await;
+
+    assert!(matches!(result, Err(AgentError::Cleanup { .. })));
+    assert_eq!(failing_close_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(successful_close_calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
 async fn run_returns_response_when_no_tool_call() {
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
@@ -289,15 +895,19 @@ async fn run_returns_response_when_no_tool_call() {
     let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Hello!",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Hello!",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
     let expected = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("Hi!")],
         output: vec![AgentItem::Model(ModelResponse {
             content: vec![Part::text("Hi!")],
@@ -342,15 +952,19 @@ async fn run_executes_single_tool_call_and_returns_response() {
     .await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Use the tool",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Use the tool",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
     let expected = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("Final response")],
         output: vec![
             AgentItem::Model(ModelResponse {
@@ -367,7 +981,7 @@ async fn run_executes_single_tool_call_and_returns_response() {
                 tool_name: "test_tool".to_string(),
                 input: json!({"param": "value"}),
                 output: vec![Part::text("Tool result")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Final response")],
@@ -425,15 +1039,19 @@ async fn run_executes_multiple_tool_calls_from_one_model_response() {
     .await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Use both tools",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Use both tools",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
     let expected = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("Processed both tools")],
         output: vec![
             AgentItem::Model(ModelResponse {
@@ -449,14 +1067,14 @@ async fn run_executes_multiple_tool_calls_from_one_model_response() {
                 tool_name: "tool_1".to_string(),
                 input: json!({"param": "value1"}),
                 output: vec![Part::text("Tool 1 result")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Tool(AgentItemTool {
                 tool_call_id: "call_2".to_string(),
                 tool_name: "tool_2".to_string(),
                 input: json!({"param": "value2"}),
                 output: vec![Part::text("Tool 2 result")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Processed both tools")],
@@ -478,18 +1096,22 @@ async fn run_returns_existing_assistant_response_without_new_model_output() {
     let session = new_run_session(Arc::new(AgentParams::new("cached", model.clone())), ()).await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![
-                AgentItem::Message(Message::user(vec![Part::text("What did I say?")])),
-                AgentItem::Message(Message::assistant(vec![Part::text("Cached answer")])),
-            ],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![
+                    AgentItem::Message(Message::user(vec![Part::text("What did I say?")])),
+                    AgentItem::Message(Message::assistant(vec![Part::text("Cached answer")])),
+                ],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
     assert_eq!(
         response,
         AgentResponse {
+            status: AgentResponseStatus::Completed,
             content: vec![Part::text("Cached answer")],
             output: vec![],
         }
@@ -521,23 +1143,26 @@ async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
     .await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![
-                AgentItem::Message(Message::user(vec![Part::text("Continue")])),
-                AgentItem::Model(ModelResponse {
-                    content: vec![
-                        Part::tool_call("call_1", "resume_tool", json!({"step": 1})),
-                        Part::tool_call("call_2", "resume_tool", json!({"step": 2})),
-                    ],
-                    ..Default::default()
-                }),
-                AgentItem::Message(Message::tool(vec![Part::tool_result(
-                    "call_1",
-                    "resume_tool",
-                    vec![Part::text("already done")],
-                )])),
-            ],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![
+                    AgentItem::Message(Message::user(vec![Part::text("Continue")])),
+                    AgentItem::Model(ModelResponse {
+                        content: vec![
+                            Part::tool_call("call_1", "resume_tool", json!({"step": 1})),
+                            Part::tool_call("call_2", "resume_tool", json!({"step": 2})),
+                        ],
+                        ..Default::default()
+                    }),
+                    AgentItem::Message(Message::tool(vec![Part::tool_result(
+                        "call_1",
+                        "resume_tool",
+                        vec![Part::text("already done")],
+                    )])),
+                ],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
@@ -546,6 +1171,7 @@ async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
     assert_eq!(
         response,
         AgentResponse {
+            status: AgentResponseStatus::Completed,
             content: vec![Part::text("Final reply")],
             output: vec![
                 AgentItem::Tool(AgentItemTool {
@@ -553,7 +1179,7 @@ async fn run_resumes_tool_processing_from_tool_message_with_partial_results() {
                     tool_name: "resume_tool".to_string(),
                     input: json!({"step": 2}),
                     output: vec![Part::text("call_2 result")],
-                    is_error: false,
+                    status: ToolResultStatus::Completed,
                 }),
                 AgentItem::Model(ModelResponse {
                     content: vec![Part::text("Final reply")],
@@ -590,25 +1216,28 @@ async fn run_resumes_tool_processing_when_trailing_items_are_tool_entries() {
     .await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![
-                AgentItem::Message(Message::user(vec![Part::text("Continue")])),
-                AgentItem::Model(ModelResponse {
-                    content: vec![
-                        Part::tool_call("call_1", "resume_tool", json!({"stage": 1})),
-                        Part::tool_call("call_2", "resume_tool", json!({"stage": 2})),
-                    ],
-                    ..Default::default()
-                }),
-                AgentItem::Tool(AgentItemTool {
-                    tool_call_id: "call_1".to_string(),
-                    tool_name: "resume_tool".to_string(),
-                    input: json!({"stage": 1}),
-                    output: vec![Part::text("already done")],
-                    is_error: false,
-                }),
-            ],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![
+                    AgentItem::Message(Message::user(vec![Part::text("Continue")])),
+                    AgentItem::Model(ModelResponse {
+                        content: vec![
+                            Part::tool_call("call_1", "resume_tool", json!({"stage": 1})),
+                            Part::tool_call("call_2", "resume_tool", json!({"stage": 2})),
+                        ],
+                        ..Default::default()
+                    }),
+                    AgentItem::Tool(AgentItemTool {
+                        tool_call_id: "call_1".to_string(),
+                        tool_name: "resume_tool".to_string(),
+                        input: json!({"stage": 1}),
+                        output: vec![Part::text("already done")],
+                        status: ToolResultStatus::Completed,
+                    }),
+                ],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
@@ -617,6 +1246,7 @@ async fn run_resumes_tool_processing_when_trailing_items_are_tool_entries() {
     assert_eq!(
         response,
         AgentResponse {
+            status: AgentResponseStatus::Completed,
             content: vec![Part::text("Final reply from items")],
             output: vec![
                 AgentItem::Tool(AgentItemTool {
@@ -624,7 +1254,7 @@ async fn run_resumes_tool_processing_when_trailing_items_are_tool_entries() {
                     tool_name: "resume_tool".to_string(),
                     input: json!({"stage": 2}),
                     output: vec![Part::text("call_2 via item")],
-                    is_error: false,
+                    status: ToolResultStatus::Completed,
                 }),
                 AgentItem::Model(ModelResponse {
                     content: vec![Part::text("Final reply from items")],
@@ -656,21 +1286,24 @@ async fn run_errors_when_tool_results_lack_preceding_assistant_content() {
     .await;
 
     let err = session
-        .run(RunSessionRequest {
-            input: vec![
-                AgentItem::Message(Message::user(vec![Part::text("Resume")])),
-                AgentItem::Message(Message::tool(vec![Part::tool_result(
-                    "call_1",
-                    "resume_tool",
-                    vec![Part::text("orphan")],
-                )])),
-            ],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![
+                    AgentItem::Message(Message::user(vec![Part::text("Resume")])),
+                    AgentItem::Message(Message::tool(vec![Part::tool_result(
+                        "call_1",
+                        "resume_tool",
+                        vec![Part::text("orphan")],
+                    )])),
+                ],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect_err("run fails");
 
     match err {
-        AgentError::Invariant(msg) => {
+        AgentError::Invariant { message: msg, .. } => {
             assert!(msg.contains("Expected a model item or assistant message"));
         }
         other => panic!("unexpected error: {other:?}"),
@@ -718,15 +1351,19 @@ async fn run_handles_multiple_turns_with_tool_calls() {
     .await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Calculate some numbers",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Calculate some numbers",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
     let expected = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("All calculations done")],
         output: vec![
             AgentItem::Model(ModelResponse {
@@ -742,7 +1379,7 @@ async fn run_handles_multiple_turns_with_tool_calls() {
                 tool_name: "calculator".to_string(),
                 input: json!({"operation": "add", "a": 1, "b": 2}),
                 output: vec![Part::text("Calculation result")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::tool_call(
@@ -757,7 +1394,7 @@ async fn run_handles_multiple_turns_with_tool_calls() {
                 tool_name: "calculator".to_string(),
                 input: json!({"operation": "multiply", "a": 3, "b": 4}),
                 output: vec![Part::text("Calculation result")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::text("All calculations done")],
@@ -811,15 +1448,18 @@ async fn run_throws_max_turns_exceeded_error() {
     .await;
 
     let result = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Keep using tools",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Keep using tools",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await;
 
     match result {
-        Err(AgentError::MaxTurnsExceeded(turns)) => assert_eq!(turns, 2),
+        Err(AgentError::MaxTurnsExceeded { max_turns, .. }) => assert_eq!(max_turns, 2),
         other => panic!("expected max turns exceeded error, got {other:?}"),
     }
 }
@@ -835,15 +1475,18 @@ async fn run_throws_invariant_error_when_tool_not_found() {
     let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
     let result = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Use a tool",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Use a tool",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await;
 
     match result {
-        Err(AgentError::Invariant(message)) => {
+        Err(AgentError::Invariant { message, .. }) => {
             assert!(message.contains("Tool non_existent_tool not found"));
         }
         other => panic!("expected invariant error, got {other:?}"),
@@ -869,14 +1512,17 @@ async fn run_throws_tool_execution_error() {
     .await;
 
     let result = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Use the tool",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Use the tool",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await;
 
-    assert!(matches!(result, Err(AgentError::ToolExecution(_))));
+    assert!(matches!(result, Err(AgentError::ToolExecution { .. })));
 }
 
 #[tokio::test]
@@ -910,15 +1556,19 @@ async fn run_handles_tool_returning_error_result() {
     .await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Use the tool",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Use the tool",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
     let expected = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("Handled the error")],
         output: vec![
             AgentItem::Model(ModelResponse {
@@ -934,7 +1584,7 @@ async fn run_handles_tool_returning_error_result() {
                 tool_name: "test_tool".to_string(),
                 input: json!({"invalid": true}),
                 output: vec![Part::text("Error: Invalid parameters")],
-                is_error: true,
+                status: ToolResultStatus::Failed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Handled the error")],
@@ -969,9 +1619,12 @@ async fn run_passes_sampling_parameters_to_model() {
     .await;
 
     session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
@@ -1003,11 +1656,14 @@ async fn run_passes_provider_hosted_tools_to_model() {
     .await;
 
     session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Find an example",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Find an example",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
@@ -1026,13 +1682,16 @@ async fn run_throws_language_model_error_when_generation_fails() {
     let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
     let result = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+            },
+            RunOptions::default(),
+        )
         .await;
 
     match result {
-        Err(AgentError::LanguageModel(err)) => {
+        Err(AgentError::LanguageModel { source: err, .. }) => {
             assert!(err.to_string().contains("API quota exceeded"));
         }
         other => panic!("expected language model error, got {other:?}"),
@@ -1071,9 +1730,12 @@ async fn run_includes_string_and_dynamic_function_instructions() {
     .await;
 
     session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
@@ -1122,11 +1784,14 @@ async fn run_merges_toolkit_prompts_and_tools() {
     .await;
 
     let response = session
-        .run(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Status?",
-            )]))],
-        })
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Status?",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run succeeds");
 
@@ -1149,11 +1814,12 @@ async fn run_merges_toolkit_prompts_and_tools() {
         assert_eq!(tools.len(), 1);
         assert!(matches!(
             &tools[0],
-            llm_sdk::Tool::Function(tool) if tool.name == "lookup-order"
+            Tool::Function(tool) if tool.name == "lookup-order"
         ));
     }
 
     let expected = AgentResponse {
+        status: AgentResponseStatus::Completed,
         content: vec![Part::text("Order ready")],
         output: vec![
             AgentItem::Model(ModelResponse {
@@ -1169,7 +1835,7 @@ async fn run_merges_toolkit_prompts_and_tools() {
                 tool_name: "lookup-order".to_string(),
                 input: json!({"orderId": "123"}),
                 output: vec![Part::text("Order 123 ready for Ada")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
             AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Order ready")],
@@ -1183,6 +1849,46 @@ async fn run_merges_toolkit_prompts_and_tools() {
     close_run_session(session).await;
 
     assert_eq!(toolkit_session_state.close_calls(), 1);
+}
+
+#[tokio::test]
+async fn run_stream_returns_cancelled_without_calling_model_when_token_already_cancelled() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::Text(TextPartDelta::new("ignored".to_string())),
+        }),
+        ..Default::default()
+    }]);
+    let session = RunSession::new(Arc::new(AgentParams::new("test_agent", model.clone())), ())
+        .await
+        .expect("session should initialize");
+    let cancellation_token = CancellationToken::new();
+    cancellation_token.cancel();
+
+    let events = session
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+            },
+            RunOptions::default().with_cancellation_token(cancellation_token),
+        )
+        .expect("run_stream succeeds")
+        .map_err(|err| err.to_string())
+        .try_collect::<Vec<_>>()
+        .await
+        .expect("collect stream");
+
+    assert_eq!(
+        events,
+        vec![AgentStreamEvent::Response(AgentResponse {
+            content: Vec::new(),
+            output: Vec::new(),
+            status: AgentResponseStatus::Cancelled,
+        })]
+    );
+    assert!(model.tracked_stream_inputs().is_empty());
 }
 
 #[tokio::test]
@@ -1217,9 +1923,12 @@ async fn run_stream_streams_response_when_no_tool_call() {
 
     let stream = session
         .clone()
-        .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hi")]))],
-        })
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hi")]))],
+            },
+            RunOptions::default(),
+        )
         .expect("run_stream succeeds");
 
     let events = stream
@@ -1258,6 +1967,7 @@ async fn run_stream_streams_response_when_no_tool_call() {
             }),
         }),
         AgentStreamEvent::Response(AgentResponse {
+            status: AgentResponseStatus::Completed,
             content: vec![Part::text("Hello!")],
             output: vec![AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Hello!")],
@@ -1302,9 +2012,12 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
 
     let stream = session
         .clone()
-        .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
-        })
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+            },
+            RunOptions::default(),
+        )
         .expect("run_stream succeeds");
 
     let events = stream
@@ -1329,6 +2042,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
             }),
         }),
         AgentStreamEvent::Response(AgentResponse {
+            status: AgentResponseStatus::Completed,
             content: vec![Part::text("Done")],
             output: vec![AgentItem::Model(ModelResponse {
                 content: vec![Part::text("Done")],
@@ -1352,7 +2066,7 @@ async fn run_stream_merges_toolkit_prompts_and_tools() {
     assert_eq!(tools.len(), 1);
     assert!(matches!(
         &tools[0],
-        llm_sdk::Tool::Function(tool) if tool.name == "lookup-order"
+        Tool::Function(tool) if tool.name == "lookup-order"
     ));
 
     close_run_session(session).await;
@@ -1411,11 +2125,14 @@ async fn run_stream_streams_tool_call_execution_and_response() {
 
     let stream = session
         .clone()
-        .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Use tool",
-            )]))],
-        })
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Use tool",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .expect("run_stream succeeds");
 
     let events = stream
@@ -1451,7 +2168,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
                 tool_name: "test_tool".to_string(),
                 input: tool_args.clone(),
                 output: vec![Part::text("Tool result")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
@@ -1476,6 +2193,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
             }),
         }),
         AgentStreamEvent::Response(AgentResponse {
+            status: AgentResponseStatus::Completed,
             content: vec![Part::text("Final response")],
             output: vec![
                 AgentItem::Model(ModelResponse {
@@ -1487,7 +2205,7 @@ async fn run_stream_streams_tool_call_execution_and_response() {
                     tool_name: "test_tool".to_string(),
                     input: tool_args.clone(),
                     output: vec![Part::text("Tool result")],
-                    is_error: false,
+                    status: ToolResultStatus::Completed,
                 }),
                 AgentItem::Model(ModelResponse {
                     content: vec![Part::text("Final response")],
@@ -1558,11 +2276,14 @@ async fn run_stream_handles_multiple_turns() {
 
     let stream = session
         .clone()
-        .run_stream(RunSessionRequest {
-            input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                "Calculate",
-            )]))],
-        })
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Calculate",
+                )]))],
+            },
+            RunOptions::default(),
+        )
         .expect("run_stream succeeds");
 
     let events = stream
@@ -1598,7 +2319,7 @@ async fn run_stream_handles_multiple_turns() {
                 tool_name: "calculator".to_string(),
                 input: first_args.clone(),
                 output: vec![Part::text("Calculation done")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
@@ -1627,7 +2348,7 @@ async fn run_stream_handles_multiple_turns() {
                 tool_name: "calculator".to_string(),
                 input: second_args.clone(),
                 output: vec![Part::text("Calculation done")],
-                is_error: false,
+                status: ToolResultStatus::Completed,
             }),
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
@@ -1645,6 +2366,7 @@ async fn run_stream_handles_multiple_turns() {
             }),
         }),
         AgentStreamEvent::Response(AgentResponse {
+            status: AgentResponseStatus::Completed,
             content: vec![Part::text("All done")],
             output: vec![
                 AgentItem::Model(ModelResponse {
@@ -1656,7 +2378,7 @@ async fn run_stream_handles_multiple_turns() {
                     tool_name: "calculator".to_string(),
                     input: first_args.clone(),
                     output: vec![Part::text("Calculation done")],
-                    is_error: false,
+                    status: ToolResultStatus::Completed,
                 }),
                 AgentItem::Model(ModelResponse {
                     content: vec![Part::tool_call("call_2", "calculator", second_args.clone())],
@@ -1667,7 +2389,7 @@ async fn run_stream_handles_multiple_turns() {
                     tool_name: "calculator".to_string(),
                     input: second_args.clone(),
                     output: vec![Part::text("Calculation done")],
-                    is_error: false,
+                    status: ToolResultStatus::Completed,
                 }),
                 AgentItem::Model(ModelResponse {
                     content: vec![Part::text("All done")],
@@ -1742,18 +2464,21 @@ async fn run_stream_throws_max_turns_exceeded_error() {
     )
     .await;
 
-    let result = session.clone().run_stream(RunSessionRequest {
-        input: vec![AgentItem::Message(Message::user(vec![Part::text(
-            "Keep using tools",
-        )]))],
-    });
+    let result = session.clone().run_stream(
+        RunSessionRequest {
+            input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                "Keep using tools",
+            )]))],
+        },
+        RunOptions::default(),
+    );
 
     match result {
-        Err(AgentError::MaxTurnsExceeded(_)) => {}
+        Err(AgentError::MaxTurnsExceeded { .. }) => {}
         Ok(mut stream) => {
             let mut seen = false;
             while let Some(event) = stream.next().await {
-                if matches!(event, Err(AgentError::MaxTurnsExceeded(_))) {
+                if matches!(event, Err(AgentError::MaxTurnsExceeded { .. })) {
                     seen = true;
                     break;
                 }
@@ -1778,19 +2503,22 @@ async fn run_stream_throws_language_model_error() {
 
     let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
 
-    let result = session.clone().run_stream(RunSessionRequest {
-        input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
-    });
+    let result = session.clone().run_stream(
+        RunSessionRequest {
+            input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+        },
+        RunOptions::default(),
+    );
 
     match result {
-        Err(AgentError::LanguageModel(err)) => {
+        Err(AgentError::LanguageModel { source: err, .. }) => {
             assert!(err.to_string().contains("Rate limit exceeded"));
         }
         Ok(mut stream) => {
             let mut seen = false;
             while let Some(event) = stream.next().await {
                 match event {
-                    Err(AgentError::LanguageModel(err)) => {
+                    Err(AgentError::LanguageModel { source: err, .. }) => {
                         assert!(err.to_string().contains("Rate limit exceeded"));
                         seen = true;
                         break;
@@ -1814,6 +2542,100 @@ async fn run_stream_throws_language_model_error() {
 }
 
 #[tokio::test]
+async fn run_stream_commits_materializable_partial_content_before_error() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(MockStreamResult::partials_then_error(
+        mixed_snapshot_partials(),
+        LanguageModelError::InvalidInput("stream failed".to_string()),
+    ));
+    let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
+    let mut stream = session
+        .clone()
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+            },
+            RunOptions::default(),
+        )
+        .expect("stream should initialize");
+
+    let mut partial_count = 0;
+    let mut committed_item = None;
+    let error = loop {
+        match stream.next().await {
+            Some(Ok(AgentStreamEvent::Partial(_))) => partial_count += 1,
+            Some(Ok(AgentStreamEvent::Item(event))) => committed_item = Some(event.item),
+            Some(Ok(event)) => panic!("unexpected terminal event: {event:?}"),
+            Some(Err(error)) => break error,
+            None => panic!("stream ended without an error"),
+        }
+    };
+    assert_eq!(partial_count, 3);
+    let expected_item = AgentItem::Model(mixed_snapshot_model_response());
+    assert_eq!(committed_item, Some(expected_item.clone()));
+    let snapshot = error.snapshot().expect("error should contain a snapshot");
+    assert_eq!(snapshot.output, vec![expected_item]);
+
+    close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_stream_records_cancelled_results_for_materialized_tool_calls() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(mixed_snapshot_partials());
+    let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
+    let cancellation_token = CancellationToken::new();
+    let mut stream = session
+        .clone()
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text("Hello")]))],
+            },
+            RunOptions::default().with_cancellation_token(cancellation_token.clone()),
+        )
+        .expect("stream should initialize");
+
+    for _ in 0..3 {
+        assert!(matches!(
+            stream.next().await,
+            Some(Ok(AgentStreamEvent::Partial(_)))
+        ));
+    }
+    cancellation_token.cancel();
+
+    let item = match stream.next().await {
+        Some(Ok(AgentStreamEvent::Item(event))) => event.item,
+        event => panic!("expected committed model item, got {event:?}"),
+    };
+    let expected_item = AgentItem::Model(mixed_snapshot_model_response());
+    assert_eq!(item, expected_item);
+
+    let cancelled_tool_item = match stream.next().await {
+        Some(Ok(AgentStreamEvent::Item(event))) => event.item,
+        event => panic!("expected cancelled tool item, got {event:?}"),
+    };
+    let expected_tool_item = AgentItem::Tool(AgentItemTool {
+        tool_call_id: "call_1".to_string(),
+        tool_name: "weather".to_string(),
+        input: json!({"city": "Paris"}),
+        output: Vec::new(),
+        status: ToolResultStatus::Cancelled,
+    });
+    assert_eq!(cancelled_tool_item, expected_tool_item);
+
+    let response = match stream.next().await {
+        Some(Ok(AgentStreamEvent::Response(response))) => response,
+        event => panic!("expected cancelled response, got {event:?}"),
+    };
+    assert_eq!(response.status, AgentResponseStatus::Cancelled);
+    assert!(response.content.is_empty());
+    assert_eq!(response.output, vec![expected_item, expected_tool_item]);
+    assert!(stream.next().await.is_none());
+
+    close_run_session(session).await;
+}
+
+#[tokio::test]
 async fn run_session_reports_instruction_resolution_as_init_error() {
     let model = Arc::new(MockLanguageModel::new());
     let params = Arc::new(AgentParams::new("test_agent", model).add_instruction(
@@ -1825,7 +2647,7 @@ async fn run_session_reports_instruction_resolution_as_init_error() {
     let result = RunSession::new(params, ()).await;
 
     match result {
-        Err(AgentError::Init(err)) => {
+        Err(AgentError::Init { source: err, .. }) => {
             assert!(err
                 .to_string()
                 .contains("could not load tenant instructions"));

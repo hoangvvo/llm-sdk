@@ -10,6 +10,7 @@ use futures::{stream, StreamExt};
 use llm_sdk::{
     openai::{OpenAIModel, OpenAIModelOptions},
     LanguageModel, LanguageModelError, LanguageModelInput, Message, Part, PartDelta,
+    ToolResultPart, ToolResultStatus,
 };
 use serde_json::{json, Value};
 use std::{convert::Infallible, sync::Arc};
@@ -240,6 +241,50 @@ async fn sends_exact_generate_request_and_maps_recorded_response() {
     let usage = result.usage.expect("recorded usage");
     assert_eq!(usage.input_tokens, 4);
     assert_eq!(usage.output_tokens, 2);
+}
+
+#[tokio::test]
+async fn sends_one_neutral_output_for_an_empty_tool_result() {
+    let capture = RequestCapture::default();
+    let server = start_server(
+        Router::new()
+            .route("/v1/responses", post(generate_handler))
+            .with_state(capture.clone()),
+    )
+    .await;
+    let input = LanguageModelInput {
+        messages: vec![
+            Message::assistant(vec![Part::tool_call("call_1", "wait", json!({}))]),
+            Message::tool(vec![Part::ToolResult(
+                ToolResultPart::new("call_1", "wait", Vec::new())
+                    .with_status(ToolResultStatus::Cancelled),
+            )]),
+        ],
+        ..Default::default()
+    };
+
+    recorded_model(&server.base_url)
+        .generate(input)
+        .await
+        .expect("generate recorded response");
+
+    let body = capture.body.lock().await;
+    let outputs: Vec<Value> = body
+        .as_ref()
+        .and_then(|body| body["input"].as_array())
+        .expect("request input")
+        .iter()
+        .filter(|item| item["type"] == "function_call_output")
+        .cloned()
+        .collect();
+    assert_eq!(
+        outputs,
+        vec![json!({
+            "type": "function_call_output",
+            "call_id": "call_1",
+            "output": ""
+        })]
+    );
 }
 
 #[tokio::test]

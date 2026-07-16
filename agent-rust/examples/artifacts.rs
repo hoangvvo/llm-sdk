@@ -1,5 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
+use llm_agent::RunOptions;
 use llm_agent::{
     Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentTool, AgentToolResult, BoxedError,
     Toolkit, ToolkitSession,
@@ -372,10 +373,13 @@ async fn main() {
          save the full document to a separate document we can keep iterating on.",
     )]))];
     let res1 = agent
-        .run(AgentRequest {
-            context: (),
-            input: items1,
-        })
+        .run(
+            AgentRequest {
+                context: (),
+                input: items1,
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run failed");
     println!("{:?}", res1.content);
@@ -386,10 +390,13 @@ async fn main() {
          Milestones section. Keep your chat reply brief.",
     )]))];
     let res2 = agent
-        .run(AgentRequest {
-            context: (),
-            input: items2,
-        })
+        .run(
+            AgentRequest {
+                context: (),
+                input: items2,
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run failed");
     println!("{:?}", res2.content);

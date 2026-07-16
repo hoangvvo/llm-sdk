@@ -43,6 +43,15 @@ func NewMockStreamResultPartials(partials []llmsdk.PartialModelResponse) MockStr
 	}
 }
 
+// NewMockStreamResultPartialsThenError constructs a stream result that yields
+// partial responses followed by an error.
+func NewMockStreamResultPartialsThenError(partials []llmsdk.PartialModelResponse, err error) MockStreamResult {
+	return MockStreamResult{
+		Partials: partials,
+		Error:    err,
+	}
+}
+
 // NewMockStreamResultError constructs a stream result that yields an error.
 func NewMockStreamResultError(err error) MockStreamResult {
 	return MockStreamResult{
@@ -133,7 +142,7 @@ func (m *MockLanguageModel) Stream(_ context.Context, input *llmsdk.LanguageMode
 	m.mockedStreamResults = m.mockedStreamResults[1:]
 	m.trackedStreamInputs = append(m.trackedStreamInputs, *input)
 
-	if result.Error != nil {
+	if result.Error != nil && len(result.Partials) == 0 {
 		return nil, result.Error
 	}
 
@@ -149,6 +158,9 @@ func (m *MockLanguageModel) Stream(_ context.Context, input *llmsdk.LanguageMode
 		for _, partial := range partials {
 			p := partial
 			eventChan <- &p
+		}
+		if result.Error != nil {
+			errChan <- result.Error
 		}
 	}()
 

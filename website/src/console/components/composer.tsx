@@ -59,7 +59,7 @@ export function Composer({
   }, [attachments.length, disabled, inputText, isRecording, isStreaming]);
 
   const handleFileAdd = useCallback(
-    (files: FileList | File[] | null, kind: Attachment["kind"]) => {
+    (files: FileList | File[] | null, kind: "image" | "audio") => {
       if (!files) {
         return;
       }

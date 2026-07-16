@@ -134,9 +134,18 @@ type ToolResultPart struct {
 	ToolName string `json:"tool_name"`
 	// The content of the tool result.
 	Content []Part `json:"content"`
-	// Marks the tool result as an error.
-	IsError bool `json:"is_error,omitempty"`
+	// Status is the terminal status of the tool call.
+	Status ToolResultStatus `json:"status"`
 }
+
+// ToolResultStatus is the terminal status of a tool call.
+type ToolResultStatus string
+
+const (
+	ToolResultStatusCompleted ToolResultStatus = "completed"
+	ToolResultStatusFailed    ToolResultStatus = "failed"
+	ToolResultStatusCancelled ToolResultStatus = "cancelled"
+)
 
 // ReasoningPart represents part of the message that represents the model reasoning.
 type ReasoningPart struct {

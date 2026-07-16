@@ -1,5 +1,6 @@
 use dotenvy::dotenv;
 use futures::{future::BoxFuture, StreamExt};
+use llm_agent::RunOptions;
 use llm_agent::{
     Agent, AgentError, AgentFunctionTool, AgentItem, AgentRequest, AgentStreamEvent,
     AgentToolResult,
@@ -163,10 +164,13 @@ async fn run_stream(
     context: VaultContext,
 ) -> Result<llm_agent::AgentResponse, AgentError> {
     let mut stream = agent
-        .run_stream(AgentRequest {
-            context,
-            input: transcript.clone(),
-        })
+        .run_stream(
+            AgentRequest {
+                context,
+                input: transcript.clone(),
+            },
+            RunOptions::default(),
+        )
         .await?;
 
     while let Some(event) = stream.next().await {
@@ -181,8 +185,8 @@ async fn run_stream(
         }
     }
 
-    Err(AgentError::Invariant(
-        "agent stream completed without emitting a response".into(),
+    Err(AgentError::invariant(
+        "agent stream completed without emitting a response",
     ))
 }
 
@@ -293,7 +297,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
                 println!("{:#?}", response.content);
                 break;
             }
-            Err(AgentError::ToolExecution(inner)) => {
+            Err(AgentError::ToolExecution { source: inner, .. }) => {
                 if let Some(approval) = inner.downcast_ref::<RequireApprovalError>() {
                     println!("\n[agent halted] err = {}", approval.message);
                     let decision = prompt_for_approval(&approval.artifact);

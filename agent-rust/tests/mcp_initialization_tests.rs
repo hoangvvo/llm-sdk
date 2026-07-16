@@ -39,7 +39,7 @@ async fn mcp_initialization_resolves_async_params_from_context() {
         })
         .await;
 
-    assert!(matches!(result, Err(AgentError::Init(_))));
+    assert!(matches!(result, Err(AgentError::Init { .. })));
     assert_eq!(
         *contexts.lock().expect("contexts lock"),
         vec![TestContext {
@@ -61,7 +61,7 @@ async fn mcp_initialization_wraps_resolver_errors() {
     let result = agent.create_session(()).await;
 
     match result {
-        Err(AgentError::Init(error)) => {
+        Err(AgentError::Init { source: error, .. }) => {
             assert!(error.to_string().contains("credential lookup failed"));
         }
         _ => panic!("expected agent initialization error"),

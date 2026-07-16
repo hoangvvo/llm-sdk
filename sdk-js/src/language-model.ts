@@ -17,6 +17,10 @@ export interface LanguageModelMetadata {
   capabilities?: LanguageModelCapabilities;
 }
 
+export interface LanguageModelCallOptions {
+  signal?: AbortSignal;
+}
+
 export interface LanguageModel {
   /**
    * The provider of the model, e.g. "openai", "anthropic", "google"
@@ -33,9 +37,15 @@ export interface LanguageModel {
   /**
    * Generates a response to the given input.
    */
-  generate(input: LanguageModelInput): Promise<ModelResponse>;
+  generate(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): Promise<ModelResponse>;
   /**
    * Generates a response to the given input, returning a stream of partial responses.
    */
-  stream(input: LanguageModelInput): AsyncGenerator<PartialModelResponse>;
+  stream(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): AsyncGenerator<PartialModelResponse>;
 }

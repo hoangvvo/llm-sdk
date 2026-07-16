@@ -1,3 +1,4 @@
+use crate::ToolResultStatus;
 use crate::{
     AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FunctionTool,
     ImagePart, ImagePartDelta, LanguageModelInput, Message, Modality, Part, ReasoningOptions,
@@ -185,13 +186,13 @@ impl ToolResultPart {
             tool_call_id: tool_call_id.into(),
             tool_name: tool_name.into(),
             content,
-            is_error: None,
+            status: ToolResultStatus::Completed,
         }
     }
 
     #[must_use]
-    pub fn with_is_error(mut self, is_error: bool) -> Self {
-        self.is_error = Some(is_error);
+    pub fn with_status(mut self, status: ToolResultStatus) -> Self {
+        self.status = status;
         self
     }
 }

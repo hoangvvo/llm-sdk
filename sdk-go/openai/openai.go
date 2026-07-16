@@ -470,6 +470,21 @@ func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]op
 		}
 
 		toolResultPartContent := partutil.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
+		if len(toolResultPartContent) == 0 {
+			empty := openaiapi.FunctionCallOutputItemParamOutputString(ptr.To(""))
+			inputItems = append(inputItems, openaiapi.InputItem{
+				Item: &openaiapi.Item{
+					FunctionCallOutputItemParam: &openaiapi.FunctionCallOutputItemParam{
+						CallId: part.ToolResultPart.ToolCallID,
+						Output: openaiapi.FunctionCallOutputItemParamOutput{
+							FunctionCallOutputItemParamOutputString: &empty,
+						},
+						Type: openaiapi.FunctionCallOutputItemParamTypeFunctionCallOutput,
+					},
+				},
+			})
+			continue
+		}
 		for _, toolResultPart := range toolResultPartContent {
 			switch {
 			case toolResultPart.TextPart != nil:

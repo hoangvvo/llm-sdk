@@ -1,6 +1,7 @@
 import type { z, ZodType } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { type AgentFunctionTool, type AgentToolResult } from "../tool.ts";
+import type { RunState } from "../run.ts";
 
 export function zodTool<TContext, TZodSchema extends ZodType>(params: {
   /**
@@ -24,6 +25,7 @@ export function zodTool<TContext, TZodSchema extends ZodType>(params: {
   execute(
     args: z.infer<TZodSchema>,
     context: TContext,
+    state: RunState,
   ): AgentToolResult | Promise<AgentToolResult>;
 }): AgentFunctionTool<TContext, z.infer<TZodSchema>> {
   return {

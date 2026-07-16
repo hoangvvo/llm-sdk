@@ -6,8 +6,11 @@ import {
   RefusalError,
   UnsupportedError,
 } from "../errors.ts";
-import type { LanguageModel } from "../language-model.ts";
-import { type LanguageModelMetadata } from "../language-model.ts";
+import type {
+  LanguageModel,
+  LanguageModelCallOptions,
+  LanguageModelMetadata,
+} from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import { guessDeltaIndex } from "../stream.utils.ts";
@@ -67,13 +70,16 @@ export class OpenAIChatModel implements LanguageModel {
     traceLanguageModel(this);
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): Promise<ModelResponse> {
     const createParams = convertToOpenAICreateParams(input, this.modelId);
 
-    const response = await this.#openai.chat.completions.create({
-      ...createParams,
-      stream: false,
-    });
+    const response = await this.#openai.chat.completions.create(
+      { ...createParams, stream: false },
+      { signal: options?.signal },
+    );
 
     const choice = response.choices[0];
     if (!choice) {
@@ -103,16 +109,18 @@ export class OpenAIChatModel implements LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): AsyncGenerator<PartialModelResponse> {
     const createParams = convertToOpenAICreateParams(input, this.modelId);
 
-    const stream = await this.#openai.chat.completions.create({
-      ...createParams,
-      stream: true,
-      stream_options: {
-        include_usage: true,
+    const stream = await this.#openai.chat.completions.create(
+      {
+        ...createParams,
+        stream: true,
+        stream_options: { include_usage: true },
       },
-    });
+      { signal: options?.signal },
+    );
 
     let refusal = "";
 
@@ -320,9 +328,12 @@ function convertToOpenAIMessages(
           openaiMessages.push({
             role: "tool",
             tool_call_id: part.tool_call_id,
-            content: toolResultPartContent.map(
-              convertToOpenAIToolMessageParamContent,
-            ),
+            content:
+              toolResultPartContent.length === 0
+                ? ""
+                : toolResultPartContent.map(
+                    convertToOpenAIToolMessageParamContent,
+                  ),
           });
         });
         break;
@@ -373,13 +384,13 @@ function convertToOpenAIContentPartImage(
 function convertToOpenAIContentPartInputAudio(
   part: AudioPart,
 ): OpenAI.Chat.ChatCompletionContentPartInputAudio {
-  let format: OpenAI.Chat.ChatCompletionContentPartInputAudio.InputAudio["format"];
+  let inputAudio: OpenAI.Chat.ChatCompletionContentPartInputAudio.InputAudio;
   switch (part.format) {
     case "mp3":
-      format = "mp3";
+      inputAudio = { data: part.data, format: "mp3" };
       break;
     case "wav":
-      format = "wav";
+      inputAudio = { data: part.data, format: "wav" };
       break;
     default:
       throw new UnsupportedError(
@@ -389,10 +400,7 @@ function convertToOpenAIContentPartInputAudio(
   }
   return {
     type: "input_audio",
-    input_audio: {
-      data: part.data,
-      format,
-    },
+    input_audio: inputAudio,
   };
 }
 
@@ -425,10 +433,7 @@ function convertToOpenAIToolCall(
 
 function convertToOpenAIToolMessageParamContent(
   part: Part,
-): Extract<
-  OpenAI.ChatCompletionToolMessageParam["content"],
-  unknown[]
->[number] {
+): OpenAI.Chat.ChatCompletionContentPartText {
   switch (part.type) {
     case "text":
       return convertToOpenAIContentPartText(part);
@@ -491,9 +496,10 @@ function convertToOpenAIToolChoice(
 
 function convertToOpenAIResponseFormat(
   responseFormat: ResponseFormatOption,
-): NonNullable<
-  OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"]
-> {
+):
+  | OpenAI.ResponseFormatText
+  | OpenAI.ResponseFormatJSONSchema
+  | OpenAI.ResponseFormatJSONObject {
   switch (responseFormat.type) {
     case "json": {
       if (responseFormat.schema) {
@@ -525,7 +531,7 @@ function convertToOpenAIResponseFormat(
 
 function convertToOpenAIModality(
   modality: Modality,
-): NonNullable<OpenAI.Chat.ChatCompletionCreateParams["modalities"]>[number] {
+): OpenAI.Chat.ChatCompletionModality {
   switch (modality) {
     case "text":
       return "text";
@@ -546,36 +552,25 @@ function convertToOpenAIAudio(
   if (!audio.voice) {
     throw new InvalidInputError("Audio voice is required for OpenAI audio");
   }
-  let format: OpenAI.Chat.Completions.ChatCompletionAudioParam["format"];
   switch (audio.format) {
     case "wav":
-      format = "wav";
-      break;
+      return { voice: audio.voice, format: "wav" };
     case "mp3":
-      format = "mp3";
-      break;
+      return { voice: audio.voice, format: "mp3" };
     case "flac":
-      format = "flac";
-      break;
+      return { voice: audio.voice, format: "flac" };
     case "aac":
-      format = "aac";
-      break;
+      return { voice: audio.voice, format: "aac" };
     case "opus":
-      format = "opus";
-      break;
+      return { voice: audio.voice, format: "opus" };
     case "linear16":
-      format = "pcm16";
-      break;
+      return { voice: audio.voice, format: "pcm16" };
     default:
       throw new UnsupportedError(
         PROVIDER,
         `Cannot convert audio format to OpenAI Audio format for format ${String(audio.format)}`,
       );
   }
-  return {
-    voice: audio.voice,
-    format,
-  };
 }
 
 // MARK: To SDK Message
@@ -603,7 +598,7 @@ function mapOpenAIMessage(
     const audioPart: AudioPart = {
       type: "audio",
       data: message.audio.data,
-      format: mapOpenAIAudioFormat(createParams.audio.format),
+      format: mapOpenAIAudioFormat(createParams.audio),
       id: message.audio.id,
       transcript: message.audio.transcript,
     };
@@ -624,9 +619,9 @@ function mapOpenAIMessage(
 }
 
 function mapOpenAIAudioFormat(
-  format: OpenAI.Chat.Completions.ChatCompletionAudioParam["format"],
+  audio: OpenAI.Chat.Completions.ChatCompletionAudioParam,
 ): AudioFormat {
-  switch (format) {
+  switch (audio.format) {
     case "wav":
       return "wav";
     case "mp3":
@@ -696,8 +691,8 @@ function mapOpenAIDelta(
     }
     if (delta.audio.data) {
       part.data = delta.audio.data;
-      if (createParams.audio?.format) {
-        part.format = mapOpenAIAudioFormat(createParams.audio.format);
+      if (createParams.audio) {
+        part.format = mapOpenAIAudioFormat(createParams.audio);
       }
       if (part.format == "linear16") {
         part.sample_rate = OPENAI_AUDIO_SAMPLE_RATE;

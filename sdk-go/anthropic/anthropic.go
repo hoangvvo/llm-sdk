@@ -527,7 +527,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 				RequestToolResultBlockContentArray: &content,
 			},
 		}
-		if part.ToolResultPart.IsError {
+		if part.ToolResultPart.Status != llmsdk.ToolResultStatusCompleted {
 			toolResult.IsError = ptr.To(true)
 		}
 		return anthropicapi.InputContentBlock{

@@ -32,6 +32,10 @@ export type Message = UserMessage | AssistantMessage | ToolMessage;
  */
 export type Modality = "text" | "image" | "audio";
 /**
+ * The terminal status of a tool call.
+ */
+export type ToolResultStatus = "completed" | "failed" | "cancelled";
+/**
  * Determines how the model should choose which tool to use:
  * - "auto": The model will automatically choose the tool to use or not use any tools.
  * - "none": The model will not use any tools.
@@ -191,9 +195,9 @@ export interface ToolResultPart {
    */
   content: Part[];
   /**
-   * Marks the tool result as an error.
+   * The terminal status of the tool call.
    */
-  is_error?: boolean;
+  status: ToolResultStatus;
 }
 /**
  * A part of the message that represents the model reasoning.

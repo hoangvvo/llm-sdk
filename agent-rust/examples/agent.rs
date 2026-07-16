@@ -1,5 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
+use llm_agent::RunOptions;
 use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
 use llm_sdk::{JSONSchema, Message, Part};
 use schemars::JsonSchema;
@@ -174,10 +175,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // Call assistant
         let response = my_assistant
-            .run(AgentRequest {
-                context: context.clone(),
-                input: items.clone(),
-            })
+            .run(
+                AgentRequest {
+                    context: context.clone(),
+                    input: items.clone(),
+                },
+                RunOptions::default(),
+            )
             .await?;
 
         // Append items with the output items

@@ -55,6 +55,60 @@ const input = {
 };
 
 suite("OpenAI recorded transport", () => {
+  test("sends one neutral output for an empty tool result", async (t) => {
+    let requestBody: unknown;
+    const baseURL = await startServer(t, async (request, response) => {
+      requestBody = await readJSON(request);
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ output: [] }));
+    });
+    const model = new OpenAIModel({
+      modelId: "recorded-model",
+      apiKey: "test-token",
+      baseURL,
+    });
+
+    await model.generate({
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              tool_call_id: "call_1",
+              tool_name: "wait",
+              args: {},
+            },
+          ],
+        },
+        {
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              tool_call_id: "call_1",
+              tool_name: "wait",
+              content: [],
+              status: "cancelled",
+            },
+          ],
+        },
+      ],
+    });
+
+    const body = requestBody as { input: Record<string, unknown>[] };
+    assert.deepStrictEqual(
+      body.input.filter((item) => item["type"] === "function_call_output"),
+      [
+        {
+          type: "function_call_output",
+          call_id: "call_1",
+          output: "",
+        },
+      ],
+    );
+  });
+
   test("sends the exact generate request and maps the recorded response", async (t) => {
     let requestBody: unknown;
     let authorization: string | undefined;

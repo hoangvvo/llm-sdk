@@ -18,7 +18,7 @@ use crate::{
     LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse,
     ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption,
     TextPart, TextPartDelta, Tool as SdkTool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
-    ToolResultPart,
+    ToolResultPart, ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -550,7 +550,7 @@ fn convert_tool_result_part(
     Ok(RequestToolResultBlock {
         cache_control: None,
         content,
-        is_error: tool_result.is_error,
+        is_error: (tool_result.status != ToolResultStatus::Completed).then_some(true),
         tool_use_id: tool_result.tool_call_id,
     })
 }

@@ -16,6 +16,7 @@ import type {
   ReasoningPart,
   TextPart,
   ToolCallPart,
+  WebSearchUserLocation,
 } from "@hoangvvo/llm-sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -441,9 +442,9 @@ function prepareWebSearchPayload(
   const locationEntries = Object.entries(settings.user_location ?? {})
     .map(([key, value]) => [key, value?.trim()] as const)
     .filter((entry): entry is [string, string] => Boolean(entry[1]));
-  const userLocation = Object.fromEntries(locationEntries) as NonNullable<
-    WebSearchSettings["user_location"]
-  >;
+  const userLocation = Object.fromEntries(
+    locationEntries,
+  ) as WebSearchUserLocation;
 
   return {
     ...(allowedDomains && allowedDomains.length > 0

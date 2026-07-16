@@ -107,4 +107,63 @@ suite("StreamAccumulator", () => {
       /Missing required fields/,
     );
   });
+
+  test("snapshots independently materializable parts", (t: TestContext) => {
+    const accumulator = new StreamAccumulator();
+    accumulator.addPartial({
+      delta: { index: 0, part: { type: "text", text: "partial" } },
+      usage: { input_tokens: 2, output_tokens: 3 },
+      cost: 0.25,
+    });
+    accumulator.addPartial({
+      delta: {
+        index: 1,
+        part: {
+          type: "tool-call",
+          tool_call_id: "call_1",
+          tool_name: "weather",
+          args: '{"city":"Paris"}',
+        },
+      },
+    });
+    accumulator.addPartial({
+      delta: {
+        index: 2,
+        part: { type: "tool-call", args: "{incomplete" },
+      },
+    });
+    accumulator.addPartial({
+      delta: {
+        index: 3,
+        part: {
+          type: "image",
+          data: "aGVsbG8=",
+          mime_type: "image/png",
+        },
+      },
+    });
+    accumulator.addPartial({
+      delta: {
+        index: 4,
+        part: { type: "audio", data: "AAABAA==", format: "linear16" },
+      },
+    });
+
+    t.assert.deepStrictEqual(accumulator.snapshot(), {
+      content: [
+        { type: "text", text: "partial" },
+        {
+          type: "tool-call",
+          tool_call_id: "call_1",
+          tool_name: "weather",
+          args: { city: "Paris" },
+        },
+        { type: "image", data: "aGVsbG8=", mime_type: "image/png" },
+        { type: "audio", data: "AAABAA==", format: "linear16" },
+      ],
+      usage: { input_tokens: 2, output_tokens: 3 },
+      cost: 0.25,
+    });
+    t.assert.throws(() => accumulator.computeResponse());
+  });
 });

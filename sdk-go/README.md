@@ -139,6 +139,7 @@ go run ./examples/generate-text
 ### To 0.4.0
 
 - Replace `Tool{Name, Description, Parameters}` literals with `NewFunctionTool(...)`.
+- `ToolResultPart.IsError` has been replaced with the required `Status` field (`ToolResultStatusCompleted`, `ToolResultStatusFailed`, or `ToolResultStatusCancelled`).
 
 ### To 0.2.0
 

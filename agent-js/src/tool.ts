@@ -78,6 +78,7 @@ export function tool<TContext, TArgs extends Record<string, unknown>>(params: {
   execute: (
     args: TArgs,
     ctx: TContext,
+    state: RunState,
   ) => AgentToolResult | Promise<AgentToolResult>;
 }): AgentFunctionTool<TContext, TArgs> {
   return {

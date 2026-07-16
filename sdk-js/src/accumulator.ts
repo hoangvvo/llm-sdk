@@ -432,6 +432,36 @@ export class StreamAccumulator {
   }
 
   /**
+   * Creates a best-effort snapshot of the accumulated response.
+   *
+   * Each part is materialized independently. Parts that cannot yet form a
+   * valid response part are omitted, while partial text remains available
+   * without incomplete citation metadata.
+   */
+  snapshot(): ModelResponse {
+    const content = Array.from(this.#accumulatedParts.entries())
+      .sort(([a], [b]) => a - b)
+      .flatMap(([index, data]) => {
+        try {
+          return [createPart(data, index)];
+        } catch {
+          if (data.type === "text") {
+            return [{ type: "text" as const, text: data.text }];
+          }
+          return [];
+        }
+      });
+    const response: ModelResponse = { content };
+    if (this.#accumulatedUsage) {
+      response.usage = this.#accumulatedUsage;
+    }
+    if (this.#accumulatedCost !== undefined) {
+      response.cost = this.#accumulatedCost;
+    }
+    return response;
+  }
+
+  /**
    * Gets the number of accumulated parts
    */
   get size(): number {

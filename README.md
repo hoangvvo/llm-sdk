@@ -53,7 +53,7 @@ See [Supported providers](./website/src/content/docs/sdk/providers.mdx).
 - `ModelResponse` / `PartialModelResponse`: normalized outputs (with usage/cost when available) that you can forward directly to other services.
 - `Message`: building blocks for conversations. Messages represent user, assistant, or tool turns, with a list of parts, each representing a chunk of content in a specific modality:
   - `Part`: `TextPart`, `ImagePart`, `AudioPart`, `SourcePart` (for citation), `ToolCallPart`, `ToolResultPart`, and `ReasoningPart`.
-- Tool semantics: function calling and tool-result envelopes share the same schema across providers. The SDK normalizes call IDs, arguments, and error flags so agent runtimes can hydrate rich tool events without per-provider branching.
+- Tool semantics: function calling and tool-result envelopes share the same schema across providers. The SDK normalizes call IDs, arguments, and terminal statuses so agent runtimes can hydrate rich tool events without per-provider branching.
 
 ## LLM Agent
 

@@ -1,5 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
+use llm_agent::RunOptions;
 use llm_agent::{
     Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, InstructionParam,
 };
@@ -291,10 +292,13 @@ For less important or long-tail info, use archival_memory_search before answerin
     )]))];
     println!("[user] Remember that my favorite color is blue.");
     let res1 = agent
-        .run(AgentRequest {
-            context: (),
-            input: items1,
-        })
+        .run(
+            AgentRequest {
+                context: (),
+                input: items1,
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run failed");
     println!("res1: {:#?}", res1.content);
@@ -305,10 +309,13 @@ For less important or long-tail info, use archival_memory_search before answerin
     )]))];
     println!("[user] What's my favorite color?");
     let res2 = agent
-        .run(AgentRequest {
-            context: (),
-            input: items2,
-        })
+        .run(
+            AgentRequest {
+                context: (),
+                input: items2,
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run failed");
     println!("res2: {:#?}", res2.content);
@@ -323,10 +330,13 @@ For less important or long-tail info, use archival_memory_search before answerin
     let items3: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(&turn3)]))];
     println!("[user] {turn3}");
     let res3 = agent
-        .run(AgentRequest {
-            context: (),
-            input: items3,
-        })
+        .run(
+            AgentRequest {
+                context: (),
+                input: items3,
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run failed");
     println!("res3: {:#?}", res3.content);
@@ -336,10 +346,13 @@ For less important or long-tail info, use archival_memory_search before answerin
     let items4: Vec<AgentItem> = vec![AgentItem::Message(Message::user(vec![Part::text(turn4)]))];
     println!("[user] {turn4}");
     let res4 = agent
-        .run(AgentRequest {
-            context: (),
-            input: items4,
-        })
+        .run(
+            AgentRequest {
+                context: (),
+                input: items4,
+            },
+            RunOptions::default(),
+        )
         .await
         .expect("run failed");
     println!("res4: {:#?}", res4.content);

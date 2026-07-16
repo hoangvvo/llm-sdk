@@ -402,7 +402,10 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 		}
 		return []googleapi.Part{googlePart}, nil
 	case part.ToolResultPart != nil:
-		response, parts, err := convertToGoogleFunctionResponse(part.ToolResultPart.Content, part.ToolResultPart.IsError)
+		response, parts, err := convertToGoogleFunctionResponse(
+			part.ToolResultPart.Content,
+			part.ToolResultPart.Status != llmsdk.ToolResultStatusCompleted,
+		)
 		if err != nil {
 			return nil, err
 		}

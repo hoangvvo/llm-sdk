@@ -1,5 +1,11 @@
 import type { AgentItem } from "@hoangvvo/llm-agent";
-import type { AudioPart, Part, TextPart } from "@hoangvvo/llm-sdk";
+import type {
+  AudioFormat,
+  AudioPart,
+  Part,
+  TextPart,
+  ToolResultStatus,
+} from "@hoangvvo/llm-sdk";
 import { useEffect, useState } from "react";
 import { base64ToArrayBuffer } from "../lib/utils.ts";
 import { WavPacker } from "../lib/wavtools/wav_packer.ts";
@@ -73,7 +79,7 @@ function ConversationItem({ item }: { item: AgentItem }) {
     tool_call_id: string;
     input: Record<string, unknown>;
     output: Part[];
-    is_error: boolean;
+    status: ToolResultStatus;
   }[] = [];
 
   if (item.type === "tool") {
@@ -82,7 +88,7 @@ function ConversationItem({ item }: { item: AgentItem }) {
       tool_call_id: item.tool_call_id,
       input: item.input,
       output: item.output,
-      is_error: item.is_error,
+      status: item.status,
     });
   } else {
     item.content.forEach((part) => {
@@ -92,7 +98,7 @@ function ConversationItem({ item }: { item: AgentItem }) {
           tool_call_id: part.tool_call_id,
           input: {}, // input is not available in tool-result part
           output: part.content,
-          is_error: !!part.is_error,
+          status: part.status,
         });
       }
     });
@@ -121,9 +127,9 @@ function ConversationItem({ item }: { item: AgentItem }) {
               <PartsList parts={tool.output} />
             </div>
           </div>
-          {tool.is_error ? (
+          {tool.status !== "completed" ? (
             <div className="console-subheading mt-3 text-rose-500!">
-              Tool reported an error.
+              Tool status: {tool.status}.
             </div>
           ) : null}
         </div>
@@ -185,8 +191,8 @@ function PartView({ part }: { part: Part }) {
           <div className="mt-2">
             <PartsList parts={part.content} />
           </div>
-          {part.is_error ? (
-            <div className="mt-2 text-rose-500">Marked as error.</div>
+          {part.status !== "completed" ? (
+            <div className="mt-2 text-rose-500">Status: {part.status}.</div>
           ) : null}
         </div>
       );
@@ -329,7 +335,7 @@ function useAudioSource(part: AudioPart): string | null {
   return part.data ? source : null;
 }
 
-function audioFormatToMime(format: AudioPart["format"]): string {
+function audioFormatToMime(format: AudioFormat): string {
   switch (format) {
     case "mp3":
       return "audio/mpeg";

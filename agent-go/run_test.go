@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -11,7 +12,62 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/llmsdktest"
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
+	sdkstream "github.com/hoangvvo/llm-sdk/sdk-go/utils/stream"
 )
+
+func mixedSnapshotPartials() []llmsdk.PartialModelResponse {
+	return []llmsdk.PartialModelResponse{
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("partial text")}},
+		{Delta: &llmsdk.ContentDelta{Index: 1, Part: llmsdk.NewToolCallPartDelta(
+			llmsdk.WithToolCallPartDeltaToolCallID("call_1"),
+			llmsdk.WithToolCallPartDeltaToolName("weather"),
+			llmsdk.WithToolCallPartDeltaArgs(`{"city":"Paris"}`),
+		)}},
+		{Delta: &llmsdk.ContentDelta{Index: 2, Part: llmsdk.NewToolCallPartDelta(
+			llmsdk.WithToolCallPartDeltaArgs("{incomplete"),
+		)}},
+	}
+}
+
+func mixedSnapshotModelResponse() llmsdk.ModelResponse {
+	return llmsdk.ModelResponse{Content: []llmsdk.Part{
+		llmsdk.NewTextPart("partial text"),
+		llmsdk.NewToolCallPart("call_1", "weather", map[string]any{"city": "Paris"}),
+	}}
+}
+
+type cancellationLanguageModel struct {
+	partials []llmsdk.PartialModelResponse
+}
+
+func (m *cancellationLanguageModel) Provider() string { return "cancellation-test" }
+func (m *cancellationLanguageModel) ModelID() string  { return "cancellation-test" }
+func (m *cancellationLanguageModel) Metadata() *llmsdk.LanguageModelMetadata {
+	return nil
+}
+func (m *cancellationLanguageModel) Generate(context.Context, *llmsdk.LanguageModelInput) (*llmsdk.ModelResponse, error) {
+	return nil, errors.New("generate is not supported")
+}
+func (m *cancellationLanguageModel) Stream(ctx context.Context, _ *llmsdk.LanguageModelInput) (*llmsdk.LanguageModelStream, error) {
+	eventChan := make(chan *llmsdk.PartialModelResponse)
+	errChan := make(chan error)
+	go func() {
+		defer close(eventChan)
+		defer close(errChan)
+		for _, partial := range m.partials {
+			value := partial
+			select {
+			case eventChan <- &value:
+			case <-ctx.Done():
+				errChan <- ctx.Err()
+				return
+			}
+		}
+		<-ctx.Done()
+		errChan <- ctx.Err()
+	}()
+	return sdkstream.New(eventChan, errChan), nil
+}
 
 // MockAgentTool implements llmagent.AgentTool for testing
 type MockAgentTool[C any] struct {
@@ -105,6 +161,215 @@ func mustNewRunSession[C any](t *testing.T, params *llmagent.AgentParams[C], con
 	return session
 }
 
+func TestRun_RejectsEmptyInputWithoutCallingModel(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10},
+		struct{}{},
+	)
+
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{})
+	var agentErr *llmagent.AgentError
+	if !errors.As(err, &agentErr) || agentErr.Kind != llmagent.InvariantErrorKind {
+		t.Fatalf("expected invariant error, got %v", err)
+	}
+	if len(model.TrackedGenerateInputs()) != 0 {
+		t.Fatal("model should not be called for empty input")
+	}
+}
+
+func TestRun_ReturnsCancelledWithoutCallingModelWhenContextAlreadyCancelled(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("ignored")},
+	}))
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10},
+		struct{}{},
+	)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	response, err := session.Run(ctx, llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
+	}})
+	if err != nil {
+		t.Fatalf("expected cancelled response, got %v", err)
+	}
+	if response.Status != llmagent.AgentResponseStatusCancelled || len(response.Content) != 0 || len(response.Output) != 0 {
+		t.Fatalf("unexpected cancelled response: %#v", response)
+	}
+	if len(model.TrackedGenerateInputs()) != 0 {
+		t.Fatal("model should not be called after cancellation")
+	}
+}
+
+func TestRun_RejectsDuplicateToolCallIDsBeforeExecution(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+		Content: []llmsdk.Part{
+			llmsdk.NewToolCallPart("duplicate", "first", map[string]any{}),
+			llmsdk.NewToolCallPart("duplicate", "second", map[string]any{}),
+		},
+	}))
+	first := NewMockTool[struct{}]("first", llmagent.AgentToolResult{}, nil)
+	second := NewMockTool[struct{}]("second", llmagent.AgentToolResult{}, nil)
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{
+			Name:     "test_agent",
+			Model:    model,
+			Tools:    llmagent.FunctionTools[struct{}](first, second),
+			MaxTurns: 10,
+		},
+		struct{}{},
+	)
+
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Use tools"))),
+	}})
+	if err == nil || !strings.Contains(err.Error(), "duplicate tool call ID: duplicate") {
+		t.Fatalf("expected duplicate-ID error, got %v", err)
+	}
+	if len(first.AllCalls) != 0 || len(second.AllCalls) != 0 {
+		t.Fatal("tools must not execute after duplicate IDs are detected")
+	}
+}
+
+func TestRun_PassesCurrentTurnAndAccumulatedItemsToTool(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueGenerateResult(
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{Content: []llmsdk.Part{
+			llmsdk.NewToolCallPart("call_1", "inspect_state", map[string]any{}),
+		}}),
+		llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{Content: []llmsdk.Part{
+			llmsdk.NewTextPart("done"),
+		}}),
+	)
+	type observation struct {
+		turn      uint
+		itemTypes []llmagent.AgentItemType
+	}
+	observed := make(chan observation, 1)
+	tool := NewMockTool[struct{}]("inspect_state", llmagent.AgentToolResult{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("inspected")},
+	}, func(_ context.Context, _ json.RawMessage, _ struct{}, state *llmagent.RunState) (llmagent.AgentToolResult, error) {
+		items := state.Items()
+		types := make([]llmagent.AgentItemType, 0, len(items))
+		for _, item := range items {
+			types = append(types, item.Type())
+		}
+		observed <- observation{turn: state.CurrentTurn, itemTypes: types}
+		return llmagent.AgentToolResult{Content: []llmsdk.Part{llmsdk.NewTextPart("inspected")}}, nil
+	})
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{
+			Name: "test_agent", Model: model, Tools: llmagent.FunctionTools[struct{}](tool), MaxTurns: 10,
+		},
+		struct{}{},
+	)
+
+	_, err := session.Run(t.Context(), llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Inspect"))),
+	}})
+	if err != nil {
+		t.Fatalf("run session: %v", err)
+	}
+	got := <-observed
+	if got.turn != 1 || len(got.itemTypes) != 2 || got.itemTypes[0] != llmagent.AgentItemTypeMessage || got.itemTypes[1] != llmagent.AgentItemTypeModel {
+		t.Fatalf("unexpected run-state observation: %#v", got)
+	}
+}
+
+func TestRunStream_InvalidDeltaSequenceReturnsInvariantError(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueStreamResult(llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("hello")}},
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewReasoningPartDelta("wrong type")}},
+	}))
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10},
+		struct{}{},
+	)
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Stream"))),
+	}})
+	if err != nil {
+		t.Fatalf("create stream: %v", err)
+	}
+	for stream.Next() {
+	}
+	var agentErr *llmagent.AgentError
+	if !errors.As(stream.Err(), &agentErr) || agentErr.Kind != llmagent.InvariantErrorKind {
+		t.Fatalf("expected invariant stream error, got %v", stream.Err())
+	}
+}
+
+func TestRunSession_ClosesInitializedToolkitsWhenCreationFails(t *testing.T) {
+	initialized := &mockToolkitSession[struct{}]{}
+	initFailure := errors.New("second toolkit failed")
+	model := llmsdktest.NewMockLanguageModel()
+	_, err := llmagent.NewRunSession(
+		t.Context(),
+		&llmagent.AgentParams[struct{}]{
+			Name:  "test_agent",
+			Model: model,
+			Toolkits: []llmagent.Toolkit[struct{}]{
+				&mockToolkit[struct{}]{createFn: func(context.Context, struct{}) (llmagent.ToolkitSession[struct{}], error) {
+					return initialized, nil
+				}},
+				&mockToolkit[struct{}]{createFn: func(context.Context, struct{}) (llmagent.ToolkitSession[struct{}], error) {
+					return nil, initFailure
+				}},
+			},
+			MaxTurns: 10,
+		},
+		struct{}{},
+	)
+	if !errors.Is(err, initFailure) {
+		t.Fatalf("expected initialization failure, got %v", err)
+	}
+	if initialized.closeCalls != 1 {
+		t.Fatalf("expected initialized toolkit cleanup, got %d", initialized.closeCalls)
+	}
+}
+
+func TestRunSession_CloseAttemptsEveryToolkitAndReportsFailure(t *testing.T) {
+	cleanupFailure := errors.New("cleanup failed")
+	failing := &mockToolkitSession[struct{}]{closeErr: cleanupFailure}
+	successful := &mockToolkitSession[struct{}]{}
+	model := llmsdktest.NewMockLanguageModel()
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{
+			Name:  "test_agent",
+			Model: model,
+			Toolkits: []llmagent.Toolkit[struct{}]{
+				&mockToolkit[struct{}]{createFn: func(context.Context, struct{}) (llmagent.ToolkitSession[struct{}], error) {
+					return failing, nil
+				}},
+				&mockToolkit[struct{}]{createFn: func(context.Context, struct{}) (llmagent.ToolkitSession[struct{}], error) {
+					return successful, nil
+				}},
+			},
+			MaxTurns: 10,
+		},
+		struct{}{},
+	)
+
+	err := session.Close(t.Context())
+	if !errors.Is(err, cleanupFailure) {
+		t.Fatalf("expected cleanup failure, got %v", err)
+	}
+	if failing.closeCalls != 1 || successful.closeCalls != 1 {
+		t.Fatalf("expected every toolkit to close: failing=%d successful=%d", failing.closeCalls, successful.closeCalls)
+	}
+}
+
 // -------- Root-level tests (Run) --------
 
 func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
@@ -141,6 +406,7 @@ func TestRun_ReturnsResponse_NoToolCall(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
+		Status: llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{
 			llmsdk.NewTextPart("Hi!"),
 		},
@@ -228,6 +494,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
+		Status: llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{
 			llmsdk.NewTextPart("Final response"),
 		},
@@ -248,7 +515,7 @@ func TestRun_ExecutesSingleToolCallAndReturnsResponse(t *testing.T) {
 				"test_tool",
 				json.RawMessage(`{"param": "value"}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Tool result")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			// Final model item
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
@@ -350,6 +617,7 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
+		Status:  llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Processed both tools")},
 		Output: []llmagent.AgentItem{
 			// model with tool calls
@@ -365,14 +633,14 @@ func TestRun_ExecutesMultipleToolCallsInParallel(t *testing.T) {
 				"tool_1",
 				json.RawMessage(`{"param":"value1"}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Tool 1 result")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemTool(
 				"call_2",
 				"tool_2",
 				json.RawMessage(`{"param":"value2"}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Tool 2 result")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemModelResponse(
 				llmsdk.ModelResponse{
@@ -492,6 +760,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
+		Status: llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{
 			llmsdk.NewTextPart("All calculations done"),
 		},
@@ -510,7 +779,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 				"calculator",
 				json.RawMessage(`{"operation": "add", "a": 1, "b": 2}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Calculation result")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
@@ -526,7 +795,7 @@ func TestRun_HandlesMultipleTurnsWithToolCalls(t *testing.T) {
 				"calculator",
 				json.RawMessage(`{"operation": "multiply", "a": 3, "b": 4}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Calculation result")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
@@ -568,6 +837,7 @@ func TestRun_ReturnsExistingAssistantResponseWithoutNewModelOutput(t *testing.T)
 	}
 
 	expected := &llmagent.AgentResponse{
+		Status:  llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Cached answer")},
 		Output:  []llmagent.AgentItem{},
 	}
@@ -638,9 +908,10 @@ func TestRun_ResumesToolProcessingFromToolMessageWithPartialResults(t *testing.T
 	}
 
 	expected := &llmagent.AgentResponse{
+		Status:  llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply")},
 		Output: []llmagent.AgentItem{
-			llmagent.NewAgentItemTool("call_2", "resume_tool", call2Args, []llmsdk.Part{llmsdk.NewTextPart("call_2 result")}, false),
+			llmagent.NewAgentItemTool("call_2", "resume_tool", call2Args, []llmsdk.Part{llmsdk.NewTextPart("call_2 result")}, llmsdk.ToolResultStatusCompleted),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply")}}),
 		},
 	}
@@ -693,7 +964,7 @@ func TestRun_ResumesToolProcessingWhenTrailingToolEntries(t *testing.T) {
 					llmsdk.NewToolCallPart("call_2", "resume_tool", call2Args),
 				},
 			}),
-			llmagent.NewAgentItemTool("call_1", "resume_tool", call1Args, []llmsdk.Part{llmsdk.NewTextPart("already done")}, false),
+			llmagent.NewAgentItemTool("call_1", "resume_tool", call1Args, []llmsdk.Part{llmsdk.NewTextPart("already done")}, llmsdk.ToolResultStatusCompleted),
 		},
 	})
 	if err != nil {
@@ -705,9 +976,10 @@ func TestRun_ResumesToolProcessingWhenTrailingToolEntries(t *testing.T) {
 	}
 
 	expected := &llmagent.AgentResponse{
+		Status:  llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply from items")},
 		Output: []llmagent.AgentItem{
-			llmagent.NewAgentItemTool("call_2", "resume_tool", call2Args, []llmsdk.Part{llmsdk.NewTextPart("call_2 via item")}, false),
+			llmagent.NewAgentItemTool("call_2", "resume_tool", call2Args, []llmsdk.Part{llmsdk.NewTextPart("call_2 via item")}, llmsdk.ToolResultStatusCompleted),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{Content: []llmsdk.Part{llmsdk.NewTextPart("Final reply from items")}}),
 		},
 	}
@@ -830,6 +1102,9 @@ func TestRun_ThrowsAgentMaxTurnsExceededError(t *testing.T) {
 
 	if agentErr.Kind != llmagent.AgentErrorKindMaxTurnsExceeded {
 		t.Errorf("expected max turns exceeded error, got %s", agentErr.Kind)
+	}
+	if agentErr.Snapshot == nil {
+		t.Fatal("expected a run snapshot")
 	}
 }
 
@@ -982,6 +1257,7 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
+		Status: llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{
 			llmsdk.NewTextPart("Handled the error"),
 		},
@@ -996,7 +1272,7 @@ func TestRun_HandlesToolReturningErrorResult(t *testing.T) {
 				"test_tool",
 				json.RawMessage(`{"invalid": true}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Error: Invalid parameters")},
-				true,
+				llmsdk.ToolResultStatusFailed,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
@@ -1317,6 +1593,7 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
+		Status:  llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Order ready")},
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
@@ -1329,7 +1606,7 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 				"lookup-order",
 				json.RawMessage(`{"orderId":"123"}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Order 123 ready for Ada")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{llmsdk.NewTextPart("Order ready")},
@@ -1350,6 +1627,40 @@ func TestRun_MergesToolkitPromptsAndTools(t *testing.T) {
 }
 
 // -------- Root-level tests (RunStream) --------
+
+func TestRunStream_ReturnsCancelledWithoutCallingModelWhenContextAlreadyCancelled(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueStreamResult(llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+		{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("ignored")}},
+	}))
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10},
+		struct{}{},
+	)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	stream, err := session.RunStream(ctx, llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
+	}})
+	if err != nil {
+		t.Fatalf("create stream: %v", err)
+	}
+	var events []*llmagent.AgentStreamEvent
+	for stream.Next() {
+		events = append(events, stream.Current())
+	}
+	if err := stream.Err(); err != nil {
+		t.Fatalf("expected cancelled response, got %v", err)
+	}
+	if len(events) != 1 || events[0].Response == nil || events[0].Response.Status != llmagent.AgentResponseStatusCancelled {
+		t.Fatalf("unexpected cancellation events: %#v", events)
+	}
+	if len(model.TrackedStreamInputs()) != 0 {
+		t.Fatal("model should not be called after cancellation")
+	}
+}
 
 func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
@@ -1427,6 +1738,7 @@ func TestRunStream_StreamsResponse_NoToolCall(t *testing.T) {
 		},
 		{
 			Response: &llmagent.AgentResponse{
+				Status: llmagent.AgentResponseStatusCompleted,
 				Content: []llmsdk.Part{
 					llmsdk.NewTextPart("Hello!"),
 				},
@@ -1538,7 +1850,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 				}
 			} else if itemEvent.Item.Tool != nil {
 				suffix := ":false"
-				if itemEvent.Item.Tool.IsError {
+				if itemEvent.Item.Tool.Status != llmsdk.ToolResultStatusCompleted {
 					suffix = ":true"
 				}
 				summaries = append(summaries, "item:tool:"+itemEvent.Item.Tool.ToolName+suffix)
@@ -1575,6 +1887,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 	}
 
 	expectedResponse := &llmagent.AgentResponse{
+		Status: llmagent.AgentResponseStatusCompleted,
 		Content: []llmsdk.Part{
 			llmsdk.NewTextPart("Final response"),
 		},
@@ -1589,7 +1902,7 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 				"test_tool",
 				json.RawMessage(`{"a":1,"b":2,"operation":"add"}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Tool result")},
-				false,
+				llmsdk.ToolResultStatusCompleted,
 			),
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
@@ -1734,6 +2047,111 @@ func TestRunStream_ReturnsLanguageModelError(t *testing.T) {
 	var agentErr *llmagent.AgentError
 	if !errors.As(stream.Err(), &agentErr) || agentErr.Kind != llmagent.LanguageModelErrorKind {
 		t.Fatalf("expected language model agent error, got %v", stream.Err())
+	}
+}
+
+func TestRunStream_CommitsMaterializablePartialContentBeforeError(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	modelErr := llmsdk.NewInvalidInputError("stream failed")
+	model.EnqueueStreamResult(llmsdktest.NewMockStreamResultPartialsThenError(
+		mixedSnapshotPartials(),
+		modelErr,
+	))
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10},
+		struct{}{},
+	)
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
+	}})
+	if err != nil {
+		t.Fatalf("create stream: %v", err)
+	}
+	var events []llmagent.AgentStreamEvent
+	for stream.Next() {
+		events = append(events, *stream.Current())
+	}
+	var agentErr *llmagent.AgentError
+	if !errors.As(stream.Err(), &agentErr) || agentErr.Kind != llmagent.LanguageModelErrorKind {
+		t.Fatalf("expected language model agent error, got %v", stream.Err())
+	}
+	if agentErr.Snapshot == nil {
+		t.Fatal("expected a run snapshot")
+	}
+	expectedItem := llmagent.NewAgentItemModelResponse(mixedSnapshotModelResponse())
+	if diff := cmp.Diff([]llmagent.AgentItem{expectedItem}, agentErr.Snapshot.Output); diff != "" {
+		t.Fatalf("snapshot output mismatch (-want +got):\n%s", diff)
+	}
+	if len(events) != 4 {
+		t.Fatalf("expected three partial events and one item event, got %#v", events)
+	}
+	for _, event := range events[:3] {
+		if event.Partial == nil || event.Response != nil {
+			t.Fatalf("expected partial events first, got %#v", events)
+		}
+	}
+	if events[3].Item == nil || cmp.Diff(expectedItem, events[3].Item.Item) != "" {
+		t.Fatalf("expected committed model item event, got %#v", events[3])
+	}
+}
+
+func TestRunStream_RecordsCancelledResultsForMaterializedToolCalls(t *testing.T) {
+	model := &cancellationLanguageModel{partials: mixedSnapshotPartials()}
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10},
+		struct{}{},
+	)
+	ctx, cancel := context.WithCancel(t.Context())
+	stream, err := session.RunStream(ctx, llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Hello"))),
+	}})
+	if err != nil {
+		t.Fatalf("create stream: %v", err)
+	}
+	for index := 0; index < 3; index++ {
+		if !stream.Next() || stream.Current().Partial == nil {
+			t.Fatalf("expected partial event %d, got error %v", index, stream.Err())
+		}
+	}
+	cancel()
+	if !stream.Next() || stream.Current().Item == nil {
+		t.Fatalf("expected committed model item, got error %v", stream.Err())
+	}
+	expectedItem := llmagent.NewAgentItemModelResponse(mixedSnapshotModelResponse())
+	if diff := cmp.Diff(expectedItem, stream.Current().Item.Item); diff != "" {
+		t.Fatalf("model item mismatch (-want +got):\n%s", diff)
+	}
+	if !stream.Next() || stream.Current().Item == nil {
+		t.Fatalf("expected cancelled tool item, got error %v", stream.Err())
+	}
+	toolCall := mixedSnapshotModelResponse().Content[1].ToolCallPart
+	expectedToolItem := llmagent.NewAgentItemTool(
+		toolCall.ToolCallID,
+		toolCall.ToolName,
+		toolCall.Args,
+		[]llmsdk.Part{},
+		llmsdk.ToolResultStatusCancelled,
+	)
+	if diff := cmp.Diff(expectedToolItem, stream.Current().Item.Item); diff != "" {
+		t.Fatalf("cancelled tool item mismatch (-want +got):\n%s", diff)
+	}
+	if !stream.Next() || stream.Current().Response == nil {
+		t.Fatalf("expected cancelled response, got error %v", stream.Err())
+	}
+	response := stream.Current().Response
+	if response.Status != llmagent.AgentResponseStatusCancelled {
+		t.Fatalf("expected cancelled status, got %q", response.Status)
+	}
+	if diff := cmp.Diff([]llmsdk.Part{}, response.Content); diff != "" {
+		t.Fatalf("cancelled content mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]llmagent.AgentItem{expectedItem, expectedToolItem}, response.Output); diff != "" {
+		t.Fatalf("cancelled output mismatch (-want +got):\n%s", diff)
+	}
+	if stream.Next() || stream.Err() != nil {
+		t.Fatalf("expected clean end after cancelled response, got %v", stream.Err())
 	}
 }
 
@@ -1902,6 +2320,7 @@ func TestRunStream_MergesToolkitPromptsAndTools(t *testing.T) {
 		),
 		{
 			Response: &llmagent.AgentResponse{
+				Status:  llmagent.AgentResponseStatusCompleted,
 				Content: []llmsdk.Part{llmsdk.NewTextPart("Done")},
 				Output: []llmagent.AgentItem{
 					llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{

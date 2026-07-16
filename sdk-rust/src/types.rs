@@ -214,9 +214,18 @@ pub struct ToolResultPart {
     pub tool_name: String,
     /// The content of the tool result.
     pub content: Vec<Part>,
-    /// Marks the tool result as an error.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_error: Option<bool>,
+    /// The terminal status of the tool call.
+    pub status: ToolResultStatus,
+}
+
+/// The terminal status of a tool call.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ToolResultStatus {
+    Completed,
+    Failed,
+    Cancelled,
 }
 
 // A part of the message that represents the model reasoning.

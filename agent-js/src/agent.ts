@@ -1,5 +1,6 @@
 import type { AgentParams } from "./params.ts";
-import { RunSession } from "./run.ts";
+import { AgentInvariantError } from "./errors.ts";
+import { RunSession, type RunOptions } from "./run.ts";
 import type { AgentRequest, AgentResponse, AgentStreamEvent } from "./types.ts";
 
 export class Agent<TContext> {
@@ -18,14 +19,14 @@ export class Agent<TContext> {
    * Create a one-time run of the agent and generate a response.
    * A session is created for the run and cleaned up afterwards.
    */
-  async run({
-    input,
-    context,
-  }: AgentRequest<TContext>): Promise<AgentResponse> {
+  async run(
+    { input, context }: AgentRequest<TContext>,
+    options?: RunOptions,
+  ): Promise<AgentResponse> {
     const runSession = await this.createSession(context);
     let response: AgentResponse;
     try {
-      response = await runSession.run({ input });
+      response = await runSession.run({ input }, options);
     } catch (error) {
       try {
         await runSession.close();
@@ -42,22 +43,26 @@ export class Agent<TContext> {
    * Create a one-time streaming run of the agent and generate a response.
    * A session is created for the run and cleaned up afterwards.
    */
-  async *runStream({
-    input,
-    context,
-  }: AgentRequest<TContext>): AsyncGenerator<AgentStreamEvent, AgentResponse> {
+  async *runStream(
+    { input, context }: AgentRequest<TContext>,
+    options?: RunOptions,
+  ): AsyncGenerator<AgentStreamEvent, AgentResponse> {
     const runSession = await this.createSession(context);
+    let response: AgentResponse | undefined;
     let streamFailed = false;
     try {
-      const stream = runSession.runStream({ input });
-
-      let current = await stream.next();
-      while (!current.done) {
-        yield current.value;
-        current = await stream.next();
+      const stream = runSession.runStream({ input }, options);
+      for await (const event of stream) {
+        if (event.event === "response") {
+          response = {
+            content: event.content,
+            output: event.output,
+            status: event.status,
+          };
+        } else {
+          yield event;
+        }
       }
-
-      return current.value;
     } catch (error) {
       streamFailed = true;
       throw error;
@@ -72,6 +77,12 @@ export class Agent<TContext> {
         }
       }
     }
+
+    if (!response) {
+      throw new AgentInvariantError("Agent stream ended without a response.");
+    }
+    yield { event: "response", ...response };
+    return response;
   }
 
   /**

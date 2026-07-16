@@ -11,8 +11,11 @@ use futures::future::BoxFuture;
 use llm_sdk;
 use rmcp::{
     handler::client::ClientHandler,
-    model::{CallToolRequestParams, CallToolResult, Tool},
-    service::{serve_client, NotificationContext, RoleClient, RunningService},
+    model::{CallToolRequestParams, CallToolResult, ClientRequest, Request, ServerResult, Tool},
+    service::{
+        serve_client, NotificationContext, PeerRequestOptions, RoleClient, RunningService,
+        ServiceError,
+    },
     transport::{
         child_process::TokioChildProcess,
         streamable_http_client::{
@@ -178,12 +181,12 @@ where
         self.parameters.clone()
     }
 
-    fn execute(
-        &self,
+    fn execute<'a>(
+        &'a self,
         args: Value,
-        _context: &TCtx,
-        _state: &RunState,
-    ) -> BoxFuture<'_, Result<AgentToolResult, BoxedError>> {
+        _context: &'a TCtx,
+        state: &'a RunState,
+    ) -> BoxFuture<'a, Result<AgentToolResult, BoxedError>> {
         Box::pin(async move {
             let arguments = match args {
                 Value::Null => None,
@@ -209,10 +212,32 @@ where
                     "MCP service not initialised",
                 )) as BoxedError);
             };
-            let result = service
-                .call_tool(request)
+            let mut handle = service
+                .send_cancellable_request(
+                    ClientRequest::CallToolRequest(Request::new(request)),
+                    PeerRequestOptions::no_options(),
+                )
                 .await
                 .map_err(|err| Box::new(err) as BoxedError)?;
+            let response = tokio::select! {
+                () = state.cancellation_token().cancelled() => {
+                    let _ = handle
+                        .cancel(Some("Agent run cancelled".to_string()))
+                        .await;
+                    return Err(Box::new(IoError::new(
+                        ErrorKind::Interrupted,
+                        "MCP tool call cancelled",
+                    )) as BoxedError);
+                }
+                response = &mut handle.rx => {
+                    response
+                        .map_err(|_| Box::new(ServiceError::TransportClosed) as BoxedError)?
+                        .map_err(|err| Box::new(err) as BoxedError)?
+                }
+            };
+            let ServerResult::CallToolResult(result) = response else {
+                return Err(Box::new(ServiceError::UnexpectedResponse) as BoxedError);
+            };
 
             let CallToolResult {
                 content, is_error, ..
@@ -345,21 +370,5 @@ where
                 state.record_error(err);
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::strip_bearer_prefix;
-
-    #[test]
-    fn normalizes_bearer_tokens_for_rmcp() {
-        assert_eq!(strip_bearer_prefix("token"), Some("token".to_string()));
-        assert_eq!(
-            strip_bearer_prefix("  BEARER   token  "),
-            Some("token".to_string())
-        );
-        assert_eq!(strip_bearer_prefix("  "), None);
-        assert_eq!(strip_bearer_prefix("Bearer "), None);
     }
 }

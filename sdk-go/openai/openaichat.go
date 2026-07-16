@@ -500,6 +500,15 @@ func convertToolMessageToOpenAIChatMessages(message *llmsdk.ToolMessage) ([]open
 
 		toolResultParts := partutil.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
 		if len(toolResultParts) == 0 {
+			empty := openaichatapi.ChatCompletionRequestToolMessageContentString(ptr.To(""))
+			result = append(result, openaichatapi.ChatCompletionRequestMessage{
+				Tool: &openaichatapi.ChatCompletionRequestToolMessage{
+					ToolCallId: part.ToolResultPart.ToolCallID,
+					Content: openaichatapi.ChatCompletionRequestToolMessageContent{
+						ChatCompletionRequestToolMessageContentString: &empty,
+					},
+				},
+			})
 			continue
 		}
 

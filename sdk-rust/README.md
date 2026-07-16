@@ -120,6 +120,7 @@ cargo run --example generate-text
 ### To 0.4.0
 
 - Replace `Tool { name, description, parameters }` with `FunctionTool::new(...)`.
+- `ToolResultPart::is_error` has been replaced with the required `status` field (`Completed`, `Failed`, or `Cancelled`).
 
 ### To 0.2.0
 

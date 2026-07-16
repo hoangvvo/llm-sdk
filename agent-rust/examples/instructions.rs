@@ -1,4 +1,5 @@
 use dotenvy::dotenv;
+use llm_agent::RunOptions;
 use llm_agent::{Agent, AgentRequest, InstructionParam};
 use llm_sdk::{Message, Part};
 use std::error::Error;
@@ -64,12 +65,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let response = dungeon_coach
-        .run(AgentRequest {
-            context,
-            input: vec![llm_agent::AgentItem::Message(Message::user(vec![
-                Part::text("The party is stuck at a collapsed bridge. What should happen next?"),
-            ]))],
-        })
+        .run(
+            AgentRequest {
+                context,
+                input: vec![llm_agent::AgentItem::Message(Message::user(vec![
+                    Part::text(
+                        "The party is stuck at a collapsed bridge. What should happen next?",
+                    ),
+                ]))],
+            },
+            RunOptions::default(),
+        )
         .await?;
 
     println!("{}", response.text());

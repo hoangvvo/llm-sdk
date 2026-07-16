@@ -82,11 +82,15 @@ export class MCPToolkitSession<TContext> implements ToolkitSession<TContext> {
           name: mcpTool.name,
           parameters: mcpTool.inputSchema,
           description: mcpTool.description ?? "",
-          execute: async (args) => {
-            const res = await this.#client.callTool({
-              name: mcpTool.name,
-              arguments: args as Record<string, unknown>,
-            });
+          execute: async (args, _context, state) => {
+            const res = await this.#client.callTool(
+              {
+                name: mcpTool.name,
+                arguments: args as Record<string, unknown>,
+              },
+              undefined,
+              state.signal ? { signal: state.signal } : undefined,
+            );
             return {
               content: convertMCPContentToParts(res.content as MCPContent[]),
               is_error: Boolean(res.isError),

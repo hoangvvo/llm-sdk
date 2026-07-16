@@ -10,7 +10,9 @@ import {
 } from "@hoangvvo/llm-sdk";
 import { MockLanguageModel } from "@hoangvvo/llm-sdk/test";
 import test, { suite, type TestContext } from "node:test";
+import { setTimeout } from "node:timers/promises";
 import {
+  AgentCleanupError,
   AgentInitError,
   AgentInvariantError,
   AgentLanguageModelError,
@@ -45,6 +47,57 @@ function createPartialResponse(part: PartDelta): PartialModelResponse {
   };
 }
 
+function createMixedSnapshotPartials(): PartialModelResponse[] {
+  return [
+    {
+      delta: { index: 0, part: { type: "text", text: "partial text" } },
+    },
+    {
+      delta: {
+        index: 1,
+        part: {
+          type: "tool-call",
+          tool_call_id: "call_1",
+          tool_name: "weather",
+          args: '{"city":"Paris"}',
+        },
+      },
+    },
+    {
+      delta: {
+        index: 2,
+        part: { type: "tool-call", args: "{incomplete" },
+      },
+    },
+  ];
+}
+
+function createMixedSnapshotModelItem() {
+  return {
+    type: "model" as const,
+    content: [
+      { type: "text" as const, text: "partial text" },
+      {
+        type: "tool-call" as const,
+        tool_call_id: "call_1",
+        tool_name: "weather",
+        args: { city: "Paris" },
+      },
+    ],
+  };
+}
+
+function createMixedSnapshotCancelledToolItem() {
+  return {
+    type: "tool" as const,
+    tool_call_id: "call_1",
+    tool_name: "weather",
+    input: { city: "Paris" },
+    output: [],
+    status: "cancelled" as const,
+  };
+}
+
 function isPartialEvent(
   event: AgentStreamEvent,
 ): event is Extract<AgentStreamEvent, { event: "partial" }> {
@@ -64,6 +117,348 @@ function isResponseEvent(
 }
 
 suite("RunSession#run", () => {
+  test("rejects empty input without calling the model", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+    });
+
+    await t.assert.rejects(
+      () => session.run({ input: [] }),
+      (error: unknown) => error instanceof AgentInvariantError,
+    );
+    t.assert.strictEqual(model.trackedGenerateInputs.length, 0);
+  });
+
+  test("returns cancelled without calling the model when already aborted", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: { content: [{ type: "text", text: "ignored" }] },
+    });
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+    });
+    const controller = new AbortController();
+    controller.abort();
+
+    const response = await session.run(
+      {
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "text", text: "Hello" }],
+          },
+        ],
+      },
+      { signal: controller.signal },
+    );
+
+    t.assert.deepStrictEqual(response, {
+      content: [],
+      output: [],
+      status: "cancelled",
+    });
+    t.assert.strictEqual(model.trackedGenerateInputs.length, 0);
+  });
+
+  test("rejects duplicate tool-call IDs before executing tools", async (t: TestContext) => {
+    let executions = 0;
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
+        content: [
+          {
+            type: "tool-call",
+            tool_call_id: "duplicate",
+            tool_name: "first",
+            args: {},
+          },
+          {
+            type: "tool-call",
+            tool_call_id: "duplicate",
+            tool_name: "second",
+            args: {},
+          },
+        ],
+      },
+    });
+    const makeTool = (name: string): AgentFunctionTool<object> => ({
+      type: "function",
+      name,
+      description: name,
+      parameters: { type: "object", properties: {} },
+      execute: () => {
+        executions++;
+        return { content: [], is_error: false };
+      },
+    });
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      tools: [makeTool("first"), makeTool("second")],
+      context: {},
+    });
+
+    await t.assert.rejects(
+      () =>
+        session.run({
+          input: [
+            {
+              type: "message",
+              role: "user",
+              content: [{ type: "text", text: "Use tools" }],
+            },
+          ],
+        }),
+      /Duplicate tool call ID: duplicate/,
+    );
+    t.assert.strictEqual(executions, 0);
+  });
+
+  test("exposes the current turn and accumulated items to tools", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult(
+      {
+        response: {
+          content: [
+            {
+              type: "tool-call",
+              tool_call_id: "call_1",
+              tool_name: "inspect_state",
+              args: {},
+            },
+          ],
+        },
+      },
+      { response: { content: [{ type: "text", text: "done" }] } },
+    );
+    const inspectTool: AgentFunctionTool<object> = {
+      type: "function",
+      name: "inspect_state",
+      description: "Inspect run state",
+      parameters: { type: "object", properties: {} },
+      execute: (_args, _context, state) => {
+        t.assert.strictEqual(state.currentTurn, 1);
+        t.assert.deepStrictEqual(
+          state.getItems().map((item) => item.type),
+          ["message", "model"],
+        );
+        return {
+          content: [{ type: "text", text: "inspected" }],
+          is_error: false,
+        };
+      },
+    };
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      tools: [inspectTool],
+      context: {},
+    });
+
+    const response = await session.run({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Inspect" }],
+        },
+      ],
+    });
+    t.assert.deepStrictEqual(response.content, [
+      { type: "text", text: "done" },
+    ]);
+  });
+
+  test("records cancelled tool results for the next run", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
+        content: [
+          {
+            type: "tool-call",
+            tool_call_id: "call_1",
+            tool_name: "wait",
+            args: {},
+          },
+          {
+            type: "tool-call",
+            tool_call_id: "call_2",
+            tool_name: "wait",
+            args: {},
+          },
+        ],
+      },
+    });
+    let started: (() => void) | undefined;
+    const toolStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const waitTool: AgentFunctionTool<object> = {
+      type: "function",
+      name: "wait",
+      description: "wait",
+      parameters: { type: "object", properties: {} },
+      execute: async (_args, _context, state) => {
+        started?.();
+        await setTimeout(60_000, undefined, { signal: state.signal });
+        return { content: [], is_error: false };
+      },
+    };
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      tools: [waitTool],
+      context: {},
+    });
+    const initial = {
+      type: "message" as const,
+      role: "user" as const,
+      content: [{ type: "text" as const, text: "Wait" }],
+    };
+    const controller = new AbortController();
+    const run = session.run(
+      { input: [initial] },
+      { signal: controller.signal },
+    );
+    await toolStarted;
+    controller.abort();
+    const response = await run;
+
+    t.assert.strictEqual(response.status, "cancelled");
+    t.assert.strictEqual(response.output.length, 3);
+    for (const item of response.output.slice(1)) {
+      if (item.type !== "tool") t.assert.fail("Expected a tool item");
+      t.assert.strictEqual(item.status, "cancelled");
+      t.assert.deepStrictEqual(item.output, []);
+    }
+
+    model.enqueueGenerateResult({
+      response: { content: [{ type: "text", text: "continued" }] },
+    });
+    const nextSession = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+    });
+    await nextSession.run({
+      input: [
+        initial,
+        ...response.output,
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Continue" }],
+        },
+      ],
+    });
+
+    const toolMessage = model.trackedGenerateInputs[1]?.messages[2];
+    if (toolMessage?.role !== "tool") t.assert.fail("Expected a tool message");
+    t.assert.strictEqual(toolMessage.content.length, 2);
+    for (const part of toolMessage.content) {
+      if (part.type !== "tool-result") t.assert.fail("Expected a tool result");
+      t.assert.strictEqual(part.status, "cancelled");
+      t.assert.deepStrictEqual(part.content, []);
+    }
+  });
+
+  test("does not start later tools after a non-cooperative tool finishes", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
+        content: [
+          {
+            type: "tool-call",
+            tool_call_id: "call_1",
+            tool_name: "first",
+            args: {},
+          },
+          {
+            type: "tool-call",
+            tool_call_id: "call_2",
+            tool_name: "second",
+            args: {},
+          },
+        ],
+      },
+    });
+
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    let releaseFirst: (() => void) | undefined;
+    const released = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const first: AgentFunctionTool<object> = {
+      type: "function",
+      name: "first",
+      description: "first",
+      parameters: { type: "object", properties: {} },
+      execute: async () => {
+        markStarted?.();
+        await released;
+        return {
+          content: [{ type: "text", text: "first finished" }],
+          is_error: false,
+        };
+      },
+    };
+    const secondExecute = t.mock.fn(() => ({
+      content: [{ type: "text" as const, text: "second finished" }],
+      is_error: false,
+    }));
+    const second: AgentFunctionTool<object> = {
+      type: "function",
+      name: "second",
+      description: "second",
+      parameters: { type: "object", properties: {} },
+      execute: secondExecute,
+    };
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      tools: [first, second],
+      context: {},
+    });
+    const controller = new AbortController();
+    const run = session.run(
+      {
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "text", text: "Run both tools" }],
+          },
+        ],
+      },
+      { signal: controller.signal },
+    );
+
+    await started;
+    controller.abort();
+    releaseFirst?.();
+    const response = await run;
+
+    t.assert.strictEqual(response.status, "cancelled");
+    t.assert.strictEqual(response.output.length, 3);
+    const firstItem = response.output[1];
+    const secondItem = response.output[2];
+    if (firstItem?.type !== "tool" || secondItem?.type !== "tool") {
+      t.assert.fail("Expected completed and cancelled tool items");
+    }
+    t.assert.strictEqual(firstItem.status, "completed");
+    t.assert.strictEqual(secondItem.status, "cancelled");
+    t.assert.strictEqual(secondExecute.mock.callCount(), 0);
+  });
+
   test("returns a response when there is no tool call", async (t: TestContext) => {
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -91,6 +486,7 @@ suite("RunSession#run", () => {
     });
 
     t.assert.deepStrictEqual(response, {
+      status: "completed",
       content: [{ type: "text", text: "Hi!" }],
       output: [
         {
@@ -172,6 +568,7 @@ suite("RunSession#run", () => {
     ]);
 
     t.assert.deepStrictEqual(response, {
+      status: "completed",
       content: [{ type: "text", text: "Final response" }],
       output: [
         {
@@ -196,7 +593,7 @@ suite("RunSession#run", () => {
           tool_call_id: "call_1",
           input: { param: "value" },
           output: [{ type: "text", text: "Tool result" }],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -235,6 +632,7 @@ suite("RunSession#run", () => {
     });
 
     t.assert.deepStrictEqual(response, {
+      status: "completed",
       content: [{ type: "text", text: "Cached answer" }],
       output: [],
     });
@@ -319,6 +717,7 @@ suite("RunSession#run", () => {
     );
 
     const expectedResponse: AgentResponse = {
+      status: "completed",
       content: [{ type: "text", text: "Processed both tools" }],
       output: [
         {
@@ -353,7 +752,7 @@ suite("RunSession#run", () => {
               text: "Tool 1 result",
             },
           ],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "tool",
@@ -366,7 +765,7 @@ suite("RunSession#run", () => {
               text: "Tool 2 result",
             },
           ],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -457,6 +856,7 @@ suite("RunSession#run", () => {
     );
 
     const expectedResponse: AgentResponse = {
+      status: "completed",
       content: [{ type: "text", text: "All calculations done" }],
       output: [
         {
@@ -476,7 +876,7 @@ suite("RunSession#run", () => {
           tool_call_id: "call_1",
           input: { operation: "add", a: 1, b: 2 },
           output: [{ type: "text", text: "Calculation result" }],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -495,7 +895,7 @@ suite("RunSession#run", () => {
           tool_call_id: "call_2",
           input: { operation: "multiply", a: 3, b: 4 },
           output: [{ type: "text", text: "Calculation result" }],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -738,7 +1138,7 @@ suite("RunSession#run", () => {
               tool_name: "resume_tool",
               tool_call_id: "call_1",
               content: [{ type: "text", text: "already done" }],
-              is_error: false,
+              status: "completed",
             },
           ],
         },
@@ -751,6 +1151,7 @@ suite("RunSession#run", () => {
     });
 
     t.assert.deepStrictEqual(response, {
+      status: "completed",
       content: [{ type: "text", text: "Final reply" }],
       output: [
         {
@@ -759,7 +1160,7 @@ suite("RunSession#run", () => {
           tool_call_id: "call_2",
           input: { step: 2 },
           output: [{ type: "text", text: "call_2 result" }],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -825,7 +1226,7 @@ suite("RunSession#run", () => {
           tool_call_id: "call_1",
           input: { stage: 1 },
           output: [{ type: "text", text: "already done" }],
-          is_error: false,
+          status: "completed",
         },
       ],
     });
@@ -836,6 +1237,7 @@ suite("RunSession#run", () => {
     });
 
     t.assert.deepStrictEqual(response, {
+      status: "completed",
       content: [{ type: "text", text: "Final reply from items" }],
       output: [
         {
@@ -844,7 +1246,7 @@ suite("RunSession#run", () => {
           tool_call_id: "call_2",
           input: { stage: 2 },
           output: [{ type: "text", text: "call_2 via item" }],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -890,7 +1292,7 @@ suite("RunSession#run", () => {
                   tool_name: "resume_tool",
                   tool_call_id: "call_1",
                   content: [{ type: "text", text: "orphan" }],
-                  is_error: false,
+                  status: "completed",
                 },
               ],
             },
@@ -909,12 +1311,13 @@ suite("RunSession#run", () => {
   });
 
   test("handles tool returning error result", async (t: TestContext) => {
-    const toolExecute = t.mock.fn<
-      AgentFunctionTool<object, Record<string, unknown>>["execute"]
-    >(() => ({
-      content: [{ type: "text", text: "Error: Invalid parameters" }],
-      is_error: true,
-    }));
+    const toolExecute = t.mock.fn((args: Record<string, unknown>) => {
+      t.assert.deepStrictEqual(args, { invalid: true });
+      return {
+        content: [{ type: "text" as const, text: "Error: Invalid parameters" }],
+        is_error: true,
+      };
+    });
 
     const tool = createMockTool<object>("test_tool", null, toolExecute);
 
@@ -957,12 +1360,10 @@ suite("RunSession#run", () => {
       ],
     });
 
-    t.assert.deepStrictEqual(
-      toolExecute.mock.calls.map((call) => call.arguments[0]),
-      [{ invalid: true }],
-    );
+    t.assert.strictEqual(toolExecute.mock.callCount(), 1);
 
     const expectedResponse: AgentResponse = {
+      status: "completed",
       content: [{ type: "text", text: "Handled the error" }],
       output: [
         {
@@ -982,7 +1383,7 @@ suite("RunSession#run", () => {
           tool_call_id: "call_1",
           input: { invalid: true },
           output: [{ type: "text", text: "Error: Invalid parameters" }],
-          is_error: true,
+          status: "failed",
         },
         {
           type: "model",
@@ -1304,6 +1705,7 @@ suite("RunSession#run", () => {
       ]);
     }
     t.assert.deepStrictEqual(response, {
+      status: "completed",
       content: [{ type: "text", text: "Order ready" }],
       output: [
         {
@@ -1328,7 +1730,7 @@ suite("RunSession#run", () => {
               text: "Order 123 ready for Ada",
             },
           ],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -1343,6 +1745,75 @@ suite("RunSession#run", () => {
 });
 
 suite("RunSession#runStream", () => {
+  test("returns cancelled without streaming when already aborted", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [createPartialResponse({ type: "text", text: "ignored" })],
+    });
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+    });
+    const controller = new AbortController();
+    controller.abort();
+    const events: AgentStreamEvent[] = [];
+
+    for await (const event of session.runStream(
+      {
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "text", text: "Hello" }],
+          },
+        ],
+      },
+      { signal: controller.signal },
+    )) {
+      events.push(event);
+    }
+
+    t.assert.deepStrictEqual(events, [
+      { event: "response", content: [], output: [], status: "cancelled" },
+    ]);
+    t.assert.strictEqual(model.trackedStreamInputs.length, 0);
+  });
+
+  test("turns invalid delta sequences into invariant errors", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [
+        { delta: { index: 0, part: { type: "text", text: "hello" } } },
+        {
+          delta: {
+            index: 0,
+            part: { type: "reasoning", text: "wrong type" },
+          },
+        },
+      ],
+    });
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+    });
+
+    await t.assert.rejects(async () => {
+      for await (const event of session.runStream({
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "text", text: "Stream" }],
+          },
+        ],
+      })) {
+        t.assert.ok(event);
+      }
+    }, /Type mismatch at index 0/);
+  });
+
   test("streams response when there is no tool call", async (t: TestContext) => {
     const model = new MockLanguageModel();
     model.enqueueStreamResult({
@@ -1405,6 +1876,7 @@ suite("RunSession#runStream", () => {
     ]);
     t.assert.deepStrictEqual(events.find(isResponseEvent), {
       event: "response",
+      status: "completed",
       content: [{ type: "text", text: "Hello!" }],
       output: [
         {
@@ -1515,7 +1987,7 @@ suite("RunSession#runStream", () => {
           tool_call_id: "call_1",
           input: { a: 1, b: 2, operation: "add" },
           output: [{ type: "text", text: "Tool result" }],
-          is_error: false,
+          status: "completed",
         },
       },
       {
@@ -1533,6 +2005,7 @@ suite("RunSession#runStream", () => {
     const responseEvent = events.find(isResponseEvent);
     t.assert.deepStrictEqual(responseEvent, {
       event: "response",
+      status: "completed",
       content: [{ type: "text", text: "FinalFinal response" }],
       output: [
         {
@@ -1552,7 +2025,7 @@ suite("RunSession#runStream", () => {
           tool_call_id: "call_1",
           input: { a: 1, b: 2, operation: "add" },
           output: [{ type: "text", text: "Tool result" }],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -1568,12 +2041,13 @@ suite("RunSession#runStream", () => {
   });
 
   test("handles multiple turns in streaming mode", async (t: TestContext) => {
-    const toolExecute = t.mock.fn<
-      AgentFunctionTool<object, Record<string, unknown>>["execute"]
-    >(() => ({
-      content: [{ type: "text", text: "Calculation done" }],
-      is_error: false,
-    }));
+    const toolExecute = t.mock.fn((args: Record<string, unknown>) => {
+      t.assert.ok("a" in args && "b" in args);
+      return {
+        content: [{ type: "text" as const, text: "Calculation done" }],
+        is_error: false,
+      };
+    });
 
     const tool = createMockTool<object>("calculator", null, toolExecute);
 
@@ -1667,7 +2141,7 @@ suite("RunSession#runStream", () => {
           tool_call_id: "call_1",
           input: { a: 1, b: 2 },
           output: [{ type: "text", text: "Calculation done" }],
-          is_error: false,
+          status: "completed",
         },
       },
       {
@@ -1694,7 +2168,7 @@ suite("RunSession#runStream", () => {
           tool_call_id: "call_2",
           input: { a: 3, b: 4 },
           output: [{ type: "text", text: "Calculation done" }],
-          is_error: false,
+          status: "completed",
         },
       },
       {
@@ -1719,6 +2193,7 @@ suite("RunSession#runStream", () => {
     const responseEvent = events.at(-1);
     t.assert.deepStrictEqual(responseEvent, {
       event: "response",
+      status: "completed",
       content: [{ type: "text", text: "All done" }],
       output: [
         {
@@ -1738,7 +2213,7 @@ suite("RunSession#runStream", () => {
           tool_call_id: "call_1",
           input: { a: 1, b: 2 },
           output: [{ type: "text", text: "Calculation done" }],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -1757,7 +2232,7 @@ suite("RunSession#runStream", () => {
           tool_call_id: "call_2",
           input: { a: 3, b: 4 },
           output: [{ type: "text", text: "Calculation done" }],
-          is_error: false,
+          status: "completed",
         },
         {
           type: "model",
@@ -1883,6 +2358,126 @@ suite("RunSession#runStream", () => {
         return true;
       },
     );
+  });
+
+  test("commits materializable partial content before streaming errors", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: createMixedSnapshotPartials(),
+      error: new LanguageModelError("stream failed"),
+    });
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+    });
+    const events: AgentStreamEvent[] = [];
+
+    await t.assert.rejects(
+      async () => {
+        for await (const event of session.runStream({
+          input: [
+            {
+              type: "message",
+              role: "user",
+              content: [{ type: "text", text: "Hello" }],
+            },
+          ],
+        })) {
+          events.push(event);
+        }
+      },
+      (error: unknown) => {
+        t.assert.strictEqual(error instanceof AgentLanguageModelError, true);
+        if (!(error instanceof AgentLanguageModelError)) return false;
+        t.assert.deepStrictEqual(error.snapshot, {
+          output: [createMixedSnapshotModelItem()],
+        });
+        return true;
+      },
+    );
+
+    t.assert.strictEqual(events.length, 4);
+    t.assert.strictEqual(events.slice(0, 3).every(isPartialEvent), true);
+    t.assert.deepStrictEqual(events[3], {
+      event: "item",
+      index: 0,
+      item: createMixedSnapshotModelItem(),
+    });
+  });
+
+  test("records cancelled results for materialized streamed tool calls", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({ partials: createMixedSnapshotPartials() });
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+    });
+    const controller = new AbortController();
+    const generator = session.runStream(
+      {
+        input: [
+          {
+            type: "message",
+            role: "user",
+            content: [{ type: "text", text: "Hello" }],
+          },
+        ],
+      },
+      { signal: controller.signal },
+    );
+
+    for (let index = 0; index < 3; index++) {
+      const current = await generator.next();
+      t.assert.strictEqual(current.done, false);
+      t.assert.strictEqual(isPartialEvent(current.value), true);
+    }
+    controller.abort();
+
+    const item = await generator.next();
+    t.assert.strictEqual(item.done, false);
+    if (!isItemEvent(item.value)) {
+      t.assert.fail("Expected a model item event");
+    }
+    t.assert.deepStrictEqual(item.value, {
+      event: "item",
+      index: 0,
+      item: createMixedSnapshotModelItem(),
+    });
+
+    const toolItem = await generator.next();
+    t.assert.strictEqual(toolItem.done, false);
+    if (!isItemEvent(toolItem.value)) {
+      t.assert.fail("Expected a cancelled tool item event");
+    }
+    t.assert.deepStrictEqual(toolItem.value, {
+      event: "item",
+      index: 1,
+      item: createMixedSnapshotCancelledToolItem(),
+    });
+
+    const terminal = await generator.next();
+    t.assert.strictEqual(terminal.done, false);
+    if (!isResponseEvent(terminal.value)) {
+      t.assert.fail("Expected a terminal response event");
+    }
+    t.assert.deepStrictEqual(terminal.value, {
+      event: "response",
+      status: "cancelled",
+      output: [
+        createMixedSnapshotModelItem(),
+        createMixedSnapshotCancelledToolItem(),
+      ],
+      content: [],
+    });
+    const completed = await generator.next();
+    t.assert.strictEqual(completed.done, true);
+    t.assert.deepStrictEqual(completed.value, {
+      status: "cancelled",
+      output: terminal.value.output,
+      content: terminal.value.content,
+    });
   });
 
   test("throws error when session not initialized in streaming", async (t: TestContext) => {
@@ -2019,6 +2614,7 @@ suite("RunSession#runStream", () => {
       },
       {
         event: "response",
+        status: "completed",
         content: [{ type: "text", text: "Done" }],
         output: [
           {
@@ -2029,6 +2625,7 @@ suite("RunSession#runStream", () => {
       },
     ]);
     t.assert.deepStrictEqual(result.value, {
+      status: "completed",
       content: [{ type: "text", text: "Done" }],
       output: [
         {
@@ -2070,7 +2667,101 @@ suite("RunSession#runStream", () => {
   });
 });
 
-suite("RunSession lifecycle", () => {
+suite("RunSession initialization and cleanup", () => {
+  test("closes initialized toolkit sessions when a later toolkit fails", async (t: TestContext) => {
+    let closeCalls = 0;
+    const initFailure = new Error("later toolkit failed");
+    const cleanupFailure = new Error("cleanup failed");
+    const model = new MockLanguageModel();
+
+    await t.assert.rejects(
+      () =>
+        RunSession.create({
+          name: "test_agent",
+          model,
+          context: {},
+          toolkits: [
+            {
+              createSession: () =>
+                Promise.resolve({
+                  getSystemPrompt: () => undefined,
+                  getTools: () => [],
+                  close: () => {
+                    closeCalls++;
+                    throw cleanupFailure;
+                  },
+                }),
+            },
+            {
+              createSession: () =>
+                Promise.resolve({
+                  getSystemPrompt: () => undefined,
+                  getTools: () => [],
+                  close: () => {
+                    closeCalls++;
+                    return Promise.resolve();
+                  },
+                }),
+            },
+            { createSession: () => Promise.reject(initFailure) },
+          ],
+        }),
+      (error: unknown) => {
+        t.assert.strictEqual(error instanceof AgentInitError, true);
+        t.assert.strictEqual((error as AgentInitError).cause, initFailure);
+        return true;
+      },
+    );
+    t.assert.strictEqual(closeCalls, 2);
+  });
+
+  test("attempts every toolkit close and reports cleanup failure", async (t: TestContext) => {
+    const cleanupFailure = new Error("cleanup failed");
+    let successfulCloseCalls = 0;
+    const model = new MockLanguageModel();
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+      toolkits: [
+        {
+          createSession: () =>
+            Promise.resolve({
+              getSystemPrompt: () => undefined,
+              getTools: () => [],
+              close: () => {
+                throw cleanupFailure;
+              },
+            }),
+        },
+        {
+          createSession: () =>
+            Promise.resolve({
+              getSystemPrompt: () => undefined,
+              getTools: () => [],
+              close: () => {
+                successfulCloseCalls++;
+                return Promise.resolve();
+              },
+            }),
+        },
+      ],
+    });
+
+    await t.assert.rejects(
+      () => session.close(),
+      (error: unknown) => {
+        t.assert.strictEqual(error instanceof AgentCleanupError, true);
+        t.assert.strictEqual(
+          (error as AgentCleanupError).cause,
+          cleanupFailure,
+        );
+        return true;
+      },
+    );
+    t.assert.strictEqual(successfulCloseCalls, 1);
+  });
+
   test("reports instruction resolution failures as initialization errors", async (t: TestContext) => {
     const model = new MockLanguageModel();
     const cause = new Error("could not load tenant instructions");

@@ -57,6 +57,7 @@ const stream = await model.stream({
       content: [
         {
           type: "tool-result",
+          status: "completed",
           tool_name: "lookup",
           tool_call_id: "caffeine_lookup_456",
           // Provide other sources as part of the tool result

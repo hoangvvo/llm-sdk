@@ -497,6 +497,21 @@ fn convert_tool_message_to_response_input_items(
                 let tool_result_part_content =
                     source_part_utils::get_compatible_parts_without_source_parts(content);
 
+                if tool_result_part_content.is_empty() {
+                    acc.push(InputItem::Item(
+                        responses_api::Item::FunctionCallOutputItemParam(
+                            FunctionCallOutputItemParam {
+                                call_id: tool_call_id,
+                                output: FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputString(Some(String::new())),
+                                id: None,
+                                status: None,
+                                r#type: FunctionCallOutputItemParamType::FunctionCallOutput,
+                            },
+                        ),
+                    ));
+                    return Ok(acc);
+                }
+
                 let items = tool_result_part_content
                     .into_iter()
                     .map(|tool_result_part_part| {

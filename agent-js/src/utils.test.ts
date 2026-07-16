@@ -5,6 +5,7 @@ import { getContentText } from "./utils.ts";
 
 void test("getContentText concatenates text parts", (t: TestContext) => {
   const response: AgentResponse = {
+    status: "completed",
     output: [],
     content: [
       { type: "text", text: "Hello" },
@@ -19,6 +20,7 @@ void test("getContentText concatenates text parts", (t: TestContext) => {
 
 void test("getContentText omits non-text and empty strings", (t: TestContext) => {
   const response: AgentResponse = {
+    status: "completed",
     output: [],
     content: [
       { type: "tool-call", args: {}, tool_call_id: "1", tool_name: "tool" },

@@ -13,7 +13,7 @@ pub use agent::Agent;
 pub use errors::{AgentError, BoxedError};
 pub use instruction::InstructionParam;
 pub use params::AgentParams;
-pub use run::{RunSession, RunSessionRequest, RunState};
+pub use run::{RunOptions, RunSession, RunSessionRequest, RunState};
 pub use tool::{AgentFunctionTool, AgentTool, AgentToolResult};
 pub use toolkit::{Toolkit, ToolkitSession};
 pub use types::*;

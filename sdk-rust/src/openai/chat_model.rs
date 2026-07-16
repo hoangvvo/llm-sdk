@@ -597,6 +597,13 @@ fn convert_tool_message(
                 let converted_parts = source_part_utils::get_compatible_parts_without_source_parts(
                     tool_result_part.content,
                 );
+                if converted_parts.is_empty() {
+                    result.push(ChatCompletionRequestToolMessage {
+                        content: ChatCompletionRequestToolMessageContent::ChatCompletionRequestToolMessageContentString(Some(String::new())),
+                        tool_call_id: tool_result_part.tool_call_id,
+                    });
+                    continue;
+                }
                 for content_part in converted_parts {
                     match content_part {
                         Part::Text(text_part) => {

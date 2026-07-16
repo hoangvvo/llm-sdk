@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { RefusalError, UnsupportedError } from "../errors.ts";
 import type {
   LanguageModel,
+  LanguageModelCallOptions,
   LanguageModelMetadata,
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
@@ -62,10 +63,15 @@ export class AnthropicModel implements LanguageModel {
     traceLanguageModel(this);
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): Promise<ModelResponse> {
     const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    const response = await this.#anthropic.messages.create(createParams);
+    const response = await this.#anthropic.messages.create(createParams, {
+      signal: options?.signal,
+    });
 
     if (response.stop_reason === "refusal") {
       throw new RefusalError(anthropicRefusalMessage(response.stop_details));
@@ -85,10 +91,13 @@ export class AnthropicModel implements LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): AsyncGenerator<PartialModelResponse> {
     const createParams = convertToAnthropicCreateParams(input, this.modelId);
 
-    const stream = this.#anthropic.messages.stream(createParams);
+    const stream = this.#anthropic.messages.stream(createParams, {
+      signal: options?.signal,
+    });
     const providerToolBlockIndexes = new Set<number>();
 
     for await (const chunk of stream) {
@@ -308,13 +317,29 @@ function convertToAnthropicImageBlockParam(
 ): Anthropic.ImageBlockParam {
   return {
     type: "image",
-    source: {
-      data: part.data,
-      type: "base64",
-      media_type:
-        part.mime_type as Anthropic.Messages.Base64ImageSource["media_type"],
-    },
+    source: convertToAnthropicImageSource(part),
   };
+}
+
+function convertToAnthropicImageSource(
+  part: ImagePart,
+): Anthropic.Messages.Base64ImageSource {
+  switch (part.mime_type) {
+    case "image/jpeg":
+    case "image/png":
+    case "image/gif":
+    case "image/webp":
+      return {
+        data: part.data,
+        type: "base64",
+        media_type: part.mime_type,
+      };
+    default:
+      throw new UnsupportedError(
+        PROVIDER,
+        `Cannot convert image MIME type ${part.mime_type} to Anthropic image source`,
+      );
+  }
 }
 
 function convertToAnthropicSearchResultBlockParam(
@@ -371,7 +396,7 @@ function convertToAnthropicToolResultBlockParam(
       }
       return blockParam;
     }),
-    is_error: part.is_error ?? false,
+    is_error: part.status !== "completed",
   };
 }
 

@@ -1,6 +1,7 @@
 import type {
   FunctionCallingConfig,
   FunctionDeclaration,
+  FunctionResponse,
   FunctionResponsePart,
   GenerateContentConfig,
   GroundingChunk,
@@ -33,6 +34,7 @@ import {
 import { generateString } from "../id.utils.ts";
 import type {
   LanguageModel,
+  LanguageModelCallOptions,
   LanguageModelMetadata,
 } from "../language-model.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
@@ -89,8 +91,14 @@ export class GoogleModel implements LanguageModel {
     traceLanguageModel(this);
   }
 
-  async generate(input: LanguageModelInput): Promise<ModelResponse> {
+  async generate(
+    input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
+  ): Promise<ModelResponse> {
     const params = convertToGenerateContentParameters(input, this.modelId);
+    if (options?.signal) {
+      params.config = { ...params.config, abortSignal: options.signal };
+    }
 
     const response = await this.#ai.models.generateContent(params);
 
@@ -116,8 +124,12 @@ export class GoogleModel implements LanguageModel {
 
   async *stream(
     input: LanguageModelInput,
+    options?: LanguageModelCallOptions,
   ): AsyncGenerator<PartialModelResponse> {
     const params = convertToGenerateContentParameters(input, this.modelId);
+    if (options?.signal) {
+      params.config = { ...params.config, abortSignal: options.signal };
+    }
 
     const stream = await this.#ai.models.generateContentStream(params);
 
@@ -346,9 +358,9 @@ function convertToGoogleParts(part: Part): GooglePart[] {
     case "tool-result": {
       const functionResponse = convertToGoogleFunctionResponse(
         part.content,
-        Boolean(part.is_error),
+        part.status !== "completed",
       );
-      const googleFunctionResponse: GooglePart["functionResponse"] = {
+      const googleFunctionResponse: FunctionResponse = {
         id: part.tool_call_id,
         name: part.tool_name,
         response: functionResponse.response,

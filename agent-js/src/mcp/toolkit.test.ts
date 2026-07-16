@@ -219,6 +219,7 @@ suite("MCP toolkit", () => {
         });
 
         const expected: AgentResponse = {
+          status: "completed",
           content: [{ type: "text", text: "Ready to roll." }],
           output: [
             {
@@ -250,7 +251,7 @@ suite("MCP toolkit", () => {
                   format: "mp3",
                 },
               ],
-              is_error: false,
+              status: "completed",
             },
             {
               type: "model",
@@ -334,6 +335,7 @@ suite("MCP toolkit", () => {
         });
 
         const expectedFirst: AgentResponse = {
+          status: "completed",
           content: [{ type: "text", text: "Ready to roll." }],
           output: [
             {
@@ -365,7 +367,7 @@ suite("MCP toolkit", () => {
                   format: "mp3",
                 },
               ],
-              is_error: false,
+              status: "completed",
             },
             {
               type: "model",
@@ -401,6 +403,7 @@ suite("MCP toolkit", () => {
         });
 
         const expectedSecond: AgentResponse = {
+          status: "completed",
           content: [{ type: "text", text: "Routes synced." }],
           output: [
             {
@@ -425,7 +428,7 @@ suite("MCP toolkit", () => {
                   text: "Updated shuttle roster for evening shift.",
                 },
               ],
-              is_error: false,
+              status: "completed",
             },
             {
               type: "model",

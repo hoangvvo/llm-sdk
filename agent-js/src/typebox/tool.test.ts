@@ -6,7 +6,9 @@ import { typeboxTool } from "./tool.ts";
 
 test("typeboxTool exposes its schema and executes typed arguments", async (t: TestContext) => {
   const context = { prefix: "typed:" };
+  const signal = new AbortController().signal;
   let receivedContext: typeof context | undefined;
+  let receivedSignal: AbortSignal | undefined;
   const tool = typeboxTool({
     name: "echo",
     description: "Echo input",
@@ -14,8 +16,9 @@ test("typeboxTool exposes its schema and executes typed arguments", async (t: Te
       { message: Type.String() },
       { additionalProperties: false },
     ),
-    execute: ({ message }, ctx: typeof context) => {
+    execute: ({ message }, ctx: typeof context, state) => {
       receivedContext = ctx;
+      receivedSignal = state.signal;
       return Promise.resolve({
         content: [{ type: "text", text: `${ctx.prefix}${message}` }],
         is_error: false,
@@ -23,7 +26,7 @@ test("typeboxTool exposes its schema and executes typed arguments", async (t: Te
     },
   });
 
-  const expected: AgentTool<object> = {
+  const expected: AgentTool<typeof context> = {
     type: "function",
     name: "echo",
     description: "Echo input",
@@ -43,9 +46,10 @@ test("typeboxTool exposes its schema and executes typed arguments", async (t: Te
   const result = await tool.execute(
     { message: "hello" },
     context,
-    new RunState([], 1),
+    new RunState([], 1, signal),
   );
   t.assert.strictEqual(receivedContext, context);
+  t.assert.strictEqual(receivedSignal, signal);
   t.assert.deepStrictEqual(result, {
     content: [{ type: "text", text: "typed:hello" }],
     is_error: false,

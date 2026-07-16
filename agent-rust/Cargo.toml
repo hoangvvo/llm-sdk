@@ -40,6 +40,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt", "process"] }
+tokio-util = "0.7"
 tracing = "0.1"
 tracing-futures = { version = "0.2", features = ["std", "futures-03"] }
 tracing-opentelemetry = "0.32"

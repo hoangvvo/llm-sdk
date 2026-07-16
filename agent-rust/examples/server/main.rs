@@ -10,6 +10,7 @@ use axum::{
 use context::MyContext;
 use dotenvy::dotenv;
 use futures::{stream::Stream, StreamExt};
+use llm_agent::RunOptions;
 use llm_agent::{mcp::MCPParams, AgentRequest, BoxedError};
 use llm_sdk::{AudioOptions, LanguageModelMetadata, Modality, ReasoningOptions, WebSearchTool};
 use serde::{Deserialize, Serialize};
@@ -128,7 +129,7 @@ async fn run_stream_handler(
 
     // Create a stream that handles the agent run
     let stream = stream! {
-        match agent.run_stream(input).await {
+        match agent.run_stream(input, RunOptions::default()).await {
             Ok(mut agent_stream) => {
                 while let Some(event_result) = agent_stream.next().await {
                     match event_result {

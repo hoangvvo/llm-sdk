@@ -3,6 +3,9 @@ title: Run
 ---
 
 import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goCancellationExample from "../../../../../agent-go/examples/cancellation/main.go?raw";
+import jsCancellationExample from "../../../../../agent-js/examples/cancellation.ts?raw";
+import rustCancellationExample from "../../../../../agent-rust/examples/cancellation.rs?raw";
 import {
   extractGoAgentTypes,
   extractRustAgentTypes,
@@ -70,7 +73,9 @@ An `AgentRequest` combines two pieces:
 - `context`: the per-run value passed to instructions, toolkits, and tools.
 
 <Aside type="caution">
-  Runs are stateless. The library never replays earlier items automatically, so persist what you need (for example in a database) and send the combined history back as the next request's `input`.
+  Runs are stateless. The library never replays earlier items automatically, so
+  persist what you need (for example in a database) and send the combined
+  history back as the next request's `input`.
 </Aside>
 
 ## Agent items
@@ -116,7 +121,7 @@ All inputs and outputs share the same `AgentItem` union, making it easy to stitc
 
 - `AgentItemMessage`: user messages, assistant messages, and tool messages you collected before calling `run`. Use these to seed the conversation or to replay prior turns.
 - `AgentItemModelResponse`: the model output produced during a run. It mirrors an assistant message but also carries usage and cost data. You can pass this back as input and it will be interpreted the same as an `AgentItemMessage` of `AssistantMessage`, yet the extra metadata is preserved for analytics.
-- `AgentItemTool`: the full record of a tool invocation for the turn, including the call ID, arguments, model-selected tool name, tool output, and the `is_error` flag. Conceptually it has the same effect as passing an `AgentItemMessage` of `ToolMessage`, but the richer shape makes it easier to audit or replay tool interactions when you resume a session.
+- `AgentItemTool`: the full record of a tool invocation for the turn, including the call ID, arguments, model-selected tool name, tool output, and terminal `status`. Conceptually it has the same effect as passing an `AgentItemMessage` of `ToolMessage`, but the richer shape makes it easier to audit or replay tool interactions when you resume a session.
 
 ## Agent response
 
@@ -125,28 +130,28 @@ The `RunState` created per run (not exported directly) stitches these items toge
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptAgentTypes(["AgentResponse"])}
+      code={extractTypescriptAgentTypes(["AgentRunSnapshot", "AgentResponse"])}
       lang="typescript"
       title="types.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustAgentTypes(["AgentResponse"])}
+      code={extractRustAgentTypes(["AgentRunSnapshot", "AgentResponse"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
     <Code
-      code={extractGoAgentTypes(["AgentResponse"])}
+      code={extractGoAgentTypes(["AgentRunSnapshot", "AgentResponse"])}
       lang="go"
       title="types.go"
     />
   </TabItem>
 </Tabs>
 
-The `content` field is what you typically show to the user; `output` is the full list of items generated during the run and is the piece you should append to the next request's `input` when continuing the conversation.
+The `content` field is what you typically show to the user; `output` is the full list of items generated during the run and is the piece you should append to the next request's `input` when continuing the conversation. The `status` field distinguishes a completed run from a cancelled one.
 
 ```mermaid
 flowchart TD
@@ -176,20 +181,14 @@ flowchart TD
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustAgentTypes([
-        "AgentStreamEvent",
-        "AgentStreamItemEvent",
-      ])}
+      code={extractRustAgentTypes(["AgentStreamEvent", "AgentStreamItemEvent"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
     <Code
-      code={extractGoAgentTypes([
-        "AgentStreamEvent",
-        "AgentStreamItemEvent",
-      ])}
+      code={extractGoAgentTypes(["AgentStreamEvent", "AgentStreamItemEvent"])}
       lang="go"
       title="types.go"
     />
@@ -201,3 +200,39 @@ flowchart TD
 - `AgentStreamResponseEvent`: fired once the run ends, bundling the same `AgentResponse` shape you get from non-streaming runs.
 
 Use the stream when you want to surface partial answers, display tool progress, or fan out work while the run continues. The same items emitted during streaming will appear in the final `AgentResponse.output`, so you can rely on stream events for real-time UX and use the terminal response to persist state.
+
+## Cancellation
+
+Every run accepts a cancellation primitive.
+
+After cancellation, the agent stops scheduling model turns and tools and returns a cancelled `AgentResponse`. Completed output items are preserved, and tool calls that will not run are recorded as cancelled. Check `status` before using `content` as the final answer.
+
+If cancellation happens while a model response is streaming, materializable partial content is emitted as a model item. Complete tool calls receive cancelled tool items; incomplete parts are omitted.
+
+<Aside type="danger">
+  Cancellation waits for an active tool to return. The tool must observe the
+  cancellation handle and stop; otherwise, the run remains pending. See [Tool
+  cancellation](../tools/#cancellation).
+</Aside>
+
+The examples use timers only to demonstrate cancellation. In application code, pass the cancellation handle directly to database, HTTP, or external-system calls.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsCancellationExample}
+      lang="typescript"
+      title="cancellation.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustCancellationExample} lang="rust" title="cancellation.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goCancellationExample} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Errors and partial work
+
+Failures return an `AgentError`, not an `AgentResponse`. When a run has started, the error may carry an `AgentRunSnapshot` containing the generated `output` items. If a streaming model response has independently materializable content, the stream emits it as a model item before returning the error.

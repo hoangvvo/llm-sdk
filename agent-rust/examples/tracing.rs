@@ -1,5 +1,6 @@
 use dotenvy::dotenv;
 use futures::future::BoxFuture;
+use llm_agent::RunOptions;
 use llm_agent::{Agent, AgentFunctionTool, AgentItem, AgentRequest, AgentToolResult, RunState};
 use llm_sdk::{JSONSchema, Message, Part};
 use opentelemetry::{trace::TracerProvider, KeyValue};
@@ -212,7 +213,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         input: vec![AgentItem::Message(Message::user(vec![Part::text(query)]))],
     };
 
-    let response = agent.run(request).await?;
+    let response = agent.run(request, RunOptions::default()).await?;
     println!("Agent response: {response:#?}");
 
     telemetry_provider.force_flush().ok();
