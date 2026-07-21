@@ -12,7 +12,7 @@ To use [zod](https://github.com/colinhacks/zod) or [typebox](https://github.com/
 
 ```bash
 npm install zod zod-to-json-schema
-npm install @sinclair/typebox
+npm install typebox
 ```
 
 To use [MCP](https://modelcontextprotocol.io), install the following package:

@@ -1,5 +1,6 @@
 {
   "type": "module",
+  "sideEffects": false,
   "name": "@hoangvvo/llm-sdk",
   "version": "0.5.0",
   "description": "A JavaScript library that enables the development of applications that can interact with different language models through a unified interface.",
@@ -55,5 +56,29 @@
   "module": "./dist/index.js",
   "dependencies": {
     "@opentelemetry/api": "^1.9.1"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
+    "@google/genai": "^1.52.0",
+    "@mistralai/mistralai": "^2.4.1",
+    "cohere-ai": "^8.0.0",
+    "openai": "^6.47.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "@google/genai": {
+      "optional": true
+    },
+    "@mistralai/mistralai": {
+      "optional": true
+    },
+    "cohere-ai": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    }
   }
 }
