@@ -234,7 +234,7 @@ Find examples in the [examples](./examples/) folder:
 - [`require-approval`: Human-in-the-loop approval](./examples/require-approval.rs)
 
 ```bash
-cargo run --example agent --features examples
+cargo run --example agent --features examples,openai
 ```
 
 An example server that exposes an API to interact with the agent can be found in [examples/server](./examples/server). This can be used to test the agent with the [console application](../website).
