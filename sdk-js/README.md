@@ -138,6 +138,9 @@ node examples/generate-text.ts
 
 - Function tools now require `type: "function"`.
 - `ToolResultPart.is_error` has been replaced with the required `status` field (`"completed"`, `"failed"`, or `"cancelled"`).
+- Function tool calls now store `tool_name` and `args` in `call` (`{ type: "function", name, args }`). Check `call.type` before accessing function-call fields because `call` can also describe a provider-hosted web search.
+- Function tool results now store `tool_name` and `content` in `result` (`{ type: "function", name, content }`). Check `result.type` before accessing function-result fields because `result` can also contain a provider-hosted web search result.
+- `ToolCallPartDelta.tool_name` and `args` have moved to the discriminated `call` field, matching `ToolCallPart`.
 
 ### To 0.4.0
 

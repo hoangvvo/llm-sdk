@@ -140,6 +140,9 @@ go run ./examples/generate-text
 
 - Replace `Tool{Name, Description, Parameters}` literals with `NewFunctionTool(...)`.
 - `ToolResultPart.IsError` has been replaced with the required `Status` field (`ToolResultStatusCompleted`, `ToolResultStatusFailed`, or `ToolResultStatusCancelled`).
+- Function tool calls now store `ToolName` and `Args` in `Call.Function` as `Name` and `Args`. Check that `Call.Function` is non-nil because `Call.WebSearch` can now contain a provider-hosted web search call.
+- Function tool results now store `ToolName` and `Content` in `Result.Function` as `Name` and `Content`. Check that `Result.Function` is non-nil because `Result.WebSearch` can now contain a provider-hosted web search result.
+- `ToolCallPartDelta.ToolName` and `Args` have moved to `Call.Function`, matching `ToolCallPart`. The `NewToolCallPart`, `NewToolResultPart`, and `NewToolCallPartDelta` helpers retain their existing function-tool APIs.
 
 ### To 0.2.0
 
