@@ -88,3 +88,18 @@ test_group!(
 );
 test_group!(google_reasoning_model(), reasoning);
 test_group!(google_reasoning_model(), reasoning_tool_use);
+
+#[test]
+async fn transport() -> Result<(), Box<dyn Error>> {
+    common::transports::run_transport_test_group("google_transport", |base_url| {
+        GoogleModel::new(
+            "test-model",
+            GoogleModelOptions {
+                api_key: "test-token".to_string(),
+                base_url: Some(format!("{base_url}/v1beta")),
+                ..Default::default()
+            },
+        )
+    })
+    .await
+}

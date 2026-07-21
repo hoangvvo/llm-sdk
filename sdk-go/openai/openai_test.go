@@ -4,84 +4,89 @@ import (
 	"os"
 	"testing"
 
+	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
 	"github.com/hoangvvo/llm-sdk/sdk-go/openai"
 	"github.com/joho/godotenv"
 )
 
-var chatModel *openai.OpenAIChatModel
-var audioChatModel *openai.OpenAIChatModel
-
-var model *openai.OpenAIModel
-var reasoningModel *openai.OpenAIModel
-
-func TestMain(m *testing.M) {
-	godotenv.Load("../../.env")
+func openAIAPIKey(t *testing.T) string {
+	t.Helper()
+	_ = godotenv.Load("../../.env")
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
-		panic("OPENAI_API_KEY must be set")
+		t.Fatal("OPENAI_API_KEY must be set")
 	}
+	return apiKey
+}
 
-	model = openai.NewOpenAIModel("gpt-5.6-sol", openai.OpenAIModelOptions{
-		APIKey: apiKey,
+func openAIModel(t *testing.T, modelID string) *openai.OpenAIModel {
+	t.Helper()
+	return openai.NewOpenAIModel(modelID, openai.OpenAIModelOptions{
+		APIKey: openAIAPIKey(t),
 	})
-	reasoningModel = openai.NewOpenAIModel("o1", openai.OpenAIModelOptions{
-		APIKey: apiKey,
-	})
+}
 
-	chatModel = openai.NewOpenAIChatModel("gpt-5.6-terra", openai.OpenAIChatModelOptions{
-		APIKey: apiKey,
+func openAIChatModel(t *testing.T, modelID string) *openai.OpenAIChatModel {
+	t.Helper()
+	return openai.NewOpenAIChatModel(modelID, openai.OpenAIChatModelOptions{
+		APIKey: openAIAPIKey(t),
 	})
-	audioChatModel = openai.NewOpenAIChatModel("gpt-audio-1.5", openai.OpenAIChatModelOptions{
-		APIKey: apiKey,
-	})
-	m.Run()
 }
 
 func TestTextGeneration(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "text_generation")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "text_generation")
 }
 
 func TestConversation(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "conversation")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "conversation")
 }
 
 func TestToolUse(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "tool_use")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "tool_use")
 }
 
 func TestStructuredOutput(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "structured_output")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "structured_output")
 }
 
 func TestGenerationOptions(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "generation_options")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "generation_options")
 }
 
 func TestSourceInput(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "source_input")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "source_input")
 }
 
 func TestMultimodalToolResult(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "multimodal_tool_result")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "multimodal_tool_result")
 }
 
 func TestWebSearch(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "web_search")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "web_search")
 }
 
 func TestImageGeneration(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "image_generation")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "image_generation")
 }
 
 func TestImageInput(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "image_input")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "image_input")
 }
 
 func TestReasoning(t *testing.T) {
-	testcommon.RunTestGroup(t, reasoningModel, "reasoning", testcommon.WithProfile("openai_opaque_reasoning"))
+	testcommon.RunTestGroup(t, openAIModel(t, "o1"), "reasoning", testcommon.WithProfile("openai_opaque_reasoning"))
 }
 
 func TestReasoningToolUse(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "reasoning_tool_use")
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "reasoning_tool_use")
+}
+
+func TestTransport(t *testing.T) {
+	testcommon.RunTransportTestGroup(t, "openai_transport", func(baseURL string) llmsdk.LanguageModel {
+		return openai.NewOpenAIModel("test-model", openai.OpenAIModelOptions{
+			APIKey:  "test-token",
+			BaseURL: baseURL + "/v1",
+		})
+	})
 }

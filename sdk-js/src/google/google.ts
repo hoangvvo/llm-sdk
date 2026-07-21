@@ -72,6 +72,7 @@ const PROVIDER = "google";
 export interface GoogleModelOptions {
   apiKey: string;
   modelId: string;
+  baseURL?: string;
 }
 
 export class GoogleModel implements LanguageModel {
@@ -88,6 +89,7 @@ export class GoogleModel implements LanguageModel {
 
     this.#ai = new GoogleGenAI({
       apiKey: options.apiKey,
+      ...(options.baseURL ? { httpOptions: { baseUrl: options.baseURL } } : {}),
     });
 
     traceLanguageModel(this);

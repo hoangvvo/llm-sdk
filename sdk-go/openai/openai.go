@@ -173,6 +173,8 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 			defer sseStream.Close()
 
 			refusal := ""
+			normalizedOutputIndexes := map[int]int{}
+			nextContentIndex := 0
 
 			for sseStream.Next() {
 				streamEvent, err := sseStream.Current()
@@ -195,7 +197,20 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 				}
 
 				if partDelta != nil {
+					providerOutputIndex := partDelta.Index
+					normalizedOutputIndex, ok := normalizedOutputIndexes[providerOutputIndex]
+					if !ok {
+						normalizedOutputIndex = nextContentIndex
+						nextContentIndex++
+						normalizedOutputIndexes[providerOutputIndex] = normalizedOutputIndex
+					}
+					partDelta.Index = normalizedOutputIndex
 					responseCh <- &llmsdk.PartialModelResponse{Delta: partDelta}
+				}
+
+				if resultDelta := mapOpenAIStreamWebSearchResult(*streamEvent, nextContentIndex); resultDelta != nil {
+					nextContentIndex++
+					responseCh <- &llmsdk.PartialModelResponse{Delta: resultDelta}
 				}
 
 				if streamEvent.ResponseCompleted != nil {
@@ -248,8 +263,10 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 
 	if input.Tools != nil {
 		tools := openaiapi.ToolsArray{}
+		hasWebSearchTool := false
 		for _, tool := range input.Tools {
 			if tool.WebSearchTool != nil {
+				hasWebSearchTool = true
 				webSearch := tool.WebSearchTool
 				openAIWebSearch := &openaiapi.WebSearchTool{
 					Type: openaiapi.WebSearchToolTypeWebSearch,
@@ -284,6 +301,9 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 			tools = append(tools, openAITool)
 		}
 		params.Tools = &tools
+		if hasWebSearchTool {
+			params.Include = append(params.Include, openaiapi.IncludeEnumWebSearchCallActionSources)
+		}
 	}
 
 	if input.ToolChoice != nil {
@@ -309,9 +329,9 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 	}
 
 	if input.Reasoning != nil {
-		params.Include = []openaiapi.IncludeEnum{
+		params.Include = append(params.Include,
 			openaiapi.IncludeEnumReasoningEncryptedContent,
-		}
+		)
 		params.Reasoning, err = convertToOpenAIReasoning(*input.Reasoning)
 		if err != nil {
 			return nil, err
@@ -672,7 +692,7 @@ func convertToOpenAIReasoning(reasoning llmsdk.ReasoningOptions) (*openaiapi.Rea
 // MARK: - To SDK Message
 
 func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
-	var parts []llmsdk.Part
+	parts := make([]llmsdk.Part, 0, len(items))
 
 	for _, item := range items {
 		switch {
@@ -915,6 +935,29 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 	default:
 		return nil, nil
 	}
+}
+
+func mapOpenAIStreamWebSearchResult(event openaiapi.ResponseStreamEvent, index int) *llmsdk.ContentDelta {
+	if event.ResponseOutputItemDone == nil || event.ResponseOutputItemDone.Item.WebSearchToolCall == nil {
+		return nil
+	}
+	web := event.ResponseOutputItemDone.Item.WebSearchToolCall
+	if web.Action.Search == nil || len(web.Action.Search.Sources) == 0 {
+		return nil
+	}
+	sources := make([]llmsdk.WebSearchSource, 0, len(web.Action.Search.Sources))
+	for _, source := range web.Action.Search.Sources {
+		sources = append(sources, llmsdk.WebSearchSource{URL: source.Url})
+	}
+	return &llmsdk.ContentDelta{Index: index, Part: llmsdk.PartDelta{
+		ToolResultPartDelta: &llmsdk.ToolResultPartDelta{
+			ToolCallID: web.Id,
+			Result: llmsdk.ToolResult{WebSearch: &llmsdk.WebSearchToolResult{
+				Sources: sources,
+			}},
+			Status: llmsdk.ToolResultStatusCompleted,
+		},
+	}}
 }
 
 func convertToOpenAIWebSearchAction(action llmsdk.WebSearchAction) openaiapi.WebSearchToolCallAction {

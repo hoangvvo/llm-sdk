@@ -203,6 +203,8 @@ impl LanguageModel for OpenAIModel {
 
                     let stream = try_stream! {
                         let mut refusal = String::new();
+                        let mut normalized_output_indexes = HashMap::new();
+                        let mut next_content_index = 0_usize;
 
                         while let Some(event) = chunk_stream.next().await {
                             let event = event?;
@@ -222,10 +224,31 @@ impl LanguageModel for OpenAIModel {
                                 refusal.push_str(&refusal_delta_event.delta);
                             }
 
+                            let web_search_result = map_openai_stream_web_search_result(&event);
                             let part_delta = map_openai_stream_event(event)?;
-                            if let Some(part_delta) = part_delta {
+                            if let Some(mut part_delta) = part_delta {
+                                let provider_output_index = part_delta.index;
+                                let normalized_output_index = *normalized_output_indexes
+                                    .entry(provider_output_index)
+                                    .or_insert_with(|| {
+                                        let index = next_content_index;
+                                        next_content_index += 1;
+                                        index
+                                    });
+                                part_delta.index = normalized_output_index;
                                 yield PartialModelResponse {
                                     delta: Some(part_delta),
+                                    ..Default::default()
+                                }
+                            }
+                            if let Some(result) = web_search_result {
+                                let result_delta = ContentDelta {
+                                    index: next_content_index,
+                                    part: PartDelta::ToolResult(result),
+                                };
+                                next_content_index += 1;
+                                yield PartialModelResponse {
+                                    delta: Some(result_delta),
                                     ..Default::default()
                                 }
                             }
@@ -263,6 +286,16 @@ fn convert_to_response_create_params(
     } = input;
 
     let include_reasoning_encrypted = reasoning.as_ref().is_some_and(|r| r.enabled);
+    let include_web_search_sources = tools
+        .as_ref()
+        .is_some_and(|tools| tools.iter().any(|tool| matches!(tool, Tool::WebSearch(_))));
+    let mut include = Vec::new();
+    if include_web_search_sources {
+        include.push(IncludeEnum::WebSearchCallActionSources);
+    }
+    if include_reasoning_encrypted {
+        include.push(IncludeEnum::ReasoningEncryptedContent);
+    }
 
     let mut params = CreateResponse {
         metadata: None,
@@ -297,11 +330,7 @@ fn convert_to_response_create_params(
         truncation: None,
         context_management: None,
         conversation: None,
-        include: if include_reasoning_encrypted {
-            Some(vec![IncludeEnum::ReasoningEncryptedContent])
-        } else {
-            None
-        },
+        include: (!include.is_empty()).then_some(include),
         input: Some(responses_api::InputParam::InputParamArray(Some(
             convert_to_openai_inputs(messages)?,
         ))),
@@ -1061,6 +1090,42 @@ fn map_openai_stream_event(
         }
         _ => Ok(None),
     }
+}
+
+fn map_openai_stream_web_search_result(
+    event: &ResponseStreamEvent,
+) -> Option<crate::ToolResultPartDelta> {
+    let ResponseStreamEvent::ResponseOutputItemDone(done) = event else {
+        return None;
+    };
+    let OutputItem::WebSearchToolCall(web) = &done.item else {
+        return None;
+    };
+    let responses_api::WebSearchToolCallAction::Search(search) = &web.action else {
+        return None;
+    };
+    let sources = search
+        .sources
+        .as_ref()?
+        .iter()
+        .map(|source| crate::WebSearchSource {
+            url: source.url.clone(),
+            title: None,
+            page_age: None,
+            signature: None,
+        })
+        .collect::<Vec<_>>();
+    if sources.is_empty() {
+        return None;
+    }
+    Some(crate::ToolResultPartDelta {
+        tool_call_id: web.id.clone(),
+        result: crate::ToolResult::WebSearch(crate::WebSearchToolResult {
+            sources,
+            error_code: None,
+        }),
+        status: ToolResultStatus::Completed,
+    })
 }
 
 fn convert_to_openai_web_search_action(

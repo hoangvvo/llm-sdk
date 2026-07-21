@@ -7,7 +7,7 @@ import {
   type StageContext,
   validateError,
   validateOutput,
-} from "../../sdk-tests/protocol.mjs";
+} from "../../sdk-tests/protocol.ts";
 import { StreamAccumulator } from "../src/accumulator.ts";
 import type { LanguageModel } from "../src/language-model.ts";
 import type {

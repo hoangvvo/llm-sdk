@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
     "test": "c8 --all --include='src/**/*.ts' --exclude='**/*.test.ts' --reporter=text --reporter=cobertura node --test --env-file-if-exists=../.env --test-timeout=20000 \"**/*.test.ts\"",
-    "test:offline": "node --test --test-timeout=20000 src/accumulator.test.ts src/test/test.test.ts src/openai/openai.transport.test.ts"
+    "test:offline": "node --test --test-timeout=20000 src/accumulator.test.ts src/test/test.test.ts && node --test --test-timeout=20000 --test-name-pattern=transport src/openai/openai.test.ts src/anthropic/anthropic.test.ts src/google/google.test.ts"
   },
   "files": [
     "dist"
@@ -47,7 +47,8 @@
     "./package.json": "./package.json"
   },
   "imports": {
-    "#test-common/cases": "./test-common/cases.ts"
+    "#test-common/cases": "./test-common/cases.ts",
+    "#test-common/transports": "./test-common/transports.ts"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

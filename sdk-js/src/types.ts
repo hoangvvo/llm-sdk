@@ -483,6 +483,10 @@ export interface WebSearchTool {
    */
   allowed_domains?: string[];
   /**
+   * Limits the number of searches the provider may perform when supported.
+   */
+  max_uses?: number;
+  /**
    * An approximate user location used to localize web search results.
    */
   user_location?: WebSearchUserLocation;

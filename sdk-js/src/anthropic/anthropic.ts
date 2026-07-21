@@ -154,7 +154,12 @@ export class AnthropicModel implements LanguageModel {
                   part: {
                     type: "tool-call",
                     tool_call_id: chunk.content_block.tool_use_id,
-                    call: { type: "web_search", status: "completed" },
+                    call: {
+                      type: "web_search",
+                      status: anthropicWebSearchResultStatus(
+                        chunk.content_block,
+                      ),
+                    },
                   },
                 },
               };
@@ -516,6 +521,9 @@ function convertToAnthropicTool(tool: Tool): Anthropic.Messages.ToolUnion {
     if (tool.allowed_domains) {
       webSearchTool.allowed_domains = tool.allowed_domains;
     }
+    if (tool.max_uses !== undefined) {
+      webSearchTool.max_uses = tool.max_uses;
+    }
     if (tool.user_location) {
       webSearchTool.user_location = {
         type: "approximate",
@@ -603,19 +611,21 @@ function convertToAnthropicThinkingConfigParam(
 function mapAnthropicMessage(
   contentBlocks: Anthropic.Messages.ContentBlock[],
 ): Part[] {
-  const completedCalls = new Set(
+  const callStatuses = new Map(
     contentBlocks.flatMap((block) =>
-      block.type === "web_search_tool_result" ? [block.tool_use_id] : [],
+      block.type === "web_search_tool_result"
+        ? [[block.tool_use_id, anthropicWebSearchResultStatus(block)] as const]
+        : [],
     ),
   );
   return contentBlocks
-    .map((block) => mapAnthropicBlock(block, completedCalls))
+    .map((block) => mapAnthropicBlock(block, callStatuses))
     .filter((b) => !!b);
 }
 
 function mapAnthropicBlock(
   block: Anthropic.Messages.ContentBlock,
-  completedCalls = new Set<string>(),
+  callStatuses = new Map<string, "completed" | "failed">(),
 ): Part | null {
   switch (block.type) {
     case "text":
@@ -638,7 +648,7 @@ function mapAnthropicBlock(
         tool_call_id: block.id,
         call: {
           type: "web_search",
-          status: completedCalls.has(block.id) ? "completed" : "in_progress",
+          status: callStatuses.get(block.id) ?? "in_progress",
           ...(typeof input.query === "string"
             ? { action: { type: "search" as const, queries: [input.query] } }
             : {}),
@@ -682,6 +692,12 @@ function mapAnthropicBlock(
     default:
       return null;
   }
+}
+
+function anthropicWebSearchResultStatus(
+  block: Anthropic.Messages.WebSearchToolResultBlock,
+): "completed" | "failed" {
+  return Array.isArray(block.content) ? "completed" : "failed";
 }
 
 function mapAnthropicTextBlock(block: Anthropic.Messages.TextBlock): TextPart {

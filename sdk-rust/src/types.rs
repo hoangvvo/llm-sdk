@@ -569,6 +569,9 @@ pub struct WebSearchTool {
     /// provider.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_domains: Option<Vec<String>>,
+    /// Limits the number of searches the provider may perform when supported.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_uses: Option<u32>,
     /// An approximate user location used to localize web search results.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_location: Option<WebSearchUserLocation>,

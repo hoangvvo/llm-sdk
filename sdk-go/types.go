@@ -1003,6 +1003,8 @@ type FunctionTool struct {
 type WebSearchTool struct {
 	// Restricts search results to these domains when supported by the provider.
 	AllowedDomains []string `json:"allowed_domains,omitempty"`
+	// Limits the number of searches the provider may perform when supported.
+	MaxUses *int `json:"max_uses,omitempty"`
 	// An approximate user location used to localize web search results.
 	UserLocation *WebSearchUserLocation `json:"user_location,omitempty"`
 }

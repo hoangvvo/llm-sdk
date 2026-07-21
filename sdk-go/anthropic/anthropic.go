@@ -212,7 +212,7 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 					}
 					if block.WebSearchToolResult != nil {
 						if callIndex, ok := serverToolCallIndexes[block.WebSearchToolResult.ToolUseId]; ok {
-							status := llmsdk.WebSearchToolCallStatusCompleted
+							status := anthropicWebSearchResultStatus(block.WebSearchToolResult)
 							id := block.WebSearchToolResult.ToolUseId
 							responseCh <- &llmsdk.PartialModelResponse{Delta: &llmsdk.ContentDelta{Index: callIndex, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Status: &status}}}}}}
 						}
@@ -352,6 +352,7 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 				anthropicWebSearch := &anthropicapi.WebSearchTool20250305{
 					Name: "web_search", Type: "web_search_20250305",
 					AllowedDomains: webSearch.AllowedDomains,
+					MaxUses:        webSearch.MaxUses,
 				}
 				if webSearch.UserLocation != nil {
 					anthropicWebSearch.UserLocation = &anthropicapi.UserLocation{
@@ -668,10 +669,10 @@ func convertToAnthropicThinkingConfigParam(reasoning llmsdk.ReasoningOptions) *a
 
 func mapAnthropicMessage(content []anthropicapi.ContentBlock) ([]llmsdk.Part, error) {
 	parts := make([]llmsdk.Part, 0, len(content))
-	completed := map[string]bool{}
+	callStatuses := map[string]llmsdk.WebSearchToolCallStatus{}
 	for _, block := range content {
 		if block.WebSearchToolResult != nil {
-			completed[block.WebSearchToolResult.ToolUseId] = true
+			callStatuses[block.WebSearchToolResult.ToolUseId] = anthropicWebSearchResultStatus(block.WebSearchToolResult)
 		}
 	}
 
@@ -681,15 +682,24 @@ func mapAnthropicMessage(content []anthropicapi.ContentBlock) ([]llmsdk.Part, er
 			return nil, err
 		}
 		if part != nil {
-			if part.ToolCallPart != nil && part.ToolCallPart.Call.WebSearch != nil && completed[part.ToolCallPart.ToolCallID] {
-				status := llmsdk.WebSearchToolCallStatusCompleted
-				part.ToolCallPart.Call.WebSearch.Status = &status
+			if part.ToolCallPart != nil && part.ToolCallPart.Call.WebSearch != nil {
+				status, ok := callStatuses[part.ToolCallPart.ToolCallID]
+				if ok {
+					part.ToolCallPart.Call.WebSearch.Status = &status
+				}
 			}
 			parts = append(parts, *part)
 		}
 	}
 
 	return parts, nil
+}
+
+func anthropicWebSearchResultStatus(block *anthropicapi.ResponseWebSearchToolResultBlock) llmsdk.WebSearchToolCallStatus {
+	if block.Content.ResponseWebSearchToolResultError != nil {
+		return llmsdk.WebSearchToolCallStatusFailed
+	}
+	return llmsdk.WebSearchToolCallStatusCompleted
 }
 
 func mapAnthropicContentBlock(block anthropicapi.ContentBlock) (*llmsdk.Part, error) {

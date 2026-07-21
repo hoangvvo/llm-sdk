@@ -118,6 +118,8 @@ export class OpenAIModel implements LanguageModel {
     );
 
     let refusal = "";
+    const normalizedOutputIndexes = new Map<number, number>();
+    let nextContentIndex = 0;
 
     for await (const event of stream) {
       if (event.type === "response.refusal.delta") {
@@ -126,8 +128,29 @@ export class OpenAIModel implements LanguageModel {
 
       const partDelta = mapOpenAIStreamEvent(event);
       if (partDelta) {
+        const providerOutputIndex = partDelta.index;
+        let normalizedOutputIndex =
+          normalizedOutputIndexes.get(providerOutputIndex);
+        if (normalizedOutputIndex === undefined) {
+          normalizedOutputIndex = nextContentIndex;
+          nextContentIndex += 1;
+          normalizedOutputIndexes.set(
+            providerOutputIndex,
+            normalizedOutputIndex,
+          );
+        }
+        partDelta.index = normalizedOutputIndex;
         const partial: PartialModelResponse = { delta: partDelta };
         yield partial;
+      }
+
+      const webSearchResultDelta = mapOpenAIStreamWebSearchResult(
+        event,
+        nextContentIndex,
+      );
+      if (webSearchResultDelta) {
+        nextContentIndex += 1;
+        yield { delta: webSearchResultDelta };
       }
 
       if (event.type === "response.completed") {
@@ -178,6 +201,9 @@ function convertToOpenAICreateParams(
   }
   if (tools) {
     params.tools = tools.map(convertToOpenAITool);
+    if (tools.some((tool) => tool.type === "web_search")) {
+      params.include = ["web_search_call.action.sources"];
+    }
   }
   if (tool_choice) {
     params.tool_choice = convertToOpenAIToolChoice(tool_choice);
@@ -192,7 +218,7 @@ function convertToOpenAICreateParams(
     });
   }
   if (reasoning) {
-    params.include = ["reasoning.encrypted_content"];
+    params.include = [...(params.include ?? []), "reasoning.encrypted_content"];
     params.reasoning = convertToOpenAIReasoning(reasoning);
   }
 
@@ -941,6 +967,35 @@ function mapOpenAIStreamEvent(
   }
 
   return null;
+}
+
+function mapOpenAIStreamWebSearchResult(
+  event: OpenAI.Responses.ResponseStreamEvent,
+  index: number,
+): ContentDelta | null {
+  if (
+    event.type !== "response.output_item.done" ||
+    event.item.type !== "web_search_call" ||
+    event.item.action.type !== "search" ||
+    !event.item.action.sources?.length
+  ) {
+    return null;
+  }
+
+  return {
+    index,
+    part: {
+      type: "tool-result",
+      tool_call_id: event.item.id,
+      result: {
+        type: "web_search",
+        sources: event.item.action.sources.map((source) => ({
+          url: source.url,
+        })),
+      },
+      status: "completed",
+    },
+  };
 }
 
 // MARK: To SDK Usage

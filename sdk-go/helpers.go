@@ -516,6 +516,13 @@ func WithWebSearchAllowedDomains(allowedDomains ...string) WebSearchToolOption {
 	}
 }
 
+// WithWebSearchMaxUses limits the number of searches the provider may perform.
+func WithWebSearchMaxUses(maxUses int) WebSearchToolOption {
+	return func(tool *WebSearchTool) {
+		tool.MaxUses = &maxUses
+	}
+}
+
 // WithWebSearchUserLocation localizes search results using an approximate user location.
 func WithWebSearchUserLocation(userLocation WebSearchUserLocation) WebSearchToolOption {
 	return func(tool *WebSearchTool) {

@@ -51,3 +51,18 @@ test_group!(
     })
 );
 test_group!(openai_model(), reasoning_tool_use);
+
+#[test]
+async fn transport() -> Result<(), Box<dyn Error>> {
+    common::transports::run_transport_test_group("openai_transport", |base_url| {
+        OpenAIModel::new(
+            "test-model",
+            OpenAIModelOptions {
+                api_key: "test-token".to_string(),
+                base_url: Some(format!("{base_url}/v1")),
+                ..Default::default()
+            },
+        )
+    })
+    .await
+}

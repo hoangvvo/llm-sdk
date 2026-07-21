@@ -270,6 +270,12 @@ impl WebSearchTool {
     }
 
     #[must_use]
+    pub fn with_max_uses(mut self, max_uses: u32) -> Self {
+        self.max_uses = Some(max_uses);
+        self
+    }
+
+    #[must_use]
     pub fn with_user_location(mut self, user_location: WebSearchUserLocation) -> Self {
         self.user_location = Some(user_location);
         self

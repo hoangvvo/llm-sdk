@@ -4,9 +4,10 @@ import {
   getTestCaseInfo,
   getTestCasesByGroup,
   prepareStage,
+  prepareTransportStage,
   validateError,
   validateOutput,
-} from "./protocol.mjs";
+} from "./protocol.ts";
 
 async function readRequest() {
   let body = "";
@@ -26,6 +27,9 @@ try {
       break;
     case "prepare_stage":
       response = prepareStage(request);
+      break;
+    case "prepare_transport_stage":
+      response = prepareTransportStage(request);
       break;
     case "validate_output":
       response = validateOutput(request);

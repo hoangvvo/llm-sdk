@@ -286,7 +286,7 @@ impl LanguageModel for AnthropicModel {
                                                         call: crate::ToolCallDelta::WebSearch(
                                                             crate::WebSearchToolCallDelta {
                                                                 action: None,
-                                                                status: Some(crate::WebSearchToolCallStatus::Completed),
+                                                                status: Some(anthropic_web_search_result_status(&block.content)),
                                                             },
                                                         ),
                                                         signature: None,
@@ -477,7 +477,7 @@ fn convert_tool(tool: SdkTool) -> CreateMessageParamsToolsItem {
                 blocked_domains: None,
                 cache_control: None,
                 defer_loading: None,
-                max_uses: None,
+                max_uses: tool.max_uses.map(i64::from),
                 name: "web_search".to_string(),
                 strict: None,
                 r#type: "web_search_20250305".to_string(),
@@ -820,10 +820,13 @@ fn convert_to_anthropic_thinking_config(reasoning: &ReasoningOptions) -> Thinkin
 
 fn map_anthropic_message(content: Vec<ContentBlock>) -> Vec<Part> {
     let mut parts = Vec::new();
-    let completed: std::collections::HashSet<String> = content
+    let call_statuses: HashMap<String, crate::WebSearchToolCallStatus> = content
         .iter()
         .filter_map(|block| match block {
-            ContentBlock::WebSearchToolResult(result) => Some(result.tool_use_id.clone()),
+            ContentBlock::WebSearchToolResult(result) => Some((
+                result.tool_use_id.clone(),
+                anthropic_web_search_result_status(&result.content),
+            )),
             _ => None,
         })
         .collect();
@@ -831,9 +834,9 @@ fn map_anthropic_message(content: Vec<ContentBlock>) -> Vec<Part> {
         if let Some(part) = map_content_block(block) {
             let mut part = part;
             if let Part::ToolCall(call) = &mut part {
-                if completed.contains(&call.tool_call_id) {
+                if let Some(status) = call_statuses.get(&call.tool_call_id) {
                     if let crate::ToolCall::WebSearch(web) = &mut call.call {
-                        web.status = Some(crate::WebSearchToolCallStatus::Completed);
+                        web.status = Some(status.clone());
                     }
                 }
             }
@@ -841,6 +844,19 @@ fn map_anthropic_message(content: Vec<ContentBlock>) -> Vec<Part> {
         }
     }
     parts
+}
+
+fn anthropic_web_search_result_status(
+    content: &api::ResponseWebSearchToolResultBlockContent,
+) -> crate::WebSearchToolCallStatus {
+    if matches!(
+        content,
+        api::ResponseWebSearchToolResultBlockContent::ResponseWebSearchToolResultError(_)
+    ) {
+        crate::WebSearchToolCallStatus::Failed
+    } else {
+        crate::WebSearchToolCallStatus::Completed
+    }
 }
 
 fn map_content_block(block: ContentBlock) -> Option<Part> {

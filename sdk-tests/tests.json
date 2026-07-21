@@ -213,10 +213,12 @@
         "content": [
           {
             "type": "web_search_call",
+            "status": "completed",
             "action": true
           },
           {
             "type": "web_search_result",
+            "status": "completed",
             "source_signature": true
           },
           {
@@ -237,10 +239,12 @@
         "content": [
           {
             "type": "web_search_call",
+            "status": "completed",
             "action": true
           },
           {
-            "type": "web_search_result"
+            "type": "web_search_result",
+            "status": "completed"
           },
           {
             "type": "text",
@@ -1299,7 +1303,12 @@
             "content": [
               {
                 "type": "web_search_call",
+                "status": "completed",
                 "action": true
+              },
+              {
+                "type": "web_search_result",
+                "status": "completed"
               },
               {
                 "type": "text",
@@ -1338,7 +1347,12 @@
             "content": [
               {
                 "type": "web_search_call",
+                "status": "completed",
                 "action": true
+              },
+              {
+                "type": "web_search_result",
+                "status": "completed"
               },
               {
                 "type": "text",
@@ -1347,6 +1361,90 @@
                   "source": "^https?://(?:www\\.)?iana\\.org/",
                   "title": "IANA|iana|Reserved|reserved"
                 }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_generate_web_search_failure",
+      "groups": ["anthropic_web_search_failure"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Perform exactly two separate web searches: first search for the current time in Tokyo, then separately search for the current time in Paris. Do not combine the searches or answer from memory."
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "web_search",
+                "max_uses": 1
+              }
+            ]
+          },
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "web_search_call",
+                "status": "failed"
+              },
+              {
+                "type": "web_search_result",
+                "status": "failed",
+                "error_code": "^max_uses_exceeded$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_stream_web_search_failure",
+      "groups": ["anthropic_web_search_failure"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Perform exactly two separate web searches: first search for the current time in Tokyo, then separately search for the current time in Paris. Do not combine the searches or answer from memory."
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "web_search",
+                "max_uses": 1
+              }
+            ]
+          },
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "web_search_call",
+                "status": "failed"
+              },
+              {
+                "type": "web_search_result",
+                "status": "failed",
+                "error_code": "^max_uses_exceeded$"
               }
             ]
           }

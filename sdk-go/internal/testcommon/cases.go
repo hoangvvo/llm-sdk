@@ -48,7 +48,7 @@ type protocolRequest struct {
 	TestCase string                `json:"test_case"`
 	Stage    int                   `json:"stage"`
 	Context  *stageContext         `json:"context,omitempty"`
-	Content  []llmsdk.Part         `json:"content,omitempty"`
+	Content  []llmsdk.Part         `json:"content"`
 	Response *llmsdk.ModelResponse `json:"response,omitempty"`
 	Stream   *streamMetrics        `json:"stream,omitempty"`
 	Error    *protocolError        `json:"error,omitempty"`

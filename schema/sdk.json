@@ -666,6 +666,11 @@
           "items": { "type": "string" },
           "description": "Restricts search results to these domains when supported by the provider."
         },
+        "max_uses": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Limits the number of searches the provider may perform when supported."
+        },
         "user_location": {
           "$ref": "#/definitions/WebSearchUserLocation"
         }
