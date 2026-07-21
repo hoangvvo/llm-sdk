@@ -1,11 +1,15 @@
 use llm_agent::BoxedError;
-use llm_sdk::{
-    anthropic::{AnthropicModel, AnthropicModelOptions},
-    google::{GoogleModel, GoogleModelOptions},
-    openai::{OpenAIChatModel, OpenAIChatModelOptions, OpenAIModel, OpenAIModelOptions},
-    LanguageModel, LanguageModelMetadata,
+#[cfg(feature = "anthropic")]
+use llm_sdk::anthropic::{AnthropicModel, AnthropicModelOptions};
+#[cfg(feature = "google")]
+use llm_sdk::google::{GoogleModel, GoogleModelOptions};
+#[cfg(feature = "openai")]
+use llm_sdk::openai::{OpenAIChatModel, OpenAIChatModelOptions, OpenAIModel, OpenAIModelOptions};
+use llm_sdk::{LanguageModel, LanguageModelMetadata};
+use std::{
+    env,
+    sync::{Arc, Once},
 };
-use std::{env, sync::Arc};
 
 pub fn get_model(
     provider: &str,
@@ -13,7 +17,10 @@ pub fn get_model(
     metadata: LanguageModelMetadata,
     api_key: Option<String>,
 ) -> Result<Arc<dyn LanguageModel + Send + Sync>, BoxedError> {
+    install_tls_provider();
+
     match provider {
+        #[cfg(feature = "openai")]
         "openai" => {
             let api_key = api_key
                 .or_else(|| env::var("OPENAI_API_KEY").ok())
@@ -30,6 +37,7 @@ pub fn get_model(
                 .with_metadata(metadata),
             ))
         }
+        #[cfg(feature = "openai")]
         "openai-chat-completion" => {
             let api_key = api_key
                 .or_else(|| env::var("OPENAI_API_KEY").ok())
@@ -46,6 +54,7 @@ pub fn get_model(
                 .with_metadata(metadata),
             ))
         }
+        #[cfg(feature = "anthropic")]
         "anthropic" => {
             let api_key = api_key
                 .or_else(|| env::var("ANTHROPIC_API_KEY").ok())
@@ -62,6 +71,7 @@ pub fn get_model(
                 .with_metadata(metadata),
             ))
         }
+        #[cfg(feature = "google")]
         "google" => {
             let api_key = api_key
                 .or_else(|| env::var("GOOGLE_API_KEY").ok())
@@ -80,4 +90,16 @@ pub fn get_model(
         }
         _ => Err(format!("Unsupported provider: {provider}").into()),
     }
+}
+
+fn install_tls_provider() {
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        if rustls::crypto::CryptoProvider::get_default().is_none() {
+            rustls::crypto::ring::default_provider()
+                .install_default()
+                .expect("the application must select its Rustls provider once");
+        }
+    });
 }

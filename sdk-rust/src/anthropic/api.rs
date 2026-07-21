@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct CreateMessageParams {
     /// Top-level cache control automatically applies a cache_control marker to
     /// the last cacheable block in the request.
@@ -244,13 +244,12 @@ pub struct CreateMessageParams {
 
 /// Top-level cache control automatically applies a cache_control marker to the
 /// last cacheable block in the request.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum CreateMessageParamsCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -259,14 +258,13 @@ pub enum CreateMessageParamsCacheControl {
 /// capacity for this request.
 ///
 /// Anthropic offers different levels of service for your API requests. See [service-tiers](https://docs.claude.com/en/api/service-tiers) for details.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum CreateMessageParamsServiceTier {
     #[serde(rename = "auto")]
     Auto,
     #[serde(rename = "standard_only")]
     StandardOnly,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -278,7 +276,7 @@ pub type CreateMessageParamsSystemArray = Option<Vec<RequestTextBlock>>;
 /// System prompt.
 ///
 /// A system prompt is a way of providing context and instructions to Claude, such as specifying a particular goal or role. See our [guide to system prompts](https://docs.claude.com/en/docs/system-prompts).
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum CreateMessageParamsSystem {
@@ -289,7 +287,7 @@ pub enum CreateMessageParamsSystem {
     Unknown(Value),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum CreateMessageParamsToolsItem {
@@ -314,7 +312,7 @@ pub enum CreateMessageParamsToolsItem {
     Unknown(Value),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Message {
     /// Information about the container used in this request.
     ///
@@ -409,7 +407,7 @@ pub struct Message {
     pub usage: Usage,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum MessageStreamEvent {
@@ -426,11 +424,10 @@ pub enum MessageStreamEvent {
     #[serde(rename = "content_block_stop")]
     ContentBlockStop(ContentBlockStopEvent),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct CacheControlEphemeral {
     /// The time-to-live for the cache control breakpoint.
     ///
@@ -450,19 +447,18 @@ pub struct CacheControlEphemeral {
 /// - `1h`: 1 hour
 ///
 /// Defaults to `5m`.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum CacheControlEphemeralTtl {
     #[serde(rename = "5m")]
     N5M,
     #[serde(rename = "1h")]
     N1H,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct InputMessage {
     pub content: InputMessageContent,
     pub role: InputMessageRole,
@@ -472,7 +468,7 @@ pub type InputMessageContentString = Option<String>;
 
 pub type InputMessageContentArray = Option<Vec<InputContentBlock>>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum InputMessageContent {
@@ -483,19 +479,18 @@ pub enum InputMessageContent {
     Unknown(Value),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum InputMessageRole {
     #[serde(rename = "user")]
     User,
     #[serde(rename = "assistant")]
     Assistant,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct Metadata {
     /// An external identifier for the user who is associated with the request.
     ///
@@ -509,7 +504,7 @@ pub struct Metadata {
 /// The model that will complete your prompt.\n\nSee [models](https://docs.anthropic.com/en/docs/models-overview) for additional details and options.
 pub type Model = Option<String>;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct OutputConfig {
     /// How much effort the model should put into its response. Higher effort
     /// levels may result in more thorough analysis but take longer.
@@ -522,7 +517,7 @@ pub struct OutputConfig {
     pub format: Option<JsonOutputFormat>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestTextBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -534,18 +529,17 @@ pub struct RequestTextBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestTextBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestTextBlockCitationsItem {
@@ -559,7 +553,6 @@ pub enum RequestTextBlockCitationsItem {
     WebSearchResultLocation(RequestWebSearchResultLocationCitation),
     #[serde(rename = "search_result_location")]
     SearchResultLocation(RequestSearchResultLocationCitation),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -571,7 +564,7 @@ pub enum RequestTextBlockCitationsItem {
 /// tokens and counts towards your `max_tokens` limit.
 ///
 /// See [extended thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking) for details.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ThinkingConfigParam {
@@ -581,14 +574,13 @@ pub enum ThinkingConfigParam {
     Disabled(ThinkingConfigDisabled),
     #[serde(rename = "adaptive")]
     Adaptive(ThinkingConfigAdaptive),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// How the model should use the provided tools. The model can use a specific
 /// tool, any available tool, decide by itself, or not use tools at all.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ToolChoice {
@@ -600,12 +592,11 @@ pub enum ToolChoice {
     Tool(ToolChoiceTool),
     #[serde(rename = "none")]
     None(ToolChoiceNone),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct Tool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -652,18 +643,17 @@ pub struct Tool {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ToolCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct BashTool20250124 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -688,18 +678,17 @@ pub struct BashTool20250124 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum BashTool20250124CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct CodeExecutionTool20250522 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -722,18 +711,17 @@ pub struct CodeExecutionTool20250522 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum CodeExecutionTool20250522CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct CodeExecutionTool20250825 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -756,20 +744,19 @@ pub struct CodeExecutionTool20250825 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum CodeExecutionTool20250825CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Code execution tool with REPL state persistence (daemon mode + gVisor
 /// checkpoint).
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct CodeExecutionTool20260120 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -792,18 +779,17 @@ pub struct CodeExecutionTool20260120 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum CodeExecutionTool20260120CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct MemoryTool20250818 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -828,18 +814,17 @@ pub struct MemoryTool20250818 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum MemoryTool20250818CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct TextEditor20250124 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -864,18 +849,17 @@ pub struct TextEditor20250124 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum TextEditor20250124CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct TextEditor20250429 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -900,18 +884,17 @@ pub struct TextEditor20250429 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum TextEditor20250429CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct TextEditor20250728 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -940,18 +923,17 @@ pub struct TextEditor20250728 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum TextEditor20250728CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct WebSearchTool20250305 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -989,18 +971,17 @@ pub struct WebSearchTool20250305 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum WebSearchTool20250305CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct WebFetchTool20250910 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -1041,18 +1022,17 @@ pub struct WebFetchTool20250910 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum WebFetchTool20250910CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct WebSearchTool20260209 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -1090,18 +1070,17 @@ pub struct WebSearchTool20260209 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum WebSearchTool20260209CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct WebFetchTool20260209 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -1142,19 +1121,18 @@ pub struct WebFetchTool20260209 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum WebFetchTool20260209CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Web fetch tool with use_cache parameter for bypassing cached content.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct WebFetchTool20260309 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -1200,18 +1178,17 @@ pub struct WebFetchTool20260309 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum WebFetchTool20260309CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct ToolSearchToolBM2520251119 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -1234,30 +1211,28 @@ pub struct ToolSearchToolBM2520251119 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ToolSearchToolBM2520251119CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ToolSearchToolBM2520251119Type {
     #[serde(rename = "tool_search_tool_bm25_20251119")]
     ToolSearchToolBm2520251119,
     #[serde(rename = "tool_search_tool_bm25")]
     ToolSearchToolBm25,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct ToolSearchToolRegex20251119 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_callers: Option<Vec<AllowedCaller>>,
@@ -1280,32 +1255,30 @@ pub struct ToolSearchToolRegex20251119 {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ToolSearchToolRegex20251119CacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ToolSearchToolRegex20251119Type {
     #[serde(rename = "tool_search_tool_regex_20251119")]
     ToolSearchToolRegex20251119,
     #[serde(rename = "tool_search_tool_regex")]
     ToolSearchToolRegex,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Information about the container used in the request (for the code execution
 /// tool)
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Container {
     /// The time at which the container will expire.
     pub expires_at: String,
@@ -1313,7 +1286,7 @@ pub struct Container {
     pub id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ContentBlock {
@@ -1342,12 +1315,11 @@ pub enum ContentBlock {
     #[serde(rename = "container_upload")]
     ContainerUpload(ResponseContainerUploadBlock),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Structured information about a refusal.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct RefusalStopDetails {
     /// The policy category that triggered the refusal.
     ///
@@ -1364,7 +1336,7 @@ pub struct RefusalStopDetails {
 /// The policy category that triggered the refusal.
 ///
 /// `null` when the refusal doesn't map to a named category.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum RefusalStopDetailsCategory {
     #[serde(rename = "cyber")]
@@ -1372,11 +1344,10 @@ pub enum RefusalStopDetailsCategory {
     #[serde(rename = "bio")]
     Bio,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum StopReason {
     #[serde(rename = "end_turn")]
@@ -1392,11 +1363,10 @@ pub enum StopReason {
     #[serde(rename = "refusal")]
     Refusal,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Usage {
     /// Breakdown of cached tokens by TTL
     pub cache_creation: Option<CacheCreation>,
@@ -1417,7 +1387,7 @@ pub struct Usage {
 }
 
 /// If the request used the priority, standard, or batch tier.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum UsageServiceTier {
     #[serde(rename = "standard")]
@@ -1427,17 +1397,16 @@ pub enum UsageServiceTier {
     #[serde(rename = "batch")]
     Batch,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ContentBlockDeltaEvent {
     pub delta: ContentBlockDeltaEventDelta,
     pub index: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ContentBlockDeltaEventDelta {
@@ -1452,17 +1421,16 @@ pub enum ContentBlockDeltaEventDelta {
     #[serde(rename = "signature_delta")]
     SignatureDelta(SignatureContentBlockDelta),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ContentBlockStartEvent {
     pub content_block: ContentBlockStartEventContentBlock,
     pub index: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ContentBlockStartEventContentBlock {
@@ -1491,16 +1459,15 @@ pub enum ContentBlockStartEventContentBlock {
     #[serde(rename = "container_upload")]
     ContainerUpload(ResponseContainerUploadBlock),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ContentBlockStopEvent {
     pub index: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct MessageDeltaEvent {
     pub delta: MessageDelta,
     /// Billing and rate-limit usage.
@@ -1522,15 +1489,15 @@ pub struct MessageDeltaEvent {
     pub usage: MessageDeltaUsage,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct MessageStartEvent {
     pub message: Message,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct MessageStopEvent {}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum InputContentBlock {
@@ -1566,13 +1533,12 @@ pub enum InputContentBlock {
     ToolSearchToolResult(RequestToolSearchToolResultBlock),
     #[serde(rename = "container_upload")]
     ContainerUpload(RequestContainerUploadBlock),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// All possible effort levels.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum EffortLevel {
     #[serde(rename = "low")]
@@ -1585,19 +1551,18 @@ pub enum EffortLevel {
     Xhigh,
     #[serde(rename = "max")]
     Max,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct JsonOutputFormat {
     /// The JSON schema of the format
     pub schema: Value,
     pub r#type: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestCharLocationCitation {
     pub cited_text: String,
     pub document_index: i64,
@@ -1606,7 +1571,7 @@ pub struct RequestCharLocationCitation {
     pub start_char_index: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestContentBlockLocationCitation {
     pub cited_text: String,
     pub document_index: i64,
@@ -1615,7 +1580,7 @@ pub struct RequestContentBlockLocationCitation {
     pub start_block_index: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestPageLocationCitation {
     pub cited_text: String,
     pub document_index: i64,
@@ -1624,7 +1589,7 @@ pub struct RequestPageLocationCitation {
     pub start_page_number: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestSearchResultLocationCitation {
     pub cited_text: String,
     pub end_block_index: i64,
@@ -1634,7 +1599,7 @@ pub struct RequestSearchResultLocationCitation {
     pub title: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestWebSearchResultLocationCitation {
     pub cited_text: String,
     pub encrypted_index: String,
@@ -1642,7 +1607,7 @@ pub struct RequestWebSearchResultLocationCitation {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ThinkingConfigAdaptive {
     /// Controls how thinking content appears in the response. When set to
     /// `summarized`, thinking is returned normally. When set to `omitted`,
@@ -1652,10 +1617,10 @@ pub struct ThinkingConfigAdaptive {
     pub display: Option<ThinkingDisplayMode>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ThinkingConfigDisabled {}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct ThinkingConfigEnabled {
     /// Determines how many tokens Claude can use for its internal reasoning
     /// process. Larger budgets can enable more thorough analysis for complex
@@ -1674,7 +1639,7 @@ pub struct ThinkingConfigEnabled {
 }
 
 /// The model will use any available tools.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ToolChoiceAny {
     /// Whether to disable parallel tool use.
     ///
@@ -1685,7 +1650,7 @@ pub struct ToolChoiceAny {
 }
 
 /// The model will automatically decide whether to use tools.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ToolChoiceAuto {
     /// Whether to disable parallel tool use.
     ///
@@ -1696,11 +1661,11 @@ pub struct ToolChoiceAuto {
 }
 
 /// The model will not be allowed to use tools.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ToolChoiceNone {}
 
 /// The model will use the specified tool with `tool_choice.name`.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct ToolChoiceTool {
     /// Whether to disable parallel tool use.
     ///
@@ -1719,7 +1684,7 @@ pub struct ToolChoiceTool {
 ///     code_execution_20250825: The tool can be called from the code execution
 /// environment (v1).     code_execution_20260120: The tool can be called from
 /// the code execution environment (v2 with persistence).
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum AllowedCaller {
     #[serde(rename = "direct")]
@@ -1728,7 +1693,6 @@ pub enum AllowedCaller {
     CodeExecution20250825,
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -1737,7 +1701,7 @@ pub type JsonValue = Option<Value>;
 
 pub type InputSchema = Option<Value>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct UserLocation {
     /// The city of the user.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1754,19 +1718,19 @@ pub struct UserLocation {
     pub r#type: String,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct RequestCitationsConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseBashCodeExecutionToolResultBlock {
     pub content: ResponseBashCodeExecutionToolResultBlockContent,
     pub tool_use_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseBashCodeExecutionToolResultBlockContent {
@@ -1775,17 +1739,16 @@ pub enum ResponseBashCodeExecutionToolResultBlockContent {
     #[serde(rename = "bash_code_execution_result")]
     BashCodeExecutionResult(ResponseBashCodeExecutionResultBlock),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseCodeExecutionToolResultBlock {
     pub content: ResponseCodeExecutionToolResultBlockContent,
     pub tool_use_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseCodeExecutionToolResultBlockContent {
@@ -1796,31 +1759,29 @@ pub enum ResponseCodeExecutionToolResultBlockContent {
     #[serde(rename = "encrypted_code_execution_result")]
     EncryptedCodeExecutionResult(ResponseEncryptedCodeExecutionResultBlock),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Response model for a file uploaded to the container.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseContainerUploadBlock {
     pub file_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseRedactedThinkingBlock {
     pub data: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseServerToolUseBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub caller: Option<ResponseServerToolUseBlockCaller>,
     pub id: String,
     pub input: Value,
     pub name: ResponseServerToolUseBlockName,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseServerToolUseBlockCaller {
@@ -1831,11 +1792,10 @@ pub enum ResponseServerToolUseBlockCaller {
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120(ServerToolCaller20260120),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum ResponseServerToolUseBlockName {
     #[serde(rename = "web_search")]
@@ -1853,11 +1813,10 @@ pub enum ResponseServerToolUseBlockName {
     #[serde(rename = "tool_search_tool_bm25")]
     ToolSearchToolBm25,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseTextBlock {
     /// Citations supporting the text block.
     ///
@@ -1869,7 +1828,7 @@ pub struct ResponseTextBlock {
     pub text: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseTextBlockCitationsItem {
@@ -1884,17 +1843,16 @@ pub enum ResponseTextBlockCitationsItem {
     #[serde(rename = "search_result_location")]
     SearchResultLocation(ResponseSearchResultLocationCitation),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseTextEditorCodeExecutionToolResultBlock {
     pub content: ResponseTextEditorCodeExecutionToolResultBlockContent,
     pub tool_use_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseTextEditorCodeExecutionToolResultBlockContent {
@@ -1907,23 +1865,22 @@ pub enum ResponseTextEditorCodeExecutionToolResultBlockContent {
     #[serde(rename = "text_editor_code_execution_str_replace_result")]
     TextEditorCodeExecutionStrReplaceResult(ResponseTextEditorCodeExecutionStrReplaceResultBlock),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseThinkingBlock {
     pub signature: String,
     pub thinking: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseToolSearchToolResultBlock {
     pub content: ResponseToolSearchToolResultBlockContent,
     pub tool_use_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseToolSearchToolResultBlockContent {
@@ -1932,20 +1889,18 @@ pub enum ResponseToolSearchToolResultBlockContent {
     #[serde(rename = "tool_search_tool_search_result")]
     ToolSearchToolSearchResult(ResponseToolSearchToolSearchResultBlock),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseToolUseBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub caller: Option<ResponseToolUseBlockCaller>,
     pub id: String,
     pub input: Value,
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseToolUseBlockCaller {
@@ -1956,19 +1911,17 @@ pub enum ResponseToolUseBlockCaller {
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120(ServerToolCaller20260120),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseWebFetchToolResultBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub caller: Option<ResponseWebFetchToolResultBlockCaller>,
     pub content: ResponseWebFetchToolResultBlockContent,
     pub tool_use_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseWebFetchToolResultBlockCaller {
@@ -1979,11 +1932,10 @@ pub enum ResponseWebFetchToolResultBlockCaller {
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120(ServerToolCaller20260120),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseWebFetchToolResultBlockContent {
@@ -1992,19 +1944,17 @@ pub enum ResponseWebFetchToolResultBlockContent {
     #[serde(rename = "web_fetch_result")]
     WebFetchResult(ResponseWebFetchResultBlock),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseWebSearchToolResultBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub caller: Option<ResponseWebSearchToolResultBlockCaller>,
     pub content: ResponseWebSearchToolResultBlockContent,
     pub tool_use_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseWebSearchToolResultBlockCaller {
@@ -2015,24 +1965,22 @@ pub enum ResponseWebSearchToolResultBlockCaller {
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120(ServerToolCaller20260120),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 pub type ResponseWebSearchToolResultBlockContentArray = Option<Vec<ResponseWebSearchResultBlock>>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum ResponseWebSearchToolResultBlockContent {
     ResponseWebSearchToolResultError(ResponseWebSearchToolResultError),
     ResponseWebSearchToolResultBlockContentArray(ResponseWebSearchToolResultBlockContentArray),
     #[allow(dead_code)]
-    #[serde(skip_serializing)]
     Unknown(Value),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct CacheCreation {
     /// The number of input tokens used to create the 1 hour cache entry.
     #[serde(rename = "ephemeral_1h_input_tokens")]
@@ -2042,7 +1990,7 @@ pub struct CacheCreation {
     pub ephemeral_5_m_input_tokens: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ServerToolUsage {
     /// The number of web fetch tool requests.
     pub web_fetch_requests: i64,
@@ -2050,12 +1998,12 @@ pub struct ServerToolUsage {
     pub web_search_requests: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct CitationsDelta {
     pub citation: CitationsDeltaCitation,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum CitationsDeltaCitation {
@@ -2070,31 +2018,30 @@ pub enum CitationsDeltaCitation {
     #[serde(rename = "search_result_location")]
     SearchResultLocation(ResponseSearchResultLocationCitation),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct InputJsonContentBlockDelta {
     pub partial_json: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct SignatureContentBlockDelta {
     pub signature: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct TextContentBlockDelta {
     pub text: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ThinkingContentBlockDelta {
     pub thinking: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct MessageDelta {
     /// Information about the container used in this request.
     ///
@@ -2110,7 +2057,7 @@ pub struct MessageDelta {
     pub stop_sequence: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct MessageDeltaUsage {
     /// The cumulative number of input tokens used to create the cache entry.
     pub cache_creation_input_tokens: Option<i64>,
@@ -2124,7 +2071,7 @@ pub struct MessageDeltaUsage {
     pub server_tool_use: Option<ServerToolUsage>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestBashCodeExecutionToolResultBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2134,18 +2081,17 @@ pub struct RequestBashCodeExecutionToolResultBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestBashCodeExecutionToolResultBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestBashCodeExecutionToolResultBlockContent {
@@ -2153,12 +2099,11 @@ pub enum RequestBashCodeExecutionToolResultBlockContent {
     BashCodeExecutionToolResultError(RequestBashCodeExecutionToolResultError),
     #[serde(rename = "bash_code_execution_result")]
     BashCodeExecutionResult(RequestBashCodeExecutionResultBlock),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestCodeExecutionToolResultBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2168,18 +2113,17 @@ pub struct RequestCodeExecutionToolResultBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestCodeExecutionToolResultBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestCodeExecutionToolResultBlockContent {
@@ -2189,7 +2133,6 @@ pub enum RequestCodeExecutionToolResultBlockContent {
     CodeExecutionResult(RequestCodeExecutionResultBlock),
     #[serde(rename = "encrypted_code_execution_result")]
     EncryptedCodeExecutionResult(RequestEncryptedCodeExecutionResultBlock),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -2197,7 +2140,7 @@ pub enum RequestCodeExecutionToolResultBlockContent {
 /// A content block that represents a file to be uploaded to the container
 /// Files uploaded via this block will be available in the container's input
 /// directory.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestContainerUploadBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2206,18 +2149,17 @@ pub struct RequestContainerUploadBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestContainerUploadBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestDocumentBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2233,18 +2175,17 @@ pub struct RequestDocumentBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestDocumentBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestDocumentBlockSource {
@@ -2256,12 +2197,11 @@ pub enum RequestDocumentBlockSource {
     Content(ContentBlockSource),
     #[serde(rename = "url")]
     Url(URLPDFSource),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestImageBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2270,18 +2210,17 @@ pub struct RequestImageBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestImageBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestImageBlockSource {
@@ -2289,17 +2228,16 @@ pub enum RequestImageBlockSource {
     Base64(Base64ImageSource),
     #[serde(rename = "url")]
     Url(URLImageSource),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestRedactedThinkingBlock {
     pub data: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestSearchResultBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2312,18 +2250,17 @@ pub struct RequestSearchResultBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestSearchResultBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestServerToolUseBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2336,18 +2273,17 @@ pub struct RequestServerToolUseBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestServerToolUseBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestServerToolUseBlockCaller {
@@ -2357,12 +2293,11 @@ pub enum RequestServerToolUseBlockCaller {
     CodeExecution20250825(ServerToolCaller),
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120(ServerToolCaller20260120),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum RequestServerToolUseBlockName {
     #[serde(rename = "web_search")]
@@ -2379,12 +2314,11 @@ pub enum RequestServerToolUseBlockName {
     ToolSearchToolRegex,
     #[serde(rename = "tool_search_tool_bm25")]
     ToolSearchToolBm25,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestTextEditorCodeExecutionToolResultBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2394,18 +2328,17 @@ pub struct RequestTextEditorCodeExecutionToolResultBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestTextEditorCodeExecutionToolResultBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestTextEditorCodeExecutionToolResultBlockContent {
@@ -2417,18 +2350,17 @@ pub enum RequestTextEditorCodeExecutionToolResultBlockContent {
     TextEditorCodeExecutionCreateResult(RequestTextEditorCodeExecutionCreateResultBlock),
     #[serde(rename = "text_editor_code_execution_str_replace_result")]
     TextEditorCodeExecutionStrReplaceResult(RequestTextEditorCodeExecutionStrReplaceResultBlock),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestThinkingBlock {
     pub signature: String,
     pub thinking: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestToolResultBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2441,20 +2373,19 @@ pub struct RequestToolResultBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestToolResultBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 pub type RequestToolResultBlockContentString = Option<String>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestToolResultBlockContentArrayItem {
@@ -2468,14 +2399,13 @@ pub enum RequestToolResultBlockContentArrayItem {
     Document(RequestDocumentBlock),
     #[serde(rename = "tool_reference")]
     ToolReference(RequestToolReferenceBlock),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 pub type RequestToolResultBlockContentArray = Option<Vec<RequestToolResultBlockContentArrayItem>>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum RequestToolResultBlockContent {
@@ -2486,7 +2416,7 @@ pub enum RequestToolResultBlockContent {
     Unknown(Value),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestToolSearchToolResultBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2496,18 +2426,17 @@ pub struct RequestToolSearchToolResultBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestToolSearchToolResultBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestToolSearchToolResultBlockContent {
@@ -2515,12 +2444,11 @@ pub enum RequestToolSearchToolResultBlockContent {
     ToolSearchToolResultError(RequestToolSearchToolResultError),
     #[serde(rename = "tool_search_tool_search_result")]
     ToolSearchToolSearchResult(RequestToolSearchToolSearchResultBlock),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestToolUseBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2533,18 +2461,17 @@ pub struct RequestToolUseBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestToolUseBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestToolUseBlockCaller {
@@ -2554,12 +2481,11 @@ pub enum RequestToolUseBlockCaller {
     CodeExecution20250825(ServerToolCaller),
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120(ServerToolCaller20260120),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestWebFetchToolResultBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2571,18 +2497,17 @@ pub struct RequestWebFetchToolResultBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestWebFetchToolResultBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestWebFetchToolResultBlockCaller {
@@ -2592,12 +2517,11 @@ pub enum RequestWebFetchToolResultBlockCaller {
     CodeExecution20250825(ServerToolCaller),
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120(ServerToolCaller20260120),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestWebFetchToolResultBlockContent {
@@ -2605,12 +2529,11 @@ pub enum RequestWebFetchToolResultBlockContent {
     WebFetchToolResultError(RequestWebFetchToolResultError),
     #[serde(rename = "web_fetch_result")]
     WebFetchResult(RequestWebFetchResultBlock),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestWebSearchToolResultBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2622,18 +2545,17 @@ pub struct RequestWebSearchToolResultBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestWebSearchToolResultBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestWebSearchToolResultBlockCaller {
@@ -2643,14 +2565,13 @@ pub enum RequestWebSearchToolResultBlockCaller {
     CodeExecution20250825(ServerToolCaller),
     #[serde(rename = "code_execution_20260120")]
     CodeExecution20260120(ServerToolCaller20260120),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 pub type RequestWebSearchToolResultBlockContentArray = Option<Vec<RequestWebSearchResultBlock>>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum RequestWebSearchToolResultBlockContent {
@@ -2661,24 +2582,23 @@ pub enum RequestWebSearchToolResultBlockContent {
     Unknown(Value),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ThinkingDisplayMode {
     #[serde(rename = "summarized")]
     Summarized,
     #[serde(rename = "omitted")]
     Omitted,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseBashCodeExecutionToolResultError {
     pub error_code: BashCodeExecutionToolResultErrorCode,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseBashCodeExecutionResultBlock {
     pub content: Vec<ResponseBashCodeExecutionOutputBlock>,
     pub return_code: i64,
@@ -2686,12 +2606,12 @@ pub struct ResponseBashCodeExecutionResultBlock {
     pub stdout: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseCodeExecutionToolResultError {
     pub error_code: CodeExecutionToolResultErrorCode,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseCodeExecutionResultBlock {
     pub content: Vec<ResponseCodeExecutionOutputBlock>,
     pub return_code: i64,
@@ -2700,7 +2620,7 @@ pub struct ResponseCodeExecutionResultBlock {
 }
 
 /// Code execution result with encrypted stdout for PFC + web_search results.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseEncryptedCodeExecutionResultBlock {
     pub content: Vec<ResponseCodeExecutionOutputBlock>,
     pub encrypted_stdout: String,
@@ -2723,7 +2643,7 @@ pub struct ServerToolCaller20260120 {
 #[derive(Serialize, Deserialize, Default)]
 pub struct DirectCaller {}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseCharLocationCitation {
     pub cited_text: String,
     pub document_index: i64,
@@ -2733,7 +2653,7 @@ pub struct ResponseCharLocationCitation {
     pub start_char_index: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseContentBlockLocationCitation {
     pub cited_text: String,
     pub document_index: i64,
@@ -2743,7 +2663,7 @@ pub struct ResponseContentBlockLocationCitation {
     pub start_block_index: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponsePageLocationCitation {
     pub cited_text: String,
     pub document_index: i64,
@@ -2753,7 +2673,7 @@ pub struct ResponsePageLocationCitation {
     pub start_page_number: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseSearchResultLocationCitation {
     pub cited_text: String,
     pub end_block_index: i64,
@@ -2763,7 +2683,7 @@ pub struct ResponseSearchResultLocationCitation {
     pub title: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseWebSearchResultLocationCitation {
     pub cited_text: String,
     pub encrypted_index: String,
@@ -2771,13 +2691,13 @@ pub struct ResponseWebSearchResultLocationCitation {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseTextEditorCodeExecutionToolResultError {
     pub error_code: TextEditorCodeExecutionToolResultErrorCode,
     pub error_message: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseTextEditorCodeExecutionViewResultBlock {
     pub content: String,
     pub file_type: ResponseTextEditorCodeExecutionViewResultBlockFileType,
@@ -2786,7 +2706,7 @@ pub struct ResponseTextEditorCodeExecutionViewResultBlock {
     pub total_lines: Option<i64>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum ResponseTextEditorCodeExecutionViewResultBlockFileType {
     #[serde(rename = "text")]
@@ -2796,16 +2716,15 @@ pub enum ResponseTextEditorCodeExecutionViewResultBlockFileType {
     #[serde(rename = "pdf")]
     Pdf,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseTextEditorCodeExecutionCreateResultBlock {
     pub is_file_update: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseTextEditorCodeExecutionStrReplaceResultBlock {
     pub lines: Option<Vec<String>>,
     pub new_lines: Option<i64>,
@@ -2814,23 +2733,23 @@ pub struct ResponseTextEditorCodeExecutionStrReplaceResultBlock {
     pub old_start: Option<i64>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseToolSearchToolResultError {
     pub error_code: ToolSearchToolResultErrorCode,
     pub error_message: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseToolSearchToolSearchResultBlock {
     pub tool_references: Vec<ResponseToolReferenceBlock>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseWebFetchToolResultError {
     pub error_code: WebFetchToolResultErrorCode,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseWebFetchResultBlock {
     pub content: ResponseDocumentBlock,
     /// ISO 8601 timestamp when the content was retrieved
@@ -2839,13 +2758,13 @@ pub struct ResponseWebFetchResultBlock {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseWebSearchToolResultError {
     pub error_code: WebSearchToolResultErrorCode,
     pub r#type: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseWebSearchResultBlock {
     pub encrypted_content: String,
     pub page_age: Option<String>,
@@ -2854,12 +2773,12 @@ pub struct ResponseWebSearchResultBlock {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestBashCodeExecutionToolResultError {
     pub error_code: BashCodeExecutionToolResultErrorCode,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestBashCodeExecutionResultBlock {
     pub content: Vec<RequestBashCodeExecutionOutputBlock>,
     pub return_code: i64,
@@ -2867,12 +2786,12 @@ pub struct RequestBashCodeExecutionResultBlock {
     pub stdout: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestCodeExecutionToolResultError {
     pub error_code: CodeExecutionToolResultErrorCode,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestCodeExecutionResultBlock {
     pub content: Vec<RequestCodeExecutionOutputBlock>,
     pub return_code: i64,
@@ -2881,7 +2800,7 @@ pub struct RequestCodeExecutionResultBlock {
 }
 
 /// Code execution result with encrypted stdout for PFC + web_search results.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestEncryptedCodeExecutionResultBlock {
     pub content: Vec<RequestCodeExecutionOutputBlock>,
     pub encrypted_stdout: String,
@@ -2895,14 +2814,14 @@ pub struct Base64PDFSource {
     pub media_type: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct ContentBlockSource {
     pub content: ContentBlockSourceContent,
 }
 
 pub type ContentBlockSourceContentString = Option<String>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ContentBlockSourceContentArrayItem {
@@ -2910,14 +2829,13 @@ pub enum ContentBlockSourceContentArrayItem {
     Text(RequestTextBlock),
     #[serde(rename = "image")]
     Image(RequestImageBlock),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 pub type ContentBlockSourceContentArray = Option<Vec<ContentBlockSourceContentArrayItem>>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum ContentBlockSourceContent {
@@ -2934,18 +2852,18 @@ pub struct PlainTextSource {
     pub media_type: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct URLPDFSource {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct Base64ImageSource {
     pub data: String,
     pub media_type: Base64ImageSourceMediaType,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum Base64ImageSourceMediaType {
     #[serde(rename = "image/jpeg")]
@@ -2956,24 +2874,23 @@ pub enum Base64ImageSourceMediaType {
     ImageGif,
     #[serde(rename = "image/webp")]
     ImageWebp,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct URLImageSource {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestTextEditorCodeExecutionToolResultError {
     pub error_code: TextEditorCodeExecutionToolResultErrorCode,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestTextEditorCodeExecutionViewResultBlock {
     pub content: String,
     pub file_type: RequestTextEditorCodeExecutionViewResultBlockFileType,
@@ -2985,7 +2902,7 @@ pub struct RequestTextEditorCodeExecutionViewResultBlock {
     pub total_lines: Option<i64>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum RequestTextEditorCodeExecutionViewResultBlockFileType {
     #[serde(rename = "text")]
@@ -2994,17 +2911,16 @@ pub enum RequestTextEditorCodeExecutionViewResultBlockFileType {
     Image,
     #[serde(rename = "pdf")]
     Pdf,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestTextEditorCodeExecutionCreateResultBlock {
     pub is_file_update: bool,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct RequestTextEditorCodeExecutionStrReplaceResultBlock {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lines: Option<Vec<String>>,
@@ -3019,7 +2935,7 @@ pub struct RequestTextEditorCodeExecutionStrReplaceResultBlock {
 }
 
 /// Tool reference block that can be included in tool_result content.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestToolReferenceBlock {
     /// Create a cache control breakpoint at this content block.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3029,33 +2945,32 @@ pub struct RequestToolReferenceBlock {
 }
 
 /// Create a cache control breakpoint at this content block.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum RequestToolReferenceBlockCacheControl {
     #[serde(rename = "ephemeral")]
     Ephemeral(CacheControlEphemeral),
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestToolSearchToolResultError {
     pub error_code: ToolSearchToolResultErrorCode,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestToolSearchToolSearchResultBlock {
     pub tool_references: Vec<RequestToolReferenceBlock>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestWebFetchToolResultError {
     pub error_code: WebFetchToolResultErrorCode,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestWebFetchResultBlock {
     pub content: RequestDocumentBlock,
     /// ISO 8601 timestamp when the content was retrieved
@@ -3065,7 +2980,7 @@ pub struct RequestWebFetchResultBlock {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestWebSearchResultBlock {
     pub encrypted_content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3075,7 +2990,7 @@ pub struct RequestWebSearchResultBlock {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestWebSearchToolResultError {
     pub error_code: WebSearchToolResultErrorCode,
     pub r#type: String,
@@ -3099,7 +3014,7 @@ pub enum BashCodeExecutionToolResultErrorCode {
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseBashCodeExecutionOutputBlock {
     pub file_id: String,
     pub r#type: String,
@@ -3121,7 +3036,7 @@ pub enum CodeExecutionToolResultErrorCode {
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseCodeExecutionOutputBlock {
     pub file_id: String,
     pub r#type: String,
@@ -3161,7 +3076,7 @@ pub enum ToolSearchToolResultErrorCode {
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseToolReferenceBlock {
     pub tool_name: String,
     pub r#type: String,
@@ -3191,7 +3106,7 @@ pub enum WebFetchToolResultErrorCode {
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseDocumentBlock {
     /// Citation configuration for the document
     pub citations: Option<ResponseCitationsConfig>,
@@ -3201,7 +3116,7 @@ pub struct ResponseDocumentBlock {
     pub r#type: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
 pub enum ResponseDocumentBlockSource {
@@ -3210,7 +3125,6 @@ pub enum ResponseDocumentBlockSource {
     #[serde(rename = "text")]
     Text(PlainTextSource),
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
@@ -3234,19 +3148,19 @@ pub enum WebSearchToolResultErrorCode {
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestBashCodeExecutionOutputBlock {
     pub file_id: String,
     pub r#type: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct RequestCodeExecutionOutputBlock {
     pub file_id: String,
     pub r#type: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ResponseCitationsConfig {
     pub enabled: bool,
 }

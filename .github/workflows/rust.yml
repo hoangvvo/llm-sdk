@@ -13,6 +13,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
 
 jobs:
   sdk:
@@ -34,16 +35,17 @@ jobs:
       - name: Check formatting
         run: cargo +nightly fmt --all -- --check
       - name: Run SDK Clippy
-        run: RUSTFLAGS="-Dwarnings" cargo clippy --package llm-sdk-rs
+        run: cargo clippy --package llm-sdk-rs --features anthropic,google,openai -- -D warnings
+      - name: Check SDK examples
+        run: cargo check --package llm-sdk-rs --features examples,anthropic,google,openai --examples
       - name: Test SDK offline suites
         run: |
           cargo test --package llm-sdk-rs \
-            --test accumulator_tests \
-            --test llm_sdk_test_test
+            --no-default-features \
+            --test core_tests
           cargo test --package llm-sdk-rs \
-            --test anthropic_test \
-            --test google_test \
-            --test openai_test \
+            --features anthropic,google,openai \
+            --test provider_tests \
             transport
 
   agent:
@@ -68,13 +70,15 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run agent Clippy
-        run: RUSTFLAGS="-Dwarnings" cargo clippy --package llm-agent
+        run: cargo clippy --package llm-agent -- -D warnings
+      - name: Check agent examples
+        run: cargo check --package llm-agent --features examples,anthropic,google,openai --examples
       - name: Test agent with coverage
         env:
           CARGO_TARGET_DIR: coverage/rust/target
         run: |
           mkdir -p coverage/rust
-          cargo llvm-cov --no-report --package llm-agent --no-fail-fast
+          cargo llvm-cov --no-report --package llm-agent --no-fail-fast --tests
           cargo llvm-cov report --package llm-agent --cobertura --output-path coverage/rust/cobertura.xml
       - name: Upload agent coverage
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}

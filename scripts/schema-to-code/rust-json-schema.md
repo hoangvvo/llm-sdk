@@ -9,7 +9,11 @@ The input is a JSON Schema 7 document whose root defines named schemas under `de
 - Support `$recursiveRef: "#"` only as a self-reference to the current top-level definition.
 - Keep schema names, except for converting Rust type names to CamelCase and field names to snake_case.
 - Preserve descriptions as `///` comments.
-- Derive `Serialize` and `Deserialize` for structs and enums.
+- Without Rust serde roots, derive both `Serialize` and `Deserialize` for structs and enums.
+- An override may define `rustSerde.serialize` and `rustSerde.deserialize` root type names. When
+  present, emit only declarations transitively reachable from those roots and derive only the
+  direction through which each declaration is reached. A declaration reachable in both directions
+  derives both traits.
 - Ignore validation-only metadata such as `format`, `default`, `minimum`, `maximum`, and similar non-type keywords.
 - If a schema shape is not explicitly covered here, throw an error.
 

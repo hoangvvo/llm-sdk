@@ -173,6 +173,9 @@ fn init_tracing() -> Result<SdkTracerProvider, Box<dyn Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("the application must select its Rustls provider once");
     dotenv().ok();
     let telemetry_provider = init_tracing()?;
 

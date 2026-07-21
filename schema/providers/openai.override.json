@@ -3,5 +3,9 @@
   "optionalProperties": {
     "InputImageContent": ["detail"]
   },
+  "rustSerde": {
+    "serialize": ["CreateResponse"],
+    "deserialize": ["Response", "ResponseStreamEvent", "Annotation"]
+  },
   "untaggedUnions": ["InputContent", "FunctionAndCustomToolCallOutput"]
 }

@@ -16,7 +16,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 /// Request to generate a completion from the model.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct GenerateContentRequest {
     /// Optional. Tool configuration for any `Tool` specified in the request. Refer to the [Function calling guide](https://ai.google.dev/gemini-api/docs/function-calling#function_calling_mode) for a usage example.
     #[serde(rename = "toolConfig", skip_serializing_if = "Option::is_none")]
@@ -53,7 +53,7 @@ pub struct GenerateContentRequest {
 }
 
 /// Optional. The service tier of the request.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum GenerateContentRequestServiceTier {
     #[serde(rename = "unspecified")]
@@ -64,7 +64,6 @@ pub enum GenerateContentRequestServiceTier {
     Flex,
     #[serde(rename = "priority")]
     Priority,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -76,31 +75,30 @@ pub enum GenerateContentRequestServiceTier {
 /// requested candidates or none of them - Returns no candidates at all only if
 /// there was something wrong with the prompt (check `prompt_feedback`) -
 /// Reports feedback on each candidate in `finish_reason` and `safety_ratings`.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GenerateContentResponse {
     /// Returns the prompt's feedback related to the content filters.
-    #[serde(rename = "promptFeedback", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "promptFeedback")]
     pub prompt_feedback: Option<PromptFeedback>,
     /// Output only. The model version used to generate the response.
-    #[serde(rename = "modelVersion", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "modelVersion")]
     pub model_version: Option<String>,
     /// Output only. The current model status of this model.
-    #[serde(rename = "modelStatus", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "modelStatus")]
     pub model_status: Option<ModelStatus>,
     /// Candidate responses from the model.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub candidates: Option<Vec<Candidate>>,
     /// Output only. Metadata on the generation requests' token usage.
-    #[serde(rename = "usageMetadata", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "usageMetadata")]
     pub usage_metadata: Option<UsageMetadata>,
     /// Output only. response_id is used to identify each response.
-    #[serde(rename = "responseId", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "responseId")]
     pub response_id: Option<String>,
 }
 
 /// The Tool configuration containing parameters for specifying `Tool` use in
 /// the request.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ToolConfig {
     /// Optional. Retrieval config.
     #[serde(rename = "retrievalConfig", skip_serializing_if = "Option::is_none")]
@@ -123,7 +121,7 @@ pub struct ToolConfig {
 
 /// Configuration options for model generation and outputs. Not all parameters
 /// are configurable for every model.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct GenerationConfig {
     /// Optional. MIME type of the generated candidate text. Supported MIME types are: `text/plain`: (default) Text output. `application/json`: JSON response in the response candidates. `text/x.enum`: ENUM as a string response in the response candidates. Refer to the [docs](https://ai.google.dev/gemini-api/docs/prompting_with_media#plain_text_formats) for a list of all supported text MIME types.
     #[serde(rename = "responseMimeType", skip_serializing_if = "Option::is_none")]
@@ -261,7 +259,7 @@ pub struct GenerationConfig {
     pub enable_enhanced_civic_answers: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum GenerationConfigResponseModalitiesItem {
     #[serde(rename = "MODALITY_UNSPECIFIED")]
@@ -272,13 +270,12 @@ pub enum GenerationConfigResponseModalitiesItem {
     IMAGE,
     #[serde(rename = "AUDIO")]
     AUDIO,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Optional. If specified, the media resolution specified will be used.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum GenerationConfigMediaResolution {
     #[serde(rename = "MEDIA_RESOLUTION_UNSPECIFIED")]
@@ -289,7 +286,6 @@ pub enum GenerationConfigMediaResolution {
     MEDIARESOLUTIONMEDIUM,
     #[serde(rename = "MEDIA_RESOLUTION_HIGH")]
     MEDIARESOLUTIONHIGH,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -297,7 +293,7 @@ pub enum GenerationConfigMediaResolution {
 /// Safety setting, affecting the safety-blocking behavior. Passing a safety
 /// setting for a category changes the allowed probability that content is
 /// blocked.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct SafetySetting {
     /// Required. The category for this setting.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -308,7 +304,7 @@ pub struct SafetySetting {
 }
 
 /// Required. The category for this setting.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum SafetySettingCategory {
     #[serde(rename = "HARM_CATEGORY_UNSPECIFIED")]
@@ -337,13 +333,12 @@ pub enum SafetySettingCategory {
     HARMCATEGORYCIVICINTEGRITY,
     #[serde(rename = "HARM_CATEGORY_JAILBREAK")]
     HARMCATEGORYJAILBREAK,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Required. Controls the probability threshold at which harm is blocked.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum SafetySettingThreshold {
     #[serde(rename = "HARM_BLOCK_THRESHOLD_UNSPECIFIED")]
@@ -358,7 +353,6 @@ pub enum SafetySettingThreshold {
     BLOCKNONE,
     #[serde(rename = "OFF")]
     OFF,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -384,7 +378,7 @@ pub struct Content {
 /// piece of code that enables the system to interact with external systems to
 /// perform an action, or set of actions, outside of knowledge and scope of the
 /// model. Next ID: 16
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct Tool {
     /// Optional. Enables the model to execute code as part of generation.
     #[serde(rename = "codeExecution", skip_serializing_if = "Option::is_none")]
@@ -435,21 +429,21 @@ pub struct Tool {
 
 /// A set of the feedback metadata the prompt specified in
 /// `GenerateContentRequest.content`.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct PromptFeedback {
     /// Optional. If set, the prompt was blocked and no candidates are returned.
     /// Rephrase the prompt.
-    #[serde(rename = "blockReason", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "blockReason")]
     pub block_reason: Option<PromptFeedbackBlockReason>,
     /// Ratings for safety of the prompt. There is at most one rating per
     /// category.
-    #[serde(rename = "safetyRatings", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "safetyRatings")]
     pub safety_ratings: Option<Vec<SafetyRating>>,
 }
 
 /// Optional. If set, the prompt was blocked and no candidates are returned.
 /// Rephrase the prompt.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum PromptFeedbackBlockReason {
     #[serde(rename = "BLOCK_REASON_UNSPECIFIED")]
@@ -465,27 +459,25 @@ pub enum PromptFeedbackBlockReason {
     #[serde(rename = "IMAGE_SAFETY")]
     IMAGESAFETY,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// The status of the underlying model. This is used to indicate the stage of
 /// the underlying model and the retirement time if applicable.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct ModelStatus {
     /// The stage of the underlying model.
-    #[serde(rename = "modelStage", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "modelStage")]
     pub model_stage: Option<ModelStatusModelStage>,
     /// A message explaining the model status.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     /// The time at which the model will be retired.
-    #[serde(rename = "retirementTime", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "retirementTime")]
     pub retirement_time: Option<String>,
 }
 
 /// The stage of the underlying model.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum ModelStatusModelStage {
     #[serde(rename = "MODEL_STAGE_UNSPECIFIED")]
@@ -505,66 +497,60 @@ pub enum ModelStatusModelStage {
     #[serde(rename = "RETIRED")]
     RETIRED,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// A response candidate generated from the model.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct Candidate {
     /// Output only. Generated content returned from the model.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<Content>,
     /// Output only. Average log probability score of the candidate.
-    #[serde(rename = "avgLogprobs", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "avgLogprobs")]
     pub avg_logprobs: Option<f64>,
     /// Output only. Token count for this candidate.
-    #[serde(rename = "tokenCount", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "tokenCount")]
     pub token_count: Option<i64>,
     /// Optional. Output only. Details the reason why the model stopped
     /// generating tokens. This is populated only when `finish_reason` is set.
-    #[serde(rename = "finishMessage", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "finishMessage")]
     pub finish_message: Option<String>,
     /// List of ratings for the safety of a response candidate. There is at most
     /// one rating per category.
-    #[serde(rename = "safetyRatings", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "safetyRatings")]
     pub safety_ratings: Option<Vec<SafetyRating>>,
     /// Output only. Log-likelihood scores for the response tokens and top
     /// tokens
-    #[serde(rename = "logprobsResult", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "logprobsResult")]
     pub logprobs_result: Option<LogprobsResult>,
     /// Output only. Attribution information for sources that contributed to a
     /// grounded answer. This field is populated for `GenerateAnswer` calls.
-    #[serde(
-        rename = "groundingAttributions",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "groundingAttributions")]
     pub grounding_attributions: Option<Vec<GroundingAttribution>>,
     /// Output only. Metadata related to url context retrieval tool.
-    #[serde(rename = "urlContextMetadata", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "urlContextMetadata")]
     pub url_context_metadata: Option<UrlContextMetadata>,
     /// Output only. Index of the candidate in the list of response candidates.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<i64>,
     /// Optional. Output only. The reason why the model stopped generating
     /// tokens. If empty, the model has not stopped generating tokens.
-    #[serde(rename = "finishReason", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "finishReason")]
     pub finish_reason: Option<CandidateFinishReason>,
     /// Output only. Citation information for model-generated candidate. This
     /// field may be populated with recitation information for any text included
     /// in the `content`. These are passages that are "recited" from copyrighted
     /// material in the foundational LLM's training data.
-    #[serde(rename = "citationMetadata", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "citationMetadata")]
     pub citation_metadata: Option<CitationMetadata>,
     /// Output only. Grounding metadata for the candidate. This field is
     /// populated for `GenerateContent` calls.
-    #[serde(rename = "groundingMetadata", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "groundingMetadata")]
     pub grounding_metadata: Option<GroundingMetadata>,
 }
 
 /// Optional. Output only. The reason why the model stopped generating tokens.
 /// If empty, the model has not stopped generating tokens.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum CandidateFinishReason {
     #[serde(rename = "FINISH_REASON_UNSPECIFIED")]
@@ -610,74 +596,55 @@ pub enum CandidateFinishReason {
     #[serde(rename = "ESCALATION")]
     ESCALATION,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Metadata on the generation request's token usage.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct UsageMetadata {
     /// Output only. List of modalities of the cached content in the request
     /// input.
-    #[serde(rename = "cacheTokensDetails", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "cacheTokensDetails")]
     pub cache_tokens_details: Option<Vec<ModalityTokenCount>>,
     /// Output only. Service tier of the request.
-    #[serde(rename = "serviceTier", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "serviceTier")]
     pub service_tier: Option<UsageMetadataServiceTier>,
     /// Output only. Number of tokens present in tool-use prompt(s).
-    #[serde(
-        rename = "toolUsePromptTokenCount",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "toolUsePromptTokenCount")]
     pub tool_use_prompt_token_count: Option<i64>,
     /// Total token count for the generation request (prompt + thoughts +
     /// response candidates).
-    #[serde(rename = "totalTokenCount", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "totalTokenCount")]
     pub total_token_count: Option<i64>,
     /// Total number of tokens across all the generated response candidates.
-    #[serde(
-        rename = "candidatesTokenCount",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "candidatesTokenCount")]
     pub candidates_token_count: Option<i64>,
     /// Output only. Number of tokens of thoughts for thinking models.
-    #[serde(rename = "thoughtsTokenCount", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "thoughtsTokenCount")]
     pub thoughts_token_count: Option<i64>,
     /// Output only. List of modalities that were returned in the response.
-    #[serde(
-        rename = "candidatesTokensDetails",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "candidatesTokensDetails")]
     pub candidates_tokens_details: Option<Vec<ModalityTokenCount>>,
     /// Output only. List of modalities that were processed for tool-use request
     /// inputs.
-    #[serde(
-        rename = "toolUsePromptTokensDetails",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "toolUsePromptTokensDetails")]
     pub tool_use_prompt_tokens_details: Option<Vec<ModalityTokenCount>>,
     /// Number of tokens in the prompt. When `cached_content` is set, this is
     /// still the total effective prompt size meaning this includes the number
     /// of tokens in the cached content.
-    #[serde(rename = "promptTokenCount", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "promptTokenCount")]
     pub prompt_token_count: Option<i64>,
     /// Output only. List of modalities that were processed in the request
     /// input.
-    #[serde(
-        rename = "promptTokensDetails",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "promptTokensDetails")]
     pub prompt_tokens_details: Option<Vec<ModalityTokenCount>>,
     /// Number of tokens in the cached part of the prompt (the cached content)
-    #[serde(
-        rename = "cachedContentTokenCount",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "cachedContentTokenCount")]
     pub cached_content_token_count: Option<i64>,
 }
 
 /// Output only. Service tier of the request.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum UsageMetadataServiceTier {
     #[serde(rename = "unspecified")]
@@ -689,12 +656,11 @@ pub enum UsageMetadataServiceTier {
     #[serde(rename = "priority")]
     Priority,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Retrieval config.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct RetrievalConfig {
     /// Optional. The language code of the user. Language code for content. Use language tags defined by [BCP47](https://www.rfc-editor.org/rfc/bcp/bcp47.txt).
     #[serde(rename = "languageCode", skip_serializing_if = "Option::is_none")]
@@ -705,7 +671,7 @@ pub struct RetrievalConfig {
 }
 
 /// Configuration for specifying function calling behavior.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct FunctionCallingConfig {
     /// Optional. Specifies the mode in which function calling should execute.
     /// If unspecified, the default value will be set to AUTO.
@@ -725,7 +691,7 @@ pub struct FunctionCallingConfig {
 
 /// Optional. Specifies the mode in which function calling should execute. If
 /// unspecified, the default value will be set to AUTO.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum FunctionCallingConfigMode {
     #[serde(rename = "MODE_UNSPECIFIED")]
@@ -738,13 +704,12 @@ pub enum FunctionCallingConfigMode {
     NONE,
     #[serde(rename = "VALIDATED")]
     VALIDATED,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Config for image generation features.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ImageConfig {
     /// Optional. The aspect ratio of the image to generate. Supported aspect
     /// ratios: `1:1`, `1:4`, `4:1`, `1:8`, `8:1`, `2:3`, `3:2`, `3:4`, `4:3`,
@@ -761,7 +726,7 @@ pub struct ImageConfig {
 }
 
 /// Config for thinking features.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ThinkingConfig {
     /// Indicates whether to include thoughts in the response. If true, thoughts
     /// are returned only when available.
@@ -776,7 +741,7 @@ pub struct ThinkingConfig {
 }
 
 /// Optional. Controls the maximum depth of the model's internal reasoning process before it produces a response. The default value is model-dependent. Refer to the [Thinking levels guide](https://ai.google.dev/gemini-api/docs/thinking#thinking-levels) for more details. Recommended for Gemini 3 or later models. Use with earlier models results in an error.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ThinkingConfigThinkingLevel {
     #[serde(rename = "THINKING_LEVEL_UNSPECIFIED")]
@@ -789,14 +754,13 @@ pub enum ThinkingConfigThinkingLevel {
     MEDIUM,
     #[serde(rename = "HIGH")]
     HIGH,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Configuration for the response output format. This is a flat object where
 /// each optional sub-field configures a specific output modality.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ResponseFormatConfig {
     /// Optional. Audio output format configuration.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -810,7 +774,7 @@ pub struct ResponseFormatConfig {
 }
 
 /// Config for translation features.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct TranslationConfig {
     /// Optional. If true, the model will generate audio when the target
     /// language is spoken, essentially it will parrot the input. If false, we
@@ -824,7 +788,7 @@ pub struct TranslationConfig {
 }
 
 /// The `Schema` object allows the definition of input and output data types. These types can be objects, but also primitives and arrays. Represents a select subset of an [OpenAPI 3.0 schema object](https://spec.openapis.org/oas/v3.0.3#schema).
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct Schema {
     /// Optional. The title of the schema.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -908,7 +872,7 @@ pub struct Schema {
 }
 
 /// Required. Data type.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum SchemaType {
     #[serde(rename = "TYPE_UNSPECIFIED")]
@@ -927,13 +891,12 @@ pub enum SchemaType {
     OBJECT,
     #[serde(rename = "NULL")]
     NULL,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Config for speech generation and transcription.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct SpeechConfig {
     /// Optional. The configuration for the multi-speaker setup. It is mutually
     /// exclusive with the voice_config field.
@@ -1028,7 +991,7 @@ pub type UrlContext = Option<Value>;
 /// The FileSearch tool that retrieves knowledge from Semantic Retrieval
 /// corpora. Files are imported to Semantic Retrieval corpora using the
 /// ImportFile API.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct FileSearch {
     /// Optional. Metadata filter to apply to the semantic retrieval documents
     /// and chunks.
@@ -1047,7 +1010,7 @@ pub struct FileSearch {
 }
 
 /// Structured representation of a function declaration as defined by the [OpenAPI 3.03 specification](https://spec.openapis.org/oas/v3.0.3). Included in this declaration are the function name and parameters. This FunctionDeclaration is a representation of a block of code that can be used as a `Tool` by the model and executed by the client.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct FunctionDeclaration {
     /// Optional. Describes the output from this function in JSON Schema format.
     /// Reflects the Open API 3.03 Response Object. The Schema defines the type
@@ -1092,7 +1055,7 @@ pub struct FunctionDeclaration {
 
 /// Optional. Specifies the function Behavior. Currently only supported by the
 /// BidiGenerateContent method.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum FunctionDeclarationBehavior {
     #[serde(rename = "UNSPECIFIED")]
@@ -1101,14 +1064,13 @@ pub enum FunctionDeclarationBehavior {
     BLOCKING,
     #[serde(rename = "NON_BLOCKING")]
     NONBLOCKING,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// GoogleSearch tool type. Tool to support Google Search in Model. Powered by
 /// Google.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct GoogleSearch {
     /// Optional. Filter search results to a specific time range. If customers
     /// set a start time, they must set an end time (and vice versa).
@@ -1121,7 +1083,7 @@ pub struct GoogleSearch {
 }
 
 /// Tool to retrieve public web data for grounding, powered by Google.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct GoogleSearchRetrieval {
     /// Specifies the dynamic retrieval configuration for the given source.
     #[serde(
@@ -1133,7 +1095,7 @@ pub struct GoogleSearchRetrieval {
 
 /// A MCPServer is a server that can be called by the model to perform actions.
 /// It is a server that implements the MCP protocol. Next ID: 6
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct McpServer {
     /// A transport that can stream HTTP requests and responses.
     #[serde(
@@ -1147,7 +1109,7 @@ pub struct McpServer {
 }
 
 /// The GoogleMaps Tool that provides geospatial context for the user's query.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct GoogleMaps {
     /// Optional. Whether to return a widget context token in the
     /// GroundingMetadata of the response. Developers can use the widget context
@@ -1158,7 +1120,7 @@ pub struct GoogleMaps {
 }
 
 /// Computer Use tool type.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ComputerUse {
     /// Optional. Disabled safety policies for computer use.
     #[serde(
@@ -1188,7 +1150,7 @@ pub struct ComputerUse {
     pub enable_prompt_injection_detection: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ComputerUseDisabledSafetyPoliciesItem {
     #[serde(rename = "SAFETY_POLICY_UNSPECIFIED")]
@@ -1207,13 +1169,12 @@ pub enum ComputerUseDisabledSafetyPoliciesItem {
     USERCONSENTMANAGEMENT,
     #[serde(rename = "LEGAL_TERMS_AND_AGREEMENTS")]
     LEGALTERMSANDAGREEMENTS,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Required. The environment being operated.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ComputerUseEnvironment {
     #[serde(rename = "ENVIRONMENT_UNSPECIFIED")]
@@ -1224,7 +1185,6 @@ pub enum ComputerUseEnvironment {
     ENVIRONMENTMOBILE,
     #[serde(rename = "ENVIRONMENT_DESKTOP")]
     ENVIRONMENTDESKTOP,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
@@ -1233,21 +1193,18 @@ pub enum ComputerUseEnvironment {
 /// category of harm and the harm probability level in that category for a piece
 /// of content. Content is classified for safety across a number of harm
 /// categories and the probability of the harm classification is included here.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct SafetyRating {
     /// Required. The probability of harm for this content.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub probability: Option<SafetyRatingProbability>,
     /// Required. The category for this rating.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<SafetyRatingCategory>,
     /// Was this content blocked because of this rating?
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub blocked: Option<bool>,
 }
 
 /// Required. The probability of harm for this content.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum SafetyRatingProbability {
     #[serde(rename = "HARM_PROBABILITY_UNSPECIFIED")]
@@ -1261,12 +1218,11 @@ pub enum SafetyRatingProbability {
     #[serde(rename = "HIGH")]
     HIGH,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Required. The category for this rating.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum SafetyRatingCategory {
     #[serde(rename = "HARM_CATEGORY_UNSPECIFIED")]
@@ -1296,99 +1252,93 @@ pub enum SafetyRatingCategory {
     #[serde(rename = "HARM_CATEGORY_JAILBREAK")]
     HARMCATEGORYJAILBREAK,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Logprobs Result
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct LogprobsResult {
     /// Sum of log probabilities for all tokens.
-    #[serde(rename = "logProbabilitySum", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "logProbabilitySum")]
     pub log_probability_sum: Option<f64>,
     /// Length = total number of decoding steps.
-    #[serde(rename = "topCandidates", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "topCandidates")]
     pub top_candidates: Option<Vec<TopCandidates>>,
     /// Length = total number of decoding steps. The chosen candidates may or
     /// may not be in top_candidates.
-    #[serde(rename = "chosenCandidates", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "chosenCandidates")]
     pub chosen_candidates: Option<Vec<LogprobsResultCandidate>>,
 }
 
 /// Attribution for a source that contributed to an answer.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GroundingAttribution {
     /// Output only. Identifier for the source contributing to this attribution.
-    #[serde(rename = "sourceId", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "sourceId")]
     pub source_id: Option<AttributionSourceId>,
     /// Grounding source content that makes up this attribution.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<Content>,
 }
 
 /// Metadata related to url context retrieval tool.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct UrlContextMetadata {
     /// List of url context.
-    #[serde(rename = "urlMetadata", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "urlMetadata")]
     pub url_metadata: Option<Vec<UrlMetadata>>,
 }
 
 /// A collection of source attributions for a piece of content.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct CitationMetadata {
     /// Citations to sources for a specific response.
-    #[serde(rename = "citationSources", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "citationSources")]
     pub citation_sources: Option<Vec<CitationSource>>,
 }
 
 /// Metadata returned to client when grounding is enabled.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GroundingMetadata {
     /// List of grounding support.
-    #[serde(rename = "groundingSupports", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "groundingSupports")]
     pub grounding_supports: Option<Vec<GoogleAiGenerativelanguageV1BetaGroundingSupport>>,
     /// Optional. Google search entry for the following-up web searches.
-    #[serde(rename = "searchEntryPoint", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "searchEntryPoint")]
     pub search_entry_point: Option<SearchEntryPoint>,
     /// List of supporting references retrieved from specified grounding source.
     /// When streaming, this only contains the grounding chunks that have not
     /// been included in the grounding metadata of previous responses.
-    #[serde(rename = "groundingChunks", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "groundingChunks")]
     pub grounding_chunks: Option<Vec<GroundingChunk>>,
     /// Metadata related to retrieval in the grounding flow.
-    #[serde(rename = "retrievalMetadata", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "retrievalMetadata")]
     pub retrieval_metadata: Option<RetrievalMetadata>,
     /// Optional. Resource name of the Google Maps widget context token that can
     /// be used with the PlacesContextElement widget in order to render
     /// contextual data. Only populated in the case that grounding with Google
     /// Maps is enabled.
-    #[serde(
-        rename = "googleMapsWidgetContextToken",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "googleMapsWidgetContextToken")]
     pub google_maps_widget_context_token: Option<String>,
     /// Web search queries for the following-up web search.
-    #[serde(rename = "webSearchQueries", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "webSearchQueries")]
     pub web_search_queries: Option<Vec<String>>,
     /// Image search queries used for grounding.
-    #[serde(rename = "imageSearchQueries", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "imageSearchQueries")]
     pub image_search_queries: Option<Vec<String>>,
 }
 
 /// Represents token counting info for a single modality.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct ModalityTokenCount {
     /// The modality associated with this token count.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub modality: Option<ModalityTokenCountModality>,
     /// Number of tokens.
-    #[serde(rename = "tokenCount", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "tokenCount")]
     pub token_count: Option<i64>,
 }
 
 /// The modality associated with this token count.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum ModalityTokenCountModality {
     #[serde(rename = "MODALITY_UNSPECIFIED")]
@@ -1404,7 +1354,6 @@ pub enum ModalityTokenCountModality {
     #[serde(rename = "DOCUMENT")]
     DOCUMENT,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
@@ -1412,7 +1361,7 @@ pub enum ModalityTokenCountModality {
 /// pair of doubles to represent degrees latitude and degrees longitude. Unless
 /// specified otherwise, this object must conform to the WGS84 standard. Values
 /// must be within normalized ranges.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct LatLng {
     /// The longitude in degrees. It must be in the range [-180.0, +180.0].
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1423,7 +1372,7 @@ pub struct LatLng {
 }
 
 /// Configuration for audio output format.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct AudioResponseFormat {
     /// Optional. The MIME type of the audio output.
     #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
@@ -1441,7 +1390,7 @@ pub struct AudioResponseFormat {
 }
 
 /// Optional. The MIME type of the audio output.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum AudioResponseFormatMimeType {
     #[serde(rename = "MIME_TYPE_UNSPECIFIED")]
@@ -1458,13 +1407,12 @@ pub enum AudioResponseFormatMimeType {
     AUDIOALAW,
     #[serde(rename = "AUDIO_MULAW")]
     AUDIOMULAW,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Optional. The delivery mode for the audio output.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum AudioResponseFormatDelivery {
     #[serde(rename = "DELIVERY_UNSPECIFIED")]
@@ -1473,13 +1421,12 @@ pub enum AudioResponseFormatDelivery {
     INLINE,
     #[serde(rename = "URI")]
     URI,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Configuration for text output format.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct TextResponseFormat {
     /// Optional. The MIME type of the text output.
     #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
@@ -1491,7 +1438,7 @@ pub struct TextResponseFormat {
 }
 
 /// Optional. The MIME type of the text output.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum TextResponseFormatMimeType {
     #[serde(rename = "MIME_TYPE_UNSPECIFIED")]
@@ -1500,13 +1447,12 @@ pub enum TextResponseFormatMimeType {
     APPLICATIONJSON,
     #[serde(rename = "TEXT_PLAIN")]
     TEXTPLAIN,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Configuration for image output format.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct ImageResponseFormat {
     /// Optional. The MIME type of the image output.
     #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
@@ -1523,20 +1469,19 @@ pub struct ImageResponseFormat {
 }
 
 /// Optional. The MIME type of the image output.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ImageResponseFormatMimeType {
     #[serde(rename = "MIME_TYPE_UNSPECIFIED")]
     MIMETYPEUNSPECIFIED,
     #[serde(rename = "IMAGE_JPEG")]
     IMAGEJPEG,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Optional. The delivery mode for the image output.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ImageResponseFormatDelivery {
     #[serde(rename = "DELIVERY_UNSPECIFIED")]
@@ -1545,13 +1490,12 @@ pub enum ImageResponseFormatDelivery {
     INLINE,
     #[serde(rename = "URI")]
     URI,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Optional. The aspect ratio for the image output.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ImageResponseFormatAspectRatio {
     #[serde(rename = "ASPECT_RATIO_UNSPECIFIED")]
@@ -1584,13 +1528,12 @@ pub enum ImageResponseFormatAspectRatio {
     ASPECTRATIOONEBYFOUR,
     #[serde(rename = "ASPECT_RATIO_FOUR_BY_ONE")]
     ASPECTRATIOFOURBYONE,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// Optional. The size of the image output.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum ImageResponseFormatImageSize {
     #[serde(rename = "IMAGE_SIZE_UNSPECIFIED")]
@@ -1603,13 +1546,12 @@ pub enum ImageResponseFormatImageSize {
     IMAGESIZETWOK,
     #[serde(rename = "IMAGE_SIZE_FOUR_K")]
     IMAGESIZEFOURK,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// The configuration for the multi-speaker setup.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct MultiSpeakerVoiceConfig {
     /// Required. All the enabled speaker voices.
     #[serde(
@@ -1620,7 +1562,7 @@ pub struct MultiSpeakerVoiceConfig {
 }
 
 /// The configuration for the voice to use.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct VoiceConfig {
     /// The configuration for the prebuilt voice to use.
     #[serde(
@@ -1897,7 +1839,7 @@ pub enum FunctionResponseScheduling {
 /// Timestamp end (exclusive). The start must be less than or equal to the end.
 /// When the start equals the end, the interval is empty (matches no time). When
 /// both start and end are unspecified, the interval matches any time.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct Interval {
     /// Optional. Inclusive start of the interval. If specified, a Timestamp
     /// matching this interval will have to be the same or after the start.
@@ -1910,7 +1852,7 @@ pub struct Interval {
 }
 
 /// Different types of search that can be enabled on the GoogleSearch tool.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct SearchTypes {
     /// Optional. Enables image search. Image bytes are returned.
     #[serde(rename = "imageSearch", skip_serializing_if = "Option::is_none")]
@@ -1921,7 +1863,7 @@ pub struct SearchTypes {
 }
 
 /// Describes the options to customize dynamic retrieval.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct DynamicRetrievalConfig {
     /// The mode of the predictor to be used in dynamic retrieval.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1933,20 +1875,19 @@ pub struct DynamicRetrievalConfig {
 }
 
 /// The mode of the predictor to be used in dynamic retrieval.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 pub enum DynamicRetrievalConfigMode {
     #[serde(rename = "MODE_UNSPECIFIED")]
     MODEUNSPECIFIED,
     #[serde(rename = "MODE_DYNAMIC")]
     MODEDYNAMIC,
-    #[serde(other)]
     #[serde(skip_serializing)]
     Unknown,
 }
 
 /// A transport that can stream HTTP requests and responses. Next ID: 6
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct StreamableHttpTransport {
     /// Optional: Fields for authentication headers, timeouts, etc., if needed.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1966,54 +1907,49 @@ pub struct StreamableHttpTransport {
 }
 
 /// Candidates with top log probabilities at each decoding step.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct TopCandidates {
     /// Sorted by log probability in descending order.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub candidates: Option<Vec<LogprobsResultCandidate>>,
 }
 
 /// Candidate for the logprobs token and score.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct LogprobsResultCandidate {
     /// The candidate’s token string value.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
     /// The candidate’s token id value.
-    #[serde(rename = "tokenId", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "tokenId")]
     pub token_id: Option<i64>,
     /// The candidate's log probability.
-    #[serde(rename = "logProbability", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "logProbability")]
     pub log_probability: Option<f64>,
 }
 
 /// Identifier for the source contributing to this attribution.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct AttributionSourceId {
     /// Identifier for an inline passage.
-    #[serde(rename = "groundingPassage", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "groundingPassage")]
     pub grounding_passage: Option<GroundingPassageId>,
     /// Identifier for a `Chunk` fetched via Semantic Retriever.
-    #[serde(
-        rename = "semanticRetrieverChunk",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "semanticRetrieverChunk")]
     pub semantic_retriever_chunk: Option<SemanticRetrieverChunk>,
 }
 
 /// Context of the a single url retrieval.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct UrlMetadata {
     /// Status of the url retrieval.
-    #[serde(rename = "urlRetrievalStatus", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "urlRetrievalStatus")]
     pub url_retrieval_status: Option<UrlMetadataUrlRetrievalStatus>,
     /// Retrieved url by the tool.
-    #[serde(rename = "retrievedUrl", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "retrievedUrl")]
     pub retrieved_url: Option<String>,
 }
 
 /// Status of the url retrieval.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[non_exhaustive]
 pub enum UrlMetadataUrlRetrievalStatus {
     #[serde(rename = "URL_RETRIEVAL_STATUS_UNSPECIFIED")]
@@ -2027,31 +1963,28 @@ pub enum UrlMetadataUrlRetrievalStatus {
     #[serde(rename = "URL_RETRIEVAL_STATUS_UNSAFE")]
     URLRETRIEVALSTATUSUNSAFE,
     #[serde(other)]
-    #[serde(skip_serializing)]
     Unknown,
 }
 
 /// A citation to a source for a portion of a specific response.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct CitationSource {
     /// Optional. End of the attributed segment, exclusive.
-    #[serde(rename = "endIndex", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "endIndex")]
     pub end_index: Option<i64>,
     /// Optional. License for the GitHub project that is attributed as a source
     /// for segment. License info is required for code citations.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub license: Option<String>,
     /// Optional. URI that is attributed as a source for a portion of the text.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub uri: Option<String>,
     /// Optional. Start of segment of the response that is attributed to this
     /// source. Index indicates the start of the segment, measured in bytes.
-    #[serde(rename = "startIndex", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "startIndex")]
     pub start_index: Option<i64>,
 }
 
 /// Grounding support.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GoogleAiGenerativelanguageV1BetaGroundingSupport {
     /// Optional. A list of indices (into 'grounding_chunk' in
     /// `response.candidate.grounding_metadata`) specifying the citations
@@ -2061,60 +1994,53 @@ pub struct GoogleAiGenerativelanguageV1BetaGroundingSupport {
     /// the grounding_chunk_indices refer to the indices across all responses.
     /// It is the client's responsibility to accumulate the grounding chunks
     /// from all responses (while maintaining the same order).
-    #[serde(
-        rename = "groundingChunkIndices",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "groundingChunkIndices")]
     pub grounding_chunk_indices: Option<Vec<i64>>,
     /// Segment of the content this support belongs to.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub segment: Option<GoogleAiGenerativelanguageV1BetaSegment>,
     /// Output only. Indices into the `parts` field of the candidate's content.
     /// These indices specify which rendered parts are associated with this
     /// support source.
-    #[serde(rename = "renderedParts", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "renderedParts")]
     pub rendered_parts: Option<Vec<i64>>,
     /// Optional. Confidence score of the support references. Ranges from 0 to
     /// 1. 1 is the most confident. This list must have the same size as the
     /// grounding_chunk_indices.
-    #[serde(rename = "confidenceScores", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "confidenceScores")]
     pub confidence_scores: Option<Vec<f64>>,
 }
 
 /// Google search entry point.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct SearchEntryPoint {
     /// Optional. Web content snippet that can be embedded in a web page or an
     /// app webview.
-    #[serde(rename = "renderedContent", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "renderedContent")]
     pub rendered_content: Option<String>,
     /// Optional. Base64 encoded JSON representing array of tuple.
-    #[serde(rename = "sdkBlob", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "sdkBlob")]
     pub sdk_blob: Option<String>,
 }
 
 /// A `GroundingChunk` represents a segment of supporting evidence that grounds
 /// the model's response. It can be a chunk from the web, a retrieved context
 /// from a file, or information from Google Maps.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GroundingChunk {
     /// Optional. Grounding chunk from image search.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub image: Option<Image>,
     /// Optional. Grounding chunk from context retrieved by the file search
     /// tool.
-    #[serde(rename = "retrievedContext", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "retrievedContext")]
     pub retrieved_context: Option<RetrievedContext>,
     /// Grounding chunk from the web.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub web: Option<Web>,
     /// Optional. Grounding chunk from Google Maps.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub maps: Option<Maps>,
 }
 
 /// Metadata related to retrieval in the grounding flow.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct RetrievalMetadata {
     /// Optional. Score indicating how likely information from google search
     /// could help answer the prompt. The score is in the range [0, 1], where 0
@@ -2122,15 +2048,12 @@ pub struct RetrievalMetadata {
     /// populated when google search grounding and dynamic retrieval is enabled.
     /// It will be compared to the threshold to determine whether to trigger
     /// google search.
-    #[serde(
-        rename = "googleSearchDynamicRetrievalScore",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "googleSearchDynamicRetrievalScore")]
     pub google_search_dynamic_retrieval_score: Option<f64>,
 }
 
 /// The configuration for a single speaker in a multi speaker setup.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct SpeakerVoiceConfig {
     /// Required. The configuration for the voice to use.
     #[serde(rename = "voiceConfig", skip_serializing_if = "Option::is_none")]
@@ -2142,7 +2065,7 @@ pub struct SpeakerVoiceConfig {
 }
 
 /// The configuration for the prebuilt speaker to use.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Default)]
 pub struct PrebuiltVoiceConfig {
     /// The name of the preset voice to use.
     #[serde(rename = "voiceName", skip_serializing_if = "Option::is_none")]
@@ -2169,129 +2092,116 @@ pub type ImageSearch = Option<Value>;
 pub type WebSearch = Option<Value>;
 
 /// Identifier for a part within a `GroundingPassage`.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GroundingPassageId {
     /// Output only. ID of the passage matching the `GenerateAnswerRequest`'s
     /// `GroundingPassage.id`.
-    #[serde(rename = "passageId", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "passageId")]
     pub passage_id: Option<String>,
     /// Output only. Index of the part within the `GenerateAnswerRequest`'s
     /// `GroundingPassage.content`.
-    #[serde(rename = "partIndex", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "partIndex")]
     pub part_index: Option<i64>,
 }
 
 /// Identifier for a `Chunk` retrieved via Semantic Retriever specified in the
 /// `GenerateAnswerRequest` using `SemanticRetrieverConfig`.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct SemanticRetrieverChunk {
     /// Output only. Name of the source matching the request's
     /// `SemanticRetrieverConfig.source`. Example: `corpora/123` or
     /// `corpora/123/documents/abc`
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
     /// Output only. Name of the `Chunk` containing the attributed text.
     /// Example: `corpora/123/documents/abc/chunks/xyz`
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub chunk: Option<String>,
 }
 
 /// Segment of the content.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GoogleAiGenerativelanguageV1BetaSegment {
     /// The index of a Part object within its parent Content object.
-    #[serde(rename = "partIndex", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "partIndex")]
     pub part_index: Option<i64>,
     /// Start index in the given Part, measured in bytes. Offset from the start
     /// of the Part, inclusive, starting at zero.
-    #[serde(rename = "startIndex", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "startIndex")]
     pub start_index: Option<i64>,
     /// The text corresponding to the segment from the response.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     /// End index in the given Part, measured in bytes. Offset from the start of
     /// the Part, exclusive, starting at zero.
-    #[serde(rename = "endIndex", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "endIndex")]
     pub end_index: Option<i64>,
 }
 
 /// Chunk from image search.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct Image {
     /// The title of the web page that the image is from.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// The image asset URL.
-    #[serde(rename = "imageUri", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "imageUri")]
     pub image_uri: Option<String>,
     /// The web page URI for attribution.
-    #[serde(rename = "sourceUri", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "sourceUri")]
     pub source_uri: Option<String>,
     /// The root domain of the web page that the image is from, e.g.
     /// "example.com".
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub domain: Option<String>,
 }
 
 /// Chunk from context retrieved by the file search tool.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct RetrievedContext {
     /// Optional. Name of the `FileSearchStore` containing the document.
     /// Example: `fileSearchStores/123`
-    #[serde(rename = "fileSearchStore", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "fileSearchStore")]
     pub file_search_store: Option<String>,
     /// Optional. Text of the chunk.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     /// Optional. Page number of the retrieved context, if applicable.
-    #[serde(rename = "pageNumber", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "pageNumber")]
     pub page_number: Option<i64>,
     /// Optional. URI reference of the semantic retrieval document.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub uri: Option<String>,
     /// Optional. Title of the document.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// Optional. The media blob resource name for multimodal file search
     /// results. Format: fileSearchStores/{file_search_store_id}/media/{blob_id}
-    #[serde(rename = "mediaId", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "mediaId")]
     pub media_id: Option<String>,
     /// Optional. User-provided metadata about the retrieved context.
-    #[serde(rename = "customMetadata", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "customMetadata")]
     pub custom_metadata: Option<Vec<GroundingChunkCustomMetadata>>,
 }
 
 /// Chunk from the web.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct Web {
     /// Output only. URI reference of the chunk.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub uri: Option<String>,
     /// Output only. Title of the chunk.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
 }
 
 /// A grounding chunk from Google Maps. A Maps chunk corresponds to a single
 /// place.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct Maps {
     /// Sources that provide answers about the features of a given place in
     /// Google Maps.
-    #[serde(rename = "placeAnswerSources", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "placeAnswerSources")]
     pub place_answer_sources: Option<PlaceAnswerSources>,
     /// Text description of the place answer.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     /// URI reference of the place.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub uri: Option<String>,
     /// Title of the place.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// The ID of the place, in `places/{place_id}` format. A user can use this
     /// ID to look up that place.
-    #[serde(rename = "placeId", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "placeId")]
     pub place_id: Option<String>,
 }
 
@@ -2308,20 +2218,19 @@ pub struct FunctionResponseBlob {
 }
 
 /// User provided metadata about the GroundingFact.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GroundingChunkCustomMetadata {
     /// Optional. The numeric value of the metadata. The expected range for this
     /// value depends on the specific `key` used.
-    #[serde(rename = "numericValue", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "numericValue")]
     pub numeric_value: Option<f64>,
     /// Optional. A list of string values for the metadata.
-    #[serde(rename = "stringListValue", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "stringListValue")]
     pub string_list_value: Option<GroundingChunkStringList>,
     /// The key of the metadata.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     /// Optional. The string value of the metadata.
-    #[serde(rename = "stringValue", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "stringValue")]
     pub string_value: Option<String>,
 }
 
@@ -2331,33 +2240,31 @@ pub struct GroundingChunkCustomMetadata {
 /// order to answer questions about features of the place (e.g: "does Bar Foo
 /// have Wifi" or "is Foo Bar wheelchair accessible?"). Currently we only
 /// support review snippets as sources.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct PlaceAnswerSources {
     /// Snippets of reviews that are used to generate answers about the features
     /// of a given place in Google Maps.
-    #[serde(rename = "reviewSnippets", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "reviewSnippets")]
     pub review_snippets: Option<Vec<ReviewSnippet>>,
 }
 
 /// A list of string values.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct GroundingChunkStringList {
     /// The string values of the list.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub values: Option<Vec<String>>,
 }
 
 /// Encapsulates a snippet of a user review that answers a question about the
 /// features of a specific place in Google Maps.
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Deserialize, Default)]
 pub struct ReviewSnippet {
     /// A link that corresponds to the user review on Google Maps.
-    #[serde(rename = "googleMapsUri", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "googleMapsUri")]
     pub google_maps_uri: Option<String>,
     /// The ID of the review snippet.
-    #[serde(rename = "reviewId", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "reviewId")]
     pub review_id: Option<String>,
     /// Title of the review.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
 }

@@ -4,5 +4,9 @@
     "ResponseToolUseBlock": ["caller"],
     "ResponseWebFetchToolResultBlock": ["caller"],
     "ResponseWebSearchToolResultBlock": ["caller"]
+  },
+  "rustSerde": {
+    "serialize": ["CreateMessageParams"],
+    "deserialize": ["Message", "MessageStreamEvent"]
   }
 }

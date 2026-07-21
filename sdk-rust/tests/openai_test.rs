@@ -1,5 +1,4 @@
-mod common;
-use crate::common::cases::RunTestCaseOptions;
+use crate::{common, common::cases::RunTestCaseOptions, test_group};
 use llm_sdk::openai::*;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
@@ -7,6 +6,7 @@ use tokio::test;
 fn openai_api_key() -> &'static String {
     static KEY: OnceLock<String> = OnceLock::new();
 
+    common::install_tls_provider();
     KEY.get_or_init(|| {
         dotenvy::dotenv().ok();
         env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
@@ -54,6 +54,8 @@ test_group!(openai_model(), reasoning_tool_use);
 
 #[test]
 async fn transport() -> Result<(), Box<dyn Error>> {
+    common::install_tls_provider();
+
     common::transports::run_transport_test_group("openai_transport", |base_url| {
         OpenAIModel::new(
             "test-model",

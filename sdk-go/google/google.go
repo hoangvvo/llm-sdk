@@ -347,39 +347,37 @@ func convertToGenerateContentParameters(input *llmsdk.LanguageModelInput, modelI
 }
 
 func convertToGoogleContents(messages []llmsdk.Message) ([]googleapi.Content, error) {
-	contents := make([]googleapi.Content, len(messages))
-	for i, message := range messages {
+	contents := make([]googleapi.Content, 0, len(messages))
+	for _, message := range messages {
+		var role string
+		var messageParts []llmsdk.Part
 		switch {
 		case message.UserMessage != nil:
-			parts, err := sliceutils.MapErr(message.UserMessage.Content, convertToGoogleParts)
-			if err != nil {
-				return nil, err
-			}
-			contents[i] = googleapi.Content{
-				Role:  ptr.To("user"),
-				Parts: sliceutils.Flat(parts),
-			}
+			role = "user"
+			messageParts = message.UserMessage.Content
 		case message.AssistantMessage != nil:
-			parts, err := sliceutils.MapErr(message.AssistantMessage.Content, convertToGoogleParts)
-			if err != nil {
-				return nil, err
-			}
-			contents[i] = googleapi.Content{
-				Role:  ptr.To("model"),
-				Parts: sliceutils.Flat(parts),
-			}
+			role = "model"
+			messageParts = message.AssistantMessage.Content
 		case message.ToolMessage != nil:
-			parts, err := sliceutils.MapErr(message.ToolMessage.Content, convertToGoogleParts)
-			if err != nil {
-				return nil, err
-			}
-			contents[i] = googleapi.Content{
-				Role:  ptr.To("user"),
-				Parts: sliceutils.Flat(parts),
-			}
+			role = "user"
+			messageParts = message.ToolMessage.Content
 		default:
 			return nil, llmsdk.NewInvalidInputError(fmt.Sprintf("unknown message type: %T", message))
 		}
+
+		parts, err := sliceutils.MapErr(messageParts, convertToGoogleParts)
+		if err != nil {
+			return nil, err
+		}
+		googleParts := sliceutils.Flat(parts)
+		// Google hosted-tool metadata has no request part to replay.
+		if len(googleParts) == 0 {
+			continue
+		}
+		contents = append(contents, googleapi.Content{
+			Role:  ptr.To(role),
+			Parts: googleParts,
+		})
 	}
 	return contents, nil
 }

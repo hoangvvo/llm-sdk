@@ -6,6 +6,9 @@ mod common;
 
 #[tokio::main]
 async fn main() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("the application must select its Rustls provider once");
     dotenv().ok();
 
     let audio_url = "https://archive.org/download/MLKDream/MLKDream.ogg";
