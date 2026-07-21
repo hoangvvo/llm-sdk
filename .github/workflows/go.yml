@@ -35,7 +35,7 @@ jobs:
       - name: Test SDK offline suites
         run: |
           go test ./sdk-go ./sdk-go/llmsdktest
-          OPENAI_API_KEY=offline-test-only go test ./sdk-go/openai -run '^TestOpenAIRecordedTransport'
+          go test ./sdk-go/openai ./sdk-go/anthropic ./sdk-go/google -run '^TestTransport$'
 
   agent:
     name: Agent
