@@ -15,14 +15,17 @@ use llm_sdk::{
 use std::{collections::HashSet, sync::Arc};
 use tokio_util::sync::CancellationToken;
 
-fn create_cancelled_tool_item(tool_call: &ToolCallPart) -> AgentItem {
-    AgentItem::Tool(AgentItemTool {
+fn create_cancelled_tool_item(tool_call: &ToolCallPart) -> Option<AgentItem> {
+    let llm_sdk::ToolCall::Function(call) = &tool_call.call else {
+        return None;
+    };
+    Some(AgentItem::Tool(AgentItemTool {
         tool_call_id: tool_call.tool_call_id.clone(),
-        tool_name: tool_call.tool_name.clone(),
-        input: tool_call.args.clone(),
+        tool_name: call.name.clone(),
+        input: call.args.clone(),
         output: Vec::new(),
         status: ToolResultStatus::Cancelled,
-    })
+    }))
 }
 
 fn create_tool_cancellation_events(
@@ -30,7 +33,7 @@ fn create_tool_cancellation_events(
 ) -> impl Iterator<Item = ProcessEvent> + '_ {
     pending_tool_calls
         .iter()
-        .map(create_cancelled_tool_item)
+        .filter_map(create_cancelled_tool_item)
         .map(ProcessEvent::Item)
         .chain(std::iter::once(ProcessEvent::Response(ProcessResponse {
             content: Vec::new(),
@@ -229,7 +232,7 @@ where
                     "No assistant content found to process.".to_string(),
                 ))?;
 
-            let tool_call_parts: Vec<ToolCallPart> = content
+            let all_tool_call_parts: Vec<ToolCallPart> = content
                 .iter()
                 .filter_map(|part| {
                     if let Part::ToolCall(tool_call) = part {
@@ -240,6 +243,11 @@ where
                 })
                 .collect();
 
+            let tool_call_parts: Vec<ToolCallPart> = all_tool_call_parts
+                .iter()
+                .filter(|part| matches!(part.call, llm_sdk::ToolCall::Function(_)))
+                .cloned()
+                .collect();
 
             // If no tool calls were found, return the model response as is
             if tool_call_parts.is_empty() {
@@ -255,7 +263,7 @@ where
             }
 
             let mut seen_tool_call_ids = HashSet::new();
-            for tool_call_part in &tool_call_parts {
+            for tool_call_part in &all_tool_call_parts {
                 if !seen_tool_call_ids.insert(tool_call_part.tool_call_id.clone()) {
                     Err(AgentError::invariant(format!(
                         "Duplicate tool call ID: {}",
@@ -279,10 +287,12 @@ where
 
                 let ToolCallPart {
                     tool_call_id,
-                    tool_name,
-                    args,
+                    call,
                     ..
                 } = tool_call_part;
+                let llm_sdk::ToolCall::Function(call) = call else { continue };
+                let tool_name = call.name;
+                let args = call.args;
 
                 let agent_tool = tools
                     .iter()

@@ -12,6 +12,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "isolatedModules": true,
+    "erasableSyntaxOnly": true,
     "allowImportingTsExtensions": true,
     "checkJs": true,
     "esModuleInterop": true,
@@ -23,5 +24,5 @@
     "module": "NodeNext",
     "noEmit": true
   },
-  "include": ["scripts/*.ts", "schema/**/*.ts"]
+  "include": ["scripts/*.ts", "schema/**/*.ts", "sdk-tests/*.ts"]
 }

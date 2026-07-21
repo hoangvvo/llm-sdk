@@ -4,25 +4,22 @@ import (
 	"os"
 	"testing"
 
+	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/anthropic"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
 	"github.com/joho/godotenv"
 )
 
-var model *anthropic.AnthropicModel
-
-func TestMain(m *testing.M) {
-	godotenv.Load("../../.env")
+func anthropicModel(t *testing.T) *anthropic.AnthropicModel {
+	t.Helper()
+	_ = godotenv.Load("../../.env")
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
-		panic("ANTHROPIC_API_KEY must be set")
+		t.Fatal("ANTHROPIC_API_KEY must be set")
 	}
-
-	model = anthropic.NewAnthropicModel("claude-sonnet-5", anthropic.AnthropicModelOptions{
+	return anthropic.NewAnthropicModel("claude-sonnet-5", anthropic.AnthropicModelOptions{
 		APIKey: apiKey,
 	})
-
-	m.Run()
 }
 
 var reasoningOptions = []testcommon.TestCaseOption{
@@ -30,49 +27,62 @@ var reasoningOptions = []testcommon.TestCaseOption{
 }
 
 func TestTextGeneration(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "text_generation")
+	testcommon.RunTestGroup(t, anthropicModel(t), "text_generation")
 }
 
 func TestConversation(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "conversation")
+	testcommon.RunTestGroup(t, anthropicModel(t), "conversation")
 }
 
 func TestToolUse(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "tool_use")
+	testcommon.RunTestGroup(t, anthropicModel(t), "tool_use")
 }
 
 func TestStructuredOutput(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "structured_output")
+	testcommon.RunTestGroup(t, anthropicModel(t), "structured_output")
 }
 
 func TestGenerationOptions(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "generation_options")
+	testcommon.RunTestGroup(t, anthropicModel(t), "generation_options")
 }
 
 func TestSourceInput(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "source_input")
+	testcommon.RunTestGroup(t, anthropicModel(t), "source_input")
 }
 
 func TestMultimodalToolResult(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "multimodal_tool_result")
+	testcommon.RunTestGroup(t, anthropicModel(t), "multimodal_tool_result")
 }
 
 func TestWebSearch(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "web_search")
+	testcommon.RunTestGroup(t, anthropicModel(t), "web_search", testcommon.WithProfile("anthropic_web_search"))
 }
 
 func TestImageInput(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "image_input")
+	testcommon.RunTestGroup(t, anthropicModel(t), "image_input")
 }
 
 func TestReasoning(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "reasoning", reasoningOptions...)
+	testcommon.RunTestGroup(t, anthropicModel(t), "reasoning", reasoningOptions...)
 }
 
 func TestReasoningToolUse(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "reasoning_tool_use")
+	testcommon.RunTestGroup(t, anthropicModel(t), "reasoning_tool_use")
 }
 
 func TestAnthropicRefusal(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "anthropic_refusal")
+	testcommon.RunTestGroup(t, anthropicModel(t), "anthropic_refusal")
+}
+
+func TestAnthropicWebSearchFailure(t *testing.T) {
+	testcommon.RunTestGroup(t, anthropicModel(t), "anthropic_web_search_failure")
+}
+
+func TestTransport(t *testing.T) {
+	testcommon.RunTransportTestGroup(t, "anthropic_transport", func(baseURL string) llmsdk.LanguageModel {
+		return anthropic.NewAnthropicModel("test-model", anthropic.AnthropicModelOptions{
+			APIKey:  "test-token",
+			BaseURL: baseURL,
+		})
+	})
 }

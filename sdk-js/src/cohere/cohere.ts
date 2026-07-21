@@ -286,16 +286,22 @@ function convertToCohereMessages(
               "Tool messages must contain only tool result parts",
             );
           }
+          if (part.result.type !== "function") {
+            throw new UnsupportedError(
+              PROVIDER,
+              "Cohere does not accept hosted web-search results",
+            );
+          }
 
           cohereMessages.push({
             role: "tool",
             toolCallId: part.tool_call_id,
             content:
-              part.content.length === 0
+              part.result.content.length === 0
                 ? part.status === "cancelled"
                   ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
                   : ""
-                : part.content.map(convertToCohereToolMessageContent),
+                : part.result.content.map(convertToCohereToolMessageContent),
           });
         });
         break;
@@ -405,12 +411,18 @@ function convertToCohereDocumentData(
 function convertToCohereToolCall(
   toolCallPart: ToolCallPart,
 ): Cohere.ToolCallV2 {
+  if (toolCallPart.call.type !== "function") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "Cohere does not accept hosted web-search calls",
+    );
+  }
   return {
     type: "function",
     id: toolCallPart.tool_call_id,
     function: {
-      name: toolCallPart.tool_name,
-      arguments: JSON.stringify(toolCallPart.args),
+      name: toolCallPart.call.name,
+      arguments: JSON.stringify(toolCallPart.call.args),
     },
   };
 }
@@ -557,10 +569,13 @@ function mapCohereToolCall(toolCall: Cohere.ToolCallV2): ToolCallPart {
   return {
     type: "tool-call",
     tool_call_id: toolCall.id,
-    tool_name: functionName,
-    args: functionArguments
-      ? (JSON.parse(functionArguments) as Record<string, unknown>)
-      : {},
+    call: {
+      type: "function",
+      name: functionName,
+      args: functionArguments
+        ? (JSON.parse(functionArguments) as Record<string, unknown>)
+        : {},
+    },
   };
 }
 
@@ -602,17 +617,18 @@ function mapCohereToolCallStartEvent(
   const toolCall = event.delta?.message?.toolCalls;
   const index = event.index;
   if (!toolCall || typeof index !== "number") return null;
-  const part: ToolCallPartDelta = {
-    type: "tool-call",
+  const call: Extract<ToolCallPartDelta["call"], { type: "function" }> = {
+    type: "function",
   };
+  const part: ToolCallPartDelta = { type: "tool-call", call };
   if (toolCall.id) {
     part.tool_call_id = toolCall.id;
   }
   if (toolCall.function?.name) {
-    part.tool_name = toolCall.function.name;
+    call.name = toolCall.function.name;
   }
   if (toolCall.function?.arguments) {
-    part.args = toolCall.function.arguments;
+    call.args = toolCall.function.arguments;
   }
   return {
     index,
@@ -627,9 +643,12 @@ function mapCohereToolCallDeltaEvent(
   const index = event.index;
   if (!toolCall || typeof index !== "number") return null;
 
-  const part: ToolCallPartDelta = { type: "tool-call" };
+  const call: Extract<ToolCallPartDelta["call"], { type: "function" }> = {
+    type: "function",
+  };
+  const part: ToolCallPartDelta = { type: "tool-call", call };
   if (toolCall.function?.arguments) {
-    part.args = toolCall.function.arguments;
+    call.args = toolCall.function.arguments;
   }
   return {
     index,

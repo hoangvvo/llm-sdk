@@ -1,37 +1,159 @@
 import { readFileSync } from "node:fs";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+type DataObject = any;
+
+interface TestData {
+  tools: any[];
+  test_cases: any[];
+  profiles?: Record<string, any>;
+}
+
+export interface StageContext {
+  stages: Array<{
+    assistant: unknown[];
+    tool_calls: unknown[];
+  }>;
+}
+
+export interface PreparedStage {
+  method: "generate" | "stream";
+  input: unknown;
+  stage_count: number;
+}
+
+export interface PreparedTransportStage extends PreparedStage {
+  transport: {
+    request: unknown;
+    response: unknown;
+  };
+}
+
+interface StageOptions {
+  test_case: string;
+  stage: number;
+  context?: StageContext;
+  profile?: string;
+}
+
+interface ValidateOutputOptions {
+  test_case: string;
+  stage: number;
+  content: any[];
+  response?: any;
+  stream?: any;
+  profile?: string;
+}
+
+interface ValidateErrorOptions {
+  test_case: string;
+  stage: number;
+  error: { kind: string; message: string };
+  profile?: string;
+}
+
+type TestCaseNames = Readonly<{
+  GENERATE_TEXT: "generate_text";
+  STREAM_TEXT: "stream_text";
+  GENERATE_WITH_SYSTEM_PROMPT: "generate_with_system_prompt";
+  GENERATE_TOOL_CALL: "generate_tool_call";
+  STREAM_TOOL_CALL: "stream_tool_call";
+  GENERATE_TEXT_FROM_TOOL_RESULT: "generate_text_from_tool_result";
+  STREAM_TEXT_FROM_TOOL_RESULT: "stream_text_from_tool_result";
+  GENERATE_TEXT_FROM_IMAGE_TOOL_RESULT: "generate_text_from_image_tool_result";
+  GENERATE_PARALLEL_TOOL_CALLS: "generate_parallel_tool_calls";
+  STREAM_PARALLEL_TOOL_CALLS: "stream_parallel_tool_calls";
+  STREAM_PARALLEL_TOOL_CALLS_OF_SAME_NAME: "stream_parallel_tool_calls_of_same_name";
+  STRUCTURED_RESPONSE_FORMAT: "structured_response_format";
+  SOURCE_PART_INPUT: "source_part_input";
+  GENERATE_AUDIO: "generate_audio";
+  STREAM_AUDIO: "stream_audio";
+  GENERATE_IMAGE: "generate_image";
+  STREAM_IMAGE: "stream_image";
+  GENERATE_IMAGE_INPUT: "generate_image_input";
+  STREAM_IMAGE_INPUT: "stream_image_input";
+  GENERATE_WEB_SEARCH: "generate_web_search";
+  STREAM_WEB_SEARCH: "stream_web_search";
+  ANTHROPIC_GENERATE_WEB_SEARCH_FAILURE: "anthropic_generate_web_search_failure";
+  ANTHROPIC_STREAM_WEB_SEARCH_FAILURE: "anthropic_stream_web_search_failure";
+  GENERATE_REASONING: "generate_reasoning";
+  STREAM_REASONING: "stream_reasoning";
+  MIXED_CONTENT_CONVERSATION: "mixed_content_conversation";
+  MULTI_STEP_TOOL_WORKFLOW: "multi_step_tool_workflow";
+  STREAM_NESTED_TOOL_ARGUMENTS: "stream_nested_tool_arguments";
+  STREAM_NESTED_STRUCTURED_RESPONSE: "stream_nested_structured_response";
+  GENERATE_EXPLICIT_TEXT_OPTIONS: "generate_explicit_text_options";
+  CONSECUTIVE_USER_MESSAGES: "consecutive_user_messages";
+  ASSISTANT_MESSAGE_HISTORY: "assistant_message_history";
+  AUTO_TOOL_CHOICE_TEXT_RESPONSE: "auto_tool_choice_text_response";
+  CANCELLED_TOOL_RESULT: "cancelled_tool_result";
+  PARALLEL_TOOL_RESULTS: "parallel_tool_results";
+  SEQUENTIAL_TOOL_CHAIN: "sequential_tool_chain";
+  STRUCTURED_DATA_EXTRACTION: "structured_data_extraction";
+  MULTIPLE_SOURCE_DOCUMENTS: "multiple_source_documents";
+  STREAM_UNICODE_TEXT: "stream_unicode_text";
+  MULTI_PART_TOOL_RESULT: "multi_part_tool_result";
+  REASONING_TOOL_CONTINUATION: "reasoning_tool_continuation";
+  ANTHROPIC_GENERATE_REFUSAL: "anthropic_generate_refusal";
+  ANTHROPIC_STREAM_REFUSAL: "anthropic_stream_refusal";
+  OPENAI_GENERATE: "openai_generate";
+  OPENAI_STREAM: "openai_stream";
+  OPENAI_HTTP_ERROR: "openai_http_error";
+  OPENAI_CANCELLED_RESULT: "openai_cancelled_result";
+  OPENAI_MALFORMED_STREAM: "openai_malformed_stream";
+  ANTHROPIC_GENERATE: "anthropic_generate";
+  ANTHROPIC_STREAM: "anthropic_stream";
+  ANTHROPIC_HTTP_ERROR: "anthropic_http_error";
+  ANTHROPIC_MALFORMED_STREAM: "anthropic_malformed_stream";
+  GOOGLE_GENERATE: "google_generate";
+  GOOGLE_STREAM: "google_stream";
+  GOOGLE_HTTP_ERROR: "google_http_error";
+  GOOGLE_MALFORMED_STREAM: "google_malformed_stream";
+}>;
+
 const TEST_DATA = JSON.parse(
   readFileSync(new URL("./tests.json", import.meta.url), "utf8"),
-);
+) as TestData;
+const TRANSPORT_DATA = JSON.parse(
+  readFileSync(new URL("./transports.json", import.meta.url), "utf8"),
+) as TestData;
+const ALL_TEST_CASES = [...TEST_DATA.test_cases, ...TRANSPORT_DATA.test_cases];
 
 const PART_TYPES = new Set([
   "text",
   "tool_call",
+  "web_search_call",
+  "web_search_result",
   "audio",
   "image",
   "reasoning",
   "json",
 ]);
 
-function fail(message) {
+function fail(message: string): never {
   throw new Error(message);
 }
 
-function isObject(value) {
+function isObject(value: unknown): value is DataObject {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function clone(value) {
+function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
-function validateTestData() {
-  if (!Array.isArray(TEST_DATA.tools) || !Array.isArray(TEST_DATA.test_cases)) {
+function validateTestData(): void {
+  if (
+    !Array.isArray(TEST_DATA.tools) ||
+    !Array.isArray(TEST_DATA.test_cases) ||
+    !Array.isArray(TRANSPORT_DATA.test_cases)
+  ) {
     fail("sdk-tests/tests.json must contain tools and test_cases arrays");
   }
 
-  const names = new Set();
-  for (const testCase of TEST_DATA.test_cases) {
+  const names = new Set<string>();
+  for (const testCase of ALL_TEST_CASES) {
     if (typeof testCase.name !== "string" || names.has(testCase.name)) {
       fail(`Invalid or duplicate test case name: ${String(testCase.name)}`);
     }
@@ -42,7 +164,7 @@ function validateTestData() {
     if (
       testCase.groups !== undefined &&
       (!Array.isArray(testCase.groups) ||
-        testCase.groups.some((group) => typeof group !== "string"))
+        testCase.groups.some((group: any) => typeof group !== "string"))
     ) {
       fail(`Test case "${testCase.name}" has invalid groups`);
     }
@@ -84,13 +206,20 @@ function validateTestData() {
           `Stream expectations require a stream stage for ${testCase.name} stage ${index}`,
         );
       }
+      if (
+        stage.transport !== undefined &&
+        (!isObject(stage.transport.request) ||
+          !isObject(stage.transport.response))
+      ) {
+        fail(`Invalid transport fixture for ${testCase.name} stage ${index}`);
+      }
     }
   }
 
   for (const [name, profile] of Object.entries(TEST_DATA.profiles ?? {})) {
     if (
       !Array.isArray(profile.applies_to) ||
-      profile.applies_to.some((testCaseName) => !names.has(testCaseName))
+      profile.applies_to.some((testCaseName: any) => !names.has(testCaseName))
     ) {
       fail(`Profile "${name}" has invalid applies_to entries`);
     }
@@ -100,7 +229,7 @@ function validateTestData() {
 validateTestData();
 
 const TEST_CASES = new Map(
-  TEST_DATA.test_cases.map((testCase) => [testCase.name, testCase]),
+  ALL_TEST_CASES.map((testCase) => [testCase.name, testCase]),
 );
 const TOOLS = new Map(
   TEST_DATA.tools.map((tool) => [
@@ -111,20 +240,23 @@ const TOOLS = new Map(
 
 export const TEST_CASE_NAMES = Object.freeze(
   Object.fromEntries(
-    TEST_DATA.test_cases.map((testCase) => [
+    ALL_TEST_CASES.map((testCase) => [
       testCase.name.toUpperCase(),
       testCase.name,
     ]),
   ),
-);
+) as TestCaseNames;
 
-function getTestCase(name) {
+function getTestCase(name: string): any {
   const testCase = TEST_CASES.get(name);
   if (!testCase) fail(`Test case "${name}" not found`);
   return testCase;
 }
 
-function getProfile(name, testCaseName) {
+function getProfile(
+  name: string | null | undefined,
+  testCaseName: string,
+): any {
   if (name === undefined || name === null) return undefined;
   const profile = TEST_DATA.profiles?.[name];
   if (!profile) fail(`Test profile "${name}" not found`);
@@ -134,7 +266,7 @@ function getProfile(name, testCaseName) {
   return profile;
 }
 
-function deepMerge(base, patch) {
+function deepMerge(base: any, patch: any): any {
   if (!isObject(base) || !isObject(patch)) return clone(patch);
   const result = clone(base);
   for (const [key, value] of Object.entries(patch)) {
@@ -146,7 +278,7 @@ function deepMerge(base, patch) {
   return result;
 }
 
-function omitPath(value, segments) {
+function omitPath(value: any, segments: string[]): void {
   if (!isObject(value) && !Array.isArray(value)) return;
   const [segment, ...rest] = segments;
   if (segment === undefined) return;
@@ -163,7 +295,7 @@ function omitPath(value, segments) {
   omitPath(value[segment], rest);
 }
 
-function resolvePath(path, root) {
+function resolvePath(path: string, root: any): any {
   let current = root;
   for (const segment of path.split(".")) {
     const key = Array.isArray(current) ? Number(segment) : segment;
@@ -175,7 +307,19 @@ function resolvePath(path, root) {
   return clone(current);
 }
 
-function resolveRefs(value, context) {
+function readPath(path: string, root: any): any {
+  let current = root;
+  for (const segment of path.split(".")) {
+    const key = Array.isArray(current) ? Number(segment) : segment;
+    if (current === null || typeof current !== "object" || !(key in current)) {
+      return undefined;
+    }
+    current = current[key];
+  }
+  return current;
+}
+
+function resolveRefs(value: any, context: StageContext): any {
   if (Array.isArray(value)) {
     return value.map((child) => resolveRefs(child, context));
   }
@@ -190,7 +334,7 @@ function resolveRefs(value, context) {
           (candidate) =>
             isObject(candidate) &&
             Object.entries(value.$where).every(([key, expected]) =>
-              Object.is(candidate[key], expected),
+              Object.is(readPath(key, candidate), expected),
             ),
         );
         if (resolved === undefined) {
@@ -215,7 +359,7 @@ function resolveRefs(value, context) {
   return value;
 }
 
-function resolveTools(input, names) {
+function resolveTools(input: any, names: string[] | undefined): any {
   if (names === undefined) return input;
   const tools = names.map((name) => {
     const tool = TOOLS.get(name);
@@ -225,18 +369,21 @@ function resolveTools(input, names) {
   return { ...input, tools };
 }
 
-export function getTestCaseInfo(testCaseName) {
+export function getTestCaseInfo(testCaseName: string): {
+  name: string;
+  stage_count: number;
+} {
   const testCase = getTestCase(testCaseName);
   return { name: testCase.name, stage_count: testCase.stages.length };
 }
 
-export function getTestCasesByGroup(group) {
+export function getTestCasesByGroup(group: string): string[] {
   if (typeof group !== "string" || group.length === 0) {
     fail("Test case group must be a non-empty string");
   }
-  const testCases = TEST_DATA.test_cases
-    .filter((testCase) => testCase.groups?.includes(group))
-    .map((testCase) => testCase.name);
+  const testCases = ALL_TEST_CASES.filter((testCase) =>
+    testCase.groups?.includes(group),
+  ).map((testCase) => testCase.name);
   if (testCases.length === 0) fail(`Test case group "${group}" not found`);
   return testCases;
 }
@@ -246,7 +393,7 @@ export function prepareStage({
   stage: stageIndex,
   context = { stages: [] },
   profile: profileName,
-}) {
+}: StageOptions): PreparedStage {
   const testCase = getTestCase(testCaseName);
   const stage = testCase.stages[stageIndex];
   if (!stage)
@@ -267,16 +414,31 @@ export function prepareStage({
   };
 }
 
-function regexMatches(pattern, value) {
+export function prepareTransportStage(
+  options: StageOptions,
+): PreparedTransportStage {
+  const prepared = prepareStage(options);
+  const testCase = getTestCase(options.test_case);
+  const stage = testCase.stages[options.stage];
+  if (!isObject(stage?.transport)) {
+    fail(
+      `Test case "${options.test_case}" stage ${String(options.stage)} has no transport fixture`,
+    );
+  }
+  return { ...prepared, transport: clone(stage.transport) };
+}
+
+function regexMatches(pattern: string, value: unknown): boolean {
   if (typeof value !== "string") return false;
   try {
     return new RegExp(pattern, "s").test(value);
   } catch (error) {
-    fail(`Invalid test pattern ${JSON.stringify(pattern)}: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    fail(`Invalid test pattern ${JSON.stringify(pattern)}: ${message}`);
   }
 }
 
-function valueMatches(expected, actual) {
+function valueMatches(expected: any, actual: any): boolean {
   if (Object.is(expected, actual)) return true;
   if (
     isObject(expected) &&
@@ -304,7 +466,7 @@ function valueMatches(expected, actual) {
   return false;
 }
 
-function citationMatches(assertion, citation) {
+function citationMatches(assertion: any, citation: any): boolean {
   return (
     isObject(citation) &&
     (assertion.source === undefined ||
@@ -314,11 +476,11 @@ function citationMatches(assertion, citation) {
     (assertion.cited_text === undefined ||
       regexMatches(assertion.cited_text, citation.cited_text)) &&
     (assertion.any_of === undefined ||
-      assertion.any_of.some((option) => citationMatches(option, citation)))
+      assertion.any_of.some((option: any) => citationMatches(option, citation)))
   );
 }
 
-function parseJsonText(text) {
+function parseJsonText(text: unknown): any {
   if (typeof text !== "string") return undefined;
   try {
     return JSON.parse(text);
@@ -327,7 +489,7 @@ function parseJsonText(text) {
   }
 }
 
-function assertionMatches(assertion, part) {
+function assertionMatches(assertion: any, part: any): boolean {
   switch (assertion.type) {
     case "text":
       return (
@@ -335,21 +497,53 @@ function assertionMatches(assertion, part) {
         (assertion.text === undefined ||
           regexMatches(assertion.text, part.text)) &&
         (assertion.contains_all === undefined ||
-          assertion.contains_all.every((value) => part.text.includes(value))) &&
+          assertion.contains_all.every((value: any) =>
+            part.text.includes(value),
+          )) &&
         (assertion.citation === undefined ||
-          part.citations?.some((citation) =>
+          part.citations?.some((citation: any) =>
             citationMatches(assertion.citation, citation),
           ))
       );
     case "tool_call":
       return (
         (part.type === "tool-call" || part.type === "tool_call") &&
-        part.tool_name === assertion.tool_name &&
+        (part.call?.type ?? "function") === "function" &&
+        (part.call?.name ?? part.tool_name) === assertion.tool_name &&
         (assertion.tool_call_id === false ||
           (typeof part.tool_call_id === "string" &&
             part.tool_call_id.length > 0)) &&
         (assertion.args === undefined ||
-          valueMatches(assertion.args, part.args))
+          valueMatches(assertion.args, part.call?.args ?? part.args))
+      );
+    case "web_search_call":
+      return (
+        (part.type === "tool-call" || part.type === "tool_call") &&
+        part.call?.type === "web_search" &&
+        typeof part.tool_call_id === "string" &&
+        part.tool_call_id.length > 0 &&
+        (assertion.status === undefined ||
+          part.call.status === assertion.status) &&
+        (assertion.action !== true || isObject(part.call.action))
+      );
+    case "web_search_result":
+      return (
+        (part.type === "tool-result" || part.type === "tool_result") &&
+        part.result?.type === "web_search" &&
+        Array.isArray(part.result.sources) &&
+        (assertion.status === undefined || part.status === assertion.status) &&
+        (assertion.error_code === undefined ||
+          regexMatches(assertion.error_code, part.result.error_code)) &&
+        (assertion.source === undefined ||
+          part.result.sources.some((source: any) =>
+            regexMatches(assertion.source, source.url),
+          )) &&
+        (assertion.source_signature !== true ||
+          part.result.sources.some(
+            (source: any) =>
+              typeof source.signature === "string" &&
+              source.signature.length > 0,
+          ))
       );
     case "audio":
       return (
@@ -389,7 +583,12 @@ function assertionMatches(assertion, part) {
   }
 }
 
-function findDistinctMatches(assertions, content, index = 0, used = new Set()) {
+function findDistinctMatches(
+  assertions: any[],
+  content: any[],
+  index = 0,
+  used = new Set<number>(),
+): boolean {
   if (index === assertions.length) return true;
   for (const [partIndex, part] of content.entries()) {
     if (!used.has(partIndex) && assertionMatches(assertions[index], part)) {
@@ -402,7 +601,12 @@ function findDistinctMatches(assertions, content, index = 0, used = new Set()) {
   return false;
 }
 
-function formatValidationFailure(testCaseName, stageIndex, expected, content) {
+function formatValidationFailure(
+  testCaseName: string,
+  stageIndex: number,
+  expected: any,
+  content: any[],
+): string {
   return [
     `Output validation failed for "${testCaseName}" stage ${stageIndex}.`,
     "Expected each assertion to match a distinct content part:",
@@ -412,7 +616,11 @@ function formatValidationFailure(testCaseName, stageIndex, expected, content) {
   ].join("\n");
 }
 
-function validateUsage(testCaseName, stageIndex, usage) {
+function validateUsage(
+  testCaseName: string,
+  stageIndex: number,
+  usage: any,
+): void {
   if (!isObject(usage)) {
     fail(
       `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected usage metadata.`,
@@ -435,7 +643,7 @@ function validateUsage(testCaseName, stageIndex, usage) {
     if (details === undefined) continue;
     if (
       !isObject(details) ||
-      Object.values(details).some(
+      (Object.values(details) as any[]).some(
         (value) => !Number.isInteger(value) || value < 0,
       )
     ) {
@@ -452,7 +660,7 @@ function validateResponseMetadata({
   expected,
   response,
   stream,
-}) {
+}: any): void {
   if (response !== undefined) {
     if (!isObject(response) || !Array.isArray(response.content)) {
       fail(
@@ -473,6 +681,13 @@ function validateResponseMetadata({
 
   if (expected.usage === true) {
     validateUsage(testCaseName, stageIndex, response?.usage);
+  } else if (
+    isObject(expected.usage) &&
+    !valueContains(expected.usage, response?.usage)
+  ) {
+    fail(
+      `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected usage ${JSON.stringify(expected.usage)}, received ${JSON.stringify(response?.usage)}.`,
+    );
   }
 
   if (expected.stream !== undefined) {
@@ -481,7 +696,9 @@ function validateResponseMetadata({
         `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected stream metrics.`,
       );
     }
-    for (const [metric, minimum] of Object.entries(expected.stream)) {
+    for (const [metric, minimum] of Object.entries(expected.stream) as Array<
+      [string, number]
+    >) {
       if (
         !Number.isInteger(minimum) ||
         minimum < 0 ||
@@ -489,7 +706,7 @@ function validateResponseMetadata({
         stream[metric] < minimum
       ) {
         fail(
-          `Output validation failed for "${testCaseName}" stage ${stageIndex}: stream.${metric} must be at least ${String(minimum)}.`,
+          `Output validation failed for "${testCaseName}" stage ${stageIndex}: stream.${metric} must be at least ${String(minimum)}, received ${String(stream[metric])}.`,
         );
       }
     }
@@ -503,7 +720,7 @@ export function validateOutput({
   response,
   stream,
   profile: profileName,
-}) {
+}: ValidateOutputOptions): { ok: true } {
   const testCase = getTestCase(testCaseName);
   const stage = testCase.stages[stageIndex];
   if (!stage)
@@ -529,10 +746,11 @@ export function validateOutput({
     stream,
   });
   const aggregateAssertions = expected.content.filter(
-    (assertion) => assertion.type === "text" && assertion.aggregate === true,
+    (assertion: any) =>
+      assertion.type === "text" && assertion.aggregate === true,
   );
   const partAssertions = expected.content.filter(
-    (assertion) => !aggregateAssertions.includes(assertion),
+    (assertion: any) => !aggregateAssertions.includes(assertion),
   );
   const aggregateText = content
     .filter((part) => part.type === "text")
@@ -541,7 +759,7 @@ export function validateOutput({
 
   if (
     aggregateAssertions.some(
-      (assertion) =>
+      (assertion: any) =>
         !assertionMatches(assertion, { type: "text", text: aggregateText }),
     ) ||
     !findDistinctMatches(partAssertions, content)
@@ -550,12 +768,15 @@ export function validateOutput({
   }
 
   const expectedToolCalls = expected.content.filter(
-    (part) => part.type === "tool_call",
+    (part: any) => part.type === "tool_call" || part.type === "web_search_call",
   ).length;
   const actualToolCalls = content.filter(
     (part) => part.type === "tool-call" || part.type === "tool_call",
   );
-  if (actualToolCalls.length !== expectedToolCalls) {
+  if (
+    expected.allow_extra_tool_calls !== true &&
+    actualToolCalls.length !== expectedToolCalls
+  ) {
     fail(
       `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected exactly ${expectedToolCalls} tool call(s), received ${actualToolCalls.length}.`,
     );
@@ -576,7 +797,7 @@ export function validateError({
   stage: stageIndex,
   error,
   profile: profileName,
-}) {
+}: ValidateErrorOptions): { ok: true } {
   const testCase = getTestCase(testCaseName);
   const stage = testCase.stages[stageIndex];
   if (!stage)
@@ -590,7 +811,7 @@ export function validateError({
   }
   if (
     !isObject(error) ||
-    error.kind !== expected.error.kind ||
+    !regexMatches(expected.error.kind, error.kind) ||
     (expected.error.message !== undefined &&
       !regexMatches(expected.error.message, error.message))
   ) {
@@ -599,6 +820,72 @@ export function validateError({
         `Error validation failed for "${testCaseName}" stage ${stageIndex}.`,
         `Expected: ${JSON.stringify(expected.error)}`,
         `Received: ${JSON.stringify(error)}`,
+      ].join("\n"),
+    );
+  }
+  return { ok: true };
+}
+
+function valueContains(expected: any, actual: any): boolean {
+  if (Array.isArray(expected)) {
+    return (
+      Array.isArray(actual) &&
+      expected.length === actual.length &&
+      expected.every((value, index) => valueContains(value, actual[index]))
+    );
+  }
+  if (isObject(expected)) {
+    return (
+      isObject(actual) &&
+      Object.entries(expected).every(
+        ([key, value]) => key in actual && valueContains(value, actual[key]),
+      )
+    );
+  }
+  return Object.is(expected, actual);
+}
+
+export function validateTransportRequest(
+  expected: unknown,
+  actual: unknown,
+): { ok: true } {
+  if (!isObject(expected) || !isObject(actual)) {
+    fail("Transport request validation requires request objects");
+  }
+  if (
+    expected.method !== undefined &&
+    actual.method?.toUpperCase() !== expected.method.toUpperCase()
+  ) {
+    fail(
+      `Expected transport method ${JSON.stringify(expected.method)}, received ${JSON.stringify(actual.method)}`,
+    );
+  }
+  if (
+    expected.path !== undefined &&
+    !regexMatches(`^(?:${expected.path})$`, actual.path)
+  ) {
+    fail(
+      `Expected transport path /${expected.path}/, received ${JSON.stringify(actual.path)}`,
+    );
+  }
+  for (const [name, pattern] of Object.entries(expected.headers ?? {}) as Array<
+    [string, string]
+  >) {
+    if (!regexMatches(pattern, actual.headers?.[name.toLowerCase()])) {
+      fail(
+        `Expected transport header ${JSON.stringify(name)} to match ${JSON.stringify(pattern)}, received ${JSON.stringify(actual.headers?.[name.toLowerCase()])}`,
+      );
+    }
+  }
+  if (
+    expected.body !== undefined &&
+    !valueContains(expected.body, actual.body)
+  ) {
+    fail(
+      [
+        "Transport request body did not contain the expected value.",
+        `Expected subset: ${JSON.stringify(expected.body, null, 2)}`,
+        `Received: ${JSON.stringify(actual.body, null, 2)}`,
       ].join("\n"),
     );
   }

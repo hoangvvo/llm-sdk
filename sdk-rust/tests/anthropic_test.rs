@@ -29,7 +29,13 @@ test_group!(anthropic_model(), structured_output);
 test_group!(anthropic_model(), generation_options);
 test_group!(anthropic_model(), source_input);
 test_group!(anthropic_model(), multimodal_tool_result);
-test_group!(anthropic_model(), web_search);
+test_group!(
+    anthropic_model(),
+    web_search,
+    Some(crate::common::cases::RunTestCaseOptions {
+        profile: Some("anthropic_web_search"),
+    })
+);
 test_group!(anthropic_model(), image_input);
 test_group!(
     anthropic_model(),
@@ -40,3 +46,19 @@ test_group!(
 );
 test_group!(anthropic_model(), reasoning_tool_use);
 test_group!(anthropic_model(), anthropic_refusal);
+test_group!(anthropic_model(), anthropic_web_search_failure);
+
+#[test]
+async fn transport() -> Result<(), Box<dyn Error>> {
+    common::transports::run_transport_test_group("anthropic_transport", |base_url| {
+        AnthropicModel::new(
+            "test-model",
+            AnthropicModelOptions {
+                api_key: "test-token".to_string(),
+                base_url: Some(base_url.to_string()),
+                ..Default::default()
+            },
+        )
+    })
+    .await
+}

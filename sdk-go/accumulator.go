@@ -36,11 +36,12 @@ type accumulatedAudioData struct {
 
 // accumulatedData represents accumulated data for different part types
 type accumulatedData struct {
-	Text      *accumulatedTextData
-	ToolCall  *ToolCallPartDelta
-	Image     *accumulatedImageData
-	Audio     *accumulatedAudioData
-	Reasoning *ReasoningPartDelta
+	Text       *accumulatedTextData
+	ToolCall   *ToolCallPartDelta
+	ToolResult *ToolResultPartDelta
+	Image      *accumulatedImageData
+	Audio      *accumulatedAudioData
+	Reasoning  *ReasoningPartDelta
 }
 
 // newDelta creates accumulated data from a delta
@@ -63,6 +64,8 @@ func newDelta(delta ContentDelta) *accumulatedData {
 		return &accumulatedData{
 			ToolCall: delta.Part.ToolCallPartDelta,
 		}
+	case delta.Part.ToolResultPartDelta != nil:
+		return &accumulatedData{ToolResult: delta.Part.ToolResultPartDelta}
 	case delta.Part.ImagePartDelta != nil:
 		imageData := ""
 		if delta.Part.ImagePartDelta.Data != nil {
@@ -131,20 +134,8 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 			return fmt.Errorf("type mismatch at index %d: existing type is tool-call, incoming type is not tool-call", delta.Index)
 		}
 		existingData := existing.ToolCall
-		if toolCallPartDelta.ToolName != nil {
-			if existingData.ToolName == nil {
-				existingData.ToolName = new(string)
-			}
-			*existingData.ToolName += *toolCallPartDelta.ToolName
-		}
 		if toolCallPartDelta.ToolCallID != nil {
 			existingData.ToolCallID = toolCallPartDelta.ToolCallID
-		}
-		if toolCallPartDelta.Args != nil {
-			if existingData.Args == nil {
-				existingData.Args = new(string)
-			}
-			*existingData.Args += *toolCallPartDelta.Args
 		}
 		if toolCallPartDelta.Signature != nil {
 			existingData.Signature = toolCallPartDelta.Signature
@@ -152,6 +143,38 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 		if toolCallPartDelta.ID != nil {
 			existingData.ID = toolCallPartDelta.ID
 		}
+		if toolCallPartDelta.Call.Function != nil {
+			if existingData.Call.Function == nil {
+				return fmt.Errorf("tool call type mismatch at index %d", delta.Index)
+			}
+			if toolCallPartDelta.Call.Function.Name != nil {
+				if existingData.Call.Function.Name == nil {
+					existingData.Call.Function.Name = new(string)
+				}
+				*existingData.Call.Function.Name += *toolCallPartDelta.Call.Function.Name
+			}
+			if toolCallPartDelta.Call.Function.Args != nil {
+				if existingData.Call.Function.Args == nil {
+					existingData.Call.Function.Args = new(string)
+				}
+				*existingData.Call.Function.Args += *toolCallPartDelta.Call.Function.Args
+			}
+		} else if toolCallPartDelta.Call.WebSearch != nil {
+			if existingData.Call.WebSearch == nil {
+				return fmt.Errorf("tool call type mismatch at index %d", delta.Index)
+			}
+			if toolCallPartDelta.Call.WebSearch.Action != nil {
+				existingData.Call.WebSearch.Action = toolCallPartDelta.Call.WebSearch.Action
+			}
+			if toolCallPartDelta.Call.WebSearch.Status != nil {
+				existingData.Call.WebSearch.Status = toolCallPartDelta.Call.WebSearch.Status
+			}
+		}
+	case existing.ToolResult != nil:
+		if delta.Part.ToolResultPartDelta == nil {
+			return fmt.Errorf("type mismatch at index %d: existing type is tool-result", delta.Index)
+		}
+		existing.ToolResult = delta.Part.ToolResultPartDelta
 	case existing.Image != nil:
 		imagePartDelta := delta.Part.ImagePartDelta
 		if imagePartDelta == nil {
@@ -269,17 +292,17 @@ func createTextPart(data *accumulatedTextData, index int) (Part, error) {
 	return NewTextPart(data.Text, opts...), nil
 }
 
-// parseToolCallArgs parses tool call arguments from JSON string
-func parseToolCallArgs(args string) (map[string]any, error) {
+// parseToolCallArgs validates and preserves tool call arguments from a JSON string.
+func parseToolCallArgs(args string) (json.RawMessage, error) {
 	if args == "" {
-		return make(map[string]any), nil
+		return json.RawMessage(`{}`), nil
 	}
 
-	var result map[string]any
-	if err := json.Unmarshal([]byte(args), &result); err != nil {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(args), &object); err != nil {
 		return nil, NewInvariantError("", fmt.Sprintf("Invalid tool call arguments: %s: %s", args, err.Error()))
 	}
-	return result, nil
+	return json.RawMessage(args), nil
 }
 
 // createToolCallPart creates a tool call part from accumulated tool call data
@@ -287,13 +310,18 @@ func createToolCallPart(data *ToolCallPartDelta, index int) (Part, error) {
 	if data.ToolCallID == nil {
 		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required field tool_call_id at index %d", index))
 	}
-	if data.ToolName == nil {
+	if data.Call.WebSearch != nil {
+		return Part{ToolCallPart: &ToolCallPart{ToolCallID: *data.ToolCallID, Call: ToolCall{WebSearch: &WebSearchToolCall{Action: data.Call.WebSearch.Action, Status: data.Call.WebSearch.Status}}, Signature: data.Signature, ID: data.ID}}, nil
+	}
+	if data.Call.Function == nil || data.Call.Function.Name == nil {
 		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required field tool_name at index %d", index))
 	}
 
+	name := data.Call.Function.Name
+	argsDelta := data.Call.Function.Args
 	strArgs := ""
-	if data.Args != nil {
-		strArgs = *data.Args
+	if argsDelta != nil {
+		strArgs = *argsDelta
 	}
 	args, err := parseToolCallArgs(strArgs)
 	if err != nil {
@@ -308,7 +336,7 @@ func createToolCallPart(data *ToolCallPartDelta, index int) (Part, error) {
 		opts = append(opts, WithToolCallPartID(*data.ID))
 	}
 
-	toolCallPart := NewToolCallPart(*data.ToolCallID, *data.ToolName, args, opts...)
+	toolCallPart := NewToolCallPart(*data.ToolCallID, *name, args, opts...)
 	return toolCallPart, nil
 }
 
@@ -383,6 +411,8 @@ func createPart(data accumulatedData, index int) (Part, error) {
 		return createTextPart(data.Text, index)
 	case data.ToolCall != nil:
 		return createToolCallPart(data.ToolCall, index)
+	case data.ToolResult != nil:
+		return Part{ToolResultPart: &ToolResultPart{ToolCallID: data.ToolResult.ToolCallID, Result: data.ToolResult.Result, Status: data.ToolResult.Status}}, nil
 	case data.Image != nil:
 		return createImagePart(data.Image, index)
 	case data.Audio != nil:

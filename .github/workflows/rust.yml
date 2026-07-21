@@ -36,11 +36,15 @@ jobs:
       - name: Run SDK Clippy
         run: RUSTFLAGS="-Dwarnings" cargo clippy --package llm-sdk-rs
       - name: Test SDK offline suites
-        run: >-
-          cargo test --package llm-sdk-rs
-          --test accumulator_tests
-          --test llm_sdk_test_test
-          --test openai_transport_tests
+        run: |
+          cargo test --package llm-sdk-rs \
+            --test accumulator_tests \
+            --test llm_sdk_test_test
+          cargo test --package llm-sdk-rs \
+            --test anthropic_test \
+            --test google_test \
+            --test openai_test \
+            transport
 
   agent:
     name: Agent

@@ -93,11 +93,12 @@ function ConversationItem({ item }: { item: AgentItem }) {
   } else {
     item.content.forEach((part) => {
       if (part.type === "tool-result") {
+        if (part.result.type !== "function") return;
         tools.push({
-          tool_name: part.tool_name,
+          tool_name: part.result.name,
           tool_call_id: part.tool_call_id,
           input: {}, // input is not available in tool-result part
-          output: part.content,
+          output: part.result.content,
           status: part.status,
         });
       }
@@ -178,9 +179,15 @@ function PartView({ part }: { part: Part }) {
           <div className="console-subheading text-amber-600">
             Requested tool
           </div>
-          <div className="mt-2 text-amber-700">{part.tool_name}</div>
+          <div className="mt-2 text-amber-700">
+            {part.call.type === "function" ? part.call.name : "Web search"}
+          </div>
           <div className="mt-3 max-h-[100px] overflow-y-auto text-[11px] break-words whitespace-pre-wrap text-amber-800">
-            {JSON.stringify(part.args, null, 2)}
+            {JSON.stringify(
+              part.call.type === "function" ? part.call.args : part.call,
+              null,
+              2,
+            )}
           </div>
         </div>
       );
@@ -189,7 +196,13 @@ function PartView({ part }: { part: Part }) {
         <div className="console-card-tool-result">
           <div className="console-subheading text-emerald-600">Tool result</div>
           <div className="mt-2">
-            <PartsList parts={part.content} />
+            {part.result.type === "function" ? (
+              <PartsList parts={part.result.content} />
+            ) : (
+              <pre className="text-xs whitespace-pre-wrap">
+                {JSON.stringify(part.result, null, 2)}
+              </pre>
+            )}
           </div>
           {part.status !== "completed" ? (
             <div className="mt-2 text-rose-500">Status: {part.status}.</div>

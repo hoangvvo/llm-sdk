@@ -72,6 +72,7 @@ const PROVIDER = "google";
 export interface GoogleModelOptions {
   apiKey: string;
   modelId: string;
+  baseURL?: string;
 }
 
 export class GoogleModel implements LanguageModel {
@@ -88,6 +89,7 @@ export class GoogleModel implements LanguageModel {
 
     this.#ai = new GoogleGenAI({
       apiKey: options.apiKey,
+      ...(options.baseURL ? { httpOptions: { baseUrl: options.baseURL } } : {}),
     });
 
     traceLanguageModel(this);
@@ -139,6 +141,7 @@ export class GoogleModel implements LanguageModel {
     // Streaming support indices refer to grounding chunks accumulated across
     // all chunks, rather than only the current response chunk.
     const groundingChunks: GroundingChunk[] = [];
+    const webSearchQueries = new Set<string>();
     const streamTextPartMappings = new Map<number, number>();
 
     for await (const chunk of stream) {
@@ -157,6 +160,9 @@ export class GoogleModel implements LanguageModel {
 
       const metadata = candidate?.groundingMetadata;
       if (metadata) {
+        for (const query of metadata.webSearchQueries ?? []) {
+          webSearchQueries.add(query);
+        }
         if (metadata.groundingChunks) {
           groundingChunks.push(...metadata.groundingChunks);
         }
@@ -198,6 +204,54 @@ export class GoogleModel implements LanguageModel {
         }
         yield partial;
       }
+    }
+
+    const sources = groundingChunks.flatMap((chunk) =>
+      chunk.web?.uri
+        ? [
+            {
+              url: chunk.web.uri,
+              ...(chunk.web.title ? { title: chunk.web.title } : {}),
+            },
+          ]
+        : [],
+    );
+    if (webSearchQueries.size > 0 || sources.length > 0) {
+      const callIndex =
+        Math.max(...allContentDeltas.map(({ index }) => index), -1) + 1;
+      const toolCallId = generateString(10);
+      yield {
+        delta: {
+          index: callIndex,
+          part: {
+            type: "tool-call",
+            tool_call_id: toolCallId,
+            call: {
+              type: "web_search",
+              status: "completed",
+              ...(webSearchQueries.size > 0
+                ? {
+                    action: {
+                      type: "search" as const,
+                      queries: [...webSearchQueries],
+                    },
+                  }
+                : {}),
+            },
+          },
+        },
+      };
+      yield {
+        delta: {
+          index: callIndex + 1,
+          part: {
+            type: "tool-result",
+            tool_call_id: toolCallId,
+            result: { type: "web_search", sources },
+            status: "completed",
+          },
+        },
+      };
     }
   }
 }
@@ -345,10 +399,11 @@ function convertToGoogleParts(part: Part): GooglePart[] {
     case "source":
       return part.content.map(convertToGoogleParts).flat();
     case "tool-call": {
+      if (part.call.type === "web_search") return [];
       const googleToolCallPart: GooglePart = {
         functionCall: {
-          name: part.tool_name,
-          args: part.args,
+          name: part.call.name,
+          args: part.call.args,
           id: part.tool_call_id,
         },
       };
@@ -358,13 +413,14 @@ function convertToGoogleParts(part: Part): GooglePart[] {
       return [googleToolCallPart];
     }
     case "tool-result": {
+      if (part.result.type === "web_search") return [];
       const functionResponse = convertToGoogleFunctionResponse(
-        part.content,
+        part.result.content,
         part.status,
       );
       const googleFunctionResponse: FunctionResponse = {
         id: part.tool_call_id,
-        name: part.tool_name,
+        name: part.result.name,
         response: functionResponse.response,
       };
       if (functionResponse.parts) {
@@ -567,7 +623,39 @@ function mapGoogleContent(
     }
   }
 
-  return mappedParts.filter((part) => part !== null);
+  const content = mappedParts.filter((part) => part !== null);
+  const queries = groundingMetadata?.webSearchQueries ?? [];
+  const sources = (groundingMetadata?.groundingChunks ?? []).flatMap((chunk) =>
+    chunk.web?.uri
+      ? [
+          {
+            url: chunk.web.uri,
+            ...(chunk.web.title ? { title: chunk.web.title } : {}),
+          },
+        ]
+      : [],
+  );
+  if (queries.length > 0 || sources.length > 0) {
+    const toolCallId = generateString(10);
+    content.push({
+      type: "tool-call",
+      tool_call_id: toolCallId,
+      call: {
+        type: "web_search",
+        status: "completed",
+        ...(queries.length > 0
+          ? { action: { type: "search" as const, queries } }
+          : {}),
+      },
+    });
+    content.push({
+      type: "tool-result",
+      tool_call_id: toolCallId,
+      result: { type: "web_search", sources },
+      status: "completed",
+    });
+  }
+  return content;
 }
 
 function mapGooglePart(googlePart: GooglePart): Part | null {
@@ -618,8 +706,11 @@ function mapGooglePart(googlePart: GooglePart): Part | null {
     const toolCallPart: Extract<Part, { type: "tool-call" }> = {
       type: "tool-call",
       tool_call_id: googlePart.functionCall.id ?? generateString(10),
-      tool_name: googlePart.functionCall.name,
-      args: googlePart.functionCall.args ?? {},
+      call: {
+        type: "function",
+        name: googlePart.functionCall.name,
+        args: googlePart.functionCall.args ?? {},
+      },
     };
     if (googlePart.thoughtSignature) {
       toolCallPart.signature = googlePart.thoughtSignature;

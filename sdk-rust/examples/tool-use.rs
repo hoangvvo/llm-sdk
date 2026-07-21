@@ -110,9 +110,12 @@ async fn main() {
         let mut tool_results: Vec<Part> = Vec::new();
 
         for call in tool_calls {
-            let result_json = match call.tool_name.as_str() {
+            let llm_sdk::ToolCall::Function(function) = &call.call else {
+                continue;
+            };
+            let result_json = match function.name.as_str() {
                 "trade" => {
-                    let args: TradeArgs = serde_json::from_value(call.args.clone())
+                    let args: TradeArgs = serde_json::from_value(function.args.clone())
                         .expect("Failed to parse tool call arguments");
                     account.trade(&args)
                 }
@@ -124,7 +127,7 @@ async fn main() {
             tool_results.push(
                 ToolResultPart::new(
                     call.tool_call_id.clone(),
-                    call.tool_name.clone(),
+                    function.name.clone(),
                     vec![Part::text(result_str)],
                 )
                 .into(),

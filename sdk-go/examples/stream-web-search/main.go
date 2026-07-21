@@ -57,4 +57,12 @@ func main() {
 	}
 
 	litter.Dump(response.Content)
+	for _, part := range response.Content {
+		if part.ToolCallPart != nil && part.ToolCallPart.Call.WebSearch != nil {
+			log.Printf("web search: %#v", part.ToolCallPart.Call.WebSearch)
+		}
+		if part.ToolResultPart != nil && part.ToolResultPart.Result.WebSearch != nil {
+			log.Printf("sources: %#v", part.ToolResultPart.Result.WebSearch.Sources)
+		}
+	}
 }

@@ -23,7 +23,11 @@ void test("getContentText omits non-text and empty strings", (t: TestContext) =>
     status: "completed",
     output: [],
     content: [
-      { type: "tool-call", args: {}, tool_call_id: "1", tool_name: "tool" },
+      {
+        type: "tool-call",
+        tool_call_id: "1",
+        call: { type: "function", name: "tool", args: {} },
+      },
       { type: "text", text: "" },
     ],
   };

@@ -1,9 +1,10 @@
 use crate::{
     AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FunctionTool,
-    ImagePart, ImagePartDelta, LanguageModelInput, Message, Modality, Part, ReasoningOptions,
-    ReasoningPart, ReasoningPartDelta, ResponseFormatOption, SourcePart, TextPart, TextPartDelta,
-    Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart,
-    ToolResultStatus, UserMessage, WebSearchTool, WebSearchUserLocation,
+    FunctionToolCall, FunctionToolResult, ImagePart, ImagePartDelta, LanguageModelInput, Message,
+    Modality, Part, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatOption,
+    SourcePart, TextPart, TextPartDelta, Tool, ToolCall, ToolCallDelta, ToolCallPart,
+    ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResult, ToolResultPart, ToolResultStatus,
+    UserMessage, WebSearchTool, WebSearchUserLocation,
 };
 
 impl TextPart {
@@ -155,8 +156,10 @@ impl ToolCallPart {
     ) -> Self {
         Self {
             tool_call_id: tool_call_id.into(),
-            tool_name: tool_name.into(),
-            args,
+            call: ToolCall::Function(FunctionToolCall {
+                name: tool_name.into(),
+                args,
+            }),
             signature: None,
             id: None,
         }
@@ -183,8 +186,10 @@ impl ToolResultPart {
     ) -> Self {
         Self {
             tool_call_id: tool_call_id.into(),
-            tool_name: tool_name.into(),
-            content,
+            result: ToolResult::Function(FunctionToolResult {
+                name: tool_name.into(),
+                content,
+            }),
             status: ToolResultStatus::Completed,
         }
     }
@@ -261,6 +266,12 @@ impl WebSearchTool {
     #[must_use]
     pub fn with_allowed_domains(mut self, allowed_domains: Vec<String>) -> Self {
         self.allowed_domains = Some(allowed_domains);
+        self
+    }
+
+    #[must_use]
+    pub fn with_max_uses(mut self, max_uses: u32) -> Self {
+        self.max_uses = Some(max_uses);
         self
     }
 
@@ -666,13 +677,17 @@ impl ToolCallPartDelta {
 
     #[must_use]
     pub fn with_tool_name(mut self, tool_name: impl Into<String>) -> Self {
-        self.tool_name = Some(tool_name.into());
+        if let ToolCallDelta::Function(call) = &mut self.call {
+            call.name = Some(tool_name.into());
+        }
         self
     }
 
     #[must_use]
     pub fn with_args(mut self, args: impl Into<String>) -> Self {
-        self.args = Some(args.into());
+        if let ToolCallDelta::Function(call) = &mut self.call {
+            call.args = Some(args.into());
+        }
         self
     }
 

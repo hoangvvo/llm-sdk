@@ -238,6 +238,25 @@ func TestRun_RejectsDuplicateToolCallIDsBeforeExecution(t *testing.T) {
 	}
 }
 
+func TestRun_DoesNotExecuteProviderHostedWebSearch(t *testing.T) {
+	model := llmsdktest.NewMockLanguageModel()
+	status := llmsdk.WebSearchToolCallStatusCompleted
+	model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{Content: []llmsdk.Part{
+		{ToolCallPart: &llmsdk.ToolCallPart{ToolCallID: "ws_1", Call: llmsdk.ToolCall{WebSearch: &llmsdk.WebSearchToolCall{Status: &status}}}},
+		llmsdk.NewTextPart("done"),
+	}}))
+	session := mustNewRunSession(t, &llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10}, struct{}{})
+	response, err := session.Run(t.Context(), llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+		llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Search"))),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Content) != 2 || response.Content[1].TextPart == nil {
+		t.Fatalf("unexpected response: %#v", response.Content)
+	}
+}
+
 func TestRun_PassesCurrentTurnAndAccumulatedItemsToTool(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	model.EnqueueGenerateResult(
@@ -1823,8 +1842,8 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 		switch {
 		case event.Partial != nil:
 			if delta := event.Partial.Delta; delta != nil {
-				if delta.Part.ToolCallPartDelta != nil && delta.Part.ToolCallPartDelta.ToolName != nil {
-					summaries = append(summaries, "partial:tool-call:"+*delta.Part.ToolCallPartDelta.ToolName)
+				if delta.Part.ToolCallPartDelta != nil && delta.Part.ToolCallPartDelta.Call.Function != nil && delta.Part.ToolCallPartDelta.Call.Function.Name != nil {
+					summaries = append(summaries, "partial:tool-call:"+*delta.Part.ToolCallPartDelta.Call.Function.Name)
 				} else if delta.Part.TextPartDelta != nil {
 					summaries = append(summaries, "partial:text:"+delta.Part.TextPartDelta.Text)
 				} else {
@@ -1838,8 +1857,8 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 			if itemEvent.Item.Model != nil {
 				if len(itemEvent.Item.Model.Content) > 0 {
 					part := itemEvent.Item.Model.Content[0]
-					if part.ToolCallPart != nil {
-						summaries = append(summaries, "item:model:tool-call:"+part.ToolCallPart.ToolName)
+					if part.ToolCallPart != nil && part.ToolCallPart.Call.Function != nil {
+						summaries = append(summaries, "item:model:tool-call:"+part.ToolCallPart.Call.Function.Name)
 					} else if part.TextPart != nil {
 						summaries = append(summaries, "item:model:text:"+part.TextPart.Text)
 					} else {
@@ -1894,13 +1913,13 @@ func TestRunStream_StreamsToolCallExecutionAndResponse(t *testing.T) {
 		Output: []llmagent.AgentItem{
 			llmagent.NewAgentItemModelResponse(llmsdk.ModelResponse{
 				Content: []llmsdk.Part{
-					llmsdk.NewToolCallPart("call_1", "test_tool", map[string]any{"operation": "add", "a": 1, "b": 2}),
+					llmsdk.NewToolCallPart("call_1", "test_tool", json.RawMessage(`{"operation": "add", "a": 1, "b": 2}`)),
 				},
 			}),
 			llmagent.NewAgentItemTool(
 				"call_1",
 				"test_tool",
-				json.RawMessage(`{"a":1,"b":2,"operation":"add"}`),
+				json.RawMessage(`{"operation": "add", "a": 1, "b": 2}`),
 				[]llmsdk.Part{llmsdk.NewTextPart("Tool result")},
 				llmsdk.ToolResultStatusCompleted,
 			),
@@ -2127,10 +2146,14 @@ func TestRunStream_RecordsCancelledResultsForMaterializedToolCalls(t *testing.T)
 		t.Fatalf("expected cancelled tool item, got error %v", stream.Err())
 	}
 	toolCall := mixedSnapshotModelResponse().Content[1].ToolCallPart
+	functionCall := toolCall.Call.Function
+	if functionCall == nil {
+		t.Fatal("expected function tool call")
+	}
 	expectedToolItem := llmagent.NewAgentItemTool(
 		toolCall.ToolCallID,
-		toolCall.ToolName,
-		toolCall.Args,
+		functionCall.Name,
+		functionCall.Args,
 		[]llmsdk.Part{},
 		llmsdk.ToolResultStatusCancelled,
 	)

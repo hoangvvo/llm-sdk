@@ -1319,17 +1319,15 @@ class SchemaDocumentBuilder {
         name: ownerTypeName,
         description: schema.description,
         discriminator: undefined,
-        untaggedDeserializeStrategy: this.requiresCustomUntaggedDeserializer(
-          schema,
-          path,
+        untaggedDeserializeStrategy: this.customUntaggedDeserializers.has(
           ownerTypeName,
         )
-          ? this.customUntaggedDeserializers.has(ownerTypeName)
-            ? "custom"
-            : fail(
+          ? "custom"
+          : this.requiresCustomUntaggedDeserializer(schema, path, ownerTypeName)
+            ? fail(
                 `Untagged union ${ownerTypeName} requires a custom deserializer override`,
               )
-          : "derive",
+            : "derive",
         variants,
       },
     ];

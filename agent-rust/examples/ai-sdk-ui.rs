@@ -565,7 +565,9 @@ impl DataStreamProtocolAdapter {
             PartDelta::ToolCall(tool_delta) => {
                 self.write_for_tool_call_part(delta.index, tool_delta)
             }
-            PartDelta::Audio(_) | PartDelta::Image(_) => self.flush_states(),
+            PartDelta::Audio(_) | PartDelta::Image(_) | PartDelta::ToolResult(_) => {
+                self.flush_states()
+            }
         }
     }
 
@@ -616,6 +618,9 @@ impl DataStreamProtocolAdapter {
         index: usize,
         part: &llm_sdk::ToolCallPartDelta,
     ) -> Vec<UIMessageChunk> {
+        let llm_sdk::ToolCallDelta::Function(call) = &part.call else {
+            return Vec::new();
+        };
         let mut events = Vec::new();
         if !self.tool_call_state.contains_key(&index) {
             events.extend(self.flush_states());
@@ -627,7 +632,7 @@ impl DataStreamProtocolAdapter {
         if let Some(tool_call_id) = &part.tool_call_id {
             state.tool_call_id = Some(tool_call_id.clone());
         }
-        if let Some(tool_name) = &part.tool_name {
+        if let Some(tool_name) = &call.name {
             state.tool_name = Some(tool_name.clone());
         }
 
@@ -641,7 +646,7 @@ impl DataStreamProtocolAdapter {
             }
         }
 
-        if let Some(args_chunk) = &part.args {
+        if let Some(args_chunk) = &call.args {
             state.args_buffer.push_str(args_chunk);
             if let Some(tool_call_id) = &state.tool_call_id {
                 events.push(UIMessageChunk::ToolInputDelta {

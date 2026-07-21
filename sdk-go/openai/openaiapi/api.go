@@ -1715,7 +1715,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 	*u = OutputItem{}
 	switch value := raw.(type) {
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; (!ok || rawType == "tool_search_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["execution"] != nil && value["arguments"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "tool_search_call" {
 			var v ToolSearchCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1723,7 +1723,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.ToolSearchCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "tool_search_output") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["execution"] != nil && value["tools"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "tool_search_output" {
 			var v ToolSearchOutput
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1731,7 +1731,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.ToolSearchOutput = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "code_interpreter_call") && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["container_id"] != nil && value["code"] != nil && value["outputs"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "code_interpreter_call" {
 			var v CodeInterpreterToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1739,7 +1739,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.CodeInterpreterToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "shell_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["action"] != nil && value["status"] != nil && value["environment"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "shell_call" {
 			var v FunctionShellCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1747,7 +1747,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.FunctionShellCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "shell_call_output") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["status"] != nil && value["output"] != nil && value["max_output_length"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "shell_call_output" {
 			var v FunctionShellCallOutput
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1763,7 +1763,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.OutputMessage = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "function_call_output") && value["type"] != nil && value["call_id"] != nil && value["output"] != nil && value["id"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "function_call_output" {
 			var v FunctionToolCallOutputResource
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1771,7 +1771,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.FunctionToolCallOutputResource = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "computer_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["pending_safety_checks"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "computer_call" {
 			var v ComputerToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1779,7 +1779,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.ComputerToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "computer_call_output") && value["type"] != nil && value["call_id"] != nil && value["output"] != nil && value["id"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "computer_call_output" {
 			var v ComputerToolCallOutputResource
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1787,7 +1787,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.ComputerToolCallOutputResource = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "local_shell_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["action"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "local_shell_call" {
 			var v LocalShellToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1795,7 +1795,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.LocalShellToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["status"] != nil && value["operation"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "apply_patch_call" {
 			var v ApplyPatchToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1803,7 +1803,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.ApplyPatchToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "mcp_call") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "mcp_call" {
 			var v MCPToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1811,7 +1811,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.MCPToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "mcp_approval_request") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "mcp_approval_request" {
 			var v MCPApprovalRequest
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1819,7 +1819,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.MCPApprovalRequest = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "mcp_approval_response") && value["type"] != nil && value["id"] != nil && value["request_id"] != nil && value["approve"] != nil && value["approval_request_id"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "mcp_approval_response" {
 			var v MCPApprovalResponseResource
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1827,7 +1827,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.MCPApprovalResponseResource = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "custom_tool_call_output") && value["type"] != nil && value["call_id"] != nil && value["output"] != nil && value["id"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "custom_tool_call_output" {
 			var v CustomToolCallOutputResource
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1835,7 +1835,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.CustomToolCallOutputResource = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "file_search_call") && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["queries"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "file_search_call" {
 			var v FileSearchToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1843,7 +1843,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.FileSearchToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "function_call") && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "function_call" {
 			var v FunctionToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1851,7 +1851,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.FunctionToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "web_search_call") && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["action"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "web_search_call" {
 			var v WebSearchToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1859,7 +1859,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.WebSearchToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "image_generation_call") && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["result"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "image_generation_call" {
 			var v ImageGenToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1867,7 +1867,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.ImageGenToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "local_shell_call_output") && value["id"] != nil && value["type"] != nil && value["call_id"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "local_shell_call_output" {
 			var v LocalShellToolCallOutput
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1875,7 +1875,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.LocalShellToolCallOutput = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch_call_output") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "apply_patch_call_output" {
 			var v ApplyPatchToolCallOutput
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1883,7 +1883,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.ApplyPatchToolCallOutput = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "mcp_list_tools") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["tools"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "mcp_list_tools" {
 			var v MCPListTools
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1891,7 +1891,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.MCPListTools = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "custom_tool_call") && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["input"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "custom_tool_call" {
 			var v CustomToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1899,7 +1899,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.CustomToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "reasoning") && value["id"] != nil && value["summary"] != nil && value["type"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "reasoning" {
 			var v ReasoningItem
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -1907,7 +1907,7 @@ func (u *OutputItem) UnmarshalJSON(data []byte) error {
 			u.ReasoningItem = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "compaction") && value["type"] != nil && value["id"] != nil && value["encrypted_content"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "compaction" {
 			var v CompactionBody
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3142,7 +3142,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 	*u = Item{}
 	switch value := raw.(type) {
 	case map[string]interface{}:
-		if rawType, ok := value["type"]; (!ok || rawType == "code_interpreter_call") && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["container_id"] != nil && value["code"] != nil && value["outputs"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "code_interpreter_call" {
 			var v CodeInterpreterToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3158,7 +3158,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.OutputMessage = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "computer_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["pending_safety_checks"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "computer_call" {
 			var v ComputerToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3166,7 +3166,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ComputerToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "local_shell_call") && value["type"] != nil && value["id"] != nil && value["call_id"] != nil && value["action"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "local_shell_call" {
 			var v LocalShellToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3174,7 +3174,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.LocalShellToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "mcp_approval_request") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "mcp_approval_request" {
 			var v MCPApprovalRequest
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3182,7 +3182,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.MCPApprovalRequest = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "mcp_call") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "mcp_call" {
 			var v MCPToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3190,7 +3190,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.MCPToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "file_search_call") && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["queries"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "file_search_call" {
 			var v FileSearchToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3198,7 +3198,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FileSearchToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "web_search_call") && value["id"] != nil && value["type"] != nil && value["status"] != nil && value["action"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "web_search_call" {
 			var v WebSearchToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3206,7 +3206,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.WebSearchToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "function_call") && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "function_call" {
 			var v FunctionToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3214,7 +3214,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FunctionToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "image_generation_call") && value["type"] != nil && value["id"] != nil && value["status"] != nil && value["result"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "image_generation_call" {
 			var v ImageGenToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3222,7 +3222,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ImageGenToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "local_shell_call_output") && value["id"] != nil && value["type"] != nil && value["call_id"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "local_shell_call_output" {
 			var v LocalShellToolCallOutput
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3230,7 +3230,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.LocalShellToolCallOutput = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch_call") && value["type"] != nil && value["call_id"] != nil && value["status"] != nil && value["operation"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "apply_patch_call" {
 			var v ApplyPatchToolCallItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3238,7 +3238,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ApplyPatchToolCallItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "mcp_list_tools") && value["type"] != nil && value["id"] != nil && value["server_label"] != nil && value["tools"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "mcp_list_tools" {
 			var v MCPListTools
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3246,7 +3246,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.MCPListTools = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "mcp_approval_response") && value["type"] != nil && value["request_id"] != nil && value["approve"] != nil && value["approval_request_id"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "mcp_approval_response" {
 			var v MCPApprovalResponse
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3254,7 +3254,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.MCPApprovalResponse = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "custom_tool_call") && value["type"] != nil && value["call_id"] != nil && value["name"] != nil && value["input"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "custom_tool_call" {
 			var v CustomToolCall
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3262,7 +3262,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.CustomToolCall = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "computer_call_output") && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "computer_call_output" {
 			var v ComputerCallOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3270,7 +3270,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ComputerCallOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "function_call_output") && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "function_call_output" {
 			var v FunctionCallOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3278,7 +3278,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FunctionCallOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "reasoning") && value["id"] != nil && value["summary"] != nil && value["type"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "reasoning" {
 			var v ReasoningItem
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3286,7 +3286,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ReasoningItem = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "shell_call") && value["call_id"] != nil && value["type"] != nil && value["action"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "shell_call" {
 			var v FunctionShellCallItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3294,7 +3294,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FunctionShellCallItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "shell_call_output") && value["call_id"] != nil && value["type"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "shell_call_output" {
 			var v FunctionShellCallOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3302,7 +3302,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.FunctionShellCallOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "apply_patch_call_output") && value["type"] != nil && value["call_id"] != nil && value["status"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "apply_patch_call_output" {
 			var v ApplyPatchToolCallOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3310,7 +3310,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ApplyPatchToolCallOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "custom_tool_call_output") && value["type"] != nil && value["call_id"] != nil && value["output"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "custom_tool_call_output" {
 			var v CustomToolCallOutput
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3318,7 +3318,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.CustomToolCallOutput = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "message") && value["role"] != nil && value["content"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "message" {
 			var v InputMessage
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3326,7 +3326,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.InputMessage = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "tool_search_call") && value["type"] != nil && value["arguments"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "tool_search_call" {
 			var v ToolSearchCallItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3334,7 +3334,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ToolSearchCallItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "tool_search_output") && value["type"] != nil && value["tools"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "tool_search_output" {
 			var v ToolSearchOutputItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil
@@ -3342,7 +3342,7 @@ func (u *Item) UnmarshalJSON(data []byte) error {
 			u.ToolSearchOutputItemParam = &v
 			return nil
 		}
-		if rawType, ok := value["type"]; (!ok || rawType == "compaction") && value["type"] != nil && value["encrypted_content"] != nil {
+		if rawType, ok := value["type"]; ok && rawType == "compaction" {
 			var v CompactionSummaryItemParam
 			if err := json.Unmarshal(data, &v); err != nil {
 				return nil

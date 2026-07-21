@@ -101,10 +101,12 @@ do {
   let toolMessage: ToolMessage | undefined;
 
   for (const toolCallPart of toolCallParts) {
-    const { tool_call_id, tool_name, args } = toolCallPart;
+    if (toolCallPart.call.type !== "function") continue;
+    const { tool_call_id, call } = toolCallPart;
+    const { name: toolName, args } = call;
 
     let toolResult;
-    switch (tool_name) {
+    switch (toolName) {
       case "trade": {
         toolResult = trade(
           args as {
@@ -116,7 +118,7 @@ do {
         break;
       }
       default:
-        throw new Error(`Tool ${tool_name} not found`);
+        throw new Error(`Tool ${toolName} not found`);
     }
 
     toolMessage = toolMessage ?? {
@@ -127,14 +129,17 @@ do {
     toolMessage.content.push({
       type: "tool-result",
       status: "completed",
-      tool_name,
       tool_call_id,
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(toolResult),
-        },
-      ],
+      result: {
+        type: "function",
+        name: toolName,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(toolResult),
+          },
+        ],
+      },
     });
   }
 

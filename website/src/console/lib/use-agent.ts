@@ -592,19 +592,38 @@ function reduceContentDelta(
           ? (next[index] as ToolCallPart)
           : {
               type: "tool-call",
-              tool_name: part.tool_name ?? "unknown",
-              args: {},
+              call:
+                part.call.type === "function"
+                  ? {
+                      type: "function",
+                      name: part.call.name ?? "unknown",
+                      args: {},
+                    }
+                  : { ...part.call },
               tool_call_id: part.tool_call_id ?? "",
             };
+      const call =
+        previousToolCall.call.type === "function" &&
+        part.call.type === "function"
+          ? {
+              type: "function" as const,
+              name: part.call.name ?? previousToolCall.call.name,
+              args: {},
+            }
+          : part.call.type === "web_search"
+            ? { ...previousToolCall.call, ...part.call }
+            : previousToolCall.call;
       next[index] = {
         ...previousToolCall,
-        tool_name: part.tool_name ?? previousToolCall.tool_name,
-        args: {},
+        call,
         tool_call_id: part.tool_call_id ?? previousToolCall.tool_call_id,
         id: part.id ?? previousToolCall.id,
       } satisfies ToolCallPart;
       break;
     }
+    case "tool-result":
+      next[index] = part;
+      break;
     default:
       return next;
   }

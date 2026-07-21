@@ -1,5 +1,5 @@
 {
-  "customUntaggedDeserializers": ["Item"],
+  "customUntaggedDeserializers": ["Item", "OutputItem"],
   "optionalProperties": {
     "InputImageContent": ["detail"]
   },

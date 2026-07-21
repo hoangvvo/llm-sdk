@@ -58,15 +58,21 @@ function createMixedSnapshotPartials(): PartialModelResponse[] {
         part: {
           type: "tool-call",
           tool_call_id: "call_1",
-          tool_name: "weather",
-          args: '{"city":"Paris"}',
+          call: {
+            type: "function",
+            name: "weather",
+            args: '{"city":"Paris"}',
+          },
         },
       },
     },
     {
       delta: {
         index: 2,
-        part: { type: "tool-call", args: "{incomplete" },
+        part: {
+          type: "tool-call",
+          call: { type: "function", args: "{incomplete" },
+        },
       },
     },
   ];
@@ -80,8 +86,11 @@ function createMixedSnapshotModelItem() {
       {
         type: "tool-call" as const,
         tool_call_id: "call_1",
-        tool_name: "weather",
-        args: { city: "Paris" },
+        call: {
+          type: "function" as const,
+          name: "weather",
+          args: { city: "Paris" },
+        },
       },
     ],
   };
@@ -175,14 +184,12 @@ suite("RunSession#run", () => {
           {
             type: "tool-call",
             tool_call_id: "duplicate",
-            tool_name: "first",
-            args: {},
+            call: { type: "function", name: "first", args: {} },
           },
           {
             type: "tool-call",
             tool_call_id: "duplicate",
-            tool_name: "second",
-            args: {},
+            call: { type: "function", name: "second", args: {} },
           },
         ],
       },
@@ -229,8 +236,7 @@ suite("RunSession#run", () => {
             {
               type: "tool-call",
               tool_call_id: "call_1",
-              tool_name: "inspect_state",
-              args: {},
+              call: { type: "function", name: "inspect_state", args: {} },
             },
           ],
         },
@@ -275,6 +281,48 @@ suite("RunSession#run", () => {
     ]);
   });
 
+  test("does not execute provider-hosted web-search calls", async (t: TestContext) => {
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult({
+      response: {
+        content: [
+          {
+            type: "tool-call",
+            tool_call_id: "ws_1",
+            call: {
+              type: "web_search",
+              status: "completed",
+              action: { type: "search", queries: ["docs"] },
+            },
+          },
+          {
+            type: "tool-result",
+            tool_call_id: "ws_1",
+            result: { type: "web_search", sources: [] },
+            status: "completed",
+          },
+          { type: "text", text: "done" },
+        ],
+      },
+    });
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+    });
+
+    const response = await session.run({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Search" }],
+        },
+      ],
+    });
+    t.assert.strictEqual(response.content.at(-1)?.type, "text");
+  });
+
   test("records cancelled tool results for the next run", async (t: TestContext) => {
     const model = new MockLanguageModel();
     model.enqueueGenerateResult({
@@ -283,14 +331,12 @@ suite("RunSession#run", () => {
           {
             type: "tool-call",
             tool_call_id: "call_1",
-            tool_name: "wait",
-            args: {},
+            call: { type: "function", name: "wait", args: {} },
           },
           {
             type: "tool-call",
             tool_call_id: "call_2",
-            tool_name: "wait",
-            args: {},
+            call: { type: "function", name: "wait", args: {} },
           },
         ],
       },
@@ -364,7 +410,8 @@ suite("RunSession#run", () => {
     for (const part of toolMessage.content) {
       if (part.type !== "tool-result") t.assert.fail("Expected a tool result");
       t.assert.strictEqual(part.status, "cancelled");
-      t.assert.deepStrictEqual(part.content, []);
+      t.assert.strictEqual(part.result.type, "function");
+      t.assert.deepStrictEqual(part.result.content, []);
     }
   });
 
@@ -376,14 +423,12 @@ suite("RunSession#run", () => {
           {
             type: "tool-call",
             tool_call_id: "call_1",
-            tool_name: "first",
-            args: {},
+            call: { type: "function", name: "first", args: {} },
           },
           {
             type: "tool-call",
             tool_call_id: "call_2",
-            tool_name: "second",
-            args: {},
+            call: { type: "function", name: "second", args: {} },
           },
         ],
       },
@@ -521,9 +566,12 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "test_tool",
+            call: {
+              type: "function",
+              name: "test_tool",
+              args: { param: "value" },
+            },
             tool_call_id: "call_1",
-            args: { param: "value" },
           },
         ],
         usage: {
@@ -576,9 +624,12 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "test_tool",
+              call: {
+                type: "function",
+                name: "test_tool",
+                args: { param: "value" },
+              },
               tool_call_id: "call_1",
-              args: { param: "value" },
             },
           ],
           usage: {
@@ -659,15 +710,21 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "tool_1",
+            call: {
+              type: "function",
+              name: "tool_1",
+              args: { param: "value1" },
+            },
             tool_call_id: "call_1",
-            args: { param: "value1" },
           },
           {
             type: "tool-call",
-            tool_name: "tool_2",
+            call: {
+              type: "function",
+              name: "tool_2",
+              args: { param: "value2" },
+            },
             tool_call_id: "call_2",
-            args: { param: "value2" },
           },
         ],
         usage: {
@@ -725,15 +782,21 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "tool_1",
+              call: {
+                type: "function",
+                name: "tool_1",
+                args: { param: "value1" },
+              },
               tool_call_id: "call_1",
-              args: { param: "value1" },
             },
             {
               type: "tool-call",
-              tool_name: "tool_2",
+              call: {
+                type: "function",
+                name: "tool_2",
+                args: { param: "value2" },
+              },
               tool_call_id: "call_2",
-              args: { param: "value2" },
             },
           ],
           usage: {
@@ -802,9 +865,12 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "calculator",
+            call: {
+              type: "function",
+              name: "calculator",
+              args: { operation: "add", a: 1, b: 2 },
+            },
             tool_call_id: "call_1",
-            args: { operation: "add", a: 1, b: 2 },
           },
         ],
       },
@@ -814,9 +880,12 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "calculator",
+            call: {
+              type: "function",
+              name: "calculator",
+              args: { operation: "multiply", a: 3, b: 4 },
+            },
             tool_call_id: "call_2",
-            args: { operation: "multiply", a: 3, b: 4 },
           },
         ],
       },
@@ -864,9 +933,12 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "calculator",
+              call: {
+                type: "function",
+                name: "calculator",
+                args: { operation: "add", a: 1, b: 2 },
+              },
               tool_call_id: "call_1",
-              args: { operation: "add", a: 1, b: 2 },
             },
           ],
         },
@@ -883,9 +955,12 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "calculator",
+              call: {
+                type: "function",
+                name: "calculator",
+                args: { operation: "multiply", a: 3, b: 4 },
+              },
               tool_call_id: "call_2",
-              args: { operation: "multiply", a: 3, b: 4 },
             },
           ],
         },
@@ -921,9 +996,8 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "test_tool",
+            call: { type: "function", name: "test_tool", args: {} },
             tool_call_id: "call_1",
-            args: {},
           },
         ],
       },
@@ -933,9 +1007,8 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "test_tool",
+            call: { type: "function", name: "test_tool", args: {} },
             tool_call_id: "call_2",
-            args: {},
           },
         ],
       },
@@ -945,9 +1018,8 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "test_tool",
+            call: { type: "function", name: "test_tool", args: {} },
             tool_call_id: "call_3",
-            args: {},
           },
         ],
       },
@@ -990,9 +1062,8 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "non_existent_tool",
+            call: { type: "function", name: "non_existent_tool", args: {} },
             tool_call_id: "call_1",
-            args: {},
           },
         ],
       },
@@ -1041,9 +1112,8 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "failing_tool",
+            call: { type: "function", name: "failing_tool", args: {} },
             tool_call_id: "call_1",
-            args: {},
           },
         ],
       },
@@ -1117,15 +1187,21 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "resume_tool",
+              call: {
+                type: "function",
+                name: "resume_tool",
+                args: { step: 1 },
+              },
               tool_call_id: "call_1",
-              args: { step: 1 },
             },
             {
               type: "tool-call",
-              tool_name: "resume_tool",
+              call: {
+                type: "function",
+                name: "resume_tool",
+                args: { step: 2 },
+              },
               tool_call_id: "call_2",
-              args: { step: 2 },
             },
           ],
         },
@@ -1135,9 +1211,12 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-result",
-              tool_name: "resume_tool",
+              result: {
+                type: "function",
+                name: "resume_tool",
+                content: [{ type: "text", text: "already done" }],
+              },
               tool_call_id: "call_1",
-              content: [{ type: "text", text: "already done" }],
               status: "completed",
             },
           ],
@@ -1208,15 +1287,21 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "resume_tool",
+              call: {
+                type: "function",
+                name: "resume_tool",
+                args: { stage: 1 },
+              },
               tool_call_id: "call_1",
-              args: { stage: 1 },
             },
             {
               type: "tool-call",
-              tool_name: "resume_tool",
+              call: {
+                type: "function",
+                name: "resume_tool",
+                args: { stage: 2 },
+              },
               tool_call_id: "call_2",
-              args: { stage: 2 },
             },
           ],
         },
@@ -1289,9 +1374,12 @@ suite("RunSession#run", () => {
               content: [
                 {
                   type: "tool-result",
-                  tool_name: "resume_tool",
+                  result: {
+                    type: "function",
+                    name: "resume_tool",
+                    content: [{ type: "text", text: "orphan" }],
+                  },
                   tool_call_id: "call_1",
-                  content: [{ type: "text", text: "orphan" }],
                   status: "completed",
                 },
               ],
@@ -1327,9 +1415,12 @@ suite("RunSession#run", () => {
         content: [
           {
             type: "tool-call",
-            tool_name: "test_tool",
+            call: {
+              type: "function",
+              name: "test_tool",
+              args: { invalid: true },
+            },
             tool_call_id: "call_1",
-            args: { invalid: true },
           },
         ],
       },
@@ -1371,9 +1462,12 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "test_tool",
+              call: {
+                type: "function",
+                name: "test_tool",
+                args: { invalid: true },
+              },
               tool_call_id: "call_1",
-              args: { invalid: true },
             },
           ],
         },
@@ -1590,9 +1684,12 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "lookup-order",
+              call: {
+                type: "function",
+                name: "lookup-order",
+                args: { orderId: "123" },
+              },
               tool_call_id: "call-1",
-              args: { orderId: "123" },
             },
           ],
         },
@@ -1713,9 +1810,12 @@ suite("RunSession#run", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "lookup-order",
+              call: {
+                type: "function",
+                name: "lookup-order",
+                args: { orderId: "123" },
+              },
               tool_call_id: "call-1",
-              args: { orderId: "123" },
             },
           ],
         },
@@ -1901,9 +2001,12 @@ suite("RunSession#runStream", () => {
       partials: [
         createPartialResponse({
           type: "tool-call",
-          tool_name: "test_tool",
+          call: {
+            type: "function",
+            name: "test_tool",
+            args: JSON.stringify({ a: 1, b: 2, operation: "add" }),
+          },
           tool_call_id: "call_1",
-          args: JSON.stringify({ a: 1, b: 2, operation: "add" }),
         }),
       ],
     });
@@ -1952,9 +2055,12 @@ suite("RunSession#runStream", () => {
           index: 0,
           part: {
             type: "tool-call",
-            tool_name: "test_tool",
+            call: {
+              type: "function",
+              name: "test_tool",
+              args: JSON.stringify({ a: 1, b: 2, operation: "add" }),
+            },
             tool_call_id: "call_1",
-            args: JSON.stringify({ a: 1, b: 2, operation: "add" }),
           },
         },
         { index: 0, part: { type: "text", text: "Final" } },
@@ -1971,9 +2077,12 @@ suite("RunSession#runStream", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "test_tool",
+              call: {
+                type: "function",
+                name: "test_tool",
+                args: { a: 1, b: 2, operation: "add" },
+              },
               tool_call_id: "call_1",
-              args: { a: 1, b: 2, operation: "add" },
             },
           ],
         },
@@ -2013,9 +2122,12 @@ suite("RunSession#runStream", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "test_tool",
+              call: {
+                type: "function",
+                name: "test_tool",
+                args: { a: 1, b: 2, operation: "add" },
+              },
               tool_call_id: "call_1",
-              args: { a: 1, b: 2, operation: "add" },
             },
           ],
         },
@@ -2056,9 +2168,12 @@ suite("RunSession#runStream", () => {
       partials: [
         createPartialResponse({
           type: "tool-call",
-          tool_name: "calculator",
+          call: {
+            type: "function",
+            name: "calculator",
+            args: JSON.stringify({ a: 1, b: 2 }),
+          },
           tool_call_id: "call_1",
-          args: JSON.stringify({ a: 1, b: 2 }),
         }),
       ],
     });
@@ -2066,9 +2181,12 @@ suite("RunSession#runStream", () => {
       partials: [
         createPartialResponse({
           type: "tool-call",
-          tool_name: "calculator",
+          call: {
+            type: "function",
+            name: "calculator",
+            args: JSON.stringify({ a: 3, b: 4 }),
+          },
           tool_call_id: "call_2",
-          args: JSON.stringify({ a: 3, b: 4 }),
         }),
       ],
     });
@@ -2125,9 +2243,12 @@ suite("RunSession#runStream", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "calculator",
+              call: {
+                type: "function",
+                name: "calculator",
+                args: { a: 1, b: 2 },
+              },
               tool_call_id: "call_1",
-              args: { a: 1, b: 2 },
             },
           ],
         },
@@ -2152,9 +2273,12 @@ suite("RunSession#runStream", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "calculator",
+              call: {
+                type: "function",
+                name: "calculator",
+                args: { a: 3, b: 4 },
+              },
               tool_call_id: "call_2",
-              args: { a: 3, b: 4 },
             },
           ],
         },
@@ -2201,9 +2325,12 @@ suite("RunSession#runStream", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "calculator",
+              call: {
+                type: "function",
+                name: "calculator",
+                args: { a: 1, b: 2 },
+              },
               tool_call_id: "call_1",
-              args: { a: 1, b: 2 },
             },
           ],
         },
@@ -2220,9 +2347,12 @@ suite("RunSession#runStream", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "calculator",
+              call: {
+                type: "function",
+                name: "calculator",
+                args: { a: 3, b: 4 },
+              },
               tool_call_id: "call_2",
-              args: { a: 3, b: 4 },
             },
           ],
         },
@@ -2255,9 +2385,8 @@ suite("RunSession#runStream", () => {
       partials: [
         createPartialResponse({
           type: "tool-call",
-          tool_name: "test_tool",
+          call: { type: "function", name: "test_tool", args: "{}" },
           tool_call_id: "call_1",
-          args: "{}",
         }),
       ],
     });
@@ -2265,9 +2394,8 @@ suite("RunSession#runStream", () => {
       partials: [
         createPartialResponse({
           type: "tool-call",
-          tool_name: "test_tool",
+          call: { type: "function", name: "test_tool", args: "{}" },
           tool_call_id: "call_2",
-          args: "{}",
         }),
       ],
     });
@@ -2275,9 +2403,8 @@ suite("RunSession#runStream", () => {
       partials: [
         createPartialResponse({
           type: "tool-call",
-          tool_name: "test_tool",
+          call: { type: "function", name: "test_tool", args: "{}" },
           tool_call_id: "call_3",
-          args: "{}",
         }),
       ],
     });

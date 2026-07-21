@@ -595,9 +595,12 @@ fn convert_tool_message(
     for part in tool_message.content {
         match part {
             Part::ToolResult(tool_result_part) => {
+                let crate::ToolResult::Function(function_result) = tool_result_part.result else {
+                    continue;
+                };
                 let mut content_parts = Vec::new();
                 let converted_parts = source_part_utils::get_compatible_parts_without_source_parts(
-                    tool_result_part.content,
+                    function_result.content,
                 );
                 if converted_parts.is_empty() {
                     result.push(ChatCompletionRequestToolMessage {
@@ -679,13 +682,19 @@ fn convert_to_openai_tool_call(
 ) -> LanguageModelResult<ChatCompletionMessageToolCall> {
     let ToolCallPart {
         tool_call_id,
-        tool_name,
-        args,
+        call,
         signature: _,
         id,
     } = part;
 
-    let arguments = serde_json::to_string(&args).map_err(|error| {
+    let crate::ToolCall::Function(call) = call else {
+        return Err(LanguageModelError::Unsupported(
+            PROVIDER,
+            "OpenAI Chat Completions does not support hosted web-search calls".to_string(),
+        ));
+    };
+
+    let arguments = serde_json::to_string(&call.args).map_err(|error| {
         LanguageModelError::InvalidInput(format!(
             "Failed to serialize tool call arguments: {error}"
         ))
@@ -694,7 +703,7 @@ fn convert_to_openai_tool_call(
     Ok(ChatCompletionMessageToolCall {
         function: chat_api::ChatCompletionMessageToolCallFunction {
             arguments,
-            name: tool_name,
+            name: call.name,
         },
         id: id.unwrap_or(tool_call_id),
     })
@@ -913,8 +922,10 @@ fn map_openai_function_tool_call(
 
     Ok(ToolCallPart {
         tool_call_id: tool_call.id,
-        tool_name: tool_call.function.name,
-        args,
+        call: crate::ToolCall::Function(crate::FunctionToolCall {
+            name: tool_call.function.name,
+            args,
+        }),
         signature: None,
         id: None,
     })
@@ -971,18 +982,19 @@ fn map_openai_delta(
         for tool_call in tool_calls {
             let mut part = crate::ToolCallPartDelta {
                 tool_call_id: tool_call.id,
-                tool_name: None,
-                args: None,
+                call: crate::ToolCallDelta::Function(crate::FunctionToolCallDelta::default()),
                 signature: None,
                 id: None,
             };
 
             if let Some(function) = tool_call.function {
-                if part.tool_name.is_none() {
-                    part.tool_name = function.name;
-                }
-                if part.args.is_none() {
-                    part.args = function.arguments;
+                if let crate::ToolCallDelta::Function(call) = &mut part.call {
+                    if call.name.is_none() {
+                        call.name = function.name;
+                    }
+                    if call.args.is_none() {
+                        call.args = function.arguments;
+                    }
                 }
             }
 

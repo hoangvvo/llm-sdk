@@ -173,6 +173,8 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 			defer sseStream.Close()
 
 			refusal := ""
+			normalizedOutputIndexes := map[int]int{}
+			nextContentIndex := 0
 
 			for sseStream.Next() {
 				streamEvent, err := sseStream.Current()
@@ -195,7 +197,20 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 				}
 
 				if partDelta != nil {
+					providerOutputIndex := partDelta.Index
+					normalizedOutputIndex, ok := normalizedOutputIndexes[providerOutputIndex]
+					if !ok {
+						normalizedOutputIndex = nextContentIndex
+						nextContentIndex++
+						normalizedOutputIndexes[providerOutputIndex] = normalizedOutputIndex
+					}
+					partDelta.Index = normalizedOutputIndex
 					responseCh <- &llmsdk.PartialModelResponse{Delta: partDelta}
+				}
+
+				if resultDelta := mapOpenAIStreamWebSearchResult(*streamEvent, nextContentIndex); resultDelta != nil {
+					nextContentIndex++
+					responseCh <- &llmsdk.PartialModelResponse{Delta: resultDelta}
 				}
 
 				if streamEvent.ResponseCompleted != nil {
@@ -248,8 +263,10 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 
 	if input.Tools != nil {
 		tools := openaiapi.ToolsArray{}
+		hasWebSearchTool := false
 		for _, tool := range input.Tools {
 			if tool.WebSearchTool != nil {
+				hasWebSearchTool = true
 				webSearch := tool.WebSearchTool
 				openAIWebSearch := &openaiapi.WebSearchTool{
 					Type: openaiapi.WebSearchToolTypeWebSearch,
@@ -284,6 +301,9 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 			tools = append(tools, openAITool)
 		}
 		params.Tools = &tools
+		if hasWebSearchTool {
+			params.Include = append(params.Include, openaiapi.IncludeEnumWebSearchCallActionSources)
+		}
 	}
 
 	if input.ToolChoice != nil {
@@ -309,9 +329,9 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 	}
 
 	if input.Reasoning != nil {
-		params.Include = []openaiapi.IncludeEnum{
+		params.Include = append(params.Include,
 			openaiapi.IncludeEnumReasoningEncryptedContent,
-		}
+		)
 		params.Reasoning, err = convertToOpenAIReasoning(*input.Reasoning)
 		if err != nil {
 			return nil, err
@@ -442,13 +462,33 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 			})
 
 		case part.ToolCallPart != nil:
-			args, _ := json.Marshal(part.ToolCallPart.Args)
+			if part.ToolCallPart.Call.WebSearch != nil {
+				web := part.ToolCallPart.Call.WebSearch
+				if web.Action == nil {
+					return nil, llmsdk.NewInvalidInputError("OpenAI web-search history requires an action")
+				}
+				status := openaiapi.WebSearchToolCallStatusCompleted
+				if web.Status != nil {
+					status = openaiapi.WebSearchToolCallStatus(*web.Status)
+				}
+				inputItems = append(inputItems, openaiapi.InputItem{Item: &openaiapi.Item{WebSearchToolCall: &openaiapi.WebSearchToolCall{
+					Id: part.ToolCallPart.ToolCallID, Status: status,
+					Type:   openaiapi.WebSearchToolCallTypeWebSearchCall,
+					Action: convertToOpenAIWebSearchAction(*web.Action),
+				}}})
+				continue
+			}
+			call := part.ToolCallPart.Call.Function
+			if call == nil {
+				return nil, llmsdk.NewUnsupportedError(Provider, "tool call has no supported payload")
+			}
+			args, _ := json.Marshal(call.Args)
 			inputItems = append(inputItems, openaiapi.InputItem{
 				Item: &openaiapi.Item{
 					FunctionToolCall: &openaiapi.FunctionToolCall{
 						Arguments: string(args),
 						CallId:    part.ToolCallPart.ToolCallID,
-						Name:      part.ToolCallPart.ToolName,
+						Name:      call.Name,
 						Id:        part.ToolCallPart.ID,
 						Type:      openaiapi.FunctionToolCallTypeFunctionCall,
 					},
@@ -469,8 +509,15 @@ func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]op
 		if part.ToolResultPart == nil {
 			return nil, fmt.Errorf("tool messages must contain only tool result parts")
 		}
+		if part.ToolResultPart.Result.WebSearch != nil {
+			continue
+		}
+		result := part.ToolResultPart.Result.Function
+		if result == nil {
+			return nil, llmsdk.NewUnsupportedError(Provider, "tool result has no supported payload")
+		}
 
-		toolResultPartContent := partutil.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
+		toolResultPartContent := partutil.GetCompatiblePartsWithoutSourceParts(result.Content)
 		if len(toolResultPartContent) == 0 {
 			content := ""
 			if part.ToolResultPart.Status == llmsdk.ToolResultStatusCancelled {
@@ -645,7 +692,7 @@ func convertToOpenAIReasoning(reasoning llmsdk.ReasoningOptions) (*openaiapi.Rea
 // MARK: - To SDK Message
 
 func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
-	var parts []llmsdk.Part
+	parts := make([]llmsdk.Part, 0, len(items))
 
 	for _, item := range items {
 		switch {
@@ -678,6 +725,27 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 			)
 			toolCallPart.ToolCallPart.ID = item.FunctionToolCall.Id
 			parts = append(parts, toolCallPart)
+
+		case item.WebSearchToolCall != nil:
+			web := item.WebSearchToolCall
+			status := llmsdk.WebSearchToolCallStatus(web.Status)
+			call := llmsdk.Part{ToolCallPart: &llmsdk.ToolCallPart{
+				ToolCallID: web.Id,
+				Call: llmsdk.ToolCall{WebSearch: &llmsdk.WebSearchToolCall{
+					Status: &status, Action: mapOpenAIWebSearchAction(web.Action),
+				}},
+			}}
+			parts = append(parts, call)
+			if web.Action.Search != nil && len(web.Action.Search.Sources) > 0 {
+				sources := make([]llmsdk.WebSearchSource, 0, len(web.Action.Search.Sources))
+				for _, source := range web.Action.Search.Sources {
+					sources = append(sources, llmsdk.WebSearchSource{URL: source.Url})
+				}
+				parts = append(parts, llmsdk.Part{ToolResultPart: &llmsdk.ToolResultPart{
+					ToolCallID: web.Id, Result: llmsdk.ToolResult{WebSearch: &llmsdk.WebSearchToolResult{Sources: sources}},
+					Status: llmsdk.ToolResultStatusCompleted,
+				}})
+			}
 
 		case item.ImageGenToolCall != nil:
 			responseOutputItemImageGenerationCall := item.ImageGenToolCall
@@ -743,13 +811,21 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 				Index: event.ResponseOutputItemAdded.OutputIndex,
 				Part: llmsdk.PartDelta{
 					ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
-						Args:       ptr.To(item.FunctionToolCall.Arguments),
-						ToolName:   ptr.To(item.FunctionToolCall.Name),
+						Call:       llmsdk.ToolCallDelta{Function: &llmsdk.FunctionToolCallDelta{Name: ptr.To(item.FunctionToolCall.Name), Args: ptr.To(item.FunctionToolCall.Arguments)}},
 						ToolCallID: ptr.To(item.FunctionToolCall.CallId),
 						ID:         item.FunctionToolCall.Id,
 					},
 				},
 			}, nil
+		}
+		if item.WebSearchToolCall != nil {
+			status := llmsdk.WebSearchToolCallStatus(item.WebSearchToolCall.Status)
+			return &llmsdk.ContentDelta{Index: event.ResponseOutputItemAdded.OutputIndex, Part: llmsdk.PartDelta{
+				ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+					ToolCallID: ptr.To(item.WebSearchToolCall.Id),
+					Call:       llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Status: &status, Action: mapOpenAIWebSearchAction(item.WebSearchToolCall.Action)}},
+				},
+			}}, nil
 		}
 
 		if item.ReasoningItem != nil {
@@ -765,6 +841,21 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 		}
 
 		return nil, nil
+
+	case event.ResponseOutputItemDone != nil:
+		item := event.ResponseOutputItemDone.Item
+		if item.WebSearchToolCall == nil {
+			return nil, nil
+		}
+		status := llmsdk.WebSearchToolCallStatus(item.WebSearchToolCall.Status)
+		return &llmsdk.ContentDelta{Index: event.ResponseOutputItemDone.OutputIndex, Part: llmsdk.PartDelta{
+			ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolCallID: ptr.To(item.WebSearchToolCall.Id),
+				Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{
+					Status: &status, Action: mapOpenAIWebSearchAction(item.WebSearchToolCall.Action),
+				}},
+			},
+		}}, nil
 
 	case event.ResponseOutputTextDelta != nil:
 		return &llmsdk.ContentDelta{
@@ -804,6 +895,13 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 			Part:  llmsdk.NewToolCallPartDelta(llmsdk.WithToolCallPartDeltaArgs(event.ResponseFunctionCallArgumentsDelta.Delta)),
 		}, nil
 
+	case event.ResponseWebSearchCallInProgress != nil:
+		return mapOpenAIWebSearchStatus(event.ResponseWebSearchCallInProgress.OutputIndex, event.ResponseWebSearchCallInProgress.ItemId, llmsdk.WebSearchToolCallStatusInProgress), nil
+	case event.ResponseWebSearchCallSearching != nil:
+		return mapOpenAIWebSearchStatus(event.ResponseWebSearchCallSearching.OutputIndex, event.ResponseWebSearchCallSearching.ItemId, llmsdk.WebSearchToolCallStatusSearching), nil
+	case event.ResponseWebSearchCallCompleted != nil:
+		return mapOpenAIWebSearchStatus(event.ResponseWebSearchCallCompleted.OutputIndex, event.ResponseWebSearchCallCompleted.ItemId, llmsdk.WebSearchToolCallStatusCompleted), nil
+
 	case event.ResponseImageGenerationCallPartialImage != nil:
 		responseImageGenCallPartialImageEvent := event.ResponseImageGenerationCallPartialImage
 		var width, height *int
@@ -837,6 +935,69 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 	default:
 		return nil, nil
 	}
+}
+
+func mapOpenAIStreamWebSearchResult(event openaiapi.ResponseStreamEvent, index int) *llmsdk.ContentDelta {
+	if event.ResponseOutputItemDone == nil || event.ResponseOutputItemDone.Item.WebSearchToolCall == nil {
+		return nil
+	}
+	web := event.ResponseOutputItemDone.Item.WebSearchToolCall
+	if web.Action.Search == nil || len(web.Action.Search.Sources) == 0 {
+		return nil
+	}
+	sources := make([]llmsdk.WebSearchSource, 0, len(web.Action.Search.Sources))
+	for _, source := range web.Action.Search.Sources {
+		sources = append(sources, llmsdk.WebSearchSource{URL: source.Url})
+	}
+	return &llmsdk.ContentDelta{Index: index, Part: llmsdk.PartDelta{
+		ToolResultPartDelta: &llmsdk.ToolResultPartDelta{
+			ToolCallID: web.Id,
+			Result: llmsdk.ToolResult{WebSearch: &llmsdk.WebSearchToolResult{
+				Sources: sources,
+			}},
+			Status: llmsdk.ToolResultStatusCompleted,
+		},
+	}}
+}
+
+func convertToOpenAIWebSearchAction(action llmsdk.WebSearchAction) openaiapi.WebSearchToolCallAction {
+	switch action.Type {
+	case "search":
+		return openaiapi.WebSearchToolCallAction{Search: &openaiapi.WebSearchActionSearch{Queries: action.Queries}}
+	case "open_page":
+		return openaiapi.WebSearchToolCallAction{OpenPage: &openaiapi.WebSearchActionOpenPage{Url: ptr.To(action.URL)}}
+	case "find_in_page":
+		return openaiapi.WebSearchToolCallAction{FindInPage: &openaiapi.WebSearchActionFind{Url: action.URL, Pattern: action.Pattern}}
+	default:
+		return openaiapi.WebSearchToolCallAction{}
+	}
+}
+
+func mapOpenAIWebSearchAction(action openaiapi.WebSearchToolCallAction) *llmsdk.WebSearchAction {
+	if action.Search != nil {
+		queries := action.Search.Queries
+		if len(queries) == 0 && action.Search.Query != "" {
+			queries = []string{action.Search.Query}
+		}
+		return &llmsdk.WebSearchAction{Type: "search", Queries: queries}
+	}
+	if action.OpenPage != nil {
+		url := ""
+		if action.OpenPage.Url != nil {
+			url = *action.OpenPage.Url
+		}
+		return &llmsdk.WebSearchAction{Type: "open_page", URL: url}
+	}
+	if action.FindInPage != nil {
+		return &llmsdk.WebSearchAction{Type: "find_in_page", URL: action.FindInPage.Url, Pattern: action.FindInPage.Pattern}
+	}
+	return nil
+}
+
+func mapOpenAIWebSearchStatus(index int, id string, status llmsdk.WebSearchToolCallStatus) *llmsdk.ContentDelta {
+	return &llmsdk.ContentDelta{Index: index, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+		ToolCallID: &id, Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Status: &status}},
+	}}}
 }
 
 func mapOpenAIURLCitation(value openaiapi.UrlCitationBody) llmsdk.Citation {

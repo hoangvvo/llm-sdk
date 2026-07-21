@@ -114,11 +114,8 @@ type SourcePart struct {
 // ToolCallPart represents a part of the message that represents a call to a tool the model wants to use.
 type ToolCallPart struct {
 	// The ID of the tool call, used to match the tool result with the tool call.
-	ToolCallID string `json:"tool_call_id"`
-	// The name of the tool to call.
-	ToolName string `json:"tool_name"`
-	// The arguments to pass to the tool.
-	Args json.RawMessage `json:"args"`
+	ToolCallID string   `json:"tool_call_id"`
+	Call       ToolCall `json:"call"`
 	// The provider-specific signature used to preserve reasoning/tool continuity.
 	Signature *string `json:"signature,omitempty"`
 	// The ID of the part, if applicable.
@@ -129,11 +126,8 @@ type ToolCallPart struct {
 // ToolResultPart represents a part of the message that represents the result of a tool call.
 type ToolResultPart struct {
 	// The ID of the tool call from previous assistant message.
-	ToolCallID string `json:"tool_call_id"`
-	// The name of the tool that was called.
-	ToolName string `json:"tool_name"`
-	// The content of the tool result.
-	Content []Part `json:"content"`
+	ToolCallID string     `json:"tool_call_id"`
+	Result     ToolResult `json:"result"`
 	// Status is the terminal status of the tool call.
 	Status ToolResultStatus `json:"status"`
 }
@@ -146,6 +140,147 @@ const (
 	ToolResultStatusFailed    ToolResultStatus = "failed"
 	ToolResultStatusCancelled ToolResultStatus = "cancelled"
 )
+
+type ToolCall struct {
+	Function  *FunctionToolCall  `json:"-"`
+	WebSearch *WebSearchToolCall `json:"-"`
+}
+
+type FunctionToolCall struct {
+	Name string          `json:"name"`
+	Args json.RawMessage `json:"args"`
+}
+
+type WebSearchToolCallStatus string
+
+const (
+	WebSearchToolCallStatusInProgress WebSearchToolCallStatus = "in_progress"
+	WebSearchToolCallStatusSearching  WebSearchToolCallStatus = "searching"
+	WebSearchToolCallStatusCompleted  WebSearchToolCallStatus = "completed"
+	WebSearchToolCallStatusFailed     WebSearchToolCallStatus = "failed"
+)
+
+type WebSearchAction struct {
+	Type    string   `json:"type"`
+	Queries []string `json:"queries,omitempty"`
+	URL     string   `json:"url,omitempty"`
+	Pattern string   `json:"pattern,omitempty"`
+}
+
+type WebSearchToolCall struct {
+	Action *WebSearchAction         `json:"action,omitempty"`
+	Status *WebSearchToolCallStatus `json:"status,omitempty"`
+}
+
+type ToolResult struct {
+	Function  *FunctionToolResult  `json:"-"`
+	WebSearch *WebSearchToolResult `json:"-"`
+}
+
+type FunctionToolResult struct {
+	Name    string `json:"name"`
+	Content []Part `json:"content"`
+}
+
+type WebSearchSource struct {
+	URL       string  `json:"url"`
+	Title     *string `json:"title,omitempty"`
+	PageAge   *string `json:"page_age,omitempty"`
+	Signature *string `json:"signature,omitempty"`
+}
+
+type WebSearchToolResult struct {
+	Sources   []WebSearchSource `json:"sources"`
+	ErrorCode *string           `json:"error_code,omitempty"`
+}
+
+func (c ToolCall) MarshalJSON() ([]byte, error) {
+	if c.Function != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*FunctionToolCall
+		}{Type: "function", FunctionToolCall: c.Function})
+	}
+	if c.WebSearch != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*WebSearchToolCall
+		}{Type: "web_search", WebSearchToolCall: c.WebSearch})
+	}
+	return nil, fmt.Errorf("tool call has no content")
+}
+
+func (c *ToolCall) UnmarshalJSON(data []byte) error {
+	var tag struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &tag); err != nil {
+		return err
+	}
+	switch tag.Type {
+	case "function":
+		var value FunctionToolCall
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		c.Function = &value
+	case "web_search":
+		var value WebSearchToolCall
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		c.WebSearch = &value
+	default:
+		return fmt.Errorf("unknown tool call type: %s", tag.Type)
+	}
+	return nil
+}
+
+func (r ToolResult) MarshalJSON() ([]byte, error) {
+	if r.Function != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*FunctionToolResult
+		}{Type: "function", FunctionToolResult: r.Function})
+	}
+	if r.WebSearch != nil {
+		result := *r.WebSearch
+		if result.Sources == nil {
+			result.Sources = []WebSearchSource{}
+		}
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*WebSearchToolResult
+		}{Type: "web_search", WebSearchToolResult: &result})
+	}
+	return nil, fmt.Errorf("tool result has no content")
+}
+
+func (r *ToolResult) UnmarshalJSON(data []byte) error {
+	var tag struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &tag); err != nil {
+		return err
+	}
+	switch tag.Type {
+	case "function":
+		var value FunctionToolResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		r.Function = &value
+	case "web_search":
+		var value WebSearchToolResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		r.WebSearch = &value
+	default:
+		return fmt.Errorf("unknown tool result type: %s", tag.Type)
+	}
+	return nil
+}
 
 // ReasoningPart represents part of the message that represents the model reasoning.
 type ReasoningPart struct {
@@ -302,11 +437,12 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 
 // PartDelta represents delta parts used in partial updates.
 type PartDelta struct {
-	TextPartDelta      *TextPartDelta      `json:"-"`
-	ToolCallPartDelta  *ToolCallPartDelta  `json:"-"`
-	ImagePartDelta     *ImagePartDelta     `json:"-"`
-	AudioPartDelta     *AudioPartDelta     `json:"-"`
-	ReasoningPartDelta *ReasoningPartDelta `json:"-"`
+	TextPartDelta       *TextPartDelta       `json:"-"`
+	ToolCallPartDelta   *ToolCallPartDelta   `json:"-"`
+	ToolResultPartDelta *ToolResultPartDelta `json:"-"`
+	ImagePartDelta      *ImagePartDelta      `json:"-"`
+	AudioPartDelta      *AudioPartDelta      `json:"-"`
+	ReasoningPartDelta  *ReasoningPartDelta  `json:"-"`
 }
 
 // TextPartDelta represents a delta update for a text part, used in streaming or incremental updates of a message.
@@ -338,11 +474,73 @@ func (c CitationDelta) MarshalJSON() ([]byte, error) {
 
 // ToolCallPartDelta represents a delta update for a tool call part, used in streaming of a tool invocation.
 type ToolCallPartDelta struct {
-	ToolCallID *string `json:"tool_call_id,omitempty"`
-	ToolName   *string `json:"tool_name,omitempty"`
-	Args       *string `json:"args,omitempty"`
-	Signature  *string `json:"signature,omitempty"`
-	ID         *string `json:"id,omitempty"`
+	ToolCallID *string       `json:"tool_call_id,omitempty"`
+	Call       ToolCallDelta `json:"call"`
+	Signature  *string       `json:"signature,omitempty"`
+	ID         *string       `json:"id,omitempty"`
+}
+
+type ToolCallDelta struct {
+	Function  *FunctionToolCallDelta  `json:"-"`
+	WebSearch *WebSearchToolCallDelta `json:"-"`
+}
+
+type FunctionToolCallDelta struct {
+	Name *string `json:"name,omitempty"`
+	Args *string `json:"args,omitempty"`
+}
+
+type WebSearchToolCallDelta struct {
+	Action *WebSearchAction         `json:"action,omitempty"`
+	Status *WebSearchToolCallStatus `json:"status,omitempty"`
+}
+
+func (c ToolCallDelta) MarshalJSON() ([]byte, error) {
+	if c.Function != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*FunctionToolCallDelta
+		}{Type: "function", FunctionToolCallDelta: c.Function})
+	}
+	if c.WebSearch != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*WebSearchToolCallDelta
+		}{Type: "web_search", WebSearchToolCallDelta: c.WebSearch})
+	}
+	return nil, fmt.Errorf("tool call delta has no content")
+}
+
+func (c *ToolCallDelta) UnmarshalJSON(data []byte) error {
+	var tag struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &tag); err != nil {
+		return err
+	}
+	switch tag.Type {
+	case "function":
+		var value FunctionToolCallDelta
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		c.Function = &value
+	case "web_search":
+		var value WebSearchToolCallDelta
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		c.WebSearch = &value
+	default:
+		return fmt.Errorf("unknown tool call delta type: %s", tag.Type)
+	}
+	return nil
+}
+
+type ToolResultPartDelta struct {
+	ToolCallID string           `json:"tool_call_id"`
+	Result     ToolResult       `json:"result"`
+	Status     ToolResultStatus `json:"status"`
 }
 
 // ImagePartDelta represents a delta update for an image part, used in streaming of an image message.
@@ -397,6 +595,12 @@ func (p PartDelta) MarshalJSON() ([]byte, error) {
 			ToolCallPartDelta: p.ToolCallPartDelta,
 		})
 	}
+	if p.ToolResultPartDelta != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ToolResultPartDelta
+		}{Type: "tool-result", ToolResultPartDelta: p.ToolResultPartDelta})
+	}
 	if p.ImagePartDelta != nil {
 		return json.Marshal(struct {
 			Type string `json:"type"`
@@ -449,6 +653,12 @@ func (p *PartDelta) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.ToolCallPartDelta = &tc
+	case "tool-result":
+		var tr ToolResultPartDelta
+		if err := json.Unmarshal(data, &tr); err != nil {
+			return err
+		}
+		p.ToolResultPartDelta = &tr
 	case "audio":
 		var a AudioPartDelta
 		if err := json.Unmarshal(data, &a); err != nil {
@@ -793,6 +1003,8 @@ type FunctionTool struct {
 type WebSearchTool struct {
 	// Restricts search results to these domains when supported by the provider.
 	AllowedDomains []string `json:"allowed_domains,omitempty"`
+	// Limits the number of searches the provider may perform when supported.
+	MaxUses *int `json:"max_uses,omitempty"`
 	// An approximate user location used to localize web search results.
 	UserLocation *WebSearchUserLocation `json:"user_location,omitempty"`
 }

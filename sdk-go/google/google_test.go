@@ -4,91 +4,81 @@ import (
 	"os"
 	"testing"
 
+	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/google"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
 	"github.com/joho/godotenv"
 )
 
-var model *google.GoogleModel
-var audioModel *google.GoogleModel
-var imageModel *google.GoogleModel
-var multimodalToolModel *google.GoogleModel
-var reasoningModel *google.GoogleModel
-
-func TestMain(m *testing.M) {
-	godotenv.Load("../../.env")
+func googleModel(t *testing.T, modelID string) *google.GoogleModel {
+	t.Helper()
+	_ = godotenv.Load("../../.env")
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {
-		panic("GOOGLE_API_KEY must be set")
+		t.Fatal("GOOGLE_API_KEY must be set")
 	}
-
-	model = google.NewGoogleModel("gemini-3.1-flash-lite", google.GoogleModelOptions{
+	return google.NewGoogleModel(modelID, google.GoogleModelOptions{
 		APIKey: apiKey,
 	})
-	audioModel = google.NewGoogleModel("gemini-3.1-flash-tts-preview", google.GoogleModelOptions{
-		APIKey: apiKey,
-	})
-	imageModel = google.NewGoogleModel("gemini-3.1-flash-image", google.GoogleModelOptions{
-		APIKey: apiKey,
-	})
-	multimodalToolModel = google.NewGoogleModel("gemini-3.1-pro-preview", google.GoogleModelOptions{
-		APIKey: apiKey,
-	})
-	reasoningModel = google.NewGoogleModel("gemini-3.1-pro-preview", google.GoogleModelOptions{
-		APIKey: apiKey,
-	})
-
-	m.Run()
 }
 
 func TestTextGeneration(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "text_generation")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "text_generation")
 }
 
 func TestConversation(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "conversation")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "conversation")
 }
 
 func TestToolUse(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "tool_use")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "tool_use")
 }
 
 func TestStructuredOutput(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "structured_output")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "structured_output")
 }
 
 func TestGenerationOptions(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "generation_options")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "generation_options")
 }
 
 func TestSourceInput(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "source_input")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "source_input")
 }
 
 func TestMultimodalToolResult(t *testing.T) {
-	testcommon.RunTestGroup(t, multimodalToolModel, "multimodal_tool_result")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-pro-preview"), "multimodal_tool_result")
 }
 
 func TestWebSearch(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "web_search", testcommon.WithProfile("google_web_search"))
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "web_search", testcommon.WithProfile("google_web_search"))
 }
 
 func TestImageGeneration(t *testing.T) {
-	testcommon.RunTestGroup(t, imageModel, "image_generation")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-image"), "image_generation")
 }
 
 func TestImageInput(t *testing.T) {
-	testcommon.RunTestGroup(t, imageModel, "image_input")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-image"), "image_input")
 }
 
 func TestAudioGeneration(t *testing.T) {
-	testcommon.RunTestGroup(t, audioModel, "audio_generation", testcommon.WithProfile("google_audio"))
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-tts-preview"), "audio_generation", testcommon.WithProfile("google_audio"))
 }
 
 func TestReasoning(t *testing.T) {
-	testcommon.RunTestGroup(t, reasoningModel, "reasoning")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-pro-preview"), "reasoning")
 }
 
 func TestReasoningToolUse(t *testing.T) {
-	testcommon.RunTestGroup(t, reasoningModel, "reasoning_tool_use")
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-pro-preview"), "reasoning_tool_use")
+}
+
+func TestTransport(t *testing.T) {
+	testcommon.RunTransportTestGroup(t, "google_transport", func(baseURL string) llmsdk.LanguageModel {
+		return google.NewGoogleModel("test-model", google.GoogleModelOptions{
+			APIKey:  "test-token",
+			BaseURL: baseURL,
+		})
+	})
 }

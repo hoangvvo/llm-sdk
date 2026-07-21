@@ -1,0 +1,923 @@
+{
+  "test_cases": [
+    {
+      "name": "openai_generate",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "system_prompt": "Be exact",
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ],
+            "tools": [{ "type": "web_search" }],
+            "max_tokens": 17,
+            "temperature": 0.2,
+            "top_p": 0.8
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": { "authorization": "^Bearer test-token$" },
+              "body": {
+                "model": "test-model",
+                "input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{ "type": "input_text", "text": "Hello" }]
+                  }
+                ],
+                "instructions": "Be exact",
+                "max_output_tokens": 17,
+                "store": false,
+                "stream": false,
+                "temperature": 0.2,
+                "top_p": 0.8,
+                "tools": [{ "type": "web_search" }],
+                "include": ["web_search_call.action.sources"]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "created_at": 0,
+                "error": null,
+                "id": "resp_1",
+                "incomplete_details": null,
+                "instructions": null,
+                "object": "response",
+                "output": [
+                  {
+                    "type": "web_search_call",
+                    "id": "ws_1",
+                    "status": "completed",
+                    "action": {
+                      "type": "search",
+                      "query": "test query",
+                      "queries": ["test query"],
+                      "sources": [
+                        {
+                          "type": "url",
+                          "url": "https://example.com/source"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "message",
+                    "id": "msg_1",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [
+                      {
+                        "type": "output_text",
+                        "text": "Fixture response",
+                        "annotations": [],
+                        "logprobs": []
+                      }
+                    ]
+                  }
+                ],
+                "parallel_tool_calls": false,
+                "status": "completed",
+                "usage": {
+                  "input_tokens": 4,
+                  "output_tokens": 2,
+                  "total_tokens": 6,
+                  "input_tokens_details": { "cached_tokens": 1 },
+                  "output_tokens_details": { "reasoning_tokens": 0 }
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
+              {
+                "type": "web_search_result",
+                "status": "completed",
+                "source": "^https://example\\.com/source$"
+              },
+              { "type": "text", "text": "^Fixture response$" }
+            ],
+            "usage": { "input_tokens": 4, "output_tokens": 2 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_stream",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ],
+            "tools": [{ "type": "web_search" }]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": { "authorization": "^Bearer test-token$" },
+              "body": {
+                "model": "test-model",
+                "stream": true,
+                "tools": [{ "type": "web_search" }],
+                "include": ["web_search_call.action.sources"]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "text/event-stream" },
+              "events": [
+                {
+                  "data": {
+                    "type": "response.output_item.added",
+                    "output_index": 0,
+                    "sequence_number": 0,
+                    "item": {
+                      "type": "web_search_call",
+                      "id": "ws_1",
+                      "status": "in_progress"
+                    }
+                  },
+                  "split_at": [31]
+                },
+                {
+                  "data": {
+                    "type": "response.output_item.done",
+                    "output_index": 0,
+                    "sequence_number": 1,
+                    "item": {
+                      "type": "web_search_call",
+                      "id": "ws_1",
+                      "status": "completed",
+                      "action": {
+                        "type": "search",
+                        "query": "test query",
+                        "queries": ["test query"],
+                        "sources": [
+                          {
+                            "type": "url",
+                            "url": "https://example.com/source"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.output_text.delta",
+                    "item_id": "msg_1",
+                    "output_index": 1,
+                    "content_index": 0,
+                    "sequence_number": 2,
+                    "delta": "Fixture response",
+                    "logprobs": []
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.completed",
+                    "sequence_number": 3,
+                    "response": {
+                      "created_at": 0,
+                      "error": null,
+                      "id": "resp_1",
+                      "incomplete_details": null,
+                      "instructions": null,
+                      "object": "response",
+                      "output": [],
+                      "parallel_tool_calls": false,
+                      "status": "completed",
+                      "usage": {
+                        "input_tokens": 4,
+                        "output_tokens": 2,
+                        "total_tokens": 6,
+                        "input_tokens_details": { "cached_tokens": 0 },
+                        "output_tokens_details": { "reasoning_tokens": 0 }
+                      }
+                    }
+                  }
+                },
+                { "raw_data": "[DONE]" }
+              ]
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
+              {
+                "type": "web_search_result",
+                "status": "completed",
+                "source": "^https://example\\.com/source$"
+              },
+              { "type": "text", "text": "^Fixture response$" }
+            ],
+            "usage": { "input_tokens": 4, "output_tokens": 2 },
+            "stream": { "partials": 3, "deltas": 2, "usage_updates": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_generate",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Search" }]
+              }
+            ],
+            "tools": [{ "type": "web_search", "max_uses": 1 }],
+            "max_tokens": 17
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "headers": {
+                "x-api-key": "^test-token$",
+                "anthropic-version": "^2023-06-01$"
+              },
+              "body": {
+                "model": "test-model",
+                "max_tokens": 17,
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": [{ "type": "text", "text": "Search" }]
+                  }
+                ],
+                "tools": [
+                  {
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": 1
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "test-model",
+                "content": [
+                  {
+                    "type": "server_tool_use",
+                    "id": "srvtoolu_1",
+                    "name": "web_search",
+                    "input": { "query": "test query" }
+                  },
+                  {
+                    "type": "web_search_tool_result",
+                    "tool_use_id": "srvtoolu_1",
+                    "content": {
+                      "type": "web_search_tool_result_error",
+                      "error_code": "max_uses_exceeded"
+                    }
+                  }
+                ],
+                "stop_reason": "end_turn",
+                "stop_sequence": null,
+                "usage": { "input_tokens": 1, "output_tokens": 1 }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              { "type": "web_search_call", "status": "failed" },
+              {
+                "type": "web_search_result",
+                "status": "failed",
+                "error_code": "^max_uses_exceeded$"
+              }
+            ],
+            "usage": { "input_tokens": 1, "output_tokens": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_stream",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Search" }]
+              }
+            ],
+            "tools": [{ "type": "web_search", "max_uses": 1 }],
+            "max_tokens": 17
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "headers": {
+                "x-api-key": "^test-token$",
+                "anthropic-version": "^2023-06-01$"
+              },
+              "body": {
+                "model": "test-model",
+                "max_tokens": 17,
+                "stream": true,
+                "tools": [
+                  {
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": 1
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "text/event-stream" },
+              "events": [
+                {
+                  "event": "message_start",
+                  "data": {
+                    "type": "message_start",
+                    "message": {
+                      "id": "msg_1",
+                      "type": "message",
+                      "role": "assistant",
+                      "model": "test-model",
+                      "content": [],
+                      "stop_reason": null,
+                      "stop_sequence": null,
+                      "usage": { "input_tokens": 1, "output_tokens": 0 }
+                    }
+                  },
+                  "split_at": [37]
+                },
+                {
+                  "event": "content_block_start",
+                  "data": {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {
+                      "type": "server_tool_use",
+                      "id": "srvtoolu_1",
+                      "name": "web_search",
+                      "input": {}
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_delta",
+                  "data": {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {
+                      "type": "input_json_delta",
+                      "partial_json": "{\"query\":\"test query\"}"
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_stop",
+                  "data": { "type": "content_block_stop", "index": 0 }
+                },
+                {
+                  "event": "content_block_start",
+                  "data": {
+                    "type": "content_block_start",
+                    "index": 1,
+                    "content_block": {
+                      "type": "web_search_tool_result",
+                      "tool_use_id": "srvtoolu_1",
+                      "content": {
+                        "type": "web_search_tool_result_error",
+                        "error_code": "max_uses_exceeded"
+                      }
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_stop",
+                  "data": { "type": "content_block_stop", "index": 1 }
+                },
+                {
+                  "event": "message_delta",
+                  "data": {
+                    "type": "message_delta",
+                    "delta": {
+                      "stop_reason": "end_turn",
+                      "stop_sequence": null
+                    },
+                    "usage": { "output_tokens": 1 }
+                  }
+                },
+                { "event": "message_stop", "data": { "type": "message_stop" } }
+              ]
+            }
+          },
+          "expect": {
+            "content": [
+              { "type": "web_search_call", "status": "failed" },
+              {
+                "type": "web_search_result",
+                "status": "failed",
+                "error_code": "^max_uses_exceeded$"
+              }
+            ],
+            "usage": { "input_tokens": 1, "output_tokens": 1 },
+            "stream": { "partials": 5, "deltas": 3, "usage_updates": 2 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "google_generate",
+      "groups": ["google_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ],
+            "tools": [{ "type": "web_search" }],
+            "max_tokens": 17,
+            "temperature": 0.2,
+            "top_p": 0.8
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1beta/models/test-model:generateContent(?:\\?.*)?",
+              "body": {
+                "contents": [
+                  { "role": "user", "parts": [{ "text": "Hello" }] }
+                ],
+                "generationConfig": {
+                  "maxOutputTokens": 17,
+                  "temperature": 0.2,
+                  "topP": 0.8
+                },
+                "tools": [{ "googleSearch": {} }]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "candidates": [
+                  {
+                    "content": {
+                      "role": "model",
+                      "parts": [{ "text": "Fixture response" }]
+                    },
+                    "groundingMetadata": {
+                      "webSearchQueries": ["test query"],
+                      "groundingChunks": [
+                        {
+                          "web": {
+                            "uri": "https://example.com/source",
+                            "title": "Fixture source"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "usageMetadata": {
+                  "promptTokenCount": 4,
+                  "candidatesTokenCount": 2,
+                  "responseTokenCount": 2,
+                  "totalTokenCount": 6
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              { "type": "text", "text": "^Fixture response$" },
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
+              {
+                "type": "web_search_result",
+                "status": "completed",
+                "source": "^https://example\\.com/source$"
+              }
+            ],
+            "usage": { "input_tokens": 4, "output_tokens": 2 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "google_stream",
+      "groups": ["google_transport"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ],
+            "tools": [{ "type": "web_search" }]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1beta/models/test-model:streamGenerateContent(?:\\?.*)?",
+              "body": {
+                "contents": [
+                  { "role": "user", "parts": [{ "text": "Hello" }] }
+                ],
+                "tools": [{ "googleSearch": {} }]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "text/event-stream" },
+              "events": [
+                {
+                  "data": {
+                    "candidates": [
+                      {
+                        "content": {
+                          "role": "model",
+                          "parts": [{ "text": "Fixture response" }]
+                        },
+                        "groundingMetadata": {
+                          "webSearchQueries": ["test query"],
+                          "groundingChunks": [
+                            {
+                              "web": {
+                                "uri": "https://example.com/source",
+                                "title": "Fixture source"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "usageMetadata": {
+                      "promptTokenCount": 4,
+                      "candidatesTokenCount": 2,
+                      "responseTokenCount": 2,
+                      "totalTokenCount": 6
+                    }
+                  },
+                  "split_at": [29]
+                }
+              ]
+            }
+          },
+          "expect": {
+            "content": [
+              { "type": "text", "text": "^Fixture response$" },
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
+              {
+                "type": "web_search_result",
+                "status": "completed",
+                "source": "^https://example\\.com/source$"
+              }
+            ],
+            "usage": { "input_tokens": 4, "output_tokens": 2 },
+            "stream": { "partials": 4, "deltas": 3, "usage_updates": 1 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_http_error",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": { "authorization": "^Bearer test-token$" },
+              "body": { "model": "test-model", "stream": false }
+            },
+            "response": {
+              "status": 400,
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "error": {
+                  "message": "invalid request",
+                  "type": "invalid_request_error",
+                  "code": "invalid_request"
+                }
+              }
+            }
+          },
+          "expect": {
+            "error": {
+              "kind": "^(?:bad_request_error|api_error|status_code|error)$",
+              "message": "400|invalid request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_http_error",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ],
+            "max_tokens": 17
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "headers": { "x-api-key": "^test-token$" },
+              "body": { "model": "test-model", "max_tokens": 17 }
+            },
+            "response": {
+              "status": 400,
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "type": "error",
+                "error": {
+                  "type": "invalid_request_error",
+                  "message": "invalid request"
+                },
+                "request_id": "req_test"
+              }
+            }
+          },
+          "expect": {
+            "error": {
+              "kind": "^(?:bad_request_error|api_error|status_code|error)$",
+              "message": "400|invalid request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "google_http_error",
+      "groups": ["google_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1beta/models/test-model:generateContent(?:\\?.*)?",
+              "body": {
+                "contents": [{ "role": "user", "parts": [{ "text": "Hello" }] }]
+              }
+            },
+            "response": {
+              "status": 400,
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "error": {
+                  "code": 400,
+                  "message": "invalid request",
+                  "status": "INVALID_ARGUMENT"
+                }
+              }
+            }
+          },
+          "expect": {
+            "error": {
+              "kind": "^(?:bad_request_error|api_error|client_error|status_code|error)$",
+              "message": "400|invalid request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_cancelled_result",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": "call_1",
+                    "result": {
+                      "type": "function",
+                      "name": "wait",
+                      "content": []
+                    },
+                    "status": "cancelled"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "body": {
+                "input": [
+                  {
+                    "type": "function_call_output",
+                    "call_id": "call_1",
+                    "output": "cancelled"
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "created_at": 0,
+                "error": null,
+                "id": "resp_cancelled",
+                "incomplete_details": null,
+                "instructions": null,
+                "object": "response",
+                "output": [],
+                "parallel_tool_calls": false,
+                "status": "completed",
+                "usage": null
+              }
+            }
+          },
+          "expect": { "content": [] }
+        }
+      ]
+    },
+    {
+      "name": "openai_malformed_stream",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "body": { "model": "test-model", "stream": true }
+            },
+            "response": {
+              "headers": { "content-type": "text/event-stream" },
+              "chunks": ["data: {\"type\":\n\n"]
+            }
+          },
+          "expect": {
+            "error": {
+              "kind": "^(?:syntax_error|api_error|invariant|transport|error)$",
+              "message": "JSON|json|parse|decode|unmarshal|SSE|sse|stream"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_malformed_stream",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ],
+            "max_tokens": 17
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "body": {
+                "model": "test-model",
+                "max_tokens": 17,
+                "stream": true
+              }
+            },
+            "response": {
+              "headers": { "content-type": "text/event-stream" },
+              "chunks": ["event: message_start\ndata: {\"type\":\n\n"]
+            }
+          },
+          "expect": {
+            "error": {
+              "kind": "^(?:syntax_error|api_error|invariant|transport|error)$",
+              "message": "JSON|json|parse|decode|unmarshal|SSE|sse|stream"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "google_malformed_stream",
+      "groups": ["google_transport"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1beta/models/test-model:streamGenerateContent(?:\\?.*)?"
+            },
+            "response": {
+              "headers": { "content-type": "text/event-stream" },
+              "chunks": ["data: {\"candidates\":\n\n"]
+            }
+          },
+          "expect": {
+            "error": {
+              "kind": "^(?:syntax_error|api_error|invariant|transport|error)$",
+              "message": "JSON|json|parse|decode|unmarshal|SSE|sse|stream"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

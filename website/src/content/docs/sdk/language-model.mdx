@@ -241,27 +241,29 @@ The following `Part` types are implemented in the SDK: [`TextPart`](#text-part),
 
 <Aside>
   Tool calls are implemented as a `Part` instead of being a property of the
-  `AssistantMessage`.
+  `AssistantMessage`. The nested `call.type` discriminates client function
+  calls from provider-hosted web search without combining two discriminators at
+  the same object level.
 </Aside>
 
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptTypes(["ToolCallPart"])}
+      code={extractTypescriptTypes(["ToolCallPart", "ToolCall", "FunctionToolCall", "WebSearchToolCall", "WebSearchAction"])}
       lang="typescript"
       title="types.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustTypes(["ToolCallPart"])}
+      code={extractRustTypes(["ToolCallPart", "ToolCall", "FunctionToolCall", "WebSearchToolCall", "WebSearchAction"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
     <Code
-      code={extractGoTypes(["ToolCallPart"])}
+      code={extractGoTypes(["ToolCallPart", "ToolCall", "FunctionToolCall", "WebSearchToolCall", "WebSearchAction"])}
       lang="go"
       title="types.go"
     />
@@ -271,30 +273,29 @@ The following `Part` types are implemented in the SDK: [`TextPart`](#text-part),
 ### Tool Result Part
 
 <Aside>
-  The `ToolResultPart` content is an array of `Part` instead of a string or an
-  object. This enables non-text results to be returned for LLM providers that
-  support them (e.g., Anthropic Function Calling supports images in tool
-  results).
+  `ToolResultPart.result` mirrors the call union. Function results contain an
+  array of `Part`, enabling multimodal results; web-search results contain
+  normalized source metadata.
 </Aside>
 
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptTypes(["ToolResultPart"])}
+      code={extractTypescriptTypes(["ToolResultPart", "ToolResult", "FunctionToolResult", "WebSearchToolResult", "WebSearchSource"])}
       lang="typescript"
       title="types.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustTypes(["ToolResultPart"])}
+      code={extractRustTypes(["ToolResultPart", "ToolResult", "FunctionToolResult", "WebSearchToolResult", "WebSearchSource"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
     <Code
-      code={extractGoTypes(["ToolResultPart"])}
+      code={extractGoTypes(["ToolResultPart", "ToolResult", "FunctionToolResult", "WebSearchToolResult", "WebSearchSource"])}
       lang="go"
       title="types.go"
     />

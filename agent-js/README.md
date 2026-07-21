@@ -213,6 +213,7 @@ An example server that exposes an API to interact with the agent can be found in
 ### To 0.4.0
 
 - `AgentItemTool.is_error` has been replaced with the required `status` field, and `AgentResponse` now includes a terminal `status`.
+- SDK tool calls and results in model content now use discriminated `call` and `result` objects. Update code that inspects `AgentItemModelResponse.content` or supplies SDK messages to use `part.call`/`part.result` and check their `type`; `AgentItemTool` keeps its flat `tool_name`/`input`/`output` shape.
 
 ### To 0.3.0
 

@@ -121,6 +121,9 @@ cargo run --example generate-text
 
 - Replace `Tool { name, description, parameters }` with `FunctionTool::new(...)`.
 - `ToolResultPart::is_error` has been replaced with the required `status` field (`Completed`, `Failed`, or `Cancelled`).
+- Function tool calls now store `tool_name` and `args` in `call`. Match `ToolCall::Function(call)` before accessing `call.name` and `call.args` because the enum can now contain a provider-hosted web search call.
+- Function tool results now store `tool_name` and `content` in `result`. Match `ToolResult::Function(result)` before accessing `result.name` and `result.content` because the enum can now contain a provider-hosted web search result.
+- `ToolCallPartDelta.tool_name` and `args` have moved to its `ToolCallDelta::Function` value, matching `ToolCallPart`. The `ToolCallPart::new`, `ToolResultPart::new`, and builder APIs retain their existing function-tool signatures.
 
 ### To 0.2.0
 

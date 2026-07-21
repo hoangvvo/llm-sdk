@@ -829,9 +829,13 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
     return [
       {
         type: "tool-call",
-        args: part.input as Record<string, unknown>,
+
         tool_call_id: part.toolCallId,
-        tool_name: part.toolName,
+        call: {
+          type: "function",
+          name: part.toolName,
+          args: part.input as Record<string, unknown>,
+        },
       },
     ];
   }
@@ -889,51 +893,71 @@ function uiMessagePartToPart(part: UIMessagePart): Part[] {
         return [
           {
             type: "tool-call",
-            args: toolUIPart.input as Record<string, unknown>,
+
             tool_call_id: toolUIPart.toolCallId,
-            tool_name: toolName,
+            call: {
+              type: "function",
+              name: toolName,
+              args: toolUIPart.input as Record<string, unknown>,
+            },
           },
         ];
       case "output-available":
         return [
           {
             type: "tool-call",
-            args: toolUIPart.input as Record<string, unknown>,
+
             tool_call_id: toolUIPart.toolCallId,
-            tool_name: toolName,
+            call: {
+              type: "function",
+              name: toolName,
+              args: toolUIPart.input as Record<string, unknown>,
+            },
           },
           {
             type: "tool-result",
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify(toolUIPart.output),
-              },
-            ],
+
             tool_call_id: toolUIPart.toolCallId,
-            tool_name: toolName,
             status: "completed",
+            result: {
+              type: "function",
+              name: toolName,
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(toolUIPart.output),
+                },
+              ],
+            },
           },
         ];
       case "output-error":
         return [
           {
             type: "tool-call",
-            args: toolUIPart.input as Record<string, unknown>,
+
             tool_call_id: toolUIPart.toolCallId,
-            tool_name: toolName,
+            call: {
+              type: "function",
+              name: toolName,
+              args: toolUIPart.input as Record<string, unknown>,
+            },
           },
           {
             type: "tool-result",
-            content: [
-              {
-                type: "text",
-                text: toolUIPart.errorText,
-              },
-            ],
+
             tool_call_id: toolUIPart.toolCallId,
-            tool_name: toolName,
             status: "failed",
+            result: {
+              type: "function",
+              name: toolName,
+              content: [
+                {
+                  type: "text",
+                  text: toolUIPart.errorText,
+                },
+              ],
+            },
           },
         ];
     }

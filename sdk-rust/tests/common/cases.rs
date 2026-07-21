@@ -20,7 +20,7 @@ struct PreparedStage {
     input: Value,
 }
 
-fn test_cases_by_group(group: &str) -> Result<Vec<String>, Box<dyn Error>> {
+pub(super) fn test_cases_by_group(group: &str) -> Result<Vec<String>, Box<dyn Error>> {
     call_protocol(&json!({
         "command": "list_cases",
         "group": group,
