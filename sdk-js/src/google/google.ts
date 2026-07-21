@@ -338,24 +338,33 @@ function convertToGenerateContentParameters(
 }
 
 function convertToGoogleContents(messages: Message[]): Content[] {
-  return messages.map((message): Content => {
+  return messages.flatMap((message): Content[] => {
     const parts = message.content.map(convertToGoogleParts).flat();
+    // Google hosted-tool metadata has no request part to replay.
+    if (parts.length === 0) return [];
+
     switch (message.role) {
       case "user":
-        return {
-          role: "user",
-          parts,
-        };
+        return [
+          {
+            role: "user",
+            parts,
+          },
+        ];
       case "assistant":
-        return {
-          role: "model",
-          parts,
-        };
+        return [
+          {
+            role: "model",
+            parts,
+          },
+        ];
       case "tool":
-        return {
-          role: "user",
-          parts,
-        };
+        return [
+          {
+            role: "user",
+            parts,
+          },
+        ];
     }
   });
 }

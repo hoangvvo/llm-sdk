@@ -421,23 +421,26 @@ fn convert_to_generate_content_parameters(
 }
 
 fn convert_to_google_contents(messages: Vec<Message>) -> LanguageModelResult<Vec<Content>> {
-    messages
-        .into_iter()
-        .map(|message| match message {
-            Message::User(user_message) => Ok(Content {
-                role: Some("user".to_string()),
-                parts: Some(convert_parts_to_google_parts(user_message.content)?),
-            }),
-            Message::Assistant(assistant_message) => Ok(Content {
-                role: Some("model".to_string()),
-                parts: Some(convert_parts_to_google_parts(assistant_message.content)?),
-            }),
-            Message::Tool(tool_message) => Ok(Content {
-                role: Some("user".to_string()),
-                parts: Some(convert_parts_to_google_parts(tool_message.content)?),
-            }),
-        })
-        .collect()
+    let mut contents = Vec::with_capacity(messages.len());
+
+    for message in messages {
+        let (role, parts) = match message {
+            Message::User(message) => ("user", message.content),
+            Message::Assistant(message) => ("model", message.content),
+            Message::Tool(message) => ("user", message.content),
+        };
+        let parts = convert_parts_to_google_parts(parts)?;
+        // Google hosted-tool metadata has no request part to replay.
+        if parts.is_empty() {
+            continue;
+        }
+        contents.push(Content {
+            role: Some(role.to_string()),
+            parts: Some(parts),
+        });
+    }
+
+    Ok(contents)
 }
 
 fn convert_parts_to_google_parts(parts: Vec<Part>) -> LanguageModelResult<Vec<GooglePart>> {

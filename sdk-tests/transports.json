@@ -588,8 +588,7 @@
                   {
                     "role": "user",
                     "parts": [{ "text": "Find the docs" }]
-                  },
-                  { "role": "model", "parts": [] }
+                  }
                 ]
               }
             },
