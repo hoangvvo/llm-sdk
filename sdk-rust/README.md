@@ -5,57 +5,38 @@ A Rust library that enables the development of applications that can interact wi
 ## Installation
 
 ```bash
-cargo add llm-sdk-rs
+cargo add llm-sdk-rs --features openai
+cargo add rustls --no-default-features --features ring,std,tls12
+```
+
+Applications using the default HTTP client select the process-wide Rustls provider once at
+startup. A custom `reqwest::Client` supplied through model options owns its own TLS setup.
+
+```rust
+rustls::crypto::ring::default_provider()
+    .install_default()
+    .expect("Rustls provider already selected");
 ```
 
 ## Usage
 
-All models implement the `LanguageModel` trait:
+All models implement the `LanguageModel` trait.
 
 ```rust
 use llm_sdk::{
-    anthropic::{AnthropicModel, AnthropicModelOptions},
-    google::{GoogleModel, GoogleModelOptions},
-    openai::{OpenAIChatModel, OpenAIChatModelOptions, OpenAIModel, OpenAIModelOptions},
+    openai::{OpenAIModel, OpenAIModelOptions},
     LanguageModel,
 };
 
-pub fn get_model(provider: &str, model_id: &str) -> Box<dyn LanguageModel> {
-    match provider {
-        "openai" => Box::new(OpenAIModel::new(
-            model_id.to_string(),
-            OpenAIModelOptions {
-                api_key: std::env::var("OPENAI_API_KEY")
-                    .expect("OPENAI_API_KEY environment variable must be set"),
-                ..Default::default()
-            },
-        )),
-        "openai-chat-completion" => Box::new(OpenAIChatModel::new(
-            model_id.to_string(),
-            OpenAIChatModelOptions {
-                api_key: std::env::var("OPENAI_API_KEY")
-                    .expect("OPENAI_API_KEY environment variable must be set"),
-                ..Default::default()
-            },
-        )),
-        "anthropic" => Box::new(AnthropicModel::new(
-            model_id.to_string(),
-            AnthropicModelOptions {
-                api_key: std::env::var("ANTHROPIC_API_KEY")
-                    .expect("ANTHROPIC_API_KEY environment variable must be set"),
-                ..Default::default()
-            },
-        )),
-        "google" => Box::new(GoogleModel::new(
-            model_id.to_string(),
-            GoogleModelOptions {
-                api_key: std::env::var("GOOGLE_API_KEY")
-                    .expect("GOOGLE_API_KEY environment variable must be set"),
-                ..Default::default()
-            },
-        )),
-        _ => panic!("Unsupported provider: {provider}"),
-    }
+pub fn get_model(model_id: &str) -> Box<dyn LanguageModel> {
+    Box::new(OpenAIModel::new(
+        model_id.to_string(),
+        OpenAIModelOptions {
+            api_key: std::env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY environment variable must be set"),
+            ..Default::default()
+        },
+    ))
 }
 ```
 
@@ -112,7 +93,7 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`stream-citations`: Stream citations](./examples/stream-citations.rs)
 
 ```bash
-cargo run --example generate-text
+cargo run --example generate-text --features examples,openai
 ```
 
 ## Migration
@@ -132,7 +113,7 @@ cargo run --example generate-text
 # Testing
 
 ```bash
-cargo test --package llm-sdk-rs
+cargo test --package llm-sdk-rs --test core_tests
 ```
 
 ## License

@@ -1,5 +1,4 @@
-mod common;
-use crate::common::cases::RunTestCaseOptions;
+use crate::{common, common::cases::RunTestCaseOptions, test_group};
 use llm_sdk::google::*;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
@@ -7,6 +6,7 @@ use tokio::test;
 fn google_api_key() -> &'static String {
     static KEY: OnceLock<String> = OnceLock::new();
 
+    common::install_tls_provider();
     KEY.get_or_init(|| {
         dotenvy::dotenv().ok();
         env::var("GOOGLE_API_KEY").expect("GOOGLE_API_KEY must be set")
@@ -91,6 +91,8 @@ test_group!(google_reasoning_model(), reasoning_tool_use);
 
 #[test]
 async fn transport() -> Result<(), Box<dyn Error>> {
+    common::install_tls_provider();
+
     common::transports::run_transport_test_group("google_transport", |base_url| {
         GoogleModel::new(
             "test-model",

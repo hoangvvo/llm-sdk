@@ -1,4 +1,4 @@
-mod common;
+use crate::{common, test_group};
 use llm_sdk::anthropic::*;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
@@ -6,6 +6,7 @@ use tokio::test;
 fn anthropic_api_key() -> &'static String {
     static KEY: OnceLock<String> = OnceLock::new();
 
+    common::install_tls_provider();
     KEY.get_or_init(|| {
         dotenvy::dotenv().ok();
         env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY must be set")
@@ -50,6 +51,8 @@ test_group!(anthropic_model(), anthropic_web_search_failure);
 
 #[test]
 async fn transport() -> Result<(), Box<dyn Error>> {
+    common::install_tls_provider();
+
     common::transports::run_transport_test_group("anthropic_transport", |base_url| {
         AnthropicModel::new(
             "test-model",

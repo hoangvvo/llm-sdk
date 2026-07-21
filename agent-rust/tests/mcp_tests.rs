@@ -33,7 +33,7 @@ use serde_json::{json, Value};
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, Once,
     },
     time::Duration,
 };
@@ -789,6 +789,15 @@ fn resource_link_content(uri: impl Into<String>, name: impl Into<String>) -> rmc
 }
 
 async fn start_stub_mcp_server() -> Result<StubServer, BoxedError> {
+    static TLS_INIT: Once = Once::new();
+    TLS_INIT.call_once(|| {
+        if rustls::crypto::CryptoProvider::get_default().is_none() {
+            rustls::crypto::ring::default_provider()
+                .install_default()
+                .expect("the test application must select its Rustls provider once");
+        }
+    });
+
     let initial_tool = ToolDefinition::new(
         "list_shuttles",
         "List active shuttle routes for a shift",

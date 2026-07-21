@@ -1048,23 +1048,3 @@ fn map_modality_token_counts(
 
     Some(tokens_details)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::convert_to_google_parts;
-    use crate::{Part, ToolResult, ToolResultPart, ToolResultStatus, WebSearchToolResult};
-
-    #[test]
-    fn skips_hosted_web_search_results_when_replaying_history() {
-        let part = Part::ToolResult(ToolResultPart {
-            tool_call_id: "search_1".to_string(),
-            result: ToolResult::WebSearch(WebSearchToolResult {
-                sources: vec![],
-                error_code: None,
-            }),
-            status: ToolResultStatus::Completed,
-        });
-
-        assert!(convert_to_google_parts(part).unwrap().is_empty());
-    }
-}

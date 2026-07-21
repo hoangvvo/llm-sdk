@@ -10,12 +10,19 @@ export interface CodegenDocument {
   declarations: Declaration[];
   usesMap: boolean;
   usesJsonValue: boolean;
+  rustSerde?: RustSerdeRoots;
 }
 
 export interface CodegenOverrides {
   customUntaggedDeserializers?: string[];
   optionalProperties?: Record<string, string[]>;
+  rustSerde?: RustSerdeRoots;
   untaggedUnions?: string[];
+}
+
+export interface RustSerdeRoots {
+  deserialize?: string[];
+  serialize?: string[];
 }
 
 export type Declaration =
@@ -535,6 +542,7 @@ class SchemaDocumentBuilder {
   private readonly optionalProperties: ReadonlyMap<string, ReadonlySet<string>>;
   private readonly untaggedUnions: ReadonlySet<string>;
   private readonly customUntaggedDeserializers: ReadonlySet<string>;
+  private readonly rustSerde: RustSerdeRoots | undefined;
   private readonly reservedNames = new Set<string>();
   // When a named definition is referenced as a tagged-union variant via $ref,
   // we record the discriminator metadata here so the lowered struct can omit
@@ -564,6 +572,7 @@ class SchemaDocumentBuilder {
     this.customUntaggedDeserializers = new Set(
       overrides.customUntaggedDeserializers ?? [],
     );
+    this.rustSerde = overrides.rustSerde;
   }
 
   build(): CodegenDocument {
@@ -605,6 +614,7 @@ class SchemaDocumentBuilder {
       declarations,
       usesMap: this.usesMap,
       usesJsonValue: this.usesJsonValue,
+      ...(this.rustSerde ? { rustSerde: this.rustSerde } : {}),
     };
   }
 

@@ -189,6 +189,9 @@ async fn home_handler() -> &'static str {
 
 #[tokio::main]
 async fn main() -> Result<(), BoxedError> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("the application must select its Rustls provider once");
     // Load environment variables
     dotenv().ok();
 

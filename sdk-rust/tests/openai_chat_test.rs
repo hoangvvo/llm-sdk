@@ -1,5 +1,4 @@
-mod common;
-use crate::common::cases::RunTestCaseOptions;
+use crate::{common::cases::RunTestCaseOptions, test_group, test_set};
 use llm_sdk::openai::*;
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;

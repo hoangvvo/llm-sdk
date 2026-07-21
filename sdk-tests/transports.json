@@ -544,6 +544,76 @@
       ]
     },
     {
+      "name": "google_replay_hosted_web_search",
+      "groups": ["google_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Find the docs" }]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "tool-call",
+                    "tool_call_id": "search_1",
+                    "call": {
+                      "type": "web_search",
+                      "status": "completed"
+                    }
+                  },
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": "search_1",
+                    "result": {
+                      "type": "web_search",
+                      "sources": []
+                    },
+                    "status": "completed"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1beta/models/test-model:generateContent(?:\\?.*)?",
+              "body": {
+                "contents": [
+                  {
+                    "role": "user",
+                    "parts": [{ "text": "Find the docs" }]
+                  },
+                  { "role": "model", "parts": [] }
+                ]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "candidates": [
+                  {
+                    "content": {
+                      "role": "model",
+                      "parts": [{ "text": "Fixture response" }]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "expect": {
+            "content": [{ "type": "text", "text": "^Fixture response$" }]
+          }
+        }
+      ]
+    },
+    {
       "name": "google_stream",
       "groups": ["google_transport"],
       "stages": [

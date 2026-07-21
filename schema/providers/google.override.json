@@ -1,0 +1,6 @@
+{
+  "rustSerde": {
+    "serialize": ["GenerateContentRequest"],
+    "deserialize": ["GenerateContentResponse"]
+  }
+}

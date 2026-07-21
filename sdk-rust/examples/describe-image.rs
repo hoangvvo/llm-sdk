@@ -6,6 +6,9 @@ mod common;
 
 #[tokio::main]
 async fn main() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("the application must select its Rustls provider once");
     dotenv().ok();
 
     let image_url = "https://images.unsplash.com/photo-1464809142576-df63ca4ed7f0";

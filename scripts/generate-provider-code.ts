@@ -63,6 +63,7 @@ const targets: GenerationTarget[] = [
     input: "schema/providers/google.json",
     language: "rust",
     output: "sdk-rust/src/google/api.rs",
+    overrides: "schema/providers/google.override.json",
   },
 ];
 

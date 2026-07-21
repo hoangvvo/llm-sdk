@@ -1,4 +1,5 @@
 [package]
+autotests = false
 description = "The agent library to build LLM applications that work with any LLM providers."
 edition = "2021"
 homepage = "https://llm-sdk.hoangvvo.com/"
@@ -19,23 +20,34 @@ version = "0.3.0"
 
 [lib]
 name = "llm_agent"
+test = false
 
 [lints.clippy]
 missing_errors_doc = "allow"
 pedantic = "warn"
 use_self = "warn"
 
+[features]
+anthropic = ["llm-sdk-rs/anthropic"]
+examples = ["tls-ring"]
+google = ["llm-sdk-rs/google"]
+openai = ["llm-sdk-rs/openai"]
+tls-aws-lc = ["llm-sdk-rs/tls-aws-lc"]
+tls-ring = ["llm-sdk-rs/tls-ring"]
+
 [dependencies]
 async-stream = "0.3.6"
 futures = "0.3"
-llm-sdk-rs = { version = ">=0.3, <1.0", path = "../sdk-rust" }
-opentelemetry = "0.31"
+llm-sdk-rs = { version = ">=0.3, <1.0", path = "../sdk-rust", default-features = false }
+opentelemetry = { version = "0.32", default-features = false, features = [
+  "trace",
+] }
 rmcp = { version = "1.2", features = [
   "client",
+  "reqwest-tls-no-provider",
   "transport-child-process",
   "transport-streamable-http-client-reqwest",
-  "transport-streamable-http-server",
-] }
+], default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -43,21 +55,37 @@ tokio = { version = "1", features = ["macros", "rt", "process"] }
 tokio-util = "0.7"
 tracing = "0.1"
 tracing-futures = { version = "0.2", features = ["std", "futures-03"] }
-tracing-opentelemetry = "0.32"
+tracing-opentelemetry = { version = "0.33", default-features = false }
 
 [dev-dependencies]
 axum = "0.8.8"
 base64 = "0.22"
 chrono = "0.4"
-dotenvy = { version = "0.15.7" }
-opentelemetry-otlp = { version = "0.31", features = [
+dotenvy = "0.15.7"
+opentelemetry-otlp = { version = "0.32", default-features = false, features = [
   "http-proto",
-  "trace",
   "reqwest-client",
+  "trace",
 ] }
-opentelemetry_sdk = { version = "0.31", features = ["rt-tokio", "trace"] }
-rand = { version = "0.10" }
-reqwest = { version = "0.12.28", features = ["json"] }
+opentelemetry_sdk = { version = "0.32", default-features = false, features = [
+  "rt-tokio",
+  "trace",
+] }
+rand = "0.10"
+reqwest = { version = "0.13", default-features = false, features = [
+  "json",
+  "rustls-no-provider",
+] }
+rmcp = { version = "1.2", default-features = false, features = [
+  "macros",
+  "server",
+  "transport-streamable-http-server",
+] }
+rustls = { version = "0.23", default-features = false, features = [
+  "ring",
+  "std",
+  "tls12",
+] }
 schemars = "1.2.1"
 similar = "2"
 tokio = { version = "1.50.0", features = ["full"] }
@@ -65,3 +93,68 @@ tower = "0.5.3"
 tower-http = { version = "0.6.8", features = ["cors"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 urlencoding = "2.1.3"
+
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"
+
+[[example]]
+name = "agent"
+required-features = ["examples"]
+
+[[example]]
+name = "agents-delegation"
+required-features = ["examples"]
+
+[[example]]
+name = "ai-sdk-ui"
+required-features = ["examples"]
+
+[[example]]
+name = "artifacts"
+required-features = ["examples"]
+
+[[example]]
+name = "cancellation"
+required-features = ["examples"]
+
+[[example]]
+name = "instructions"
+required-features = ["examples"]
+
+[[example]]
+name = "mcp"
+required-features = ["examples"]
+
+[[example]]
+name = "memory"
+required-features = ["examples"]
+
+[[example]]
+name = "planner-executor"
+required-features = ["examples"]
+
+[[example]]
+name = "require-approval"
+required-features = ["examples"]
+
+[[example]]
+name = "server"
+path = "examples/server/main.rs"
+required-features = ["examples"]
+
+[[example]]
+name = "structured-output"
+required-features = ["examples"]
+
+[[example]]
+name = "toolkits"
+required-features = ["examples"]
+
+[[example]]
+name = "tools"
+required-features = ["examples"]
+
+[[example]]
+name = "tracing"
+required-features = ["examples"]

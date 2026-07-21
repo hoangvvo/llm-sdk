@@ -1,5 +1,12 @@
 {
   "optionalProperties": {
     "CreateChatCompletionResponseChoicesItem": ["finish_reason"]
+  },
+  "rustSerde": {
+    "serialize": ["CreateChatCompletionRequest"],
+    "deserialize": [
+      "CreateChatCompletionResponse",
+      "CreateChatCompletionStreamResponse"
+    ]
   }
 }
