@@ -166,8 +166,7 @@ func NewToolCallPart(toolCallID, toolName string, args any, opts ...ToolCallPart
 	toolCallPart := Part{
 		ToolCallPart: &ToolCallPart{
 			ToolCallID: toolCallID,
-			ToolName:   toolName,
-			Args:       argsJSON,
+			Call:       ToolCall{Function: &FunctionToolCall{Name: toolName, Args: argsJSON}},
 		},
 	}
 
@@ -197,8 +196,7 @@ func NewToolResultPart(toolCallID, toolName string, content []Part, opts ...Tool
 	toolResultPart := Part{
 		ToolResultPart: &ToolResultPart{
 			ToolCallID: toolCallID,
-			ToolName:   toolName,
-			Content:    content,
+			Result:     ToolResult{Function: &FunctionToolResult{Name: toolName, Content: content}},
 			Status:     ToolResultStatusCompleted,
 		},
 	}
@@ -292,7 +290,7 @@ func WithCitationDeltaSignature(signature string) CitationDeltaOption {
 
 // NewToolCallPartDelta constructs a tool call part delta for streaming tool invocations.
 func NewToolCallPartDelta(opts ...ToolCallPartDeltaOption) PartDelta {
-	toolCallDelta := &ToolCallPartDelta{}
+	toolCallDelta := &ToolCallPartDelta{Call: ToolCallDelta{Function: &FunctionToolCallDelta{}}}
 
 	for _, opt := range opts {
 		opt(toolCallDelta)
@@ -311,13 +309,19 @@ func WithToolCallPartDeltaToolCallID(toolCallID string) ToolCallPartDeltaOption 
 
 func WithToolCallPartDeltaToolName(toolName string) ToolCallPartDeltaOption {
 	return func(p *ToolCallPartDelta) {
-		p.ToolName = &toolName
+		if p.Call.Function == nil {
+			p.Call.Function = &FunctionToolCallDelta{}
+		}
+		p.Call.Function.Name = &toolName
 	}
 }
 
 func WithToolCallPartDeltaArgs(args string) ToolCallPartDeltaOption {
 	return func(p *ToolCallPartDelta) {
-		p.Args = &args
+		if p.Call.Function == nil {
+			p.Call.Function = &FunctionToolCallDelta{}
+		}
+		p.Call.Function.Args = &args
 	}
 }
 

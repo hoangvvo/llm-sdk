@@ -60,7 +60,7 @@ func TestOpenAIRecordedTransportGenerateRequestAndResponse(t *testing.T) {
 		requestBody = readRequestJSON(t, request)
 		response.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(response, `{
-			"output":[{"type":"message","id":"msg_1","role":"assistant","status":"completed","content":[{"type":"output_text","text":"Recorded response","annotations":[],"logprobs":[]}]}],
+			"output":[{"type":"web_search_call","id":"ws_1","status":"completed","action":{"type":"search","query":"recorded query","queries":["recorded query"],"sources":[{"type":"url","url":"https://example.com/source"}]}},{"type":"message","id":"msg_1","role":"assistant","status":"completed","content":[{"type":"output_text","text":"Recorded response","annotations":[],"logprobs":[]}]}],
 			"usage":{"input_tokens":4,"output_tokens":2,"total_tokens":6,"input_tokens_details":{"cached_tokens":1},"output_tokens_details":{"reasoning_tokens":0}}
 		}`)
 	}))
@@ -98,7 +98,7 @@ func TestOpenAIRecordedTransportGenerateRequestAndResponse(t *testing.T) {
 	if authorization != "Bearer test-token" {
 		t.Fatalf("unexpected authorization: %q", authorization)
 	}
-	if !reflect.DeepEqual(result.Content, []llmsdk.Part{llmsdk.NewTextPart("Recorded response")}) {
+	if len(result.Content) != 3 || result.Content[0].ToolCallPart == nil || result.Content[0].ToolCallPart.Call.WebSearch == nil || result.Content[1].ToolResultPart == nil || result.Content[1].ToolResultPart.Result.WebSearch == nil || result.Content[2].TextPart == nil {
 		t.Fatalf("unexpected content: %#v", result.Content)
 	}
 	if result.Usage == nil || result.Usage.InputTokens != 4 || result.Usage.OutputTokens != 2 {
@@ -162,7 +162,12 @@ func TestOpenAIRecordedTransportFragmentedStream(t *testing.T) {
 		_, _ = io.WriteString(response, first[31:]+"\n\n")
 		_, _ = io.WriteString(response, `data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","output_index":0,"sequence_number":1,"delta":"{\"city\":"}`+"\n\n")
 		_, _ = io.WriteString(response, `data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","output_index":0,"sequence_number":2,"delta":"\"Hanoi\"}"}`+"\n\n")
-		_, _ = io.WriteString(response, `data: {"type":"response.completed","sequence_number":3,"response":{"usage":{"input_tokens":7,"output_tokens":3,"total_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":0}}}}`+"\n\n")
+		_, _ = io.WriteString(response, `data: {"type":"response.output_item.added","output_index":1,"sequence_number":3,"item":{"type":"web_search_call","id":"ws_1","status":"in_progress"}}`+"\n\n")
+		_, _ = io.WriteString(response, `data: {"type":"response.web_search_call.in_progress","item_id":"ws_1","output_index":1,"sequence_number":4}`+"\n\n")
+		_, _ = io.WriteString(response, `data: {"type":"response.web_search_call.searching","item_id":"ws_1","output_index":1,"sequence_number":5}`+"\n\n")
+		_, _ = io.WriteString(response, `data: {"type":"response.web_search_call.completed","item_id":"ws_1","output_index":1,"sequence_number":6}`+"\n\n")
+		_, _ = io.WriteString(response, `data: {"type":"response.output_item.done","output_index":1,"sequence_number":7,"item":{"type":"web_search_call","id":"ws_1","status":"completed","action":{"type":"search","queries":["recorded query"]}}}`+"\n\n")
+		_, _ = io.WriteString(response, `data: {"type":"response.completed","sequence_number":8,"response":{"usage":{"input_tokens":7,"output_tokens":3,"total_tokens":10,"input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":0}}}}`+"\n\n")
 		_, _ = io.WriteString(response, "data: [DONE]\n\n")
 	}))
 	t.Cleanup(server.Close)
@@ -178,21 +183,29 @@ func TestOpenAIRecordedTransportFragmentedStream(t *testing.T) {
 	if err := stream.Err(); err != nil {
 		t.Fatalf("consume stream: %v", err)
 	}
-	if len(partials) != 4 {
-		t.Fatalf("expected 4 partials, got %d: %#v", len(partials), partials)
+	if len(partials) != 9 {
+		t.Fatalf("expected 9 partials, got %d: %#v", len(partials), partials)
 	}
 	initial := partials[0].Delta.Part.ToolCallPartDelta
-	if initial == nil || initial.ToolCallID == nil || *initial.ToolCallID != "call_1" || initial.ToolName == nil || *initial.ToolName != "lookup" || initial.Args == nil || *initial.Args != "" {
+	if initial == nil || initial.ToolCallID == nil || *initial.ToolCallID != "call_1" || initial.Call.Function == nil || initial.Call.Function.Name == nil || *initial.Call.Function.Name != "lookup" || initial.Call.Function.Args == nil || *initial.Call.Function.Args != "" {
 		t.Fatalf("unexpected initial tool delta: %#v", partials[0])
 	}
-	if args := partials[1].Delta.Part.ToolCallPartDelta.Args; args == nil || *args != `{"city":` {
+	if args := partials[1].Delta.Part.ToolCallPartDelta.Call.Function.Args; args == nil || *args != `{"city":` {
 		t.Fatalf("unexpected first argument delta: %#v", partials[1])
 	}
-	if args := partials[2].Delta.Part.ToolCallPartDelta.Args; args == nil || *args != `"Hanoi"}` {
+	if args := partials[2].Delta.Part.ToolCallPartDelta.Call.Function.Args; args == nil || *args != `"Hanoi"}` {
 		t.Fatalf("unexpected second argument delta: %#v", partials[2])
 	}
-	if partials[3].Delta != nil || partials[3].Usage == nil || partials[3].Usage.InputTokens != 7 || partials[3].Usage.OutputTokens != 3 {
-		t.Fatalf("unexpected usage-only partial: %#v", partials[3])
+	initialWeb := partials[3].Delta.Part.ToolCallPartDelta
+	if initialWeb == nil || initialWeb.Call.WebSearch == nil || initialWeb.Call.WebSearch.Action != nil || initialWeb.Call.WebSearch.Status == nil || *initialWeb.Call.WebSearch.Status != llmsdk.WebSearchToolCallStatusInProgress {
+		t.Fatalf("unexpected initial web-search delta: %#v", partials[3])
+	}
+	completedWeb := partials[7].Delta.Part.ToolCallPartDelta
+	if completedWeb == nil || completedWeb.Call.WebSearch == nil || completedWeb.Call.WebSearch.Action == nil || completedWeb.Call.WebSearch.Action.Type != "search" || len(completedWeb.Call.WebSearch.Action.Queries) != 1 || completedWeb.Call.WebSearch.Action.Queries[0] != "recorded query" {
+		t.Fatalf("unexpected completed web-search delta: %#v", partials[7])
+	}
+	if partials[8].Delta != nil || partials[8].Usage == nil || partials[8].Usage.InputTokens != 7 || partials[8].Usage.OutputTokens != 3 {
+		t.Fatalf("unexpected usage-only partial: %#v", partials[8])
 	}
 }
 

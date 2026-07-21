@@ -20,6 +20,7 @@ export type Part =
 export type PartDelta =
   | TextPartDelta
   | ToolCallPartDelta
+  | ToolResultPartDelta
   | ImagePartDelta
   | AudioPartDelta
   | ReasoningPartDelta;
@@ -157,14 +158,7 @@ export interface ToolCallPart {
    * The ID of the tool call, used to match the tool result with the tool call.
    */
   tool_call_id: string;
-  /**
-   * The name of the tool to call.
-   */
-  tool_name: string;
-  /**
-   * The arguments to pass to the tool.
-   */
-  args: Record<string, unknown>;
+  call: ToolCall;
   /**
    * The provider-specific signature used to preserve reasoning/tool continuity.
    */
@@ -175,6 +169,23 @@ export interface ToolCallPart {
    */
   id?: string;
 }
+export type ToolCall = FunctionToolCall | WebSearchToolCall;
+export interface FunctionToolCall {
+  type: "function";
+  name: string;
+  args: Record<string, unknown>;
+}
+export type WebSearchToolCallStatus =
+  "in_progress" | "searching" | "completed" | "failed";
+export type WebSearchAction =
+  | { type: "search"; queries: string[] }
+  | { type: "open_page"; url: string }
+  | { type: "find_in_page"; url: string; pattern: string };
+export interface WebSearchToolCall {
+  type: "web_search";
+  action?: WebSearchAction;
+  status?: WebSearchToolCallStatus;
+}
 /**
  * A part of the message that represents the result of a tool call.
  */
@@ -184,20 +195,30 @@ export interface ToolResultPart {
    * The ID of the tool call from previous assistant message.
    */
   tool_call_id: string;
-  /**
-   * The name of the tool that was called.
-   */
-  tool_name: string;
-  /**
-   * The content of the tool result.
-   * This may include non-text parts such as images or audio.
-   * Provider support varies by model API.
-   */
-  content: Part[];
+  result: ToolResult;
   /**
    * The terminal status of the tool call.
    */
   status: ToolResultStatus;
+}
+export type ToolResult = FunctionToolResult | WebSearchToolResult;
+export interface FunctionToolResult {
+  type: "function";
+  name: string;
+  content: Part[];
+}
+export interface WebSearchSource {
+  url: string;
+  title?: string;
+  page_age?: string;
+  /** Opaque provider data required to replay this source to the same provider. */
+  signature?: string;
+}
+export interface WebSearchToolResult {
+  type: "web_search";
+  sources: WebSearchSource[];
+  /** Provider error code required to replay a failed hosted-search result. */
+  error_code?: string;
 }
 /**
  * A part of the message that represents the model reasoning.
@@ -286,14 +307,7 @@ export interface ToolCallPartDelta {
    * The ID of the tool call, used to match the tool result with the tool call.
    */
   tool_call_id?: string;
-  /**
-   * The name of the tool to call.
-   */
-  tool_name?: string;
-  /**
-   * The partial JSON string of the arguments to pass to the tool.
-   */
-  args?: string;
+  call: ToolCallDelta;
   /**
    * The provider-specific signature used to preserve reasoning/tool continuity.
    */
@@ -303,6 +317,25 @@ export interface ToolCallPartDelta {
    * This is different from tool_call_id which is used to match tool results.
    */
   id?: string;
+}
+export type ToolCallDelta = FunctionToolCallDelta | WebSearchToolCallDelta;
+export interface FunctionToolCallDelta {
+  type: "function";
+  name?: string;
+  /** The partial JSON string of the arguments to pass to the tool. */
+  args?: string;
+}
+export interface WebSearchToolCallDelta {
+  type: "web_search";
+  action?: WebSearchAction;
+  status?: WebSearchToolCallStatus;
+}
+/** An atomic delta containing a hosted or client tool result. */
+export interface ToolResultPartDelta {
+  type: "tool-result";
+  tool_call_id: string;
+  result: ToolResult;
+  status: ToolResultStatus;
 }
 /**
  * A delta update for an image part, used in streaming of an image message.

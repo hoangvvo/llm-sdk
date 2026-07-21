@@ -69,14 +69,17 @@ async fn main() {
         let mut tool_results: Vec<Part> = Vec::new();
 
         for call in tool_calls {
-            let sample = match call.tool_name.as_str() {
+            let llm_sdk::ToolCall::Function(function) = &call.call else {
+                continue;
+            };
+            let sample = match function.name.as_str() {
                 "get_color_sample" => get_color_sample(),
                 other => panic!("tool {other} not found"),
             };
 
             tool_results.push(Part::tool_result(
                 call.tool_call_id.clone(),
-                call.tool_name.clone(),
+                function.name.clone(),
                 vec![Part::image(sample.data, sample.mime_type)],
             ));
         }

@@ -36,11 +36,14 @@ import type {
 } from "./types.ts";
 
 function createCancelledToolItem(toolCall: ToolCallPart): AgentItemTool {
+  if (toolCall.call.type !== "function") {
+    throw new AgentInvariantError("Cannot cancel a provider-hosted tool call");
+  }
   return {
     type: "tool",
     tool_call_id: toolCall.tool_call_id,
-    tool_name: toolCall.tool_name,
-    input: toolCall.args,
+    tool_name: toolCall.call.name,
+    input: toolCall.call.args,
     output: [],
     status: "cancelled",
   };
@@ -285,7 +288,12 @@ export class RunSession<TContext> {
       throw new AgentInvariantError("No content in the assistant message.");
     }
 
-    const toolCallParts = content.filter((part) => part.type === "tool-call");
+    const allToolCallParts = content.filter(
+      (part) => part.type === "tool-call",
+    );
+    const toolCallParts = allToolCallParts.filter(
+      (part) => part.call.type === "function",
+    );
 
     if (!toolCallParts.length) {
       yield {
@@ -297,7 +305,7 @@ export class RunSession<TContext> {
     }
 
     const toolCallIds = new Set<string>();
-    for (const toolCallPart of toolCallParts) {
+    for (const toolCallPart of allToolCallParts) {
       if (toolCallIds.has(toolCallPart.tool_call_id)) {
         throw new AgentInvariantError(
           `Duplicate tool call ID: ${toolCallPart.tool_call_id}`,
@@ -315,16 +323,16 @@ export class RunSession<TContext> {
         yield* createToolCancellationEvents(pendingToolCalls.slice(index));
         return;
       }
+      const call = toolCallPart.call;
+      if (call.type !== "function") continue;
 
       const agentTool = tools.find(
         (tool): tool is AgentFunctionTool<TContext> =>
-          tool.type === "function" && tool.name === toolCallPart.tool_name,
+          tool.type === "function" && tool.name === call.name,
       );
 
       if (!agentTool) {
-        throw new AgentInvariantError(
-          `Tool ${toolCallPart.tool_name} not found in agent`,
-        );
+        throw new AgentInvariantError(`Tool ${call.name} not found in agent`);
       }
 
       let toolRes;
@@ -335,11 +343,7 @@ export class RunSession<TContext> {
           agentTool.description,
           async () => {
             try {
-              return await agentTool.execute(
-                toolCallPart.args,
-                this.#context,
-                state,
-              );
+              return await agentTool.execute(call.args, this.#context, state);
             } catch (e) {
               throw new AgentToolExecutionError(e);
             }
@@ -353,9 +357,9 @@ export class RunSession<TContext> {
 
       const agentItemTool: AgentItemTool = {
         type: "tool",
-        tool_name: toolCallPart.tool_name,
+        tool_name: call.name,
         tool_call_id: toolCallPart.tool_call_id,
-        input: toolCallPart.args,
+        input: call.args,
         output: toolRes.content,
         status: toolRes.is_error ? "failed" : "completed",
       };
@@ -882,9 +886,12 @@ export class RunState {
         case "tool": {
           const toolResultPart: Part = {
             type: "tool-result",
-            tool_name: item.tool_name,
             tool_call_id: item.tool_call_id,
-            content: item.output,
+            result: {
+              type: "function",
+              name: item.tool_name,
+              content: item.output,
+            },
             status: item.status,
           };
 

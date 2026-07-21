@@ -29,7 +29,13 @@ test_group!(anthropic_model(), structured_output);
 test_group!(anthropic_model(), generation_options);
 test_group!(anthropic_model(), source_input);
 test_group!(anthropic_model(), multimodal_tool_result);
-test_group!(anthropic_model(), web_search);
+test_group!(
+    anthropic_model(),
+    web_search,
+    Some(crate::common::cases::RunTestCaseOptions {
+        profile: Some("anthropic_web_search"),
+    })
+);
 test_group!(anthropic_model(), image_input);
 test_group!(
     anthropic_model(),

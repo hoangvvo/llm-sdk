@@ -7,6 +7,8 @@ const TEST_DATA = JSON.parse(
 const PART_TYPES = new Set([
   "text",
   "tool_call",
+  "web_search_call",
+  "web_search_result",
   "audio",
   "image",
   "reasoning",
@@ -175,6 +177,18 @@ function resolvePath(path, root) {
   return clone(current);
 }
 
+function readPath(path, root) {
+  let current = root;
+  for (const segment of path.split(".")) {
+    const key = Array.isArray(current) ? Number(segment) : segment;
+    if (current === null || typeof current !== "object" || !(key in current)) {
+      return undefined;
+    }
+    current = current[key];
+  }
+  return current;
+}
+
 function resolveRefs(value, context) {
   if (Array.isArray(value)) {
     return value.map((child) => resolveRefs(child, context));
@@ -190,7 +204,7 @@ function resolveRefs(value, context) {
           (candidate) =>
             isObject(candidate) &&
             Object.entries(value.$where).every(([key, expected]) =>
-              Object.is(candidate[key], expected),
+              Object.is(readPath(key, candidate), expected),
             ),
         );
         if (resolved === undefined) {
@@ -344,12 +358,33 @@ function assertionMatches(assertion, part) {
     case "tool_call":
       return (
         (part.type === "tool-call" || part.type === "tool_call") &&
-        part.tool_name === assertion.tool_name &&
+        (part.call?.type ?? "function") === "function" &&
+        (part.call?.name ?? part.tool_name) === assertion.tool_name &&
         (assertion.tool_call_id === false ||
           (typeof part.tool_call_id === "string" &&
             part.tool_call_id.length > 0)) &&
         (assertion.args === undefined ||
-          valueMatches(assertion.args, part.args))
+          valueMatches(assertion.args, part.call?.args ?? part.args))
+      );
+    case "web_search_call":
+      return (
+        (part.type === "tool-call" || part.type === "tool_call") &&
+        part.call?.type === "web_search" &&
+        typeof part.tool_call_id === "string" &&
+        part.tool_call_id.length > 0 &&
+        (assertion.action !== true || isObject(part.call.action))
+      );
+    case "web_search_result":
+      return (
+        (part.type === "tool-result" || part.type === "tool_result") &&
+        part.result?.type === "web_search" &&
+        Array.isArray(part.result.sources) &&
+        (assertion.source_signature !== true ||
+          part.result.sources.some(
+            (source) =>
+              typeof source.signature === "string" &&
+              source.signature.length > 0,
+          ))
       );
     case "audio":
       return (
@@ -550,7 +585,7 @@ export function validateOutput({
   }
 
   const expectedToolCalls = expected.content.filter(
-    (part) => part.type === "tool_call",
+    (part) => part.type === "tool_call" || part.type === "web_search_call",
   ).length;
   const actualToolCalls = content.filter(
     (part) => part.type === "tool-call" || part.type === "tool_call",

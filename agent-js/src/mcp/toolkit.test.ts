@@ -174,9 +174,12 @@ suite("MCP toolkit", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "list_shuttles",
+              call: {
+                type: "function",
+                name: "list_shuttles",
+                args: { shift: "evening" },
+              },
               tool_call_id: "call_1",
-              args: { shift: "evening" },
             },
           ],
         },
@@ -227,9 +230,12 @@ suite("MCP toolkit", () => {
               content: [
                 {
                   type: "tool-call",
-                  tool_name: "list_shuttles",
+                  call: {
+                    type: "function",
+                    name: "list_shuttles",
+                    args: { shift: "evening" },
+                  },
                   tool_call_id: "call_1",
-                  args: { shift: "evening" },
                 },
               ],
             },
@@ -278,9 +284,12 @@ suite("MCP toolkit", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "list_shuttles",
+              call: {
+                type: "function",
+                name: "list_shuttles",
+                args: { shift: "evening" },
+              },
               tool_call_id: "call_1",
-              args: { shift: "evening" },
             },
           ],
         },
@@ -295,9 +304,12 @@ suite("MCP toolkit", () => {
           content: [
             {
               type: "tool-call",
-              tool_name: "list_shuttles_v2",
+              call: {
+                type: "function",
+                name: "list_shuttles_v2",
+                args: { shift: "evening" },
+              },
               tool_call_id: "call_2",
-              args: { shift: "evening" },
             },
           ],
         },
@@ -343,9 +355,12 @@ suite("MCP toolkit", () => {
               content: [
                 {
                   type: "tool-call",
-                  tool_name: "list_shuttles",
+                  call: {
+                    type: "function",
+                    name: "list_shuttles",
+                    args: { shift: "evening" },
+                  },
                   tool_call_id: "call_1",
-                  args: { shift: "evening" },
                 },
               ],
             },
@@ -411,9 +426,12 @@ suite("MCP toolkit", () => {
               content: [
                 {
                   type: "tool-call",
-                  tool_name: "list_shuttles_v2",
+                  call: {
+                    type: "function",
+                    name: "list_shuttles_v2",
+                    args: { shift: "evening" },
+                  },
                   tool_call_id: "call_2",
-                  args: { shift: "evening" },
                 },
               ],
             },

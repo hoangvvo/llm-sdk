@@ -99,6 +99,11 @@ async fn generate_handler(
 
     Json(completed_response(
         &json!([{
+            "type": "web_search_call",
+            "id": "ws_1",
+            "status": "completed",
+            "action": {"type": "search", "query": "recorded query", "queries": ["recorded query"], "sources": [{"type": "url", "url": "https://example.com/source"}]}
+        }, {
             "type": "message",
             "id": "msg_1",
             "role": "assistant",
@@ -139,7 +144,7 @@ async fn fragmented_stream_handler(body: Bytes) -> Response {
     .to_string();
     let completed = json!({
         "type": "response.completed",
-        "sequence_number": 3,
+        "sequence_number": 8,
         "response": completed_response(
             &json!([]),
             &json!({
@@ -172,6 +177,41 @@ async fn fragmented_stream_handler(body: Bytes) -> Response {
                 "output_index": 0,
                 "sequence_number": 2,
                 "delta": "\"Hanoi\"}"
+            })
+        )),
+        Bytes::from(format!(
+            "data: {}\n\n",
+            json!({
+                "type": "response.output_item.added",
+                "output_index": 1,
+                "sequence_number": 3,
+                "item": {"type": "web_search_call", "id": "ws_1", "status": "in_progress"}
+            })
+        )),
+        Bytes::from(format!(
+            "data: {}\n\n",
+            json!({"type": "response.web_search_call.in_progress", "item_id": "ws_1", "output_index": 1, "sequence_number": 4})
+        )),
+        Bytes::from(format!(
+            "data: {}\n\n",
+            json!({"type": "response.web_search_call.searching", "item_id": "ws_1", "output_index": 1, "sequence_number": 5})
+        )),
+        Bytes::from(format!(
+            "data: {}\n\n",
+            json!({"type": "response.web_search_call.completed", "item_id": "ws_1", "output_index": 1, "sequence_number": 6})
+        )),
+        Bytes::from(format!(
+            "data: {}\n\n",
+            json!({
+                "type": "response.output_item.done",
+                "output_index": 1,
+                "sequence_number": 7,
+                "item": {
+                    "type": "web_search_call",
+                    "id": "ws_1",
+                    "status": "completed",
+                    "action": {"type": "search", "query": "recorded query", "queries": ["recorded query"]}
+                }
             })
         )),
         Bytes::from(format!("data: {completed}\n\n")),
@@ -237,7 +277,14 @@ async fn sends_exact_generate_request_and_maps_recorded_response() {
         capture.authorization.lock().await.as_deref(),
         Some("Bearer test-token")
     );
-    assert_eq!(result.content, vec![Part::text("Recorded response")]);
+    assert_eq!(result.content.len(), 3);
+    assert!(
+        matches!(result.content[0], Part::ToolCall(ref call) if matches!(call.call, llm_sdk::ToolCall::WebSearch(_)))
+    );
+    assert!(
+        matches!(result.content[1], Part::ToolResult(ref result) if matches!(result.result, llm_sdk::ToolResult::WebSearch(_)))
+    );
+    assert_eq!(result.content[2], Part::text("Recorded response"));
     let usage = result.usage.expect("recorded usage");
     assert_eq!(usage.input_tokens, 4);
     assert_eq!(usage.output_tokens, 2);
@@ -300,28 +347,64 @@ async fn parses_fragmented_sse_split_tool_args_and_usage_only_chunks() {
         partials.push(partial.expect("decode recorded partial"));
     }
 
-    assert_eq!(partials.len(), 4);
+    assert_eq!(partials.len(), 9, "unexpected partials: {partials:#?}");
     let Some(PartDelta::ToolCall(initial)) = partials[0].delta.as_ref().map(|delta| &delta.part)
     else {
         panic!("expected initial tool-call delta");
     };
     assert_eq!(initial.id.as_deref(), Some("fc_1"));
     assert_eq!(initial.tool_call_id.as_deref(), Some("call_1"));
-    assert_eq!(initial.tool_name.as_deref(), Some("lookup"));
-    assert_eq!(initial.args.as_deref(), Some(""));
+    let llm_sdk::ToolCallDelta::Function(initial_call) = &initial.call else {
+        panic!("expected function call")
+    };
+    assert_eq!(initial_call.name.as_deref(), Some("lookup"));
+    assert_eq!(initial_call.args.as_deref(), Some(""));
     let Some(PartDelta::ToolCall(first_args)) = partials[1].delta.as_ref().map(|delta| &delta.part)
     else {
         panic!("expected first argument delta");
     };
-    assert_eq!(first_args.args.as_deref(), Some("{\"city\":"));
+    let llm_sdk::ToolCallDelta::Function(first_call) = &first_args.call else {
+        panic!("expected function call")
+    };
+    assert_eq!(first_call.args.as_deref(), Some("{\"city\":"));
     let Some(PartDelta::ToolCall(second_args)) =
         partials[2].delta.as_ref().map(|delta| &delta.part)
     else {
         panic!("expected second argument delta");
     };
-    assert_eq!(second_args.args.as_deref(), Some("\"Hanoi\"}"));
-    assert!(partials[3].delta.is_none());
-    let usage = partials[3].usage.as_ref().expect("usage-only partial");
+    let llm_sdk::ToolCallDelta::Function(second_call) = &second_args.call else {
+        panic!("expected function call")
+    };
+    assert_eq!(second_call.args.as_deref(), Some("\"Hanoi\"}"));
+    let Some(PartDelta::ToolCall(initial_web)) =
+        partials[3].delta.as_ref().map(|delta| &delta.part)
+    else {
+        panic!("expected initial web-search delta");
+    };
+    let llm_sdk::ToolCallDelta::WebSearch(initial_web_call) = &initial_web.call else {
+        panic!("expected web-search call")
+    };
+    assert!(initial_web_call.action.is_none());
+    assert_eq!(
+        initial_web_call.status,
+        Some(llm_sdk::WebSearchToolCallStatus::InProgress)
+    );
+    let Some(PartDelta::ToolCall(completed_web)) =
+        partials[7].delta.as_ref().map(|delta| &delta.part)
+    else {
+        panic!("expected completed web-search delta");
+    };
+    let llm_sdk::ToolCallDelta::WebSearch(completed_web_call) = &completed_web.call else {
+        panic!("expected web-search call")
+    };
+    assert_eq!(
+        completed_web_call.action,
+        Some(llm_sdk::WebSearchAction::Search {
+            queries: vec!["recorded query".to_string()]
+        })
+    );
+    assert!(partials[8].delta.is_none());
+    let usage = partials[8].usage.as_ref().expect("usage-only partial");
     assert_eq!(usage.input_tokens, 7);
     assert_eq!(usage.output_tokens, 3);
 }

@@ -1,8 +1,8 @@
 use crate::{
-    utils::audio_utils, AudioFormat, AudioPart, Citation, CitationDelta, ContentDelta, ImagePart,
-    LanguageModelError, LanguageModelResult, ModelResponse, ModelUsage, Part, PartDelta,
-    PartialModelResponse, ReasoningPart, ReasoningPartDelta, TextPart, ToolCallPart,
-    ToolCallPartDelta,
+    utils::audio_utils, AudioFormat, AudioPart, Citation, CitationDelta, ContentDelta,
+    FunctionToolCall, ImagePart, LanguageModelError, LanguageModelResult, ModelResponse,
+    ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningPart, ReasoningPartDelta, TextPart,
+    ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta, ToolResultPart, ToolResultPartDelta,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -41,6 +41,7 @@ struct AccumulatedAudioData {
 enum AccumulatedData {
     Text(AccumulatedTextData),
     ToolCall(ToolCallPartDelta),
+    ToolResult(ToolResultPartDelta),
     Image(AccumulatedImageData),
     Audio(AccumulatedAudioData),
     Reasoning(ReasoningPartDelta),
@@ -62,6 +63,7 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
                 .unwrap_or_default(),
         }),
         PartDelta::ToolCall(tool_delta) => AccumulatedData::ToolCall(tool_delta),
+        PartDelta::ToolResult(result_delta) => AccumulatedData::ToolResult(result_delta),
         PartDelta::Image(image_delta) => AccumulatedData::Image(AccumulatedImageData {
             data: image_delta.data.unwrap_or_default(),
             mime_type: image_delta.mime_type,
@@ -95,25 +97,9 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             }
         }
         (AccumulatedData::ToolCall(ref mut existing_tool), PartDelta::ToolCall(tool_delta)) => {
-            if let Some(tool_name) = tool_delta.tool_name {
-                existing_tool
-                    .tool_name
-                    .get_or_insert_default()
-                    .push_str(&tool_name);
-            }
-            if tool_delta.tool_call_id.is_some() {
-                existing_tool.tool_call_id = tool_delta.tool_call_id;
-            }
-            if let Some(args) = tool_delta.args {
-                existing_tool.args.get_or_insert_default().push_str(&args);
-            }
-            if tool_delta.signature.is_some() {
-                existing_tool.signature = tool_delta.signature;
-            }
-            if tool_delta.id.is_some() {
-                existing_tool.id = tool_delta.id;
-            }
+            merge_tool_call_delta(existing_tool, tool_delta, delta.index)?;
         }
+        (AccumulatedData::ToolResult(existing), PartDelta::ToolResult(delta)) => *existing = delta,
         (AccumulatedData::Image(ref mut existing_image), PartDelta::Image(image_delta)) => {
             if let Some(data) = image_delta.data {
                 existing_image.data.push_str(&data);
@@ -174,6 +160,42 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
         ))?,
     }
 
+    Ok(())
+}
+
+fn merge_tool_call_delta(
+    existing: &mut ToolCallPartDelta,
+    delta: ToolCallPartDelta,
+    index: usize,
+) -> Result<(), String> {
+    if delta.tool_call_id.is_some() {
+        existing.tool_call_id = delta.tool_call_id;
+    }
+    match (&mut existing.call, delta.call) {
+        (ToolCallDelta::Function(existing), ToolCallDelta::Function(delta)) => {
+            if let Some(name) = delta.name {
+                existing.name.get_or_insert_default().push_str(&name);
+            }
+            if let Some(args) = delta.args {
+                existing.args.get_or_insert_default().push_str(&args);
+            }
+        }
+        (ToolCallDelta::WebSearch(existing), ToolCallDelta::WebSearch(delta)) => {
+            if delta.action.is_some() {
+                existing.action = delta.action;
+            }
+            if delta.status.is_some() {
+                existing.status = delta.status;
+            }
+        }
+        _ => return Err(format!("Tool call type mismatch at index {index}")),
+    }
+    if delta.signature.is_some() {
+        existing.signature = delta.signature;
+    }
+    if delta.id.is_some() {
+        existing.id = delta.id;
+    }
     Ok(())
 }
 
@@ -256,19 +278,27 @@ fn create_tool_call_part(data: ToolCallPartDelta, index: usize) -> LanguageModel
         )
     })?;
 
-    let tool_name = data.tool_name.ok_or_else(|| {
-        LanguageModelError::Invariant(
-            "",
-            format!("Missing required field tool_name at index {index}"),
-        )
-    })?;
-
-    let args = data.args.unwrap_or_default();
-
+    let call = match data.call {
+        ToolCallDelta::Function(call) => {
+            let name = call.name.ok_or_else(|| {
+                LanguageModelError::Invariant(
+                    "",
+                    format!("Missing required field function name at index {index}"),
+                )
+            })?;
+            ToolCall::Function(FunctionToolCall {
+                name,
+                args: parse_tool_call_args(&call.args.unwrap_or_default())?,
+            })
+        }
+        ToolCallDelta::WebSearch(call) => ToolCall::WebSearch(crate::WebSearchToolCall {
+            action: call.action,
+            status: call.status,
+        }),
+    };
     Ok(Part::ToolCall(ToolCallPart {
         tool_call_id,
-        tool_name,
-        args: parse_tool_call_args(&args)?,
+        call,
         signature: data.signature,
         id: data.id,
     }))
@@ -349,6 +379,11 @@ fn create_part(data: AccumulatedData, index: usize) -> LanguageModelResult<Part>
     match data {
         AccumulatedData::Text(text_data) => create_text_part(text_data, index),
         AccumulatedData::ToolCall(tool_data) => create_tool_call_part(tool_data, index),
+        AccumulatedData::ToolResult(data) => Ok(Part::ToolResult(ToolResultPart {
+            tool_call_id: data.tool_call_id,
+            result: data.result,
+            status: data.status,
+        })),
         AccumulatedData::Image(data) => create_image_part(data, index),
         AccumulatedData::Audio(data) => create_audio_part(data),
         AccumulatedData::Reasoning(reasoning_data) => Ok(create_reasoning_part(reasoning_data)),

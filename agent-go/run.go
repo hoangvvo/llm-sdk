@@ -29,10 +29,14 @@ func attachRunSnapshot(err error, snapshot *AgentRunSnapshot) error {
 
 func emitToolCancellationEvents(currCh chan<- ProcessEvent, pendingToolCalls []*llmsdk.ToolCallPart) {
 	for _, toolCall := range pendingToolCalls {
+		call := toolCall.Call.Function
+		if call == nil {
+			continue
+		}
 		item := NewAgentItemTool(
 			toolCall.ToolCallID,
-			toolCall.ToolName,
-			toolCall.Args,
+			call.Name,
+			call.Args,
 			[]llmsdk.Part{},
 			llmsdk.ToolResultStatusCancelled,
 		)
@@ -267,10 +271,14 @@ func (s *RunSession[C]) process(
 			return
 		}
 
+		var allToolCallParts []*llmsdk.ToolCallPart
 		var toolCallParts []*llmsdk.ToolCallPart
 		for _, part := range content {
 			if part.ToolCallPart != nil {
-				toolCallParts = append(toolCallParts, part.ToolCallPart)
+				allToolCallParts = append(allToolCallParts, part.ToolCallPart)
+				if part.ToolCallPart.Call.Function != nil {
+					toolCallParts = append(toolCallParts, part.ToolCallPart)
+				}
 			}
 		}
 
@@ -286,8 +294,8 @@ func (s *RunSession[C]) process(
 			return
 		}
 
-		seenToolCallIDs := make(map[string]struct{}, len(toolCallParts))
-		for _, toolCallPart := range toolCallParts {
+		seenToolCallIDs := make(map[string]struct{}, len(allToolCallParts))
+		for _, toolCallPart := range allToolCallParts {
 			if _, exists := seenToolCallIDs[toolCallPart.ToolCallID]; exists {
 				errCh <- NewInvariantError(fmt.Sprintf("duplicate tool call ID: %s", toolCallPart.ToolCallID))
 				return
@@ -307,10 +315,14 @@ func (s *RunSession[C]) process(
 				emitToolCancellationEvents(currCh, pendingToolCalls[index:])
 				return
 			}
+			call := toolCallPart.Call.Function
+			if call == nil {
+				continue
+			}
 
 			var agentTool AgentFunctionTool[C]
 			for _, tool := range tools {
-				if tool.Name() == toolCallPart.ToolName {
+				if tool.Name() == call.Name {
 					agentTool = tool
 					break
 				}
@@ -318,7 +330,7 @@ func (s *RunSession[C]) process(
 
 			if agentTool == nil {
 				errCh <- NewInvariantError(
-					fmt.Sprintf("tool %s not found for tool call", toolCallPart.ToolName),
+					fmt.Sprintf("tool %s not found for tool call", call.Name),
 				)
 				return
 			}
@@ -326,10 +338,10 @@ func (s *RunSession[C]) process(
 			toolRes, err := startActiveToolSpan(
 				ctx,
 				toolCallPart.ToolCallID,
-				toolCallPart.ToolName,
+				call.Name,
 				agentTool.Description(),
 				func(ctx context.Context) (AgentToolResult, error) {
-					res, err := agentTool.Execute(ctx, toolCallPart.Args, s.contextVal, runState)
+					res, err := agentTool.Execute(ctx, call.Args, s.contextVal, runState)
 					if err != nil {
 						return AgentToolResult{}, NewToolExecutionError(err)
 					}
@@ -351,8 +363,8 @@ func (s *RunSession[C]) process(
 			}
 			item := NewAgentItemTool(
 				toolCallPart.ToolCallID,
-				toolCallPart.ToolName,
-				toolCallPart.Args,
+				call.Name,
+				call.Args,
 				toolRes.Content,
 				status,
 			)

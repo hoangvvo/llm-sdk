@@ -825,6 +825,10 @@ func (a *dataStreamProtocolAdapter) writeForReasoningPartDelta(index int, part *
 }
 
 func (a *dataStreamProtocolAdapter) writeForToolCallPartDelta(index int, part *llmsdk.ToolCallPartDelta) error {
+	call := part.Call.Function
+	if call == nil {
+		return nil
+	}
 	state, ok := a.toolCallStateMap[index]
 	if !ok {
 		if err := a.flushStates(); err != nil {
@@ -837,8 +841,8 @@ func (a *dataStreamProtocolAdapter) writeForToolCallPartDelta(index int, part *l
 	if part.ToolCallID != nil && *part.ToolCallID != "" {
 		state.toolCallID = *part.ToolCallID
 	}
-	if part.ToolName != nil && *part.ToolName != "" {
-		state.toolName = *part.ToolName
+	if call.Name != nil && *call.Name != "" {
+		state.toolName = *call.Name
 	}
 
 	if !state.didEmitStart && state.toolCallID != "" && state.toolName != "" {
@@ -851,11 +855,11 @@ func (a *dataStreamProtocolAdapter) writeForToolCallPartDelta(index int, part *l
 		}
 	}
 
-	if part.Args != nil && *part.Args != "" {
-		state.argsBuilder.WriteString(*part.Args)
+	if call.Args != nil && *call.Args != "" {
+		state.argsBuilder.WriteString(*call.Args)
 		return a.writer.Write(toolInputDeltaChunk{
 			ToolCallID:     state.toolCallID,
-			InputTextDelta: *part.Args,
+			InputTextDelta: *call.Args,
 		})
 	}
 

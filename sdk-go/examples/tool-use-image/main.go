@@ -82,13 +82,17 @@ func main() {
 
 			hasToolCalls = true
 			toolCallPart := part.ToolCallPart
+			call := toolCallPart.Call.Function
+			if call == nil {
+				continue
+			}
 
 			var toolResult colorSample
-			switch toolCallPart.ToolName {
+			switch call.Name {
 			case "get_color_sample":
 				toolResult = getColorSample()
 			default:
-				log.Fatalf("Tool %s not found", toolCallPart.ToolName)
+				log.Fatalf("Tool %s not found", call.Name)
 			}
 
 			if toolMessage == nil {
@@ -98,7 +102,7 @@ func main() {
 			toolMessage.Content = append(toolMessage.Content,
 				llmsdk.NewToolResultPart(
 					toolCallPart.ToolCallID,
-					toolCallPart.ToolName,
+					call.Name,
 					[]llmsdk.Part{
 						llmsdk.NewImagePart(toolResult.Data, toolResult.MimeType),
 					},

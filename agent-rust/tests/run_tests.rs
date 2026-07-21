@@ -683,7 +683,10 @@ async fn run_records_cancelled_tool_results_for_the_next_run() {
             panic!("expected tool result");
         };
         assert_eq!(result.status, ToolResultStatus::Cancelled);
-        assert!(result.content.is_empty());
+        let llm_sdk::ToolResult::Function(function_result) = &result.result else {
+            panic!("expected function tool result");
+        };
+        assert!(function_result.content.is_empty());
     }
 }
 
@@ -1669,6 +1672,41 @@ async fn run_passes_provider_hosted_tools_to_model() {
     let inputs = model.tracked_generate_inputs();
     assert_eq!(inputs.len(), 1);
     assert_eq!(inputs[0].tools, Some(vec![Tool::WebSearch(web_search)]));
+}
+
+#[tokio::test]
+async fn run_does_not_execute_provider_hosted_web_search() {
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_generate(ModelResponse {
+        content: vec![
+            Part::ToolCall(llm_sdk::ToolCallPart {
+                tool_call_id: "ws_1".to_string(),
+                call: llm_sdk::ToolCall::WebSearch(llm_sdk::WebSearchToolCall {
+                    action: None,
+                    status: Some(llm_sdk::WebSearchToolCallStatus::Completed),
+                }),
+                signature: None,
+                id: None,
+            }),
+            Part::text("done"),
+        ],
+        ..Default::default()
+    });
+    let session = new_run_session(Arc::new(AgentParams::new("test_agent", model)), ()).await;
+
+    let response = session
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Search",
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .await
+        .expect("run succeeds");
+    assert_eq!(response.content.len(), 2);
+    assert!(matches!(response.content[1], Part::Text(_)));
 }
 
 #[tokio::test]

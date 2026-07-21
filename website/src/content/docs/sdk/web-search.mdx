@@ -15,7 +15,7 @@ import {
   extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
 
-Web search lets a model retrieve current information with a provider-hosted tool. Add a `WebSearchTool` to the request; the provider executes the search and the SDK returns the answer as text with normalized [`Citation`](../language-model/#citation) metadata.
+Web search lets a model retrieve current information with a provider-hosted tool. Add a `WebSearchTool` to the request; the provider executes the search and the SDK returns its activity as typed tool call/result parts alongside answer text with normalized [`Citation`](../language-model/#citation) metadata.
 
 ## Configure web search
 
@@ -43,6 +43,31 @@ Web search lets a model retrieve current information with a provider-hosted tool
   </TabItem>
 </Tabs>
 
+## Search calls and results
+
+Hosted searches use the same outer envelopes as function tools, with a nested discriminator:
+
+```ts
+type ToolCallPart = {
+  type: "tool-call";
+  tool_call_id: string;
+  call: FunctionToolCall | WebSearchToolCall;
+};
+
+type ToolResultPart = {
+  type: "tool-result";
+  tool_call_id: string;
+  result: FunctionToolResult | WebSearchToolResult;
+  status: "completed" | "failed" | "cancelled";
+};
+```
+
+`WebSearchToolCall` can expose `search`, `open_page`, or `find_in_page` activity and its status. `WebSearchToolResult.sources` contains normalized URLs and titles when the provider returns source results. Citations remain attached to the generated text because they describe exactly which spans use those sources.
+
+Anthropic source signatures are preserved as opaque `WebSearchSource.signature` values so a response can be sent back to Anthropic without losing provider state. Failed Anthropic searches expose `error_code` because Anthropic requires that result block for exact replay. Google display-only rendered search HTML is intentionally not exposed.
+
+OpenAI always returns the search call, but source result objects are optional in its API response. Anthropic and Google normally return source results. Code should therefore treat `ToolResultPart` as provider-dependent while relying on citations for answer attribution.
+
 `allowed_domains` restricts results to specific domains, while `user_location` provides an approximate location for localized results. OpenAI and Anthropic support both options. Google supports the base web search tool and rejects these options rather than silently ignoring them.
 
 Web search is supported by OpenAI Responses, Anthropic Messages, and Google GenerateContent. It is not supported by the OpenAI Chat Completions, Cohere V2 Chat, or Mistral Chat Completions adapters.
@@ -65,7 +90,7 @@ The example defaults to OpenAI. Set `PROVIDER` and `MODEL` to run the same code 
 
 ## Stream with web search
 
-Streaming returns citation deltas with the text deltas. The accumulator combines them into citations on the final text parts.
+Streaming returns web-search call/status deltas, atomic result deltas when available, and citation deltas with text. The accumulator combines them into the same final parts returned by `generate`.
 
 <Tabs>
   <TabItem label="TypeScript">

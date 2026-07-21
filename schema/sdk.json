@@ -23,6 +23,7 @@
       "oneOf": [
         { "$ref": "#/definitions/TextPartDelta" },
         { "$ref": "#/definitions/ToolCallPartDelta" },
+        { "$ref": "#/definitions/ToolResultPartDelta" },
         { "$ref": "#/definitions/ImagePartDelta" },
         { "$ref": "#/definitions/AudioPartDelta" },
         { "$ref": "#/definitions/ReasoningPartDelta" }
@@ -196,21 +197,79 @@
           "type": "string",
           "description": "The ID of the tool call, used to match the tool result with the tool call."
         },
-        "tool_name": {
-          "type": "string",
-          "description": "The name of the tool to call."
-        },
-        "args": {
-          "type": "object",
-          "description": "The arguments to pass to the tool.",
-          "additionalProperties": true
-        },
+        "call": { "$ref": "#/definitions/ToolCall" },
         "id": {
           "type": "string",
           "description": "The ID of the tool call part, if applicable. This is different from tool_call_id which is used to match tool results."
         }
       },
-      "required": ["type", "tool_call_id", "tool_name", "args"],
+      "required": ["type", "tool_call_id", "call"],
+      "additionalProperties": false
+    },
+    "ToolCall": {
+      "description": "The provider-independent payload of a tool invocation.",
+      "oneOf": [
+        { "$ref": "#/definitions/FunctionToolCall" },
+        { "$ref": "#/definitions/WebSearchToolCall" }
+      ]
+    },
+    "FunctionToolCall": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "function" },
+        "name": { "type": "string" },
+        "args": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["type", "name", "args"],
+      "additionalProperties": false
+    },
+    "WebSearchToolCallStatus": {
+      "type": "string",
+      "enum": ["in_progress", "searching", "completed", "failed"]
+    },
+    "WebSearchAction": {
+      "oneOf": [
+        { "$ref": "#/definitions/WebSearchActionSearch" },
+        { "$ref": "#/definitions/WebSearchActionOpenPage" },
+        { "$ref": "#/definitions/WebSearchActionFindInPage" }
+      ]
+    },
+    "WebSearchActionSearch": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "search" },
+        "queries": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["type", "queries"],
+      "additionalProperties": false
+    },
+    "WebSearchActionOpenPage": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "open_page" },
+        "url": { "type": "string" }
+      },
+      "required": ["type", "url"],
+      "additionalProperties": false
+    },
+    "WebSearchActionFindInPage": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "find_in_page" },
+        "url": { "type": "string" },
+        "pattern": { "type": "string" }
+      },
+      "required": ["type", "url", "pattern"],
+      "additionalProperties": false
+    },
+    "WebSearchToolCall": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "web_search" },
+        "action": { "$ref": "#/definitions/WebSearchAction" },
+        "status": { "$ref": "#/definitions/WebSearchToolCallStatus" }
+      },
+      "required": ["type"],
       "additionalProperties": false
     },
     "ToolResultPart": {
@@ -222,18 +281,54 @@
           "type": "string",
           "description": "The ID of the tool call from previous assistant message."
         },
-        "tool_name": {
-          "type": "string",
-          "description": "The name of the tool that was called."
-        },
-        "content": {
-          "type": "array",
-          "description": "The content of the tool result.",
-          "items": { "$ref": "#/definitions/Part" }
-        },
+        "result": { "$ref": "#/definitions/ToolResult" },
         "status": { "$ref": "#/definitions/ToolResultStatus" }
       },
-      "required": ["type", "tool_call_id", "tool_name", "content", "status"],
+      "required": ["type", "tool_call_id", "result", "status"],
+      "additionalProperties": false
+    },
+    "ToolResult": {
+      "description": "The provider-independent payload of a tool result.",
+      "oneOf": [
+        { "$ref": "#/definitions/FunctionToolResult" },
+        { "$ref": "#/definitions/WebSearchToolResult" }
+      ]
+    },
+    "FunctionToolResult": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "function" },
+        "name": { "type": "string" },
+        "content": { "type": "array", "items": { "$ref": "#/definitions/Part" } }
+      },
+      "required": ["type", "name", "content"],
+      "additionalProperties": false
+    },
+    "WebSearchSource": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "title": { "type": "string" },
+        "page_age": { "type": "string" },
+        "signature": {
+          "type": "string",
+          "description": "Opaque provider data required to replay this source to the same provider."
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "WebSearchToolResult": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "web_search" },
+        "sources": { "type": "array", "items": { "$ref": "#/definitions/WebSearchSource" } },
+        "error_code": {
+          "type": "string",
+          "description": "Provider error code required to replay a failed hosted-search result."
+        }
+      },
+      "required": ["type", "sources"],
       "additionalProperties": false
     },
     "ReasoningPart": {
@@ -385,20 +480,51 @@
           "type": "string",
           "description": "The ID of the tool call, used to match the tool result with the tool call."
         },
-        "tool_name": {
-          "type": "string",
-          "description": "The name of the tool to call."
-        },
-        "args": {
-          "type": "string",
-          "description": "The partial JSON string of the arguments to pass to the tool."
-        },
+        "call": { "$ref": "#/definitions/ToolCallDelta" },
         "id": {
           "type": "string",
           "description": "The ID of the tool call part, if applicable. This is different from tool_call_id which is used to match tool results."
         }
       },
+      "required": ["type", "call"],
+      "additionalProperties": false
+    },
+    "ToolCallDelta": {
+      "oneOf": [
+        { "$ref": "#/definitions/FunctionToolCallDelta" },
+        { "$ref": "#/definitions/WebSearchToolCallDelta" }
+      ]
+    },
+    "FunctionToolCallDelta": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "function" },
+        "name": { "type": "string" },
+        "args": { "type": "string" }
+      },
       "required": ["type"],
+      "additionalProperties": false
+    },
+    "WebSearchToolCallDelta": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "web_search" },
+        "action": { "$ref": "#/definitions/WebSearchAction" },
+        "status": { "$ref": "#/definitions/WebSearchToolCallStatus" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ToolResultPartDelta": {
+      "type": "object",
+      "description": "An atomic delta containing a hosted or client tool result.",
+      "properties": {
+        "type": { "const": "tool-result" },
+        "tool_call_id": { "type": "string" },
+        "result": { "$ref": "#/definitions/ToolResult" },
+        "status": { "$ref": "#/definitions/ToolResultStatus" }
+      },
+      "required": ["type", "tool_call_id", "result", "status"],
       "additionalProperties": false
     },
     "ImagePartDelta": {

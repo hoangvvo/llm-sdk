@@ -7,9 +7,18 @@ use super::responses_api::{
     CustomToolCallOutput, FileSearchToolCall, FunctionCallOutputItemParam,
     FunctionShellCallItemParam, FunctionShellCallOutputItemParam, FunctionToolCall,
     ImageGenToolCall, InputMessage, Item, LocalShellToolCall, LocalShellToolCallOutput,
-    MCPApprovalRequest, MCPApprovalResponse, MCPListTools, MCPToolCall, OutputMessage,
+    MCPApprovalRequest, MCPApprovalResponse, MCPListTools, MCPToolCall, OutputItem, OutputMessage,
     ReasoningItem, ToolSearchCallItemParam, ToolSearchOutputItemParam, WebSearchToolCall,
 };
+
+fn decode_web_search_tool_call(mut value: Value) -> serde_json::Result<WebSearchToolCall> {
+    if let Some(object) = value.as_object_mut() {
+        object
+            .entry("action")
+            .or_insert_with(|| serde_json::json!({ "type": "unknown" }));
+    }
+    serde_json::from_value(value)
+}
 
 impl<'de> Deserialize<'de> for Item {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -36,7 +45,8 @@ impl<'de> Deserialize<'de> for Item {
             Some("mcp_approval_request") => decode!(MCPApprovalRequest, MCPApprovalRequest),
             Some("mcp_call") => decode!(MCPToolCall, MCPToolCall),
             Some("file_search_call") => decode!(FileSearchToolCall, FileSearchToolCall),
-            Some("web_search_call") => decode!(WebSearchToolCall, WebSearchToolCall),
+            Some("web_search_call") => Ok(decode_web_search_tool_call(value.clone())
+                .map_or_else(|_| Self::Unknown(value), Self::WebSearchToolCall)),
             Some("function_call") => decode!(FunctionToolCall, FunctionToolCall),
             Some("image_generation_call") => decode!(ImageGenToolCall, ImageGenToolCall),
             Some("local_shell_call_output") => {
@@ -93,6 +103,34 @@ impl<'de> Deserialize<'de> for Item {
             None if value.get("role").is_some() && value.get("content").is_some() => {
                 decode!(InputMessage, InputMessage)
             }
+            _ => Ok(Self::Unknown(value)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for OutputItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let item_type = value.get("type").and_then(Value::as_str);
+
+        macro_rules! decode {
+            ($variant:ident, $type:ty) => {{
+                return Ok(serde_json::from_value::<$type>(value.clone())
+                    .map(OutputItem::$variant)
+                    .unwrap_or_else(|_| OutputItem::Unknown(value)));
+            }};
+        }
+
+        match item_type {
+            Some("message") => decode!(OutputMessage, OutputMessage),
+            Some("function_call") => decode!(FunctionToolCall, FunctionToolCall),
+            Some("web_search_call") => Ok(decode_web_search_tool_call(value.clone())
+                .map_or_else(|_| Self::Unknown(value), Self::WebSearchToolCall)),
+            Some("image_generation_call") => decode!(ImageGenToolCall, ImageGenToolCall),
+            Some("reasoning") => decode!(ReasoningItem, ReasoningItem),
             _ => Ok(Self::Unknown(value)),
         }
     }

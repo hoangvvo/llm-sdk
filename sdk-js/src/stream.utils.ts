@@ -84,15 +84,19 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
     case "audio":
       return part;
     case "tool-call": {
-      const toolCall: ToolCallPartDelta = { type: "tool-call" };
+      const toolCall: ToolCallPartDelta = {
+        type: "tool-call",
+        call:
+          part.call.type === "function"
+            ? {
+                type: "function",
+                name: part.call.name,
+                args: JSON.stringify(part.call.args),
+              }
+            : { ...part.call },
+      };
       if (part.tool_call_id) {
         toolCall.tool_call_id = part.tool_call_id;
-      }
-      if (part.tool_name) {
-        toolCall.tool_name = part.tool_name;
-      }
-      if (typeof part.args === "object") {
-        toolCall.args = JSON.stringify(part.args);
       }
       if (part.signature) {
         toolCall.signature = part.signature;
@@ -102,6 +106,8 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
       }
       return toolCall;
     }
+    case "tool-result":
+      return part;
     case "reasoning": {
       const reasoning: ReasoningPartDelta = {
         type: "reasoning",

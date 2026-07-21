@@ -40,6 +40,7 @@ pub enum Part {
 pub enum PartDelta {
     Text(TextPartDelta),
     ToolCall(ToolCallPartDelta),
+    ToolResult(ToolResultPartDelta),
     Image(ImagePartDelta),
     Audio(AudioPartDelta),
     Reasoning(ReasoningPartDelta),
@@ -189,10 +190,7 @@ pub struct ToolCallPart {
     /// The ID of the tool call, used to match the tool result with the tool
     /// call.
     pub tool_call_id: String,
-    /// The name of the tool to call.
-    pub tool_name: String,
-    /// The arguments to pass to the tool.
-    pub args: Value,
+    pub call: ToolCall,
     /// The provider-specific signature used to preserve reasoning/tool
     /// continuity.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -210,10 +208,7 @@ pub struct ToolCallPart {
 pub struct ToolResultPart {
     /// The ID of the tool call from previous assistant message.
     pub tool_call_id: String,
-    /// The name of the tool that was called.
-    pub tool_name: String,
-    /// The content of the tool result.
-    pub content: Vec<Part>,
+    pub result: ToolResult,
     /// The terminal status of the tool call.
     pub status: ToolResultStatus,
 }
@@ -226,6 +221,84 @@ pub enum ToolResultStatus {
     Completed,
     Failed,
     Cancelled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolCall {
+    Function(FunctionToolCall),
+    WebSearch(WebSearchToolCall),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct FunctionToolCall {
+    pub name: String,
+    pub args: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum WebSearchToolCallStatus {
+    InProgress,
+    Searching,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum WebSearchAction {
+    Search { queries: Vec<String> },
+    OpenPage { url: String },
+    FindInPage { url: String, pattern: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct WebSearchToolCall {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<WebSearchAction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<WebSearchToolCallStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolResult {
+    Function(FunctionToolResult),
+    WebSearch(WebSearchToolResult),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct FunctionToolResult {
+    pub name: String,
+    pub content: Vec<Part>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct WebSearchSource {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_age: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct WebSearchToolResult {
+    pub sources: Vec<WebSearchSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
 }
 
 // A part of the message that represents the model reasoning.
@@ -341,12 +414,7 @@ pub struct ToolCallPartDelta {
     /// call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
-    /// The name of the tool to call.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_name: Option<String>,
-    /// The partial JSON string of the arguments to pass to the tool.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub args: Option<String>,
+    pub call: ToolCallDelta,
     /// The provider-specific signature used to preserve reasoning/tool
     /// continuity.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -356,6 +424,46 @@ pub struct ToolCallPartDelta {
     /// tool result with the tool call.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolCallDelta {
+    Function(FunctionToolCallDelta),
+    WebSearch(WebSearchToolCallDelta),
+}
+
+impl Default for ToolCallDelta {
+    fn default() -> Self {
+        Self::Function(FunctionToolCallDelta::default())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct FunctionToolCallDelta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct WebSearchToolCallDelta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<WebSearchAction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<WebSearchToolCallStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolResultPartDelta {
+    pub tool_call_id: String,
+    pub result: ToolResult,
+    pub status: ToolResultStatus,
 }
 
 /// A delta update for an image part, used in streaming of an image message.

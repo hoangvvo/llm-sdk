@@ -99,7 +99,8 @@ export class AnthropicModel implements LanguageModel {
     const stream = this.#anthropic.messages.stream(createParams, {
       signal: options?.signal,
     });
-    const providerToolBlockIndexes = new Set<number>();
+    const serverToolBlocks = new Map<number, { id: string; input: string }>();
+    const serverToolCallIndexes = new Map<string, number>();
 
     for await (const chunk of stream) {
       switch (chunk.type) {
@@ -132,15 +133,32 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
         case "content_block_start": {
-          const isProviderToolBlock =
-            chunk.content_block.type === "server_tool_use" ||
-            chunk.content_block.type === "web_search_tool_result";
-          if (isProviderToolBlock) {
-            // Anthropic streams provider-hosted tool arguments with the same
-            // input_json_delta shape as client tools. Track every server tool
-            // index so future hosted tools are not exposed as client calls.
-            providerToolBlockIndexes.add(chunk.index);
-            break;
+          if (
+            chunk.content_block.type === "server_tool_use" &&
+            chunk.content_block.name === "web_search"
+          ) {
+            serverToolBlocks.set(chunk.index, {
+              id: chunk.content_block.id,
+              input: "",
+            });
+            serverToolCallIndexes.set(chunk.content_block.id, chunk.index);
+          }
+          if (chunk.content_block.type === "web_search_tool_result") {
+            const callIndex = serverToolCallIndexes.get(
+              chunk.content_block.tool_use_id,
+            );
+            if (callIndex !== undefined) {
+              yield {
+                delta: {
+                  index: callIndex,
+                  part: {
+                    type: "tool-call",
+                    tool_call_id: chunk.content_block.tool_use_id,
+                    call: { type: "web_search", status: "completed" },
+                  },
+                },
+              };
+            }
           }
           const incomingContentDeltas =
             mapAnthropicRawContentBlockStartEvent(chunk);
@@ -151,12 +169,45 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
         case "content_block_delta": {
-          if (providerToolBlockIndexes.has(chunk.index)) break;
+          const serverToolBlock = serverToolBlocks.get(chunk.index);
+          if (serverToolBlock && chunk.delta.type === "input_json_delta") {
+            serverToolBlock.input += chunk.delta.partial_json;
+            break;
+          }
           const incomingContentDeltas =
             mapAnthropicRawContentBlockDeltaEvent(chunk);
           for (const delta of incomingContentDeltas) {
             const event: PartialModelResponse = { delta };
             yield event;
+          }
+          break;
+        }
+        case "content_block_stop": {
+          const serverToolBlock = serverToolBlocks.get(chunk.index);
+          if (!serverToolBlock) break;
+          serverToolBlocks.delete(chunk.index);
+          let query: unknown;
+          try {
+            query = (
+              JSON.parse(serverToolBlock.input || "{}") as { query?: unknown }
+            ).query;
+          } catch {
+            query = undefined;
+          }
+          if (typeof query === "string") {
+            yield {
+              delta: {
+                index: chunk.index,
+                part: {
+                  type: "tool-call",
+                  tool_call_id: serverToolBlock.id,
+                  call: {
+                    type: "web_search",
+                    action: { type: "search", queries: [query] },
+                  },
+                },
+              },
+            };
           }
           break;
         }
@@ -368,25 +419,55 @@ function convertToAnthropicSearchResultBlockParam(
 
 function convertToAnthropicToolUseBlockParam(
   part: ToolCallPart,
-): Anthropic.ToolUseBlockParam {
+): Anthropic.ToolUseBlockParam | Anthropic.ServerToolUseBlockParam {
+  if (part.call.type === "web_search") {
+    return {
+      type: "server_tool_use",
+      id: part.tool_call_id,
+      name: "web_search",
+      input:
+        part.call.action?.type === "search"
+          ? { query: part.call.action.queries[0] ?? "" }
+          : {},
+    };
+  }
   return {
     type: "tool_use",
     id: part.tool_call_id,
-    name: part.tool_name,
-    input: part.args,
+    name: part.call.name,
+    input: part.call.args,
   };
 }
 
 function convertToAnthropicToolResultBlockParam(
   part: ToolResultPart,
-): Anthropic.ToolResultBlockParam {
+): Anthropic.ToolResultBlockParam | Anthropic.WebSearchToolResultBlockParam {
+  if (part.result.type === "web_search") {
+    return {
+      type: "web_search_tool_result",
+      tool_use_id: part.tool_call_id,
+      content: part.result.error_code
+        ? {
+            type: "web_search_tool_result_error",
+            error_code: part.result
+              .error_code as Anthropic.WebSearchToolResultError["error_code"],
+          }
+        : part.result.sources.map((source) => ({
+            type: "web_search_result" as const,
+            url: source.url,
+            title: source.title ?? "",
+            encrypted_content: source.signature ?? "",
+            ...(source.page_age ? { page_age: source.page_age } : {}),
+          })),
+    };
+  }
   return {
     type: "tool_result",
     tool_use_id: part.tool_call_id,
     content:
-      part.content.length === 0 && part.status === "cancelled"
+      part.result.content.length === 0 && part.status === "cancelled"
         ? CANCELLED_TOOL_RESULT_FALLBACK_CONTENT
-        : part.content.map((part) => {
+        : part.result.content.map((part) => {
             const blockParam = convertToAnthropicContentBlockParam(part);
             if (
               blockParam.type !== "text" &&
@@ -522,11 +603,19 @@ function convertToAnthropicThinkingConfigParam(
 function mapAnthropicMessage(
   contentBlocks: Anthropic.Messages.ContentBlock[],
 ): Part[] {
-  return contentBlocks.map(mapAnthropicBlock).filter((b) => !!b);
+  const completedCalls = new Set(
+    contentBlocks.flatMap((block) =>
+      block.type === "web_search_tool_result" ? [block.tool_use_id] : [],
+    ),
+  );
+  return contentBlocks
+    .map((block) => mapAnthropicBlock(block, completedCalls))
+    .filter((b) => !!b);
 }
 
 function mapAnthropicBlock(
   block: Anthropic.Messages.ContentBlock,
+  completedCalls = new Set<string>(),
 ): Part | null {
   switch (block.type) {
     case "text":
@@ -535,9 +624,49 @@ function mapAnthropicBlock(
       return {
         type: "tool-call",
         tool_call_id: block.id,
-        tool_name: block.name,
-        args: block.input as Record<string, unknown>,
+        call: {
+          type: "function",
+          name: block.name,
+          args: block.input as Record<string, unknown>,
+        },
       };
+    case "server_tool_use": {
+      if (block.name !== "web_search") return null;
+      const input = block.input as { query?: unknown };
+      return {
+        type: "tool-call",
+        tool_call_id: block.id,
+        call: {
+          type: "web_search",
+          status: completedCalls.has(block.id) ? "completed" : "in_progress",
+          ...(typeof input.query === "string"
+            ? { action: { type: "search" as const, queries: [input.query] } }
+            : {}),
+        },
+      };
+    }
+    case "web_search_tool_result": {
+      const isError = !Array.isArray(block.content);
+      return {
+        type: "tool-result",
+        tool_call_id: block.tool_use_id,
+        result: {
+          type: "web_search",
+          sources: Array.isArray(block.content)
+            ? block.content.map((source) => ({
+                url: source.url,
+                title: source.title,
+                signature: source.encrypted_content,
+                ...(source.page_age ? { page_age: source.page_age } : {}),
+              }))
+            : [],
+          ...(!Array.isArray(block.content)
+            ? { error_code: block.content.error_code }
+            : {}),
+        },
+        status: isError ? "failed" : "completed",
+      };
+    }
     case "thinking":
       return {
         type: "reasoning",
@@ -606,7 +735,7 @@ function mapAnthropicRawContentBlockStartEvent(
 
   if (partDelta.type === "tool-call") {
     // Start event for tool call should not have content
-    partDelta.args = "";
+    if (partDelta.call.type === "function") partDelta.call.args = "";
   }
 
   return [
@@ -642,7 +771,7 @@ function mapAnthropicRawContentBlockDelta(
     case "input_json_delta":
       return {
         type: "tool-call",
-        args: delta.partial_json,
+        call: { type: "function", args: delta.partial_json },
       };
     case "thinking_delta":
       return {

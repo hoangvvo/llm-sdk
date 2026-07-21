@@ -293,7 +293,11 @@ function renderUntaggedGoUnion(declaration: UnionDeclaration): string {
   if (objectVariants.length > 0) {
     lines.push("\tcase map[string]interface{}:");
     lines.push(
-      ...renderGoObjectUntaggedCaseBody(objectVariants, declaration.name),
+      ...renderGoObjectUntaggedCaseBody(
+        objectVariants,
+        declaration.name,
+        declaration.untaggedDeserializeStrategy === "custom",
+      ),
     );
   }
   lines.push("\t}");
@@ -326,6 +330,7 @@ function renderGoUntaggedCaseBody(
 function renderGoObjectUntaggedCaseBody(
   variants: UnionDeclaration["variants"],
   unionName: string,
+  discriminatorFirst: boolean,
 ): string[] {
   const rankedVariants = [...variants].sort((left, right) => {
     const leftMatch =
@@ -353,6 +358,8 @@ function renderGoObjectUntaggedCaseBody(
     if (match.kind !== "object") {
       continue;
     }
+    const useDiscriminatorOnly =
+      discriminatorFirst && match.discriminator?.property === "type";
     const conditions: string[] = [];
     let hasNestedTaggedUnion = false;
     if (match.nestedTaggedUnion) {
@@ -378,10 +385,12 @@ function renderGoObjectUntaggedCaseBody(
     }
     if (match.discriminator) {
       conditions.push(
-        `raw${toGoFieldName(match.discriminator.property)}, ok := value[${JSON.stringify(match.discriminator.property)}]; (!ok || raw${toGoFieldName(match.discriminator.property)} == ${JSON.stringify(match.discriminator.value)})`,
+        useDiscriminatorOnly
+          ? `raw${toGoFieldName(match.discriminator.property)}, ok := value[${JSON.stringify(match.discriminator.property)}]; ok && raw${toGoFieldName(match.discriminator.property)} == ${JSON.stringify(match.discriminator.value)}`
+          : `raw${toGoFieldName(match.discriminator.property)}, ok := value[${JSON.stringify(match.discriminator.property)}]; (!ok || raw${toGoFieldName(match.discriminator.property)} == ${JSON.stringify(match.discriminator.value)})`,
       );
     }
-    if (match.requiredProperties.length > 0) {
+    if (match.requiredProperties.length > 0 && !useDiscriminatorOnly) {
       for (const property of match.requiredProperties) {
         conditions.push(`value[${JSON.stringify(property)}] != nil`);
       }

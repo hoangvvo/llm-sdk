@@ -202,6 +202,7 @@ impl LanguageModel for GoogleModel {
                         // Streaming support indices address grounding chunks accumulated
                         // across every response chunk, not only the current chunk.
                         let mut grounding_chunks: Vec<GroundingChunk> = Vec::new();
+                        let mut web_search_queries: Vec<String> = Vec::new();
                         let mut stream_text_part_mappings: HashMap<usize, usize> = HashMap::new();
 
                         while let Some(chunk) = chunk_stream.next().await {
@@ -224,32 +225,14 @@ impl LanguageModel for GoogleModel {
                                     Vec::new()
                                 };
 
-                                if let Some(mut grounding_metadata) = candidate.grounding_metadata.take() {
-                                    if let Some(chunks) = grounding_metadata.grounding_chunks.take() {
-                                        grounding_chunks.extend(chunks);
-                                    }
-                                    for (part_index, citation) in map_google_citations(&grounding_metadata, &grounding_chunks) {
-                                        let Some(sdk_part_index) = stream_text_part_mappings.get(&part_index) else {
-                                            continue;
-                                        };
-                                        let part = PartDelta::Text(TextPartDelta {
-                                            text: String::new(),
-                                            citation: Some(CitationDelta {
-                                                r#type: "citation".to_string(),
-                                                source: Some(citation.source),
-                                                title: citation.title,
-                                                cited_text: citation.cited_text,
-                                                start_index: citation.start_index,
-                                                end_index: citation.end_index,
-                                                signature: citation.signature,
-                                            }),
-                                            signature: None,
-                                        });
-                                        incoming_deltas.push(ContentDelta {
-                                            index: *sdk_part_index,
-                                            part,
-                                        });
-                                    }
+                                if let Some(grounding_metadata) = candidate.grounding_metadata.take() {
+                                    let (queries, citation_deltas) = map_google_stream_grounding(
+                                        grounding_metadata,
+                                        &mut grounding_chunks,
+                                        &stream_text_part_mappings,
+                                    );
+                                    web_search_queries.extend(queries);
+                                    incoming_deltas.extend(citation_deltas);
                                 }
 
                                 all_content_deltas.extend(incoming_deltas.clone());
@@ -273,6 +256,13 @@ impl LanguageModel for GoogleModel {
                                         .map(|pricing| usage.calculate_cost(pricing)),
                                     usage: Some(usage),
                                 };
+                            }
+                        }
+
+                        if !web_search_queries.is_empty() || !grounding_chunks.is_empty() {
+                            let index = all_content_deltas.iter().map(|delta| delta.index).max().map_or(0, |value| value + 1);
+                            for delta in map_google_web_search_deltas(web_search_queries, grounding_chunks, index) {
+                                yield PartialModelResponse { delta: Some(delta), usage: None, cost: None };
                             }
                         }
                     };
@@ -489,7 +479,10 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
         }],
         Part::Source(source_part) => convert_parts_to_google_parts(source_part.content)?,
         Part::ToolCall(tool_call_part) => {
-            let args = tool_call_part
+            let crate::ToolCall::Function(call) = tool_call_part.call else {
+                return Ok(vec![]);
+            };
+            let args = call
                 .args
                 .as_object()
                 .cloned()
@@ -502,7 +495,7 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
                 .collect();
             vec![GooglePart {
                 function_call: Some(FunctionCall {
-                    name: Some(tool_call_part.tool_name),
+                    name: Some(call.name),
                     args: Some(args),
                     id: Some(tool_call_part.tool_call_id),
                 }),
@@ -510,24 +503,23 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
                 ..Default::default()
             }]
         }
-        Part::ToolResult(tool_result_part) => vec![GooglePart {
-            function_response: Some(convert_to_google_function_result(tool_result_part)?),
-            ..Default::default()
-        }],
-    })
-}
-
-fn convert_to_google_function_result(
-    tool_result_part: crate::ToolResultPart,
-) -> LanguageModelResult<FunctionResponse> {
-    let (response, parts) =
-        convert_to_google_function_response(tool_result_part.content, tool_result_part.status)?;
-    Ok(FunctionResponse {
-        id: Some(tool_result_part.tool_call_id),
-        name: Some(tool_result_part.tool_name),
-        response: Some(response),
-        parts,
-        ..Default::default()
+        Part::ToolResult(tool_result_part) => {
+            let crate::ToolResult::Function(result) = tool_result_part.result else {
+                return Ok(vec![]);
+            };
+            let (response, parts) =
+                convert_to_google_function_response(result.content, tool_result_part.status)?;
+            vec![GooglePart {
+                function_response: Some(FunctionResponse {
+                    id: Some(tool_result_part.tool_call_id),
+                    name: Some(result.name),
+                    response: Some(response),
+                    parts,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }]
+        }
     })
 }
 
@@ -655,7 +647,128 @@ fn map_google_content(
             }
         }
     }
-    Ok(mapped.into_iter().flatten().collect())
+    let mut content: Vec<Part> = mapped.into_iter().flatten().collect();
+    if let Some(metadata) = grounding_metadata {
+        let queries = metadata.web_search_queries.clone().unwrap_or_default();
+        let sources: Vec<crate::WebSearchSource> = metadata
+            .grounding_chunks
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|chunk| {
+                let web = chunk.web.as_ref()?;
+                Some(crate::WebSearchSource {
+                    url: web.uri.clone()?,
+                    title: web.title.clone(),
+                    page_age: None,
+                    signature: None,
+                })
+            })
+            .collect();
+        if !queries.is_empty() || !sources.is_empty() {
+            let id = format!("call_{}", id_utils::generate_string(10));
+            content.push(Part::ToolCall(crate::ToolCallPart {
+                tool_call_id: id.clone(),
+                call: crate::ToolCall::WebSearch(crate::WebSearchToolCall {
+                    action: (!queries.is_empty())
+                        .then_some(crate::WebSearchAction::Search { queries }),
+                    status: Some(crate::WebSearchToolCallStatus::Completed),
+                }),
+                signature: None,
+                id: None,
+            }));
+            content.push(Part::ToolResult(crate::ToolResultPart {
+                tool_call_id: id,
+                result: crate::ToolResult::WebSearch(crate::WebSearchToolResult {
+                    sources,
+                    error_code: None,
+                }),
+                status: ToolResultStatus::Completed,
+            }));
+        }
+    }
+    Ok(content)
+}
+
+fn map_google_web_search_deltas(
+    queries: Vec<String>,
+    grounding_chunks: Vec<GroundingChunk>,
+    index: usize,
+) -> [ContentDelta; 2] {
+    let id = format!("call_{}", id_utils::generate_string(10));
+    let action = (!queries.is_empty()).then_some(crate::WebSearchAction::Search { queries });
+    let sources = grounding_chunks
+        .into_iter()
+        .filter_map(|chunk| {
+            let web = chunk.web?;
+            Some(crate::WebSearchSource {
+                url: web.uri?,
+                title: web.title,
+                page_age: None,
+                signature: None,
+            })
+        })
+        .collect();
+
+    [
+        ContentDelta {
+            index,
+            part: PartDelta::ToolCall(crate::ToolCallPartDelta {
+                tool_call_id: Some(id.clone()),
+                call: crate::ToolCallDelta::WebSearch(crate::WebSearchToolCallDelta {
+                    action,
+                    status: Some(crate::WebSearchToolCallStatus::Completed),
+                }),
+                signature: None,
+                id: None,
+            }),
+        },
+        ContentDelta {
+            index: index + 1,
+            part: PartDelta::ToolResult(crate::ToolResultPartDelta {
+                tool_call_id: id,
+                result: crate::ToolResult::WebSearch(crate::WebSearchToolResult {
+                    sources,
+                    error_code: None,
+                }),
+                status: ToolResultStatus::Completed,
+            }),
+        },
+    ]
+}
+
+fn map_google_stream_grounding(
+    mut metadata: GroundingMetadata,
+    grounding_chunks: &mut Vec<GroundingChunk>,
+    text_part_mappings: &HashMap<usize, usize>,
+) -> (Vec<String>, Vec<ContentDelta>) {
+    let queries = metadata.web_search_queries.take().unwrap_or_default();
+    if let Some(chunks) = metadata.grounding_chunks.take() {
+        grounding_chunks.extend(chunks);
+    }
+    let citations = map_google_citations(&metadata, grounding_chunks)
+        .into_iter()
+        .filter_map(|(part_index, citation)| {
+            let sdk_part_index = text_part_mappings.get(&part_index)?;
+            Some(ContentDelta {
+                index: *sdk_part_index,
+                part: PartDelta::Text(TextPartDelta {
+                    text: String::new(),
+                    citation: Some(CitationDelta {
+                        r#type: "citation".to_string(),
+                        source: Some(citation.source),
+                        title: citation.title,
+                        cited_text: citation.cited_text,
+                        start_index: citation.start_index,
+                        end_index: citation.end_index,
+                        signature: citation.signature,
+                    }),
+                    signature: None,
+                }),
+            })
+        })
+        .collect();
+    (queries, citations)
 }
 
 fn map_google_part(part: GooglePart) -> LanguageModelResult<Option<Part>> {
@@ -720,8 +833,10 @@ fn map_google_part(part: GooglePart) -> LanguageModelResult<Option<Part>> {
                 .id
                 // Google does not always return id, generate one if missing
                 .unwrap_or_else(|| id_utils::generate_string(10)),
-            tool_name: name,
-            args: json!(function_call.args.unwrap_or_default()),
+            call: crate::ToolCall::Function(crate::FunctionToolCall {
+                name,
+                args: json!(function_call.args.unwrap_or_default()),
+            }),
             signature: part.thought_signature,
             id: None,
         })))
@@ -932,4 +1047,24 @@ fn map_modality_token_counts(
     }
 
     Some(tokens_details)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::convert_to_google_parts;
+    use crate::{Part, ToolResult, ToolResultPart, ToolResultStatus, WebSearchToolResult};
+
+    #[test]
+    fn skips_hosted_web_search_results_when_replaying_history() {
+        let part = Part::ToolResult(ToolResultPart {
+            tool_call_id: "search_1".to_string(),
+            result: ToolResult::WebSearch(WebSearchToolResult {
+                sources: vec![],
+                error_code: None,
+            }),
+            status: ToolResultStatus::Completed,
+        });
+
+        assert!(convert_to_google_parts(part).unwrap().is_empty());
+    }
 }

@@ -21,7 +21,7 @@ suite("AnthropicModel", () => {
   test("multimodal_tool_result", (t) =>
     runTestGroup(t, model, "multimodal_tool_result"));
   test("web_search", { timeout: 120 * 1000 }, (t) =>
-    runTestGroup(t, model, "web_search"),
+    runTestGroup(t, model, "web_search", { profile: "anthropic_web_search" }),
   );
   test("image_input", (t) => runTestGroup(t, model, "image_input"));
   test("reasoning", { timeout: 120 * 1000 }, (t) =>

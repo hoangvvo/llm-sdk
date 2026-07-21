@@ -22,5 +22,12 @@ async fn main() {
         .await
         .unwrap();
 
-    println!("{:#?}", response.content);
+    for part in response.content {
+        match part {
+            Part::ToolCall(call) => println!("web search call: {:#?}", call.call),
+            Part::ToolResult(result) => println!("web search result: {:#?}", result.result),
+            Part::Text(text) => println!("{} {:#?}", text.text, text.citations),
+            _ => {}
+        }
+    }
 }

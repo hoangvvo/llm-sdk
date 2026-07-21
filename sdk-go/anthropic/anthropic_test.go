@@ -58,7 +58,7 @@ func TestMultimodalToolResult(t *testing.T) {
 }
 
 func TestWebSearch(t *testing.T) {
-	testcommon.RunTestGroup(t, model, "web_search")
+	testcommon.RunTestGroup(t, model, "web_search", testcommon.WithProfile("anthropic_web_search"))
 }
 
 func TestImageInput(t *testing.T) {

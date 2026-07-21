@@ -38,6 +38,7 @@ import type {
   ToolChoiceOption,
   ToolMessage,
   UserMessage,
+  WebSearchAction,
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 import type { OpenAIModelOptions } from "./options.ts";
@@ -299,11 +300,24 @@ function convertAssistantMessageToResponseInputItems(
           result: `data:${part.mime_type};base64,${part.data}`,
         };
       case "tool-call": {
+        if (part.call.type === "web_search") {
+          if (!part.call.action) {
+            throw new InvalidInputError(
+              "OpenAI web-search history requires an action",
+            );
+          }
+          return {
+            type: "web_search_call",
+            id: part.tool_call_id,
+            status: part.call.status ?? "completed",
+            action: convertToOpenAIWebSearchAction(part.call.action),
+          };
+        }
         const responseInputItem: OpenAI.Responses.ResponseInputItem = {
           type: "function_call",
           call_id: part.tool_call_id,
-          name: part.tool_name,
-          arguments: JSON.stringify(part.args),
+          name: part.call.name,
+          arguments: JSON.stringify(part.call.args),
         };
         if (part.id) {
           responseInputItem.id = part.id;
@@ -330,8 +344,10 @@ function convertToolMessageToResponseInputItems(
         );
       }
 
+      if (part.result.type === "web_search") return [];
+
       const toolResultPartContent = getCompatiblePartsWithoutSourceParts(
-        part.content,
+        part.result.content,
       );
 
       if (toolResultPartContent.length === 0) {
@@ -383,6 +399,45 @@ function convertToolMessageToResponseInputItems(
       );
     })
     .flat();
+}
+
+function convertToOpenAIWebSearchAction(
+  action: WebSearchAction,
+): OpenAI.Responses.ResponseFunctionWebSearch["action"] {
+  switch (action.type) {
+    case "search":
+      return { type: "search", queries: action.queries };
+    case "open_page":
+      return { type: "open_page", url: action.url };
+    case "find_in_page":
+      return {
+        type: "find_in_page",
+        url: action.url,
+        pattern: action.pattern,
+      };
+  }
+}
+
+function mapOpenAIWebSearchAction(
+  action: OpenAI.Responses.ResponseFunctionWebSearch["action"],
+): WebSearchAction {
+  switch (action.type) {
+    case "search": {
+      const legacyQuery = (action as { query?: string }).query;
+      return {
+        type: "search",
+        queries: action.queries ?? (legacyQuery ? [legacyQuery] : []),
+      };
+    }
+    case "open_page":
+      return { type: "open_page", url: action.url ?? "" };
+    case "find_in_page":
+      return {
+        type: "find_in_page",
+        url: action.url,
+        pattern: action.pattern,
+      };
+  }
 }
 
 // MARK: To Provider Tools
@@ -525,14 +580,45 @@ function mapOpenAIOutputItems(
         case "function_call": {
           const toolCallPart: ToolCallPart = {
             type: "tool-call",
-            args: JSON.parse(item.arguments) as Record<string, unknown>,
             tool_call_id: item.call_id,
-            tool_name: item.name,
+            call: {
+              type: "function",
+              name: item.name,
+              args: JSON.parse(item.arguments) as Record<string, unknown>,
+            },
           };
           if (item.id) {
             toolCallPart.id = item.id;
           }
           return [toolCallPart];
+        }
+        case "web_search_call": {
+          const call: ToolCallPart = {
+            type: "tool-call",
+            tool_call_id: item.id,
+            call: {
+              type: "web_search",
+              status: item.status,
+              action: mapOpenAIWebSearchAction(item.action),
+            },
+          };
+          if (item.action.type === "search" && item.action.sources?.length) {
+            return [
+              call,
+              {
+                type: "tool-result",
+                tool_call_id: item.id,
+                result: {
+                  type: "web_search",
+                  sources: item.action.sources.map((source) => ({
+                    url: source.url,
+                  })),
+                },
+                status: "completed",
+              },
+            ];
+          }
+          return [call];
         }
         case "image_generation_call": {
           const patchedItem = item as OpenAIPatchedResponsesImageGenerationCall;
@@ -656,8 +742,11 @@ function mapOpenAIStreamEvent(
       if (event.item.type === "function_call") {
         const toolCallPartDelta: ToolCallPartDelta = {
           type: "tool-call",
-          args: event.item.arguments,
-          tool_name: event.item.name,
+          call: {
+            type: "function",
+            args: event.item.arguments,
+            name: event.item.name,
+          },
           tool_call_id: event.item.call_id,
         };
         if (event.item.id) {
@@ -669,6 +758,28 @@ function mapOpenAIStreamEvent(
           part: toolCallPartDelta,
         };
         return contentDelta;
+      }
+      if (event.item.type === "web_search_call") {
+        const action = (
+          event.item as Omit<
+            OpenAI.Responses.ResponseFunctionWebSearch,
+            "action"
+          > & {
+            action?: OpenAI.Responses.ResponseFunctionWebSearch["action"];
+          }
+        ).action;
+        return {
+          index: event.output_index,
+          part: {
+            type: "tool-call",
+            tool_call_id: event.item.id,
+            call: {
+              type: "web_search",
+              status: event.item.status,
+              ...(action && { action: mapOpenAIWebSearchAction(action) }),
+            },
+          },
+        };
       }
 
       if (event.item.type === "reasoning") {
@@ -687,6 +798,29 @@ function mapOpenAIStreamEvent(
         }
       }
       break;
+    }
+    case "response.output_item.done": {
+      if (event.item.type !== "web_search_call") break;
+      const action = (
+        event.item as Omit<
+          OpenAI.Responses.ResponseFunctionWebSearch,
+          "action"
+        > & {
+          action?: OpenAI.Responses.ResponseFunctionWebSearch["action"];
+        }
+      ).action;
+      return {
+        index: event.output_index,
+        part: {
+          type: "tool-call",
+          tool_call_id: event.item.id,
+          call: {
+            type: "web_search",
+            status: event.item.status,
+            ...(action && { action: mapOpenAIWebSearchAction(action) }),
+          },
+        },
+      };
     }
     case "response.output_text.delta": {
       const part: TextPartDelta = {
@@ -722,12 +856,27 @@ function mapOpenAIStreamEvent(
       // Note: function name is added in "response.output_item.added"
       const part: ToolCallPartDelta = {
         type: "tool-call",
-        args: event.delta,
+        call: { type: "function", args: event.delta },
       };
       const index = event.output_index;
       return {
         index,
         part,
+      };
+    }
+
+    case "response.web_search_call.in_progress":
+    case "response.web_search_call.searching":
+    case "response.web_search_call.completed": {
+      const status = event.type.slice("response.web_search_call.".length) as
+        "in_progress" | "searching" | "completed";
+      return {
+        index: event.output_index,
+        part: {
+          type: "tool-call",
+          tool_call_id: event.item_id,
+          call: { type: "web_search", status },
+        },
       };
     }
 

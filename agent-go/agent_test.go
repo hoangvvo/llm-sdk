@@ -158,7 +158,8 @@ func TestAgent_Run(t *testing.T) {
 		if len(toolParts) != 1 || toolParts[0].ToolResultPart == nil {
 			t.Fatalf("expected one cancelled tool result, got %#v", toolParts)
 		}
-		if toolParts[0].ToolResultPart.Status != llmsdk.ToolResultStatusCancelled || len(toolParts[0].ToolResultPart.Content) != 0 {
+		functionResult := toolParts[0].ToolResultPart.Result.Function
+		if toolParts[0].ToolResultPart.Status != llmsdk.ToolResultStatusCancelled || functionResult == nil || len(functionResult.Content) != 0 {
 			t.Fatalf("unexpected cancelled tool result: %#v", toolParts[0].ToolResultPart)
 		}
 	})

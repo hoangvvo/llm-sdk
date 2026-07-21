@@ -71,14 +71,15 @@ do {
   let toolMessage: ToolMessage | undefined;
 
   for (const toolCallPart of toolCallParts) {
-    const { tool_call_id, tool_name } = toolCallPart;
+    if (toolCallPart.call.type !== "function") continue;
+    const { tool_call_id, call } = toolCallPart;
 
     const toolResult = (() => {
-      switch (tool_name) {
+      switch (call.name) {
         case "get_color_sample":
           return getColorSample();
         default:
-          throw new Error(`Tool ${tool_name} not found`);
+          throw new Error(`Tool ${call.name} not found`);
       }
     })();
 
@@ -90,15 +91,18 @@ do {
     toolMessage.content.push({
       type: "tool-result",
       status: "completed",
-      tool_name,
       tool_call_id,
-      content: [
-        {
-          type: "image",
-          mime_type: toolResult.mime_type,
-          data: toolResult.data,
-        },
-      ],
+      result: {
+        type: "function",
+        name: call.name,
+        content: [
+          {
+            type: "image",
+            mime_type: toolResult.mime_type,
+            data: toolResult.data,
+          },
+        ],
+      },
     });
   }
 

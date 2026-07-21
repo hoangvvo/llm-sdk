@@ -104,16 +104,28 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 			},
 		}
 	case part.ToolCallPart != nil:
-		argsStr := string(part.ToolCallPart.Args)
+		if part.ToolCallPart.Call.WebSearch != nil {
+			return llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolCallID: &part.ToolCallPart.ToolCallID,
+				Call:       llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Action: part.ToolCallPart.Call.WebSearch.Action, Status: part.ToolCallPart.Call.WebSearch.Status}},
+				Signature:  part.ToolCallPart.Signature, ID: part.ToolCallPart.ID,
+			}}
+		}
+		call := part.ToolCallPart.Call.Function
+		if call == nil {
+			return llmsdk.PartDelta{}
+		}
+		argsStr := string(call.Args)
 		return llmsdk.PartDelta{
 			ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
 				ToolCallID: &part.ToolCallPart.ToolCallID,
-				ToolName:   &part.ToolCallPart.ToolName,
-				Args:       &argsStr,
+				Call:       llmsdk.ToolCallDelta{Function: &llmsdk.FunctionToolCallDelta{Name: &call.Name, Args: &argsStr}},
 				Signature:  part.ToolCallPart.Signature,
 				ID:         part.ToolCallPart.ID,
 			},
 		}
+	case part.ToolResultPart != nil:
+		return llmsdk.PartDelta{ToolResultPartDelta: &llmsdk.ToolResultPartDelta{ToolCallID: part.ToolResultPart.ToolCallID, Result: part.ToolResultPart.Result, Status: part.ToolResultPart.Status}}
 	case part.ReasoningPart != nil:
 		return llmsdk.PartDelta{
 			ReasoningPartDelta: &llmsdk.ReasoningPartDelta{

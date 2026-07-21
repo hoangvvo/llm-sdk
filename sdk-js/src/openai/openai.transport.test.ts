@@ -76,8 +76,7 @@ suite("OpenAI recorded transport", () => {
             {
               type: "tool-call",
               tool_call_id: "call_1",
-              tool_name: "wait",
-              args: {},
+              call: { type: "function", name: "wait", args: {} },
             },
           ],
         },
@@ -87,8 +86,7 @@ suite("OpenAI recorded transport", () => {
             {
               type: "tool-result",
               tool_call_id: "call_1",
-              tool_name: "wait",
-              content: [],
+              result: { type: "function", name: "wait", content: [] },
               status: "cancelled",
             },
           ],
@@ -121,6 +119,17 @@ suite("OpenAI recorded transport", () => {
       response.end(
         JSON.stringify({
           output: [
+            {
+              type: "web_search_call",
+              id: "ws_1",
+              status: "completed",
+              action: {
+                type: "search",
+                query: "recorded query",
+                queries: ["recorded query"],
+                sources: [{ type: "url", url: "https://example.com/source" }],
+              },
+            },
             {
               type: "message",
               id: "msg_1",
@@ -173,7 +182,27 @@ suite("OpenAI recorded transport", () => {
       top_p: 0.8,
     });
     assert.deepEqual(result, {
-      content: [{ type: "text", text: "Recorded response" }],
+      content: [
+        {
+          type: "tool-call",
+          tool_call_id: "ws_1",
+          call: {
+            type: "web_search",
+            status: "completed",
+            action: { type: "search", queries: ["recorded query"] },
+          },
+        },
+        {
+          type: "tool-result",
+          tool_call_id: "ws_1",
+          result: {
+            type: "web_search",
+            sources: [{ url: "https://example.com/source" }],
+          },
+          status: "completed",
+        },
+        { type: "text", text: "Recorded response" },
+      ],
       usage: { input_tokens: 4, output_tokens: 2 },
     });
   });
@@ -218,8 +247,57 @@ suite("OpenAI recorded transport", () => {
       );
       response.write(
         `data: ${JSON.stringify({
-          type: "response.completed",
+          type: "response.output_item.added",
+          output_index: 1,
           sequence_number: 3,
+          item: {
+            type: "web_search_call",
+            id: "ws_1",
+            status: "in_progress",
+          },
+        })}\n\n`,
+      );
+      response.write(
+        `data: ${JSON.stringify({
+          type: "response.web_search_call.in_progress",
+          item_id: "ws_1",
+          output_index: 1,
+          sequence_number: 4,
+        })}\n\n`,
+      );
+      response.write(
+        `data: ${JSON.stringify({
+          type: "response.web_search_call.searching",
+          item_id: "ws_1",
+          output_index: 1,
+          sequence_number: 5,
+        })}\n\n`,
+      );
+      response.write(
+        `data: ${JSON.stringify({
+          type: "response.web_search_call.completed",
+          item_id: "ws_1",
+          output_index: 1,
+          sequence_number: 6,
+        })}\n\n`,
+      );
+      response.write(
+        `data: ${JSON.stringify({
+          type: "response.output_item.done",
+          output_index: 1,
+          sequence_number: 7,
+          item: {
+            type: "web_search_call",
+            id: "ws_1",
+            status: "completed",
+            action: { type: "search", queries: ["recorded query"] },
+          },
+        })}\n\n`,
+      );
+      response.write(
+        `data: ${JSON.stringify({
+          type: "response.completed",
+          sequence_number: 8,
           response: {
             usage: {
               input_tokens: 7,
@@ -250,21 +328,80 @@ suite("OpenAI recorded transport", () => {
             type: "tool-call",
             id: "fc_1",
             tool_call_id: "call_1",
-            tool_name: "lookup",
-            args: "",
+            call: { type: "function", name: "lookup", args: "" },
           },
         },
       },
       {
         delta: {
           index: 0,
-          part: { type: "tool-call", args: '{"city":' },
+          part: {
+            type: "tool-call",
+            call: { type: "function", args: '{"city":' },
+          },
         },
       },
       {
         delta: {
           index: 0,
-          part: { type: "tool-call", args: '"Hanoi"}' },
+          part: {
+            type: "tool-call",
+            call: { type: "function", args: '"Hanoi"}' },
+          },
+        },
+      },
+      {
+        delta: {
+          index: 1,
+          part: {
+            type: "tool-call",
+            tool_call_id: "ws_1",
+            call: { type: "web_search", status: "in_progress" },
+          },
+        },
+      },
+      {
+        delta: {
+          index: 1,
+          part: {
+            type: "tool-call",
+            tool_call_id: "ws_1",
+            call: { type: "web_search", status: "in_progress" },
+          },
+        },
+      },
+      {
+        delta: {
+          index: 1,
+          part: {
+            type: "tool-call",
+            tool_call_id: "ws_1",
+            call: { type: "web_search", status: "searching" },
+          },
+        },
+      },
+      {
+        delta: {
+          index: 1,
+          part: {
+            type: "tool-call",
+            tool_call_id: "ws_1",
+            call: { type: "web_search", status: "completed" },
+          },
+        },
+      },
+      {
+        delta: {
+          index: 1,
+          part: {
+            type: "tool-call",
+            tool_call_id: "ws_1",
+            call: {
+              type: "web_search",
+              status: "completed",
+              action: { type: "search", queries: ["recorded query"] },
+            },
+          },
         },
       },
       { usage: { input_tokens: 7, output_tokens: 3 } },

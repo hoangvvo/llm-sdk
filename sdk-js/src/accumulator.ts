@@ -16,6 +16,7 @@ import type {
   TextPart,
   ToolCallPart,
   ToolCallPartDelta,
+  ToolResultPartDelta,
 } from "./types.ts";
 import { sumModelUsage } from "./usage.utils.ts";
 import {
@@ -47,6 +48,7 @@ interface AccumulatedAudioData {
 type AccumulatedData =
   | AccumulatedTextData
   | ToolCallPartDelta
+  | ToolResultPartDelta
   | ImagePartDelta
   | ReasoningPartDelta
   | AccumulatedAudioData;
@@ -72,6 +74,9 @@ function createDelta(delta: ContentDelta): AccumulatedData {
     }
 
     case "tool-call":
+      return delta.part;
+
+    case "tool-result":
       return delta.part;
 
     case "image":
@@ -135,15 +140,36 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
     }
     case "tool-call": {
       const existingPart = existing as ToolCallPartDelta;
-      if (delta.part.tool_name) {
-        existingPart.tool_name =
-          (existingPart.tool_name ?? "") + delta.part.tool_name;
+      if (existingPart.call.type !== delta.part.call.type) {
+        throw new Error(
+          `Tool call type mismatch at index ${String(delta.index)}`,
+        );
+      }
+      if (
+        existingPart.call.type === "function" &&
+        delta.part.call.type === "function"
+      ) {
+        if (delta.part.call.name) {
+          existingPart.call.name =
+            (existingPart.call.name ?? "") + delta.part.call.name;
+        }
+        if (delta.part.call.args) {
+          existingPart.call.args =
+            (existingPart.call.args ?? "") + delta.part.call.args;
+        }
+      } else if (
+        existingPart.call.type === "web_search" &&
+        delta.part.call.type === "web_search"
+      ) {
+        if (delta.part.call.action) {
+          existingPart.call.action = delta.part.call.action;
+        }
+        if (delta.part.call.status) {
+          existingPart.call.status = delta.part.call.status;
+        }
       }
       if (delta.part.tool_call_id) {
         existingPart.tool_call_id = delta.part.tool_call_id;
-      }
-      if (delta.part.args) {
-        existingPart.args = (existingPart.args ?? "") + delta.part.args;
       }
       if (delta.part.signature) {
         existingPart.signature = delta.part.signature;
@@ -151,6 +177,14 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
       if (delta.part.id) {
         existingPart.id = delta.part.id;
       }
+      break;
+    }
+
+    case "tool-result": {
+      const existingPart = existing as ToolResultPartDelta;
+      existingPart.tool_call_id = delta.part.tool_call_id;
+      existingPart.result = delta.part.result;
+      existingPart.status = delta.part.status;
       break;
     }
 
@@ -266,19 +300,34 @@ function createTextPart(data: AccumulatedTextData): Part {
  * Creates a tool call part from accumulated tool call data
  */
 function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
-  if (!data.tool_call_id || !data.tool_name) {
+  if (!data.tool_call_id) {
     throw new Error(
       `Missing required fields at index ${String(index)}: ` +
-        `tool_call_id=${String(data.tool_call_id)}, tool_name=${String(data.tool_name)}`,
+        `tool_call_id=${String(data.tool_call_id)}`,
     );
   }
 
+  if (data.call.type === "web_search") {
+    return {
+      type: "tool-call",
+      tool_call_id: data.tool_call_id,
+      call: data.call,
+      ...(data.signature ? { signature: data.signature } : {}),
+      ...(data.id ? { id: data.id } : {}),
+    };
+  }
+  if (!data.call.name) {
+    throw new Error(`Missing function name at index ${String(index)}`);
+  }
   try {
     const toolCalPart: ToolCallPart = {
       type: "tool-call",
       tool_call_id: data.tool_call_id,
-      tool_name: data.tool_name,
-      args: JSON.parse(data.args ?? "{}") as Record<string, unknown>,
+      call: {
+        type: "function",
+        name: data.call.name,
+        args: JSON.parse(data.call.args ?? "{}") as Record<string, unknown>,
+      },
     };
     if (data.signature) {
       toolCalPart.signature = data.signature;
@@ -290,7 +339,7 @@ function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
   } catch (e) {
     throw new InvariantError(
       "",
-      `Invalid tool call arguments: ${String(data.args)}: ${(e as Error).message}`,
+      `Invalid tool call arguments: ${String(data.call.args)}: ${(e as Error).message}`,
     );
   }
 }
@@ -382,6 +431,9 @@ function createPart(data: AccumulatedData, index: number): Part {
 
     case "tool-call":
       return createToolCallPart(data, index);
+
+    case "tool-result":
+      return data;
 
     case "image":
       return createImagePart(data, index);

@@ -207,11 +207,41 @@
         }
       ]
     },
+    "anthropic_web_search": {
+      "applies_to": ["generate_web_search", "stream_web_search"],
+      "expect": {
+        "content": [
+          {
+            "type": "web_search_call",
+            "action": true
+          },
+          {
+            "type": "web_search_result",
+            "source_signature": true
+          },
+          {
+            "type": "text",
+            "text": "IANA",
+            "citation": {
+              "source": "^https?://(?:www\\.)?iana\\.org/",
+              "title": "IANA|iana|Reserved|reserved"
+            }
+          }
+        ]
+      }
+    },
     "google_web_search": {
       "applies_to": ["generate_web_search", "stream_web_search"],
       "input_omit": ["tools.*.allowed_domains", "tools.*.user_location"],
       "expect": {
         "content": [
+          {
+            "type": "web_search_call",
+            "action": true
+          },
+          {
+            "type": "web_search_result"
+          },
           {
             "type": "text",
             "text": "IANA",
@@ -495,13 +525,16 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_weather",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "{\"temperature\": 70, \"unit\": \"f\", \"description\": \"Sunny\"}"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"temperature\": 70, \"unit\": \"f\", \"description\": \"Sunny\"}"
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -566,13 +599,16 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_weather",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "{\"temperature\": 70, \"unit\": \"f\", \"description\": \"Sunny\"}"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"temperature\": 70, \"unit\": \"f\", \"description\": \"Sunny\"}"
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -636,14 +672,17 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_color_sample",
-                    "content": [
-                      {
-                        "type": "image",
-                        "mime_type": "image/png",
-                        "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4z8BAEmIY1TCqYfhqAACQ+f8B8u7oVwAAAABJRU5ErkJggg=="
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_color_sample",
+                      "content": [
+                        {
+                          "type": "image",
+                          "mime_type": "image/png",
+                          "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mP4z8BAEmIY1TCqYfhqAACQ+f8B8u7oVwAAAABJRU5ErkJggg=="
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -947,20 +986,23 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_first_secret_number",
-                    "content": [
-                      {
-                        "type": "source",
-                        "source": "doc1",
-                        "title": "my secret number",
-                        "content": [
-                          {
-                            "type": "text",
-                            "text": "24"
-                          }
-                        ]
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_first_secret_number",
+                      "content": [
+                        {
+                          "type": "source",
+                          "source": "doc1",
+                          "title": "my secret number",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "24"
+                            }
+                          ]
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -1256,6 +1298,10 @@
           "expect": {
             "content": [
               {
+                "type": "web_search_call",
+                "action": true
+              },
+              {
                 "type": "text",
                 "text": "IANA",
                 "citation": {
@@ -1290,6 +1336,10 @@
           "input_tools": ["web_search"],
           "expect": {
             "content": [
+              {
+                "type": "web_search_call",
+                "action": true
+              },
               {
                 "type": "text",
                 "text": "IANA",
@@ -1554,8 +1604,11 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_weather",
-                    "content": []
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": []
+                    }
                   }
                 ]
               },
@@ -1645,17 +1698,20 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls",
                       "$where": {
-                        "tool_name": "get_weather"
+                        "call.name": "get_weather"
                       },
                       "$path": "tool_call_id"
                     },
-                    "tool_name": "get_weather",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "{\"temperature\":70,\"unit\":\"F\",\"description\":\"Sunny\"}"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"temperature\":70,\"unit\":\"F\",\"description\":\"Sunny\"}"
+                        }
+                      ]
+                    }
                   },
                   {
                     "type": "tool-result",
@@ -1663,17 +1719,20 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls",
                       "$where": {
-                        "tool_name": "get_stock_price"
+                        "call.name": "get_stock_price"
                       },
                       "$path": "tool_call_id"
                     },
-                    "tool_name": "get_stock_price",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_stock_price",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -1753,13 +1812,16 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_weather",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "{\"temperature\":70,\"unit\":\"F\",\"description\":\"Sunny\"}"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"temperature\":70,\"unit\":\"F\",\"description\":\"Sunny\"}"
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -1795,13 +1857,16 @@
                     "tool_call_id": {
                       "$ref": "stages.1.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_stock_price",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_stock_price",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -1880,13 +1945,16 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_stock_price",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_stock_price",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -1959,13 +2027,16 @@
                     "tool_call_id": {
                       "$ref": "stages.2.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_weather",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "weather service unavailable"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "weather service unavailable"
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -2417,17 +2488,20 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_weather",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "Temperature: 70 F."
-                      },
-                      {
-                        "type": "text",
-                        "text": "Conditions: rainy."
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Temperature: 70 F."
+                        },
+                        {
+                          "type": "text",
+                          "text": "Conditions: rainy."
+                        }
+                      ]
+                    }
                   }
                 ]
               }
@@ -2508,13 +2582,16 @@
                     "tool_call_id": {
                       "$ref": "stages.0.tool_calls.0.tool_call_id"
                     },
-                    "tool_name": "get_stock_price",
-                    "content": [
-                      {
-                        "type": "text",
-                        "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
-                      }
-                    ]
+                    "result": {
+                      "type": "function",
+                      "name": "get_stock_price",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
+                        }
+                      ]
+                    }
                   }
                 ]
               }

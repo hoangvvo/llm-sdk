@@ -19,4 +19,12 @@ const response = await model.generate({
   tools: [{ type: "web_search" }],
 });
 
-console.dir(response.content, { depth: null });
+for (const part of response.content) {
+  if (part.type === "tool-call" && part.call.type === "web_search") {
+    console.log("web search", part.call.status, part.call.action);
+  } else if (part.type === "tool-result" && part.result.type === "web_search") {
+    console.log("sources", part.result.sources);
+  } else if (part.type === "text") {
+    console.log(part.text, part.citations ?? []);
+  }
+}

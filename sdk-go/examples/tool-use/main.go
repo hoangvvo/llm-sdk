@@ -113,22 +113,25 @@ func main() {
 
 		for _, part := range response.Content {
 			if part.ToolCallPart != nil {
+				call := part.ToolCallPart.Call.Function
+				if call == nil {
+					continue
+				}
 				hasToolCalls = true
 
 				toolCallPart := part.ToolCallPart
-				fmt.Printf("Tool call: %s(%s)\n", toolCallPart.ToolName, toolCallPart.Args)
+				fmt.Printf("Tool call: %s(%s)\n", call.Name, call.Args)
 
 				var toolResult any
-				switch toolCallPart.ToolName {
+				switch call.Name {
 				case "trade":
 					var args tradeArgs
-					argsBytes, _ := json.Marshal(toolCallPart.Args)
-					if err := json.Unmarshal(argsBytes, &args); err != nil {
+					if err := json.Unmarshal(call.Args, &args); err != nil {
 						log.Fatalf("Failed to parse trade args: %v", err)
 					}
 					toolResult = trade(args)
 				default:
-					log.Fatalf("Tool %s not found", toolCallPart.ToolName)
+					log.Fatalf("Tool %s not found", call.Name)
 				}
 
 				if toolMessage == nil {
@@ -139,7 +142,7 @@ func main() {
 				toolMessage.Content = append(toolMessage.Content,
 					llmsdk.NewToolResultPart(
 						toolCallPart.ToolCallID,
-						toolCallPart.ToolName,
+						call.Name,
 						[]llmsdk.Part{
 							llmsdk.NewTextPart(string(resultBytes)),
 						},

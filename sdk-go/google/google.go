@@ -174,6 +174,7 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 			// Streaming support indices address grounding chunks accumulated across
 			// every response chunk, not only the current chunk.
 			groundingChunks := []googleapi.GroundingChunk{}
+			webSearchQueries := map[string]bool{}
 			streamTextPartMappings := map[int]int{}
 
 			for sseStream.Next() {
@@ -201,6 +202,9 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 
 				}
 				if candidate.GroundingMetadata != nil {
+					for _, query := range candidate.GroundingMetadata.WebSearchQueries {
+						webSearchQueries[query] = true
+					}
 					groundingChunks = append(groundingChunks, candidate.GroundingMetadata.GroundingChunks...)
 					for _, support := range candidate.GroundingMetadata.GroundingSupports {
 						sdkPartIndex, ok := streamTextPartMappings[googleGroundingSupportPartIndex(support)]
@@ -233,6 +237,35 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					}
 					responseCh <- partial
 				}
+			}
+
+			if len(webSearchQueries) > 0 || len(groundingChunks) > 0 {
+				maxIndex := -1
+				for _, delta := range allContentDeltas {
+					if delta.Index > maxIndex {
+						maxIndex = delta.Index
+					}
+				}
+				id := fmt.Sprintf("call_%s", randutil.String(10))
+				status := llmsdk.WebSearchToolCallStatusCompleted
+				queries := make([]string, 0, len(webSearchQueries))
+				for query := range webSearchQueries {
+					queries = append(queries, query)
+				}
+				webCall := &llmsdk.WebSearchToolCall{Status: &status}
+				if len(queries) > 0 {
+					webCall.Action = &llmsdk.WebSearchAction{Type: "search", Queries: queries}
+				}
+				callDelta := &llmsdk.ContentDelta{Index: maxIndex + 1, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Status: &status, Action: webCall.Action}}}}}
+				responseCh <- &llmsdk.PartialModelResponse{Delta: callDelta}
+				sources := []llmsdk.WebSearchSource{}
+				for _, chunk := range groundingChunks {
+					if chunk.Web != nil && chunk.Web.Uri != nil {
+						sources = append(sources, llmsdk.WebSearchSource{URL: *chunk.Web.Uri, Title: chunk.Web.Title})
+					}
+				}
+				resultDelta := &llmsdk.ContentDelta{Index: maxIndex + 2, Part: llmsdk.PartDelta{ToolResultPartDelta: &llmsdk.ToolResultPartDelta{ToolCallID: id, Result: llmsdk.ToolResult{WebSearch: &llmsdk.WebSearchToolResult{Sources: sources}}, Status: llmsdk.ToolResultStatusCompleted}}}
+				responseCh <- &llmsdk.PartialModelResponse{Delta: resultDelta}
 			}
 
 			if err := sseStream.Err(); err != nil {
@@ -387,13 +420,20 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 			parts,
 		), nil
 	case part.ToolCallPart != nil:
+		if part.ToolCallPart.Call.WebSearch != nil {
+			return []googleapi.Part{}, nil
+		}
+		call := part.ToolCallPart.Call.Function
+		if call == nil {
+			return nil, llmsdk.NewUnsupportedError(Provider, "tool call has no supported payload")
+		}
 		var args map[string]any
-		if err := json.Unmarshal(part.ToolCallPart.Args, &args); err != nil {
+		if err := json.Unmarshal(call.Args, &args); err != nil {
 			return nil, llmsdk.NewInvalidInputError(fmt.Sprintf("invalid Google function arguments: %v", err))
 		}
 		googlePart := googleapi.Part{
 			FunctionCall: &googleapi.FunctionCall{
-				Name: &part.ToolCallPart.ToolName,
+				Name: &call.Name,
 				Args: args,
 				Id:   &part.ToolCallPart.ToolCallID,
 			},
@@ -403,17 +443,21 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 		}
 		return []googleapi.Part{googlePart}, nil
 	case part.ToolResultPart != nil:
-		response, parts, err := convertToGoogleFunctionResponse(
-			part.ToolResultPart.Content,
-			part.ToolResultPart.Status,
-		)
+		if part.ToolResultPart.Result.WebSearch != nil {
+			return []googleapi.Part{}, nil
+		}
+		result := part.ToolResultPart.Result.Function
+		if result == nil {
+			return nil, llmsdk.NewUnsupportedError(Provider, "tool result has no supported payload")
+		}
+		response, parts, err := convertToGoogleFunctionResponse(result.Content, part.ToolResultPart.Status)
 		if err != nil {
 			return nil, err
 		}
 		return []googleapi.Part{{
 			FunctionResponse: &googleapi.FunctionResponse{
 				Id:       &part.ToolResultPart.ToolCallID,
-				Name:     &part.ToolResultPart.ToolName,
+				Name:     &result.Name,
 				Response: response,
 				Parts:    parts,
 			},
@@ -614,6 +658,22 @@ func mapGoogleContent(parts []googleapi.Part, groundingMetadata *googleapi.Groun
 			result = append(result, *part)
 		}
 	}
+	if groundingMetadata != nil && (len(groundingMetadata.WebSearchQueries) > 0 || len(groundingMetadata.GroundingChunks) > 0) {
+		id := fmt.Sprintf("call_%s", randutil.String(10))
+		status := llmsdk.WebSearchToolCallStatusCompleted
+		call := &llmsdk.WebSearchToolCall{Status: &status}
+		if len(groundingMetadata.WebSearchQueries) > 0 {
+			call.Action = &llmsdk.WebSearchAction{Type: "search", Queries: groundingMetadata.WebSearchQueries}
+		}
+		result = append(result, llmsdk.Part{ToolCallPart: &llmsdk.ToolCallPart{ToolCallID: id, Call: llmsdk.ToolCall{WebSearch: call}}})
+		sources := []llmsdk.WebSearchSource{}
+		for _, chunk := range groundingMetadata.GroundingChunks {
+			if chunk.Web != nil && chunk.Web.Uri != nil {
+				sources = append(sources, llmsdk.WebSearchSource{URL: *chunk.Web.Uri, Title: chunk.Web.Title})
+			}
+		}
+		result = append(result, llmsdk.Part{ToolResultPart: &llmsdk.ToolResultPart{ToolCallID: id, Result: llmsdk.ToolResult{WebSearch: &llmsdk.WebSearchToolResult{Sources: sources}}, Status: llmsdk.ToolResultStatusCompleted}})
+	}
 	return result, nil
 }
 
@@ -670,7 +730,6 @@ func mapGooglePart(part googleapi.Part) (*llmsdk.Part, error) {
 			return nil, llmsdk.NewInvariantError(Provider, fmt.Sprintf("invalid function call arguments: %v", err))
 		}
 		mapped := llmsdk.NewToolCallPart(toolCallID, *part.FunctionCall.Name, args)
-		mapped.ToolCallPart.Args = args
 		mapped.ToolCallPart.Signature = part.ThoughtSignature
 		return &mapped, nil
 	}

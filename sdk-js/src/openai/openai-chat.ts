@@ -322,8 +322,14 @@ function convertToOpenAIMessages(
             );
           }
 
+          if (part.result.type !== "function") {
+            throw new UnsupportedError(
+              PROVIDER,
+              "OpenAI Chat Completions does not accept hosted web-search results",
+            );
+          }
           const toolResultPartContent = getCompatiblePartsWithoutSourceParts(
-            part.content,
+            part.result.content,
           );
 
           openaiMessages.push({
@@ -424,12 +430,18 @@ function convertToOpenAIAssistantMessageParamAudio(
 function convertToOpenAIToolCall(
   part: ToolCallPart,
 ): OpenAI.Chat.Completions.ChatCompletionMessageToolCall {
+  if (part.call.type !== "function") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "OpenAI Chat Completions does not accept hosted web-search calls",
+    );
+  }
   return {
     type: "function",
     id: part.tool_call_id,
     function: {
-      name: part.tool_name,
-      arguments: JSON.stringify(part.args),
+      name: part.call.name,
+      arguments: JSON.stringify(part.call.args),
     },
   };
 }
@@ -653,11 +665,14 @@ function mapOpenAIFunctionToolCall(
   return {
     type: "tool-call",
     tool_call_id: messageToolCall.id,
-    tool_name: messageToolCall.function.name,
-    args: JSON.parse(messageToolCall.function.arguments) as Record<
-      string,
-      unknown
-    >,
+    call: {
+      type: "function",
+      name: messageToolCall.function.name,
+      args: JSON.parse(messageToolCall.function.arguments) as Record<
+        string,
+        unknown
+      >,
+    },
   };
 }
 
@@ -716,15 +731,18 @@ function mapOpenAIDelta(
 
   if (delta.tool_calls) {
     delta.tool_calls.forEach((toolCall) => {
-      const part: ToolCallPartDelta = { type: "tool-call" };
+      const call: Extract<ToolCallPartDelta["call"], { type: "function" }> = {
+        type: "function",
+      };
+      const part: ToolCallPartDelta = { type: "tool-call", call };
       if (toolCall.id) {
         part.tool_call_id = toolCall.id;
       }
       if (toolCall.function?.name) {
-        part.tool_name = toolCall.function.name;
+        call.name = toolCall.function.name;
       }
       if (toolCall.function?.arguments) {
-        part.args = toolCall.function.arguments;
+        call.args = toolCall.function.arguments;
       }
       contentDeltas.push({
         index: guessDeltaIndex(

@@ -116,18 +116,35 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             transcript: audio_part.transcript,
         }),
         Part::ToolCall(tool_call_part) => PartDelta::ToolCall(ToolCallPartDelta {
-            tool_name: Some(tool_call_part.tool_name),
-            args: Some(tool_call_part.args.to_string()),
+            call: match tool_call_part.call {
+                crate::ToolCall::Function(call) => {
+                    crate::ToolCallDelta::Function(crate::FunctionToolCallDelta {
+                        name: Some(call.name),
+                        args: Some(call.args.to_string()),
+                    })
+                }
+                crate::ToolCall::WebSearch(call) => {
+                    crate::ToolCallDelta::WebSearch(crate::WebSearchToolCallDelta {
+                        action: call.action,
+                        status: call.status,
+                    })
+                }
+            },
             tool_call_id: Some(tool_call_part.tool_call_id),
             signature: tool_call_part.signature,
             id: tool_call_part.id,
+        }),
+        Part::ToolResult(result) => PartDelta::ToolResult(crate::ToolResultPartDelta {
+            tool_call_id: result.tool_call_id,
+            result: result.result,
+            status: result.status,
         }),
         Part::Reasoning(reasoning_part) => PartDelta::Reasoning(ReasoningPartDelta {
             text: Some(reasoning_part.text),
             signature: reasoning_part.signature,
             id: reasoning_part.id,
         }),
-        _ => Err(LanguageModelError::Invariant(
+        Part::Source(_) => Err(LanguageModelError::Invariant(
             "",
             "Cannot convert part to part delta".to_string(),
         ))?,

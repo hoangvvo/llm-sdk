@@ -223,6 +223,8 @@ impl LanguageModel for AnthropicModel {
 
                     let stream = try_stream! {
                         let mut provider_tool_block_indexes = HashSet::new();
+                        let mut server_tool_blocks = HashMap::<i64, (String, String)>::new();
+                        let mut server_tool_call_indexes = HashMap::new();
                         while let Some(event) = chunk_stream.next().await {
                             match event? {
                                 MessageStreamEvent::MessageStart(MessageStartEvent { message }) => {
@@ -262,18 +264,38 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::ContentBlockStart(ContentBlockStartEvent { content_block, index }) => {
-                                    let is_provider_tool_block = matches!(
-                                        &content_block,
-                                        ContentBlockStartEventContentBlock::ServerToolUse(_)
-                                            | ContentBlockStartEventContentBlock::WebSearchToolResult(_)
-                                    );
-                                    if is_provider_tool_block {
-                                        // Provider-hosted tool arguments use the same
-                                        // input_json_delta shape as client tools. Suppress every
-                                        // server tool so future hosted tools are not exposed as
-                                        // function calls the client is expected to run.
+                                    if let ContentBlockStartEventContentBlock::ServerToolUse(block) = &content_block {
                                         provider_tool_block_indexes.insert(index);
-                                        continue;
+                                        server_tool_call_indexes.insert(block.id.clone(), index);
+                                        if matches!(block.name, api::ResponseServerToolUseBlockName::WebSearch) {
+                                            server_tool_blocks.insert(index, (block.id.clone(), String::new()));
+                                        }
+                                    }
+                                    if let ContentBlockStartEventContentBlock::WebSearchToolResult(block) = &content_block {
+                                        if let Some(call_index) = server_tool_call_indexes.get(&block.tool_use_id) {
+                                            yield PartialModelResponse {
+                                                delta: Some(ContentDelta {
+                                                    index: usize::try_from(*call_index).map_err(|_| {
+                                                        LanguageModelError::Invariant(
+                                                            PROVIDER,
+                                                            format!("Anthropic stream content block index out of range: {call_index}"),
+                                                        )
+                                                    })?,
+                                                    part: PartDelta::ToolCall(ToolCallPartDelta {
+                                                        tool_call_id: None,
+                                                        call: crate::ToolCallDelta::WebSearch(
+                                                            crate::WebSearchToolCallDelta {
+                                                                action: None,
+                                                                status: Some(crate::WebSearchToolCallStatus::Completed),
+                                                            },
+                                                        ),
+                                                        signature: None,
+                                                        id: None,
+                                                    }),
+                                                }),
+                                                ..Default::default()
+                                            };
+                                        }
                                     }
                                     let deltas = map_anthropic_content_block_start_event(
                                         content_block,
@@ -294,6 +316,12 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::ContentBlockDelta(ContentBlockDeltaEvent { delta, index }) => {
+                                    if let Some((_, input)) = server_tool_blocks.get_mut(&index) {
+                                        if let ContentBlockDeltaEventDelta::InputJsonDelta(input_delta) = &delta {
+                                            input.push_str(&input_delta.partial_json);
+                                            continue;
+                                        }
+                                    }
                                     if provider_tool_block_indexes.contains(&index) {
                                         continue;
                                     }
@@ -312,6 +340,39 @@ impl LanguageModel for AnthropicModel {
                                             delta: Some(delta),
                                             ..Default::default()
                                         };
+                                    }
+                                }
+                                MessageStreamEvent::ContentBlockStop(event) => {
+                                    if let Some((id, input)) = server_tool_blocks.remove(&event.index) {
+                                        let query = serde_json::from_str::<Value>(&input)
+                                            .ok()
+                                            .and_then(|value| value.get("query")?.as_str().map(str::to_owned));
+                                        if let Some(query) = query {
+                                            yield PartialModelResponse {
+                                                delta: Some(ContentDelta {
+                                                    index: usize::try_from(event.index).map_err(|_| {
+                                                        LanguageModelError::Invariant(
+                                                            PROVIDER,
+                                                            format!("Anthropic stream content block index out of range: {}", event.index),
+                                                        )
+                                                    })?,
+                                                    part: PartDelta::ToolCall(ToolCallPartDelta {
+                                                        tool_call_id: Some(id),
+                                                        call: crate::ToolCallDelta::WebSearch(
+                                                            crate::WebSearchToolCallDelta {
+                                                                action: Some(crate::WebSearchAction::Search {
+                                                                    queries: vec![query],
+                                                                }),
+                                                                status: None,
+                                                            },
+                                                        ),
+                                                        signature: None,
+                                                        id: None,
+                                                    }),
+                                                }),
+                                                ..Default::default()
+                                            };
+                                        }
                                     }
                                 }
                                 _ => {}
@@ -501,16 +562,76 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
         Part::Source(source_part) => Ok(InputContentBlock::SearchResult(convert_source_part(
             source_part,
         )?)),
-        Part::ToolCall(tool_call) => Ok(InputContentBlock::ToolUse(RequestToolUseBlock {
-            cache_control: None,
-            caller: None,
-            id: tool_call.tool_call_id,
-            input: normalize_tool_args(tool_call.args)?,
-            name: tool_call.tool_name,
-        })),
-        Part::ToolResult(tool_result) => Ok(InputContentBlock::ToolResult(
-            convert_tool_result_part(tool_result)?,
-        )),
+        Part::ToolCall(tool_call) => match tool_call.call {
+            crate::ToolCall::Function(call) => {
+                Ok(InputContentBlock::ToolUse(RequestToolUseBlock {
+                    cache_control: None,
+                    caller: None,
+                    id: tool_call.tool_call_id,
+                    input: normalize_tool_args(call.args)?,
+                    name: call.name,
+                }))
+            }
+            crate::ToolCall::WebSearch(call) => {
+                let input = match call.action {
+                    Some(crate::WebSearchAction::Search { queries }) => {
+                        serde_json::json!({"query": queries.into_iter().next().unwrap_or_default()})
+                    }
+                    _ => serde_json::json!({}),
+                };
+                Ok(InputContentBlock::ServerToolUse(
+                    api::RequestServerToolUseBlock {
+                        cache_control: None,
+                        caller: None,
+                        id: tool_call.tool_call_id,
+                        input,
+                        name: api::RequestServerToolUseBlockName::WebSearch,
+                    },
+                ))
+            }
+        },
+        Part::ToolResult(tool_result) => match tool_result.result {
+            crate::ToolResult::Function(result) => Ok(InputContentBlock::ToolResult(
+                convert_tool_result_part(ToolResultPart {
+                    tool_call_id: tool_result.tool_call_id,
+                    result: crate::ToolResult::Function(result),
+                    status: tool_result.status,
+                })?,
+            )),
+            crate::ToolResult::WebSearch(result) => {
+                let content = if let Some(code) = result.error_code {
+                    api::RequestWebSearchToolResultBlockContent::RequestWebSearchToolResultError(
+                        api::RequestWebSearchToolResultError {
+                            error_code: match code.as_str() {
+                                "unavailable" => api::WebSearchToolResultErrorCode::Unavailable,
+                                "max_uses_exceeded" => {
+                                    api::WebSearchToolResultErrorCode::MaxUsesExceeded
+                                }
+                                "too_many_requests" => {
+                                    api::WebSearchToolResultErrorCode::TooManyRequests
+                                }
+                                "query_too_long" => api::WebSearchToolResultErrorCode::QueryTooLong,
+                                "request_too_large" => {
+                                    api::WebSearchToolResultErrorCode::RequestTooLarge
+                                }
+                                _ => api::WebSearchToolResultErrorCode::InvalidToolInput,
+                            },
+                            r#type: "web_search_tool_result_error".to_string(),
+                        },
+                    )
+                } else {
+                    api::RequestWebSearchToolResultBlockContent::RequestWebSearchToolResultBlockContentArray(Some(result.sources.into_iter().map(|source| api::RequestWebSearchResultBlock { encrypted_content: source.signature.unwrap_or_default(), page_age: source.page_age, title: source.title.unwrap_or_default(), r#type: "web_search_result".to_string(), url: source.url }).collect()))
+                };
+                Ok(InputContentBlock::WebSearchToolResult(
+                    api::RequestWebSearchToolResultBlock {
+                        cache_control: None,
+                        caller: None,
+                        content,
+                        tool_use_id: tool_result.tool_call_id,
+                    },
+                ))
+            }
+        },
         Part::Reasoning(reasoning_part) => Ok(convert_reasoning_part(reasoning_part)),
         Part::Audio(_) => Err(LanguageModelError::Unsupported(
             PROVIDER,
@@ -536,7 +657,13 @@ fn convert_tool_result_part(
     tool_result: ToolResultPart,
 ) -> LanguageModelResult<RequestToolResultBlock> {
     let mut content_blocks = Vec::new();
-    for part in tool_result.content {
+    let crate::ToolResult::Function(result) = tool_result.result else {
+        return Err(LanguageModelError::Unsupported(
+            PROVIDER,
+            "Expected function tool result".to_string(),
+        ));
+    };
+    for part in result.content {
         let block = convert_part_to_tool_result_content_block(part)?;
         content_blocks.push(block);
     }
@@ -693,8 +820,23 @@ fn convert_to_anthropic_thinking_config(reasoning: &ReasoningOptions) -> Thinkin
 
 fn map_anthropic_message(content: Vec<ContentBlock>) -> Vec<Part> {
     let mut parts = Vec::new();
+    let completed: std::collections::HashSet<String> = content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::WebSearchToolResult(result) => Some(result.tool_use_id.clone()),
+            _ => None,
+        })
+        .collect();
     for block in content {
         if let Some(part) = map_content_block(block) {
+            let mut part = part;
+            if let Part::ToolCall(call) = &mut part {
+                if completed.contains(&call.tool_call_id) {
+                    if let crate::ToolCall::WebSearch(web) = &mut call.call {
+                        web.status = Some(crate::WebSearchToolCallStatus::Completed);
+                    }
+                }
+            }
             parts.push(part);
         }
     }
@@ -711,6 +853,48 @@ fn map_content_block(block: ContentBlock) -> Option<Part> {
             Some(Part::Reasoning(map_redacted_thinking_block(redacted_block)))
         }
         ContentBlock::ToolUse(tool_use) => Some(Part::ToolCall(map_tool_use_block(tool_use))),
+        ContentBlock::ServerToolUse(block)
+            if matches!(block.name, api::ResponseServerToolUseBlockName::WebSearch) =>
+        {
+            let action = block
+                .input
+                .get("query")
+                .and_then(Value::as_str)
+                .map(|query| crate::WebSearchAction::Search {
+                    queries: vec![query.to_string()],
+                });
+            Some(Part::ToolCall(ToolCallPart {
+                tool_call_id: block.id,
+                call: crate::ToolCall::WebSearch(crate::WebSearchToolCall {
+                    action,
+                    status: Some(crate::WebSearchToolCallStatus::InProgress),
+                }),
+                signature: None,
+                id: None,
+            }))
+        }
+        ContentBlock::WebSearchToolResult(block) => {
+            let (sources, error_code) = match block.content {
+                api::ResponseWebSearchToolResultBlockContent::ResponseWebSearchToolResultBlockContentArray(values) => (values.unwrap_or_default().into_iter().map(|source| crate::WebSearchSource { url: source.url, title: Some(source.title), page_age: source.page_age, signature: Some(source.encrypted_content) }).collect(), None),
+                api::ResponseWebSearchToolResultBlockContent::ResponseWebSearchToolResultError(error) => (vec![], Some(match error.error_code {
+                    api::WebSearchToolResultErrorCode::InvalidToolInput => "invalid_tool_input", api::WebSearchToolResultErrorCode::Unavailable => "unavailable", api::WebSearchToolResultErrorCode::MaxUsesExceeded => "max_uses_exceeded", api::WebSearchToolResultErrorCode::TooManyRequests => "too_many_requests", api::WebSearchToolResultErrorCode::QueryTooLong => "query_too_long", api::WebSearchToolResultErrorCode::RequestTooLarge => "request_too_large", api::WebSearchToolResultErrorCode::Unknown => "unknown",
+                }.to_string())),
+                api::ResponseWebSearchToolResultBlockContent::Unknown(_) => (vec![], None),
+            };
+            let status = if error_code.is_some() {
+                ToolResultStatus::Failed
+            } else {
+                ToolResultStatus::Completed
+            };
+            Some(Part::ToolResult(ToolResultPart {
+                tool_call_id: block.tool_use_id,
+                result: crate::ToolResult::WebSearch(crate::WebSearchToolResult {
+                    sources,
+                    error_code,
+                }),
+                status,
+            }))
+        }
         _ => None,
     }
 }
@@ -808,8 +992,10 @@ fn map_redacted_thinking_block(block: api::ResponseRedactedThinkingBlock) -> Rea
 fn map_tool_use_block(block: api::ResponseToolUseBlock) -> ToolCallPart {
     ToolCallPart {
         tool_call_id: block.id,
-        tool_name: block.name,
-        args: block.input,
+        call: crate::ToolCall::Function(crate::FunctionToolCall {
+            name: block.name,
+            args: block.input,
+        }),
         signature: None,
         id: None,
     }
@@ -845,7 +1031,9 @@ fn map_anthropic_content_block_start_event(
     if let Some(part) = map_content_block(content_block) {
         let mut delta = stream_utils::loosely_convert_part_to_part_delta(part)?;
         if let PartDelta::ToolCall(tool_call_delta) = &mut delta {
-            tool_call_delta.args = Some(String::new());
+            if let crate::ToolCallDelta::Function(call) = &mut tool_call_delta.call {
+                call.args = Some(String::new());
+            }
         }
         Ok(vec![ContentDelta { index, part: delta }])
     } else {
@@ -865,8 +1053,10 @@ fn map_anthropic_content_block_delta_event(
         }),
         ContentBlockDeltaEventDelta::InputJsonDelta(delta) => {
             PartDelta::ToolCall(ToolCallPartDelta {
-                tool_name: None,
-                args: Some(delta.partial_json),
+                call: crate::ToolCallDelta::Function(crate::FunctionToolCallDelta {
+                    name: None,
+                    args: Some(delta.partial_json),
+                }),
                 tool_call_id: None,
                 signature: None,
                 id: None,

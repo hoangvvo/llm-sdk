@@ -304,13 +304,19 @@ function convertToMistralToolMessages(
         "Tool messages must contain only tool result parts",
       );
     }
+    if (part.result.type !== "function") {
+      throw new UnsupportedError(
+        PROVIDER,
+        "Mistral does not accept hosted web-search results",
+      );
+    }
     const toolResultContent = getCompatiblePartsWithoutSourceParts(
-      part.content,
+      part.result.content,
     );
     return {
       role: "tool",
       toolCallId: part.tool_call_id,
-      name: part.tool_name,
+      name: part.result.name,
       content:
         toolResultContent.length === 0
           ? part.status === "cancelled"
@@ -363,12 +369,18 @@ function convertToMistralContentChunk(
 function convertToMistralToolCall(
   part: ToolCallPart,
 ): MistralComponents.ToolCall {
+  if (part.call.type !== "function") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "Mistral does not accept hosted web-search calls",
+    );
+  }
   return {
     type: "function",
     id: part.tool_call_id,
     function: {
-      name: part.tool_name,
-      arguments: JSON.stringify(part.args),
+      name: part.call.name,
+      arguments: JSON.stringify(part.call.args),
     },
   };
 }
@@ -511,8 +523,7 @@ function mapMistralToolCall(
   return {
     type: "tool-call",
     tool_call_id: toolCall.id,
-    tool_name: toolCall.function.name,
-    args,
+    call: { type: "function", name: toolCall.function.name, args },
   };
 }
 

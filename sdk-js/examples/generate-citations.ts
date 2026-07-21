@@ -43,10 +43,13 @@ const response = await model.generate({
         {
           type: "tool-call",
           tool_call_id: "caffeine_lookup_456",
-          tool_name: "lookup",
-          args: {
-            query:
-              "caffeine sensitivity optimal timing metabolism coffee health benefits",
+          call: {
+            type: "function",
+            name: "lookup",
+            args: {
+              query:
+                "caffeine sensitivity optimal timing metabolism coffee health benefits",
+            },
           },
         },
       ],
@@ -57,29 +60,32 @@ const response = await model.generate({
         {
           type: "tool-result",
           status: "completed",
-          tool_name: "lookup",
+          result: {
+            type: "function",
+            name: "lookup",
+            content: [
+              {
+                type: "source",
+                source:
+                  "https://medical-journal.example/2024/caffeine-metabolism-study",
+                title:
+                  "Optimizing Coffee Intake for Caffeine-Sensitive Individuals",
+                content: [
+                  {
+                    type: "text",
+                    text: [
+                      "For caffeine-sensitive individuals, the half-life of caffeine extends to 8-12 hours compared to the average 5-6 hours.",
+                      "These individuals experience effects at doses as low as 50mg.",
+                      "Research shows consuming 1-2 cups (100-200mg caffeine) before noon provides 75% of coffee's antioxidant benefits while minimizing side effects like insomnia and anxiety.",
+                      "Splitting intake into smaller doses (half-cups) throughout the morning can further reduce sensitivity reactions while maintaining beneficial compound levels.",
+                    ].join(" "),
+                  },
+                ],
+              },
+            ],
+          },
           tool_call_id: "caffeine_lookup_456",
           // Provide other sources as part of the tool result
-          content: [
-            {
-              type: "source",
-              source:
-                "https://medical-journal.example/2024/caffeine-metabolism-study",
-              title:
-                "Optimizing Coffee Intake for Caffeine-Sensitive Individuals",
-              content: [
-                {
-                  type: "text",
-                  text: [
-                    "For caffeine-sensitive individuals, the half-life of caffeine extends to 8-12 hours compared to the average 5-6 hours.",
-                    "These individuals experience effects at doses as low as 50mg.",
-                    "Research shows consuming 1-2 cups (100-200mg caffeine) before noon provides 75% of coffee's antioxidant benefits while minimizing side effects like insomnia and anxiety.",
-                    "Splitting intake into smaller doses (half-cups) throughout the morning can further reduce sensitivity reactions while maintaining beneficial compound levels.",
-                  ].join(" "),
-                },
-              ],
-            },
-          ],
         },
       ],
     },

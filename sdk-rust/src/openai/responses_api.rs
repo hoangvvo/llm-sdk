@@ -921,7 +921,7 @@ pub enum InputItem {
     Unknown(Value),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum OutputItem {

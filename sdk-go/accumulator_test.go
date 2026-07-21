@@ -78,6 +78,42 @@ func TestStreamAccumulator_RejectsMismatchedAndMalformedDeltas(t *testing.T) {
 		}
 	})
 
+	t.Run("tool call kind changes", func(t *testing.T) {
+		functionDelta := func() llmsdk.PartDelta {
+			return llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolCallID("call_1"),
+				llmsdk.WithToolCallPartDeltaToolName("lookup"),
+				llmsdk.WithToolCallPartDeltaArgs("{}"),
+			)
+		}
+		webSearchDelta := func() llmsdk.PartDelta {
+			id := "call_1"
+			return llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolCallID: &id,
+				Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{
+					Action: &llmsdk.WebSearchAction{Type: "search", Queries: []string{"sdk docs"}},
+				}},
+			}}
+		}
+
+		for _, deltas := range [][]llmsdk.PartDelta{
+			{functionDelta(), webSearchDelta()},
+			{webSearchDelta(), functionDelta()},
+		} {
+			accumulator := llmsdk.NewStreamAccumulator()
+			if err := accumulator.AddPartial(llmsdk.PartialModelResponse{
+				Delta: &llmsdk.ContentDelta{Index: 0, Part: deltas[0]},
+			}); err != nil {
+				t.Fatalf("add initial partial: %v", err)
+			}
+			if err := accumulator.AddPartial(llmsdk.PartialModelResponse{
+				Delta: &llmsdk.ContentDelta{Index: 0, Part: deltas[1]},
+			}); err == nil {
+				t.Fatal("expected a tool-call kind mismatch error")
+			}
+		}
+	})
+
 	t.Run("malformed tool arguments", func(t *testing.T) {
 		accumulator := llmsdk.NewStreamAccumulator()
 		if err := accumulator.AddPartial(llmsdk.PartialModelResponse{
@@ -91,6 +127,27 @@ func TestStreamAccumulator_RejectsMismatchedAndMalformedDeltas(t *testing.T) {
 		}
 		if _, err := accumulator.ComputeResponse(); err == nil {
 			t.Fatal("expected malformed tool arguments to fail")
+		}
+	})
+
+	t.Run("large numeric tool arguments", func(t *testing.T) {
+		accumulator := llmsdk.NewStreamAccumulator()
+		if err := accumulator.AddPartial(llmsdk.PartialModelResponse{
+			Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolCallID("call_1"),
+				llmsdk.WithToolCallPartDeltaToolName("lookup"),
+				llmsdk.WithToolCallPartDeltaArgs(`{"id":9007199254740993}`),
+			)},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		response, err := accumulator.ComputeResponse()
+		if err != nil {
+			t.Fatal(err)
+		}
+		args := response.Content[0].ToolCallPart.Call.Function.Args
+		if string(args) != `{"id":9007199254740993}` {
+			t.Fatalf("tool arguments changed while accumulating: %s", args)
 		}
 	})
 }
@@ -161,5 +218,45 @@ func TestStreamAccumulator_SnapshotsIndependentlyMaterializableParts(t *testing.
 	}
 	if _, err := accumulator.ComputeResponse(); err == nil {
 		t.Fatal("strict response unexpectedly accepted an incomplete part")
+	}
+}
+
+func TestStreamAccumulator_WebSearchCallAndResult(t *testing.T) {
+	accumulator := llmsdk.NewStreamAccumulator()
+	status := llmsdk.WebSearchToolCallStatusCompleted
+	id := "ws_1"
+	partials := []llmsdk.PartialModelResponse{
+		{Delta: &llmsdk.ContentDelta{
+			Index: 0,
+			Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolCallID: &id,
+				Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{
+					Status: &status,
+					Action: &llmsdk.WebSearchAction{Type: "search", Queries: []string{"sdk docs"}},
+				}},
+			}},
+		}},
+		{Delta: &llmsdk.ContentDelta{
+			Index: 1,
+			Part: llmsdk.PartDelta{ToolResultPartDelta: &llmsdk.ToolResultPartDelta{
+				ToolCallID: id,
+				Result: llmsdk.ToolResult{WebSearch: &llmsdk.WebSearchToolResult{
+					Sources: []llmsdk.WebSearchSource{{URL: "https://example.com"}},
+				}},
+				Status: llmsdk.ToolResultStatusCompleted,
+			}},
+		}},
+	}
+	for _, partial := range partials {
+		if err := accumulator.AddPartial(partial); err != nil {
+			t.Fatal(err)
+		}
+	}
+	response, err := accumulator.ComputeResponse()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Content) != 2 || response.Content[0].ToolCallPart.Call.WebSearch == nil || response.Content[1].ToolResultPart.Result.WebSearch == nil {
+		t.Fatalf("unexpected response: %#v", response.Content)
 	}
 }

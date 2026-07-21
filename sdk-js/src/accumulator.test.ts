@@ -20,8 +20,7 @@ suite("StreamAccumulator", () => {
         part: {
           type: "tool-call",
           tool_call_id: "call_1",
-          tool_name: "weather",
-          args: '{"city":',
+          call: { type: "function", name: "weather", args: '{"city":' },
         },
       },
     });
@@ -33,7 +32,10 @@ suite("StreamAccumulator", () => {
     accumulator.addPartial({
       delta: {
         index: 1,
-        part: { type: "tool-call", args: '"Paris"}' },
+        part: {
+          type: "tool-call",
+          call: { type: "function", args: '"Paris"}' },
+        },
       },
     });
     accumulator.addPartial({
@@ -51,8 +53,7 @@ suite("StreamAccumulator", () => {
         {
           type: "tool-call",
           tool_call_id: "call_1",
-          tool_name: "weather",
-          args: { city: "Paris" },
+          call: { type: "function", name: "weather", args: { city: "Paris" } },
         },
         { type: "reasoning", text: "think done", signature: "sig" },
       ],
@@ -85,8 +86,7 @@ suite("StreamAccumulator", () => {
         part: {
           type: "tool-call",
           tool_call_id: "call_1",
-          tool_name: "weather",
-          args: "{bad json",
+          call: { type: "function", name: "weather", args: "{bad json" },
         },
       },
     });
@@ -99,7 +99,7 @@ suite("StreamAccumulator", () => {
     incomplete.addPartial({
       delta: {
         index: 0,
-        part: { type: "tool-call", args: "{}" },
+        part: { type: "tool-call", call: { type: "function", args: "{}" } },
       },
     });
     t.assert.throws(
@@ -121,15 +121,21 @@ suite("StreamAccumulator", () => {
         part: {
           type: "tool-call",
           tool_call_id: "call_1",
-          tool_name: "weather",
-          args: '{"city":"Paris"}',
+          call: {
+            type: "function",
+            name: "weather",
+            args: '{"city":"Paris"}',
+          },
         },
       },
     });
     accumulator.addPartial({
       delta: {
         index: 2,
-        part: { type: "tool-call", args: "{incomplete" },
+        part: {
+          type: "tool-call",
+          call: { type: "function", args: "{incomplete" },
+        },
       },
     });
     accumulator.addPartial({
@@ -155,8 +161,11 @@ suite("StreamAccumulator", () => {
         {
           type: "tool-call",
           tool_call_id: "call_1",
-          tool_name: "weather",
-          args: { city: "Paris" },
+          call: {
+            type: "function",
+            name: "weather",
+            args: { city: "Paris" },
+          },
         },
         { type: "image", data: "aGVsbG8=", mime_type: "image/png" },
         { type: "audio", data: "AAABAA==", format: "linear16" },
@@ -165,5 +174,109 @@ suite("StreamAccumulator", () => {
       cost: 0.25,
     });
     t.assert.throws(() => accumulator.computeResponse());
+  });
+
+  test("accumulates hosted web-search status and atomic results", (t: TestContext) => {
+    const accumulator = new StreamAccumulator();
+    accumulator.addPartial({
+      delta: {
+        index: 0,
+        part: {
+          type: "tool-call",
+          tool_call_id: "ws_1",
+          call: { type: "web_search", status: "in_progress" },
+        },
+      },
+    });
+    accumulator.addPartial({
+      delta: {
+        index: 0,
+        part: {
+          type: "tool-call",
+          call: {
+            type: "web_search",
+            status: "completed",
+            action: { type: "search", queries: ["sdk docs"] },
+          },
+        },
+      },
+    });
+    accumulator.addPartial({
+      delta: {
+        index: 1,
+        part: {
+          type: "tool-result",
+          tool_call_id: "ws_1",
+          result: {
+            type: "web_search",
+            sources: [
+              {
+                url: "https://example.com",
+                title: "Example",
+                signature: "opaque",
+              },
+            ],
+          },
+          status: "completed",
+        },
+      },
+    });
+    t.assert.deepStrictEqual(accumulator.computeResponse().content, [
+      {
+        type: "tool-call",
+        tool_call_id: "ws_1",
+        call: {
+          type: "web_search",
+          status: "completed",
+          action: { type: "search", queries: ["sdk docs"] },
+        },
+      },
+      {
+        type: "tool-result",
+        tool_call_id: "ws_1",
+        result: {
+          type: "web_search",
+          sources: [
+            {
+              url: "https://example.com",
+              title: "Example",
+              signature: "opaque",
+            },
+          ],
+        },
+        status: "completed",
+      },
+    ]);
+  });
+
+  test("preserves hosted web-search error codes", (t: TestContext) => {
+    const accumulator = new StreamAccumulator();
+    accumulator.addPartial({
+      delta: {
+        index: 0,
+        part: {
+          type: "tool-result",
+          tool_call_id: "ws_error",
+          result: {
+            type: "web_search",
+            sources: [],
+            error_code: "unavailable",
+          },
+          status: "failed",
+        },
+      },
+    });
+    t.assert.deepStrictEqual(accumulator.computeResponse().content, [
+      {
+        type: "tool-result",
+        tool_call_id: "ws_error",
+        result: {
+          type: "web_search",
+          sources: [],
+          error_code: "unavailable",
+        },
+        status: "failed",
+      },
+    ]);
   });
 });

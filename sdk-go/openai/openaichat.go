@@ -454,14 +454,15 @@ func convertAssistantMessageToOpenAIChatMessages(message *llmsdk.AssistantMessag
 				},
 			})
 		case part.ToolCallPart != nil:
-			if part.ToolCallPart == nil {
-				continue
+			call := part.ToolCallPart.Call.Function
+			if call == nil {
+				return nil, llmsdk.NewUnsupportedError(Provider, "OpenAI Chat does not support hosted tool calls")
 			}
 			toolCall := openaichatapi.ChatCompletionMessageToolCall{
 				Id: part.ToolCallPart.ToolCallID,
 			}
-			toolCall.Function.Name = part.ToolCallPart.ToolName
-			toolCall.Function.Arguments = string(part.ToolCallPart.Args)
+			toolCall.Function.Name = call.Name
+			toolCall.Function.Arguments = string(call.Args)
 			toolCalls = append(toolCalls, openaichatapi.ChatCompletionMessageToolCallsItem{
 				Function: &toolCall,
 			})
@@ -499,7 +500,11 @@ func convertToolMessageToOpenAIChatMessages(message *llmsdk.ToolMessage) ([]open
 			return nil, llmsdk.NewInvalidInputError("tool messages must contain only tool result parts")
 		}
 
-		toolResultParts := partutil.GetCompatiblePartsWithoutSourceParts(part.ToolResultPart.Content)
+		functionResult := part.ToolResultPart.Result.Function
+		if functionResult == nil {
+			return nil, llmsdk.NewUnsupportedError(Provider, "OpenAI Chat does not support hosted tool results")
+		}
+		toolResultParts := partutil.GetCompatiblePartsWithoutSourceParts(functionResult.Content)
 		if len(toolResultParts) == 0 {
 			content := ""
 			if part.ToolResultPart.Status == llmsdk.ToolResultStatusCancelled {
@@ -642,16 +647,16 @@ func mapOpenAIChatDelta(delta openaichatapi.ChatCompletionStreamResponseDelta, e
 			return nil, llmsdk.NewNotImplementedError(Provider, fmt.Sprintf("cannot map OpenAI tool call delta of type %s", *toolCall.Type))
 		}
 
-		toolCallDelta := llmsdk.ToolCallPartDelta{}
+		toolCallDelta := llmsdk.ToolCallPartDelta{Call: llmsdk.ToolCallDelta{Function: &llmsdk.FunctionToolCallDelta{}}}
 		if toolCall.Id != nil {
 			toolCallDelta.ToolCallID = toolCall.Id
 		}
 		if toolCall.Function != nil {
 			if toolCall.Function.Name != nil {
-				toolCallDelta.ToolName = toolCall.Function.Name
+				toolCallDelta.Call.Function.Name = toolCall.Function.Name
 			}
 			if toolCall.Function.Arguments != nil {
-				toolCallDelta.Args = toolCall.Function.Arguments
+				toolCallDelta.Call.Function.Args = toolCall.Function.Arguments
 			}
 		}
 
@@ -661,12 +666,12 @@ func mapOpenAIChatDelta(delta openaichatapi.ChatCompletionStreamResponseDelta, e
 	}
 
 	if delta.FunctionCall != nil {
-		part := llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{}}
+		part := llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{Call: llmsdk.ToolCallDelta{Function: &llmsdk.FunctionToolCallDelta{}}}}
 		if delta.FunctionCall.Name != nil {
-			part.ToolCallPartDelta.ToolName = delta.FunctionCall.Name
+			part.ToolCallPartDelta.Call.Function.Name = delta.FunctionCall.Name
 		}
 		if delta.FunctionCall.Arguments != nil {
-			part.ToolCallPartDelta.Args = delta.FunctionCall.Arguments
+			part.ToolCallPartDelta.Call.Function.Args = delta.FunctionCall.Arguments
 		}
 		index := partutil.GuessDeltaIndex(part, append(existing, result...), nil)
 		result = append(result, llmsdk.ContentDelta{Index: index, Part: part})

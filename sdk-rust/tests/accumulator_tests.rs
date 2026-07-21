@@ -217,3 +217,49 @@ fn snapshots_independently_materializable_parts() {
     );
     assert!(accumulator.compute_response().is_err());
 }
+
+#[test]
+fn accumulates_web_search_call_and_result() {
+    let mut accumulator = StreamAccumulator::new();
+    accumulator
+        .add_partial(partial(
+            0,
+            PartDelta::ToolCall(llm_sdk::ToolCallPartDelta {
+                tool_call_id: Some("ws_1".to_string()),
+                call: llm_sdk::ToolCallDelta::WebSearch(llm_sdk::WebSearchToolCallDelta {
+                    action: Some(llm_sdk::WebSearchAction::Search {
+                        queries: vec!["sdk docs".to_string()],
+                    }),
+                    status: Some(llm_sdk::WebSearchToolCallStatus::Completed),
+                }),
+                signature: None,
+                id: None,
+            }),
+        ))
+        .unwrap();
+    accumulator
+        .add_partial(partial(
+            1,
+            PartDelta::ToolResult(llm_sdk::ToolResultPartDelta {
+                tool_call_id: "ws_1".to_string(),
+                result: llm_sdk::ToolResult::WebSearch(llm_sdk::WebSearchToolResult {
+                    sources: vec![llm_sdk::WebSearchSource {
+                        url: "https://example.com".to_string(),
+                        title: None,
+                        page_age: None,
+                        signature: None,
+                    }],
+                    error_code: None,
+                }),
+                status: llm_sdk::ToolResultStatus::Completed,
+            }),
+        ))
+        .unwrap();
+    let response = accumulator.compute_response().unwrap();
+    assert!(
+        matches!(response.content[0], Part::ToolCall(ref call) if matches!(call.call, llm_sdk::ToolCall::WebSearch(_)))
+    );
+    assert!(
+        matches!(response.content[1], Part::ToolResult(ref result) if matches!(result.result, llm_sdk::ToolResult::WebSearch(_)))
+    );
+}
