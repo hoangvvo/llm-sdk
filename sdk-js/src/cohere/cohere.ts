@@ -90,11 +90,17 @@ export class CohereModel implements LanguageModel {
       options?.signal ? { abortSignal: options.signal } : undefined,
     );
 
+    let contentPartCount = 0;
+    let toolCallOffset: number | undefined;
     for await (const event of stream) {
       switch (event.type) {
         case "content-delta": {
           const incomingContentDelta = mapCohereStreamedContent(event);
           if (incomingContentDelta) {
+            contentPartCount = Math.max(
+              contentPartCount,
+              incomingContentDelta.index + 1,
+            );
             const event: PartialModelResponse = {
               delta: incomingContentDelta,
             };
@@ -105,6 +111,9 @@ export class CohereModel implements LanguageModel {
         case "tool-call-start": {
           const incomingContentDelta = mapCohereToolCallStartEvent(event);
           if (incomingContentDelta) {
+            // Cohere indexes message content and tool calls separately.
+            toolCallOffset ??= contentPartCount;
+            incomingContentDelta.index += toolCallOffset;
             const event: PartialModelResponse = {
               delta: incomingContentDelta,
             };
@@ -115,6 +124,8 @@ export class CohereModel implements LanguageModel {
         case "tool-call-delta": {
           const incomingContentDelta = mapCohereToolCallDeltaEvent(event);
           if (incomingContentDelta) {
+            toolCallOffset ??= contentPartCount;
+            incomingContentDelta.index += toolCallOffset;
             const event: PartialModelResponse = {
               delta: incomingContentDelta,
             };

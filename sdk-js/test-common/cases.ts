@@ -34,8 +34,11 @@ export interface RunTestCaseOptions {
   profile?: string;
 }
 
+// Only function calls need client-supplied results in later stages.
 function getToolCallParts(parts: Part[]): Part[] {
-  return parts.filter((part) => part.type === "tool-call");
+  return parts.filter(
+    (part) => part.type === "tool-call" && part.call.type === "function",
+  );
 }
 
 function normalizeError(error: unknown): { kind: string; message: string } {

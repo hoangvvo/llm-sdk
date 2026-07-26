@@ -2210,14 +2210,14 @@ async fn run_stream_streams_tool_call_execution_and_response() {
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
-                index: 0,
+                index: 1,
                 part: PartDelta::Text(TextPartDelta::new("Final".to_string())),
             }),
             ..Default::default()
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
-                index: 0,
+                index: 1,
                 part: PartDelta::Text(TextPartDelta::new(" response".to_string())),
             }),
             ..Default::default()
@@ -2361,7 +2361,7 @@ async fn run_stream_handles_multiple_turns() {
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
-                index: 0,
+                index: 1,
                 part: PartDelta::ToolCall(
                     ToolCallPartDelta::default()
                         .with_tool_call_id("call_2".to_string())
@@ -2390,7 +2390,7 @@ async fn run_stream_handles_multiple_turns() {
         }),
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
-                index: 0,
+                index: 2,
                 part: PartDelta::Text(TextPartDelta::new("All done".to_string())),
             }),
             ..Default::default()
@@ -2437,6 +2437,82 @@ async fn run_stream_handles_multiple_turns() {
     ];
 
     assert_eq!(events, expected);
+
+    close_run_session(session).await;
+}
+
+#[tokio::test]
+async fn run_stream_offsets_content_indices_across_turns() {
+    let tool = MockTool::new(
+        "lookup",
+        AgentToolResult {
+            content: vec![Part::text("Tool result")],
+            is_error: false,
+        },
+    );
+    let tool_args = json!({"query": "weather"});
+
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(vec![
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 0,
+                part: PartDelta::Reasoning(ReasoningPartDelta::default().with_text("Thinking")),
+            }),
+            ..Default::default()
+        },
+        PartialModelResponse {
+            delta: Some(ContentDelta {
+                index: 1,
+                part: PartDelta::ToolCall(
+                    ToolCallPartDelta::default()
+                        .with_tool_call_id("call_1".to_string())
+                        .with_tool_name("lookup".to_string())
+                        .with_args(tool_args.to_string()),
+                ),
+            }),
+            ..Default::default()
+        },
+    ]);
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::Text(TextPartDelta::new("Answer".to_string())),
+        }),
+        ..Default::default()
+    }]);
+
+    let session = new_run_session(
+        Arc::new(AgentParams::new("test_agent", model).add_tool(tool.clone())),
+        (),
+    )
+    .await;
+
+    let stream = session
+        .clone()
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Look up",
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .expect("run_stream succeeds");
+
+    let indices = stream
+        .map_err(|err| err.to_string())
+        .try_filter_map(|event| async move {
+            Ok(match event {
+                AgentStreamEvent::Partial(partial) => partial.delta.map(|delta| delta.index),
+                _ => None,
+            })
+        })
+        .try_collect::<Vec<_>>()
+        .await
+        .expect("collect stream");
+
+    assert_eq!(indices, vec![0, 1, 2]);
 
     close_run_session(session).await;
 }

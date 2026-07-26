@@ -3,14 +3,15 @@ title: Artifacts (Canvas)
 ---
 
 import { Aside, Code, TabItem, Tabs } from "@astrojs/starlight/components";
-import { Image } from 'astro:assets';
+import { Image } from "astro:assets";
 import goArtifactsCode from "../../../../../agent-go/examples/artifacts/main.go?raw";
 import jsArtifactsCode from "../../../../../agent-js/examples/artifacts.ts?raw";
 import rustArtifactsCode from "../../../../../agent-rust/examples/artifacts.rs?raw";
 import imageConsoleChat from "../../../../assets/console-chat.png";
 
 <Aside>
-  This is an agent pattern that requires custom implementation. [Why?](/agent/#agent-patterns)
+  This is an agent pattern that requires custom implementation.
+  [Why?](/agent/#agent-patterns)
 </Aside>
 
 [Artifacts](https://www.anthropic.com/news/build-artifacts) (also known as a [“Canvas”](https://openai.com/index/introducing-canvas/)) give the agent a persistent work surface separate from the chat. Use artifacts to hold substantive deliverables (documents, specs, code), while keeping chat replies brief and status‑oriented.

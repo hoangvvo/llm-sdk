@@ -13,14 +13,7 @@
               "properties": {
                 "format": {
                   "description": "Specifies the output audio format. Must be one of `wav`, `mp3`, `flac`,\n`opus`, or `pcm16`.\n",
-                  "enum": [
-                    "wav",
-                    "aac",
-                    "mp3",
-                    "flac",
-                    "opus",
-                    "pcm16"
-                  ],
+                  "enum": ["wav", "aac", "mp3", "flac", "opus", "pcm16"],
                   "type": "string"
                 },
                 "voice": {
@@ -28,10 +21,7 @@
                   "description": "The voice the model uses to respond. Supported built-in voices are\n`alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`,\n`sage`, `shimmer`, `marin`, and `cedar`. You may also provide a\ncustom voice object with an `id`, for example `{ \"id\": \"voice_1234\" }`.\n"
                 }
               },
-              "required": [
-                "voice",
-                "format"
-              ],
+              "required": ["voice", "format"],
               "type": "object"
             },
             "frequency_penalty": {
@@ -48,10 +38,7 @@
               "oneOf": [
                 {
                   "description": "`none` means the model will not call a function and instead generates a message. `auto` means the model can pick between generating a message or calling a function.\n",
-                  "enum": [
-                    "none",
-                    "auto"
-                  ],
+                  "enum": ["none", "auto"],
                   "type": "string"
                 },
                 {
@@ -231,17 +218,12 @@
                     },
                     "type": {
                       "description": "The type of location approximation. Always `approximate`.\n",
-                      "enum": [
-                        "approximate"
-                      ],
+                      "enum": ["approximate"],
                       "type": "string",
                       "x-stainless-const": true
                     }
                   },
-                  "required": [
-                    "type",
-                    "approximate"
-                  ],
+                  "required": ["type", "approximate"],
                   "type": "object"
                 }
               },
@@ -249,10 +231,7 @@
               "type": "object"
             }
           },
-          "required": [
-            "model",
-            "messages"
-          ],
+          "required": ["model", "messages"],
           "type": "object"
         }
       ]
@@ -313,10 +292,7 @@
                         ]
                       }
                     },
-                    "required": [
-                      "content",
-                      "refusal"
-                    ],
+                    "required": ["content", "refusal"],
                     "type": "object"
                   },
                   {
@@ -328,12 +304,7 @@
                 "$ref": "#/definitions/ChatCompletionResponseMessage"
               }
             },
-            "required": [
-              "finish_reason",
-              "index",
-              "message",
-              "logprobs"
-            ],
+            "required": ["finish_reason", "index", "message", "logprobs"],
             "type": "object"
           },
           "type": "array"
@@ -352,9 +323,7 @@
         },
         "object": {
           "description": "The object type, which is always `chat.completion`.",
-          "enum": [
-            "chat.completion"
-          ],
+          "enum": ["chat.completion"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -370,13 +339,7 @@
           "$ref": "#/definitions/CompletionUsage"
         }
       },
-      "required": [
-        "choices",
-        "created",
-        "id",
-        "model",
-        "object"
-      ],
+      "required": ["choices", "created", "id", "model", "object"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"id\": \"chatcmpl-B9MHDbslfkBeAs8l4bebGdFOJ6PeG\",\n  \"object\": \"chat.completion\",\n  \"created\": 1741570283,\n  \"model\": \"gpt-4o-2024-08-06\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The image shows a wooden boardwalk path running through a lush green field or meadow. The sky is bright blue with some scattered clouds, giving the scene a serene and peaceful atmosphere. Trees and shrubs are visible in the background.\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1117,\n    \"completion_tokens\": 46,\n    \"total_tokens\": 1163,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_fc9f1d7035\"\n}\n",
@@ -431,18 +394,11 @@
                     "type": "array"
                   }
                 },
-                "required": [
-                  "content",
-                  "refusal"
-                ],
+                "required": ["content", "refusal"],
                 "type": "object"
               }
             },
-            "required": [
-              "delta",
-              "finish_reason",
-              "index"
-            ],
+            "required": ["delta", "finish_reason", "index"],
             "type": "object"
           },
           "type": "array"
@@ -461,9 +417,7 @@
         },
         "object": {
           "description": "The object type, which is always `chat.completion.chunk`.",
-          "enum": [
-            "chat.completion.chunk"
-          ],
+          "enum": ["chat.completion.chunk"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -481,12 +435,7 @@
           "nullable": true
         }
       },
-      "required": [
-        "created",
-        "id",
-        "model",
-        "object"
-      ],
+      "required": ["created", "id", "model", "object"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\"id\":\"chatcmpl-123\",\"object\":\"chat.completion.chunk\",\"created\":1694268190,\"model\":\"gpt-4o-mini\", \"system_fingerprint\": \"fp_44709d6fcb\", \"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"logprobs\":null,\"finish_reason\":null}]}\n\n{\"id\":\"chatcmpl-123\",\"object\":\"chat.completion.chunk\",\"created\":1694268190,\"model\":\"gpt-4o-mini\", \"system_fingerprint\": \"fp_44709d6fcb\", \"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"},\"logprobs\":null,\"finish_reason\":null}]}\n\n....\n\n{\"id\":\"chatcmpl-123\",\"object\":\"chat.completion.chunk\",\"created\":1694268190,\"model\":\"gpt-4o-mini\", \"system_fingerprint\": \"fp_44709d6fcb\", \"choices\":[{\"index\":0,\"delta\":{},\"logprobs\":null,\"finish_reason\":\"stop\"}]}\n",
@@ -527,9 +476,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "id"
-          ],
+          "required": ["id"],
           "type": "object"
         }
       ],
@@ -544,9 +491,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "type": "object"
     },
     "ChatCompletionFunctions": {
@@ -564,9 +509,7 @@
           "$ref": "#/definitions/FunctionParameters"
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "type": "object"
     },
     "ChatCompletionRequestMessage": {
@@ -599,10 +542,7 @@
         {
           "description": "Output types that you would like the model to generate.\nMost models are capable of generating text, which is the default:\n\n`[\"text\"]`\n\nThe `gpt-4o-audio-preview` model can also be used to\n[generate audio](/docs/guides/audio). To request that this model generate\nboth text and audio responses, you can use:\n\n`[\"text\", \"audio\"]`\n",
           "items": {
-            "enum": [
-              "text",
-              "audio"
-            ],
+            "enum": ["text", "audio"],
             "type": "string"
           },
           "type": "array"
@@ -732,17 +672,12 @@
         },
         "type": {
           "description": "The type of the predicted content you want to provide. This type is\ncurrently always `content`.\n",
-          "enum": [
-            "content"
-          ],
+          "enum": ["content"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "content"
-      ],
+      "required": ["type", "content"],
       "title": "Static Content",
       "type": "object"
     },
@@ -751,14 +686,7 @@
         {
           "default": "medium",
           "description": "Constrains effort on reasoning for\n[reasoning models](https://platform.openai.com/docs/guides/reasoning).\nCurrently supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Reducing\nreasoning effort can result in faster responses and fewer tokens used\non reasoning in a response.\n\n- `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool calls are supported for all reasoning values in gpt-5.1.\n- All models before `gpt-5.1` default to `medium` reasoning effort, and do not support `none`.\n- The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.\n- `xhigh` is supported for all models after `gpt-5.1-codex-max`.\n",
-          "enum": [
-            "none",
-            "minimal",
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ],
+          "enum": ["none", "minimal", "low", "medium", "high", "xhigh"],
           "type": "string"
         },
         {
@@ -771,16 +699,12 @@
       "properties": {
         "type": {
           "description": "The type of response format being defined. Always `text`.",
-          "enum": [
-            "text"
-          ],
+          "enum": ["text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Text",
       "type": "object"
     },
@@ -814,25 +738,18 @@
               ]
             }
           },
-          "required": [
-            "name"
-          ],
+          "required": ["name"],
           "title": "JSON schema",
           "type": "object"
         },
         "type": {
           "description": "The type of response format being defined. Always `json_schema`.",
-          "enum": [
-            "json_schema"
-          ],
+          "enum": ["json_schema"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "json_schema"
-      ],
+      "required": ["type", "json_schema"],
       "title": "JSON schema",
       "type": "object"
     },
@@ -841,16 +758,12 @@
       "properties": {
         "type": {
           "description": "The type of response format being defined. Always `json_object`.",
-          "enum": [
-            "json_object"
-          ],
+          "enum": ["json_object"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "JSON object",
       "type": "object"
     },
@@ -903,11 +816,7 @@
       "oneOf": [
         {
           "description": "`none` means the model will not call any tool and instead generates a message. `auto` means the model can pick between generating a message or calling one or more tools. `required` means the model must call one or more tools.\n",
-          "enum": [
-            "none",
-            "auto",
-            "required"
-          ],
+          "enum": ["none", "auto", "required"],
           "title": "Tool choice mode",
           "type": "string"
         },
@@ -930,17 +839,12 @@
         },
         "type": {
           "description": "The type of the tool. Currently, only `function` is supported.",
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "function"
-      ],
+      "required": ["type", "function"],
       "title": "Function tool",
       "type": "object"
     },
@@ -963,16 +867,12 @@
                   "properties": {
                     "type": {
                       "description": "Unconstrained text format. Always `text`.",
-                      "enum": [
-                        "text"
-                      ],
+                      "enum": ["text"],
                       "type": "string",
                       "x-stainless-const": true
                     }
                   },
-                  "required": [
-                    "type"
-                  ],
+                  "required": ["type"],
                   "title": "Text format",
                   "type": "object"
                 },
@@ -989,33 +889,22 @@
                         },
                         "syntax": {
                           "description": "The syntax of the grammar definition. One of `lark` or `regex`.",
-                          "enum": [
-                            "lark",
-                            "regex"
-                          ],
+                          "enum": ["lark", "regex"],
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "definition",
-                        "syntax"
-                      ],
+                      "required": ["definition", "syntax"],
                       "title": "Grammar format",
                       "type": "object"
                     },
                     "type": {
                       "description": "Grammar format. Always `grammar`.",
-                      "enum": [
-                        "grammar"
-                      ],
+                      "enum": ["grammar"],
                       "type": "string",
                       "x-stainless-const": true
                     }
                   },
-                  "required": [
-                    "type",
-                    "grammar"
-                  ],
+                  "required": ["type", "grammar"],
                   "title": "Grammar format",
                   "type": "object"
                 }
@@ -1026,25 +915,18 @@
               "type": "string"
             }
           },
-          "required": [
-            "name"
-          ],
+          "required": ["name"],
           "title": "Custom tool properties",
           "type": "object"
         },
         "type": {
           "description": "The type of the custom tool. Always `custom`.",
-          "enum": [
-            "custom"
-          ],
+          "enum": ["custom"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "custom"
-      ],
+      "required": ["type", "custom"],
       "title": "Custom tool",
       "type": "object"
     },
@@ -1053,11 +935,7 @@
         {
           "default": "medium",
           "description": "Constrains the verbosity of the model's response. Lower values will result in\nmore concise responses, while higher values will result in more verbose responses.\nCurrently supported values are `low`, `medium`, and `high`.\n",
-          "enum": [
-            "low",
-            "medium",
-            "high"
-          ],
+          "enum": ["low", "medium", "high"],
           "type": "string"
         },
         {
@@ -1068,11 +946,7 @@
     "WebSearchContextSize": {
       "default": "medium",
       "description": "High level guidance for the amount of context window space to use for the \nsearch. One of `low`, `medium`, or `high`. `medium` is the default.\n",
-      "enum": [
-        "low",
-        "medium",
-        "high"
-      ],
+      "enum": ["low", "medium", "high"],
       "type": "string"
     },
     "WebSearchLocation": {
@@ -1149,22 +1023,13 @@
                 "type": "string"
               }
             },
-            "required": [
-              "token",
-              "logprob",
-              "bytes"
-            ],
+            "required": ["token", "logprob", "bytes"],
             "type": "object"
           },
           "type": "array"
         }
       },
-      "required": [
-        "token",
-        "logprob",
-        "bytes",
-        "top_logprobs"
-      ],
+      "required": ["token", "logprob", "bytes", "top_logprobs"],
       "type": "object"
     },
     "ChatCompletionResponseMessage": {
@@ -1177,9 +1042,7 @@
             "properties": {
               "type": {
                 "description": "The type of the URL citation. Always `url_citation`.",
-                "enum": [
-                  "url_citation"
-                ],
+                "enum": ["url_citation"],
                 "type": "string",
                 "x-stainless-const": true
               },
@@ -1203,19 +1066,11 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "end_index",
-                  "start_index",
-                  "url",
-                  "title"
-                ],
+                "required": ["end_index", "start_index", "url", "title"],
                 "type": "object"
               }
             },
-            "required": [
-              "type",
-              "url_citation"
-            ],
+            "required": ["type", "url_citation"],
             "type": "object"
           },
           "type": "array"
@@ -1242,12 +1097,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "id",
-                "expires_at",
-                "data",
-                "transcript"
-              ],
+              "required": ["id", "expires_at", "data", "transcript"],
               "type": "object"
             },
             {
@@ -1279,10 +1129,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "name",
-            "arguments"
-          ],
+          "required": ["name", "arguments"],
           "type": "object"
         },
         "refusal": {
@@ -1298,9 +1145,7 @@
         },
         "role": {
           "description": "The role of the author of this message.",
-          "enum": [
-            "assistant"
-          ],
+          "enum": ["assistant"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -1308,11 +1153,7 @@
           "$ref": "#/definitions/ChatCompletionMessageToolCalls"
         }
       },
-      "required": [
-        "role",
-        "content",
-        "refusal"
-      ],
+      "required": ["role", "content", "refusal"],
       "type": "object"
     },
     "ServiceTier": {
@@ -1320,13 +1161,7 @@
         {
           "default": "auto",
           "description": "Specifies the processing type used for serving the request.\n  - If set to 'auto', then the request will be processed with the service tier configured in the Project settings. Unless otherwise configured, the Project will use 'default'.\n  - If set to 'default', then the request will be processed with the standard pricing and performance for the selected model.\n  - If set to '[flex](/docs/guides/flex-processing)' or '[priority](https://openai.com/api-priority-processing/)', then the request will be processed with the corresponding service tier.\n  - When not set, the default behavior is 'auto'.\n\n  When the `service_tier` parameter is set, the response body will include the `service_tier` value based on the processing mode actually used to serve the request. This response value may be different from the value set in the parameter.\n",
-          "enum": [
-            "auto",
-            "default",
-            "flex",
-            "scale",
-            "priority"
-          ],
+          "enum": ["auto", "default", "flex", "scale", "priority"],
           "type": "string"
         },
         {
@@ -1395,11 +1230,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "prompt_tokens",
-        "completion_tokens",
-        "total_tokens"
-      ],
+      "required": ["prompt_tokens", "completion_tokens", "total_tokens"],
       "type": "object"
     },
     "ChatCompletionStreamResponseDelta": {
@@ -1454,13 +1285,7 @@
         },
         "role": {
           "description": "The role of the author of this message.",
-          "enum": [
-            "developer",
-            "system",
-            "user",
-            "assistant",
-            "tool"
-          ],
+          "enum": ["developer", "system", "user", "assistant", "tool"],
           "type": "string"
         },
         "tool_calls": {
@@ -1508,10 +1333,7 @@
           "anyOf": [
             {
               "description": "The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).\n",
-              "enum": [
-                "in_memory",
-                "24h"
-              ],
+              "enum": ["in_memory", "24h"],
               "type": "string"
             },
             {
@@ -1636,17 +1458,12 @@
         },
         "role": {
           "description": "The role of the messages author, in this case `developer`.",
-          "enum": [
-            "developer"
-          ],
+          "enum": ["developer"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "content",
-        "role"
-      ],
+      "required": ["content", "role"],
       "title": "Developer message",
       "type": "object"
     },
@@ -1678,17 +1495,12 @@
         },
         "role": {
           "description": "The role of the messages author, in this case `system`.",
-          "enum": [
-            "system"
-          ],
+          "enum": ["system"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "content",
-        "role"
-      ],
+      "required": ["content", "role"],
       "title": "System message",
       "type": "object"
     },
@@ -1720,17 +1532,12 @@
         },
         "role": {
           "description": "The role of the messages author, in this case `user`.",
-          "enum": [
-            "user"
-          ],
+          "enum": ["user"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "content",
-        "role"
-      ],
+      "required": ["content", "role"],
       "title": "User message",
       "type": "object"
     },
@@ -1747,9 +1554,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "id"
-              ],
+              "required": ["id"],
               "type": "object"
             },
             {
@@ -1798,10 +1603,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "arguments",
-                "name"
-              ],
+              "required": ["arguments", "name"],
               "type": "object"
             },
             {
@@ -1826,9 +1628,7 @@
         },
         "role": {
           "description": "The role of the messages author, in this case `assistant`.",
-          "enum": [
-            "assistant"
-          ],
+          "enum": ["assistant"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -1836,9 +1636,7 @@
           "$ref": "#/definitions/ChatCompletionMessageToolCalls"
         }
       },
-      "required": [
-        "role"
-      ],
+      "required": ["role"],
       "title": "Assistant message",
       "type": "object"
     },
@@ -1865,9 +1663,7 @@
         },
         "role": {
           "description": "The role of the messages author, in this case `tool`.",
-          "enum": [
-            "tool"
-          ],
+          "enum": ["tool"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -1876,11 +1672,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "role",
-        "content",
-        "tool_call_id"
-      ],
+      "required": ["role", "content", "tool_call_id"],
       "title": "Tool message",
       "type": "object"
     },
@@ -1904,18 +1696,12 @@
         },
         "role": {
           "description": "The role of the messages author, in this case `function`.",
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "role",
-        "content",
-        "name"
-      ],
+      "required": ["role", "content", "name"],
       "title": "Function message",
       "type": "object"
     },
@@ -1928,17 +1714,12 @@
         },
         "type": {
           "description": "The type of the content part.",
-          "enum": [
-            "text"
-          ],
+          "enum": ["text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "text"
-      ],
+      "required": ["type", "text"],
       "title": "Text content part",
       "type": "object"
     },
@@ -1956,17 +1737,12 @@
         },
         "type": {
           "description": "Allowed tool configuration type. Always `allowed_tools`.",
-          "enum": [
-            "allowed_tools"
-          ],
+          "enum": ["allowed_tools"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "allowed_tools"
-      ],
+      "required": ["type", "allowed_tools"],
       "title": "Allowed tools",
       "type": "object"
     },
@@ -1980,24 +1756,17 @@
               "type": "string"
             }
           },
-          "required": [
-            "name"
-          ],
+          "required": ["name"],
           "type": "object"
         },
         "type": {
           "description": "For function calling, the type is always `function`.",
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "function"
-      ],
+      "required": ["type", "function"],
       "title": "Function tool choice",
       "type": "object"
     },
@@ -2011,24 +1780,17 @@
               "type": "string"
             }
           },
-          "required": [
-            "name"
-          ],
+          "required": ["name"],
           "type": "object"
         },
         "type": {
           "description": "For custom tool calling, the type is always `custom`.",
-          "enum": [
-            "custom"
-          ],
+          "enum": ["custom"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "custom"
-      ],
+      "required": ["type", "custom"],
       "title": "Custom tool choice",
       "type": "object"
     },
@@ -2058,9 +1820,7 @@
           ]
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "type": "object"
     },
     "ChatCompletionMessageToolCalls": {
@@ -2104,16 +1864,12 @@
         },
         "type": {
           "description": "The type of the tool. Currently, only `function` is supported.",
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "index"
-      ],
+      "required": ["index"],
       "type": "object"
     },
     "Metadata": {
@@ -2179,10 +1935,7 @@
       "properties": {
         "mode": {
           "description": "Constrains the tools available to the model to a pre-defined set.\n\n`auto` allows the model to pick from among the allowed tools and generate a\nmessage.\n\n`required` requires the model to call one or more of the allowed tools.\n",
-          "enum": [
-            "auto",
-            "required"
-          ],
+          "enum": ["auto", "required"],
           "type": "string"
         },
         "tools": {
@@ -2196,10 +1949,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "mode",
-        "tools"
-      ],
+      "required": ["mode", "tools"],
       "title": "Allowed tools",
       "type": "object"
     },
@@ -2218,10 +1968,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "name",
-            "arguments"
-          ],
+          "required": ["name", "arguments"],
           "type": "object"
         },
         "id": {
@@ -2230,18 +1977,12 @@
         },
         "type": {
           "description": "The type of the tool. Currently, only `function` is supported.",
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "id",
-        "type",
-        "function"
-      ],
+      "required": ["id", "type", "function"],
       "title": "Function tool call",
       "type": "object"
     },
@@ -2260,10 +2001,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "name",
-            "input"
-          ],
+          "required": ["name", "input"],
           "type": "object"
         },
         "id": {
@@ -2272,18 +2010,12 @@
         },
         "type": {
           "description": "The type of the tool. Always `custom`.",
-          "enum": [
-            "custom"
-          ],
+          "enum": ["custom"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "id",
-        "type",
-        "custom"
-      ],
+      "required": ["id", "type", "custom"],
       "title": "Custom tool call",
       "type": "object"
     },
@@ -2295,11 +2027,7 @@
             "detail": {
               "default": "auto",
               "description": "Specifies the detail level of the image. Learn more in the [Vision guide](/docs/guides/vision#low-or-high-fidelity-image-understanding).",
-              "enum": [
-                "auto",
-                "low",
-                "high"
-              ],
+              "enum": ["auto", "low", "high"],
               "type": "string"
             },
             "url": {
@@ -2308,24 +2036,17 @@
               "type": "string"
             }
           },
-          "required": [
-            "url"
-          ],
+          "required": ["url"],
           "type": "object"
         },
         "type": {
           "description": "The type of the content part.",
-          "enum": [
-            "image_url"
-          ],
+          "enum": ["image_url"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "image_url"
-      ],
+      "required": ["type", "image_url"],
       "title": "Image content part",
       "type": "object"
     },
@@ -2340,32 +2061,21 @@
             },
             "format": {
               "description": "The format of the encoded audio data. Currently supports \"wav\" and \"mp3\".\n",
-              "enum": [
-                "wav",
-                "mp3"
-              ],
+              "enum": ["wav", "mp3"],
               "type": "string"
             }
           },
-          "required": [
-            "data",
-            "format"
-          ],
+          "required": ["data", "format"],
           "type": "object"
         },
         "type": {
           "description": "The type of the content part. Always `input_audio`.",
-          "enum": [
-            "input_audio"
-          ],
+          "enum": ["input_audio"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "input_audio"
-      ],
+      "required": ["type", "input_audio"],
       "title": "Audio content part",
       "type": "object"
     },
@@ -2391,17 +2101,12 @@
         },
         "type": {
           "description": "The type of the content part. Always `file`.",
-          "enum": [
-            "file"
-          ],
+          "enum": ["file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "file"
-      ],
+      "required": ["type", "file"],
       "title": "File content part",
       "type": "object"
     },
@@ -2413,17 +2118,12 @@
         },
         "type": {
           "description": "The type of the content part.",
-          "enum": [
-            "refusal"
-          ],
+          "enum": ["refusal"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "refusal"
-      ],
+      "required": ["type", "refusal"],
       "title": "Refusal content part",
       "type": "object"
     }

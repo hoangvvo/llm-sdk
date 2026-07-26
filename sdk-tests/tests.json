@@ -209,60 +209,68 @@
     },
     "anthropic_web_search": {
       "applies_to": ["generate_web_search", "stream_web_search"],
-      "expect": {
-        "content": [
-          {
-            "type": "web_search_call",
-            "status": "completed",
-            "action": true
-          },
-          {
-            "type": "web_search_result",
-            "status": "completed",
-            "source_signature": true
-          },
-          {
-            "type": "text",
-            "text": "IANA",
-            "citation": {
-              "source": "^https?://(?:www\\.)?iana\\.org/",
-              "title": "IANA|iana|Reserved|reserved"
+      "expect": [
+        {
+          "content": [
+            {
+              "type": "web_search_call",
+              "status": "completed",
+              "action": true
+            },
+            {
+              "type": "web_search_result",
+              "status": "completed",
+              "source_signature": true
+            },
+            {
+              "type": "text",
+              "text": "IANA",
+              "citation": {
+                "source": "^https?://(?:www\\.)?iana\\.org/",
+                "title": "IANA|iana|Reserved|reserved"
+              }
             }
-          }
-        ]
-      }
+          ]
+        }
+      ]
     },
     "google_web_search": {
       "applies_to": ["generate_web_search", "stream_web_search"],
       "input_omit": ["tools.*.allowed_domains", "tools.*.user_location"],
-      "expect": {
-        "content": [
-          {
-            "type": "web_search_call",
-            "status": "completed",
-            "action": true
-          },
-          {
-            "type": "web_search_result",
-            "status": "completed"
-          },
-          {
-            "type": "text",
-            "text": "IANA",
-            "citation": {
-              "source": "^https://vertexaisearch\\.cloud\\.google\\.com/grounding-api-redirect/",
-              "any_of": [
-                {
-                  "title": "iana\\.org"
-                },
-                {
-                  "cited_text": "https://www\\.iana\\.org/"
-                }
-              ]
+      "expect": [
+        {
+          "content": [
+            {
+              "type": "web_search_call",
+              "status": "completed",
+              "action": true
+            },
+            {
+              "type": "web_search_result",
+              "status": "completed"
+            },
+            {
+              "type": "text",
+              "text": "IANA",
+              "citation": {
+                "source": "^https://vertexaisearch\\.cloud\\.google\\.com/grounding-api-redirect/",
+                "any_of": [
+                  {
+                    "title": "iana\\.org"
+                  },
+                  {
+                    "cited_text": "https://www\\.iana\\.org/"
+                  }
+                ]
+              }
             }
-          }
-        ]
-      }
+          ]
+        }
+      ]
+    },
+    "google_web_search_tool_mix": {
+      "applies_to": ["web_search_and_tool_call_history"],
+      "input_omit": ["tools.*.allowed_domains", "tools.*.user_location"]
     },
     "google_audio": {
       "applies_to": ["generate_audio", "stream_audio"],
@@ -272,13 +280,15 @@
           "voice": "Zephyr"
         }
       },
-      "expect": {
-        "content": [
-          {
-            "type": "audio"
-          }
-        ]
-      }
+      "expect": [
+        {
+          "content": [
+            {
+              "type": "audio"
+            }
+          ]
+        }
+      ]
     },
     "anthropic_adaptive_reasoning": {
       "applies_to": ["generate_reasoning", "stream_reasoning"],
@@ -287,35 +297,39 @@
           "enabled": true
         }
       },
-      "expect": {
-        "content": [
-          {
-            "type": "reasoning",
-            "text": ".*",
-            "signature": true
-          },
-          {
-            "type": "text",
-            "text": "16|[Ss]ixteen"
-          }
-        ]
-      }
+      "expect": [
+        {
+          "content": [
+            {
+              "type": "reasoning",
+              "text": ".*",
+              "signature": true
+            },
+            {
+              "type": "text",
+              "text": "16|[Ss]ixteen"
+            }
+          ]
+        }
+      ]
     },
     "openai_opaque_reasoning": {
       "applies_to": ["generate_reasoning", "stream_reasoning"],
-      "expect": {
-        "content": [
-          {
-            "type": "reasoning",
-            "text": ".*",
-            "signature": true
-          },
-          {
-            "type": "text",
-            "text": "16|[Ss]ixteen"
-          }
-        ]
-      }
+      "expect": [
+        {
+          "content": [
+            {
+              "type": "reasoning",
+              "text": ".*",
+              "signature": true
+            },
+            {
+              "type": "text",
+              "text": "16|[Ss]ixteen"
+            }
+          ]
+        }
+      ]
     }
   },
   "test_cases": [
@@ -1320,6 +1334,33 @@
               }
             ]
           }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Do not search again. Reply with only the word RESERVED."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search"],
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "text",
+                "text": "^\\s*RESERVED[.!]?\\s*$",
+                "aggregate": true
+              }
+            ]
+          }
         }
       ]
     },
@@ -1361,6 +1402,147 @@
                   "source": "^https?://(?:www\\.)?iana\\.org/",
                   "title": "IANA|iana|Reserved|reserved"
                 }
+              }
+            ]
+          }
+        },
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Do not search again. Reply with only the word RESERVED."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search"],
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "text",
+                "text": "^\\s*RESERVED[.!]?\\s*$",
+                "aggregate": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "web_search_and_tool_call_history",
+      "groups": ["web_search_tool_mix"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use web search to find the official IANA page about reserved domains. Reply with one sentence containing the word IANA and cite the source."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search", "get_stock_price"],
+          "expect": {
+            "content": [
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
+              {
+                "type": "web_search_result",
+                "status": "completed"
+              }
+            ]
+          }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Now call the get_stock_price tool for AAPL. Do not search again."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search", "get_stock_price"],
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "tool_call",
+                "tool_name": "get_stock_price",
+                "args": {
+                  "symbol": "AAPL"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "status": "completed",
+                    "tool_call_id": {
+                      "$ref": "stages.1.tool_calls.0.tool_call_id"
+                    },
+                    "result": {
+                      "type": "function",
+                      "name": "get_stock_price",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"symbol\":\"AAPL\",\"price\":189.25,\"currency\":\"USD\"}"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Report the AAPL price from the tool result and name the organization whose page you cited earlier."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["web_search", "get_stock_price"],
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "text",
+                "text": "(?=.*189\\.25)(?=.*(?:IANA|iana))",
+                "aggregate": true
               }
             ]
           }

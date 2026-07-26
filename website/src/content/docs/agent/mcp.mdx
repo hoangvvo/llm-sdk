@@ -74,48 +74,50 @@ The snippets below show an init function that loads an OAuth token from storage 
 import { mcpToolkit, type MCPParams } from "@hoangvvo/llm-agent/mcp";
 
 interface SessionContext {
-  tenantId: string;
-  userId: string;
+tenantId: string;
+userId: string;
 }
 
 async function resolveMcpParams(context: SessionContext): Promise<MCPParams> {
-  const token = await fetchMcpTokenForUser(context.userId);
-  const url = await resolveMcpEndpointForTenant(context.tenantId);
-  return {
-    type: "streamable-http",
-    url,
-    authorization: token,
-  };
+const token = await fetchMcpTokenForUser(context.userId);
+const url = await resolveMcpEndpointForTenant(context.tenantId);
+return {
+type: "streamable-http",
+url,
+authorization: token,
+};
 }
 
 const agent = new Agent<SessionContext>({
-  name: "Transit Concierge",
-  model,
-  toolkits: [mcpToolkit(resolveMcpParams)],
+name: "Transit Concierge",
+model,
+toolkits: [mcpToolkit(resolveMcpParams)],
 });`}
-      lang="typescript"
-      title="agent.ts"
-    />
+lang="typescript"
+title="agent.ts"
+/>
+
   </TabItem>
   <TabItem label="Rust">
     <Code
       code={`use llm_agent::mcp::{MCPInit, MCPParams, MCPStreamableHTTPParams, MCPToolkit};
 
 let toolkit = MCPToolkit::new(MCPInit::from_async_fn(|context: &SessionContext| async move {
-    let token = fetch_mcp_token_for_user(&context.user_id).await?;
-    let url = resolve_mcp_endpoint_for_tenant(&context.tenant_id).await?;
-    Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
-        url,
-        authorization: Some(token),
-    }))
+let token = fetch_mcp_token_for_user(&context.user_id).await?;
+let url = resolve_mcp_endpoint_for_tenant(&context.tenant_id).await?;
+Ok(MCPParams::StreamableHttp(MCPStreamableHTTPParams {
+url,
+authorization: Some(token),
+}))
 }));
 
 let agent = Agent::builder("Transit Concierge", model)
-    .add_toolkit(toolkit)
-    .build();`}
-      lang="rust"
-      title="agent.rs"
-    />
+.add_toolkit(toolkit)
+.build();`}
+lang="rust"
+title="agent.rs"
+/>
+
   </TabItem>
   <TabItem label="Go">
     <Code
@@ -135,22 +137,26 @@ let agent = Agent::builder("Transit Concierge", model)
     }
 
     return llmmcp.NewMCPStreamableHTTPParams(url, token), nil
+
 })
 
 agent := llmagent.NewAgent[*SessionContext](
-    "Transit Concierge",
-    model,
-    llmagent.WithToolkits(toolkit),
+"Transit Concierge",
+model,
+llmagent.WithToolkits(toolkit),
 )`}
-      lang="go"
-      title="agent.go"
-    />
+lang="go"
+title="agent.go"
+/>
+
   </TabItem>
 </Tabs>
 
 <Aside type="note">
-  Stdio transports spawn a child process (`npx`, `python`, etc.) for the lifetime of the run session. Streamable HTTP transports keep a persistent connection open when the server supports it.
-  Make sure they shut down cleanly when the session ends to avoid resource leaks.
+  Stdio transports spawn a child process (`npx`, `python`, etc.) for the
+  lifetime of the run session. Streamable HTTP transports keep a persistent
+  connection open when the server supports it. Make sure they shut down cleanly
+  when the session ends to avoid resource leaks.
 </Aside>
 
 ## Tool lifecycle

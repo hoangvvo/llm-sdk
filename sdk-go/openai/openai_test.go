@@ -66,6 +66,10 @@ func TestWebSearch(t *testing.T) {
 	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "web_search")
 }
 
+func TestWebSearchWithToolCall(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "web_search_tool_mix")
+}
+
 func TestImageGeneration(t *testing.T) {
 	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "image_generation")
 }

@@ -223,6 +223,10 @@ function validateTestData(): void {
     ) {
       fail(`Profile "${name}" has invalid applies_to entries`);
     }
+    // Profiles may override expectations for individual stages.
+    if (profile.expect !== undefined && !Array.isArray(profile.expect)) {
+      fail(`Profile "${name}" must declare expect as an array of stages`);
+    }
   }
 }
 
@@ -727,7 +731,7 @@ export function validateOutput({
     fail(`Stage ${stageIndex} not found in test case "${testCaseName}"`);
   if (!Array.isArray(content)) fail("Model output content must be an array");
   const profile = getProfile(profileName, testCaseName);
-  const expected = clone(profile?.expect ?? stage.expect);
+  const expected = clone(profile?.expect?.[stageIndex] ?? stage.expect);
   for (const rule of profile?.expect_omit ?? []) {
     if (rule.method === undefined || rule.method === stage.type) {
       omitPath(expected, rule.path.split("."));
@@ -803,7 +807,7 @@ export function validateError({
   if (!stage)
     fail(`Stage ${stageIndex} not found in test case "${testCaseName}"`);
   const profile = getProfile(profileName, testCaseName);
-  const expected = clone(profile?.expect ?? stage.expect);
+  const expected = clone(profile?.expect?.[stageIndex] ?? stage.expect);
   if (!isObject(expected.error)) {
     fail(
       `Unexpected model error for "${testCaseName}" stage ${stageIndex}: ${String(error?.kind)}: ${String(error?.message)}`,

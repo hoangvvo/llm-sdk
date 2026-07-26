@@ -485,6 +485,8 @@ export class RunSession<TContext> {
 
     try {
       let tools = this.#getTools(); // get initial tool set
+      // Keep content indices unique across model turns.
+      let streamedPartCount = 0;
 
       for (;;) {
         const processStream = this.#process(state, tools);
@@ -540,10 +542,21 @@ export class RunSession<TContext> {
           span.withContext(() => originalNext(...args));
 
         const accumulator = new StreamAccumulator();
+        const turnPartOffset = streamedPartCount;
 
         try {
           for await (const partial of modelStream) {
             accumulator.addPartial(partial);
+            if (partial.delta) {
+              const index = partial.delta.index + turnPartOffset;
+              streamedPartCount = Math.max(streamedPartCount, index + 1);
+              yield {
+                event: "partial",
+                ...partial,
+                delta: { ...partial.delta, index },
+              };
+              continue;
+            }
             yield {
               event: "partial",
               ...partial,

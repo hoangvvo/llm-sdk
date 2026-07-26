@@ -2063,8 +2063,8 @@ suite("RunSession#runStream", () => {
             tool_call_id: "call_1",
           },
         },
-        { index: 0, part: { type: "text", text: "Final" } },
-        { index: 0, part: { type: "text", text: "Final response" } },
+        { index: 1, part: { type: "text", text: "Final" } },
+        { index: 1, part: { type: "text", text: "Final response" } },
       ],
     );
 
@@ -2370,6 +2370,65 @@ suite("RunSession#runStream", () => {
         },
       ],
     });
+  });
+
+  test("offsets content indices across turns", async (t: TestContext) => {
+    const tool = createMockTool<object>("lookup", {
+      content: [{ type: "text" as const, text: "Tool result" }],
+      is_error: false,
+    });
+
+    const model = new MockLanguageModel();
+    model.enqueueStreamResult({
+      partials: [
+        { delta: { index: 0, part: { type: "reasoning", text: "Thinking" } } },
+        {
+          delta: {
+            index: 1,
+            part: {
+              type: "tool-call",
+              call: {
+                type: "function",
+                name: "lookup",
+                args: JSON.stringify({ query: "weather" }),
+              },
+              tool_call_id: "call_1",
+            },
+          },
+        },
+      ],
+    });
+    model.enqueueStreamResult({
+      partials: [createPartialResponse({ type: "text", text: "Answer" })],
+    });
+
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      instructions: [],
+      max_turns: 10,
+      response_format: { type: "text" },
+      tools: [tool],
+      context: {},
+    });
+
+    const events: AgentStreamEvent[] = [];
+    for await (const event of session.runStream({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: "Look up" }],
+        },
+      ],
+    })) {
+      events.push(event);
+    }
+
+    t.assert.deepStrictEqual(
+      events.filter(isPartialEvent).map((event) => event.delta?.index),
+      [0, 1, 2],
+    );
   });
 
   test("throws AgentMaxTurnsExceededError in streaming mode", async (t: TestContext) => {

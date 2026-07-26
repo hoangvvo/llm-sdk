@@ -53,10 +53,13 @@ fn call_protocol<T: DeserializeOwned>(request: &Value) -> Result<T, Box<dyn Erro
     Ok(serde_json::from_slice(&output.stdout)?)
 }
 
+// Only function calls need client-supplied results in later stages.
 fn tool_call_parts(content: &[Part]) -> Vec<&Part> {
     content
         .iter()
-        .filter(|part| matches!(part, Part::ToolCall(_)))
+        .filter(|part| {
+            matches!(part, Part::ToolCall(tool_call) if matches!(tool_call.call, ToolCall::Function(_)))
+        })
         .collect()
 }
 

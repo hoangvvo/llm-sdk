@@ -495,6 +495,10 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 				},
 			})
 
+		// OpenAI replays hosted search results through the web_search_call item.
+		case part.ToolResultPart != nil && part.ToolResultPart.Result.WebSearch != nil:
+			continue
+
 		default:
 			return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert assistant message part to OpenAI ResponseInputItem for type %s", part.Type()))
 		}

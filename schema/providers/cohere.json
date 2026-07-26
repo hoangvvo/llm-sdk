@@ -4,9 +4,7 @@
       "properties": {
         "citation_options": {
           "$ref": "#/definitions/CitationOptions",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "documents": {
           "description": "A list of relevant documents that the model can cite to generate a more accurate reply. Each document is either a string or document object with content and metadata.\n",
@@ -21,17 +19,13 @@
             ]
           },
           "type": "array",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "frequency_penalty": {
           "description": "Defaults to `0.0`, min value of `0.0`, max value of `1.0`.\nUsed to reduce repetitiveness of generated tokens. The higher the value, the stronger a penalty is applied to previously present tokens, proportional to how many times they have already appeared in the prompt or prior generation.\n",
           "format": "float",
           "type": "number",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "k": {
           "default": 0,
@@ -39,36 +33,26 @@
           "maximum": 500,
           "minimum": 0,
           "type": "integer",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "logprobs": {
           "description": "Defaults to `false`. When set to `true`, the log probabilities of the generated tokens will be included in the response.\n",
           "type": "boolean",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "max_tokens": {
           "description": "The maximum number of output tokens the model will generate in the response. If not set, `max_tokens` defaults to the model's maximum output token limit. You can find the maximum output token limits for each model in the [model documentation](https://docs.cohere.com/docs/models).\n\n**Note**: Setting a low value may result in incomplete generations. In such cases, the `finish_reason` field in the response will be set to `\"MAX_TOKENS\"`.\n\n**Note**: If `max_tokens` is set higher than the model's maximum output token limit, the generation will be capped at that model-specific maximum limit.\n",
           "type": "integer",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "messages": {
           "$ref": "#/definitions/ChatMessages",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "model": {
           "description": "The name of a compatible [Cohere model](https://docs.cohere.com/v2/docs/models).",
           "type": "string",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "p": {
           "default": 0.75,
@@ -77,17 +61,13 @@
           "maximum": 0.99,
           "minimum": 0.01,
           "type": "number",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "presence_penalty": {
           "description": "Defaults to `0.0`, min value of `0.0`, max value of `1.0`.\nUsed to reduce repetitiveness of generated tokens. Similar to `frequency_penalty`, except that this penalty is applied equally to all tokens that have already appeared, regardless of their exact frequencies.\n",
           "format": "float",
           "type": "number",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "priority": {
           "default": 0,
@@ -95,35 +75,23 @@
           "maximum": 999,
           "minimum": 0,
           "type": "integer",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "response_format": {
           "$ref": "#/definitions/ResponseFormatV2",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "safety_mode": {
           "description": "Used to select the [safety instruction](https://docs.cohere.com/v2/docs/safety-modes) inserted into the prompt. Defaults to `CONTEXTUAL`.\nWhen `OFF` is specified, the safety instruction will be omitted.\n\nSafety modes are not yet configurable in combination with `tools` and `documents` parameters.\n\n**Note**: This parameter is only compatible newer Cohere models, starting with [Command R 08-2024](https://docs.cohere.com/docs/command-r#august-2024-release) and [Command R+ 08-2024](https://docs.cohere.com/docs/command-r-plus#august-2024-release).\n\n**Note**: `command-r7b-12-2024` and newer models only support `\"CONTEXTUAL\"` and `\"STRICT\"` modes.\n",
-          "enum": [
-            "CONTEXTUAL",
-            "STRICT",
-            "OFF"
-          ],
-          "x-fern-audiences": [
-            "public"
-          ]
+          "enum": ["CONTEXTUAL", "STRICT", "OFF"],
+          "x-fern-audiences": ["public"]
         },
         "seed": {
           "description": "If specified, the backend will make a best effort to sample tokens\ndeterministically, such that repeated requests with the same\nseed and parameters should return the same result. However,\ndeterminism cannot be totally guaranteed.\n",
           "maximum": 18446744073709552000,
           "minimum": 0,
           "type": "integer",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "stop_sequences": {
           "description": "A list of up to 5 strings that the model will use to stop generation. If the model generates a string that matches any of the strings in the list, it will stop generating tokens and return the generated text up to that point not including the stop sequence.\n",
@@ -131,23 +99,17 @@
             "type": "string"
           },
           "type": "array",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "stream": {
           "description": "Defaults to `false`.\n\nWhen `true`, the response will be a SSE stream of events.\n\nStreaming is beneficial for user interfaces that render the contents of the response piece by piece, as it gets generated.\n",
           "type": "boolean",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "strict_tools": {
           "description": "When set to `true`, tool calls in the Assistant message will be forced to follow the tool definition strictly. Learn more in the [Structured Outputs (Tools) guide](https://docs.cohere.com/docs/structured-outputs-json#structured-outputs-tools).\n\n**Note**: The first few requests with a new set of tools will take longer to process.\n",
           "type": "boolean",
-          "x-fern-audiences": [
-            "public"
-          ],
+          "x-fern-audiences": ["public"],
           "x-fern-availability": "beta"
         },
         "temperature": {
@@ -156,25 +118,16 @@
           "maximum": 1,
           "minimum": 0,
           "type": "number",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "thinking": {
           "$ref": "#/definitions/Thinking",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "tool_choice": {
           "description": "Used to control whether or not the model will be forced to use a tool when answering. When `REQUIRED` is specified, the model will be forced to use at least one of the user-defined tools, and the `tools` parameter must be passed in the request.\nWhen `NONE` is specified, the model will be forced **not** to use one of the specified tools, and give a direct response.\nIf tool_choice isn't specified, then the model is free to choose whether to use the specified tools or not.\n\n**Note**: This parameter is only compatible with models [Command-r7b](https://docs.cohere.com/v2/docs/command-r7b) and newer.\n",
-          "enum": [
-            "REQUIRED",
-            "NONE"
-          ],
-          "x-fern-audiences": [
-            "public"
-          ]
+          "enum": ["REQUIRED", "NONE"],
+          "x-fern-audiences": ["public"]
         },
         "tools": {
           "description": "A list of tools (functions) available to the model. The model response may contain 'tool_calls' to the specified tools.\n\nLearn more in the [Tool Use guide](https://docs.cohere.com/docs/tools).\n",
@@ -182,15 +135,10 @@
             "$ref": "#/definitions/ToolV2"
           },
           "type": "array",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         }
       },
-      "required": [
-        "messages",
-        "model"
-      ],
+      "required": ["messages", "model"],
       "type": "object"
     },
     "ChatResponseV2": {
@@ -215,11 +163,7 @@
           "$ref": "#/definitions/Usage"
         }
       },
-      "required": [
-        "id",
-        "finish_reason",
-        "message"
-      ]
+      "required": ["id", "finish_reason", "message"]
     },
     "StreamedChatResponseV2": {
       "description": "StreamedChatResponse is returned in streaming mode (specified with `stream=True` in the request).",
@@ -278,13 +222,7 @@
       "properties": {
         "mode": {
           "description": "Defaults to `\"enabled\"`.\nCitations are enabled by default for models that support it, but can be turned off by setting `\"type\": \"disabled\"`.\n",
-          "enum": [
-            "ENABLED",
-            "DISABLED",
-            "FAST",
-            "ACCURATE",
-            "OFF"
-          ],
+          "enum": ["ENABLED", "DISABLED", "FAST", "ACCURATE", "OFF"],
           "type": "string"
         }
       },
@@ -304,9 +242,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "data"
-      ],
+      "required": ["data"],
       "type": "object",
       "x-fern-type-name": "Document"
     },
@@ -344,29 +280,18 @@
           "description": "The maximum number of tokens the model can use for thinking, which must be set to a positive integer.\nThe model will stop thinking if it reaches the thinking token budget and will proceed with the response.\n",
           "minimum": 1,
           "type": "integer",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         },
         "type": {
           "description": "Reasoning is enabled by default for models that support it, but can be turned off by setting `\"type\": \"disabled\"`.\n",
-          "enum": [
-            "enabled",
-            "disabled"
-          ],
+          "enum": ["enabled", "disabled"],
           "type": "string",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object",
-      "x-fern-audiences": [
-        "public"
-      ]
+      "x-fern-audiences": ["public"]
     },
     "ToolV2": {
       "properties": {
@@ -387,23 +312,16 @@
               "x-fern-type-name": "ToolV2-6eoehf"
             }
           },
-          "required": [
-            "name",
-            "parameters"
-          ],
+          "required": ["name", "parameters"],
           "type": "object",
           "x-fern-type-name": "ToolV2Function"
         },
         "type": {
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string"
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object",
       "x-fern-type-name": "ToolV2"
     },
@@ -442,11 +360,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "token",
-        "token_ids",
-        "logprob"
-      ],
+      "required": ["token", "token_ids", "logprob"],
       "type": "object",
       "x-fern-type-name": "LogprobItem"
     },
@@ -480,9 +394,7 @@
           "type": "array"
         },
         "role": {
-          "enum": [
-            "assistant"
-          ],
+          "enum": ["assistant"],
           "type": "string"
         },
         "tool_calls": {
@@ -496,9 +408,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "role"
-      ],
+      "required": ["role"],
       "type": "object",
       "x-fern-type-name": "AssistantMessageResponse"
     },
@@ -682,10 +592,7 @@
                           "type": "string"
                         },
                         "type": {
-                          "enum": [
-                            "text",
-                            "thinking"
-                          ],
+                          "enum": ["text", "thinking"],
                           "type": "string"
                         }
                       },
@@ -720,9 +627,7 @@
           "properties": {
             "prompt": {
               "type": "string",
-              "x-fern-audiences": [
-                "public"
-              ]
+              "x-fern-audiences": ["public"]
             }
           },
           "type": "object",
@@ -743,21 +648,15 @@
                 "error": {
                   "description": "An error message if an error occurred during the generation.\n",
                   "type": "string",
-                  "x-fern-audiences": [
-                    "public"
-                  ]
+                  "x-fern-audiences": ["public"]
                 },
                 "finish_reason": {
                   "$ref": "#/definitions/ChatFinishReason",
-                  "x-fern-audiences": [
-                    "public"
-                  ]
+                  "x-fern-audiences": ["public"]
                 },
                 "usage": {
                   "$ref": "#/definitions/Usage",
-                  "x-fern-audiences": [
-                    "public"
-                  ]
+                  "x-fern-audiences": ["public"]
                 }
               },
               "type": "object",
@@ -787,9 +686,7 @@
                   "properties": {
                     "role": {
                       "description": "The role of the message.",
-                      "enum": [
-                        "assistant"
-                      ],
+                      "enum": ["assistant"],
                       "type": "string"
                     }
                   },
@@ -976,13 +873,9 @@
           "$ref": "#/definitions/ResponseFormatTypeV2"
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object",
-      "x-fern-audiences": [
-        "public"
-      ],
+      "x-fern-audiences": ["public"],
       "x-fern-type-name": "JsonResponseFormatV2"
     },
     "ChatTextResponseFormatV2": {
@@ -991,13 +884,9 @@
           "$ref": "#/definitions/ResponseFormatTypeV2"
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object",
-      "x-fern-audiences": [
-        "public"
-      ],
+      "x-fern-audiences": ["public"],
       "x-fern-type-name": "ChatTextResponseFormatV2"
     },
     "Citation": {
@@ -1039,16 +928,11 @@
           "type": "string"
         },
         "type": {
-          "enum": [
-            "text"
-          ],
+          "enum": ["text"],
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "text"
-      ],
+      "required": ["type", "text"],
       "type": "object",
       "x-fern-type-name": "ChatTextContent"
     },
@@ -1059,16 +943,11 @@
           "type": "string"
         },
         "type": {
-          "enum": [
-            "thinking"
-          ],
+          "enum": ["thinking"],
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "thinking"
-      ],
+      "required": ["type", "thinking"],
       "type": "object"
     },
     "ToolCallV2": {
@@ -1090,16 +969,11 @@
           "type": "string"
         },
         "type": {
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "type"
-      ],
+      "required": ["id", "type"],
       "type": "object",
       "x-fern-type-name": "ToolCallV2"
     },
@@ -1123,9 +997,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "x-fern-type-name": "ChatStreamEventType"
     },
     "ChatStreamEvent": {
@@ -1141,14 +1013,10 @@
             "debug"
           ],
           "type": "string",
-          "x-fern-audiences": [
-            "public"
-          ]
+          "x-fern-audiences": ["public"]
         }
       },
-      "required": [
-        "event_type"
-      ],
+      "required": ["event_type"],
       "x-fern-type-name": "ChatStreamEvent"
     },
     "AssistantMessageV2": {
@@ -1188,9 +1056,7 @@
           ]
         },
         "role": {
-          "enum": [
-            "assistant"
-          ],
+          "enum": ["assistant"],
           "type": "string"
         },
         "tool_calls": {
@@ -1204,9 +1070,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "role"
-      ],
+      "required": ["role"],
       "title": "Assistant Message",
       "type": "object",
       "x-fern-type-name": "AssistantMessage"
@@ -1238,16 +1102,11 @@
           ]
         },
         "role": {
-          "enum": [
-            "system"
-          ],
+          "enum": ["system"],
           "type": "string"
         }
       },
-      "required": [
-        "role",
-        "content"
-      ],
+      "required": ["role", "content"],
       "title": "System Message",
       "type": "object",
       "x-fern-type-name": "SystemMessageV2"
@@ -1270,9 +1129,7 @@
           ]
         },
         "role": {
-          "enum": [
-            "tool"
-          ],
+          "enum": ["tool"],
           "type": "string"
         },
         "tool_call_id": {
@@ -1280,11 +1137,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "role",
-        "tool_call_id",
-        "content"
-      ],
+      "required": ["role", "tool_call_id", "content"],
       "title": "Tool Message",
       "type": "object",
       "x-fern-type-name": "ToolMessageV2"
@@ -1307,30 +1160,20 @@
           ]
         },
         "role": {
-          "enum": [
-            "user"
-          ],
+          "enum": ["user"],
           "type": "string"
         }
       },
-      "required": [
-        "role",
-        "content"
-      ],
+      "required": ["role", "content"],
       "title": "User Message",
       "type": "object",
       "x-fern-type-name": "UserMessageV2"
     },
     "ResponseFormatTypeV2": {
       "description": "Defaults to `\"text\"`.\n\nWhen set to `\"json_object\"`, the model's output will be a valid JSON Object.\n",
-      "enum": [
-        "text",
-        "json_object"
-      ],
+      "enum": ["text", "json_object"],
       "type": "string",
-      "x-fern-audiences": [
-        "public"
-      ],
+      "x-fern-audiences": ["public"],
       "x-fern-type-name": "ResponseFormatTypeV2"
     },
     "Source": {
@@ -1354,11 +1197,7 @@
     },
     "CitationType": {
       "description": "The type of citation which indicates what part of the response the citation is for.\n",
-      "enum": [
-        "TEXT_CONTENT",
-        "THINKING_CONTENT",
-        "PLAN"
-      ],
+      "enum": ["TEXT_CONTENT", "THINKING_CONTENT", "PLAN"],
       "type": "string",
       "x-fern-type-name": "CitationType"
     },
@@ -1439,16 +1278,11 @@
           "$ref": "#/definitions/Document"
         },
         "type": {
-          "enum": [
-            "document"
-          ],
+          "enum": ["document"],
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "document"
-      ],
+      "required": ["type", "document"],
       "type": "object",
       "x-fern-type-name": "DocumentContent"
     },
@@ -1462,10 +1296,7 @@
           "$ref": "#/definitions/ContentType"
         }
       },
-      "required": [
-        "type",
-        "image_url"
-      ],
+      "required": ["type", "image_url"],
       "type": "object",
       "x-fern-type-name": "ImageContent"
     },
@@ -1473,11 +1304,7 @@
       "properties": {
         "detail": {
           "description": "Controls the level of detail in image processing. `\"auto\"` is the default and lets the system choose, `\"low\"` is faster but less detailed, and `\"high\"` preserves maximum detail. You can save tokens and speed up responses by using detail: `\"low\"`.\n",
-          "enum": [
-            "auto",
-            "low",
-            "high"
-          ],
+          "enum": ["auto", "low", "high"],
           "type": "string"
         },
         "url": {
@@ -1485,22 +1312,15 @@
           "type": "string"
         }
       },
-      "required": [
-        "url"
-      ],
+      "required": ["url"],
       "type": "object",
       "x-fern-type-name": "ImageUrl"
     },
     "ContentType": {
       "description": "Type of message content\n",
-      "enum": [
-        "text",
-        "image_url"
-      ],
+      "enum": ["text", "image_url"],
       "type": "string",
-      "x-fern-audiences": [
-        "public"
-      ],
+      "x-fern-audiences": ["public"],
       "x-fern-type-name": "ContentType"
     }
   }

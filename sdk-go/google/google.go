@@ -317,12 +317,29 @@ func convertToGenerateContentParameters(input *llmsdk.LanguageModelInput, modelI
 		if err != nil {
 			return nil, err
 		}
+		// Google requires invocation data when web search and function tools are mixed.
+		hasWebSearch := false
+		hasFunction := false
+		for _, tool := range input.Tools {
+			if tool.WebSearchTool != nil {
+				hasWebSearch = true
+			}
+			if tool.FunctionTool != nil {
+				hasFunction = true
+			}
+		}
+		if hasWebSearch && hasFunction {
+			params.ToolConfig = &googleapi.ToolConfig{
+				IncludeServerSideToolInvocations: ptr.To(true),
+			}
+		}
 	}
 
 	if input.ToolChoice != nil {
-		params.ToolConfig = &googleapi.ToolConfig{
-			FunctionCallingConfig: convertToGoogleFunctionCallingConfig(input.ToolChoice),
+		if params.ToolConfig == nil {
+			params.ToolConfig = &googleapi.ToolConfig{}
 		}
+		params.ToolConfig.FunctionCallingConfig = convertToGoogleFunctionCallingConfig(input.ToolChoice)
 	}
 
 	if input.ResponseFormat != nil {

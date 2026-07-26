@@ -280,27 +280,30 @@ function convertAssistantMessageToResponseInputItems(
 ): OpenAI.Responses.ResponseInputItem[] {
   const messageParts = getCompatiblePartsWithoutSourceParts(message.content);
 
-  return messageParts.map((part): OpenAI.Responses.ResponseInputItem => {
+  return messageParts.flatMap((part): OpenAI.Responses.ResponseInputItem[] => {
+    // OpenAI replays hosted search results through the web_search_call item.
+    if (part.type === "tool-result" && part.result.type === "web_search") {
+      return [];
+    }
+
     switch (part.type) {
       case "text":
-        return {
-          // Response output item requires an ID.
-          // This usually applies if we enable OpenAI "store".
-          // or that we propogate the message ID in output.
-          // For compatibility, we want to avoid doing that, so we use a generated ID
-          // to avoid the API from returning an error.
-          id: "msg_" + generateString(10),
-          type: "message",
-          role: "assistant",
-          status: "completed",
-          content: [
-            {
-              type: "output_text",
-              text: part.text,
-              annotations: [],
-            },
-          ],
-        };
+        return [
+          {
+            // Output messages require an ID, but the SDK does not expose provider IDs.
+            id: "msg_" + generateString(10),
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [
+              {
+                type: "output_text",
+                text: part.text,
+                annotations: [],
+              },
+            ],
+          },
+        ];
       case "reasoning": {
         const responseInputItem: OpenAI.Responses.ResponseInputItem = {
           type: "reasoning",
@@ -316,15 +319,17 @@ function convertAssistantMessageToResponseInputItems(
         if (part.signature) {
           responseInputItem.encrypted_content = part.signature;
         }
-        return responseInputItem;
+        return [responseInputItem];
       }
       case "image":
-        return {
-          id: part.id ?? "",
-          type: "image_generation_call",
-          status: "completed",
-          result: `data:${part.mime_type};base64,${part.data}`,
-        };
+        return [
+          {
+            id: part.id ?? "",
+            type: "image_generation_call",
+            status: "completed",
+            result: `data:${part.mime_type};base64,${part.data}`,
+          },
+        ];
       case "tool-call": {
         if (part.call.type === "web_search") {
           if (!part.call.action) {
@@ -332,12 +337,14 @@ function convertAssistantMessageToResponseInputItems(
               "OpenAI web-search history requires an action",
             );
           }
-          return {
-            type: "web_search_call",
-            id: part.tool_call_id,
-            status: part.call.status ?? "completed",
-            action: convertToOpenAIWebSearchAction(part.call.action),
-          };
+          return [
+            {
+              type: "web_search_call",
+              id: part.tool_call_id,
+              status: part.call.status ?? "completed",
+              action: convertToOpenAIWebSearchAction(part.call.action),
+            },
+          ];
         }
         const responseInputItem: OpenAI.Responses.ResponseInputItem = {
           type: "function_call",
@@ -348,7 +355,7 @@ function convertAssistantMessageToResponseInputItems(
         if (part.id) {
           responseInputItem.id = part.id;
         }
-        return responseInputItem;
+        return [responseInputItem];
       }
       default:
         throw new UnsupportedError(

@@ -444,12 +444,8 @@ fn convert_assistant_message_to_response_input_items(
                 Part::Text(text_part) => {
                     Some(InputItem::Item(responses_api::Item::OutputMessage(
                         OutputMessage {
-                            // Response output item requires an ID.
-                            // This usually applies if we enable OpenAI "store".
-                            // or that we propogate the message ID in output.
-                            // For compatibility, we want to avoid doing that, so we use a generated
-                            // ID to avoid the API from returning an
-                            // error.
+                            // Output messages require an ID, but the SDK does not expose provider
+                            // IDs.
                             id: format!("msg_{}", id_utils::generate_string(15)),
                             role: OutputMessageRole::Assistant,
                             content: vec![OutputMessageContent::OutputText(OutputTextContent {
@@ -501,33 +497,15 @@ fn convert_assistant_message_to_response_input_items(
                             r#type: FunctionToolCallType::FunctionCall,
                         }),
                     )),
-                    crate::ToolCall::WebSearch(call) => call.action.map(|action| {
-                        InputItem::Item(responses_api::Item::WebSearchToolCall(
-                            responses_api::WebSearchToolCall {
-                                action: convert_to_openai_web_search_action(action),
-                                id: tool_call_part.tool_call_id,
-                                status: match call
-                                    .status
-                                    .unwrap_or(crate::WebSearchToolCallStatus::Completed)
-                                {
-                                    crate::WebSearchToolCallStatus::InProgress => {
-                                        responses_api::WebSearchToolCallStatus::InProgress
-                                    }
-                                    crate::WebSearchToolCallStatus::Searching => {
-                                        responses_api::WebSearchToolCallStatus::Searching
-                                    }
-                                    crate::WebSearchToolCallStatus::Completed => {
-                                        responses_api::WebSearchToolCallStatus::Completed
-                                    }
-                                    crate::WebSearchToolCallStatus::Failed => {
-                                        responses_api::WebSearchToolCallStatus::Failed
-                                    }
-                                },
-                                r#type: responses_api::WebSearchToolCallType::WebSearchCall,
-                            },
-                        ))
-                    }),
+                    crate::ToolCall::WebSearch(call) => {
+                        convert_to_openai_web_search_call(tool_call_part.tool_call_id, call)
+                    }
                 },
+                // OpenAI replays hosted search results through the web_search_call item.
+                Part::ToolResult(ToolResultPart {
+                    result: crate::ToolResult::WebSearch(_),
+                    ..
+                }) => None,
                 _ => Err(LanguageModelError::Unsupported(
                     PROVIDER,
                     format!("Cannot convert part to OpenAI input item for part {part:?}"),
@@ -1126,6 +1104,38 @@ fn map_openai_stream_web_search_result(
         }),
         status: ToolResultStatus::Completed,
     })
+}
+
+fn convert_to_openai_web_search_call(
+    tool_call_id: String,
+    call: crate::WebSearchToolCall,
+) -> Option<InputItem> {
+    // Calls without actions cannot be replayed.
+    let action = call.action?;
+    Some(InputItem::Item(responses_api::Item::WebSearchToolCall(
+        responses_api::WebSearchToolCall {
+            action: convert_to_openai_web_search_action(action),
+            id: tool_call_id,
+            status: match call
+                .status
+                .unwrap_or(crate::WebSearchToolCallStatus::Completed)
+            {
+                crate::WebSearchToolCallStatus::InProgress => {
+                    responses_api::WebSearchToolCallStatus::InProgress
+                }
+                crate::WebSearchToolCallStatus::Searching => {
+                    responses_api::WebSearchToolCallStatus::Searching
+                }
+                crate::WebSearchToolCallStatus::Completed => {
+                    responses_api::WebSearchToolCallStatus::Completed
+                }
+                crate::WebSearchToolCallStatus::Failed => {
+                    responses_api::WebSearchToolCallStatus::Failed
+                }
+            },
+            r#type: responses_api::WebSearchToolCallType::WebSearchCall,
+        },
+    )))
 }
 
 fn convert_to_openai_web_search_action(

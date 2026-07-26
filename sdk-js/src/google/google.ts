@@ -309,9 +309,20 @@ function convertToGenerateContentParameters(
   }
   if (tools) {
     config.tools = convertToGoogleTools(tools);
+    // Google requires invocation data when web search and function tools are mixed.
+    if (
+      tools.some((tool) => tool.type === "web_search") &&
+      tools.some((tool) => tool.type === "function")
+    ) {
+      config.toolConfig = {
+        ...config.toolConfig,
+        includeServerSideToolInvocations: true,
+      };
+    }
   }
   if (tool_choice) {
     config.toolConfig = {
+      ...config.toolConfig,
       functionCallingConfig: convertToGoogleFunctionCallingConfig(tool_choice),
     };
   }

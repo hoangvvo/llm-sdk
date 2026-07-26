@@ -93,6 +93,6 @@ Primitive definitions become named type aliases.
 
 ## Unsupported Shapes
 
- - Boolean JSON Schema.
- - Tuple arrays where `items` is an array.
- - Bare top-level `$ref` definitions.
+- Boolean JSON Schema.
+- Tuple arrays where `items` is an array.
+- Bare top-level `$ref` definitions.

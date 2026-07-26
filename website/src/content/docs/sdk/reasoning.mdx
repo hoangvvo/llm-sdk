@@ -33,11 +33,7 @@ For reasoning models, the SDK also outputs [`ReasoningPart`](../language-model/#
     />
   </TabItem>
   <TabItem label="Go">
-    <Code
-      code={extractGoTypes(["ReasoningPart"])}
-      lang="go"
-      title="types.go"
-    />
+    <Code code={extractGoTypes(["ReasoningPart"])} lang="go" title="types.go" />
   </TabItem>
 </Tabs>
 
@@ -82,7 +78,11 @@ Once enabled, the model will output `ReasoningPart`s in addition to other parts.
     />
   </TabItem>
   <TabItem label="Rust">
-    <Code code={rustGenerateReasoningCode} lang="rust" title="generate-reasoning.rs" />
+    <Code
+      code={rustGenerateReasoningCode}
+      lang="rust"
+      title="generate-reasoning.rs"
+    />
   </TabItem>
   <TabItem label="Go">
     <Code code={goGenerateReasoningCode} lang="go" title="main.go" />
@@ -130,7 +130,11 @@ Accessing reasoning parts in streaming mode like other parts:
     />
   </TabItem>
   <TabItem label="Rust">
-    <Code code={rustStreamReasoningCode} lang="rust" title="stream-reasoning.rs" />
+    <Code
+      code={rustStreamReasoningCode}
+      lang="rust"
+      title="stream-reasoning.rs"
+    />
   </TabItem>
   <TabItem label="Go">
     <Code code={goStreamReasoningCode} lang="go" title="main.go" />
