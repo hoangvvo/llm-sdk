@@ -369,8 +369,7 @@ fn convert_to_generate_content_parameters(
         }
     }
 
-    // Google rejects a server-side tool alongside function declarations unless
-    // its invocations are reported back in the response content.
+    // Google requires invocation data when web search and function tools are mixed.
     if has_google_search && has_function_declarations {
         params
             .tool_config

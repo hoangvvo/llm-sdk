@@ -444,12 +444,8 @@ fn convert_assistant_message_to_response_input_items(
                 Part::Text(text_part) => {
                     Some(InputItem::Item(responses_api::Item::OutputMessage(
                         OutputMessage {
-                            // Response output item requires an ID.
-                            // This usually applies if we enable OpenAI "store".
-                            // or that we propogate the message ID in output.
-                            // For compatibility, we want to avoid doing that, so we use a generated
-                            // ID to avoid the API from returning an
-                            // error.
+                            // Output messages require an ID, but the SDK does not expose provider
+                            // IDs.
                             id: format!("msg_{}", id_utils::generate_string(15)),
                             role: OutputMessageRole::Assistant,
                             content: vec![OutputMessageContent::OutputText(OutputTextContent {
@@ -505,9 +501,7 @@ fn convert_assistant_message_to_response_input_items(
                         convert_to_openai_web_search_call(tool_call_part.tool_call_id, call)
                     }
                 },
-                // The web search result is already carried by the replayed
-                // web_search_call item, which OpenAI resolves server-side, so
-                // the result part has no input item of its own.
+                // OpenAI replays hosted search results through the web_search_call item.
                 Part::ToolResult(ToolResultPart {
                     result: crate::ToolResult::WebSearch(_),
                     ..
@@ -1112,12 +1106,11 @@ fn map_openai_stream_web_search_result(
     })
 }
 
-/// Replays a hosted search as its `web_search_call` item. A call whose action
-/// another provider never reported cannot be replayed and is dropped.
 fn convert_to_openai_web_search_call(
     tool_call_id: String,
     call: crate::WebSearchToolCall,
 ) -> Option<InputItem> {
+    // Calls without actions cannot be replayed.
     let action = call.action?;
     Some(InputItem::Item(responses_api::Item::WebSearchToolCall(
         responses_api::WebSearchToolCall {

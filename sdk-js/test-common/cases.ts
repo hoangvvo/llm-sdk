@@ -34,8 +34,7 @@ export interface RunTestCaseOptions {
   profile?: string;
 }
 
-// Only function calls are collected: later stages reference these ids to supply
-// tool results, which hosted tool calls never need.
+// Only function calls need client-supplied results in later stages.
 function getToolCallParts(parts: Part[]): Part[] {
   return parts.filter(
     (part) => part.type === "tool-call" && part.call.type === "function",

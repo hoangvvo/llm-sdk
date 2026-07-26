@@ -281,9 +281,7 @@ function convertAssistantMessageToResponseInputItems(
   const messageParts = getCompatiblePartsWithoutSourceParts(message.content);
 
   return messageParts.flatMap((part): OpenAI.Responses.ResponseInputItem[] => {
-    // The web search result is already carried by the replayed web_search_call
-    // item, which OpenAI resolves server-side, so the result part has no input
-    // item of its own.
+    // OpenAI replays hosted search results through the web_search_call item.
     if (part.type === "tool-result" && part.result.type === "web_search") {
       return [];
     }
@@ -292,11 +290,7 @@ function convertAssistantMessageToResponseInputItems(
       case "text":
         return [
           {
-            // Response output item requires an ID.
-            // This usually applies if we enable OpenAI "store".
-            // or that we propogate the message ID in output.
-            // For compatibility, we want to avoid doing that, so we use a generated ID
-            // to avoid the API from returning an error.
+            // Output messages require an ID, but the SDK does not expose provider IDs.
             id: "msg_" + generateString(10),
             type: "message",
             role: "assistant",

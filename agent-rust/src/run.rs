@@ -430,8 +430,7 @@ where
 
         let stream = async_stream::try_stream! {
             let mut tools = session.get_function_tools();
-            // Each turn numbers its content parts from zero, so indices are
-            // offset past the parts already streamed to stay unique for the run.
+            // Keep content indices unique across model turns.
             let mut streamed_part_count = 0usize;
 
             'run: loop {

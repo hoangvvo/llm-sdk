@@ -317,8 +317,7 @@ func convertToGenerateContentParameters(input *llmsdk.LanguageModelInput, modelI
 		if err != nil {
 			return nil, err
 		}
-		// Google rejects a server-side tool alongside function declarations
-		// unless its invocations are reported back in the response content.
+		// Google requires invocation data when web search and function tools are mixed.
 		hasWebSearch := false
 		hasFunction := false
 		for _, tool := range input.Tools {

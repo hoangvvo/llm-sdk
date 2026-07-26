@@ -2063,7 +2063,6 @@ suite("RunSession#runStream", () => {
             tool_call_id: "call_1",
           },
         },
-        // Offset past the first turn's tool call.
         { index: 1, part: { type: "text", text: "Final" } },
         { index: 1, part: { type: "text", text: "Final response" } },
       ],
@@ -2373,8 +2372,6 @@ suite("RunSession#runStream", () => {
     });
   });
 
-  // A later turn must not reuse an earlier turn's content indices, which would
-  // make a consumer accumulating by index merge or drop unrelated parts.
   test("offsets content indices across turns", async (t: TestContext) => {
     const tool = createMockTool<object>("lookup", {
       content: [{ type: "text" as const, text: "Tool result" }],

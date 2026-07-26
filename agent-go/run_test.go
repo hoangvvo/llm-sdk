@@ -2040,8 +2040,6 @@ func TestRunStream_HandlesMultipleTurns(t *testing.T) {
 	}
 }
 
-// A later turn must not reuse an earlier turn's content indices, which would
-// make a consumer accumulating by index merge or drop unrelated parts.
 func TestRunStream_OffsetsContentIndicesAcrossTurns(t *testing.T) {
 	tool := NewMockTool[struct{}]("lookup", llmagent.AgentToolResult{
 		Content: []llmsdk.Part{llmsdk.NewTextPart("Tool result")},

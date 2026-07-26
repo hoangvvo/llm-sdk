@@ -114,8 +114,7 @@ func WithProfile(profile string) TestCaseOption {
 	}
 }
 
-// Only function calls are collected: later stages reference these ids to supply
-// tool results, which hosted tool calls never need.
+// Only function calls need client-supplied results in later stages.
 func getToolCalls(content []llmsdk.Part) []llmsdk.Part {
 	toolCalls := make([]llmsdk.Part, 0)
 	for _, part := range content {

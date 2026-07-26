@@ -223,8 +223,7 @@ function validateTestData(): void {
     ) {
       fail(`Profile "${name}" has invalid applies_to entries`);
     }
-    // Expectations are indexed by stage so a profile can override the stages
-    // whose provider output differs and leave the rest to the case.
+    // Profiles may override expectations for individual stages.
     if (profile.expect !== undefined && !Array.isArray(profile.expect)) {
       fail(`Profile "${name}" must declare expect as an array of stages`);
     }

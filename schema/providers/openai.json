@@ -169,10 +169,7 @@
                   "properties": {
                     "reason": {
                       "description": "The reason why the response is incomplete.",
-                      "enum": [
-                        "max_output_tokens",
-                        "content_filter"
-                      ],
+                      "enum": ["max_output_tokens", "content_filter"],
                       "type": "string"
                     }
                   },
@@ -220,9 +217,7 @@
             },
             "object": {
               "description": "The object type of this resource - always set to `response`.\n",
-              "enum": [
-                "response"
-              ],
+              "enum": ["response"],
               "type": "string",
               "x-stainless-const": true
             },
@@ -238,10 +233,7 @@
                 {
                   "description": "SDK-only convenience property that contains the aggregated text output\nfrom all `output_text` items in the `output` array, if any are present.\nSupported in the Python and JavaScript SDKs.\n",
                   "type": "string",
-                  "x-oaiSupportedSDKs": [
-                    "python",
-                    "javascript"
-                  ]
+                  "x-oaiSupportedSDKs": ["python", "javascript"]
                 },
                 {
                   "type": "null"
@@ -609,10 +601,7 @@
             {
               "default": "disabled",
               "description": "The truncation strategy to use for the model response.\n- `auto`: If the input to this Response exceeds\n  the model's context window size, the model will truncate the\n  response to fit the context window by dropping items from the beginning of the conversation.\n- `disabled` (default): If the input size will exceed the context window\n  size for a model, the request will fail with a 400 error.\n",
-              "enum": [
-                "auto",
-                "disabled"
-              ],
+              "enum": ["auto", "disabled"],
               "type": "string"
             },
             {
@@ -642,9 +631,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object"
     },
     "ConversationParam": {
@@ -725,10 +712,7 @@
           "anyOf": [
             {
               "description": "The retention policy for the prompt cache. Set to `24h` to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours. [Learn more](/docs/guides/prompt-caching#prompt-cache-retention).\n",
-              "enum": [
-                "in_memory",
-                "24h"
-              ],
+              "enum": ["in_memory", "24h"],
               "type": "string"
             },
             {
@@ -805,9 +789,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
+      "required": ["id"],
       "title": "Conversation",
       "type": "object"
     },
@@ -824,10 +806,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "code",
-            "message"
-          ],
+          "required": ["code", "message"],
           "type": "object"
         },
         {
@@ -951,9 +930,7 @@
               "type": "integer"
             }
           },
-          "required": [
-            "cached_tokens"
-          ],
+          "required": ["cached_tokens"],
           "type": "object"
         },
         "output_tokens": {
@@ -968,9 +945,7 @@
               "type": "integer"
             }
           },
-          "required": [
-            "reasoning_tokens"
-          ],
+          "required": ["reasoning_tokens"],
           "type": "object"
         },
         "total_tokens": {
@@ -1000,18 +975,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.audio.delta`.\n",
-          "enum": [
-            "response.audio.delta"
-          ],
+          "enum": ["response.audio.delta"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "delta",
-        "sequence_number"
-      ],
+      "required": ["type", "delta", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.audio.delta\",\n  \"response_id\": \"resp_123\",\n  \"delta\": \"base64encoded...\",\n  \"sequence_number\": 1\n}\n",
@@ -1028,18 +997,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.audio.done`.\n",
-          "enum": [
-            "response.audio.done"
-          ],
+          "enum": ["response.audio.done"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "sequence_number",
-        "response_id"
-      ],
+      "required": ["type", "sequence_number", "response_id"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.audio.done\",\n  \"response_id\": \"resp-123\",\n  \"sequence_number\": 1\n}\n",
@@ -1060,19 +1023,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.audio.transcript.delta`.\n",
-          "enum": [
-            "response.audio.transcript.delta"
-          ],
+          "enum": ["response.audio.transcript.delta"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "response_id",
-        "delta",
-        "sequence_number"
-      ],
+      "required": ["type", "response_id", "delta", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.audio.transcript.delta\",\n  \"response_id\": \"resp_123\",\n  \"delta\": \" ... partial transcript ... \",\n  \"sequence_number\": 1\n}\n",
@@ -1089,18 +1045,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.audio.transcript.done`.\n",
-          "enum": [
-            "response.audio.transcript.done"
-          ],
+          "enum": ["response.audio.transcript.done"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "response_id",
-        "sequence_number"
-      ],
+      "required": ["type", "response_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.audio.transcript.done\",\n  \"response_id\": \"resp_123\",\n  \"sequence_number\": 1\n}\n",
@@ -1129,9 +1079,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.code_interpreter_call_code.delta`.",
-          "enum": [
-            "response.code_interpreter_call_code.delta"
-          ],
+          "enum": ["response.code_interpreter_call_code.delta"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -1171,9 +1119,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.code_interpreter_call_code.done`.",
-          "enum": [
-            "response.code_interpreter_call_code.done"
-          ],
+          "enum": ["response.code_interpreter_call_code.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -1209,19 +1155,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.code_interpreter_call.completed`.",
-          "enum": [
-            "response.code_interpreter_call.completed"
-          ],
+          "enum": ["response.code_interpreter_call.completed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.code_interpreter_call.completed\",\n  \"output_index\": 5,\n  \"item_id\": \"ci_12345\",\n  \"sequence_number\": 1\n}\n",
@@ -1246,19 +1185,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.code_interpreter_call.in_progress`.",
-          "enum": [
-            "response.code_interpreter_call.in_progress"
-          ],
+          "enum": ["response.code_interpreter_call.in_progress"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.code_interpreter_call.in_progress\",\n  \"output_index\": 0,\n  \"item_id\": \"ci_12345\",\n  \"sequence_number\": 1\n}\n",
@@ -1283,19 +1215,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.code_interpreter_call.interpreting`.",
-          "enum": [
-            "response.code_interpreter_call.interpreting"
-          ],
+          "enum": ["response.code_interpreter_call.interpreting"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.code_interpreter_call.interpreting\",\n  \"output_index\": 4,\n  \"item_id\": \"ci_12345\",\n  \"sequence_number\": 1\n}\n",
@@ -1316,18 +1241,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.completed`.\n",
-          "enum": [
-            "response.completed"
-          ],
+          "enum": ["response.completed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "response",
-        "sequence_number"
-      ],
+      "required": ["type", "response", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.completed\",\n  \"response\": {\n    \"id\": \"resp_123\",\n    \"object\": \"response\",\n    \"created_at\": 1740855869,\n    \"status\": \"completed\",\n    \"completed_at\": 1740855870,\n    \"error\": null,\n    \"incomplete_details\": null,\n    \"input\": [],\n    \"instructions\": null,\n    \"max_output_tokens\": null,\n    \"model\": \"gpt-4o-mini-2024-07-18\",\n    \"output\": [\n      {\n        \"id\": \"msg_123\",\n        \"type\": \"message\",\n        \"role\": \"assistant\",\n        \"content\": [\n          {\n            \"type\": \"output_text\",\n            \"text\": \"In a shimmering forest under a sky full of stars, a lonely unicorn named Lila discovered a hidden pond that glowed with moonlight. Every night, she would leave sparkling, magical flowers by the water's edge, hoping to share her beauty with others. One enchanting evening, she woke to find a group of friendly animals gathered around, eager to be friends and share in her magic.\",\n            \"annotations\": []\n          }\n        ]\n      }\n    ],\n    \"previous_response_id\": null,\n    \"reasoning_effort\": null,\n    \"store\": false,\n    \"temperature\": 1,\n    \"text\": {\n      \"format\": {\n        \"type\": \"text\"\n      }\n    },\n    \"tool_choice\": \"auto\",\n    \"tools\": [],\n    \"top_p\": 1,\n    \"truncation\": \"disabled\",\n    \"usage\": {\n      \"input_tokens\": 0,\n      \"output_tokens\": 0,\n      \"output_tokens_details\": {\n        \"reasoning_tokens\": 0\n      },\n      \"total_tokens\": 0\n    },\n    \"user\": null,\n    \"metadata\": {}\n  },\n  \"sequence_number\": 1\n}\n",
@@ -1360,9 +1279,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.content_part.added`.\n",
-          "enum": [
-            "response.content_part.added"
-          ],
+          "enum": ["response.content_part.added"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -1407,9 +1324,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.content_part.done`.\n",
-          "enum": [
-            "response.content_part.done"
-          ],
+          "enum": ["response.content_part.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -1442,18 +1357,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.created`.\n",
-          "enum": [
-            "response.created"
-          ],
+          "enum": ["response.created"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "response",
-        "sequence_number"
-      ],
+      "required": ["type", "response", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.created\",\n  \"response\": {\n    \"id\": \"resp_67ccfcdd16748190a91872c75d38539e09e4d4aac714747c\",\n    \"object\": \"response\",\n    \"created_at\": 1741487325,\n    \"status\": \"in_progress\",\n    \"completed_at\": null,\n    \"error\": null,\n    \"incomplete_details\": null,\n    \"instructions\": null,\n    \"max_output_tokens\": null,\n    \"model\": \"gpt-4o-2024-08-06\",\n    \"output\": [],\n    \"parallel_tool_calls\": true,\n    \"previous_response_id\": null,\n    \"reasoning\": {\n      \"effort\": null,\n      \"summary\": null\n    },\n    \"store\": true,\n    \"temperature\": 1,\n    \"text\": {\n      \"format\": {\n        \"type\": \"text\"\n      }\n    },\n    \"tool_choice\": \"auto\",\n    \"tools\": [],\n    \"top_p\": 1,\n    \"truncation\": \"disabled\",\n    \"usage\": null,\n    \"user\": null,\n    \"metadata\": {}\n  },\n  \"sequence_number\": 1\n}\n",
@@ -1496,20 +1405,12 @@
         },
         "type": {
           "description": "The type of the event. Always `error`.\n",
-          "enum": [
-            "error"
-          ],
+          "enum": ["error"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "code",
-        "message",
-        "param",
-        "sequence_number"
-      ],
+      "required": ["type", "code", "message", "param", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"error\",\n  \"code\": \"ERR_SOMETHING\",\n  \"message\": \"Something went wrong\",\n  \"param\": null,\n  \"sequence_number\": 1\n}\n",
@@ -1534,19 +1435,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.file_search_call.completed`.\n",
-          "enum": [
-            "response.file_search_call.completed"
-          ],
+          "enum": ["response.file_search_call.completed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.file_search_call.completed\",\n  \"output_index\": 0,\n  \"item_id\": \"fs_123\",\n  \"sequence_number\": 1\n}\n",
@@ -1571,19 +1465,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.file_search_call.in_progress`.\n",
-          "enum": [
-            "response.file_search_call.in_progress"
-          ],
+          "enum": ["response.file_search_call.in_progress"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.file_search_call.in_progress\",\n  \"output_index\": 0,\n  \"item_id\": \"fs_123\",\n  \"sequence_number\": 1\n}\n",
@@ -1608,19 +1495,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.file_search_call.searching`.\n",
-          "enum": [
-            "response.file_search_call.searching"
-          ],
+          "enum": ["response.file_search_call.searching"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.file_search_call.searching\",\n  \"output_index\": 0,\n  \"item_id\": \"fs_123\",\n  \"sequence_number\": 1\n}\n",
@@ -1649,9 +1529,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.function_call_arguments.delta`.\n",
-          "enum": [
-            "response.function_call_arguments.delta"
-          ],
+          "enum": ["response.function_call_arguments.delta"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -1694,9 +1572,7 @@
           "type": "integer"
         },
         "type": {
-          "enum": [
-            "response.function_call_arguments.done"
-          ],
+          "enum": ["response.function_call_arguments.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -1728,18 +1604,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.in_progress`.\n",
-          "enum": [
-            "response.in_progress"
-          ],
+          "enum": ["response.in_progress"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "response",
-        "sequence_number"
-      ],
+      "required": ["type", "response", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.in_progress\",\n  \"response\": {\n    \"id\": \"resp_67ccfcdd16748190a91872c75d38539e09e4d4aac714747c\",\n    \"object\": \"response\",\n    \"created_at\": 1741487325,\n    \"status\": \"in_progress\",\n    \"completed_at\": null,\n    \"error\": null,\n    \"incomplete_details\": null,\n    \"instructions\": null,\n    \"max_output_tokens\": null,\n    \"model\": \"gpt-4o-2024-08-06\",\n    \"output\": [],\n    \"parallel_tool_calls\": true,\n    \"previous_response_id\": null,\n    \"reasoning\": {\n      \"effort\": null,\n      \"summary\": null\n    },\n    \"store\": true,\n    \"temperature\": 1,\n    \"text\": {\n      \"format\": {\n        \"type\": \"text\"\n      }\n    },\n    \"tool_choice\": \"auto\",\n    \"tools\": [],\n    \"top_p\": 1,\n    \"truncation\": \"disabled\",\n    \"usage\": null,\n    \"user\": null,\n    \"metadata\": {}\n  },\n  \"sequence_number\": 1\n}\n",
@@ -1760,18 +1630,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.failed`.\n",
-          "enum": [
-            "response.failed"
-          ],
+          "enum": ["response.failed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "response",
-        "sequence_number"
-      ],
+      "required": ["type", "response", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.failed\",\n  \"response\": {\n    \"id\": \"resp_123\",\n    \"object\": \"response\",\n    \"created_at\": 1740855869,\n    \"status\": \"failed\",\n    \"completed_at\": null,\n    \"error\": {\n      \"code\": \"server_error\",\n      \"message\": \"The model failed to generate a response.\"\n    },\n    \"incomplete_details\": null,\n    \"instructions\": null,\n    \"max_output_tokens\": null,\n    \"model\": \"gpt-4o-mini-2024-07-18\",\n    \"output\": [],\n    \"previous_response_id\": null,\n    \"reasoning_effort\": null,\n    \"store\": false,\n    \"temperature\": 1,\n    \"text\": {\n      \"format\": {\n        \"type\": \"text\"\n      }\n    },\n    \"tool_choice\": \"auto\",\n    \"tools\": [],\n    \"top_p\": 1,\n    \"truncation\": \"disabled\",\n    \"usage\": null,\n    \"user\": null,\n    \"metadata\": {}\n  }\n}\n",
@@ -1792,18 +1656,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.incomplete`.\n",
-          "enum": [
-            "response.incomplete"
-          ],
+          "enum": ["response.incomplete"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "response",
-        "sequence_number"
-      ],
+      "required": ["type", "response", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.incomplete\",\n  \"response\": {\n    \"id\": \"resp_123\",\n    \"object\": \"response\",\n    \"created_at\": 1740855869,\n    \"status\": \"incomplete\",\n    \"completed_at\": null,\n    \"error\": null,\n    \"incomplete_details\": {\n      \"reason\": \"max_tokens\"\n    },\n    \"instructions\": null,\n    \"max_output_tokens\": null,\n    \"model\": \"gpt-4o-mini-2024-07-18\",\n    \"output\": [],\n    \"previous_response_id\": null,\n    \"reasoning_effort\": null,\n    \"store\": false,\n    \"temperature\": 1,\n    \"text\": {\n      \"format\": {\n        \"type\": \"text\"\n      }\n    },\n    \"tool_choice\": \"auto\",\n    \"tools\": [],\n    \"top_p\": 1,\n    \"truncation\": \"disabled\",\n    \"usage\": null,\n    \"user\": null,\n    \"metadata\": {}\n  },\n  \"sequence_number\": 1\n}\n",
@@ -1828,19 +1686,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.output_item.added`.\n",
-          "enum": [
-            "response.output_item.added"
-          ],
+          "enum": ["response.output_item.added"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.output_item.added\",\n  \"output_index\": 0,\n  \"item\": {\n    \"id\": \"msg_123\",\n    \"status\": \"in_progress\",\n    \"type\": \"message\",\n    \"role\": \"assistant\",\n    \"content\": []\n  },\n  \"sequence_number\": 1\n}\n",
@@ -1865,19 +1716,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.output_item.done`.\n",
-          "enum": [
-            "response.output_item.done"
-          ],
+          "enum": ["response.output_item.done"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.output_item.done\",\n  \"output_index\": 0,\n  \"item\": {\n    \"id\": \"msg_123\",\n    \"status\": \"completed\",\n    \"type\": \"message\",\n    \"role\": \"assistant\",\n    \"content\": [\n      {\n        \"type\": \"output_text\",\n        \"text\": \"In a shimmering forest under a sky full of stars, a lonely unicorn named Lila discovered a hidden pond that glowed with moonlight. Every night, she would leave sparkling, magical flowers by the water's edge, hoping to share her beauty with others. One enchanting evening, she woke to find a group of friendly animals gathered around, eager to be friends and share in her magic.\",\n        \"annotations\": []\n      }\n    ]\n  },\n  \"sequence_number\": 1\n}\n",
@@ -1905,17 +1749,12 @@
             },
             "type": {
               "description": "The type of the summary part. Always `summary_text`.",
-              "enum": [
-                "summary_text"
-              ],
+              "enum": ["summary_text"],
               "type": "string",
               "x-stainless-const": true
             }
           },
-          "required": [
-            "type",
-            "text"
-          ],
+          "required": ["type", "text"],
           "type": "object"
         },
         "sequence_number": {
@@ -1928,9 +1767,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.reasoning_summary_part.added`.\n",
-          "enum": [
-            "response.reasoning_summary_part.added"
-          ],
+          "enum": ["response.reasoning_summary_part.added"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -1970,17 +1807,12 @@
             },
             "type": {
               "description": "The type of the summary part. Always `summary_text`.",
-              "enum": [
-                "summary_text"
-              ],
+              "enum": ["summary_text"],
               "type": "string",
               "x-stainless-const": true
             }
           },
-          "required": [
-            "type",
-            "text"
-          ],
+          "required": ["type", "text"],
           "type": "object"
         },
         "sequence_number": {
@@ -1993,9 +1825,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.reasoning_summary_part.done`.\n",
-          "enum": [
-            "response.reasoning_summary_part.done"
-          ],
+          "enum": ["response.reasoning_summary_part.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2040,9 +1870,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.reasoning_summary_text.delta`.\n",
-          "enum": [
-            "response.reasoning_summary_text.delta"
-          ],
+          "enum": ["response.reasoning_summary_text.delta"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2087,9 +1915,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.reasoning_summary_text.done`.\n",
-          "enum": [
-            "response.reasoning_summary_text.done"
-          ],
+          "enum": ["response.reasoning_summary_text.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2134,9 +1960,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.reasoning_text.delta`.\n",
-          "enum": [
-            "response.reasoning_text.delta"
-          ],
+          "enum": ["response.reasoning_text.delta"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2181,9 +2005,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.reasoning_text.done`.\n",
-          "enum": [
-            "response.reasoning_text.done"
-          ],
+          "enum": ["response.reasoning_text.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2228,9 +2050,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.refusal.delta`.\n",
-          "enum": [
-            "response.refusal.delta"
-          ],
+          "enum": ["response.refusal.delta"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2275,9 +2095,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.refusal.done`.\n",
-          "enum": [
-            "response.refusal.done"
-          ],
+          "enum": ["response.refusal.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2329,9 +2147,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.output_text.delta`.\n",
-          "enum": [
-            "response.output_text.delta"
-          ],
+          "enum": ["response.output_text.delta"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2384,9 +2200,7 @@
         },
         "type": {
           "description": "The type of the event. Always `response.output_text.done`.\n",
-          "enum": [
-            "response.output_text.done"
-          ],
+          "enum": ["response.output_text.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2424,19 +2238,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.web_search_call.completed`.\n",
-          "enum": [
-            "response.web_search_call.completed"
-          ],
+          "enum": ["response.web_search_call.completed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.web_search_call.completed\",\n  \"output_index\": 0,\n  \"item_id\": \"ws_123\",\n  \"sequence_number\": 0\n}\n",
@@ -2461,19 +2268,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.web_search_call.in_progress`.\n",
-          "enum": [
-            "response.web_search_call.in_progress"
-          ],
+          "enum": ["response.web_search_call.in_progress"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.web_search_call.in_progress\",\n  \"output_index\": 0,\n  \"item_id\": \"ws_123\",\n  \"sequence_number\": 0\n}\n",
@@ -2498,19 +2298,12 @@
         },
         "type": {
           "description": "The type of the event. Always `response.web_search_call.searching`.\n",
-          "enum": [
-            "response.web_search_call.searching"
-          ],
+          "enum": ["response.web_search_call.searching"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "type": "object",
       "x-oaiMeta": {
         "example": "{\n  \"type\": \"response.web_search_call.searching\",\n  \"output_index\": 0,\n  \"item_id\": \"ws_123\",\n  \"sequence_number\": 0\n}\n",
@@ -2535,19 +2328,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.image_generation_call.completed'.",
-          "enum": [
-            "response.image_generation_call.completed"
-          ],
+          "enum": ["response.image_generation_call.completed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "title": "ResponseImageGenCallCompletedEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -2573,19 +2359,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.image_generation_call.generating'.",
-          "enum": [
-            "response.image_generation_call.generating"
-          ],
+          "enum": ["response.image_generation_call.generating"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "title": "ResponseImageGenCallGeneratingEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -2611,19 +2390,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.image_generation_call.in_progress'.",
-          "enum": [
-            "response.image_generation_call.in_progress"
-          ],
+          "enum": ["response.image_generation_call.in_progress"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "title": "ResponseImageGenCallInProgressEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -2665,9 +2437,7 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.image_generation_call.partial_image'.",
-          "enum": [
-            "response.image_generation_call.partial_image"
-          ],
+          "enum": ["response.image_generation_call.partial_image"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2709,9 +2479,7 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.mcp_call_arguments.delta'.",
-          "enum": [
-            "response.mcp_call_arguments.delta"
-          ],
+          "enum": ["response.mcp_call_arguments.delta"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2752,9 +2520,7 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.mcp_call_arguments.done'.",
-          "enum": [
-            "response.mcp_call_arguments.done"
-          ],
+          "enum": ["response.mcp_call_arguments.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -2791,19 +2557,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.mcp_call.completed'.",
-          "enum": [
-            "response.mcp_call.completed"
-          ],
+          "enum": ["response.mcp_call.completed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "item_id",
-        "output_index",
-        "sequence_number"
-      ],
+      "required": ["type", "item_id", "output_index", "sequence_number"],
       "title": "ResponseMCPCallCompletedEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -2829,19 +2588,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.mcp_call.failed'.",
-          "enum": [
-            "response.mcp_call.failed"
-          ],
+          "enum": ["response.mcp_call.failed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "item_id",
-        "output_index",
-        "sequence_number"
-      ],
+      "required": ["type", "item_id", "output_index", "sequence_number"],
       "title": "ResponseMCPCallFailedEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -2867,19 +2619,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.mcp_call.in_progress'.",
-          "enum": [
-            "response.mcp_call.in_progress"
-          ],
+          "enum": ["response.mcp_call.in_progress"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "output_index",
-        "item_id",
-        "sequence_number"
-      ],
+      "required": ["type", "output_index", "item_id", "sequence_number"],
       "title": "ResponseMCPCallInProgressEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -2905,19 +2650,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.mcp_list_tools.completed'.",
-          "enum": [
-            "response.mcp_list_tools.completed"
-          ],
+          "enum": ["response.mcp_list_tools.completed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "item_id",
-        "output_index",
-        "sequence_number"
-      ],
+      "required": ["type", "item_id", "output_index", "sequence_number"],
       "title": "ResponseMCPListToolsCompletedEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -2943,19 +2681,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.mcp_list_tools.failed'.",
-          "enum": [
-            "response.mcp_list_tools.failed"
-          ],
+          "enum": ["response.mcp_list_tools.failed"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "item_id",
-        "output_index",
-        "sequence_number"
-      ],
+      "required": ["type", "item_id", "output_index", "sequence_number"],
       "title": "ResponseMCPListToolsFailedEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -2981,19 +2712,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.mcp_list_tools.in_progress'.",
-          "enum": [
-            "response.mcp_list_tools.in_progress"
-          ],
+          "enum": ["response.mcp_list_tools.in_progress"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "item_id",
-        "output_index",
-        "sequence_number"
-      ],
+      "required": ["type", "item_id", "output_index", "sequence_number"],
       "title": "ResponseMCPListToolsInProgressEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -3031,9 +2755,7 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.output_text.annotation.added'.",
-          "enum": [
-            "response.output_text.annotation.added"
-          ],
+          "enum": ["response.output_text.annotation.added"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -3068,18 +2790,12 @@
         },
         "type": {
           "description": "The type of the event. Always 'response.queued'.",
-          "enum": [
-            "response.queued"
-          ],
+          "enum": ["response.queued"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "response",
-        "sequence_number"
-      ],
+      "required": ["type", "response", "sequence_number"],
       "title": "ResponseQueuedEvent",
       "type": "object",
       "x-oaiMeta": {
@@ -3109,9 +2825,7 @@
         },
         "type": {
           "description": "The event type identifier.",
-          "enum": [
-            "response.custom_tool_call_input.delta"
-          ],
+          "enum": ["response.custom_tool_call_input.delta"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -3152,9 +2866,7 @@
         },
         "type": {
           "description": "The event type identifier.",
-          "enum": [
-            "response.custom_tool_call_input.done"
-          ],
+          "enum": ["response.custom_tool_call_input.done"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -3226,9 +2938,7 @@
               ]
             }
           },
-          "required": [
-            "id"
-          ],
+          "required": ["id"],
           "type": "object"
         },
         {
@@ -3247,11 +2957,7 @@
             {
               "deprecated": true,
               "description": "**Deprecated:** use `summary` instead.\n\nA summary of the reasoning performed by the model. This can be\nuseful for debugging and understanding the model's reasoning process.\nOne of `auto`, `concise`, or `detailed`.\n",
-              "enum": [
-                "auto",
-                "concise",
-                "detailed"
-              ],
+              "enum": ["auto", "concise", "detailed"],
               "type": "string"
             },
             {
@@ -3263,11 +2969,7 @@
           "anyOf": [
             {
               "description": "A summary of the reasoning performed by the model. This can be\nuseful for debugging and understanding the model's reasoning process.\nOne of `auto`, `concise`, or `detailed`.\n\n`concise` is supported for `computer-use-preview` models and all reasoning models after `gpt-5`.\n",
-              "enum": [
-                "auto",
-                "concise",
-                "detailed"
-              ],
+              "enum": ["auto", "concise", "detailed"],
               "type": "string"
             },
             {
@@ -3336,9 +3038,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
+      "required": ["id"],
       "title": "Conversation object",
       "type": "object"
     },
@@ -3362,13 +3062,7 @@
         {
           "default": "auto",
           "description": "Specifies the processing type used for serving the request.\n  - If set to 'auto', then the request will be processed with the service tier configured in the Project settings. Unless otherwise configured, the Project will use 'default'.\n  - If set to 'default', then the request will be processed with the standard pricing and performance for the selected model.\n  - If set to '[flex](/docs/guides/flex-processing)' or '[priority](https://openai.com/api-priority-processing/)', then the request will be processed with the corresponding service tier.\n  - When not set, the default behavior is 'auto'.\n\n  When the `service_tier` parameter is set, the response body will include the `service_tier` value based on the processing mode actually used to serve the request. This response value may be different from the value set in the parameter.\n",
-          "enum": [
-            "auto",
-            "default",
-            "flex",
-            "scale",
-            "priority"
-          ],
+          "enum": ["auto", "default", "flex", "scale", "priority"],
           "type": "string"
         },
         {
@@ -3428,27 +3122,17 @@
         },
         "role": {
           "description": "The role of the message input. One of `user`, `assistant`, `system`, or\n`developer`.\n",
-          "enum": [
-            "user",
-            "assistant",
-            "system",
-            "developer"
-          ],
+          "enum": ["user", "assistant", "system", "developer"],
           "type": "string"
         },
         "type": {
           "description": "The type of the message input. Always `message`.\n",
-          "enum": [
-            "message"
-          ],
+          "enum": ["message"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "role",
-        "content"
-      ],
+      "required": ["role", "content"],
       "title": "Input message",
       "type": "object"
     },
@@ -3551,9 +3235,7 @@
             {
               "default": "item_reference",
               "description": "The type of item to reference. Always `item_reference`.",
-              "enum": [
-                "item_reference"
-              ],
+              "enum": ["item_reference"],
               "type": "string",
               "x-stainless-const": true
             },
@@ -3563,9 +3245,7 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
+      "required": ["id"],
       "title": "Item reference",
       "type": "object"
     },
@@ -3595,37 +3275,23 @@
         },
         "role": {
           "description": "The role of the output message. Always `assistant`.\n",
-          "enum": [
-            "assistant"
-          ],
+          "enum": ["assistant"],
           "type": "string",
           "x-stainless-const": true
         },
         "status": {
           "description": "The status of the message input. One of `in_progress`, `completed`, or\n`incomplete`. Populated when input items are returned via API.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "incomplete"
-          ],
+          "enum": ["in_progress", "completed", "incomplete"],
           "type": "string"
         },
         "type": {
           "description": "The type of the output message. Always `message`.\n",
-          "enum": [
-            "message"
-          ],
+          "enum": ["message"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "id",
-        "type",
-        "role",
-        "content",
-        "status"
-      ],
+      "required": ["id", "type", "role", "content", "status"],
       "title": "Output message",
       "type": "object"
     },
@@ -3692,19 +3358,12 @@
         },
         "type": {
           "description": "The type of the file search tool call. Always `file_search_call`.\n",
-          "enum": [
-            "file_search_call"
-          ],
+          "enum": ["file_search_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "id",
-        "type",
-        "status",
-        "queries"
-      ],
+      "required": ["id", "type", "status", "queries"],
       "title": "File search tool call",
       "type": "object"
     },
@@ -3733,28 +3392,17 @@
         },
         "status": {
           "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "incomplete"
-          ],
+          "enum": ["in_progress", "completed", "incomplete"],
           "type": "string"
         },
         "type": {
           "description": "The type of the function tool call. Always `function_call`.\n",
-          "enum": [
-            "function_call"
-          ],
+          "enum": ["function_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "call_id",
-        "name",
-        "arguments"
-      ],
+      "required": ["type", "call_id", "name", "arguments"],
       "title": "Function tool call",
       "type": "object"
     },
@@ -3778,10 +3426,7 @@
               "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n"
             }
           },
-          "required": [
-            "id",
-            "status"
-          ],
+          "required": ["id", "status"],
           "type": "object"
         }
       ]
@@ -3813,29 +3458,17 @@
         },
         "status": {
           "description": "The status of the web search tool call.\n",
-          "enum": [
-            "in_progress",
-            "searching",
-            "completed",
-            "failed"
-          ],
+          "enum": ["in_progress", "searching", "completed", "failed"],
           "type": "string"
         },
         "type": {
           "description": "The type of the web search tool call. Always `web_search_call`.\n",
-          "enum": [
-            "web_search_call"
-          ],
+          "enum": ["web_search_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "id",
-        "type",
-        "status",
-        "action"
-      ],
+      "required": ["id", "type", "status", "action"],
       "title": "Web search tool call",
       "type": "object"
     },
@@ -3865,29 +3498,17 @@
         },
         "status": {
           "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "incomplete"
-          ],
+          "enum": ["in_progress", "completed", "incomplete"],
           "type": "string"
         },
         "type": {
           "default": "computer_call",
           "description": "The type of the computer call. Always `computer_call`.",
-          "enum": [
-            "computer_call"
-          ],
+          "enum": ["computer_call"],
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "id",
-        "call_id",
-        "pending_safety_checks",
-        "status"
-      ],
+      "required": ["type", "id", "call_id", "pending_safety_checks", "status"],
       "title": "Computer tool call",
       "type": "object"
     },
@@ -3911,10 +3532,7 @@
               "description": "The status of the message input. One of `in_progress`, `completed`, or\n`incomplete`. Populated when input items are returned via API.\n"
             }
           },
-          "required": [
-            "id",
-            "status"
-          ],
+          "required": ["id", "status"],
           "type": "object"
         }
       ]
@@ -3946,11 +3564,7 @@
         },
         "status": {
           "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "incomplete"
-          ],
+          "enum": ["in_progress", "completed", "incomplete"],
           "type": "string"
         },
         "summary": {
@@ -3962,18 +3576,12 @@
         },
         "type": {
           "description": "The type of the object. Always `reasoning`.\n",
-          "enum": [
-            "reasoning"
-          ],
+          "enum": ["reasoning"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "id",
-        "summary",
-        "type"
-      ],
+      "required": ["id", "summary", "type"],
       "title": "Reasoning",
       "type": "object"
     },
@@ -4012,21 +3620,12 @@
         "type": {
           "default": "tool_search_call",
           "description": "The type of the item. Always `tool_search_call`.",
-          "enum": [
-            "tool_search_call"
-          ],
+          "enum": ["tool_search_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "call_id",
-        "execution",
-        "arguments",
-        "status"
-      ],
+      "required": ["type", "id", "call_id", "execution", "arguments", "status"],
       "type": "object"
     },
     "ToolSearchOutput": {
@@ -4068,21 +3667,12 @@
         "type": {
           "default": "tool_search_output",
           "description": "The type of the item. Always `tool_search_output`.",
-          "enum": [
-            "tool_search_output"
-          ],
+          "enum": ["tool_search_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "call_id",
-        "execution",
-        "tools",
-        "status"
-      ],
+      "required": ["type", "id", "call_id", "execution", "tools", "status"],
       "type": "object"
     },
     "CompactionBody": {
@@ -4103,18 +3693,12 @@
         "type": {
           "default": "compaction",
           "description": "The type of the item. Always `compaction`.",
-          "enum": [
-            "compaction"
-          ],
+          "enum": ["compaction"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "encrypted_content"
-      ],
+      "required": ["type", "id", "encrypted_content"],
       "title": "Compaction item",
       "type": "object"
     },
@@ -4146,29 +3730,17 @@
         },
         "status": {
           "description": "The status of the image generation call.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "generating",
-            "failed"
-          ],
+          "enum": ["in_progress", "completed", "generating", "failed"],
           "type": "string"
         },
         "type": {
           "description": "The type of the image generation call. Always `image_generation_call`.\n",
-          "enum": [
-            "image_generation_call"
-          ],
+          "enum": ["image_generation_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "status",
-        "result"
-      ],
+      "required": ["type", "id", "status", "result"],
       "title": "Image generation call",
       "type": "object"
     },
@@ -4235,21 +3807,12 @@
         "type": {
           "default": "code_interpreter_call",
           "description": "The type of the code interpreter tool call. Always `code_interpreter_call`.\n",
-          "enum": [
-            "code_interpreter_call"
-          ],
+          "enum": ["code_interpreter_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "status",
-        "container_id",
-        "code",
-        "outputs"
-      ],
+      "required": ["type", "id", "status", "container_id", "code", "outputs"],
       "title": "Code interpreter tool call",
       "type": "object"
     },
@@ -4269,29 +3832,17 @@
         },
         "status": {
           "description": "The status of the local shell call.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "incomplete"
-          ],
+          "enum": ["in_progress", "completed", "incomplete"],
           "type": "string"
         },
         "type": {
           "description": "The type of the local shell call. Always `local_shell_call`.\n",
-          "enum": [
-            "local_shell_call"
-          ],
+          "enum": ["local_shell_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "call_id",
-        "action",
-        "status"
-      ],
+      "required": ["type", "id", "call_id", "action", "status"],
       "title": "Local shell call",
       "type": "object"
     },
@@ -4310,11 +3861,7 @@
           "anyOf": [
             {
               "description": "The status of the item. One of `in_progress`, `completed`, or `incomplete`.\n",
-              "enum": [
-                "in_progress",
-                "completed",
-                "incomplete"
-              ],
+              "enum": ["in_progress", "completed", "incomplete"],
               "type": "string"
             },
             {
@@ -4324,19 +3871,12 @@
         },
         "type": {
           "description": "The type of the local shell tool call output. Always `local_shell_call_output`.\n",
-          "enum": [
-            "local_shell_call_output"
-          ],
+          "enum": ["local_shell_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "id",
-        "type",
-        "call_id",
-        "output"
-      ],
+      "required": ["id", "type", "call_id", "output"],
       "title": "Local shell call output",
       "type": "object"
     },
@@ -4386,21 +3926,12 @@
         "type": {
           "default": "shell_call",
           "description": "The type of the item. Always `shell_call`.",
-          "enum": [
-            "shell_call"
-          ],
+          "enum": ["shell_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "call_id",
-        "action",
-        "status",
-        "environment"
-      ],
+      "required": ["type", "id", "call_id", "action", "status", "environment"],
       "title": "Shell tool call",
       "type": "object"
     },
@@ -4444,9 +3975,7 @@
         "type": {
           "default": "shell_call_output",
           "description": "The type of the shell call output. Always `shell_call_output`.",
-          "enum": [
-            "shell_call_output"
-          ],
+          "enum": ["shell_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -4502,20 +4031,12 @@
         "type": {
           "default": "apply_patch_call",
           "description": "The type of the item. Always `apply_patch_call`.",
-          "enum": [
-            "apply_patch_call"
-          ],
+          "enum": ["apply_patch_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "call_id",
-        "status",
-        "operation"
-      ],
+      "required": ["type", "id", "call_id", "status", "operation"],
       "title": "Apply patch tool call",
       "type": "object"
     },
@@ -4552,19 +4073,12 @@
         "type": {
           "default": "apply_patch_call_output",
           "description": "The type of the item. Always `apply_patch_call_output`.",
-          "enum": [
-            "apply_patch_call_output"
-          ],
+          "enum": ["apply_patch_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "call_id",
-        "status"
-      ],
+      "required": ["type", "id", "call_id", "status"],
       "title": "Apply patch tool call output",
       "type": "object"
     },
@@ -4626,20 +4140,12 @@
         },
         "type": {
           "description": "The type of the item. Always `mcp_call`.\n",
-          "enum": [
-            "mcp_call"
-          ],
+          "enum": ["mcp_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "server_label",
-        "name",
-        "arguments"
-      ],
+      "required": ["type", "id", "server_label", "name", "arguments"],
       "title": "MCP tool call",
       "type": "object"
     },
@@ -4674,19 +4180,12 @@
         },
         "type": {
           "description": "The type of the item. Always `mcp_list_tools`.\n",
-          "enum": [
-            "mcp_list_tools"
-          ],
+          "enum": ["mcp_list_tools"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "server_label",
-        "tools"
-      ],
+      "required": ["type", "id", "server_label", "tools"],
       "title": "MCP list tools",
       "type": "object"
     },
@@ -4711,20 +4210,12 @@
         },
         "type": {
           "description": "The type of the item. Always `mcp_approval_request`.\n",
-          "enum": [
-            "mcp_approval_request"
-          ],
+          "enum": ["mcp_approval_request"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "id",
-        "server_label",
-        "name",
-        "arguments"
-      ],
+      "required": ["type", "id", "server_label", "name", "arguments"],
       "title": "MCP approval request",
       "type": "object"
     },
@@ -4756,9 +4247,7 @@
         },
         "type": {
           "description": "The type of the item. Always `mcp_approval_response`.\n",
-          "enum": [
-            "mcp_approval_response"
-          ],
+          "enum": ["mcp_approval_response"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -4798,19 +4287,12 @@
         },
         "type": {
           "description": "The type of the custom tool call. Always `custom_tool_call`.\n",
-          "enum": [
-            "custom_tool_call"
-          ],
+          "enum": ["custom_tool_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "call_id",
-        "name",
-        "input"
-      ],
+      "required": ["type", "call_id", "name", "input"],
       "title": "Custom tool call",
       "type": "object"
     },
@@ -4834,10 +4316,7 @@
               "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n"
             }
           },
-          "required": [
-            "id",
-            "status"
-          ],
+          "required": ["id", "status"],
           "type": "object"
         }
       ],
@@ -4888,10 +4367,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "token",
-        "logprob"
-      ],
+      "required": ["token", "logprob"],
       "type": "object"
     },
     "ModelIdsShared": {
@@ -5022,14 +4498,7 @@
         {
           "default": "medium",
           "description": "Constrains effort on reasoning for\n[reasoning models](https://platform.openai.com/docs/guides/reasoning).\nCurrently supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Reducing\nreasoning effort can result in faster responses and fewer tokens used\non reasoning in a response.\n\n- `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool calls are supported for all reasoning values in gpt-5.1.\n- All models before `gpt-5.1` default to `medium` reasoning effort, and do not support `none`.\n- The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.\n- `xhigh` is supported for all models after `gpt-5.1-codex-max`.\n",
-          "enum": [
-            "none",
-            "minimal",
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ],
+          "enum": ["none", "minimal", "low", "medium", "high", "xhigh"],
           "type": "string"
         },
         {
@@ -5056,11 +4525,7 @@
         {
           "default": "medium",
           "description": "Constrains the verbosity of the model's response. Lower values will result in\nmore concise responses, while higher values will result in more verbose responses.\nCurrently supported values are `low`, `medium`, and `high`.\n",
-          "enum": [
-            "low",
-            "medium",
-            "high"
-          ],
+          "enum": ["low", "medium", "high"],
           "type": "string"
         },
         {
@@ -5070,11 +4535,7 @@
     },
     "ToolChoiceOptions": {
       "description": "Controls which (if any) tool is called by the model.\n\n`none` means the model will not call any tool and instead generates a message.\n\n`auto` means the model can pick between generating a message or calling one or\nmore tools.\n\n`required` means the model must call one or more tools.\n",
-      "enum": [
-        "none",
-        "auto",
-        "required"
-      ],
+      "enum": ["none", "auto", "required"],
       "title": "Tool choice mode",
       "type": "string"
     },
@@ -5083,10 +4544,7 @@
       "properties": {
         "mode": {
           "description": "Constrains the tools available to the model to a pre-defined set.\n\n`auto` allows the model to pick from among the allowed tools and generate a\nmessage.\n\n`required` requires the model to call one or more of the allowed tools.\n",
-          "enum": [
-            "auto",
-            "required"
-          ],
+          "enum": ["auto", "required"],
           "type": "string"
         },
         "tools": {
@@ -5101,18 +4559,12 @@
         },
         "type": {
           "description": "Allowed tool configuration type. Always `allowed_tools`.",
-          "enum": [
-            "allowed_tools"
-          ],
+          "enum": ["allowed_tools"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "mode",
-        "tools"
-      ],
+      "required": ["type", "mode", "tools"],
       "title": "Allowed tools",
       "type": "object"
     },
@@ -5134,9 +4586,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Hosted tool",
       "type": "object"
     },
@@ -5149,17 +4599,12 @@
         },
         "type": {
           "description": "For function calling, the type is always `function`.",
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "name"
-      ],
+      "required": ["type", "name"],
       "title": "Function tool",
       "type": "object"
     },
@@ -5183,17 +4628,12 @@
         },
         "type": {
           "description": "For MCP tools, the type is always `mcp`.",
-          "enum": [
-            "mcp"
-          ],
+          "enum": ["mcp"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "server_label"
-      ],
+      "required": ["type", "server_label"],
       "title": "MCP tool",
       "type": "object"
     },
@@ -5206,17 +4646,12 @@
         },
         "type": {
           "description": "For custom tool calling, the type is always `custom`.",
-          "enum": [
-            "custom"
-          ],
+          "enum": ["custom"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "name"
-      ],
+      "required": ["type", "name"],
       "title": "Custom tool",
       "type": "object"
     },
@@ -5226,16 +4661,12 @@
         "type": {
           "default": "apply_patch",
           "description": "The tool to call. Always `apply_patch`.",
-          "enum": [
-            "apply_patch"
-          ],
+          "enum": ["apply_patch"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Specific apply patch tool choice",
       "type": "object"
     },
@@ -5245,16 +4676,12 @@
         "type": {
           "default": "shell",
           "description": "The tool to call. Always `shell`.",
-          "enum": [
-            "shell"
-          ],
+          "enum": ["shell"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Specific shell tool choice",
       "type": "object"
     },
@@ -5321,10 +4748,7 @@
     },
     "MessagePhase": {
       "description": "Labels an `assistant` message as intermediate commentary (`commentary`) or the final answer (`final_answer`).\nFor models like `gpt-5.3-codex` and beyond, when sending follow-up requests, preserve and resend\nphase on all assistant messages — dropping it can degrade performance. Not used for user messages.\n",
-      "enum": [
-        "commentary",
-        "final_answer"
-      ],
+      "enum": ["commentary", "final_answer"],
       "type": "string"
     },
     "InputMessage": {
@@ -5335,35 +4759,22 @@
         },
         "role": {
           "description": "The role of the message input. One of `user`, `system`, or `developer`.\n",
-          "enum": [
-            "user",
-            "system",
-            "developer"
-          ],
+          "enum": ["user", "system", "developer"],
           "type": "string"
         },
         "status": {
           "description": "The status of item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "incomplete"
-          ],
+          "enum": ["in_progress", "completed", "incomplete"],
           "type": "string"
         },
         "type": {
           "description": "The type of the message input. Always set to `message`.\n",
-          "enum": [
-            "message"
-          ],
+          "enum": ["message"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "role",
-        "content"
-      ],
+      "required": ["role", "content"],
       "title": "Input message",
       "type": "object"
     },
@@ -5419,18 +4830,12 @@
         "type": {
           "default": "computer_call_output",
           "description": "The type of the computer tool call output. Always `computer_call_output`.",
-          "enum": [
-            "computer_call_output"
-          ],
+          "enum": ["computer_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "call_id",
-        "type",
-        "output"
-      ],
+      "required": ["call_id", "type", "output"],
       "title": "Computer tool call output",
       "type": "object"
     },
@@ -5500,18 +4905,12 @@
         "type": {
           "default": "function_call_output",
           "description": "The type of the function tool call output. Always `function_call_output`.",
-          "enum": [
-            "function_call_output"
-          ],
+          "enum": ["function_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "call_id",
-        "type",
-        "output"
-      ],
+      "required": ["call_id", "type", "output"],
       "title": "Function tool call output",
       "type": "object"
     },
@@ -5564,17 +4963,12 @@
         "type": {
           "default": "tool_search_call",
           "description": "The item type. Always `tool_search_call`.",
-          "enum": [
-            "tool_search_call"
-          ],
+          "enum": ["tool_search_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "arguments"
-      ],
+      "required": ["type", "arguments"],
       "type": "object"
     },
     "ToolSearchOutputItemParam": {
@@ -5629,17 +5023,12 @@
         "type": {
           "default": "tool_search_output",
           "description": "The item type. Always `tool_search_output`.",
-          "enum": [
-            "tool_search_output"
-          ],
+          "enum": ["tool_search_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "tools"
-      ],
+      "required": ["type", "tools"],
       "type": "object"
     },
     "CompactionSummaryItemParam": {
@@ -5665,17 +5054,12 @@
         "type": {
           "default": "compaction",
           "description": "The type of the item. Always `compaction`.",
-          "enum": [
-            "compaction"
-          ],
+          "enum": ["compaction"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "encrypted_content"
-      ],
+      "required": ["type", "encrypted_content"],
       "title": "Compaction item",
       "type": "object"
     },
@@ -5739,18 +5123,12 @@
         "type": {
           "default": "shell_call",
           "description": "The type of the item. Always `shell_call`.",
-          "enum": [
-            "shell_call"
-          ],
+          "enum": ["shell_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "call_id",
-        "type",
-        "action"
-      ],
+      "required": ["call_id", "type", "action"],
       "title": "Shell tool call",
       "type": "object"
     },
@@ -5807,18 +5185,12 @@
         "type": {
           "default": "shell_call_output",
           "description": "The type of the item. Always `shell_call_output`.",
-          "enum": [
-            "shell_call_output"
-          ],
+          "enum": ["shell_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "call_id",
-        "type",
-        "output"
-      ],
+      "required": ["call_id", "type", "output"],
       "title": "Shell tool call output",
       "type": "object"
     },
@@ -5854,19 +5226,12 @@
         "type": {
           "default": "apply_patch_call",
           "description": "The type of the item. Always `apply_patch_call`.",
-          "enum": [
-            "apply_patch_call"
-          ],
+          "enum": ["apply_patch_call"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "call_id",
-        "status",
-        "operation"
-      ],
+      "required": ["type", "call_id", "status", "operation"],
       "title": "Apply patch tool call",
       "type": "object"
     },
@@ -5910,18 +5275,12 @@
         "type": {
           "default": "apply_patch_call_output",
           "description": "The type of the item. Always `apply_patch_call_output`.",
-          "enum": [
-            "apply_patch_call_output"
-          ],
+          "enum": ["apply_patch_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "call_id",
-        "status"
-      ],
+      "required": ["type", "call_id", "status"],
       "title": "Apply patch tool call output",
       "type": "object"
     },
@@ -5960,19 +5319,12 @@
         },
         "type": {
           "description": "The type of the item. Always `mcp_approval_response`.\n",
-          "enum": [
-            "mcp_approval_response"
-          ],
+          "enum": ["mcp_approval_response"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "request_id",
-        "approve",
-        "approval_request_id"
-      ],
+      "required": ["type", "request_id", "approve", "approval_request_id"],
       "title": "MCP approval response",
       "type": "object"
     },
@@ -6007,18 +5359,12 @@
         },
         "type": {
           "description": "The type of the custom tool call output. Always `custom_tool_call_output`.\n",
-          "enum": [
-            "custom_tool_call_output"
-          ],
+          "enum": ["custom_tool_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "call_id",
-        "output"
-      ],
+      "required": ["type", "call_id", "output"],
       "title": "Custom tool call output",
       "type": "object"
     },
@@ -6097,36 +5443,22 @@
         },
         "status": {
           "description": "The status of the item. One of `in_progress`, `completed`, or\n`incomplete`. Populated when items are returned via API.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "incomplete"
-          ],
+          "enum": ["in_progress", "completed", "incomplete"],
           "type": "string"
         },
         "type": {
           "description": "The type of the function tool call output. Always `function_call_output`.\n",
-          "enum": [
-            "function_call_output"
-          ],
+          "enum": ["function_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "call_id",
-        "output"
-      ],
+      "required": ["type", "call_id", "output"],
       "title": "Function tool call output",
       "type": "object"
     },
     "FunctionCallOutputStatusEnum": {
-      "enum": [
-        "in_progress",
-        "completed",
-        "incomplete"
-      ],
+      "enum": ["in_progress", "completed", "incomplete"],
       "type": "string"
     },
     "WebSearchActionSearch": {
@@ -6152,9 +5484,7 @@
             "properties": {
               "type": {
                 "description": "The type of source. Always `url`.\n",
-                "enum": [
-                  "url"
-                ],
+                "enum": ["url"],
                 "type": "string",
                 "x-stainless-const": true
               },
@@ -6163,10 +5493,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "type",
-              "url"
-            ],
+            "required": ["type", "url"],
             "title": "Web search source",
             "type": "object"
           },
@@ -6175,17 +5502,12 @@
         },
         "type": {
           "description": "The action type.\n",
-          "enum": [
-            "search"
-          ],
+          "enum": ["search"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "query"
-      ],
+      "required": ["type", "query"],
       "title": "Search action",
       "type": "object"
     },
@@ -6194,9 +5516,7 @@
       "properties": {
         "type": {
           "description": "The action type.\n",
-          "enum": [
-            "open_page"
-          ],
+          "enum": ["open_page"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -6213,9 +5533,7 @@
           "description": "The URL opened by the model.\n"
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Open page action",
       "type": "object"
     },
@@ -6228,9 +5546,7 @@
         },
         "type": {
           "description": "The action type.\n",
-          "enum": [
-            "find_in_page"
-          ],
+          "enum": ["find_in_page"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -6240,11 +5556,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "url",
-        "pattern"
-      ],
+      "required": ["type", "url", "pattern"],
       "title": "Find action",
       "type": "object"
     },
@@ -6320,9 +5632,7 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
+      "required": ["id"],
       "type": "object"
     },
     "ComputerToolCallOutput": {
@@ -6348,37 +5658,23 @@
         },
         "status": {
           "description": "The status of the message input. One of `in_progress`, `completed`, or\n`incomplete`. Populated when input items are returned via API.\n",
-          "enum": [
-            "in_progress",
-            "completed",
-            "incomplete"
-          ],
+          "enum": ["in_progress", "completed", "incomplete"],
           "type": "string"
         },
         "type": {
           "default": "computer_call_output",
           "description": "The type of the computer tool call output. Always `computer_call_output`.\n",
-          "enum": [
-            "computer_call_output"
-          ],
+          "enum": ["computer_call_output"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "call_id",
-        "output"
-      ],
+      "required": ["type", "call_id", "output"],
       "title": "Computer tool call output",
       "type": "object"
     },
     "ComputerCallOutputStatus": {
-      "enum": [
-        "completed",
-        "incomplete",
-        "failed"
-      ],
+      "enum": ["completed", "incomplete", "failed"],
       "type": "string"
     },
     "ReasoningTextContent": {
@@ -6391,17 +5687,12 @@
         "type": {
           "default": "reasoning_text",
           "description": "The type of the reasoning text. Always `reasoning_text`.",
-          "enum": [
-            "reasoning_text"
-          ],
+          "enum": ["reasoning_text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "text"
-      ],
+      "required": ["type", "text"],
       "title": "Reasoning text",
       "type": "object"
     },
@@ -6415,33 +5706,21 @@
         "type": {
           "default": "summary_text",
           "description": "The type of the object. Always `summary_text`.",
-          "enum": [
-            "summary_text"
-          ],
+          "enum": ["summary_text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "text"
-      ],
+      "required": ["type", "text"],
       "title": "Summary text",
       "type": "object"
     },
     "ToolSearchExecutionType": {
-      "enum": [
-        "server",
-        "client"
-      ],
+      "enum": ["server", "client"],
       "type": "string"
     },
     "FunctionCallStatus": {
-      "enum": [
-        "in_progress",
-        "completed",
-        "incomplete"
-      ],
+      "enum": ["in_progress", "completed", "incomplete"],
       "type": "string"
     },
     "CodeInterpreterOutputLogs": {
@@ -6454,17 +5733,12 @@
         "type": {
           "default": "logs",
           "description": "The type of the output. Always `logs`.",
-          "enum": [
-            "logs"
-          ],
+          "enum": ["logs"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "logs"
-      ],
+      "required": ["type", "logs"],
       "title": "Code interpreter output logs",
       "type": "object"
     },
@@ -6474,9 +5748,7 @@
         "type": {
           "default": "image",
           "description": "The type of the output. Always `image`.",
-          "enum": [
-            "image"
-          ],
+          "enum": ["image"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -6485,10 +5757,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "url"
-      ],
+      "required": ["type", "url"],
       "title": "Code interpreter output image",
       "type": "object"
     },
@@ -6524,9 +5793,7 @@
         "type": {
           "default": "exec",
           "description": "The type of the local shell action. Always `exec`.",
-          "enum": [
-            "exec"
-          ],
+          "enum": ["exec"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -6553,11 +5820,7 @@
           ]
         }
       },
-      "required": [
-        "type",
-        "command",
-        "env"
-      ],
+      "required": ["type", "command", "env"],
       "title": "Local shell exec action",
       "type": "object"
     },
@@ -6594,11 +5857,7 @@
           ]
         }
       },
-      "required": [
-        "commands",
-        "timeout_ms",
-        "max_output_length"
-      ],
+      "required": ["commands", "timeout_ms", "max_output_length"],
       "title": "Shell exec action",
       "type": "object"
     },
@@ -6608,16 +5867,12 @@
         "type": {
           "default": "local",
           "description": "The environment type. Always `local`.",
-          "enum": [
-            "local"
-          ],
+          "enum": ["local"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Local Environment",
       "type": "object"
     },
@@ -6630,26 +5885,17 @@
         "type": {
           "default": "container_reference",
           "description": "The environment type. Always `container_reference`.",
-          "enum": [
-            "container_reference"
-          ],
+          "enum": ["container_reference"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "container_id"
-      ],
+      "required": ["type", "container_id"],
       "title": "Container Reference",
       "type": "object"
     },
     "LocalShellCallStatus": {
-      "enum": [
-        "in_progress",
-        "completed",
-        "incomplete"
-      ],
+      "enum": ["in_progress", "completed", "incomplete"],
       "type": "string"
     },
     "FunctionShellCallOutputContent": {
@@ -6683,20 +5929,12 @@
           "type": "string"
         }
       },
-      "required": [
-        "stdout",
-        "stderr",
-        "outcome"
-      ],
+      "required": ["stdout", "stderr", "outcome"],
       "title": "Shell call output content",
       "type": "object"
     },
     "LocalShellCallOutputStatusEnum": {
-      "enum": [
-        "in_progress",
-        "completed",
-        "incomplete"
-      ],
+      "enum": ["in_progress", "completed", "incomplete"],
       "type": "string"
     },
     "ApplyPatchCreateFileOperation": {
@@ -6713,18 +5951,12 @@
         "type": {
           "default": "create_file",
           "description": "Create a new file with the provided diff.",
-          "enum": [
-            "create_file"
-          ],
+          "enum": ["create_file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "path",
-        "diff"
-      ],
+      "required": ["type", "path", "diff"],
       "title": "Apply patch create file operation",
       "type": "object"
     },
@@ -6738,17 +5970,12 @@
         "type": {
           "default": "delete_file",
           "description": "Delete the specified file.",
-          "enum": [
-            "delete_file"
-          ],
+          "enum": ["delete_file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "path"
-      ],
+      "required": ["type", "path"],
       "title": "Apply patch delete file operation",
       "type": "object"
     },
@@ -6766,43 +5993,25 @@
         "type": {
           "default": "update_file",
           "description": "Update an existing file with the provided diff.",
-          "enum": [
-            "update_file"
-          ],
+          "enum": ["update_file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "path",
-        "diff"
-      ],
+      "required": ["type", "path", "diff"],
       "title": "Apply patch update file operation",
       "type": "object"
     },
     "ApplyPatchCallStatus": {
-      "enum": [
-        "in_progress",
-        "completed"
-      ],
+      "enum": ["in_progress", "completed"],
       "type": "string"
     },
     "ApplyPatchCallOutputStatus": {
-      "enum": [
-        "completed",
-        "failed"
-      ],
+      "enum": ["completed", "failed"],
       "type": "string"
     },
     "MCPToolCallStatus": {
-      "enum": [
-        "in_progress",
-        "completed",
-        "incomplete",
-        "calling",
-        "failed"
-      ],
+      "enum": ["in_progress", "completed", "incomplete", "calling", "failed"],
       "type": "string"
     },
     "MCPListToolsTool": {
@@ -6839,10 +6048,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "name",
-        "input_schema"
-      ],
+      "required": ["name", "input_schema"],
       "title": "MCP list tools tool",
       "type": "object"
     },
@@ -6869,19 +6075,12 @@
         "type": {
           "default": "output_text",
           "description": "The type of the output text. Always `output_text`.",
-          "enum": [
-            "output_text"
-          ],
+          "enum": ["output_text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "text",
-        "annotations",
-        "logprobs"
-      ],
+      "required": ["type", "text", "annotations", "logprobs"],
       "title": "Output text",
       "type": "object"
     },
@@ -6895,17 +6094,12 @@
         "type": {
           "default": "refusal",
           "description": "The type of the refusal. Always `refusal`.",
-          "enum": [
-            "refusal"
-          ],
+          "enum": ["refusal"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "refusal"
-      ],
+      "required": ["type", "refusal"],
       "title": "Refusal",
       "type": "object"
     },
@@ -6919,17 +6113,12 @@
         "type": {
           "default": "input_text",
           "description": "The type of the input item. Always `input_text`.",
-          "enum": [
-            "input_text"
-          ],
+          "enum": ["input_text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "text"
-      ],
+      "required": ["type", "text"],
       "title": "Input text",
       "type": "object"
     },
@@ -6965,17 +6154,12 @@
         "type": {
           "default": "input_image",
           "description": "The type of the input item. Always `input_image`.",
-          "enum": [
-            "input_image"
-          ],
+          "enum": ["input_image"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "detail"
-      ],
+      "required": ["type", "detail"],
       "title": "Input image",
       "type": "object"
     },
@@ -7012,16 +6196,12 @@
         "type": {
           "default": "input_file",
           "description": "The type of the input item. Always `input_file`.",
-          "enum": [
-            "input_file"
-          ],
+          "enum": ["input_file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Input file",
       "type": "object"
     },
@@ -7030,16 +6210,12 @@
       "properties": {
         "type": {
           "description": "The type of response format being defined. Always `text`.",
-          "enum": [
-            "text"
-          ],
+          "enum": ["text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Text",
       "type": "object"
     },
@@ -7071,18 +6247,12 @@
         },
         "type": {
           "description": "The type of response format being defined. Always `json_schema`.",
-          "enum": [
-            "json_schema"
-          ],
+          "enum": ["json_schema"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "schema",
-        "name"
-      ],
+      "required": ["type", "schema", "name"],
       "title": "JSON schema",
       "type": "object"
     },
@@ -7091,16 +6261,12 @@
       "properties": {
         "type": {
           "description": "The type of response format being defined. Always `json_object`.",
-          "enum": [
-            "json_object"
-          ],
+          "enum": ["json_object"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "JSON object",
       "type": "object"
     },
@@ -7153,19 +6319,12 @@
         "type": {
           "default": "function",
           "description": "The type of the function tool. Always `function`.",
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "name",
-        "strict",
-        "parameters"
-      ],
+      "required": ["type", "name", "strict", "parameters"],
       "title": "Function",
       "type": "object"
     },
@@ -7194,9 +6353,7 @@
         "type": {
           "default": "file_search",
           "description": "The type of the file search tool. Always `file_search`.",
-          "enum": [
-            "file_search"
-          ],
+          "enum": ["file_search"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -7208,10 +6365,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "type",
-        "vector_store_ids"
-      ],
+      "required": ["type", "vector_store_ids"],
       "title": "File search",
       "type": "object"
     },
@@ -7221,16 +6375,12 @@
         "type": {
           "default": "computer",
           "description": "The type of the computer tool. Always `computer`.",
-          "enum": [
-            "computer"
-          ],
+          "enum": ["computer"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Computer",
       "type": "object"
     },
@@ -7252,19 +6402,12 @@
         "type": {
           "default": "computer_use_preview",
           "description": "The type of the computer use tool. Always `computer_use_preview`.",
-          "enum": [
-            "computer_use_preview"
-          ],
+          "enum": ["computer_use_preview"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "environment",
-        "display_width",
-        "display_height"
-      ],
+      "required": ["type", "environment", "display_width", "display_height"],
       "title": "Computer use preview",
       "type": "object"
     },
@@ -7304,29 +6447,20 @@
         "search_context_size": {
           "default": "medium",
           "description": "High level guidance for the amount of context window space to use for the search. One of `low`, `medium`, or `high`. `medium` is the default.",
-          "enum": [
-            "low",
-            "medium",
-            "high"
-          ],
+          "enum": ["low", "medium", "high"],
           "type": "string"
         },
         "type": {
           "default": "web_search",
           "description": "The type of the web search tool. One of `web_search` or `web_search_2025_08_26`.",
-          "enum": [
-            "web_search",
-            "web_search_2025_08_26"
-          ],
+          "enum": ["web_search", "web_search_2025_08_26"],
           "type": "string"
         },
         "user_location": {
           "$ref": "#/definitions/WebSearchApproximateLocation"
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Web search",
       "type": "object"
     },
@@ -7414,10 +6548,7 @@
                 },
                 {
                   "description": "Specify a single approval policy for all tools. One of `always` or\n`never`. When set to `always`, all tools will require approval. When\nset to `never`, all tools will not require approval.\n",
-                  "enum": [
-                    "always",
-                    "never"
-                  ],
+                  "enum": ["always", "never"],
                   "title": "MCP tool approval setting",
                   "type": "string"
                 }
@@ -7442,17 +6573,12 @@
         },
         "type": {
           "description": "The type of the MCP tool. Always `mcp`.",
-          "enum": [
-            "mcp"
-          ],
+          "enum": ["mcp"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "server_label"
-      ],
+      "required": ["type", "server_label"],
       "title": "MCP tool",
       "type": "object"
     },
@@ -7473,17 +6599,12 @@
         },
         "type": {
           "description": "The type of the code interpreter tool. Always `code_interpreter`.\n",
-          "enum": [
-            "code_interpreter"
-          ],
+          "enum": ["code_interpreter"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "container"
-      ],
+      "required": ["type", "container"],
       "title": "Code interpreter",
       "type": "object"
     },
@@ -7497,11 +6618,7 @@
         "background": {
           "default": "auto",
           "description": "Background type for the generated image. One of `transparent`,\n`opaque`, or `auto`. Default: `auto`.\n",
-          "enum": [
-            "transparent",
-            "opaque",
-            "auto"
-          ],
+          "enum": ["transparent", "opaque", "auto"],
           "type": "string"
         },
         "input_fidelity": {
@@ -7538,11 +6655,7 @@
             {
               "default": "gpt-image-1",
               "description": "The image generation model to use. Default: `gpt-image-1`.\n",
-              "enum": [
-                "gpt-image-1",
-                "gpt-image-1-mini",
-                "gpt-image-1.5"
-              ],
+              "enum": ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"],
               "type": "string"
             }
           ]
@@ -7550,10 +6663,7 @@
         "moderation": {
           "default": "auto",
           "description": "Moderation level for the generated image. Default: `auto`.\n",
-          "enum": [
-            "auto",
-            "low"
-          ],
+          "enum": ["auto", "low"],
           "type": "string"
         },
         "output_compression": {
@@ -7566,11 +6676,7 @@
         "output_format": {
           "default": "png",
           "description": "The output format of the generated image. One of `png`, `webp`, or\n`jpeg`. Default: `png`.\n",
-          "enum": [
-            "png",
-            "webp",
-            "jpeg"
-          ],
+          "enum": ["png", "webp", "jpeg"],
           "type": "string"
         },
         "partial_images": {
@@ -7583,37 +6689,23 @@
         "quality": {
           "default": "auto",
           "description": "The quality of the generated image. One of `low`, `medium`, `high`,\nor `auto`. Default: `auto`.\n",
-          "enum": [
-            "low",
-            "medium",
-            "high",
-            "auto"
-          ],
+          "enum": ["low", "medium", "high", "auto"],
           "type": "string"
         },
         "size": {
           "default": "auto",
           "description": "The size of the generated image. One of `1024x1024`, `1024x1536`,\n`1536x1024`, or `auto`. Default: `auto`.\n",
-          "enum": [
-            "1024x1024",
-            "1024x1536",
-            "1536x1024",
-            "auto"
-          ],
+          "enum": ["1024x1024", "1024x1536", "1536x1024", "auto"],
           "type": "string"
         },
         "type": {
           "description": "The type of the image generation tool. Always `image_generation`.\n",
-          "enum": [
-            "image_generation"
-          ],
+          "enum": ["image_generation"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Image generation tool",
       "type": "object"
     },
@@ -7623,16 +6715,12 @@
         "type": {
           "default": "local_shell",
           "description": "The type of the local shell tool. Always `local_shell`.",
-          "enum": [
-            "local_shell"
-          ],
+          "enum": ["local_shell"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Local shell tool",
       "type": "object"
     },
@@ -7665,16 +6753,12 @@
         "type": {
           "default": "shell",
           "description": "The type of the shell tool. Always `shell`.",
-          "enum": [
-            "shell"
-          ],
+          "enum": ["shell"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Shell tool",
       "type": "object"
     },
@@ -7710,17 +6794,12 @@
         "type": {
           "default": "custom",
           "description": "The type of the custom tool. Always `custom`.",
-          "enum": [
-            "custom"
-          ],
+          "enum": ["custom"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "name"
-      ],
+      "required": ["type", "name"],
       "title": "Custom tool",
       "type": "object"
     },
@@ -7759,19 +6838,12 @@
         "type": {
           "default": "namespace",
           "description": "The type of the tool. Always `namespace`.",
-          "enum": [
-            "namespace"
-          ],
+          "enum": ["namespace"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "name",
-        "description",
-        "tools"
-      ],
+      "required": ["type", "name", "description", "tools"],
       "title": "Namespace",
       "type": "object"
     },
@@ -7807,16 +6879,12 @@
         "type": {
           "default": "tool_search",
           "description": "The type of the tool. Always `tool_search`.",
-          "enum": [
-            "tool_search"
-          ],
+          "enum": ["tool_search"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Tool search tool",
       "type": "object"
     },
@@ -7836,10 +6904,7 @@
         "type": {
           "default": "web_search_preview",
           "description": "The type of the web search tool. One of `web_search_preview` or `web_search_preview_2025_03_11`.",
-          "enum": [
-            "web_search_preview",
-            "web_search_preview_2025_03_11"
-          ],
+          "enum": ["web_search_preview", "web_search_preview_2025_03_11"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -7855,9 +6920,7 @@
           ]
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Web search preview",
       "type": "object"
     },
@@ -7867,16 +6930,12 @@
         "type": {
           "default": "apply_patch",
           "description": "The type of the tool. Always `apply_patch`.",
-          "enum": [
-            "apply_patch"
-          ],
+          "enum": ["apply_patch"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Apply patch tool",
       "type": "object"
     },
@@ -7910,24 +6969,16 @@
         "type": {
           "default": "computer_screenshot",
           "description": "Specifies the event type. For a computer screenshot, this property is \nalways set to `computer_screenshot`.\n",
-          "enum": [
-            "computer_screenshot"
-          ],
+          "enum": ["computer_screenshot"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object"
     },
     "FunctionCallItemStatus": {
-      "enum": [
-        "in_progress",
-        "completed",
-        "incomplete"
-      ],
+      "enum": ["in_progress", "completed", "incomplete"],
       "type": "string"
     },
     "InputTextContentParam": {
@@ -7941,17 +6992,12 @@
         "type": {
           "default": "input_text",
           "description": "The type of the input item. Always `input_text`.",
-          "enum": [
-            "input_text"
-          ],
+          "enum": ["input_text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "text"
-      ],
+      "required": ["type", "text"],
       "title": "Input text",
       "type": "object"
     },
@@ -7996,16 +7042,12 @@
         "type": {
           "default": "input_image",
           "description": "The type of the input item. Always `input_image`.",
-          "enum": [
-            "input_image"
-          ],
+          "enum": ["input_image"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Input image",
       "type": "object"
     },
@@ -8065,16 +7107,12 @@
         "type": {
           "default": "input_file",
           "description": "The type of the input item. Always `input_file`.",
-          "enum": [
-            "input_file"
-          ],
+          "enum": ["input_file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Input file",
       "type": "object"
     },
@@ -8116,9 +7154,7 @@
           ]
         }
       },
-      "required": [
-        "commands"
-      ],
+      "required": ["commands"],
       "title": "Shell action",
       "type": "object"
     },
@@ -8135,16 +7171,12 @@
         "type": {
           "default": "local",
           "description": "Use a local computer environment.",
-          "enum": [
-            "local"
-          ],
+          "enum": ["local"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object"
     },
     "ContainerReferenceParam": {
@@ -8157,26 +7189,17 @@
         "type": {
           "default": "container_reference",
           "description": "References a container created with the /v1/containers endpoint",
-          "enum": [
-            "container_reference"
-          ],
+          "enum": ["container_reference"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "container_id"
-      ],
+      "required": ["type", "container_id"],
       "type": "object"
     },
     "FunctionShellCallItemStatus": {
       "description": "Status values reported for shell tool calls.",
-      "enum": [
-        "in_progress",
-        "completed",
-        "incomplete"
-      ],
+      "enum": ["in_progress", "completed", "incomplete"],
       "title": "Shell call status",
       "type": "string"
     },
@@ -8198,11 +7221,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "stdout",
-        "stderr",
-        "outcome"
-      ],
+      "required": ["stdout", "stderr", "outcome"],
       "title": "Shell output content",
       "type": "object"
     },
@@ -8226,19 +7245,13 @@
     },
     "ApplyPatchCallStatusParam": {
       "description": "Status values reported for apply_patch tool calls.",
-      "enum": [
-        "in_progress",
-        "completed"
-      ],
+      "enum": ["in_progress", "completed"],
       "title": "Apply patch call status",
       "type": "string"
     },
     "ApplyPatchCallOutputStatusParam": {
       "description": "Outcome values reported for apply_patch tool call outputs.",
-      "enum": [
-        "completed",
-        "failed"
-      ],
+      "enum": ["completed", "failed"],
       "title": "Apply patch call output status",
       "type": "string"
     },
@@ -8282,9 +7295,7 @@
         "type": {
           "default": "click",
           "description": "Specifies the event type. For a click action, this property is always `click`.",
-          "enum": [
-            "click"
-          ],
+          "enum": ["click"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -8297,12 +7308,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "type",
-        "button",
-        "x",
-        "y"
-      ],
+      "required": ["type", "button", "x", "y"],
       "title": "Click",
       "type": "object"
     },
@@ -8326,9 +7332,7 @@
         "type": {
           "default": "double_click",
           "description": "Specifies the event type. For a double click action, this property is always set to `double_click`.",
-          "enum": [
-            "double_click"
-          ],
+          "enum": ["double_click"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -8341,12 +7345,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "type",
-        "x",
-        "y",
-        "keys"
-      ],
+      "required": ["type", "x", "y", "keys"],
       "title": "DoubleClick",
       "type": "object"
     },
@@ -8377,17 +7376,12 @@
         "type": {
           "default": "drag",
           "description": "Specifies the event type. For a drag action, this property is always set to `drag`.",
-          "enum": [
-            "drag"
-          ],
+          "enum": ["drag"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "path"
-      ],
+      "required": ["type", "path"],
       "title": "Drag",
       "type": "object"
     },
@@ -8405,17 +7399,12 @@
         "type": {
           "default": "keypress",
           "description": "Specifies the event type. For a keypress action, this property is always set to `keypress`.",
-          "enum": [
-            "keypress"
-          ],
+          "enum": ["keypress"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "keys"
-      ],
+      "required": ["type", "keys"],
       "title": "KeyPress",
       "type": "object"
     },
@@ -8439,9 +7428,7 @@
         "type": {
           "default": "move",
           "description": "Specifies the event type. For a move action, this property is always set to `move`.",
-          "enum": [
-            "move"
-          ],
+          "enum": ["move"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -8454,11 +7441,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "type",
-        "x",
-        "y"
-      ],
+      "required": ["type", "x", "y"],
       "title": "Move",
       "type": "object"
     },
@@ -8468,16 +7451,12 @@
         "type": {
           "default": "screenshot",
           "description": "Specifies the event type. For a screenshot action, this property is always set to `screenshot`.",
-          "enum": [
-            "screenshot"
-          ],
+          "enum": ["screenshot"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Screenshot",
       "type": "object"
     },
@@ -8509,9 +7488,7 @@
         "type": {
           "default": "scroll",
           "description": "Specifies the event type. For a scroll action, this property is always set to `scroll`.",
-          "enum": [
-            "scroll"
-          ],
+          "enum": ["scroll"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -8524,13 +7501,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "type",
-        "x",
-        "y",
-        "scroll_x",
-        "scroll_y"
-      ],
+      "required": ["type", "x", "y", "scroll_x", "scroll_y"],
       "title": "Scroll",
       "type": "object"
     },
@@ -8544,17 +7515,12 @@
         "type": {
           "default": "type",
           "description": "Specifies the event type. For a type action, this property is always set to `type`.",
-          "enum": [
-            "type"
-          ],
+          "enum": ["type"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "text"
-      ],
+      "required": ["type", "text"],
       "title": "Type",
       "type": "object"
     },
@@ -8564,16 +7530,12 @@
         "type": {
           "default": "wait",
           "description": "Specifies the event type. For a wait action, this property is always set to `wait`.",
-          "enum": [
-            "wait"
-          ],
+          "enum": ["wait"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Wait",
       "type": "object"
     },
@@ -8583,16 +7545,12 @@
         "type": {
           "default": "timeout",
           "description": "The outcome type. Always `timeout`.",
-          "enum": [
-            "timeout"
-          ],
+          "enum": ["timeout"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Shell call timeout outcome",
       "type": "object"
     },
@@ -8606,17 +7564,12 @@
         "type": {
           "default": "exit",
           "description": "The outcome type. Always `exit`.",
-          "enum": [
-            "exit"
-          ],
+          "enum": ["exit"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "exit_code"
-      ],
+      "required": ["type", "exit_code"],
       "title": "Shell call exit outcome",
       "type": "object"
     },
@@ -8662,29 +7615,16 @@
           "type": "array"
         }
       },
-      "required": [
-        "token",
-        "logprob",
-        "bytes",
-        "top_logprobs"
-      ],
+      "required": ["token", "logprob", "bytes", "top_logprobs"],
       "title": "Log probability",
       "type": "object"
     },
     "ImageDetail": {
-      "enum": [
-        "low",
-        "high",
-        "auto",
-        "original"
-      ],
+      "enum": ["low", "high", "auto", "original"],
       "type": "string"
     },
     "FileInputDetail": {
-      "enum": [
-        "low",
-        "high"
-      ],
+      "enum": ["low", "high"],
       "type": "string"
     },
     "ResponseFormatJsonSchemaSchema": {
@@ -8722,13 +7662,7 @@
       "type": "object"
     },
     "ComputerEnvironment": {
-      "enum": [
-        "windows",
-        "mac",
-        "linux",
-        "ubuntu",
-        "browser"
-      ],
+      "enum": ["windows", "mac", "linux", "ubuntu", "browser"],
       "type": "string"
     },
     "WebSearchApproximateLocation": {
@@ -8783,9 +7717,7 @@
             "type": {
               "default": "approximate",
               "description": "The type of location approximation. Always `approximate`.",
-              "enum": [
-                "approximate"
-              ],
+              "enum": ["approximate"],
               "type": "string",
               "x-stainless-const": true
             }
@@ -8859,33 +7791,22 @@
         "type": {
           "default": "auto",
           "description": "Always `auto`.",
-          "enum": [
-            "auto"
-          ],
+          "enum": ["auto"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "CodeInterpreterToolAuto",
       "type": "object"
     },
     "ImageGenActionEnum": {
-      "enum": [
-        "generate",
-        "edit",
-        "auto"
-      ],
+      "enum": ["generate", "edit", "auto"],
       "type": "string"
     },
     "InputFidelity": {
       "description": "Control how much effort the model will exert to match the style and features, especially facial features, of input images. This parameter is only supported for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.",
-      "enum": [
-        "high",
-        "low"
-      ],
+      "enum": ["high", "low"],
       "type": "string"
     },
     "ContainerAutoParam": {
@@ -8945,16 +7866,12 @@
         "type": {
           "default": "container_auto",
           "description": "Automatically creates a container for this request",
-          "enum": [
-            "container_auto"
-          ],
+          "enum": ["container_auto"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object"
     },
     "CustomTextFormatParam": {
@@ -8963,16 +7880,12 @@
         "type": {
           "default": "text",
           "description": "Unconstrained text format. Always `text`.",
-          "enum": [
-            "text"
-          ],
+          "enum": ["text"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Text format",
       "type": "object"
     },
@@ -8990,18 +7903,12 @@
         "type": {
           "default": "grammar",
           "description": "Grammar format. Always `grammar`.",
-          "enum": [
-            "grammar"
-          ],
+          "enum": ["grammar"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "syntax",
-        "definition"
-      ],
+      "required": ["type", "syntax", "definition"],
       "title": "Grammar format",
       "type": "object"
     },
@@ -9049,32 +7956,20 @@
         },
         "type": {
           "default": "function",
-          "enum": [
-            "function"
-          ],
+          "enum": ["function"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "name",
-        "type"
-      ],
+      "required": ["name", "type"],
       "type": "object"
     },
     "SearchContentType": {
-      "enum": [
-        "text",
-        "image"
-      ],
+      "enum": ["text", "image"],
       "type": "string"
     },
     "SearchContextSize": {
-      "enum": [
-        "low",
-        "medium",
-        "high"
-      ],
+      "enum": ["low", "medium", "high"],
       "type": "string"
     },
     "ApproximateLocation": {
@@ -9126,32 +8021,20 @@
         "type": {
           "default": "approximate",
           "description": "The type of location approximation. Always `approximate`.",
-          "enum": [
-            "approximate"
-          ],
+          "enum": ["approximate"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object"
     },
     "DetailEnum": {
-      "enum": [
-        "low",
-        "high",
-        "auto",
-        "original"
-      ],
+      "enum": ["low", "high", "auto", "original"],
       "type": "string"
     },
     "FileDetailEnum": {
-      "enum": [
-        "low",
-        "high"
-      ],
+      "enum": ["low", "high"],
       "type": "string"
     },
     "LocalSkillParam": {
@@ -9169,11 +8052,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "name",
-        "description",
-        "path"
-      ],
+      "required": ["name", "description", "path"],
       "type": "object"
     },
     "FunctionShellCallOutputOutcomeParam": {
@@ -9207,18 +8086,12 @@
         "type": {
           "default": "create_file",
           "description": "The operation type. Always `create_file`.",
-          "enum": [
-            "create_file"
-          ],
+          "enum": ["create_file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "path",
-        "diff"
-      ],
+      "required": ["type", "path", "diff"],
       "title": "Apply patch create file operation",
       "type": "object"
     },
@@ -9233,17 +8106,12 @@
         "type": {
           "default": "delete_file",
           "description": "The operation type. Always `delete_file`.",
-          "enum": [
-            "delete_file"
-          ],
+          "enum": ["delete_file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "path"
-      ],
+      "required": ["type", "path"],
       "title": "Apply patch delete file operation",
       "type": "object"
     },
@@ -9263,29 +8131,17 @@
         "type": {
           "default": "update_file",
           "description": "The operation type. Always `update_file`.",
-          "enum": [
-            "update_file"
-          ],
+          "enum": ["update_file"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "path",
-        "diff"
-      ],
+      "required": ["type", "path", "diff"],
       "title": "Apply patch update file operation",
       "type": "object"
     },
     "ClickButtonType": {
-      "enum": [
-        "left",
-        "right",
-        "wheel",
-        "back",
-        "forward"
-      ],
+      "enum": ["left", "right", "wheel", "back", "forward"],
       "type": "string"
     },
     "CoordParam": {
@@ -9300,10 +8156,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "x",
-        "y"
-      ],
+      "required": ["x", "y"],
       "title": "Coordinate",
       "type": "object"
     },
@@ -9325,19 +8178,12 @@
         "type": {
           "default": "file_citation",
           "description": "The type of the file citation. Always `file_citation`.",
-          "enum": [
-            "file_citation"
-          ],
+          "enum": ["file_citation"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "file_id",
-        "index",
-        "filename"
-      ],
+      "required": ["type", "file_id", "index", "filename"],
       "title": "File citation",
       "type": "object"
     },
@@ -9359,9 +8205,7 @@
         "type": {
           "default": "url_citation",
           "description": "The type of the URL citation. Always `url_citation`.",
-          "enum": [
-            "url_citation"
-          ],
+          "enum": ["url_citation"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -9370,13 +8214,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "url",
-        "start_index",
-        "end_index",
-        "title"
-      ],
+      "required": ["type", "url", "start_index", "end_index", "title"],
       "title": "URL citation",
       "type": "object"
     },
@@ -9406,9 +8244,7 @@
         "type": {
           "default": "container_file_citation",
           "description": "The type of the container file citation. Always `container_file_citation`.",
-          "enum": [
-            "container_file_citation"
-          ],
+          "enum": ["container_file_citation"],
           "type": "string",
           "x-stainless-const": true
         }
@@ -9437,18 +8273,12 @@
         },
         "type": {
           "description": "The type of the file path. Always `file_path`.\n",
-          "enum": [
-            "file_path"
-          ],
+          "enum": ["file_path"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "file_id",
-        "index"
-      ],
+      "required": ["type", "file_id", "index"],
       "title": "File path",
       "type": "object"
     },
@@ -9468,11 +8298,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "token",
-        "logprob",
-        "bytes"
-      ],
+      "required": ["token", "logprob", "bytes"],
       "title": "Top log probability",
       "type": "object"
     },
@@ -9487,16 +8313,7 @@
         "type": {
           "default": "eq",
           "description": "Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`.\n- `eq`: equals\n- `ne`: not equal\n- `gt`: greater than\n- `gte`: greater than or equal\n- `lt`: less than\n- `lte`: less than or equal\n- `in`: in\n- `nin`: not in\n",
-          "enum": [
-            "eq",
-            "ne",
-            "gt",
-            "gte",
-            "lt",
-            "lte",
-            "in",
-            "nin"
-          ],
+          "enum": ["eq", "ne", "gt", "gte", "lt", "lte", "in", "nin"],
           "type": "string"
         },
         "value": {
@@ -9527,11 +8344,7 @@
           ]
         }
       },
-      "required": [
-        "type",
-        "key",
-        "value"
-      ],
+      "required": ["type", "key", "value"],
       "title": "Comparison Filter",
       "type": "object",
       "x-oaiMeta": {
@@ -9562,17 +8375,11 @@
         },
         "type": {
           "description": "Type of operation: `and` or `or`.",
-          "enum": [
-            "and",
-            "or"
-          ],
+          "enum": ["and", "or"],
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "filters"
-      ],
+      "required": ["type", "filters"],
       "title": "Compound Filter",
       "type": "object",
       "x-oaiMeta": {
@@ -9590,26 +8397,15 @@
           "type": "number"
         }
       },
-      "required": [
-        "embedding_weight",
-        "text_weight"
-      ],
+      "required": ["embedding_weight", "text_weight"],
       "type": "object"
     },
     "RankerVersionType": {
-      "enum": [
-        "auto",
-        "default-2024-11-15"
-      ],
+      "enum": ["auto", "default-2024-11-15"],
       "type": "string"
     },
     "ContainerMemoryLimit": {
-      "enum": [
-        "1g",
-        "4g",
-        "16g",
-        "64g"
-      ],
+      "enum": ["1g", "4g", "16g", "64g"],
       "type": "string"
     },
     "ContainerNetworkPolicyDisabledParam": {
@@ -9617,16 +8413,12 @@
         "type": {
           "default": "disabled",
           "description": "Disable outbound network access. Always `disabled`.",
-          "enum": [
-            "disabled"
-          ],
+          "enum": ["disabled"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "type": "object"
     },
     "ContainerNetworkPolicyAllowlistParam": {
@@ -9650,17 +8442,12 @@
         "type": {
           "default": "allowlist",
           "description": "Allow outbound network access only to specified domains. Always `allowlist`.",
-          "enum": [
-            "allowlist"
-          ],
+          "enum": ["allowlist"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "allowed_domains"
-      ],
+      "required": ["type", "allowed_domains"],
       "type": "object"
     },
     "SkillReferenceParam": {
@@ -9674,9 +8461,7 @@
         "type": {
           "default": "skill_reference",
           "description": "References a skill created with the /v1/skills endpoint.",
-          "enum": [
-            "skill_reference"
-          ],
+          "enum": ["skill_reference"],
           "type": "string",
           "x-stainless-const": true
         },
@@ -9685,10 +8470,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "skill_id"
-      ],
+      "required": ["type", "skill_id"],
       "type": "object"
     },
     "InlineSkillParam": {
@@ -9708,26 +8490,16 @@
         "type": {
           "default": "inline",
           "description": "Defines an inline skill for this request.",
-          "enum": [
-            "inline"
-          ],
+          "enum": ["inline"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "name",
-        "description",
-        "source"
-      ],
+      "required": ["type", "name", "description", "source"],
       "type": "object"
     },
     "GrammarSyntax1": {
-      "enum": [
-        "lark",
-        "regex"
-      ],
+      "enum": ["lark", "regex"],
       "type": "string"
     },
     "FunctionShellCallOutputTimeoutOutcomeParam": {
@@ -9736,16 +8508,12 @@
         "type": {
           "default": "timeout",
           "description": "The outcome type. Always `timeout`.",
-          "enum": [
-            "timeout"
-          ],
+          "enum": ["timeout"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type"
-      ],
+      "required": ["type"],
       "title": "Shell call timeout outcome",
       "type": "object"
     },
@@ -9759,17 +8527,12 @@
         "type": {
           "default": "exit",
           "description": "The outcome type. Always `exit`.",
-          "enum": [
-            "exit"
-          ],
+          "enum": ["exit"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "exit_code"
-      ],
+      "required": ["type", "exit_code"],
       "title": "Shell call exit outcome",
       "type": "object"
     },
@@ -9792,11 +8555,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "domain",
-        "name",
-        "value"
-      ],
+      "required": ["domain", "name", "value"],
       "type": "object"
     },
     "InlineSkillSourceParam": {
@@ -9811,27 +8570,19 @@
         "media_type": {
           "default": "application/zip",
           "description": "The media type of the inline skill payload. Must be `application/zip`.",
-          "enum": [
-            "application/zip"
-          ],
+          "enum": ["application/zip"],
           "type": "string",
           "x-stainless-const": true
         },
         "type": {
           "default": "base64",
           "description": "The type of the inline skill source. Must be `base64`.",
-          "enum": [
-            "base64"
-          ],
+          "enum": ["base64"],
           "type": "string",
           "x-stainless-const": true
         }
       },
-      "required": [
-        "type",
-        "media_type",
-        "data"
-      ],
+      "required": ["type", "media_type", "data"],
       "type": "object"
     }
   }

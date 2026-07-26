@@ -309,8 +309,7 @@ function convertToGenerateContentParameters(
   }
   if (tools) {
     config.tools = convertToGoogleTools(tools);
-    // Google rejects a server-side tool alongside function declarations unless
-    // its invocations are reported back in the response content.
+    // Google requires invocation data when web search and function tools are mixed.
     if (
       tools.some((tool) => tool.type === "web_search") &&
       tools.some((tool) => tool.type === "function")

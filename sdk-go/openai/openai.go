@@ -495,9 +495,7 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 				},
 			})
 
-		// The web search result is already carried by the replayed
-		// web_search_call item, which OpenAI resolves server-side, so the
-		// result part has no input item of its own.
+		// OpenAI replays hosted search results through the web_search_call item.
 		case part.ToolResultPart != nil && part.ToolResultPart.Result.WebSearch != nil:
 			continue
 

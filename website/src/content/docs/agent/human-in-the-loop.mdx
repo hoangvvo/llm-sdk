@@ -8,7 +8,8 @@ import jsExample from "../../../../../agent-js/examples/require-approval.ts?raw"
 import rustExample from "../../../../../agent-rust/examples/require-approval.rs?raw";
 
 <Aside>
-  This is an agent pattern that requires custom implementation. [Why?](/agent/#agent-patterns)
+  This is an agent pattern that requires custom implementation.
+  [Why?](/agent/#agent-patterns)
 </Aside>
 
 Human-in-the-loop (HITL) adds people to the decision loop so agents can pause before risky actions, route questions to humans, and continue once someone signs off. In agentic systems this shows up everywhere:
@@ -62,7 +63,9 @@ sequenceDiagram
 ## Implementation
 
 <Aside>
-  At the moment, the only way to implement this pattern is to use `run_stream`, as it gives you access to the intermediate items. I am revising the API to make this easier for `run` in the future.
+  At the moment, the only way to implement this pattern is to use `run_stream`,
+  as it gives you access to the intermediate items. I am revising the API to
+  make this easier for `run` in the future.
 </Aside>
 
 ![human-in-the-loop](../../../../assets/examples/human-in-the-loop.gif)

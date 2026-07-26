@@ -92,9 +92,7 @@
         },
         "model": {
           "description": "ID of the model to use. You can use the [List Available Models](/api/#tag/models/operation/list_models_v1_models_get) API to see all of your available models, or see our [Model overview](/models) for model descriptions.",
-          "examples": [
-            "mistral-large-latest"
-          ],
+          "examples": ["mistral-large-latest"],
           "title": "Model",
           "type": "string"
         },
@@ -159,10 +157,7 @@
         },
         "reasoning_effort": {
           "description": "Controls the reasoning effort level for reasoning models. \"high\" enables comprehensive reasoning traces, \"none\" disables reasoning effort.",
-          "enum": [
-            "high",
-            "none"
-          ],
+          "enum": ["high", "none"],
           "type": "string"
         },
         "response_format": {
@@ -245,10 +240,7 @@
           "type": "number"
         }
       },
-      "required": [
-        "messages",
-        "model"
-      ],
+      "required": ["messages", "model"],
       "title": "ChatCompletionRequest",
       "type": "object"
     },
@@ -258,9 +250,7 @@
           "$ref": "#/definitions/CompletionChunk"
         }
       },
-      "required": [
-        "data"
-      ],
+      "required": ["data"],
       "title": "CompletionEvent",
       "type": "object"
     },
@@ -370,9 +360,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "content"
-      ],
+      "required": ["content"],
       "title": "SystemMessage",
       "type": "object"
     },
@@ -425,9 +413,7 @@
           "title": "Tool Call Id"
         }
       },
-      "required": [
-        "content"
-      ],
+      "required": ["content"],
       "title": "ToolMessage",
       "type": "object"
     },
@@ -458,9 +444,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "content"
-      ],
+      "required": ["content"],
       "title": "UserMessage",
       "type": "object"
     },
@@ -485,9 +469,7 @@
     },
     "MistralPromptMode": {
       "description": "Available options to the prompt_mode argument on the chat completion endpoint.\nValues represent high-level intent. Assignment to actual SPs is handled internally.\nSystem prompt may include knowledge cutoff date, model capabilities, tone to use, safety guidelines, etc.",
-      "enum": [
-        "reasoning"
-      ],
+      "enum": ["reasoning"],
       "title": "MistralPromptMode",
       "type": "string"
     },
@@ -519,10 +501,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "name",
-                "authors"
-              ],
+              "required": ["name", "authors"],
               "title": "Book",
               "type": "object"
             },
@@ -562,19 +541,12 @@
           "default": "function"
         }
       },
-      "required": [
-        "function"
-      ],
+      "required": ["function"],
       "title": "ToolChoice",
       "type": "object"
     },
     "ToolChoiceEnum": {
-      "enum": [
-        "auto",
-        "none",
-        "any",
-        "required"
-      ],
+      "enum": ["auto", "none", "any", "required"],
       "title": "ToolChoiceEnum",
       "type": "string"
     },
@@ -589,9 +561,7 @@
           "default": "function"
         }
       },
-      "required": [
-        "function"
-      ],
+      "required": ["function"],
       "title": "Tool",
       "type": "object"
     },
@@ -619,11 +589,7 @@
           "$ref": "#/definitions/UsageInfo"
         }
       },
-      "required": [
-        "id",
-        "model",
-        "choices"
-      ],
+      "required": ["id", "model", "choices"],
       "title": "CompletionChunk",
       "type": "object"
     },
@@ -752,9 +718,7 @@
           "default": "function"
         }
       },
-      "required": [
-        "function"
-      ],
+      "required": ["function"],
       "title": "ToolCall",
       "type": "object"
     },
@@ -806,19 +770,12 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "name",
-        "schema"
-      ],
+      "required": ["name", "schema"],
       "title": "JsonSchema",
       "type": "object"
     },
     "ResponseFormats": {
-      "enum": [
-        "text",
-        "json_object",
-        "json_schema"
-      ],
+      "enum": ["text", "json_object", "json_schema"],
       "title": "ResponseFormats",
       "type": "string"
     },
@@ -831,16 +788,12 @@
           "type": "string"
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "title": "FunctionName",
       "type": "object"
     },
     "ToolTypes": {
-      "enum": [
-        "function"
-      ],
+      "enum": ["function"],
       "title": "ToolTypes",
       "type": "string"
     },
@@ -867,10 +820,7 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "name",
-        "parameters"
-      ],
+      "required": ["name", "parameters"],
       "title": "Function",
       "type": "object"
     },
@@ -880,27 +830,14 @@
           "$ref": "#/definitions/DeltaMessage"
         },
         "finish_reason": {
-          "enum": [
-            "stop",
-            "length",
-            "error",
-            "tool_calls",
-            null
-          ],
-          "type": [
-            "string",
-            "null"
-          ]
+          "enum": ["stop", "length", "error", "tool_calls", null],
+          "type": ["string", "null"]
         },
         "index": {
           "type": "integer"
         }
       },
-      "required": [
-        "index",
-        "delta",
-        "finish_reason"
-      ],
+      "required": ["index", "delta", "finish_reason"],
       "title": "CompletionResponseStreamChoice",
       "type": "object"
     },
@@ -965,19 +902,12 @@
           "type": "integer"
         }
       },
-      "required": [
-        "prompt_tokens",
-        "completion_tokens",
-        "total_tokens"
-      ],
+      "required": ["prompt_tokens", "completion_tokens", "total_tokens"],
       "title": "UsageInfo",
       "type": "object"
     },
     "ModerationLLMAction": {
-      "enum": [
-        "none",
-        "block"
-      ],
+      "enum": ["none", "block"],
       "title": "ModerationLLMAction",
       "type": "string"
     },
@@ -1239,9 +1169,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "document_url"
-      ],
+      "required": ["document_url"],
       "title": "DocumentURLChunk",
       "type": "object"
     },
@@ -1260,9 +1188,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "file_id"
-      ],
+      "required": ["file_id"],
       "title": "FileChunk",
       "type": "object"
     },
@@ -1288,9 +1214,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "image_url"
-      ],
+      "required": ["image_url"],
       "title": "ImageURLChunk",
       "type": "object"
     },
@@ -1316,9 +1240,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "input_audio"
-      ],
+      "required": ["input_audio"],
       "title": "AudioChunk",
       "type": "object"
     },
@@ -1339,9 +1261,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "reference_ids"
-      ],
+      "required": ["reference_ids"],
       "title": "ReferenceChunk",
       "type": "object"
     },
@@ -1359,9 +1279,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "text"
-      ],
+      "required": ["text"],
       "title": "TextChunk",
       "type": "object"
     },
@@ -1398,9 +1316,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "thinking"
-      ],
+      "required": ["thinking"],
       "title": "ThinkChunk",
       "type": "object"
     },
@@ -1424,10 +1340,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "name",
-        "arguments"
-      ],
+      "required": ["name", "arguments"],
       "title": "FunctionCall",
       "type": "object"
     },
@@ -1507,9 +1420,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "url"
-      ],
+      "required": ["url"],
       "title": "ImageURL",
       "type": "object"
     },
@@ -1571,19 +1482,12 @@
           "title": "Url"
         }
       },
-      "required": [
-        "tool",
-        "title"
-      ],
+      "required": ["tool", "title"],
       "title": "ToolReferenceChunk",
       "type": "object"
     },
     "ImageDetail": {
-      "enum": [
-        "low",
-        "auto",
-        "high"
-      ],
+      "enum": ["low", "auto", "high"],
       "title": "ImageDetail",
       "type": "string"
     },

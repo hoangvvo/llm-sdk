@@ -485,8 +485,7 @@ export class RunSession<TContext> {
 
     try {
       let tools = this.#getTools(); // get initial tool set
-      // Each turn numbers its content parts from zero, so indices are offset
-      // past the parts already streamed to stay unique for the run.
+      // Keep content indices unique across model turns.
       let streamedPartCount = 0;
 
       for (;;) {

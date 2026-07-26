@@ -53,8 +53,7 @@ fn call_protocol<T: DeserializeOwned>(request: &Value) -> Result<T, Box<dyn Erro
     Ok(serde_json::from_slice(&output.stdout)?)
 }
 
-// Only function calls are collected: later stages reference these ids to supply
-// tool results, which hosted tool calls never need.
+// Only function calls need client-supplied results in later stages.
 fn tool_call_parts(content: &[Part]) -> Vec<&Part> {
     content
         .iter()

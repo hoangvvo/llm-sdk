@@ -299,7 +299,10 @@
       "properties": {
         "type": { "const": "function" },
         "name": { "type": "string" },
-        "content": { "type": "array", "items": { "$ref": "#/definitions/Part" } }
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Part" }
+        }
       },
       "required": ["type", "name", "content"],
       "additionalProperties": false
@@ -322,7 +325,10 @@
       "type": "object",
       "properties": {
         "type": { "const": "web_search" },
-        "sources": { "type": "array", "items": { "$ref": "#/definitions/WebSearchSource" } },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/WebSearchSource" }
+        },
         "error_code": {
           "type": "string",
           "description": "Provider error code required to replay a failed hosted-search result."

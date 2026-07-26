@@ -22,12 +22,7 @@
             "Priority service tier."
           ],
           "description": "Optional. The service tier of the request.",
-          "enum": [
-            "unspecified",
-            "standard",
-            "flex",
-            "priority"
-          ]
+          "enum": ["unspecified", "standard", "flex", "priority"]
         },
         "model": {
           "description": "Required. The name of the `Model` to use for generating the completion. Format: `models/{model}`.",
@@ -210,12 +205,7 @@
               "Indicates the model should return images.",
               "Indicates the model should return audio."
             ],
-            "enum": [
-              "MODALITY_UNSPECIFIED",
-              "TEXT",
-              "IMAGE",
-              "AUDIO"
-            ]
+            "enum": ["MODALITY_UNSPECIFIED", "TEXT", "IMAGE", "AUDIO"]
           },
           "description": "Optional. The requested modalities of the response. Represents the set of modalities that the model can return, and should be expected in the response. This is an exact match to the modalities of the response. A model may have multiple combinations of supported modalities. If the requested modalities do not match any of the supported combinations, an error will be returned. An empty list is equivalent to requesting only text."
         },
@@ -627,12 +617,7 @@
             "Flex service tier.",
             "Priority service tier."
           ],
-          "enum": [
-            "unspecified",
-            "standard",
-            "flex",
-            "priority"
-          ],
+          "enum": ["unspecified", "standard", "flex", "priority"],
           "type": "string",
           "readOnly": true,
           "description": "Output only. Service tier of the request."
@@ -717,13 +702,7 @@
       "properties": {
         "mode": {
           "description": "Optional. Specifies the mode in which function calling should execute. If unspecified, the default value will be set to AUTO.",
-          "enum": [
-            "MODE_UNSPECIFIED",
-            "AUTO",
-            "ANY",
-            "NONE",
-            "VALIDATED"
-          ],
+          "enum": ["MODE_UNSPECIFIED", "AUTO", "ANY", "NONE", "VALIDATED"],
           "type": "string",
           "enumDescriptions": [
             "Unspecified function calling mode. This value should not be used.",
@@ -1105,11 +1084,7 @@
           "type": "string"
         },
         "behavior": {
-          "enum": [
-            "UNSPECIFIED",
-            "BLOCKING",
-            "NON_BLOCKING"
-          ],
+          "enum": ["UNSPECIFIED", "BLOCKING", "NON_BLOCKING"],
           "description": "Optional. Specifies the function Behavior. Currently only supported by the BidiGenerateContent method.",
           "type": "string",
           "enumDescriptions": [
@@ -1513,11 +1488,7 @@
         },
         "delivery": {
           "description": "Optional. The delivery mode for the audio output.",
-          "enum": [
-            "DELIVERY_UNSPECIFIED",
-            "INLINE",
-            "URI"
-          ],
+          "enum": ["DELIVERY_UNSPECIFIED", "INLINE", "URI"],
           "type": "string",
           "enumDescriptions": [
             "Default value. This value is unused.",
@@ -1549,11 +1520,7 @@
             "JSON output format.",
             "Plain text output format."
           ],
-          "enum": [
-            "MIME_TYPE_UNSPECIFIED",
-            "APPLICATION_JSON",
-            "TEXT_PLAIN"
-          ],
+          "enum": ["MIME_TYPE_UNSPECIFIED", "APPLICATION_JSON", "TEXT_PLAIN"],
           "description": "Optional. The MIME type of the text output."
         },
         "schema": {
@@ -1565,10 +1532,7 @@
       "description": "Configuration for image output format.",
       "properties": {
         "mimeType": {
-          "enum": [
-            "MIME_TYPE_UNSPECIFIED",
-            "IMAGE_JPEG"
-          ],
+          "enum": ["MIME_TYPE_UNSPECIFIED", "IMAGE_JPEG"],
           "description": "Optional. The MIME type of the image output.",
           "type": "string",
           "enumDescriptions": [
@@ -1583,11 +1547,7 @@
             "Image data is returned inline in the response.",
             "Image data is returned as a URI."
           ],
-          "enum": [
-            "DELIVERY_UNSPECIFIED",
-            "INLINE",
-            "URI"
-          ],
+          "enum": ["DELIVERY_UNSPECIFIED", "INLINE", "URI"],
           "description": "Optional. The delivery mode for the image output."
         },
         "aspectRatio": {
@@ -1718,10 +1678,7 @@
             "Python >= 3.10, with numpy and simpy available. Python is the default language."
           ],
           "description": "Required. Programming language of the `code`.",
-          "enum": [
-            "LANGUAGE_UNSPECIFIED",
-            "PYTHON"
-          ]
+          "enum": ["LANGUAGE_UNSPECIFIED", "PYTHON"]
         }
       }
     },
@@ -1973,10 +1930,7 @@
       "description": "Describes the options to customize dynamic retrieval.",
       "properties": {
         "mode": {
-          "enum": [
-            "MODE_UNSPECIFIED",
-            "MODE_DYNAMIC"
-          ],
+          "enum": ["MODE_UNSPECIFIED", "MODE_DYNAMIC"],
           "description": "The mode of the predictor to be used in dynamic retrieval.",
           "type": "string",
           "enumDescriptions": [

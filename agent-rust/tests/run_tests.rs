@@ -2208,7 +2208,6 @@ async fn run_stream_streams_tool_call_execution_and_response() {
                 status: ToolResultStatus::Completed,
             }),
         }),
-        // Offset past the first turn's tool call.
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 1,
@@ -2360,7 +2359,6 @@ async fn run_stream_handles_multiple_turns() {
                 status: ToolResultStatus::Completed,
             }),
         }),
-        // Offset past the first turn's tool call.
         AgentStreamEvent::Partial(PartialModelResponse {
             delta: Some(ContentDelta {
                 index: 1,
@@ -2443,8 +2441,6 @@ async fn run_stream_handles_multiple_turns() {
     close_run_session(session).await;
 }
 
-/// A later turn must not reuse an earlier turn's content indices, which would
-/// make a consumer accumulating by index merge or drop unrelated parts.
 #[tokio::test]
 async fn run_stream_offsets_content_indices_across_turns() {
     let tool = MockTool::new(

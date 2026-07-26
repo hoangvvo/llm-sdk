@@ -450,8 +450,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 			defer close(errChan)
 
 			tools := s.getFunctionTools()
-			// Each turn numbers its content parts from zero, so indices are
-			// offset past the parts already streamed to stay unique for the run.
+			// Keep content indices unique across model turns.
 			streamedPartCount := 0
 
 			for {
