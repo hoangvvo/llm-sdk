@@ -32,6 +32,8 @@ suite("GoogleModel", () => {
     runTestGroup(t, getModel(), "web_search", {
       profile: "google_web_search",
     }));
+  test("web_search_continuation", (t) =>
+    runTestGroup(t, getModel(), "web_search_continuation"));
   test("image_generation", { timeout: 120 * 1000 }, (t) =>
     runTestGroup(t, getModel("gemini-3.1-flash-image"), "image_generation"),
   );

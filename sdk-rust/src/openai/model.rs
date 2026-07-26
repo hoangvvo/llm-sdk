@@ -528,6 +528,13 @@ fn convert_assistant_message_to_response_input_items(
                         ))
                     }),
                 },
+                // The web search result is already carried by the replayed
+                // web_search_call item, which OpenAI resolves server-side, so
+                // the result part has no input item of its own.
+                Part::ToolResult(ToolResultPart {
+                    result: crate::ToolResult::WebSearch(_),
+                    ..
+                }) => None,
                 _ => Err(LanguageModelError::Unsupported(
                     PROVIDER,
                     format!("Cannot convert part to OpenAI input item for part {part:?}"),

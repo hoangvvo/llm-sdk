@@ -27,6 +27,9 @@ suite("OpenAIModel", () => {
   test("web_search", { timeout: 120 * 1000 }, (t) =>
     runTestGroup(t, getModel(), "web_search"),
   );
+  test("web_search_continuation", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, getModel(), "web_search_continuation"),
+  );
   test("image_generation", { timeout: 240 * 1000 }, (t) =>
     runTestGroup(t, getModel(), "image_generation"),
   );

@@ -1368,6 +1368,77 @@
       ]
     },
     {
+      "name": "web_search_history_continuation",
+      "groups": ["web_search_continuation"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use web search to find the official IANA page about reserved domains. Reply with one sentence containing the word IANA and cite the source."
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "web_search"
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
+              {
+                "type": "web_search_result",
+                "status": "completed"
+              }
+            ]
+          }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Do not search again. Reply with only the word RESERVED."
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "web_search"
+              }
+            ]
+          },
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "text",
+                "text": "^\\s*RESERVED[.!]?\\s*$",
+                "aggregate": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "anthropic_generate_web_search_failure",
       "groups": ["anthropic_web_search_failure"],
       "stages": [

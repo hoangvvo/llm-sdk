@@ -54,6 +54,10 @@ func TestWebSearch(t *testing.T) {
 	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "web_search", testcommon.WithProfile("google_web_search"))
 }
 
+func TestWebSearchContinuation(t *testing.T) {
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "web_search_continuation")
+}
+
 func TestImageGeneration(t *testing.T) {
 	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-image"), "image_generation")
 }
