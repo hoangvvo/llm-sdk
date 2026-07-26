@@ -430,6 +430,9 @@ where
 
         let stream = async_stream::try_stream! {
             let mut tools = session.get_function_tools();
+            // Each turn numbers its content parts from zero, so indices are
+            // offset past the parts already streamed to stay unique for the run.
+            let mut streamed_part_count = 0usize;
 
             'run: loop {
                 let mut process_stream = session.process(&state, tools);
@@ -489,6 +492,7 @@ where
                 };
 
                 let mut accumulator = StreamAccumulator::new();
+                let turn_part_offset = streamed_part_count;
 
                 loop {
                     let partial = tokio::select! {
@@ -532,6 +536,13 @@ where
                             "Failed to accumulate stream: {error}"
                         ))
                         .with_snapshot(state.create_snapshot().await))?;
+                    }
+
+                    let mut partial = partial;
+                    if let Some(delta) = partial.delta.as_mut() {
+                        delta.index = delta.index.saturating_add(turn_part_offset);
+                        streamed_part_count =
+                            streamed_part_count.max(delta.index.saturating_add(1));
                     }
 
                     yield AgentStreamEvent::Partial(partial);

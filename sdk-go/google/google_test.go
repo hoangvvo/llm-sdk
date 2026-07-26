@@ -54,8 +54,8 @@ func TestWebSearch(t *testing.T) {
 	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "web_search", testcommon.WithProfile("google_web_search"))
 }
 
-func TestWebSearchContinuation(t *testing.T) {
-	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "web_search_continuation")
+func TestWebSearchWithToolCall(t *testing.T) {
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "web_search_tool_mix", testcommon.WithProfile("google_web_search_tool_mix"))
 }
 
 func TestImageGeneration(t *testing.T) {

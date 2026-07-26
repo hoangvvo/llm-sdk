@@ -41,7 +41,7 @@ test_group!(openai_model(), generation_options);
 test_group!(openai_model(), source_input);
 test_group!(openai_model(), multimodal_tool_result);
 test_group!(openai_model(), web_search);
-test_group!(openai_model(), web_search_continuation);
+test_group!(openai_model(), web_search_tool_mix);
 test_group!(openai_model(), image_generation);
 test_group!(openai_model(), image_input);
 test_group!(

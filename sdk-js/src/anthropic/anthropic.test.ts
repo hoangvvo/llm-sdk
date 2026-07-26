@@ -28,8 +28,8 @@ suite("AnthropicModel", () => {
       profile: "anthropic_web_search",
     }),
   );
-  test("web_search_continuation", { timeout: 120 * 1000 }, (t) =>
-    runTestGroup(t, getModel(), "web_search_continuation"),
+  test("web_search_tool_mix", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, getModel(), "web_search_tool_mix"),
   );
   test("image_input", (t) => runTestGroup(t, getModel(), "image_input"));
   test("reasoning", { timeout: 120 * 1000 }, (t) =>

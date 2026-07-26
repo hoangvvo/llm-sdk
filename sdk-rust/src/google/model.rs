@@ -4,7 +4,7 @@ use super::api::{
     GenerateContentRequest, GenerateContentResponse, GenerationConfig,
     GenerationConfigResponseModalitiesItem, GoogleSearch, GroundingChunk, GroundingMetadata,
     ModalityTokenCount, ModalityTokenCountModality, Part as GooglePart, PrebuiltVoiceConfig,
-    SpeechConfig, ThinkingConfig, Tool as GoogleTool, ToolConfig, UsageMetadata, VoiceConfig,
+    SpeechConfig, ThinkingConfig, Tool as GoogleTool, UsageMetadata, VoiceConfig,
 };
 use crate::{
     audio_part_utils, client_utils, id_utils, source_part_utils, stream_utils,
@@ -322,6 +322,8 @@ fn convert_to_generate_content_parameters(
     }
 
     let mut google_tools = Vec::new();
+    let mut has_google_search = false;
+    let mut has_function_declarations = false;
     if let Some(tools) = input.tools {
         let mut function_declarations = Vec::new();
         for tool in tools {
@@ -347,6 +349,7 @@ fn convert_to_generate_content_parameters(
                                 .to_string(),
                         ));
                     }
+                    has_google_search = true;
                     google_tools.push(GoogleTool {
                         google_search: Some(GoogleSearch::default()),
                         ..Default::default()
@@ -355,6 +358,7 @@ fn convert_to_generate_content_parameters(
             }
         }
         if !function_declarations.is_empty() {
+            has_function_declarations = true;
             google_tools.insert(
                 0,
                 GoogleTool {
@@ -365,11 +369,20 @@ fn convert_to_generate_content_parameters(
         }
     }
 
+    // Google rejects a server-side tool alongside function declarations unless
+    // its invocations are reported back in the response content.
+    if has_google_search && has_function_declarations {
+        params
+            .tool_config
+            .get_or_insert_default()
+            .include_server_side_tool_invocations = Some(true);
+    }
+
     if let Some(tool_choice) = input.tool_choice {
-        params.tool_config = Some(ToolConfig {
-            function_calling_config: Some(convert_to_google_function_calling_config(tool_choice)),
-            ..Default::default()
-        });
+        params
+            .tool_config
+            .get_or_insert_default()
+            .function_calling_config = Some(convert_to_google_function_calling_config(tool_choice));
     }
 
     if let Some(response_format) = input.response_format {

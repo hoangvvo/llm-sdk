@@ -450,6 +450,9 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 			defer close(errChan)
 
 			tools := s.getFunctionTools()
+			// Each turn numbers its content parts from zero, so indices are
+			// offset past the parts already streamed to stay unique for the run.
+			streamedPartCount := 0
 
 			for {
 				processStream := s.process(ctx, state, tools)
@@ -496,6 +499,7 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 				}
 
 				accumulator := llmsdk.NewStreamAccumulator()
+				turnPartOffset := streamedPartCount
 				commitModelSnapshot := func(snapshot llmsdk.ModelResponse) bool {
 					if item, index, ok := state.appendModelSnapshot(snapshot); ok {
 						eventChan <- NewAgentStreamItemEvent(index, item)
@@ -514,6 +518,19 @@ func (s *RunSession[C]) RunStream(ctx context.Context, request RunSessionRequest
 							state.createSnapshot(),
 						)
 						return
+					}
+
+					if partial.Delta != nil {
+						delta := *partial.Delta
+						delta.Index += turnPartOffset
+						if delta.Index+1 > streamedPartCount {
+							streamedPartCount = delta.Index + 1
+						}
+						partial = &llmsdk.PartialModelResponse{
+							Delta: &delta,
+							Usage: partial.Usage,
+							Cost:  partial.Cost,
+						}
 					}
 
 					eventChan <- NewAgentStreamEventPartial(partial)

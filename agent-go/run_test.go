@@ -2040,6 +2040,62 @@ func TestRunStream_HandlesMultipleTurns(t *testing.T) {
 	}
 }
 
+// A later turn must not reuse an earlier turn's content indices, which would
+// make a consumer accumulating by index merge or drop unrelated parts.
+func TestRunStream_OffsetsContentIndicesAcrossTurns(t *testing.T) {
+	tool := NewMockTool[struct{}]("lookup", llmagent.AgentToolResult{
+		Content: []llmsdk.Part{llmsdk.NewTextPart("Tool result")},
+	}, nil)
+	model := llmsdktest.NewMockLanguageModel()
+	model.EnqueueStreamResult(
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{{
+			Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewReasoningPartDelta("Thinking")},
+		}, {
+			Delta: &llmsdk.ContentDelta{Index: 1, Part: llmsdk.NewToolCallPartDelta(
+				llmsdk.WithToolCallPartDeltaToolName("lookup"),
+				llmsdk.WithToolCallPartDeltaToolCallID("call_1"),
+				llmsdk.WithToolCallPartDeltaArgs(`{"query":"weather"}`),
+			)},
+		}}),
+		llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{{
+			Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewTextPartDelta("Answer")},
+		}}),
+	)
+	session := mustNewRunSession(
+		t,
+		&llmagent.AgentParams[struct{}]{
+			Name:     "test_agent",
+			Model:    model,
+			Tools:    llmagent.FunctionTools[struct{}](tool),
+			MaxTurns: 10,
+		},
+		struct{}{},
+	)
+
+	stream, err := session.RunStream(t.Context(), llmagent.RunSessionRequest{
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("Look up"))),
+		},
+	})
+	if err != nil {
+		t.Fatalf("create stream: %v", err)
+	}
+
+	var indices []int
+	for stream.Next() {
+		if partial := stream.Current().Partial; partial != nil && partial.Delta != nil {
+			indices = append(indices, partial.Delta.Index)
+		}
+	}
+	if err := stream.Err(); err != nil {
+		t.Fatalf("consume stream: %v", err)
+	}
+
+	if diff := cmp.Diff([]int{0, 1, 2}, indices); diff != "" {
+		t.Fatalf("content index mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestRunStream_ReturnsLanguageModelError(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	modelErr := llmsdk.NewInvalidInputError("stream failed")

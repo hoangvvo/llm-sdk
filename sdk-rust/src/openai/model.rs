@@ -501,32 +501,9 @@ fn convert_assistant_message_to_response_input_items(
                             r#type: FunctionToolCallType::FunctionCall,
                         }),
                     )),
-                    crate::ToolCall::WebSearch(call) => call.action.map(|action| {
-                        InputItem::Item(responses_api::Item::WebSearchToolCall(
-                            responses_api::WebSearchToolCall {
-                                action: convert_to_openai_web_search_action(action),
-                                id: tool_call_part.tool_call_id,
-                                status: match call
-                                    .status
-                                    .unwrap_or(crate::WebSearchToolCallStatus::Completed)
-                                {
-                                    crate::WebSearchToolCallStatus::InProgress => {
-                                        responses_api::WebSearchToolCallStatus::InProgress
-                                    }
-                                    crate::WebSearchToolCallStatus::Searching => {
-                                        responses_api::WebSearchToolCallStatus::Searching
-                                    }
-                                    crate::WebSearchToolCallStatus::Completed => {
-                                        responses_api::WebSearchToolCallStatus::Completed
-                                    }
-                                    crate::WebSearchToolCallStatus::Failed => {
-                                        responses_api::WebSearchToolCallStatus::Failed
-                                    }
-                                },
-                                r#type: responses_api::WebSearchToolCallType::WebSearchCall,
-                            },
-                        ))
-                    }),
+                    crate::ToolCall::WebSearch(call) => {
+                        convert_to_openai_web_search_call(tool_call_part.tool_call_id, call)
+                    }
                 },
                 // The web search result is already carried by the replayed
                 // web_search_call item, which OpenAI resolves server-side, so
@@ -1133,6 +1110,39 @@ fn map_openai_stream_web_search_result(
         }),
         status: ToolResultStatus::Completed,
     })
+}
+
+/// Replays a hosted search as its `web_search_call` item. A call whose action
+/// another provider never reported cannot be replayed and is dropped.
+fn convert_to_openai_web_search_call(
+    tool_call_id: String,
+    call: crate::WebSearchToolCall,
+) -> Option<InputItem> {
+    let action = call.action?;
+    Some(InputItem::Item(responses_api::Item::WebSearchToolCall(
+        responses_api::WebSearchToolCall {
+            action: convert_to_openai_web_search_action(action),
+            id: tool_call_id,
+            status: match call
+                .status
+                .unwrap_or(crate::WebSearchToolCallStatus::Completed)
+            {
+                crate::WebSearchToolCallStatus::InProgress => {
+                    responses_api::WebSearchToolCallStatus::InProgress
+                }
+                crate::WebSearchToolCallStatus::Searching => {
+                    responses_api::WebSearchToolCallStatus::Searching
+                }
+                crate::WebSearchToolCallStatus::Completed => {
+                    responses_api::WebSearchToolCallStatus::Completed
+                }
+                crate::WebSearchToolCallStatus::Failed => {
+                    responses_api::WebSearchToolCallStatus::Failed
+                }
+            },
+            r#type: responses_api::WebSearchToolCallType::WebSearchCall,
+        },
+    )))
 }
 
 fn convert_to_openai_web_search_action(

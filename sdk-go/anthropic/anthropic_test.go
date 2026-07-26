@@ -58,8 +58,8 @@ func TestWebSearch(t *testing.T) {
 	testcommon.RunTestGroup(t, anthropicModel(t), "web_search", testcommon.WithProfile("anthropic_web_search"))
 }
 
-func TestWebSearchContinuation(t *testing.T) {
-	testcommon.RunTestGroup(t, anthropicModel(t), "web_search_continuation")
+func TestWebSearchWithToolCall(t *testing.T) {
+	testcommon.RunTestGroup(t, anthropicModel(t), "web_search_tool_mix")
 }
 
 func TestImageInput(t *testing.T) {
