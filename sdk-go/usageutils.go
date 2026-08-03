@@ -47,119 +47,96 @@ func SumModelTokensDetails(detailsList []ModelTokensDetails) *ModelTokensDetails
 			}
 			*result.CachedImageTokens += *details.CachedImageTokens
 		}
+		if details.CachedTokens != nil {
+			if result.CachedTokens == nil {
+				result.CachedTokens = ptr.To(0)
+			}
+			*result.CachedTokens += *details.CachedTokens
+		}
+		if details.CacheWriteTokens != nil {
+			if result.CacheWriteTokens == nil {
+				result.CacheWriteTokens = ptr.To(0)
+			}
+			*result.CacheWriteTokens += *details.CacheWriteTokens
+		}
+		if details.ReasoningTokens != nil {
+			if result.ReasoningTokens == nil {
+				result.ReasoningTokens = ptr.To(0)
+			}
+			*result.ReasoningTokens += *details.ReasoningTokens
+		}
 	}
 
 	return result
 }
 
-func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing) float64 {
+type ModelUsageCostOptions struct {
+	InputCacheTokensAreAdditional      bool
+	OutputReasoningTokensAreAdditional bool
+}
+
+func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options ModelUsageCostOptions) float64 {
 	if pricing == nil {
 		return 0
 	}
 
-	// Extract input token counts with fallbacks
-	inputTextTokens := usage.InputTokens
-	if usage.InputTokensDetails != nil && usage.InputTokensDetails.TextTokens != nil {
-		inputTextTokens = *usage.InputTokensDetails.TextTokens
+	value := func(value *int) int {
+		if value == nil {
+			return 0
+		}
+		return *value
+	}
+	price := func(value *float64) float64 {
+		if value == nil {
+			return 0
+		}
+		return *value
 	}
 
-	var inputAudioTokens int
-	if usage.InputTokensDetails != nil && usage.InputTokensDetails.AudioTokens != nil {
-		inputAudioTokens = *usage.InputTokensDetails.AudioTokens
+	inputDetails := usage.InputTokensDetails
+	outputDetails := usage.OutputTokensDetails
+	cost := float64(usage.InputTokens)*price(pricing.InputCostPerTextToken) +
+		float64(usage.OutputTokens)*price(pricing.OutputCostPerTextToken)
+
+	adjustment := func(tokens int, regularPrice, categoryPrice *float64) float64 {
+		if categoryPrice == nil {
+			return 0
+		}
+		return float64(tokens) * (*categoryPrice - price(regularPrice))
 	}
 
-	var inputImageTokens int
-	if usage.InputTokensDetails != nil && usage.InputTokensDetails.ImageTokens != nil {
-		inputImageTokens = *usage.InputTokensDetails.ImageTokens
+	if inputDetails != nil {
+		cost += adjustment(value(inputDetails.AudioTokens), pricing.InputCostPerTextToken, pricing.InputCostPerAudioToken)
+		cost += adjustment(value(inputDetails.ImageTokens), pricing.InputCostPerTextToken, pricing.InputCostPerImageToken)
+	}
+	if outputDetails != nil {
+		cost += adjustment(value(outputDetails.AudioTokens), pricing.OutputCostPerTextToken, pricing.OutputCostPerAudioToken)
+		cost += adjustment(value(outputDetails.ImageTokens), pricing.OutputCostPerTextToken, pricing.OutputCostPerImageToken)
 	}
 
-	var inputCachedTextTokens int
-	if usage.InputTokensDetails != nil && usage.InputTokensDetails.CachedTextTokens != nil {
-		inputCachedTextTokens = *usage.InputTokensDetails.CachedTextTokens
+	if inputDetails != nil {
+		var cacheBaseText, cacheBaseAudio, cacheBaseImage *float64
+		if !options.InputCacheTokensAreAdditional {
+			cacheBaseText = pricing.InputCostPerTextToken
+			cacheBaseAudio = pricing.InputCostPerAudioToken
+			cacheBaseImage = pricing.InputCostPerImageToken
+		}
+		hasCachedModalities := inputDetails.CachedTextTokens != nil || inputDetails.CachedAudioTokens != nil || inputDetails.CachedImageTokens != nil
+		hasCachedModalityPricing := pricing.InputCostPerCachedTextToken != nil || pricing.InputCostPerCachedAudioToken != nil || pricing.InputCostPerCachedImageToken != nil
+		if hasCachedModalities && hasCachedModalityPricing {
+			cost += adjustment(value(inputDetails.CachedTextTokens), cacheBaseText, pricing.InputCostPerCachedTextToken)
+			cost += adjustment(value(inputDetails.CachedAudioTokens), cacheBaseAudio, pricing.InputCostPerCachedAudioToken)
+			cost += adjustment(value(inputDetails.CachedImageTokens), cacheBaseImage, pricing.InputCostPerCachedImageToken)
+		} else {
+			cost += adjustment(value(inputDetails.CachedTokens), cacheBaseText, pricing.InputCostPerCachedToken)
+		}
+		cost += adjustment(value(inputDetails.CacheWriteTokens), cacheBaseText, pricing.InputCostPerCacheWriteToken)
+	}
+	if options.OutputReasoningTokensAreAdditional && outputDetails != nil {
+		cost += float64(value(outputDetails.ReasoningTokens)) * price(pricing.OutputCostPerTextToken)
 	}
 
-	var inputCachedAudioTokens int
-	if usage.InputTokensDetails != nil && usage.InputTokensDetails.CachedAudioTokens != nil {
-		inputCachedAudioTokens = *usage.InputTokensDetails.CachedAudioTokens
-	}
-
-	var inputCachedImageTokens int
-	if usage.InputTokensDetails != nil && usage.InputTokensDetails.CachedImageTokens != nil {
-		inputCachedImageTokens = *usage.InputTokensDetails.CachedImageTokens
-	}
-
-	// Extract output token counts with fallbacks
-	outputTextTokens := usage.OutputTokens
-	if usage.OutputTokensDetails != nil && usage.OutputTokensDetails.TextTokens != nil {
-		outputTextTokens = *usage.OutputTokensDetails.TextTokens
-	}
-
-	var outputAudioTokens int
-	if usage.OutputTokensDetails != nil && usage.OutputTokensDetails.AudioTokens != nil {
-		outputAudioTokens = *usage.OutputTokensDetails.AudioTokens
-	}
-
-	var outputImageTokens int
-	if usage.OutputTokensDetails != nil && usage.OutputTokensDetails.ImageTokens != nil {
-		outputImageTokens = *usage.OutputTokensDetails.ImageTokens
-	}
-
-	// Calculate cost components using pricing with zero fallbacks
-	var inputTextCost float64
-	if pricing.InputCostPerTextToken != nil {
-		inputTextCost = float64(inputTextTokens) * (*pricing.InputCostPerTextToken)
-	}
-
-	var inputAudioCost float64
-	if pricing.InputCostPerAudioToken != nil {
-		inputAudioCost = float64(inputAudioTokens) * (*pricing.InputCostPerAudioToken)
-	}
-
-	var inputImageCost float64
-	if pricing.InputCostPerImageToken != nil {
-		inputImageCost = float64(inputImageTokens) * (*pricing.InputCostPerImageToken)
-	}
-
-	var inputCachedTextCost float64
-	if pricing.InputCostPerCachedTextToken != nil {
-		inputCachedTextCost = float64(inputCachedTextTokens) * (*pricing.InputCostPerCachedTextToken)
-	}
-
-	var inputCachedAudioCost float64
-	if pricing.InputCostPerCachedAudioToken != nil {
-		inputCachedAudioCost = float64(inputCachedAudioTokens) * (*pricing.InputCostPerCachedAudioToken)
-	}
-
-	var inputCachedImageCost float64
-	if pricing.InputCostPerCachedImageToken != nil {
-		inputCachedImageCost = float64(inputCachedImageTokens) * (*pricing.InputCostPerCachedImageToken)
-	}
-
-	var outputTextCost float64
-	if pricing.OutputCostPerTextToken != nil {
-		outputTextCost = float64(outputTextTokens) * (*pricing.OutputCostPerTextToken)
-	}
-
-	var outputAudioCost float64
-	if pricing.OutputCostPerAudioToken != nil {
-		outputAudioCost = float64(outputAudioTokens) * (*pricing.OutputCostPerAudioToken)
-	}
-
-	var outputImageCost float64
-	if pricing.OutputCostPerImageToken != nil {
-		outputImageCost = float64(outputImageTokens) * (*pricing.OutputCostPerImageToken)
-	}
-
-	// Sum all costs
-	return inputTextCost +
-		inputAudioCost +
-		inputImageCost +
-		inputCachedTextCost +
-		inputCachedAudioCost +
-		inputCachedImageCost +
-		outputTextCost +
-		outputAudioCost +
-		outputImageCost
+	return cost
 }
 
 func (u *ModelUsage) Add(other *ModelUsage) *ModelUsage {

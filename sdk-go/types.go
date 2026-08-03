@@ -1073,7 +1073,6 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ModelTokensDetails represents the token usage details of the model.
 type ModelTokensDetails struct {
 	TextTokens        *int `json:"text_tokens,omitempty"`
 	CachedTextTokens  *int `json:"cached_text_tokens,omitempty"`
@@ -1081,6 +1080,9 @@ type ModelTokensDetails struct {
 	CachedAudioTokens *int `json:"cached_audio_tokens,omitempty"`
 	ImageTokens       *int `json:"image_tokens,omitempty"`
 	CachedImageTokens *int `json:"cached_image_tokens,omitempty"`
+	CachedTokens      *int `json:"cached_tokens,omitempty"`
+	CacheWriteTokens  *int `json:"cache_write_tokens,omitempty"`
+	ReasoningTokens   *int `json:"reasoning_tokens,omitempty"`
 }
 
 // ModelUsage represents the token usage of the model.
@@ -1144,6 +1146,10 @@ type LanguageModelInput struct {
 type LanguageModelPricing struct {
 	// The cost in USD per single text token for input.
 	InputCostPerTextToken *float64 `json:"input_cost_per_text_token,omitempty"`
+	// The cost in USD per single cached input token.
+	InputCostPerCachedToken *float64 `json:"input_cost_per_cached_token,omitempty"`
+	// The cost in USD per single cache-write input token.
+	InputCostPerCacheWriteToken *float64 `json:"input_cost_per_cache_write_token,omitempty"`
 	// The cost in USD per single cached text token for input.
 	InputCostPerCachedTextToken *float64 `json:"input_cost_per_cached_text_token,omitempty"`
 	// The cost in USD per single text token for output.

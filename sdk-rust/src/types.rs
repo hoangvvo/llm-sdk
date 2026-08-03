@@ -603,7 +603,6 @@ pub struct ToolMessage {
     pub content: Vec<Part>,
 }
 
-/// Represents the token usage of the model.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ModelTokensDetails {
@@ -619,6 +618,12 @@ pub struct ModelTokensDetails {
     pub image_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_image_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_write_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_tokens: Option<u32>,
 }
 
 /// Represents the token usage of the model.
@@ -773,6 +778,12 @@ pub struct LanguageModelPricing {
     /// The cost in USD per single text token for input.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_cost_per_text_token: Option<f64>,
+    /// The cost in USD per single cached input token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_cost_per_cached_token: Option<f64>,
+    /// The cost in USD per single cache-write input token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_cost_per_cache_write_token: Option<f64>,
     /// The cost in USD per single cached text token for input.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_cost_per_cached_text_token: Option<f64>,

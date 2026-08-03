@@ -29,9 +29,9 @@ use crate::{
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AssistantMessage, AudioFormat,
     AudioOptions, ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput,
     LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatJson, ResponseFormatOption,
-    Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool, ToolMessage, ToolResultStatus,
-    UserMessage,
+    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
+    ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool, ToolMessage,
+    ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -41,6 +41,11 @@ use reqwest::{
 };
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
+
+const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
+    input_cache_tokens_are_additional: false,
+    output_reasoning_tokens_are_additional: false,
+};
 
 const PROVIDER: &str = "openai";
 const OPENAI_AUDIO_SAMPLE_RATE: u32 = 24_000;
@@ -181,13 +186,13 @@ impl LanguageModel for OpenAIChatModel {
 
                     let content = map_openai_message(message, audio_format)?;
 
-                    let usage = response.usage.map(map_openai_usage).transpose()?;
+                    let usage = response.usage.map(map_openai_usage);
 
                     let cost = if let (Some(usage), Some(pricing)) = (
                         usage.as_ref(),
                         self.metadata().and_then(|m| m.pricing.as_ref()),
                     ) {
-                        Some(usage.calculate_cost(pricing))
+                        Some(usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
                     } else {
                         None
                     };
@@ -264,11 +269,11 @@ impl LanguageModel for OpenAIChatModel {
                             }
 
                             if let Some(usage) = chunk.usage {
-                                let usage = map_openai_usage(usage)?;
+                                let usage = map_openai_usage(usage);
                                 let cost = metadata
                                     .as_ref()
                                     .and_then(|m| m.pricing.as_ref())
-                                    .map(|pricing| usage.calculate_cost(pricing));
+                                    .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
 
                                 yield PartialModelResponse {
                                     delta: None,
@@ -1020,77 +1025,69 @@ fn map_openai_delta(
     Ok(content_deltas)
 }
 
-fn map_openai_usage(usage: CompletionUsage) -> LanguageModelResult<ModelUsage> {
-    let input_tokens = u32::try_from(usage.prompt_tokens).map_err(|_| {
-        LanguageModelError::Invariant(
-            PROVIDER,
-            "OpenAI prompt_tokens exceeded u32 range".to_string(),
-        )
-    })?;
-    let output_tokens = u32::try_from(usage.completion_tokens).map_err(|_| {
-        LanguageModelError::Invariant(
-            PROVIDER,
-            "OpenAI completion_tokens exceeded u32 range".to_string(),
-        )
-    })?;
-
+fn map_openai_usage(usage: CompletionUsage) -> ModelUsage {
     let mut result = ModelUsage {
-        input_tokens,
-        output_tokens,
+        input_tokens: u32::try_from(usage.prompt_tokens).unwrap_or(0),
+        output_tokens: u32::try_from(usage.completion_tokens).unwrap_or(0),
         input_tokens_details: None,
         output_tokens_details: None,
     };
 
     if let Some(details) = usage.prompt_tokens_details {
-        result.input_tokens_details = Some(map_openai_prompt_tokens_details(&details)?);
+        result.input_tokens_details = map_openai_prompt_tokens_details(&details);
     }
 
     if let Some(details) = &usage.completion_tokens_details {
-        result.output_tokens_details = Some(map_openai_completion_tokens_details(details)?);
+        result.output_tokens_details = map_openai_completion_tokens_details(details);
     }
 
-    Ok(result)
+    result
 }
 
 fn map_openai_prompt_tokens_details(
     details: &CompletionUsagePromptTokensDetails,
-) -> LanguageModelResult<crate::ModelTokensDetails> {
+) -> Option<crate::ModelTokensDetails> {
     let mut result = crate::ModelTokensDetails::default();
 
+    if let Some(text_tokens) = details.text_tokens {
+        result.text_tokens = Some(u32::try_from(text_tokens).unwrap_or(0));
+    }
+
     if let Some(audio_tokens) = details.audio_tokens {
-        result.audio_tokens = Some(u32::try_from(audio_tokens).map_err(|_| {
-            LanguageModelError::Invariant(
-                PROVIDER,
-                "OpenAI audio prompt tokens exceeded u32 range".to_string(),
-            )
-        })?);
+        result.audio_tokens = Some(u32::try_from(audio_tokens).unwrap_or(0));
+    }
+
+    if let Some(image_tokens) = details.image_tokens {
+        result.image_tokens = Some(u32::try_from(image_tokens).unwrap_or(0));
     }
 
     if let Some(cached_tokens) = details.cached_tokens {
-        result.cached_text_tokens = Some(u32::try_from(cached_tokens).map_err(|_| {
-            LanguageModelError::Invariant(
-                PROVIDER,
-                "OpenAI cached prompt tokens exceeded u32 range".to_string(),
-            )
-        })?);
+        result.cached_tokens = Some(u32::try_from(cached_tokens).unwrap_or(0));
     }
 
-    Ok(result)
+    if let Some(cache_write_tokens) = details.cache_write_tokens {
+        result.cache_write_tokens = Some(u32::try_from(cache_write_tokens).unwrap_or(0));
+    }
+
+    (result != crate::ModelTokensDetails::default()).then_some(result)
 }
 
 fn map_openai_completion_tokens_details(
     details: &CompletionUsageCompletionTokensDetails,
-) -> LanguageModelResult<crate::ModelTokensDetails> {
+) -> Option<crate::ModelTokensDetails> {
     let mut result = crate::ModelTokensDetails::default();
 
-    if let Some(audio_tokens) = details.audio_tokens {
-        result.audio_tokens = Some(u32::try_from(audio_tokens).map_err(|_| {
-            LanguageModelError::Invariant(
-                PROVIDER,
-                "OpenAI audio completion tokens exceeded u32 range".to_string(),
-            )
-        })?);
+    if let Some(text_tokens) = details.text_tokens {
+        result.text_tokens = Some(u32::try_from(text_tokens).unwrap_or(0));
     }
 
-    Ok(result)
+    if let Some(audio_tokens) = details.audio_tokens {
+        result.audio_tokens = Some(u32::try_from(audio_tokens).unwrap_or(0));
+    }
+
+    if let Some(reasoning_tokens) = details.reasoning_tokens {
+        result.reasoning_tokens = Some(u32::try_from(reasoning_tokens).unwrap_or(0));
+    }
+
+    (result != crate::ModelTokensDetails::default()).then_some(result)
 }

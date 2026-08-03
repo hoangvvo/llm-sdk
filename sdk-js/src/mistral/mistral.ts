@@ -84,11 +84,16 @@ export class MistralModel implements LanguageModel {
     }
 
     const content = mapMistralMessage(choice.message);
+    const result: ModelResponse = { content };
     const usage = mapMistralUsageInfo(response.usage);
-
-    const result: ModelResponse = { content, usage };
-    if (this.metadata?.pricing) {
-      result.cost = calculateCost(usage, this.metadata.pricing);
+    if (usage) {
+      result.usage = usage;
+      if (this.metadata?.pricing) {
+        result.cost = calculateCost(usage, this.metadata.pricing, {
+          input_cache_tokens_are_additional: false,
+          output_reasoning_tokens_are_additional: false,
+        });
+      }
     }
 
     return result;
@@ -105,6 +110,7 @@ export class MistralModel implements LanguageModel {
     );
 
     const allContentDeltas: ContentDelta[] = [];
+    let streamUsage: ModelUsage | undefined;
 
     for await (const chunk of stream) {
       const choice = chunk.data.choices[0];
@@ -124,13 +130,19 @@ export class MistralModel implements LanguageModel {
       }
 
       if (chunk.data.usage) {
-        const usage = mapMistralUsageInfo(chunk.data.usage);
-        const event: PartialModelResponse = { usage };
-        if (this.metadata?.pricing) {
-          event.cost = calculateCost(usage, this.metadata.pricing);
-        }
-        yield event;
+        streamUsage = mapMistralUsageInfo(chunk.data.usage) ?? streamUsage;
       }
+    }
+
+    if (streamUsage) {
+      const event: PartialModelResponse = { usage: streamUsage };
+      if (this.metadata?.pricing) {
+        event.cost = calculateCost(streamUsage, this.metadata.pricing, {
+          input_cache_tokens_are_additional: false,
+          output_reasoning_tokens_are_additional: false,
+        });
+      }
+      yield event;
     }
   }
 }
@@ -581,9 +593,28 @@ export function mapMistralDelta(
 
 // MARK: To SDK Usage
 
-function mapMistralUsageInfo(usage: MistralComponents.UsageInfo): ModelUsage {
-  return {
-    input_tokens: usage.promptTokens ?? 0,
-    output_tokens: usage.completionTokens ?? 0,
+type MistralUsageInfoWithDetails = MistralComponents.UsageInfo & {
+  prompt_tokens_details?: { cached_tokens?: number };
+};
+
+function mapMistralUsageInfo(
+  usage: MistralComponents.UsageInfo,
+): ModelUsage | undefined {
+  if (
+    typeof usage.promptTokens !== "number" ||
+    typeof usage.completionTokens !== "number"
+  ) {
+    return undefined;
+  }
+
+  const result: ModelUsage = {
+    input_tokens: usage.promptTokens,
+    output_tokens: usage.completionTokens,
   };
+  const cachedTokens = (usage as MistralUsageInfoWithDetails)
+    .prompt_tokens_details?.cached_tokens;
+  if (typeof cachedTokens === "number") {
+    result.input_tokens_details = { cached_tokens: cachedTokens };
+  }
+  return result;
 }

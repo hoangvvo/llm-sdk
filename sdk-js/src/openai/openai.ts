@@ -100,7 +100,10 @@ export class OpenAIModel implements LanguageModel {
     if (response.usage) {
       result.usage = mapOpenAIUsage(response.usage);
       if (this.metadata?.pricing) {
-        result.cost = calculateCost(result.usage, this.metadata.pricing);
+        result.cost = calculateCost(result.usage, this.metadata.pricing, {
+          input_cache_tokens_are_additional: false,
+          output_reasoning_tokens_are_additional: false,
+        });
       }
     }
 
@@ -158,7 +161,10 @@ export class OpenAIModel implements LanguageModel {
           const usage = mapOpenAIUsage(event.response.usage);
           const partial: PartialModelResponse = { usage };
           if (this.metadata?.pricing) {
-            partial.cost = calculateCost(usage, this.metadata.pricing);
+            partial.cost = calculateCost(usage, this.metadata.pricing, {
+              input_cache_tokens_are_additional: false,
+              output_reasoning_tokens_are_additional: false,
+            });
           }
           yield partial;
         }
@@ -1008,9 +1014,15 @@ function mapOpenAIStreamWebSearchResult(
 // MARK: To SDK Usage
 
 function mapOpenAIUsage(usage: OpenAI.Responses.ResponseUsage): ModelUsage {
-  const result: ModelUsage = {
+  return {
     input_tokens: usage.input_tokens,
     output_tokens: usage.output_tokens,
+    input_tokens_details: {
+      cached_tokens: usage.input_tokens_details.cached_tokens,
+      cache_write_tokens: usage.input_tokens_details.cache_write_tokens,
+    },
+    output_tokens_details: {
+      reasoning_tokens: usage.output_tokens_details.reasoning_tokens,
+    },
   };
-  return result;
 }

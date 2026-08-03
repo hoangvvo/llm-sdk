@@ -17,10 +17,10 @@ use crate::{
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
     Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel, LanguageModelError,
     LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
-    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningOptions,
-    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
-    TextPartDelta, Tool as SdkTool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
-    ToolResultPart, ToolResultStatus,
+    ModelResponse, ModelTokensDetails, ModelUsage, ModelUsageCostOptions, Part, PartDelta,
+    PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
+    ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool, ToolCallPart,
+    ToolCallPartDelta, ToolChoiceOption, ToolResultPart, ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -32,6 +32,11 @@ use serde_json::{Map, Value};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
+};
+
+const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
+    input_cache_tokens_are_additional: true,
+    output_reasoning_tokens_are_additional: false,
 };
 
 const PROVIDER: &str = "anthropic";
@@ -180,7 +185,7 @@ impl LanguageModel for AnthropicModel {
                             metadata
                                 .pricing
                                 .as_ref()
-                                .map(|pricing| usage.calculate_cost(pricing))
+                                .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
                         } else {
                             None
                         };
@@ -225,20 +230,11 @@ impl LanguageModel for AnthropicModel {
                         let mut provider_tool_block_indexes = HashSet::new();
                         let mut server_tool_blocks = HashMap::<i64, (String, String)>::new();
                         let mut server_tool_call_indexes = HashMap::new();
+                        let mut stream_usage = None;
                         while let Some(event) = chunk_stream.next().await {
                             match event? {
                                 MessageStreamEvent::MessageStart(MessageStartEvent { message }) => {
-                                    let usage = map_anthropic_usage(&message.usage);
-                                    let cost = metadata
-                                        .as_ref()
-                                        .and_then(|meta| meta.pricing.as_ref())
-                                        .map(|pricing| usage.calculate_cost(pricing));
-
-                                    yield PartialModelResponse {
-                                        delta: None,
-                                        usage: Some(usage),
-                                        cost,
-                                    };
+                                    stream_usage = Some(map_anthropic_usage(&message.usage));
                                     if matches!(message.stop_reason, Some(StopReason::Refusal)) {
                                         Err(LanguageModelError::Refusal(anthropic_refusal_message(
                                             message.stop_details.as_ref(),
@@ -246,17 +242,9 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::MessageDelta(MessageDeltaEvent { delta, usage }) => {
-                                    let usage = map_anthropic_message_delta_usage(&usage);
-                                    let cost = metadata
-                                        .as_ref()
-                                        .and_then(|meta| meta.pricing.as_ref())
-                                        .map(|pricing| usage.calculate_cost(pricing));
-
-                                    yield PartialModelResponse {
-                                        delta: None,
-                                        usage: Some(usage),
-                                        cost,
-                                    };
+                                    if let Some(current_usage) = &mut stream_usage {
+                                        merge_anthropic_message_delta_usage(current_usage, &usage);
+                                    }
                                     if matches!(delta.stop_reason, Some(StopReason::Refusal)) {
                                         Err(LanguageModelError::Refusal(anthropic_refusal_message(
                                             delta.stop_details.as_ref(),
@@ -377,6 +365,18 @@ impl LanguageModel for AnthropicModel {
                                 }
                                 _ => {}
                             }
+                        }
+
+                        if let Some(usage) = stream_usage {
+                            let cost = metadata
+                                .as_ref()
+                                .and_then(|meta| meta.pricing.as_ref())
+                                .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
+                            yield PartialModelResponse {
+                                delta: None,
+                                usage: Some(usage),
+                                cost,
+                            };
                         }
                     };
 
@@ -1018,21 +1018,58 @@ fn map_tool_use_block(block: api::ResponseToolUseBlock) -> ToolCallPart {
 }
 
 fn map_anthropic_usage(usage: &Usage) -> ModelUsage {
+    let mut input_tokens_details = ModelTokensDetails::default();
+    if let Some(value) = usage.cache_read_input_tokens {
+        input_tokens_details.cached_tokens = Some(u32::try_from(value).unwrap_or(0));
+    }
+    if let Some(value) = usage.cache_creation_input_tokens {
+        input_tokens_details.cache_write_tokens = Some(u32::try_from(value).unwrap_or(0));
+    }
+
+    let output_tokens_details =
+        usage
+            .output_tokens_details
+            .as_ref()
+            .map(|details| ModelTokensDetails {
+                reasoning_tokens: Some(u32::try_from(details.thinking_tokens).unwrap_or(0)),
+                ..Default::default()
+            });
+
     ModelUsage {
         input_tokens: u32::try_from(usage.input_tokens).unwrap_or(0),
         output_tokens: u32::try_from(usage.output_tokens).unwrap_or(0),
-        ..Default::default()
+        input_tokens_details: if usage.cache_read_input_tokens.is_some()
+            || usage.cache_creation_input_tokens.is_some()
+        {
+            Some(input_tokens_details)
+        } else {
+            None
+        },
+        output_tokens_details,
     }
 }
 
-fn map_anthropic_message_delta_usage(usage: &MessageDeltaUsage) -> ModelUsage {
-    ModelUsage {
-        input_tokens: usage
-            .input_tokens
-            .and_then(|value| u32::try_from(value).ok())
-            .unwrap_or(0),
-        output_tokens: u32::try_from(usage.output_tokens).unwrap_or(0),
-        ..Default::default()
+fn merge_anthropic_message_delta_usage(current: &mut ModelUsage, usage: &MessageDeltaUsage) {
+    if let Some(value) = usage.input_tokens {
+        current.input_tokens = u32::try_from(value).unwrap_or(0);
+    }
+    current.output_tokens = u32::try_from(usage.output_tokens).unwrap_or(0);
+
+    if usage.cache_read_input_tokens.is_some() || usage.cache_creation_input_tokens.is_some() {
+        let details = current.input_tokens_details.get_or_insert_default();
+        if let Some(value) = usage.cache_read_input_tokens {
+            details.cached_tokens = Some(u32::try_from(value).unwrap_or(0));
+        }
+        if let Some(value) = usage.cache_creation_input_tokens {
+            details.cache_write_tokens = Some(u32::try_from(value).unwrap_or(0));
+        }
+    }
+
+    if let Some(output_details) = &usage.output_tokens_details {
+        current
+            .output_tokens_details
+            .get_or_insert_default()
+            .reasoning_tokens = Some(u32::try_from(output_details.thinking_tokens).unwrap_or(0));
     }
 }
 

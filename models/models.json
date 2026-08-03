@@ -6,8 +6,10 @@
       "model_id": "gpt-5.6-sol",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.0000025,
-          "output_cost_per_text_token": 0.000015
+          "input_cost_per_text_token": 5e-6,
+          "input_cost_per_cached_token": 5e-7,
+          "input_cost_per_cache_write_token": 6.25e-6,
+          "output_cost_per_text_token": 3e-5
         },
         "capabilities": {
           "text_input": true,
@@ -32,8 +34,10 @@
       "model_id": "gpt-5.6-terra",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.000001,
-          "output_cost_per_text_token": 0.000006
+          "input_cost_per_text_token": 2e-6,
+          "input_cost_per_cached_token": 2e-7,
+          "input_cost_per_cache_write_token": 2.5e-6,
+          "output_cost_per_text_token": 1.2e-5
         },
         "capabilities": {
           "text_input": true,
@@ -57,8 +61,10 @@
       "model_id": "gpt-5.6-luna",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 2.5e-7,
-          "output_cost_per_text_token": 0.0000015
+          "input_cost_per_text_token": 2e-7,
+          "input_cost_per_cached_token": 2e-8,
+          "input_cost_per_cache_write_token": 2.5e-7,
+          "output_cost_per_text_token": 1.2e-6
         },
         "capabilities": {
           "text_input": true,
@@ -82,8 +88,9 @@
       "model_id": "gpt-5.3-codex",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.0000025,
-          "output_cost_per_text_token": 0.000015
+          "input_cost_per_text_token": 1.75e-6,
+          "input_cost_per_cached_token": 1.75e-7,
+          "output_cost_per_text_token": 1.4e-5
         },
         "capabilities": {
           "text_input": true,
@@ -107,10 +114,10 @@
       "model_id": "gpt-audio-1.5",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.0000025,
-          "output_cost_per_text_token": 0.00001,
-          "input_cost_per_audio_token": 0.000032,
-          "output_cost_per_audio_token": 0.000064
+          "input_cost_per_text_token": 2.5e-6,
+          "output_cost_per_text_token": 1e-5,
+          "input_cost_per_audio_token": 3.2e-5,
+          "output_cost_per_audio_token": 6.4e-5
         },
         "capabilities": {
           "text_input": true,
@@ -136,8 +143,9 @@
       "model_id": "gpt-4.1",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.000002,
-          "output_cost_per_text_token": 0.000008
+          "input_cost_per_text_token": 2e-6,
+          "input_cost_per_cached_token": 5e-7,
+          "output_cost_per_text_token": 8e-6
         },
         "capabilities": {
           "text_input": true,
@@ -158,8 +166,10 @@
       "model_id": "claude-fable-5",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.00001,
-          "output_cost_per_text_token": 0.00005
+          "input_cost_per_text_token": 1e-5,
+          "input_cost_per_cached_token": 1e-6,
+          "input_cost_per_cache_write_token": 1.25e-5,
+          "output_cost_per_text_token": 5e-5
         },
         "capabilities": {
           "text_input": true,
@@ -183,8 +193,10 @@
       "model_id": "claude-opus-4-8",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.000005,
-          "output_cost_per_text_token": 0.000025
+          "input_cost_per_text_token": 5e-6,
+          "input_cost_per_cached_token": 5e-7,
+          "input_cost_per_cache_write_token": 6.25e-6,
+          "output_cost_per_text_token": 2.5e-5
         },
         "capabilities": {
           "text_input": true,
@@ -208,8 +220,10 @@
       "model_id": "claude-sonnet-5",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.000003,
-          "output_cost_per_text_token": 0.000015
+          "input_cost_per_text_token": 2e-6,
+          "input_cost_per_cached_token": 2e-7,
+          "input_cost_per_cache_write_token": 2.5e-6,
+          "output_cost_per_text_token": 1e-5
         },
         "capabilities": {
           "text_input": true,
@@ -233,8 +247,10 @@
       "model_id": "claude-haiku-4-5",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.000001,
-          "output_cost_per_text_token": 0.000005
+          "input_cost_per_text_token": 1e-6,
+          "input_cost_per_cached_token": 1e-7,
+          "input_cost_per_cache_write_token": 1.25e-6,
+          "output_cost_per_text_token": 5e-6
         },
         "capabilities": {
           "text_input": true,
@@ -259,8 +275,11 @@
       "model_id": "gemini-3.1-pro-preview",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.000002,
-          "output_cost_per_text_token": 0.000012
+          "input_cost_per_text_token": 2e-6,
+          "input_cost_per_audio_token": 2e-6,
+          "input_cost_per_image_token": 2e-6,
+          "input_cost_per_cached_token": 2e-7,
+          "output_cost_per_text_token": 1.2e-5
         },
         "capabilities": {
           "text_input": true,
@@ -284,8 +303,11 @@
       "model_id": "gemini-3.5-flash",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.0000015,
-          "output_cost_per_text_token": 0.000009
+          "input_cost_per_text_token": 1.5e-6,
+          "input_cost_per_audio_token": 1.5e-6,
+          "input_cost_per_image_token": 1.5e-6,
+          "input_cost_per_cached_token": 1.5e-7,
+          "output_cost_per_text_token": 9e-6
         },
         "capabilities": {
           "text_input": true,
@@ -310,8 +332,12 @@
       "metadata": {
         "pricing": {
           "input_cost_per_text_token": 2.5e-7,
-          "output_cost_per_text_token": 0.0000015,
-          "input_cost_per_audio_token": 5e-7
+          "input_cost_per_image_token": 2.5e-7,
+          "output_cost_per_text_token": 1.5e-6,
+          "input_cost_per_audio_token": 5e-7,
+          "input_cost_per_cached_text_token": 2.5e-8,
+          "input_cost_per_cached_image_token": 2.5e-8,
+          "input_cost_per_cached_audio_token": 5e-8
         },
         "capabilities": {
           "text_input": true,
@@ -337,8 +363,8 @@
         "pricing": {
           "input_cost_per_text_token": 5e-7,
           "input_cost_per_image_token": 5e-7,
-          "output_cost_per_text_token": 0.000003,
-          "output_cost_per_image_token": 0.00006
+          "output_cost_per_text_token": 3e-6,
+          "output_cost_per_image_token": 6e-5
         },
         "capabilities": {
           "text_input": true,
@@ -360,8 +386,8 @@
       "model_id": "gemini-3.1-flash-tts-preview",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 5e-7,
-          "output_cost_per_audio_token": 0.00001
+          "input_cost_per_text_token": 1e-6,
+          "output_cost_per_audio_token": 2e-5
         },
         "capabilities": {
           "text_input": true,
@@ -386,10 +412,6 @@
       "provider": "cohere",
       "model_id": "command-a-plus-05-2026",
       "metadata": {
-        "pricing": {
-          "input_cost_per_text_token": 0.0000025,
-          "output_cost_per_text_token": 0.00001
-        },
         "capabilities": {
           "text_input": true,
           "text_output": true,
@@ -409,8 +431,9 @@
       "model_id": "mistral-medium-latest",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 4e-7,
-          "output_cost_per_text_token": 0.000002
+          "input_cost_per_text_token": 1.5e-6,
+          "input_cost_per_cached_token": 1.5e-7,
+          "output_cost_per_text_token": 7.5e-6
         },
         "capabilities": {
           "text_input": true,
@@ -431,8 +454,9 @@
       "model_id": "magistral-medium-latest",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 0.000002,
-          "output_cost_per_text_token": 0.000005
+          "input_cost_per_text_token": 2e-6,
+          "input_cost_per_cached_token": 2e-7,
+          "output_cost_per_text_token": 5e-6
         },
         "capabilities": {
           "text_input": true,
@@ -453,8 +477,9 @@
       "model_id": "mistral-small-latest",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 1e-7,
-          "output_cost_per_text_token": 3e-7
+          "input_cost_per_text_token": 1.5e-7,
+          "input_cost_per_cached_token": 1.5e-8,
+          "output_cost_per_text_token": 6e-7
         },
         "capabilities": {
           "text_input": true,
@@ -476,7 +501,8 @@
       "metadata": {
         "pricing": {
           "input_cost_per_text_token": 5e-7,
-          "output_cost_per_text_token": 0.0000015
+          "input_cost_per_cached_token": 5e-8,
+          "output_cost_per_text_token": 1.5e-6
         },
         "capabilities": {
           "text_input": true,

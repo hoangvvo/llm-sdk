@@ -709,14 +709,16 @@
     },
     "ModelTokensDetails": {
       "type": "object",
-      "description": "Represents the token usage of the model.",
       "properties": {
         "text_tokens": { "type": "number" },
         "cached_text_tokens": { "type": "number" },
         "audio_tokens": { "type": "number" },
         "cached_audio_tokens": { "type": "number" },
         "image_tokens": { "type": "number" },
-        "cached_image_tokens": { "type": "number" }
+        "cached_image_tokens": { "type": "number" },
+        "cached_tokens": { "type": "number" },
+        "cache_write_tokens": { "type": "number" },
+        "reasoning_tokens": { "type": "number" }
       },
       "additionalProperties": false
     },
@@ -936,6 +938,14 @@
         "input_cost_per_text_token": {
           "type": "number",
           "description": "The cost in USD per single text token for input."
+        },
+        "input_cost_per_cached_token": {
+          "type": "number",
+          "description": "The cost in USD per single cached input token."
+        },
+        "input_cost_per_cache_write_token": {
+          "type": "number",
+          "description": "The cost in USD per single cache-write input token."
         },
         "input_cost_per_cached_text_token": {
           "type": "number",

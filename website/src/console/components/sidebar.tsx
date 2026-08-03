@@ -1266,6 +1266,8 @@ function ModelDetails({ option }: { option: ModelOption }) {
   const pricingEntries: [string, number | null | undefined][] = pricing
     ? [
         ["Input text token", pricing.input_cost_per_text_token],
+        ["Input cached token", pricing.input_cost_per_cached_token],
+        ["Input cache-write token", pricing.input_cost_per_cache_write_token],
         ["Input cached text token", pricing.input_cost_per_cached_text_token],
         ["Output text token", pricing.output_cost_per_text_token],
         ["Input audio token", pricing.input_cost_per_audio_token],
@@ -1384,6 +1386,8 @@ function hasAnyPricing(pricing: LanguageModelPricing | undefined): boolean {
   if (!pricing) return false;
   return [
     pricing.input_cost_per_text_token,
+    pricing.input_cost_per_cached_token,
+    pricing.input_cost_per_cache_write_token,
     pricing.input_cost_per_cached_text_token,
     pricing.output_cost_per_text_token,
     pricing.input_cost_per_audio_token,

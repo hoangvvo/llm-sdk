@@ -99,9 +99,12 @@ export class OpenAIChatModel implements LanguageModel {
     };
 
     if (response.usage) {
-      result.usage = mapOpenAIUsage(response.usage, input);
+      result.usage = mapOpenAIUsage(response.usage);
       if (this.metadata?.pricing) {
-        result.cost = calculateCost(result.usage, this.metadata.pricing);
+        result.cost = calculateCost(result.usage, this.metadata.pricing, {
+          input_cache_tokens_are_additional: false,
+          output_reasoning_tokens_are_additional: false,
+        });
       }
     }
 
@@ -150,10 +153,13 @@ export class OpenAIChatModel implements LanguageModel {
         }
       }
       if (chunk.usage) {
-        const usage = mapOpenAIUsage(chunk.usage, input);
+        const usage = mapOpenAIUsage(chunk.usage);
         const event: PartialModelResponse = { usage };
         if (this.metadata?.pricing) {
-          event.cost = calculateCost(usage, this.metadata.pricing);
+          event.cost = calculateCost(usage, this.metadata.pricing, {
+            input_cache_tokens_are_additional: false,
+            output_reasoning_tokens_are_additional: false,
+          });
         }
         yield event;
       }
@@ -760,75 +766,62 @@ function mapOpenAIDelta(
 
 // MARK: To SDK Usage
 
-function mapOpenAIUsage(
-  usage: OpenAI.CompletionUsage,
-  input: LanguageModelInput,
-): ModelUsage {
+function mapOpenAIUsage(usage: OpenAI.CompletionUsage): ModelUsage {
   const result: ModelUsage = {
     input_tokens: usage.prompt_tokens,
     output_tokens: usage.completion_tokens,
   };
   if (usage.prompt_tokens_details) {
-    result.input_tokens_details = mapOpenAIPromptTokensDetails(
-      usage.prompt_tokens_details,
-      input,
+    const details = mapOpenAIPromptTokensDetails(usage.prompt_tokens_details);
+    if (details) {
+      result.input_tokens_details = details;
+    }
+  }
+  if (usage.completion_tokens_details) {
+    const details = mapOpenAICompletionTokenDetails(
+      usage.completion_tokens_details,
     );
-    result.output_tokens_details = mapOpenAICompletionTokenDetails(
-      usage.completion_tokens_details as OpenAIPatchedCompletionTokenDetails,
-    );
+    if (details) {
+      result.output_tokens_details = details;
+    }
   }
   return result;
 }
 
 function mapOpenAIPromptTokensDetails(
   details: OpenAIPatchedPromptTokensDetails,
-  input: LanguageModelInput,
-): ModelTokensDetails {
-  const textTokens = details.text_tokens;
-  const audioTokens = details.audio_tokens;
-  const imageTokens = details.image_tokens;
-  const hasTextPart = input.messages.some(
-    (s) => s.role === "user" && s.content.some((p) => p.type === "text"),
-  );
-  const hasAudioPart = input.messages.some(
-    (s) => s.role === "user" && s.content.some((p) => p.type === "audio"),
-  );
-  const cachedTextTokens =
-    details.cached_tokens_details?.text_tokens ??
-    // Guess that cached tokens are for text if there are text messages
-    (hasTextPart ? details.cached_tokens : undefined);
-  const cachedAudioTokens =
-    details.cached_tokens_details?.audio_tokens ??
-    // Guess that cached tokens are for audio if there are audio messages
-    (hasAudioPart ? details.cached_tokens : undefined);
+): ModelTokensDetails | undefined {
   const result: ModelTokensDetails = {};
-  if (typeof textTokens === "number") {
-    result.text_tokens = textTokens;
+  if (typeof details.text_tokens === "number") {
+    result.text_tokens = details.text_tokens;
   }
-  if (typeof audioTokens === "number") {
-    result.audio_tokens = audioTokens;
+  if (typeof details.audio_tokens === "number") {
+    result.audio_tokens = details.audio_tokens;
   }
-  if (typeof imageTokens === "number") {
-    result.image_tokens = imageTokens;
+  if (typeof details.image_tokens === "number") {
+    result.image_tokens = details.image_tokens;
   }
-  if (typeof cachedTextTokens === "number") {
-    result.cached_text_tokens = cachedTextTokens;
+  if (typeof details.cached_tokens === "number") {
+    result.cached_tokens = details.cached_tokens;
   }
-  if (typeof cachedAudioTokens === "number") {
-    result.cached_audio_tokens = cachedAudioTokens;
+  if (typeof details.cache_write_tokens === "number") {
+    result.cache_write_tokens = details.cache_write_tokens;
   }
-  return result;
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function mapOpenAICompletionTokenDetails(
   details: OpenAIPatchedCompletionTokenDetails,
-): ModelTokensDetails {
+): ModelTokensDetails | undefined {
   const result: ModelTokensDetails = {};
-  if (details.text_tokens) {
+  if (typeof details.text_tokens === "number") {
     result.text_tokens = details.text_tokens;
   }
-  if (details.audio_tokens) {
+  if (typeof details.audio_tokens === "number") {
     result.audio_tokens = details.audio_tokens;
   }
-  return result;
+  if (typeof details.reasoning_tokens === "number") {
+    result.reasoning_tokens = details.reasoning_tokens;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }

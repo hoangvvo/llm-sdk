@@ -728,6 +728,8 @@ pub struct ResponseUsage {
 /// A detailed breakdown of the input tokens.
 #[derive(Deserialize)]
 pub struct ResponseUsageInputTokensDetails {
+    /// The number of input tokens that were written to the cache.
+    pub cache_write_tokens: i64,
     /// The number of tokens that were retrieved from the cache.
     /// [More on prompt caching](/docs/guides/prompt-caching).
     pub cached_tokens: i64,

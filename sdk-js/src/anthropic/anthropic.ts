@@ -16,6 +16,7 @@ import type {
   LanguageModelInput,
   Message,
   ModelResponse,
+  ModelTokensDetails,
   ModelUsage,
   Part,
   PartDelta,
@@ -84,7 +85,10 @@ export class AnthropicModel implements LanguageModel {
     const result: ModelResponse = { content, usage };
 
     if (this.metadata?.pricing) {
-      result.cost = calculateCost(usage, this.metadata.pricing);
+      result.cost = calculateCost(usage, this.metadata.pricing, {
+        input_cache_tokens_are_additional: true,
+        output_reasoning_tokens_are_additional: false,
+      });
     }
 
     return result;
@@ -101,16 +105,12 @@ export class AnthropicModel implements LanguageModel {
     });
     const serverToolBlocks = new Map<number, { id: string; input: string }>();
     const serverToolCallIndexes = new Map<string, number>();
+    let streamUsage: ModelUsage | undefined;
 
     for await (const chunk of stream) {
       switch (chunk.type) {
         case "message_start": {
-          const usage = mapAnthropicUsage(chunk.message.usage);
-          const event: PartialModelResponse = { usage };
-          if (this.metadata?.pricing) {
-            event.cost = calculateCost(usage, this.metadata.pricing);
-          }
-          yield event;
+          streamUsage = mapAnthropicUsage(chunk.message.usage);
           if (chunk.message.stop_reason === "refusal") {
             throw new RefusalError(
               anthropicRefusalMessage(chunk.message.stop_details),
@@ -119,12 +119,12 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
         case "message_delta": {
-          const usage = mapAnthropicMessageDeltaUsage(chunk.usage);
-          const event: PartialModelResponse = { usage };
-          if (this.metadata?.pricing) {
-            event.cost = calculateCost(usage, this.metadata.pricing);
+          if (streamUsage) {
+            streamUsage = mergeAnthropicMessageDeltaUsage(
+              streamUsage,
+              chunk.usage,
+            );
           }
-          yield event;
           if (chunk.delta.stop_reason === "refusal") {
             throw new RefusalError(
               anthropicRefusalMessage(chunk.delta.stop_details),
@@ -217,6 +217,17 @@ export class AnthropicModel implements LanguageModel {
           break;
         }
       }
+    }
+
+    if (streamUsage) {
+      const event: PartialModelResponse = { usage: streamUsage };
+      if (this.metadata?.pricing) {
+        event.cost = calculateCost(streamUsage, this.metadata.pricing, {
+          input_cache_tokens_are_additional: true,
+          output_reasoning_tokens_are_additional: false,
+        });
+      }
+      yield event;
     }
   }
 }
@@ -843,15 +854,60 @@ function mapAnthropicRawContentBlockDelta(
 // MARK: To SDK Usage
 
 function mapAnthropicUsage(usage: Anthropic.Usage): ModelUsage {
-  return {
+  const result: ModelUsage = {
     input_tokens: usage.input_tokens,
     output_tokens: usage.output_tokens,
   };
+  const inputDetails = mapAnthropicInputTokenDetails(usage);
+  if (inputDetails) {
+    result.input_tokens_details = inputDetails;
+  }
+  if (typeof usage.output_tokens_details?.thinking_tokens === "number") {
+    result.output_tokens_details = {
+      reasoning_tokens: usage.output_tokens_details.thinking_tokens,
+    };
+  }
+  return result;
 }
 
-function mapAnthropicMessageDeltaUsage(usage: Anthropic.MessageDeltaUsage) {
-  return {
-    input_tokens: 0,
+function mergeAnthropicMessageDeltaUsage(
+  current: ModelUsage,
+  usage: Anthropic.MessageDeltaUsage,
+): ModelUsage {
+  const result: ModelUsage = {
+    ...current,
+    input_tokens:
+      typeof usage.input_tokens === "number"
+        ? usage.input_tokens
+        : current.input_tokens,
     output_tokens: usage.output_tokens,
   };
+  const inputDetails = mapAnthropicInputTokenDetails(usage);
+  if (inputDetails) {
+    result.input_tokens_details = {
+      ...current.input_tokens_details,
+      ...inputDetails,
+    };
+  }
+  if (typeof usage.output_tokens_details?.thinking_tokens === "number") {
+    result.output_tokens_details = {
+      ...current.output_tokens_details,
+      reasoning_tokens: usage.output_tokens_details.thinking_tokens,
+    };
+  }
+  return result;
+}
+
+function mapAnthropicInputTokenDetails(usage: {
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}): ModelTokensDetails | undefined {
+  const result: ModelTokensDetails = {};
+  if (typeof usage.cache_read_input_tokens === "number") {
+    result.cached_tokens = usage.cache_read_input_tokens;
+  }
+  if (typeof usage.cache_creation_input_tokens === "number") {
+    result.cache_write_tokens = usage.cache_creation_input_tokens;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }
