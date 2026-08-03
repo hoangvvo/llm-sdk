@@ -1380,6 +1380,8 @@ pub struct Usage {
     pub input_tokens: i64,
     /// The number of output tokens which were used.
     pub output_tokens: i64,
+    /// Breakdown of output tokens by category.
+    pub output_tokens_details: Option<OutputTokensDetails>,
     /// The number of server tool requests.
     pub server_tool_use: Option<ServerToolUsage>,
     /// If the request used the priority, standard, or batch tier.
@@ -1991,6 +1993,12 @@ pub struct CacheCreation {
 }
 
 #[derive(Deserialize)]
+pub struct OutputTokensDetails {
+    /// The number of output tokens generated as internal reasoning.
+    pub thinking_tokens: i64,
+}
+
+#[derive(Deserialize)]
 pub struct ServerToolUsage {
     /// The number of web fetch tool requests.
     pub web_fetch_requests: i64,
@@ -2067,6 +2075,8 @@ pub struct MessageDeltaUsage {
     pub input_tokens: Option<i64>,
     /// The cumulative number of output tokens which were used.
     pub output_tokens: i64,
+    /// Breakdown of output tokens by category.
+    pub output_tokens_details: Option<OutputTokensDetails>,
     /// The number of server tool requests.
     pub server_tool_use: Option<ServerToolUsage>,
 }

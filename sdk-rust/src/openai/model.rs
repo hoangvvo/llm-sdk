@@ -22,10 +22,11 @@ use crate::{
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
     AssistantMessage, Citation, CitationDelta, ContentDelta, ImagePart, ImagePartDelta,
     LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
-    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage, Part, PartDelta,
-    PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
-    ResponseFormatOption, TextPart, TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta,
-    ToolChoiceOption, ToolMessage, ToolResultPart, ToolResultStatus, UserMessage,
+    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage,
+    ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions, ReasoningPart,
+    ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart, TextPartDelta, Tool,
+    ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart,
+    ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -35,6 +36,11 @@ use reqwest::{
 };
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
+
+const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
+    input_cache_tokens_are_additional: false,
+    output_reasoning_tokens_are_additional: false,
+};
 
 const PROVIDER: &str = "openai";
 
@@ -161,7 +167,7 @@ impl LanguageModel for OpenAIModel {
                         usage.as_ref(),
                         self.metadata().and_then(|m| m.pricing.as_ref()),
                     ) {
-                        Some(usage.calculate_cost(pricing))
+                        Some(usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
                     } else {
                         None
                     };
@@ -214,7 +220,7 @@ impl LanguageModel for OpenAIModel {
                                     let usage = map_openai_response_usage(usage);
                                     yield PartialModelResponse {
                                         delta: None,
-                                        cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing)),
+                                        cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS)),
                                         usage: Some(usage),
                                     }
                                 }
@@ -1244,19 +1250,16 @@ fn parse_openai_image_size(size: Option<&String>) -> Option<(u32, u32)> {
 
 fn map_openai_response_usage(value: &ResponseUsage) -> ModelUsage {
     ModelUsage {
-        input_tokens: u32::try_from(value.input_tokens).unwrap_or(0),
-        output_tokens: u32::try_from(value.output_tokens).unwrap_or(0),
+        input_tokens: value.input_tokens as u32,
+        output_tokens: value.output_tokens as u32,
         input_tokens_details: Some(crate::ModelTokensDetails {
-            cached_text_tokens: u32::try_from(value.input_tokens_details.cached_tokens).ok(),
+            cached_tokens: Some(value.input_tokens_details.cached_tokens as u32),
+            cache_write_tokens: Some(value.input_tokens_details.cache_write_tokens as u32),
             ..Default::default()
         }),
         output_tokens_details: Some(crate::ModelTokensDetails {
-            text_tokens: Some(u32::try_from(value.output_tokens).unwrap_or(0)),
-            cached_text_tokens: None,
-            audio_tokens: None,
-            cached_audio_tokens: None,
-            image_tokens: None,
-            cached_image_tokens: None,
+            reasoning_tokens: Some(value.output_tokens_details.reasoning_tokens as u32),
+            ..Default::default()
         }),
     }
 }

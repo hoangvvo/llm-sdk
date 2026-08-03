@@ -2451,6 +2451,8 @@ type Usage struct {
 	InputTokens int `json:"input_tokens"`
 	// The number of output tokens which were used.
 	OutputTokens int `json:"output_tokens"`
+	// Breakdown of output tokens by category.
+	OutputTokensDetails *OutputTokensDetails `json:"output_tokens_details"`
 	// The number of server tool requests.
 	ServerToolUse *ServerToolUsage `json:"server_tool_use"`
 	// If the request used the priority, standard, or batch tier.
@@ -4149,6 +4151,11 @@ type CacheCreation struct {
 	Ephemeral5MInputTokens int `json:"ephemeral_5m_input_tokens"`
 }
 
+type OutputTokensDetails struct {
+	// The number of output tokens generated as internal reasoning.
+	ThinkingTokens int `json:"thinking_tokens"`
+}
+
 type ServerToolUsage struct {
 	// The number of web fetch tool requests.
 	WebFetchRequests int `json:"web_fetch_requests"`
@@ -4306,6 +4313,8 @@ type MessageDeltaUsage struct {
 	InputTokens *int `json:"input_tokens"`
 	// The cumulative number of output tokens which were used.
 	OutputTokens int `json:"output_tokens"`
+	// Breakdown of output tokens by category.
+	OutputTokensDetails *OutputTokensDetails `json:"output_tokens_details"`
 	// The number of server tool requests.
 	ServerToolUse *ServerToolUsage `json:"server_tool_use"`
 }

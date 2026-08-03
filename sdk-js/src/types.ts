@@ -520,9 +520,6 @@ export interface ToolMessage {
   role: "tool";
   content: Part[];
 }
-/**
- * Represents the token usage of the model.
- */
 export interface ModelTokensDetails {
   text_tokens?: number;
   cached_text_tokens?: number;
@@ -530,6 +527,9 @@ export interface ModelTokensDetails {
   cached_audio_tokens?: number;
   image_tokens?: number;
   cached_image_tokens?: number;
+  cached_tokens?: number;
+  cache_write_tokens?: number;
+  reasoning_tokens?: number;
 }
 /**
  * Represents the token usage of the model.
@@ -706,6 +706,14 @@ export interface LanguageModelPricing {
    * The cost in USD per single text token for input.
    */
   input_cost_per_text_token?: number;
+  /**
+   * The cost in USD per single cached input token.
+   */
+  input_cost_per_cached_token?: number;
+  /**
+   * The cost in USD per single cache-write input token.
+   */
+  input_cost_per_cache_write_token?: number;
   /**
    * The cost in USD per single cached text token for input.
    */

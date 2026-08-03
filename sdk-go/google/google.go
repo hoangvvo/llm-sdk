@@ -138,7 +138,7 @@ func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		}
 
 		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-			cost := usage.CalculateCost(m.metadata.Pricing)
+			cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: true})
 			result.Cost = &cost
 		}
 
@@ -176,6 +176,7 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 			groundingChunks := []googleapi.GroundingChunk{}
 			webSearchQueries := map[string]bool{}
 			streamTextPartMappings := map[int]int{}
+			var streamUsage *llmsdk.ModelUsage
 
 			for sseStream.Next() {
 				streamEvent, err := sseStream.Current()
@@ -183,7 +184,15 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					errCh <- fmt.Errorf("failed to get sse event: %w", err)
 					return
 				}
-				if streamEvent == nil || len(streamEvent.Candidates) == 0 {
+				if streamEvent == nil {
+					continue
+				}
+				if streamEvent.UsageMetadata != nil {
+					if usage := mapGoogleUsageMetadata(*streamEvent.UsageMetadata); usage != nil {
+						streamUsage = usage
+					}
+				}
+				if len(streamEvent.Candidates) == 0 {
 					continue
 				}
 
@@ -229,14 +238,6 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					responseCh <- partial
 				}
 
-				if streamEvent.UsageMetadata != nil {
-					usage := mapGoogleUsageMetadata(*streamEvent.UsageMetadata)
-					partial := &llmsdk.PartialModelResponse{Usage: usage}
-					if m.metadata != nil && m.metadata.Pricing != nil {
-						partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
-					}
-					responseCh <- partial
-				}
 			}
 
 			if len(webSearchQueries) > 0 || len(groundingChunks) > 0 {
@@ -270,6 +271,14 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 
 			if err := sseStream.Err(); err != nil {
 				errCh <- fmt.Errorf("scanner error: %w", err)
+				return
+			}
+			if streamUsage != nil {
+				partial := &llmsdk.PartialModelResponse{Usage: streamUsage}
+				if m.metadata != nil && m.metadata.Pricing != nil {
+					partial.Cost = ptr.To(streamUsage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: true}))
+				}
+				responseCh <- partial
 			}
 		}()
 
@@ -854,27 +863,34 @@ func nextGoogleDeltaIndex(existingContentDeltas, incomingContentDeltas []llmsdk.
 
 // mapGoogleUsageMetadata maps Google usage metadata to SDK usage
 func mapGoogleUsageMetadata(usageMetadata googleapi.UsageMetadata) *llmsdk.ModelUsage {
+	if usageMetadata.PromptTokenCount == nil || usageMetadata.CandidatesTokenCount == nil {
+		return nil
+	}
 	usage := &llmsdk.ModelUsage{
-		InputTokens:  0,
-		OutputTokens: 0,
+		InputTokens:  *usageMetadata.PromptTokenCount,
+		OutputTokens: *usageMetadata.CandidatesTokenCount,
 	}
 
-	if usageMetadata.PromptTokenCount != nil {
-		usage.InputTokens = *usageMetadata.PromptTokenCount
-	}
-
-	if usageMetadata.CandidatesTokenCount != nil {
-		usage.OutputTokens = *usageMetadata.CandidatesTokenCount
-	}
-
-	if len(usageMetadata.PromptTokensDetails) > 0 {
+	if len(usageMetadata.PromptTokensDetails) > 0 || len(usageMetadata.CacheTokensDetails) > 0 {
 		usage.InputTokensDetails =
 			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.PromptTokensDetails, usageMetadata.CacheTokensDetails)
+	}
+	if usageMetadata.CachedContentTokenCount != nil {
+		if usage.InputTokensDetails == nil {
+			usage.InputTokensDetails = &llmsdk.ModelTokensDetails{}
+		}
+		usage.InputTokensDetails.CachedTokens = ptr.To(*usageMetadata.CachedContentTokenCount)
 	}
 
 	if len(usageMetadata.CandidatesTokensDetails) > 0 {
 		usage.OutputTokensDetails =
 			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.CandidatesTokensDetails, nil)
+	}
+	if usageMetadata.ThoughtsTokenCount != nil {
+		if usage.OutputTokensDetails == nil {
+			usage.OutputTokensDetails = &llmsdk.ModelTokensDetails{}
+		}
+		usage.OutputTokensDetails.ReasoningTokens = ptr.To(*usageMetadata.ThoughtsTokenCount)
 	}
 
 	return usage
@@ -895,20 +911,11 @@ func mapGoogleModalityTokenCountToUsageDetails(
 		if modalityTokenCount.Modality != nil {
 			switch *modalityTokenCount.Modality {
 			case googleapi.ModalityTokenCountModalityTEXT:
-				if details.TextTokens == nil {
-					details.TextTokens = ptr.To(0)
-				}
-				*details.TextTokens += *modalityTokenCount.TokenCount
+				details.TextTokens = modalityTokenCount.TokenCount
 			case googleapi.ModalityTokenCountModalityIMAGE:
-				if details.ImageTokens == nil {
-					details.ImageTokens = ptr.To(0)
-				}
-				*details.ImageTokens += *modalityTokenCount.TokenCount
+				details.ImageTokens = modalityTokenCount.TokenCount
 			case googleapi.ModalityTokenCountModalityAUDIO:
-				if details.AudioTokens == nil {
-					details.AudioTokens = ptr.To(0)
-				}
-				*details.AudioTokens += *modalityTokenCount.TokenCount
+				details.AudioTokens = modalityTokenCount.TokenCount
 			}
 		}
 	}
@@ -921,23 +928,18 @@ func mapGoogleModalityTokenCountToUsageDetails(
 		if cachedTokenCount.Modality != nil {
 			switch *cachedTokenCount.Modality {
 			case googleapi.ModalityTokenCountModalityTEXT:
-				if details.CachedTextTokens == nil {
-					details.CachedTextTokens = ptr.To(0)
-				}
-				*details.CachedTextTokens += *cachedTokenCount.TokenCount
+				details.CachedTextTokens = cachedTokenCount.TokenCount
 			case googleapi.ModalityTokenCountModalityIMAGE:
-				if details.CachedImageTokens == nil {
-					details.CachedImageTokens = ptr.To(0)
-				}
-				*details.CachedImageTokens += *cachedTokenCount.TokenCount
+				details.CachedImageTokens = cachedTokenCount.TokenCount
 			case googleapi.ModalityTokenCountModalityAUDIO:
-				if details.CachedAudioTokens == nil {
-					details.CachedAudioTokens = ptr.To(0)
-				}
-				*details.CachedAudioTokens += *cachedTokenCount.TokenCount
+				details.CachedAudioTokens = cachedTokenCount.TokenCount
 			}
 		}
 	}
 
+	if details.TextTokens == nil && details.AudioTokens == nil && details.ImageTokens == nil &&
+		details.CachedTextTokens == nil && details.CachedAudioTokens == nil && details.CachedImageTokens == nil {
+		return nil
+	}
 	return &details
 }

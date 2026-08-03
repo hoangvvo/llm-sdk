@@ -6,3 +6,6 @@ mod llm_sdk_test;
 
 #[path = "tool_part_tests.rs"]
 mod tool_part;
+
+#[path = "usage_ext_tests.rs"]
+mod usage_ext;

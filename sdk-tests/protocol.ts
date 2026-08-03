@@ -685,6 +685,10 @@ function validateResponseMetadata({
 
   if (expected.usage === true) {
     validateUsage(testCaseName, stageIndex, response?.usage);
+  } else if (expected.usage === false && response?.usage !== undefined) {
+    fail(
+      `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected usage to be omitted, received ${JSON.stringify(response.usage)}.`,
+    );
   } else if (
     isObject(expected.usage) &&
     !valueContains(expected.usage, response?.usage)
@@ -700,9 +704,22 @@ function validateResponseMetadata({
         `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected stream metrics.`,
       );
     }
-    for (const [metric, minimum] of Object.entries(expected.stream) as Array<
-      [string, number]
+    for (const [metric, constraint] of Object.entries(expected.stream) as Array<
+      [string, number | { exact: number }]
     >) {
+      if (typeof constraint === "object") {
+        const exact = constraint.exact;
+        if (!Number.isInteger(exact) || exact < 0) {
+          fail(`Invalid exact stream metric for ${metric}.`);
+        }
+        if (stream[metric] !== exact) {
+          fail(
+            `Output validation failed for "${testCaseName}" stage ${stageIndex}: stream.${metric} must equal ${String(exact)}, received ${String(stream[metric])}.`,
+          );
+        }
+        continue;
+      }
+      const minimum = constraint;
       if (
         !Number.isInteger(minimum) ||
         minimum < 0 ||

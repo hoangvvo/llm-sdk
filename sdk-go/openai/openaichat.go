@@ -126,7 +126,7 @@ func (m *OpenAIChatModel) Generate(ctx context.Context, input *llmsdk.LanguageMo
 
 		var usage *llmsdk.ModelUsage
 		if response.Usage != nil {
-			usage = mapOpenAIChatUsage(*response.Usage, input)
+			usage = mapOpenAIChatUsage(*response.Usage)
 		}
 
 		result := &llmsdk.ModelResponse{
@@ -135,7 +135,7 @@ func (m *OpenAIChatModel) Generate(ctx context.Context, input *llmsdk.LanguageMo
 		}
 
 		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-			cost := usage.CalculateCost(m.metadata.Pricing)
+			cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: false})
 			result.Cost = &cost
 		}
 
@@ -207,10 +207,10 @@ func (m *OpenAIChatModel) Stream(ctx context.Context, input *llmsdk.LanguageMode
 				}
 
 				if streamEvent.Usage != nil {
-					usage := mapOpenAIChatUsage(*streamEvent.Usage, input)
+					usage := mapOpenAIChatUsage(*streamEvent.Usage)
 					partial := &llmsdk.PartialModelResponse{Usage: usage}
 					if m.metadata != nil && m.metadata.Pricing != nil {
-						partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
+						partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: false}))
 					}
 					responseCh <- partial
 				}
@@ -680,7 +680,7 @@ func mapOpenAIChatDelta(delta openaichatapi.ChatCompletionStreamResponseDelta, e
 	return result, nil
 }
 
-func mapOpenAIChatUsage(usage openaichatapi.CompletionUsage, input *llmsdk.LanguageModelInput) *llmsdk.ModelUsage {
+func mapOpenAIChatUsage(usage openaichatapi.CompletionUsage) *llmsdk.ModelUsage {
 	result := &llmsdk.ModelUsage{
 		InputTokens:  usage.PromptTokens,
 		OutputTokens: usage.CompletionTokens,
@@ -690,16 +690,20 @@ func mapOpenAIChatUsage(usage openaichatapi.CompletionUsage, input *llmsdk.Langu
 		details := usage.PromptTokensDetails
 		tokensDetails := &llmsdk.ModelTokensDetails{}
 
+		if details.TextTokens != nil {
+			tokensDetails.TextTokens = ptr.To(*details.TextTokens)
+		}
 		if details.AudioTokens != nil {
 			tokensDetails.AudioTokens = ptr.To(*details.AudioTokens)
 		}
+		if details.ImageTokens != nil {
+			tokensDetails.ImageTokens = ptr.To(*details.ImageTokens)
+		}
 		if details.CachedTokens != nil {
-			if hasUserTextPart(input.Messages) {
-				tokensDetails.CachedTextTokens = ptr.To(*details.CachedTokens)
-			}
-			if hasUserAudioPart(input.Messages) {
-				tokensDetails.CachedAudioTokens = ptr.To(*details.CachedTokens)
-			}
+			tokensDetails.CachedTokens = ptr.To(*details.CachedTokens)
+		}
+		if details.CacheWriteTokens != nil {
+			tokensDetails.CacheWriteTokens = ptr.To(*details.CacheWriteTokens)
 		}
 
 		if isModelTokensDetailsEmpty(tokensDetails) {
@@ -711,8 +715,14 @@ func mapOpenAIChatUsage(usage openaichatapi.CompletionUsage, input *llmsdk.Langu
 	if usage.CompletionTokensDetails != nil {
 		details := usage.CompletionTokensDetails
 		tokensDetails := &llmsdk.ModelTokensDetails{}
+		if details.TextTokens != nil {
+			tokensDetails.TextTokens = ptr.To(*details.TextTokens)
+		}
 		if details.AudioTokens != nil {
 			tokensDetails.AudioTokens = ptr.To(*details.AudioTokens)
+		}
+		if details.ReasoningTokens != nil {
+			tokensDetails.ReasoningTokens = ptr.To(*details.ReasoningTokens)
 		}
 		if isModelTokensDetailsEmpty(tokensDetails) {
 			tokensDetails = nil
@@ -887,34 +897,6 @@ func convertToOpenAIChatReasoningEffort(budgetTokens uint32) (*openaichatapi.Rea
 	}
 }
 
-func hasUserTextPart(messages []llmsdk.Message) bool {
-	for _, message := range messages {
-		if message.UserMessage == nil {
-			continue
-		}
-		for _, part := range message.UserMessage.Content {
-			if part.TextPart != nil {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func hasUserAudioPart(messages []llmsdk.Message) bool {
-	for _, message := range messages {
-		if message.UserMessage == nil {
-			continue
-		}
-		for _, part := range message.UserMessage.Content {
-			if part.AudioPart != nil {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func isModelTokensDetailsEmpty(details *llmsdk.ModelTokensDetails) bool {
 	if details == nil {
 		return true
@@ -924,5 +906,8 @@ func isModelTokensDetailsEmpty(details *llmsdk.ModelTokensDetails) bool {
 		details.AudioTokens == nil &&
 		details.CachedAudioTokens == nil &&
 		details.ImageTokens == nil &&
-		details.CachedImageTokens == nil
+		details.CachedImageTokens == nil &&
+		details.CachedTokens == nil &&
+		details.CacheWriteTokens == nil &&
+		details.ReasoningTokens == nil
 }

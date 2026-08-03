@@ -11,9 +11,9 @@ use crate::{
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AudioPart, Citation, CitationDelta,
     ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
     LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelTokensDetails, ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningPart,
-    ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool, ToolChoiceOption,
-    ToolResultStatus,
+    ModelTokensDetails, ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse,
+    ReasoningPart, ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool,
+    ToolChoiceOption, ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -25,6 +25,10 @@ use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
 
 const PROVIDER: &str = "google";
+const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
+    input_cache_tokens_are_additional: false,
+    output_reasoning_tokens_are_additional: true,
+};
 
 pub struct GoogleModel {
     model_id: String,
@@ -148,13 +152,13 @@ impl LanguageModel for GoogleModel {
 
                     let usage = response
                         .usage_metadata
-                        .map(|u| map_google_usage_metadata(&u));
+                        .and_then(|u| map_google_usage_metadata(&u));
 
                     let cost = if let (Some(usage), Some(pricing)) = (
                         usage.as_ref(),
                         self.metadata().and_then(|m| m.pricing.as_ref()),
                     ) {
-                        Some(usage.calculate_cost(pricing))
+                        Some(usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
                     } else {
                         None
                     };
@@ -204,6 +208,7 @@ impl LanguageModel for GoogleModel {
                         let mut grounding_chunks: Vec<GroundingChunk> = Vec::new();
                         let mut web_search_queries: Vec<String> = Vec::new();
                         let mut stream_text_part_mappings: HashMap<usize, usize> = HashMap::new();
+                        let mut stream_usage = None;
 
                         while let Some(chunk) = chunk_stream.next().await {
                             let response = chunk?;
@@ -247,16 +252,22 @@ impl LanguageModel for GoogleModel {
                             }
 
                             if let Some(usage_metadata) = response.usage_metadata {
-                                let usage = map_google_usage_metadata(&usage_metadata);
-                                yield PartialModelResponse {
-                                    delta: None,
-                                    cost: metadata
-                                        .as_ref()
-                                        .and_then(|m| m.pricing.as_ref())
-                                        .map(|pricing| usage.calculate_cost(pricing)),
-                                    usage: Some(usage),
-                                };
+                                if let Some(usage) = map_google_usage_metadata(&usage_metadata) {
+                                    stream_usage = Some(usage);
+                                }
                             }
+                        }
+
+                        if let Some(usage) = stream_usage {
+                            let cost = metadata
+                                .as_ref()
+                                .and_then(|m| m.pricing.as_ref())
+                                .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
+                            yield PartialModelResponse {
+                                delta: None,
+                                usage: Some(usage),
+                                cost,
+                            };
                         }
 
                         if !web_search_queries.is_empty() || !grounding_chunks.is_empty() {
@@ -974,30 +985,37 @@ fn next_google_delta_index(
         .map_or(0, |index| index + 1)
 }
 
-fn map_google_usage_metadata(usage: &UsageMetadata) -> ModelUsage {
-    let input_tokens = usage
-        .prompt_token_count
-        .and_then(|value| u32::try_from(value).ok())
-        .unwrap_or(0);
-    let output_tokens = usage
-        .candidates_token_count
-        .and_then(|value| u32::try_from(value).ok())
-        .unwrap_or(0);
+fn map_google_usage_metadata(usage: &UsageMetadata) -> Option<ModelUsage> {
+    let (Some(input_tokens), Some(output_tokens)) =
+        (usage.prompt_token_count, usage.candidates_token_count)
+    else {
+        return None;
+    };
 
-    let input_tokens_details = map_modality_token_counts(
+    let mut input_tokens_details = map_modality_token_counts(
         usage.prompt_tokens_details.as_ref(),
         usage.cache_tokens_details.as_ref(),
     );
 
-    let output_tokens_details =
+    if let Some(cached_tokens) = usage.cached_content_token_count {
+        input_tokens_details.get_or_insert_default().cached_tokens = Some(cached_tokens as u32);
+    }
+
+    let mut output_tokens_details =
         map_modality_token_counts(usage.candidates_tokens_details.as_ref(), None);
 
-    ModelUsage {
-        input_tokens,
-        output_tokens,
+    if let Some(reasoning_tokens) = usage.thoughts_token_count {
+        output_tokens_details
+            .get_or_insert_default()
+            .reasoning_tokens = Some(reasoning_tokens as u32);
+    }
+
+    Some(ModelUsage {
+        input_tokens: input_tokens as u32,
+        output_tokens: output_tokens as u32,
         input_tokens_details,
         output_tokens_details,
-    }
+    })
 }
 
 fn map_modality_token_counts(
@@ -1008,30 +1026,24 @@ fn map_modality_token_counts(
         return None;
     }
 
-    let mut tokens_details = ModelTokensDetails {
-        text_tokens: None,
-        cached_text_tokens: None,
-        audio_tokens: None,
-        cached_audio_tokens: None,
-        image_tokens: None,
-        cached_image_tokens: None,
-    };
+    let mut tokens_details = ModelTokensDetails::default();
+    let mut mapped_any = false;
 
     if let Some(details) = details {
         for detail in details {
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
-                let Ok(count) = u32::try_from(count) else {
-                    continue;
-                };
                 match modality {
                     ModalityTokenCountModality::TEXT => {
-                        *tokens_details.text_tokens.get_or_insert_default() += count;
+                        tokens_details.text_tokens = Some(count as u32);
+                        mapped_any = true;
                     }
                     ModalityTokenCountModality::AUDIO => {
-                        *tokens_details.audio_tokens.get_or_insert_default() += count;
+                        tokens_details.audio_tokens = Some(count as u32);
+                        mapped_any = true;
                     }
                     ModalityTokenCountModality::IMAGE => {
-                        *tokens_details.image_tokens.get_or_insert_default() += count;
+                        tokens_details.image_tokens = Some(count as u32);
+                        mapped_any = true;
                     }
                     _ => {}
                 }
@@ -1042,18 +1054,18 @@ fn map_modality_token_counts(
     if let Some(cached) = cached_details {
         for detail in cached {
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
-                let Ok(count) = u32::try_from(count) else {
-                    continue;
-                };
                 match modality {
                     ModalityTokenCountModality::TEXT => {
-                        *tokens_details.cached_text_tokens.get_or_insert_default() += count;
+                        tokens_details.cached_text_tokens = Some(count as u32);
+                        mapped_any = true;
                     }
                     ModalityTokenCountModality::AUDIO => {
-                        *tokens_details.cached_audio_tokens.get_or_insert_default() += count;
+                        tokens_details.cached_audio_tokens = Some(count as u32);
+                        mapped_any = true;
                     }
                     ModalityTokenCountModality::IMAGE => {
-                        *tokens_details.cached_image_tokens.get_or_insert_default() += count;
+                        tokens_details.cached_image_tokens = Some(count as u32);
+                        mapped_any = true;
                     }
                     _ => {}
                 }
@@ -1061,5 +1073,5 @@ fn map_modality_token_counts(
         }
     }
 
-    Some(tokens_details)
+    mapped_any.then_some(tokens_details)
 }

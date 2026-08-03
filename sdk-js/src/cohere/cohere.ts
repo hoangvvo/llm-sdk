@@ -71,9 +71,15 @@ export class CohereModel implements LanguageModel {
     const result: ModelResponse = { content };
 
     if (response.usage) {
-      result.usage = mapCohereUsage(response.usage);
-      if (this.metadata?.pricing) {
-        result.cost = calculateCost(result.usage, this.metadata.pricing);
+      const usage = mapCohereUsage(response.usage);
+      if (usage) {
+        result.usage = usage;
+        if (this.metadata?.pricing) {
+          result.cost = calculateCost(usage, this.metadata.pricing, {
+            input_cache_tokens_are_additional: false,
+            output_reasoning_tokens_are_additional: false,
+          });
+        }
       }
     }
 
@@ -131,6 +137,23 @@ export class CohereModel implements LanguageModel {
             };
             yield event;
           }
+          break;
+        }
+        case "message-end": {
+          const usage = event.delta?.usage
+            ? mapCohereUsage(event.delta.usage)
+            : undefined;
+          if (usage) {
+            const partial: PartialModelResponse = { usage };
+            if (this.metadata?.pricing) {
+              partial.cost = calculateCost(usage, this.metadata.pricing, {
+                input_cache_tokens_are_additional: false,
+                output_reasoning_tokens_are_additional: false,
+              });
+            }
+            yield partial;
+          }
+          break;
         }
       }
     }
@@ -669,11 +692,29 @@ function mapCohereToolCallDeltaEvent(
 
 // MARK: To SDK Usage
 
-function mapCohereUsage(usage: Cohere.Usage): ModelUsage {
-  return {
-    input_tokens:
-      usage.billedUnits?.inputTokens ?? usage.tokens?.inputTokens ?? 0,
-    output_tokens:
-      usage.billedUnits?.outputTokens ?? usage.tokens?.outputTokens ?? 0,
+type CohereUsageTokensWithReasoning = Cohere.UsageTokens & {
+  reasoning_tokens?: number;
+};
+
+function mapCohereUsage(usage: Cohere.Usage): ModelUsage | undefined {
+  const inputTokens = usage.billedUnits?.inputTokens;
+  const outputTokens = usage.billedUnits?.outputTokens;
+  if (typeof inputTokens !== "number" || typeof outputTokens !== "number") {
+    return undefined;
+  }
+
+  const result: ModelUsage = {
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
   };
+  if (typeof usage.cachedTokens === "number") {
+    result.input_tokens_details = { cached_tokens: usage.cachedTokens };
+  }
+  const reasoningTokens = (
+    usage.tokens as CohereUsageTokensWithReasoning | undefined
+  )?.reasoning_tokens;
+  if (typeof reasoningTokens === "number") {
+    result.output_tokens_details = { reasoning_tokens: reasoningTokens };
+  }
+  return result;
 }

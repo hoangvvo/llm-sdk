@@ -1,66 +1,109 @@
 use crate::{LanguageModelPricing, ModelUsage};
 
+pub struct ModelUsageCostOptions {
+    pub input_cache_tokens_are_additional: bool,
+    pub output_reasoning_tokens_are_additional: bool,
+}
+
 impl ModelUsage {
     #[must_use]
-    pub fn calculate_cost(&self, pricing: &LanguageModelPricing) -> f64 {
-        let input_text_tokens = self
-            .input_tokens_details
-            .as_ref()
-            .and_then(|details| details.text_tokens)
-            .unwrap_or(self.input_tokens);
-        let input_audio_tokens = self
-            .input_tokens_details
-            .as_ref()
-            .and_then(|details| details.audio_tokens)
-            .unwrap_or(0);
-        let input_image_tokens = self
-            .input_tokens_details
-            .as_ref()
-            .and_then(|details| details.image_tokens)
-            .unwrap_or(0);
-        let input_cached_text_tokens = self
-            .input_tokens_details
-            .as_ref()
-            .and_then(|details| details.cached_text_tokens)
-            .unwrap_or(0);
-        let input_cached_audio_tokens = self
-            .input_tokens_details
-            .as_ref()
-            .and_then(|details| details.cached_audio_tokens)
-            .unwrap_or(0);
-        let input_cached_image_tokens = self
-            .input_tokens_details
-            .as_ref()
-            .and_then(|details| details.cached_image_tokens)
-            .unwrap_or(0);
+    pub fn calculate_cost(
+        &self,
+        pricing: &LanguageModelPricing,
+        options: &ModelUsageCostOptions,
+    ) -> f64 {
+        let mut cost = f64::from(self.input_tokens)
+            * pricing.input_cost_per_text_token.unwrap_or(0.0)
+            + f64::from(self.output_tokens) * pricing.output_cost_per_text_token.unwrap_or(0.0);
 
-        let output_text_tokens = self
-            .output_tokens_details
-            .as_ref()
-            .and_then(|details| details.text_tokens)
-            .unwrap_or(self.output_tokens);
-        let output_audio_tokens = self
-            .output_tokens_details
-            .as_ref()
-            .and_then(|details| details.audio_tokens)
-            .unwrap_or(0);
-        let output_image_tokens = self
-            .output_tokens_details
-            .as_ref()
-            .and_then(|details| details.image_tokens)
-            .unwrap_or(0);
+        let adjustment = |tokens: u32, regular_price: Option<f64>, category_price: Option<f64>| {
+            category_price.map_or(0.0, |category_price| {
+                f64::from(tokens) * (category_price - regular_price.unwrap_or(0.0))
+            })
+        };
 
-        f64::from(input_text_tokens) * pricing.input_cost_per_text_token.unwrap_or(0.0)
-            + f64::from(input_audio_tokens) * pricing.input_cost_per_audio_token.unwrap_or(0.0)
-            + f64::from(input_image_tokens) * pricing.input_cost_per_image_token.unwrap_or(0.0)
-            + f64::from(input_cached_text_tokens) * pricing.input_cost_per_text_token.unwrap_or(0.0)
-            + f64::from(input_cached_audio_tokens)
-                * pricing.input_cost_per_audio_token.unwrap_or(0.0)
-            + f64::from(input_cached_image_tokens)
-                * pricing.input_cost_per_image_token.unwrap_or(0.0)
-            + f64::from(output_text_tokens) * pricing.output_cost_per_text_token.unwrap_or(0.0)
-            + f64::from(output_audio_tokens) * pricing.output_cost_per_audio_token.unwrap_or(0.0)
-            + f64::from(output_image_tokens) * pricing.output_cost_per_image_token.unwrap_or(0.0)
+        if let Some(details) = &self.input_tokens_details {
+            cost += adjustment(
+                details.audio_tokens.unwrap_or(0),
+                pricing.input_cost_per_text_token,
+                pricing.input_cost_per_audio_token,
+            );
+            cost += adjustment(
+                details.image_tokens.unwrap_or(0),
+                pricing.input_cost_per_text_token,
+                pricing.input_cost_per_image_token,
+            );
+        }
+        if let Some(details) = &self.output_tokens_details {
+            cost += adjustment(
+                details.audio_tokens.unwrap_or(0),
+                pricing.output_cost_per_text_token,
+                pricing.output_cost_per_audio_token,
+            );
+            cost += adjustment(
+                details.image_tokens.unwrap_or(0),
+                pricing.output_cost_per_text_token,
+                pricing.output_cost_per_image_token,
+            );
+        }
+
+        if let Some(details) = &self.input_tokens_details {
+            let has_cached_modalities = details.cached_text_tokens.is_some()
+                || details.cached_audio_tokens.is_some()
+                || details.cached_image_tokens.is_some();
+            let has_cached_modality_pricing = pricing.input_cost_per_cached_text_token.is_some()
+                || pricing.input_cost_per_cached_audio_token.is_some()
+                || pricing.input_cost_per_cached_image_token.is_some();
+            let (cache_base_text, cache_base_audio, cache_base_image) =
+                if options.input_cache_tokens_are_additional {
+                    (None, None, None)
+                } else {
+                    (
+                        pricing.input_cost_per_text_token,
+                        pricing.input_cost_per_audio_token,
+                        pricing.input_cost_per_image_token,
+                    )
+                };
+            if has_cached_modalities && has_cached_modality_pricing {
+                cost += adjustment(
+                    details.cached_text_tokens.unwrap_or(0),
+                    cache_base_text,
+                    pricing.input_cost_per_cached_text_token,
+                );
+                cost += adjustment(
+                    details.cached_audio_tokens.unwrap_or(0),
+                    cache_base_audio,
+                    pricing.input_cost_per_cached_audio_token,
+                );
+                cost += adjustment(
+                    details.cached_image_tokens.unwrap_or(0),
+                    cache_base_image,
+                    pricing.input_cost_per_cached_image_token,
+                );
+            } else {
+                cost += adjustment(
+                    details.cached_tokens.unwrap_or(0),
+                    cache_base_text,
+                    pricing.input_cost_per_cached_token,
+                );
+            }
+            cost += adjustment(
+                details.cache_write_tokens.unwrap_or(0),
+                cache_base_text,
+                pricing.input_cost_per_cache_write_token,
+            );
+        }
+
+        if options.output_reasoning_tokens_are_additional {
+            cost += f64::from(
+                self.output_tokens_details
+                    .as_ref()
+                    .and_then(|details| details.reasoning_tokens)
+                    .unwrap_or(0),
+            ) * pricing.output_cost_per_text_token.unwrap_or(0.0);
+        }
+
+        cost
     }
 
     pub fn add(&mut self, other: &Self) {
@@ -93,6 +136,18 @@ impl ModelUsage {
                 self_input_details.cached_image_tokens =
                     Some(self_input_details.cached_image_tokens.unwrap_or(0) + cached_image_tokens);
             }
+            if let Some(cached_tokens) = other_input_details.cached_tokens {
+                self_input_details.cached_tokens =
+                    Some(self_input_details.cached_tokens.unwrap_or(0) + cached_tokens);
+            }
+            if let Some(cache_write_tokens) = other_input_details.cache_write_tokens {
+                self_input_details.cache_write_tokens =
+                    Some(self_input_details.cache_write_tokens.unwrap_or(0) + cache_write_tokens);
+            }
+            if let Some(reasoning_tokens) = other_input_details.reasoning_tokens {
+                self_input_details.reasoning_tokens =
+                    Some(self_input_details.reasoning_tokens.unwrap_or(0) + reasoning_tokens);
+            }
         }
 
         if let Some(other_output_details) = &other.output_tokens_details {
@@ -108,6 +163,32 @@ impl ModelUsage {
             if let Some(image_tokens) = other_output_details.image_tokens {
                 self_output_details.image_tokens =
                     Some(self_output_details.image_tokens.unwrap_or(0) + image_tokens);
+            }
+            if let Some(cached_text_tokens) = other_output_details.cached_text_tokens {
+                self_output_details.cached_text_tokens =
+                    Some(self_output_details.cached_text_tokens.unwrap_or(0) + cached_text_tokens);
+            }
+            if let Some(cached_audio_tokens) = other_output_details.cached_audio_tokens {
+                self_output_details.cached_audio_tokens = Some(
+                    self_output_details.cached_audio_tokens.unwrap_or(0) + cached_audio_tokens,
+                );
+            }
+            if let Some(cached_image_tokens) = other_output_details.cached_image_tokens {
+                self_output_details.cached_image_tokens = Some(
+                    self_output_details.cached_image_tokens.unwrap_or(0) + cached_image_tokens,
+                );
+            }
+            if let Some(cached_tokens) = other_output_details.cached_tokens {
+                self_output_details.cached_tokens =
+                    Some(self_output_details.cached_tokens.unwrap_or(0) + cached_tokens);
+            }
+            if let Some(cache_write_tokens) = other_output_details.cache_write_tokens {
+                self_output_details.cache_write_tokens =
+                    Some(self_output_details.cache_write_tokens.unwrap_or(0) + cache_write_tokens);
+            }
+            if let Some(reasoning_tokens) = other_output_details.reasoning_tokens {
+                self_output_details.reasoning_tokens =
+                    Some(self_output_details.reasoning_tokens.unwrap_or(0) + reasoning_tokens);
             }
         }
     }

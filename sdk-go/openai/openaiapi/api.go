@@ -1937,6 +1937,8 @@ type ResponseUsage struct {
 
 // A detailed breakdown of the input tokens.
 type ResponseUsageInputTokensDetails struct {
+	// The number of input tokens that were written to the cache.
+	CacheWriteTokens int `json:"cache_write_tokens"`
 	// The number of tokens that were retrieved from the cache.
 	// [More on prompt caching](/docs/guides/prompt-caching).
 	//

@@ -4,6 +4,7 @@ import type {
   FunctionResponse,
   FunctionResponsePart,
   GenerateContentConfig,
+  GenerateContentResponseUsageMetadata,
   GroundingChunk,
   GroundingMetadata,
   GroundingSupport,
@@ -13,7 +14,6 @@ import type {
   SpeechConfig,
   ThinkingConfig,
   Tool as GoogleTool,
-  UsageMetadata,
 } from "@google/genai";
 import {
   FunctionCallingConfigMode,
@@ -65,7 +65,7 @@ import type {
   ToolChoiceOption,
   ToolResultStatus,
 } from "../types.ts";
-import { calculateCost, sumModelTokensDetails } from "../usage.utils.ts";
+import { calculateCost } from "../usage.utils.ts";
 
 const PROVIDER = "google";
 
@@ -117,9 +117,15 @@ export class GoogleModel implements LanguageModel {
     );
     const result: ModelResponse = { content };
     if (response.usageMetadata) {
-      result.usage = mapGoogleUsageMetadata(response.usageMetadata);
-      if (this.metadata?.pricing) {
-        result.cost = calculateCost(result.usage, this.metadata.pricing);
+      const usage = mapGoogleUsageMetadata(response.usageMetadata);
+      if (usage) {
+        result.usage = usage;
+        if (this.metadata?.pricing) {
+          result.cost = calculateCost(usage, this.metadata.pricing, {
+            input_cache_tokens_are_additional: false,
+            output_reasoning_tokens_are_additional: true,
+          });
+        }
       }
     }
 
@@ -143,6 +149,7 @@ export class GoogleModel implements LanguageModel {
     const groundingChunks: GroundingChunk[] = [];
     const webSearchQueries = new Set<string>();
     const streamTextPartMappings = new Map<number, number>();
+    let streamUsage: ModelUsage | undefined;
 
     for await (const chunk of stream) {
       const candidate = chunk.candidates?.[0];
@@ -197,12 +204,8 @@ export class GoogleModel implements LanguageModel {
       }
 
       if (chunk.usageMetadata) {
-        const usage = mapGoogleUsageMetadata(chunk.usageMetadata);
-        const partial: PartialModelResponse = { usage };
-        if (this.metadata?.pricing) {
-          partial.cost = calculateCost(usage, this.metadata.pricing);
-        }
-        yield partial;
+        streamUsage =
+          mapGoogleUsageMetadata(chunk.usageMetadata) ?? streamUsage;
       }
     }
 
@@ -252,6 +255,17 @@ export class GoogleModel implements LanguageModel {
           },
         },
       };
+    }
+
+    if (streamUsage) {
+      const partial: PartialModelResponse = { usage: streamUsage };
+      if (this.metadata?.pricing) {
+        partial.cost = calculateCost(streamUsage, this.metadata.pricing, {
+          input_cache_tokens_are_additional: false,
+          output_reasoning_tokens_are_additional: true,
+        });
+      }
+      yield partial;
     }
   }
 }
@@ -824,21 +838,44 @@ function nextGoogleDeltaIndex(
   );
 }
 
-function mapGoogleUsageMetadata(usageMetadata: UsageMetadata): ModelUsage {
-  const usage: ModelUsage = {
-    input_tokens: usageMetadata.promptTokenCount ?? 0,
-    output_tokens: usageMetadata.responseTokenCount ?? 0,
-  };
-  if (usageMetadata.promptTokensDetails) {
-    usage.input_tokens_details = mapGoogleModalityTokenCountToUsageDetails(
-      usageMetadata.promptTokensDetails,
-      usageMetadata.cacheTokensDetails,
-    );
+function mapGoogleUsageMetadata(
+  usageMetadata: GenerateContentResponseUsageMetadata,
+): ModelUsage | undefined {
+  if (
+    typeof usageMetadata.promptTokenCount !== "number" ||
+    typeof usageMetadata.candidatesTokenCount !== "number"
+  ) {
+    return undefined;
   }
-  if (usageMetadata.responseTokensDetails) {
-    usage.output_tokens_details = mapGoogleModalityTokenCountToUsageDetails(
-      usageMetadata.responseTokensDetails,
-    );
+
+  const usage: ModelUsage = {
+    input_tokens: usageMetadata.promptTokenCount,
+    output_tokens: usageMetadata.candidatesTokenCount,
+  };
+  const inputDetails =
+    usageMetadata.promptTokensDetails || usageMetadata.cacheTokensDetails
+      ? mapGoogleModalityTokenCountToUsageDetails(
+          usageMetadata.promptTokensDetails ?? [],
+          usageMetadata.cacheTokensDetails,
+        )
+      : {};
+  if (typeof usageMetadata.cachedContentTokenCount === "number") {
+    inputDetails.cached_tokens = usageMetadata.cachedContentTokenCount;
+  }
+  if (Object.keys(inputDetails).length > 0) {
+    usage.input_tokens_details = inputDetails;
+  }
+
+  const outputDetails = usageMetadata.candidatesTokensDetails
+    ? mapGoogleModalityTokenCountToUsageDetails(
+        usageMetadata.candidatesTokensDetails,
+      )
+    : {};
+  if (typeof usageMetadata.thoughtsTokenCount === "number") {
+    outputDetails.reasoning_tokens = usageMetadata.thoughtsTokenCount;
+  }
+  if (Object.keys(outputDetails).length > 0) {
+    usage.output_tokens_details = outputDetails;
   }
 
   return usage;
@@ -848,29 +885,20 @@ function mapGoogleModalityTokenCountToUsageDetails(
   modalityTokenCounts: ModalityTokenCount[],
   cachedTokensDetails?: ModalityTokenCount[],
 ): ModelTokensDetails {
-  let tokensDetails: ModelTokensDetails = {};
+  const tokensDetails: ModelTokensDetails = {};
   for (const detail of modalityTokenCounts) {
     if (detail.tokenCount === undefined) {
       continue;
     }
     switch (detail.modality) {
       case MediaModality.TEXT:
-        tokensDetails = sumModelTokensDetails([
-          tokensDetails,
-          { text_tokens: detail.tokenCount },
-        ]);
+        tokensDetails.text_tokens = detail.tokenCount;
         break;
       case MediaModality.IMAGE:
-        tokensDetails = sumModelTokensDetails([
-          tokensDetails,
-          { image_tokens: detail.tokenCount },
-        ]);
+        tokensDetails.image_tokens = detail.tokenCount;
         break;
       case MediaModality.AUDIO:
-        tokensDetails = sumModelTokensDetails([
-          tokensDetails,
-          { audio_tokens: detail.tokenCount },
-        ]);
+        tokensDetails.audio_tokens = detail.tokenCount;
         break;
       default:
         break;
@@ -882,22 +910,13 @@ function mapGoogleModalityTokenCountToUsageDetails(
     }
     switch (detail.modality) {
       case MediaModality.TEXT:
-        tokensDetails = sumModelTokensDetails([
-          tokensDetails,
-          { cached_text_tokens: detail.tokenCount },
-        ]);
+        tokensDetails.cached_text_tokens = detail.tokenCount;
         break;
       case MediaModality.IMAGE:
-        tokensDetails = sumModelTokensDetails([
-          tokensDetails,
-          { cached_image_tokens: detail.tokenCount },
-        ]);
+        tokensDetails.cached_image_tokens = detail.tokenCount;
         break;
       case MediaModality.AUDIO:
-        tokensDetails = sumModelTokensDetails([
-          tokensDetails,
-          { cached_audio_tokens: detail.tokenCount },
-        ]);
+        tokensDetails.cached_audio_tokens = detail.tokenCount;
         break;
       default:
         break;

@@ -138,7 +138,7 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		}
 
 		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-			cost := usage.CalculateCost(m.metadata.Pricing)
+			cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: false})
 			result.Cost = &cost
 		}
 
@@ -218,7 +218,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 						usage := mapOpenAIUsage(*streamEvent.ResponseCompleted.Response.Usage)
 						partial := &llmsdk.PartialModelResponse{Usage: usage}
 						if m.metadata != nil && m.metadata.Pricing != nil {
-							partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
+							partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: false}))
 						}
 						responseCh <- partial
 					}
@@ -1017,6 +1017,13 @@ func mapOpenAIUsage(usage openaiapi.ResponseUsage) *llmsdk.ModelUsage {
 	return &llmsdk.ModelUsage{
 		InputTokens:  usage.InputTokens,
 		OutputTokens: usage.OutputTokens,
+		InputTokensDetails: &llmsdk.ModelTokensDetails{
+			CachedTokens:     ptr.To(usage.InputTokensDetails.CachedTokens),
+			CacheWriteTokens: ptr.To(usage.InputTokensDetails.CacheWriteTokens),
+		},
+		OutputTokensDetails: &llmsdk.ModelTokensDetails{
+			ReasoningTokens: ptr.To(usage.OutputTokensDetails.ReasoningTokens),
+		},
 	}
 }
 

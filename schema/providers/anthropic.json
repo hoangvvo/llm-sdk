@@ -2355,6 +2355,18 @@
           "title": "Output Tokens",
           "type": "integer"
         },
+        "output_tokens_details": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OutputTokensDetails"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Breakdown of output tokens by category."
+        },
         "server_tool_use": {
           "anyOf": [
             {
@@ -2389,6 +2401,7 @@
         "inference_geo",
         "input_tokens",
         "output_tokens",
+        "output_tokens_details",
         "server_tool_use",
         "service_tier"
       ],
@@ -3741,6 +3754,18 @@
       "title": "CacheCreation",
       "type": "object"
     },
+    "OutputTokensDetails": {
+      "properties": {
+        "thinking_tokens": {
+          "description": "The number of output tokens generated as internal reasoning.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["thinking_tokens"],
+      "title": "OutputTokensDetails",
+      "type": "object"
+    },
     "ServerToolUsage": {
       "properties": {
         "web_fetch_requests": {
@@ -3983,6 +4008,18 @@
           "title": "Output Tokens",
           "type": "integer"
         },
+        "output_tokens_details": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OutputTokensDetails"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Breakdown of output tokens by category."
+        },
         "server_tool_use": {
           "anyOf": [
             {
@@ -4001,6 +4038,7 @@
         "cache_read_input_tokens",
         "input_tokens",
         "output_tokens",
+        "output_tokens_details",
         "server_tool_use"
       ],
       "title": "MessageDeltaUsage",

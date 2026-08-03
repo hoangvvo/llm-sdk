@@ -925,12 +925,16 @@
         "input_tokens_details": {
           "description": "A detailed breakdown of the input tokens.",
           "properties": {
+            "cache_write_tokens": {
+              "description": "The number of input tokens that were written to the cache.",
+              "type": "integer"
+            },
             "cached_tokens": {
               "description": "The number of tokens that were retrieved from the cache. \n[More on prompt caching](/docs/guides/prompt-caching).\n",
               "type": "integer"
             }
           },
-          "required": ["cached_tokens"],
+          "required": ["cache_write_tokens", "cached_tokens"],
           "type": "object"
         },
         "output_tokens": {
