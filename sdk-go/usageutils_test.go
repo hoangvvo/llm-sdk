@@ -1,134 +1,55 @@
 package llmsdk_test
 
 import (
+	"encoding/json"
+	"math"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
-	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
-func TestCalculateCostCacheAccounting(t *testing.T) {
-	pricing := &llmsdk.LanguageModelPricing{
-		InputCostPerTextToken:       ptr.To(2.0),
-		InputCostPerCachedToken:     ptr.To(0.5),
-		InputCostPerCacheWriteToken: ptr.To(2.5),
-		OutputCostPerTextToken:      ptr.To(3.0),
+type usageCostCase struct {
+	Name         string                      `json:"name"`
+	Usage        llmsdk.ModelUsage           `json:"usage"`
+	Pricing      llmsdk.LanguageModelPricing `json:"pricing"`
+	Options      usageCostCaseOptions        `json:"options"`
+	ExpectedCost float64                     `json:"expected_cost"`
+}
+
+type usageCostCaseOptions struct {
+	InputCacheTokensAreAdditional      bool `json:"input_cache_tokens_are_additional"`
+	OutputReasoningTokensAreAdditional bool `json:"output_reasoning_tokens_are_additional"`
+}
+
+func TestSharedUsageCostCases(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve usage cost test path")
 	}
-	tests := []struct {
-		name       string
-		usage      llmsdk.ModelUsage
-		additional bool
-	}{
-		{
-			name: "included",
-			usage: llmsdk.ModelUsage{
-				InputTokens: 100, OutputTokens: 10,
-				InputTokensDetails: &llmsdk.ModelTokensDetails{
-					CachedTokens: ptr.To(40), CacheWriteTokens: ptr.To(20),
-				},
-			},
-		},
-		{
-			name: "additional",
-			usage: llmsdk.ModelUsage{
-				InputTokens: 40, OutputTokens: 10,
-				InputTokensDetails: &llmsdk.ModelTokensDetails{
-					CachedTokens: ptr.To(40), CacheWriteTokens: ptr.To(20),
-				},
-			},
-			additional: true,
-		},
+	data, err := os.ReadFile(filepath.Join(filepath.Dir(filename), "..", "sdk-tests", "usage-costs.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			cost := test.usage.CalculateCost(pricing, llmsdk.ModelUsageCostOptions{
-				InputCacheTokensAreAdditional: test.additional,
+	var suite struct {
+		TestCases []usageCostCase `json:"test_cases"`
+	}
+	if err := json.Unmarshal(data, &suite); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, testCase := range suite.TestCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			actual := testCase.Usage.CalculateCost(&testCase.Pricing, llmsdk.ModelUsageCostOptions{
+				InputCacheTokensAreAdditional:      testCase.Options.InputCacheTokensAreAdditional,
+				OutputReasoningTokensAreAdditional: testCase.Options.OutputReasoningTokensAreAdditional,
 			})
-			if cost != 180 {
-				t.Fatalf("cost = %v, want 180", cost)
+			tolerance := math.Max(1e-12, math.Abs(testCase.ExpectedCost)*1e-12)
+			if math.Abs(actual-testCase.ExpectedCost) > tolerance {
+				t.Fatalf("cost = %v, want %v", actual, testCase.ExpectedCost)
 			}
 		})
-	}
-}
-
-func TestCalculateCostUsesModalityCacheBreakdownOnce(t *testing.T) {
-	usage := llmsdk.ModelUsage{
-		InputTokens: 100,
-		InputTokensDetails: &llmsdk.ModelTokensDetails{
-			TextTokens: ptr.To(100), CachedTextTokens: ptr.To(80), CachedTokens: ptr.To(80),
-		},
-	}
-	pricing := &llmsdk.LanguageModelPricing{
-		InputCostPerTextToken:       ptr.To(2.0),
-		InputCostPerCachedToken:     ptr.To(0.1),
-		InputCostPerCachedTextToken: ptr.To(0.5),
-	}
-	if cost := usage.CalculateCost(pricing, llmsdk.ModelUsageCostOptions{}); cost != 80 {
-		t.Fatalf("cost = %v, want 80", cost)
-	}
-}
-
-func TestCalculateCostReasoningAndMissingCacheRate(t *testing.T) {
-	t.Run("additional reasoning", func(t *testing.T) {
-		usage := llmsdk.ModelUsage{
-			OutputTokens:        10,
-			OutputTokensDetails: &llmsdk.ModelTokensDetails{ReasoningTokens: ptr.To(5)},
-		}
-		pricing := &llmsdk.LanguageModelPricing{OutputCostPerTextToken: ptr.To(3.0)}
-		if cost := usage.CalculateCost(pricing, llmsdk.ModelUsageCostOptions{}); cost != 30 {
-			t.Fatalf("included cost = %v, want 30", cost)
-		}
-		cost := usage.CalculateCost(pricing, llmsdk.ModelUsageCostOptions{
-			OutputReasoningTokensAreAdditional: true,
-		})
-		if cost != 45 {
-			t.Fatalf("cost = %v, want 45", cost)
-		}
-	})
-
-	t.Run("missing cache-write rate", func(t *testing.T) {
-		usage := llmsdk.ModelUsage{
-			InputTokens:        40,
-			InputTokensDetails: &llmsdk.ModelTokensDetails{CacheWriteTokens: ptr.To(20)},
-		}
-		pricing := &llmsdk.LanguageModelPricing{InputCostPerTextToken: ptr.To(2.0)}
-		cost := usage.CalculateCost(pricing, llmsdk.ModelUsageCostOptions{
-			InputCacheTokensAreAdditional: true,
-		})
-		if cost != 80 {
-			t.Fatalf("cost = %v, want 80", cost)
-		}
-	})
-}
-
-func TestCalculateCostAdjustsReportedModalities(t *testing.T) {
-	usage := llmsdk.ModelUsage{
-		InputTokens:        100,
-		InputTokensDetails: &llmsdk.ModelTokensDetails{AudioTokens: ptr.To(20)},
-	}
-	pricing := &llmsdk.LanguageModelPricing{
-		InputCostPerTextToken:  ptr.To(2.0),
-		InputCostPerAudioToken: ptr.To(3.0),
-	}
-	if cost := usage.CalculateCost(pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true}); cost != 220 {
-		t.Fatalf("cost = %v, want 220", cost)
-	}
-}
-
-func TestCalculateCostIgnoresZeroOnlyModalityDetails(t *testing.T) {
-	usage := llmsdk.ModelUsage{
-		InputTokens:         100,
-		OutputTokens:        10,
-		InputTokensDetails:  &llmsdk.ModelTokensDetails{AudioTokens: ptr.To(0)},
-		OutputTokensDetails: &llmsdk.ModelTokensDetails{AudioTokens: ptr.To(0)},
-	}
-	pricing := &llmsdk.LanguageModelPricing{
-		InputCostPerTextToken:   ptr.To(2.0),
-		InputCostPerAudioToken:  ptr.To(3.0),
-		OutputCostPerTextToken:  ptr.To(4.0),
-		OutputCostPerAudioToken: ptr.To(5.0),
-	}
-	if cost := usage.CalculateCost(pricing, llmsdk.ModelUsageCostOptions{}); cost != 240 {
-		t.Fatalf("cost = %v, want 240", cost)
 	}
 }

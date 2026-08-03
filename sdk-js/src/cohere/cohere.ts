@@ -72,14 +72,12 @@ export class CohereModel implements LanguageModel {
 
     if (response.usage) {
       const usage = mapCohereUsage(response.usage);
-      if (usage) {
-        result.usage = usage;
-        if (this.metadata?.pricing) {
-          result.cost = calculateCost(usage, this.metadata.pricing, {
-            input_cache_tokens_are_additional: false,
-            output_reasoning_tokens_are_additional: false,
-          });
-        }
+      result.usage = usage;
+      if (this.metadata?.pricing) {
+        result.cost = calculateCost(usage, this.metadata.pricing, {
+          input_cache_tokens_are_additional: false,
+          output_reasoning_tokens_are_additional: false,
+        });
       }
     }
 
@@ -696,25 +694,36 @@ type CohereUsageTokensWithReasoning = Cohere.UsageTokens & {
   reasoning_tokens?: number;
 };
 
-function mapCohereUsage(usage: Cohere.Usage): ModelUsage | undefined {
-  const inputTokens = usage.billedUnits?.inputTokens;
-  const outputTokens = usage.billedUnits?.outputTokens;
-  if (typeof inputTokens !== "number" || typeof outputTokens !== "number") {
-    return undefined;
-  }
+export function mapCohereUsage(usage: Cohere.Usage): ModelUsage {
+  const value = (value: number | undefined) =>
+    typeof value === "number" && Number.isFinite(value)
+      ? Math.max(0, value)
+      : undefined;
+  const inputTokens =
+    value(usage.billedUnits?.inputTokens) ??
+    value(usage.tokens?.inputTokens) ??
+    0;
+  const outputTokens =
+    value(usage.billedUnits?.outputTokens) ??
+    value(usage.tokens?.outputTokens) ??
+    0;
 
   const result: ModelUsage = {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
   };
-  if (typeof usage.cachedTokens === "number") {
-    result.input_tokens_details = { cached_tokens: usage.cachedTokens };
+  const cachedTokens = value(usage.cachedTokens);
+  if (cachedTokens !== undefined) {
+    result.input_tokens_details = { cached_tokens: cachedTokens };
   }
   const reasoningTokens = (
     usage.tokens as CohereUsageTokensWithReasoning | undefined
   )?.reasoning_tokens;
-  if (typeof reasoningTokens === "number") {
-    result.output_tokens_details = { reasoning_tokens: reasoningTokens };
+  const normalizedReasoningTokens = value(reasoningTokens);
+  if (normalizedReasoningTokens !== undefined) {
+    result.output_tokens_details = {
+      reasoning_tokens: normalizedReasoningTokens,
+    };
   }
   return result;
 }

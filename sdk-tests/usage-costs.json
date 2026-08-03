@@ -1,0 +1,226 @@
+{
+  "test_cases": [
+    {
+      "name": "included cache tokens are not double counted",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 10,
+        "input_tokens_details": {
+          "cached_tokens": 40,
+          "cache_write_tokens": 20
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_cached_token": 0.5,
+        "input_cost_per_cache_write_token": 2.5,
+        "output_cost_per_text_token": 3
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 180
+    },
+    {
+      "name": "additional cache tokens are priced once",
+      "usage": {
+        "input_tokens": 40,
+        "output_tokens": 10,
+        "input_tokens_details": {
+          "cached_tokens": 40,
+          "cache_write_tokens": 20
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_cached_token": 0.5,
+        "input_cost_per_cache_write_token": 2.5,
+        "output_cost_per_text_token": 3
+      },
+      "options": {
+        "input_cache_tokens_are_additional": true,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 180
+    },
+    {
+      "name": "modality cache breakdown replaces its aggregate duplicate",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 0,
+        "input_tokens_details": {
+          "text_tokens": 100,
+          "cached_text_tokens": 80,
+          "cached_tokens": 80
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_cached_token": 0.1,
+        "input_cost_per_cached_text_token": 0.5
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 80
+    },
+    {
+      "name": "reasoning included in output is not double counted",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 10,
+        "output_tokens_details": { "reasoning_tokens": 5 }
+      },
+      "pricing": { "output_cost_per_text_token": 3 },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 30
+    },
+    {
+      "name": "additional reasoning is added to output",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 10,
+        "output_tokens_details": { "reasoning_tokens": 5 }
+      },
+      "pricing": { "output_cost_per_text_token": 3 },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": true
+      },
+      "expected_cost": 45
+    },
+    {
+      "name": "missing cache write rate falls back to text",
+      "usage": {
+        "input_tokens": 40,
+        "output_tokens": 0,
+        "input_tokens_details": { "cache_write_tokens": 20 }
+      },
+      "pricing": { "input_cost_per_text_token": 2 },
+      "options": {
+        "input_cache_tokens_are_additional": true,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 120
+    },
+    {
+      "name": "reported modality tokens adjust the aggregate text cost",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 0,
+        "input_tokens_details": { "audio_tokens": 20 }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_audio_token": 3
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 220
+    },
+    {
+      "name": "zero-only modality details still use text rates",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 10,
+        "input_tokens_details": { "audio_tokens": 0 },
+        "output_tokens_details": { "audio_tokens": 0 }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_audio_token": 3,
+        "output_cost_per_text_token": 4,
+        "output_cost_per_audio_token": 5
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 240
+    },
+    {
+      "name": "unattributed aggregate tokens default to text",
+      "usage": { "input_tokens": 100, "output_tokens": 10 },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_audio_token": 3,
+        "output_cost_per_text_token": 4,
+        "output_cost_per_audio_token": 5
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 240
+    },
+    {
+      "name": "specialized rate is used when no text rate exists",
+      "usage": { "input_tokens": 0, "output_tokens": 1000 },
+      "pricing": { "output_cost_per_audio_token": 0.00002 },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 0.02
+    },
+    {
+      "name": "modality details derive a missing aggregate",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "input_tokens_details": { "audio_tokens": 20 }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_audio_token": 3
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 60
+    },
+    {
+      "name": "unattributed residual tokens are priced as text",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 0,
+        "input_tokens_details": { "audio_tokens": 20, "image_tokens": 10 }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_audio_token": 3,
+        "input_cost_per_image_token": 4
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 240
+    },
+    {
+      "name": "explicit zero modality rate is preserved",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 0,
+        "input_tokens_details": { "audio_tokens": 20 }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_audio_token": 0
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 160
+    }
+  ]
+}

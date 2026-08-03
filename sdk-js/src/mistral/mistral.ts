@@ -35,7 +35,7 @@ import type {
   ToolMessage,
   UserMessage,
 } from "../types.ts";
-import { calculateCost } from "../usage.utils.ts";
+import { calculateCost, mergeModelUsageMax } from "../usage.utils.ts";
 
 const PROVIDER = "mistral";
 
@@ -86,14 +86,12 @@ export class MistralModel implements LanguageModel {
     const content = mapMistralMessage(choice.message);
     const result: ModelResponse = { content };
     const usage = mapMistralUsageInfo(response.usage);
-    if (usage) {
-      result.usage = usage;
-      if (this.metadata?.pricing) {
-        result.cost = calculateCost(usage, this.metadata.pricing, {
-          input_cache_tokens_are_additional: false,
-          output_reasoning_tokens_are_additional: false,
-        });
-      }
+    result.usage = usage;
+    if (this.metadata?.pricing) {
+      result.cost = calculateCost(usage, this.metadata.pricing, {
+        input_cache_tokens_are_additional: false,
+        output_reasoning_tokens_are_additional: false,
+      });
     }
 
     return result;
@@ -130,7 +128,10 @@ export class MistralModel implements LanguageModel {
       }
 
       if (chunk.data.usage) {
-        streamUsage = mapMistralUsageInfo(chunk.data.usage) ?? streamUsage;
+        streamUsage = mergeModelUsageMax(
+          streamUsage,
+          mapMistralUsageInfo(chunk.data.usage),
+        );
       }
     }
 
@@ -597,24 +598,36 @@ type MistralUsageInfoWithDetails = MistralComponents.UsageInfo & {
   prompt_tokens_details?: { cached_tokens?: number };
 };
 
-function mapMistralUsageInfo(
+export function mapMistralUsageInfo(
   usage: MistralComponents.UsageInfo,
-): ModelUsage | undefined {
-  if (
-    typeof usage.promptTokens !== "number" ||
-    typeof usage.completionTokens !== "number"
-  ) {
-    return undefined;
+): ModelUsage {
+  const value = (value: number | undefined) =>
+    typeof value === "number" && Number.isFinite(value)
+      ? Math.max(0, value)
+      : undefined;
+  let inputTokens = value(usage.promptTokens);
+  let outputTokens = value(usage.completionTokens);
+  const totalTokens = value(usage.totalTokens);
+  if (totalTokens !== undefined) {
+    if (inputTokens === undefined && outputTokens !== undefined) {
+      inputTokens = Math.max(0, totalTokens - outputTokens);
+    } else if (outputTokens === undefined && inputTokens !== undefined) {
+      outputTokens = Math.max(0, totalTokens - inputTokens);
+    } else if (inputTokens === undefined && outputTokens === undefined) {
+      outputTokens = totalTokens;
+    }
   }
 
   const result: ModelUsage = {
-    input_tokens: usage.promptTokens,
-    output_tokens: usage.completionTokens,
+    input_tokens: inputTokens ?? 0,
+    output_tokens: outputTokens ?? 0,
   };
   const cachedTokens = (usage as MistralUsageInfoWithDetails)
     .prompt_tokens_details?.cached_tokens;
   if (typeof cachedTokens === "number") {
-    result.input_tokens_details = { cached_tokens: cachedTokens };
+    result.input_tokens_details = {
+      cached_tokens: Math.max(0, cachedTokens),
+    };
   }
   return result;
 }

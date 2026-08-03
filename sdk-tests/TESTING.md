@@ -23,3 +23,10 @@ provide a model factory configured with the replay server URL.
 Keep provider HTTP shapes in these central fixtures instead of duplicating them
 across JS, Go, and Rust transport tests. Use `tests.json` for live portable
 behavior and `transports.json` for deterministic provider protocol coverage.
+
+## Usage cost tests
+
+Portable usage-cost calculator cases live in `usage-costs.json`. Each SDK has a
+thin adapter that deserializes these cases into its native usage and pricing
+types and calls its calculator. Add or change calculator expectations in this
+shared file instead of copying a test into every language SDK.

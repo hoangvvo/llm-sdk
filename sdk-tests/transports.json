@@ -579,11 +579,16 @@
                 "usageMetadata": {
                   "promptTokenCount": 4,
                   "candidatesTokenCount": 2,
-                  "totalTokenCount": 7,
+                  "toolUsePromptTokenCount": 3,
+                  "totalTokenCount": 10,
                   "cachedContentTokenCount": 1,
                   "thoughtsTokenCount": 1,
                   "promptTokensDetails": [
-                    { "modality": "TEXT", "tokenCount": 4 }
+                    { "modality": "TEXT", "tokenCount": 2 },
+                    { "modality": "TEXT", "tokenCount": 2 }
+                  ],
+                  "toolUsePromptTokensDetails": [
+                    { "modality": "TEXT", "tokenCount": 3 }
                   ],
                   "cacheTokensDetails": [
                     { "modality": "TEXT", "tokenCount": 1 }
@@ -610,10 +615,10 @@
               }
             ],
             "usage": {
-              "input_tokens": 4,
+              "input_tokens": 7,
               "output_tokens": 2,
               "input_tokens_details": {
-                "text_tokens": 4,
+                "text_tokens": 7,
                 "cached_text_tokens": 1,
                 "cached_tokens": 1
               },
@@ -692,7 +697,55 @@
           },
           "expect": {
             "content": [{ "type": "text", "text": "^Fixture response$" }],
-            "usage": false
+            "usage": { "input_tokens": 4, "output_tokens": 0 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "google_derive_missing_usage",
+      "groups": ["google_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [{ "type": "text", "text": "Hello" }]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1beta/models/test-model:generateContent(?:\\?.*)?",
+              "body": {
+                "contents": [{ "role": "user", "parts": [{ "text": "Hello" }] }]
+              }
+            },
+            "response": {
+              "headers": { "content-type": "application/json" },
+              "body": {
+                "candidates": [
+                  {
+                    "content": {
+                      "role": "model",
+                      "parts": [{ "text": "Fixture response" }]
+                    }
+                  }
+                ],
+                "usageMetadata": {
+                  "promptTokenCount": 4,
+                  "totalTokenCount": 9
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [{ "type": "text", "text": "^Fixture response$" }],
+            "usage": { "input_tokens": 4, "output_tokens": 5 },
+            "cost": 28
           }
         }
       ]
@@ -769,20 +822,7 @@
                 {
                   "data": {
                     "usageMetadata": {
-                      "promptTokenCount": 4,
-                      "candidatesTokenCount": 2,
-                      "totalTokenCount": 7,
-                      "cachedContentTokenCount": 1,
-                      "thoughtsTokenCount": 1,
-                      "promptTokensDetails": [
-                        { "modality": "TEXT", "tokenCount": 4 }
-                      ],
-                      "cacheTokensDetails": [
-                        { "modality": "TEXT", "tokenCount": 1 }
-                      ],
-                      "candidatesTokensDetails": [
-                        { "modality": "TEXT", "tokenCount": 2 }
-                      ]
+                      "candidatesTokenCount": 2
                     }
                   }
                 }

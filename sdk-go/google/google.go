@@ -188,9 +188,10 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					continue
 				}
 				if streamEvent.UsageMetadata != nil {
-					if usage := mapGoogleUsageMetadata(*streamEvent.UsageMetadata); usage != nil {
-						streamUsage = usage
-					}
+					streamUsage = mergeGoogleUsageMax(
+						streamUsage,
+						mapGoogleUsageMetadata(*streamEvent.UsageMetadata),
+					)
 				}
 				if len(streamEvent.Candidates) == 0 {
 					continue
@@ -861,36 +862,140 @@ func nextGoogleDeltaIndex(existingContentDeltas, incomingContentDeltas []llmsdk.
 	return maxIndex + 1
 }
 
+func mergeGoogleUsageMax(current, incoming *llmsdk.ModelUsage) *llmsdk.ModelUsage {
+	if current == nil {
+		return incoming
+	}
+	current.InputTokens = max(current.InputTokens, incoming.InputTokens)
+	current.OutputTokens = max(current.OutputTokens, incoming.OutputTokens)
+	current.InputTokensDetails = mergeGoogleTokenDetailsMax(current.InputTokensDetails, incoming.InputTokensDetails)
+	current.OutputTokensDetails = mergeGoogleTokenDetailsMax(current.OutputTokensDetails, incoming.OutputTokensDetails)
+	return current
+}
+
+func mergeGoogleTokenDetailsMax(current, incoming *llmsdk.ModelTokensDetails) *llmsdk.ModelTokensDetails {
+	if current == nil {
+		return incoming
+	}
+	if incoming == nil {
+		return current
+	}
+	merge := func(target **int, value *int) {
+		if value == nil {
+			return
+		}
+		if *target == nil {
+			*target = ptr.To(*value)
+		} else {
+			**target = max(**target, *value)
+		}
+	}
+	merge(&current.TextTokens, incoming.TextTokens)
+	merge(&current.AudioTokens, incoming.AudioTokens)
+	merge(&current.ImageTokens, incoming.ImageTokens)
+	merge(&current.CachedTextTokens, incoming.CachedTextTokens)
+	merge(&current.CachedAudioTokens, incoming.CachedAudioTokens)
+	merge(&current.CachedImageTokens, incoming.CachedImageTokens)
+	merge(&current.CachedTokens, incoming.CachedTokens)
+	merge(&current.CacheWriteTokens, incoming.CacheWriteTokens)
+	merge(&current.ReasoningTokens, incoming.ReasoningTokens)
+	return current
+}
+
 // mapGoogleUsageMetadata maps Google usage metadata to SDK usage
 func mapGoogleUsageMetadata(usageMetadata googleapi.UsageMetadata) *llmsdk.ModelUsage {
-	if usageMetadata.PromptTokenCount == nil || usageMetadata.CandidatesTokenCount == nil {
-		return nil
+	value := func(value *int) (int, bool) {
+		if value == nil {
+			return 0, false
+		}
+		if *value < 0 {
+			return 0, true
+		}
+		return *value, true
 	}
-	usage := &llmsdk.ModelUsage{
-		InputTokens:  *usageMetadata.PromptTokenCount,
-		OutputTokens: *usageMetadata.CandidatesTokenCount,
+	sumTokenCounts := func(details []googleapi.ModalityTokenCount) (int, bool) {
+		total := 0
+		hasCount := false
+		for _, detail := range details {
+			if count, ok := value(detail.TokenCount); ok {
+				total += count
+				hasCount = true
+			}
+		}
+		return total, hasCount
 	}
 
-	if len(usageMetadata.PromptTokensDetails) > 0 || len(usageMetadata.CacheTokensDetails) > 0 {
+	promptTokens, hasPromptTokens := value(usageMetadata.PromptTokenCount)
+	if !hasPromptTokens {
+		promptTokens, hasPromptTokens = sumTokenCounts(usageMetadata.PromptTokensDetails)
+	}
+	toolUsePromptTokens, hasToolUsePromptTokens := value(usageMetadata.ToolUsePromptTokenCount)
+	if !hasToolUsePromptTokens {
+		toolUsePromptTokens, hasToolUsePromptTokens = sumTokenCounts(usageMetadata.ToolUsePromptTokensDetails)
+	}
+	outputTokens, hasOutputTokens := value(usageMetadata.CandidatesTokenCount)
+	if !hasOutputTokens {
+		outputTokens, hasOutputTokens = sumTokenCounts(usageMetadata.CandidatesTokensDetails)
+	}
+	reasoningTokens, hasReasoningTokens := value(usageMetadata.ThoughtsTokenCount)
+	totalTokens, hasTotalTokens := value(usageMetadata.TotalTokenCount)
+
+	if hasTotalTokens {
+		if !hasPromptTokens && hasOutputTokens {
+			promptTokens = max(0, totalTokens-outputTokens-toolUsePromptTokens-reasoningTokens)
+			hasPromptTokens = true
+		} else if !hasOutputTokens && hasPromptTokens {
+			outputTokens = max(0, totalTokens-promptTokens-toolUsePromptTokens-reasoningTokens)
+			hasOutputTokens = true
+		}
+
+		residual := max(0, totalTokens-promptTokens-toolUsePromptTokens-outputTokens-reasoningTokens)
+		if residual > 0 {
+			switch {
+			case !hasReasoningTokens:
+				reasoningTokens = residual
+				hasReasoningTokens = true
+			case !hasToolUsePromptTokens:
+				toolUsePromptTokens = residual
+				hasToolUsePromptTokens = true
+			case !hasOutputTokens:
+				outputTokens = residual
+				hasOutputTokens = true
+			default:
+				promptTokens += residual
+				hasPromptTokens = true
+			}
+		}
+	}
+
+	usage := &llmsdk.ModelUsage{
+		InputTokens:  promptTokens + toolUsePromptTokens,
+		OutputTokens: outputTokens,
+	}
+
+	if len(usageMetadata.PromptTokensDetails) > 0 || len(usageMetadata.ToolUsePromptTokensDetails) > 0 || len(usageMetadata.CacheTokensDetails) > 0 {
+		inputTokenDetails := append([]googleapi.ModalityTokenCount{}, usageMetadata.PromptTokensDetails...)
+		inputTokenDetails = append(inputTokenDetails, usageMetadata.ToolUsePromptTokensDetails...)
 		usage.InputTokensDetails =
-			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.PromptTokensDetails, usageMetadata.CacheTokensDetails)
+			mapGoogleModalityTokenCountToUsageDetails(inputTokenDetails, usageMetadata.CacheTokensDetails)
 	}
 	if usageMetadata.CachedContentTokenCount != nil {
 		if usage.InputTokensDetails == nil {
 			usage.InputTokensDetails = &llmsdk.ModelTokensDetails{}
 		}
-		usage.InputTokensDetails.CachedTokens = ptr.To(*usageMetadata.CachedContentTokenCount)
+		cachedTokens, _ := value(usageMetadata.CachedContentTokenCount)
+		usage.InputTokensDetails.CachedTokens = ptr.To(cachedTokens)
 	}
 
 	if len(usageMetadata.CandidatesTokensDetails) > 0 {
 		usage.OutputTokensDetails =
 			mapGoogleModalityTokenCountToUsageDetails(usageMetadata.CandidatesTokensDetails, nil)
 	}
-	if usageMetadata.ThoughtsTokenCount != nil {
+	if usageMetadata.ThoughtsTokenCount != nil || reasoningTokens > 0 {
 		if usage.OutputTokensDetails == nil {
 			usage.OutputTokensDetails = &llmsdk.ModelTokensDetails{}
 		}
-		usage.OutputTokensDetails.ReasoningTokens = ptr.To(*usageMetadata.ThoughtsTokenCount)
+		usage.OutputTokensDetails.ReasoningTokens = ptr.To(reasoningTokens)
 	}
 
 	return usage
@@ -902,6 +1007,17 @@ func mapGoogleModalityTokenCountToUsageDetails(
 	cachedTokenCounts []googleapi.ModalityTokenCount,
 ) *llmsdk.ModelTokensDetails {
 	var details llmsdk.ModelTokensDetails
+	add := func(target **int, count *int) {
+		if count == nil {
+			return
+		}
+		value := max(0, *count)
+		if *target == nil {
+			*target = ptr.To(value)
+		} else {
+			**target += value
+		}
+	}
 
 	for _, modalityTokenCount := range modalityTokenCounts {
 		if modalityTokenCount.TokenCount == nil {
@@ -911,11 +1027,11 @@ func mapGoogleModalityTokenCountToUsageDetails(
 		if modalityTokenCount.Modality != nil {
 			switch *modalityTokenCount.Modality {
 			case googleapi.ModalityTokenCountModalityTEXT:
-				details.TextTokens = modalityTokenCount.TokenCount
+				add(&details.TextTokens, modalityTokenCount.TokenCount)
 			case googleapi.ModalityTokenCountModalityIMAGE:
-				details.ImageTokens = modalityTokenCount.TokenCount
+				add(&details.ImageTokens, modalityTokenCount.TokenCount)
 			case googleapi.ModalityTokenCountModalityAUDIO:
-				details.AudioTokens = modalityTokenCount.TokenCount
+				add(&details.AudioTokens, modalityTokenCount.TokenCount)
 			}
 		}
 	}
@@ -928,11 +1044,11 @@ func mapGoogleModalityTokenCountToUsageDetails(
 		if cachedTokenCount.Modality != nil {
 			switch *cachedTokenCount.Modality {
 			case googleapi.ModalityTokenCountModalityTEXT:
-				details.CachedTextTokens = cachedTokenCount.TokenCount
+				add(&details.CachedTextTokens, cachedTokenCount.TokenCount)
 			case googleapi.ModalityTokenCountModalityIMAGE:
-				details.CachedImageTokens = cachedTokenCount.TokenCount
+				add(&details.CachedImageTokens, cachedTokenCount.TokenCount)
 			case googleapi.ModalityTokenCountModalityAUDIO:
-				details.CachedAudioTokens = cachedTokenCount.TokenCount
+				add(&details.CachedAudioTokens, cachedTokenCount.TokenCount)
 			}
 		}
 	}

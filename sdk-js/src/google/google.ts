@@ -65,7 +65,7 @@ import type {
   ToolChoiceOption,
   ToolResultStatus,
 } from "../types.ts";
-import { calculateCost } from "../usage.utils.ts";
+import { calculateCost, mergeModelUsageMax } from "../usage.utils.ts";
 
 const PROVIDER = "google";
 
@@ -118,14 +118,12 @@ export class GoogleModel implements LanguageModel {
     const result: ModelResponse = { content };
     if (response.usageMetadata) {
       const usage = mapGoogleUsageMetadata(response.usageMetadata);
-      if (usage) {
-        result.usage = usage;
-        if (this.metadata?.pricing) {
-          result.cost = calculateCost(usage, this.metadata.pricing, {
-            input_cache_tokens_are_additional: false,
-            output_reasoning_tokens_are_additional: true,
-          });
-        }
+      result.usage = usage;
+      if (this.metadata?.pricing) {
+        result.cost = calculateCost(usage, this.metadata.pricing, {
+          input_cache_tokens_are_additional: false,
+          output_reasoning_tokens_are_additional: true,
+        });
       }
     }
 
@@ -204,8 +202,10 @@ export class GoogleModel implements LanguageModel {
       }
 
       if (chunk.usageMetadata) {
-        streamUsage =
-          mapGoogleUsageMetadata(chunk.usageMetadata) ?? streamUsage;
+        streamUsage = mergeModelUsageMax(
+          streamUsage,
+          mapGoogleUsageMetadata(chunk.usageMetadata),
+        );
       }
     }
 
@@ -840,22 +840,94 @@ function nextGoogleDeltaIndex(
 
 function mapGoogleUsageMetadata(
   usageMetadata: GenerateContentResponseUsageMetadata,
-): ModelUsage | undefined {
-  if (
-    typeof usageMetadata.promptTokenCount !== "number" ||
-    typeof usageMetadata.candidatesTokenCount !== "number"
-  ) {
-    return undefined;
+): ModelUsage {
+  const value = (value: number | undefined) =>
+    typeof value === "number" && Number.isFinite(value)
+      ? Math.max(0, value)
+      : undefined;
+  const sumTokenCounts = (details: ModalityTokenCount[] | undefined) => {
+    let total = 0;
+    let hasCount = false;
+    for (const detail of details ?? []) {
+      const count = value(detail.tokenCount);
+      if (count !== undefined) {
+        total += count;
+        hasCount = true;
+      }
+    }
+    return hasCount ? total : undefined;
+  };
+
+  let promptTokens =
+    value(usageMetadata.promptTokenCount) ??
+    sumTokenCounts(usageMetadata.promptTokensDetails);
+  let toolUsePromptTokens =
+    value(usageMetadata.toolUsePromptTokenCount) ??
+    sumTokenCounts(usageMetadata.toolUsePromptTokensDetails);
+  let outputTokens =
+    value(usageMetadata.candidatesTokenCount) ??
+    sumTokenCounts(usageMetadata.candidatesTokensDetails);
+  let reasoningTokens = value(usageMetadata.thoughtsTokenCount);
+  const totalTokens = value(usageMetadata.totalTokenCount);
+
+  if (totalTokens !== undefined) {
+    if (promptTokens === undefined && outputTokens !== undefined) {
+      promptTokens = Math.max(
+        0,
+        totalTokens -
+          outputTokens -
+          (toolUsePromptTokens ?? 0) -
+          (reasoningTokens ?? 0),
+      );
+    } else if (outputTokens === undefined && promptTokens !== undefined) {
+      outputTokens = Math.max(
+        0,
+        totalTokens -
+          promptTokens -
+          (toolUsePromptTokens ?? 0) -
+          (reasoningTokens ?? 0),
+      );
+    }
+
+    const residual = Math.max(
+      0,
+      totalTokens -
+        (promptTokens ?? 0) -
+        (toolUsePromptTokens ?? 0) -
+        (outputTokens ?? 0) -
+        (reasoningTokens ?? 0),
+    );
+    if (residual > 0) {
+      if (reasoningTokens === undefined) {
+        reasoningTokens = residual;
+      } else if (toolUsePromptTokens === undefined) {
+        toolUsePromptTokens = residual;
+      } else if (outputTokens === undefined) {
+        outputTokens = residual;
+      } else {
+        promptTokens = (promptTokens ?? 0) + residual;
+      }
+    }
   }
 
+  promptTokens ??= 0;
+  toolUsePromptTokens ??= 0;
+  outputTokens ??= 0;
+  reasoningTokens ??= 0;
+
   const usage: ModelUsage = {
-    input_tokens: usageMetadata.promptTokenCount,
-    output_tokens: usageMetadata.candidatesTokenCount,
+    input_tokens: promptTokens + toolUsePromptTokens,
+    output_tokens: outputTokens,
   };
   const inputDetails =
-    usageMetadata.promptTokensDetails || usageMetadata.cacheTokensDetails
+    usageMetadata.promptTokensDetails ||
+    usageMetadata.toolUsePromptTokensDetails ||
+    usageMetadata.cacheTokensDetails
       ? mapGoogleModalityTokenCountToUsageDetails(
-          usageMetadata.promptTokensDetails ?? [],
+          [
+            ...(usageMetadata.promptTokensDetails ?? []),
+            ...(usageMetadata.toolUsePromptTokensDetails ?? []),
+          ],
           usageMetadata.cacheTokensDetails,
         )
       : {};
@@ -871,8 +943,11 @@ function mapGoogleUsageMetadata(
         usageMetadata.candidatesTokensDetails,
       )
     : {};
-  if (typeof usageMetadata.thoughtsTokenCount === "number") {
-    outputDetails.reasoning_tokens = usageMetadata.thoughtsTokenCount;
+  if (
+    typeof usageMetadata.thoughtsTokenCount === "number" ||
+    reasoningTokens > 0
+  ) {
+    outputDetails.reasoning_tokens = reasoningTokens;
   }
   if (Object.keys(outputDetails).length > 0) {
     usage.output_tokens_details = outputDetails;
@@ -890,15 +965,19 @@ function mapGoogleModalityTokenCountToUsageDetails(
     if (detail.tokenCount === undefined) {
       continue;
     }
+    const tokenCount = Math.max(0, detail.tokenCount);
     switch (detail.modality) {
       case MediaModality.TEXT:
-        tokensDetails.text_tokens = detail.tokenCount;
+        tokensDetails.text_tokens =
+          (tokensDetails.text_tokens ?? 0) + tokenCount;
         break;
       case MediaModality.IMAGE:
-        tokensDetails.image_tokens = detail.tokenCount;
+        tokensDetails.image_tokens =
+          (tokensDetails.image_tokens ?? 0) + tokenCount;
         break;
       case MediaModality.AUDIO:
-        tokensDetails.audio_tokens = detail.tokenCount;
+        tokensDetails.audio_tokens =
+          (tokensDetails.audio_tokens ?? 0) + tokenCount;
         break;
       default:
         break;
@@ -908,15 +987,19 @@ function mapGoogleModalityTokenCountToUsageDetails(
     if (detail.tokenCount === undefined) {
       continue;
     }
+    const tokenCount = Math.max(0, detail.tokenCount);
     switch (detail.modality) {
       case MediaModality.TEXT:
-        tokensDetails.cached_text_tokens = detail.tokenCount;
+        tokensDetails.cached_text_tokens =
+          (tokensDetails.cached_text_tokens ?? 0) + tokenCount;
         break;
       case MediaModality.IMAGE:
-        tokensDetails.cached_image_tokens = detail.tokenCount;
+        tokensDetails.cached_image_tokens =
+          (tokensDetails.cached_image_tokens ?? 0) + tokenCount;
         break;
       case MediaModality.AUDIO:
-        tokensDetails.cached_audio_tokens = detail.tokenCount;
+        tokensDetails.cached_audio_tokens =
+          (tokensDetails.cached_audio_tokens ?? 0) + tokenCount;
         break;
       default:
         break;
