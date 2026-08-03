@@ -1020,10 +1020,10 @@ fn map_tool_use_block(block: api::ResponseToolUseBlock) -> ToolCallPart {
 fn map_anthropic_usage(usage: &Usage) -> ModelUsage {
     let mut input_tokens_details = ModelTokensDetails::default();
     if let Some(value) = usage.cache_read_input_tokens {
-        input_tokens_details.cached_tokens = Some(value as u32);
+        input_tokens_details.cached_tokens = Some(u32::try_from(value).unwrap_or(0));
     }
     if let Some(value) = usage.cache_creation_input_tokens {
-        input_tokens_details.cache_write_tokens = Some(value as u32);
+        input_tokens_details.cache_write_tokens = Some(u32::try_from(value).unwrap_or(0));
     }
 
     let output_tokens_details =
@@ -1031,13 +1031,13 @@ fn map_anthropic_usage(usage: &Usage) -> ModelUsage {
             .output_tokens_details
             .as_ref()
             .map(|details| ModelTokensDetails {
-                reasoning_tokens: Some(details.thinking_tokens as u32),
+                reasoning_tokens: Some(u32::try_from(details.thinking_tokens).unwrap_or(0)),
                 ..Default::default()
             });
 
     ModelUsage {
-        input_tokens: usage.input_tokens as u32,
-        output_tokens: usage.output_tokens as u32,
+        input_tokens: u32::try_from(usage.input_tokens).unwrap_or(0),
+        output_tokens: u32::try_from(usage.output_tokens).unwrap_or(0),
         input_tokens_details: if usage.cache_read_input_tokens.is_some()
             || usage.cache_creation_input_tokens.is_some()
         {
@@ -1051,17 +1051,17 @@ fn map_anthropic_usage(usage: &Usage) -> ModelUsage {
 
 fn merge_anthropic_message_delta_usage(current: &mut ModelUsage, usage: &MessageDeltaUsage) {
     if let Some(value) = usage.input_tokens {
-        current.input_tokens = value as u32;
+        current.input_tokens = u32::try_from(value).unwrap_or(0);
     }
-    current.output_tokens = usage.output_tokens as u32;
+    current.output_tokens = u32::try_from(usage.output_tokens).unwrap_or(0);
 
     if usage.cache_read_input_tokens.is_some() || usage.cache_creation_input_tokens.is_some() {
         let details = current.input_tokens_details.get_or_insert_default();
         if let Some(value) = usage.cache_read_input_tokens {
-            details.cached_tokens = Some(value as u32);
+            details.cached_tokens = Some(u32::try_from(value).unwrap_or(0));
         }
         if let Some(value) = usage.cache_creation_input_tokens {
-            details.cache_write_tokens = Some(value as u32);
+            details.cache_write_tokens = Some(u32::try_from(value).unwrap_or(0));
         }
     }
 
@@ -1069,7 +1069,7 @@ fn merge_anthropic_message_delta_usage(current: &mut ModelUsage, usage: &Message
         current
             .output_tokens_details
             .get_or_insert_default()
-            .reasoning_tokens = Some(output_details.thinking_tokens as u32);
+            .reasoning_tokens = Some(u32::try_from(output_details.thinking_tokens).unwrap_or(0));
     }
 }
 

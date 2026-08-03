@@ -1027,8 +1027,8 @@ fn map_openai_delta(
 
 fn map_openai_usage(usage: CompletionUsage) -> ModelUsage {
     let mut result = ModelUsage {
-        input_tokens: usage.prompt_tokens as u32,
-        output_tokens: usage.completion_tokens as u32,
+        input_tokens: u32::try_from(usage.prompt_tokens).unwrap_or(0),
+        output_tokens: u32::try_from(usage.completion_tokens).unwrap_or(0),
         input_tokens_details: None,
         output_tokens_details: None,
     };
@@ -1050,23 +1050,23 @@ fn map_openai_prompt_tokens_details(
     let mut result = crate::ModelTokensDetails::default();
 
     if let Some(text_tokens) = details.text_tokens {
-        result.text_tokens = Some(text_tokens as u32);
+        result.text_tokens = Some(u32::try_from(text_tokens).unwrap_or(0));
     }
 
     if let Some(audio_tokens) = details.audio_tokens {
-        result.audio_tokens = Some(audio_tokens as u32);
+        result.audio_tokens = Some(u32::try_from(audio_tokens).unwrap_or(0));
     }
 
     if let Some(image_tokens) = details.image_tokens {
-        result.image_tokens = Some(image_tokens as u32);
+        result.image_tokens = Some(u32::try_from(image_tokens).unwrap_or(0));
     }
 
     if let Some(cached_tokens) = details.cached_tokens {
-        result.cached_tokens = Some(cached_tokens as u32);
+        result.cached_tokens = Some(u32::try_from(cached_tokens).unwrap_or(0));
     }
 
     if let Some(cache_write_tokens) = details.cache_write_tokens {
-        result.cache_write_tokens = Some(cache_write_tokens as u32);
+        result.cache_write_tokens = Some(u32::try_from(cache_write_tokens).unwrap_or(0));
     }
 
     (result != crate::ModelTokensDetails::default()).then_some(result)
@@ -1078,15 +1078,15 @@ fn map_openai_completion_tokens_details(
     let mut result = crate::ModelTokensDetails::default();
 
     if let Some(text_tokens) = details.text_tokens {
-        result.text_tokens = Some(text_tokens as u32);
+        result.text_tokens = Some(u32::try_from(text_tokens).unwrap_or(0));
     }
 
     if let Some(audio_tokens) = details.audio_tokens {
-        result.audio_tokens = Some(audio_tokens as u32);
+        result.audio_tokens = Some(u32::try_from(audio_tokens).unwrap_or(0));
     }
 
     if let Some(reasoning_tokens) = details.reasoning_tokens {
-        result.reasoning_tokens = Some(reasoning_tokens as u32);
+        result.reasoning_tokens = Some(u32::try_from(reasoning_tokens).unwrap_or(0));
     }
 
     (result != crate::ModelTokensDetails::default()).then_some(result)

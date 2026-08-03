@@ -998,7 +998,8 @@ fn map_google_usage_metadata(usage: &UsageMetadata) -> Option<ModelUsage> {
     );
 
     if let Some(cached_tokens) = usage.cached_content_token_count {
-        input_tokens_details.get_or_insert_default().cached_tokens = Some(cached_tokens as u32);
+        input_tokens_details.get_or_insert_default().cached_tokens =
+            Some(u32::try_from(cached_tokens).unwrap_or(0));
     }
 
     let mut output_tokens_details =
@@ -1007,12 +1008,12 @@ fn map_google_usage_metadata(usage: &UsageMetadata) -> Option<ModelUsage> {
     if let Some(reasoning_tokens) = usage.thoughts_token_count {
         output_tokens_details
             .get_or_insert_default()
-            .reasoning_tokens = Some(reasoning_tokens as u32);
+            .reasoning_tokens = Some(u32::try_from(reasoning_tokens).unwrap_or(0));
     }
 
     Some(ModelUsage {
-        input_tokens: input_tokens as u32,
-        output_tokens: output_tokens as u32,
+        input_tokens: u32::try_from(input_tokens).unwrap_or(0),
+        output_tokens: u32::try_from(output_tokens).unwrap_or(0),
         input_tokens_details,
         output_tokens_details,
     })
@@ -1034,15 +1035,15 @@ fn map_modality_token_counts(
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
                 match modality {
                     ModalityTokenCountModality::TEXT => {
-                        tokens_details.text_tokens = Some(count as u32);
+                        tokens_details.text_tokens = Some(u32::try_from(count).unwrap_or(0));
                         mapped_any = true;
                     }
                     ModalityTokenCountModality::AUDIO => {
-                        tokens_details.audio_tokens = Some(count as u32);
+                        tokens_details.audio_tokens = Some(u32::try_from(count).unwrap_or(0));
                         mapped_any = true;
                     }
                     ModalityTokenCountModality::IMAGE => {
-                        tokens_details.image_tokens = Some(count as u32);
+                        tokens_details.image_tokens = Some(u32::try_from(count).unwrap_or(0));
                         mapped_any = true;
                     }
                     _ => {}
@@ -1056,15 +1057,17 @@ fn map_modality_token_counts(
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
                 match modality {
                     ModalityTokenCountModality::TEXT => {
-                        tokens_details.cached_text_tokens = Some(count as u32);
+                        tokens_details.cached_text_tokens = Some(u32::try_from(count).unwrap_or(0));
                         mapped_any = true;
                     }
                     ModalityTokenCountModality::AUDIO => {
-                        tokens_details.cached_audio_tokens = Some(count as u32);
+                        tokens_details.cached_audio_tokens =
+                            Some(u32::try_from(count).unwrap_or(0));
                         mapped_any = true;
                     }
                     ModalityTokenCountModality::IMAGE => {
-                        tokens_details.cached_image_tokens = Some(count as u32);
+                        tokens_details.cached_image_tokens =
+                            Some(u32::try_from(count).unwrap_or(0));
                         mapped_any = true;
                     }
                     _ => {}

@@ -1250,15 +1250,21 @@ fn parse_openai_image_size(size: Option<&String>) -> Option<(u32, u32)> {
 
 fn map_openai_response_usage(value: &ResponseUsage) -> ModelUsage {
     ModelUsage {
-        input_tokens: value.input_tokens as u32,
-        output_tokens: value.output_tokens as u32,
+        input_tokens: u32::try_from(value.input_tokens).unwrap_or(0),
+        output_tokens: u32::try_from(value.output_tokens).unwrap_or(0),
         input_tokens_details: Some(crate::ModelTokensDetails {
-            cached_tokens: Some(value.input_tokens_details.cached_tokens as u32),
-            cache_write_tokens: Some(value.input_tokens_details.cache_write_tokens as u32),
+            cached_tokens: Some(
+                u32::try_from(value.input_tokens_details.cached_tokens).unwrap_or(0),
+            ),
+            cache_write_tokens: Some(
+                u32::try_from(value.input_tokens_details.cache_write_tokens).unwrap_or(0),
+            ),
             ..Default::default()
         }),
         output_tokens_details: Some(crate::ModelTokensDetails {
-            reasoning_tokens: Some(value.output_tokens_details.reasoning_tokens as u32),
+            reasoning_tokens: Some(
+                u32::try_from(value.output_tokens_details.reasoning_tokens).unwrap_or(0),
+            ),
             ..Default::default()
         }),
     }

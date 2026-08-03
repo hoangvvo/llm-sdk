@@ -1,5 +1,12 @@
 use llm_sdk::{LanguageModelPricing, ModelTokensDetails, ModelUsage, ModelUsageCostOptions};
 
+fn assert_cost_eq(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() < f64::EPSILON,
+        "expected cost {expected}, got {actual}"
+    );
+}
+
 #[test]
 fn calculates_included_and_additional_cache_tokens_without_double_counting() {
     let pricing = LanguageModelPricing {
@@ -30,7 +37,7 @@ fn calculates_included_and_additional_cache_tokens_without_double_counting() {
         ..included.clone()
     };
 
-    assert_eq!(
+    assert_cost_eq(
         included.calculate_cost(
             &pricing,
             &ModelUsageCostOptions {
@@ -38,9 +45,9 @@ fn calculates_included_and_additional_cache_tokens_without_double_counting() {
                 output_reasoning_tokens_are_additional: false,
             },
         ),
-        180.0
+        180.0,
     );
-    assert_eq!(
+    assert_cost_eq(
         additional.calculate_cost(
             &pricing,
             &ModelUsageCostOptions {
@@ -48,7 +55,7 @@ fn calculates_included_and_additional_cache_tokens_without_double_counting() {
                 output_reasoning_tokens_are_additional: false,
             },
         ),
-        180.0
+        180.0,
     );
 }
 
@@ -78,7 +85,7 @@ fn uses_modality_cache_breakdown_instead_of_aggregate_duplicate() {
         input_cost_per_cached_image_token: None,
         output_cost_per_image_token: None,
     };
-    assert_eq!(
+    assert_cost_eq(
         usage.calculate_cost(
             &pricing,
             &ModelUsageCostOptions {
@@ -86,7 +93,7 @@ fn uses_modality_cache_breakdown_instead_of_aggregate_duplicate() {
                 output_reasoning_tokens_are_additional: false,
             },
         ),
-        80.0
+        80.0,
     );
 }
 
@@ -114,7 +121,7 @@ fn handles_additional_reasoning_and_missing_cache_rate() {
         input_cost_per_cached_image_token: None,
         output_cost_per_image_token: None,
     };
-    assert_eq!(
+    assert_cost_eq(
         reasoning_usage.calculate_cost(
             &output_pricing,
             &ModelUsageCostOptions {
@@ -122,9 +129,9 @@ fn handles_additional_reasoning_and_missing_cache_rate() {
                 output_reasoning_tokens_are_additional: false,
             },
         ),
-        30.0
+        30.0,
     );
-    assert_eq!(
+    assert_cost_eq(
         reasoning_usage.calculate_cost(
             &output_pricing,
             &ModelUsageCostOptions {
@@ -132,7 +139,7 @@ fn handles_additional_reasoning_and_missing_cache_rate() {
                 output_reasoning_tokens_are_additional: true,
             },
         ),
-        45.0
+        45.0,
     );
 
     let write_usage = ModelUsage {
@@ -157,7 +164,7 @@ fn handles_additional_reasoning_and_missing_cache_rate() {
         input_cost_per_cached_image_token: None,
         output_cost_per_image_token: None,
     };
-    assert_eq!(
+    assert_cost_eq(
         write_usage.calculate_cost(
             &input_pricing,
             &ModelUsageCostOptions {
@@ -165,7 +172,7 @@ fn handles_additional_reasoning_and_missing_cache_rate() {
                 output_reasoning_tokens_are_additional: false,
             },
         ),
-        80.0
+        80.0,
     );
 }
 
@@ -193,7 +200,7 @@ fn adjusts_reported_modality_tokens_from_the_aggregate_rate() {
         input_cost_per_cached_image_token: None,
         output_cost_per_image_token: None,
     };
-    assert_eq!(
+    assert_cost_eq(
         usage.calculate_cost(
             &pricing,
             &ModelUsageCostOptions {
@@ -201,7 +208,7 @@ fn adjusts_reported_modality_tokens_from_the_aggregate_rate() {
                 output_reasoning_tokens_are_additional: false,
             },
         ),
-        220.0
+        220.0,
     );
 }
 
@@ -232,7 +239,7 @@ fn ignores_zero_only_modality_details() {
         input_cost_per_cached_image_token: None,
         output_cost_per_image_token: None,
     };
-    assert_eq!(
+    assert_cost_eq(
         usage.calculate_cost(
             &pricing,
             &ModelUsageCostOptions {
@@ -240,6 +247,6 @@ fn ignores_zero_only_modality_details() {
                 output_reasoning_tokens_are_additional: false,
             },
         ),
-        240.0
+        240.0,
     );
 }
