@@ -62,10 +62,21 @@ suite("GoogleModel", () => {
       t,
       "google_transport",
       (baseURL) =>
-        new GoogleModel({
-          apiKey: "test-token",
-          modelId: "test-model",
-          baseURL,
-        }),
+        new GoogleModel(
+          {
+            apiKey: "test-token",
+            modelId: "test-model",
+            baseURL,
+          },
+          {
+            pricing: {
+              input_cost_per_text_token: 2,
+              input_cost_per_cached_token: 1,
+              input_cost_per_audio_token: 3,
+              output_cost_per_text_token: 4,
+              output_cost_per_audio_token: 5,
+            },
+          },
+        ),
     ));
 });

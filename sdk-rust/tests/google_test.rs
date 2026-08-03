@@ -1,5 +1,5 @@
 use crate::{common, common::cases::RunTestCaseOptions, test_group};
-use llm_sdk::google::*;
+use llm_sdk::{google::*, LanguageModelMetadata, LanguageModelPricing};
 use std::{env, error::Error, sync::OnceLock};
 use tokio::test;
 
@@ -109,6 +109,22 @@ async fn transport() -> Result<(), Box<dyn Error>> {
                 ..Default::default()
             },
         )
+        .with_metadata(LanguageModelMetadata {
+            pricing: Some(LanguageModelPricing {
+                input_cost_per_text_token: Some(2.0),
+                input_cost_per_cached_token: Some(1.0),
+                input_cost_per_cache_write_token: None,
+                input_cost_per_cached_text_token: None,
+                output_cost_per_text_token: Some(4.0),
+                input_cost_per_audio_token: Some(3.0),
+                input_cost_per_cached_audio_token: None,
+                output_cost_per_audio_token: Some(5.0),
+                input_cost_per_image_token: None,
+                input_cost_per_cached_image_token: None,
+                output_cost_per_image_token: None,
+            }),
+            capabilities: None,
+        })
     })
     .await
 }

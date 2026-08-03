@@ -683,6 +683,19 @@ function validateResponseMetadata({
     }
   }
 
+  if (typeof expected.cost === "number") {
+    const actualCost = response?.cost;
+    const tolerance = Math.max(1e-12, Math.abs(expected.cost) * 1e-12);
+    if (
+      typeof actualCost !== "number" ||
+      Math.abs(actualCost - expected.cost) > tolerance
+    ) {
+      fail(
+        `Output validation failed for "${testCaseName}" stage ${stageIndex}: expected cost ${expected.cost}, received ${String(actualCost)}.`,
+      );
+    }
+  }
+
   if (expected.usage === true) {
     validateUsage(testCaseName, stageIndex, response?.usage);
   } else if (expected.usage === false && response?.usage !== undefined) {

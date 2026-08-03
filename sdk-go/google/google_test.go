@@ -7,6 +7,7 @@ import (
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/google"
 	"github.com/hoangvvo/llm-sdk/sdk-go/internal/testcommon"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"github.com/joho/godotenv"
 )
 
@@ -83,6 +84,12 @@ func TestTransport(t *testing.T) {
 		return google.NewGoogleModel("test-model", google.GoogleModelOptions{
 			APIKey:  "test-token",
 			BaseURL: baseURL,
-		})
+		}).WithMetadata(&llmsdk.LanguageModelMetadata{Pricing: &llmsdk.LanguageModelPricing{
+			InputCostPerTextToken:   ptr.To(2.0),
+			InputCostPerCachedToken: ptr.To(1.0),
+			InputCostPerAudioToken:  ptr.To(3.0),
+			OutputCostPerTextToken:  ptr.To(4.0),
+			OutputCostPerAudioToken: ptr.To(5.0),
+		}})
 	})
 }

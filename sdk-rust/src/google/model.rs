@@ -152,7 +152,7 @@ impl LanguageModel for GoogleModel {
 
                     let usage = response
                         .usage_metadata
-                        .and_then(|u| map_google_usage_metadata(&u));
+                        .map(|u| map_google_usage_metadata(&u));
 
                     let cost = if let (Some(usage), Some(pricing)) = (
                         usage.as_ref(),
@@ -252,8 +252,11 @@ impl LanguageModel for GoogleModel {
                             }
 
                             if let Some(usage_metadata) = response.usage_metadata {
-                                if let Some(usage) = map_google_usage_metadata(&usage_metadata) {
-                                    stream_usage = Some(usage);
+                                let incoming_usage = map_google_usage_metadata(&usage_metadata);
+                                if let Some(current_usage) = stream_usage.as_mut() {
+                                    merge_google_usage_max(current_usage, incoming_usage);
+                                } else {
+                                    stream_usage = Some(incoming_usage);
                                 }
                             }
                         }
@@ -985,65 +988,187 @@ fn next_google_delta_index(
         .map_or(0, |index| index + 1)
 }
 
-fn map_google_usage_metadata(usage: &UsageMetadata) -> Option<ModelUsage> {
-    let (Some(input_tokens), Some(output_tokens)) =
-        (usage.prompt_token_count, usage.candidates_token_count)
-    else {
-        return None;
+fn merge_google_usage_max(current: &mut ModelUsage, incoming: ModelUsage) {
+    current.input_tokens = current.input_tokens.max(incoming.input_tokens);
+    current.output_tokens = current.output_tokens.max(incoming.output_tokens);
+    merge_google_token_details_max(
+        &mut current.input_tokens_details,
+        incoming.input_tokens_details,
+    );
+    merge_google_token_details_max(
+        &mut current.output_tokens_details,
+        incoming.output_tokens_details,
+    );
+}
+
+fn merge_google_token_details_max(
+    current: &mut Option<ModelTokensDetails>,
+    incoming: Option<ModelTokensDetails>,
+) {
+    let Some(incoming) = incoming else {
+        return;
+    };
+    let current = current.get_or_insert_default();
+    macro_rules! merge {
+        ($field:ident) => {
+            if let Some(value) = incoming.$field {
+                current.$field = Some(current.$field.unwrap_or(0).max(value));
+            }
+        };
+    }
+    merge!(text_tokens);
+    merge!(audio_tokens);
+    merge!(image_tokens);
+    merge!(cached_text_tokens);
+    merge!(cached_audio_tokens);
+    merge!(cached_image_tokens);
+    merge!(cached_tokens);
+    merge!(cache_write_tokens);
+    merge!(reasoning_tokens);
+}
+
+fn map_google_usage_metadata(usage: &UsageMetadata) -> ModelUsage {
+    let value =
+        |value: Option<i64>| value.map(|value| u32::try_from(value.max(0)).unwrap_or(u32::MAX));
+    let sum_token_counts = |details: Option<&Vec<ModalityTokenCount>>| {
+        let mut total = 0_u32;
+        let mut has_count = false;
+        for detail in details.into_iter().flatten() {
+            if let Some(count) = value(detail.token_count) {
+                total = total.saturating_add(count);
+                has_count = true;
+            }
+        }
+        has_count.then_some(total)
     };
 
-    let mut input_tokens_details = map_modality_token_counts(
-        usage.prompt_tokens_details.as_ref(),
-        usage.cache_tokens_details.as_ref(),
-    );
+    let mut prompt_tokens = value(usage.prompt_token_count)
+        .or_else(|| sum_token_counts(usage.prompt_tokens_details.as_ref()));
+    let mut tool_use_prompt_tokens = value(usage.tool_use_prompt_token_count)
+        .or_else(|| sum_token_counts(usage.tool_use_prompt_tokens_details.as_ref()));
+    let mut output_tokens = value(usage.candidates_token_count)
+        .or_else(|| sum_token_counts(usage.candidates_tokens_details.as_ref()));
+    let mut reasoning_tokens = value(usage.thoughts_token_count);
+    let total_tokens = value(usage.total_token_count);
+
+    if let Some(total_tokens) = total_tokens {
+        if prompt_tokens.is_none() && output_tokens.is_some() {
+            prompt_tokens = Some(
+                total_tokens
+                    .saturating_sub(output_tokens.unwrap_or(0))
+                    .saturating_sub(tool_use_prompt_tokens.unwrap_or(0))
+                    .saturating_sub(reasoning_tokens.unwrap_or(0)),
+            );
+        } else if output_tokens.is_none() && prompt_tokens.is_some() {
+            output_tokens = Some(
+                total_tokens
+                    .saturating_sub(prompt_tokens.unwrap_or(0))
+                    .saturating_sub(tool_use_prompt_tokens.unwrap_or(0))
+                    .saturating_sub(reasoning_tokens.unwrap_or(0)),
+            );
+        }
+
+        let residual = total_tokens
+            .saturating_sub(prompt_tokens.unwrap_or(0))
+            .saturating_sub(tool_use_prompt_tokens.unwrap_or(0))
+            .saturating_sub(output_tokens.unwrap_or(0))
+            .saturating_sub(reasoning_tokens.unwrap_or(0));
+        if residual > 0 {
+            if reasoning_tokens.is_none() {
+                reasoning_tokens = Some(residual);
+            } else if tool_use_prompt_tokens.is_none() {
+                tool_use_prompt_tokens = Some(residual);
+            } else if output_tokens.is_none() {
+                output_tokens = Some(residual);
+            } else {
+                prompt_tokens = Some(prompt_tokens.unwrap_or(0).saturating_add(residual));
+            }
+        }
+    }
+
+    let prompt_tokens = prompt_tokens.unwrap_or(0);
+    let tool_use_prompt_tokens = tool_use_prompt_tokens.unwrap_or(0);
+    let output_tokens = output_tokens.unwrap_or(0);
+    let reasoning_tokens = reasoning_tokens.unwrap_or(0);
+
+    let input_detail_sets = [
+        usage.prompt_tokens_details.as_deref().unwrap_or_default(),
+        usage
+            .tool_use_prompt_tokens_details
+            .as_deref()
+            .unwrap_or_default(),
+    ];
+
+    let mut input_tokens_details =
+        map_modality_token_counts(&input_detail_sets, usage.cache_tokens_details.as_deref());
 
     if let Some(cached_tokens) = usage.cached_content_token_count {
         input_tokens_details.get_or_insert_default().cached_tokens =
-            Some(u32::try_from(cached_tokens).unwrap_or(0));
+            Some(value(Some(cached_tokens)).unwrap_or(0));
     }
 
-    let mut output_tokens_details =
-        map_modality_token_counts(usage.candidates_tokens_details.as_ref(), None);
+    let output_detail_sets = [usage
+        .candidates_tokens_details
+        .as_deref()
+        .unwrap_or_default()];
+    let mut output_tokens_details = map_modality_token_counts(&output_detail_sets, None);
 
-    if let Some(reasoning_tokens) = usage.thoughts_token_count {
+    if usage.thoughts_token_count.is_some() || reasoning_tokens > 0 {
         output_tokens_details
             .get_or_insert_default()
-            .reasoning_tokens = Some(u32::try_from(reasoning_tokens).unwrap_or(0));
+            .reasoning_tokens = Some(reasoning_tokens);
     }
 
-    Some(ModelUsage {
-        input_tokens: u32::try_from(input_tokens).unwrap_or(0),
-        output_tokens: u32::try_from(output_tokens).unwrap_or(0),
+    ModelUsage {
+        input_tokens: prompt_tokens.saturating_add(tool_use_prompt_tokens),
+        output_tokens,
         input_tokens_details,
         output_tokens_details,
-    })
+    }
 }
 
 fn map_modality_token_counts(
-    details: Option<&Vec<ModalityTokenCount>>,
-    cached_details: Option<&Vec<ModalityTokenCount>>,
+    detail_sets: &[&[ModalityTokenCount]],
+    cached_details: Option<&[ModalityTokenCount]>,
 ) -> Option<ModelTokensDetails> {
-    if details.is_none() && cached_details.is_none() {
+    if detail_sets.iter().all(|details| details.is_empty()) && cached_details.is_none() {
         return None;
     }
 
     let mut tokens_details = ModelTokensDetails::default();
     let mut mapped_any = false;
+    let value = |value: i64| u32::try_from(value.max(0)).unwrap_or(u32::MAX);
 
-    if let Some(details) = details {
-        for detail in details {
+    for details in detail_sets {
+        for detail in *details {
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
+                let count = value(count);
                 match modality {
                     ModalityTokenCountModality::TEXT => {
-                        tokens_details.text_tokens = Some(u32::try_from(count).unwrap_or(0));
+                        tokens_details.text_tokens = Some(
+                            tokens_details
+                                .text_tokens
+                                .unwrap_or(0)
+                                .saturating_add(count),
+                        );
                         mapped_any = true;
                     }
                     ModalityTokenCountModality::AUDIO => {
-                        tokens_details.audio_tokens = Some(u32::try_from(count).unwrap_or(0));
+                        tokens_details.audio_tokens = Some(
+                            tokens_details
+                                .audio_tokens
+                                .unwrap_or(0)
+                                .saturating_add(count),
+                        );
                         mapped_any = true;
                     }
                     ModalityTokenCountModality::IMAGE => {
-                        tokens_details.image_tokens = Some(u32::try_from(count).unwrap_or(0));
+                        tokens_details.image_tokens = Some(
+                            tokens_details
+                                .image_tokens
+                                .unwrap_or(0)
+                                .saturating_add(count),
+                        );
                         mapped_any = true;
                     }
                     _ => {}
@@ -1055,19 +1180,33 @@ fn map_modality_token_counts(
     if let Some(cached) = cached_details {
         for detail in cached {
             if let (Some(modality), Some(count)) = (&detail.modality, detail.token_count) {
+                let count = value(count);
                 match modality {
                     ModalityTokenCountModality::TEXT => {
-                        tokens_details.cached_text_tokens = Some(u32::try_from(count).unwrap_or(0));
+                        tokens_details.cached_text_tokens = Some(
+                            tokens_details
+                                .cached_text_tokens
+                                .unwrap_or(0)
+                                .saturating_add(count),
+                        );
                         mapped_any = true;
                     }
                     ModalityTokenCountModality::AUDIO => {
-                        tokens_details.cached_audio_tokens =
-                            Some(u32::try_from(count).unwrap_or(0));
+                        tokens_details.cached_audio_tokens = Some(
+                            tokens_details
+                                .cached_audio_tokens
+                                .unwrap_or(0)
+                                .saturating_add(count),
+                        );
                         mapped_any = true;
                     }
                     ModalityTokenCountModality::IMAGE => {
-                        tokens_details.cached_image_tokens =
-                            Some(u32::try_from(count).unwrap_or(0));
+                        tokens_details.cached_image_tokens = Some(
+                            tokens_details
+                                .cached_image_tokens
+                                .unwrap_or(0)
+                                .saturating_add(count),
+                        );
                         mapped_any = true;
                     }
                     _ => {}
