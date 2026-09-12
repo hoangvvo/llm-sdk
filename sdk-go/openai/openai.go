@@ -182,6 +182,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 			normalizedOutputIndexes := map[int]int{}
 			nextContentIndex := 0
 			webSearchRequests := 0
+			streamState := &openAIStreamState{}
 
 			for sseStream.Next() {
 				streamEvent, err := sseStream.Current()
@@ -200,7 +201,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					webSearchRequests++
 				}
 
-				partDelta, err := mapOpenAIStreamEvent(*streamEvent)
+				partDelta, err := mapOpenAIStreamEvent(*streamEvent, streamState)
 				if err != nil {
 					errCh <- fmt.Errorf("failed to map stream event: %w", err)
 					return
@@ -258,7 +259,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 // MARK: - Convert To OpenAI API Types
 
 func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID string) (*openaiapi.CreateResponse, error) {
-	inputItems, err := convertToOpenAIInputs(input.Messages)
+	inputItems, err := convertToOpenAIInputs(input.Messages, input.Tools)
 	if err != nil {
 		return nil, err
 	}
@@ -315,20 +316,17 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 				tools = append(tools, openaiapi.Tool{WebSearchTool: openAIWebSearch})
 				continue
 			}
+			if tool.ToolSearchTool != nil {
+				// OpenAI's hosted search has a single algorithm, so strategy is ignored.
+				tools = append(tools, openaiapi.Tool{ToolSearchToolParam: &openaiapi.ToolSearchToolParam{
+					Type: openaiapi.ToolSearchToolParamTypeToolSearch,
+				}})
+				continue
+			}
 			if tool.FunctionTool == nil {
 				continue
 			}
-			functionTool := tool.FunctionTool
-			openAITool := openaiapi.Tool{
-				FunctionTool: &openaiapi.FunctionTool{
-					Name:        functionTool.Name,
-					Description: &functionTool.Description,
-					Parameters:  functionTool.Parameters,
-					Strict:      ptr.To(true),
-					Type:        openaiapi.FunctionToolTypeFunction,
-				},
-			}
-			tools = append(tools, openAITool)
+			tools = append(tools, convertToOpenAIFunctionTool(tool.FunctionTool))
 		}
 		params.Tools = &tools
 		if hasWebSearchTool {
@@ -371,9 +369,23 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 	return params, nil
 }
 
+func convertToOpenAIFunctionTool(functionTool *llmsdk.FunctionTool) openaiapi.Tool {
+	openAIFunctionTool := &openaiapi.FunctionTool{
+		Name:        functionTool.Name,
+		Description: ptr.To(functionTool.Description),
+		Parameters:  functionTool.Parameters,
+		Strict:      ptr.To(true),
+		Type:        openaiapi.FunctionToolTypeFunction,
+	}
+	if functionTool.DeferLoading != nil && *functionTool.DeferLoading {
+		openAIFunctionTool.DeferLoading = ptr.To(true)
+	}
+	return openaiapi.Tool{FunctionTool: openAIFunctionTool}
+}
+
 // MARK: - To Provider Messages
 
-func convertToOpenAIInputs(messages []llmsdk.Message) ([]openaiapi.InputItem, error) {
+func convertToOpenAIInputs(messages []llmsdk.Message, tools []llmsdk.Tool) ([]openaiapi.InputItem, error) {
 	var inputItems []openaiapi.InputItem
 
 	for _, message := range messages {
@@ -386,7 +398,7 @@ func convertToOpenAIInputs(messages []llmsdk.Message) ([]openaiapi.InputItem, er
 			inputItems = append(inputItems, inputItem)
 
 		case message.AssistantMessage != nil:
-			items, err := convertAssistantMessageToOpenAIInputItems(message.AssistantMessage)
+			items, err := convertAssistantMessageToOpenAIInputItems(message.AssistantMessage, tools)
 			if err != nil {
 				return nil, err
 			}
@@ -427,12 +439,19 @@ func convertUserMessageToOpenAIInputItem(userMessage *llmsdk.UserMessage) (opena
 	}, nil
 }
 
-func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.AssistantMessage) ([]openaiapi.InputItem, error) {
+func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.AssistantMessage, tools []llmsdk.Tool) ([]openaiapi.InputItem, error) {
 	messageParts := partutil.GetCompatiblePartsWithoutSourceParts(assistantMessage.Content)
 	var inputItems []openaiapi.InputItem
 
 	for _, part := range messageParts {
 		switch {
+		// OpenAI replays hosted search results through the web_search_call item.
+		case part.ToolResultPart != nil && part.ToolResultPart.Result.WebSearch != nil:
+			continue
+
+		case part.ToolResultPart != nil && part.ToolResultPart.Result.ToolSearch != nil:
+			inputItems = append(inputItems, convertToOpenAIToolSearchOutput(part.ToolResultPart, part.ToolResultPart.Result.ToolSearch, tools))
+
 		case part.TextPart != nil:
 			inputItems = append(inputItems, openaiapi.InputItem{
 				Item: &openaiapi.Item{
@@ -492,6 +511,24 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 			})
 
 		case part.ToolCallPart != nil:
+			if toolSearch := part.ToolCallPart.Call.ToolSearch; toolSearch != nil {
+				id := part.ToolCallPart.ToolCallID
+				if part.ToolCallPart.ID != nil {
+					id = *part.ToolCallPart.ID
+				}
+				args := toolSearch.Args
+				if len(args) == 0 {
+					args = json.RawMessage(`{}`)
+				}
+				inputItems = append(inputItems, openaiapi.InputItem{Item: &openaiapi.Item{ToolSearchCallItemParam: &openaiapi.ToolSearchCallItemParam{
+					Type:      openaiapi.ToolSearchCallItemParamTypeToolSearchCall,
+					Id:        &id,
+					Arguments: args,
+					Status:    ptr.To(openaiapi.FunctionCallItemStatusCompleted),
+					Execution: ptr.To(openaiapi.ToolSearchExecutionTypeServer),
+				}}})
+				continue
+			}
 			if part.ToolCallPart.Call.WebSearch != nil {
 				web := part.ToolCallPart.Call.WebSearch
 				if web.Action == nil {
@@ -513,21 +550,22 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 				return nil, llmsdk.NewUnsupportedError(Provider, "tool call has no supported payload")
 			}
 			args, _ := json.Marshal(call.Args)
-			inputItems = append(inputItems, openaiapi.InputItem{
-				Item: &openaiapi.Item{
-					FunctionToolCall: &openaiapi.FunctionToolCall{
-						Arguments: string(args),
-						CallId:    part.ToolCallPart.ToolCallID,
-						Name:      call.Name,
-						Id:        part.ToolCallPart.ID,
-						Type:      openaiapi.FunctionToolCallTypeFunctionCall,
-					},
-				},
-			})
-
-		// OpenAI replays hosted search results through the web_search_call item.
-		case part.ToolResultPart != nil && part.ToolResultPart.Result.WebSearch != nil:
-			continue
+			functionCall := &openaiapi.FunctionToolCall{
+				Arguments: string(args),
+				CallId:    part.ToolCallPart.ToolCallID,
+				Name:      call.Name,
+				Id:        part.ToolCallPart.ID,
+				Type:      openaiapi.FunctionToolCallTypeFunctionCall,
+			}
+			// Calls to deferred tools must be replayed with the namespace OpenAI
+			// assigned them, which for top-level functions is the function name.
+			for _, tool := range tools {
+				if tool.FunctionTool != nil && tool.FunctionTool.Name == call.Name && tool.FunctionTool.DeferLoading != nil && *tool.FunctionTool.DeferLoading {
+					functionCall.Namespace = ptr.To(call.Name)
+					break
+				}
+			}
+			inputItems = append(inputItems, openaiapi.InputItem{Item: &openaiapi.Item{FunctionToolCall: functionCall}})
 
 		default:
 			return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert assistant message part to OpenAI ResponseInputItem for type %s", part.Type()))
@@ -537,18 +575,40 @@ func convertAssistantMessageToOpenAIInputItems(assistantMessage *llmsdk.Assistan
 	return inputItems, nil
 }
 
+func convertToOpenAIToolSearchOutput(part *llmsdk.ToolResultPart, result *llmsdk.ToolSearchToolResult, tools []llmsdk.Tool) openaiapi.InputItem {
+	// OpenAI needs the full definitions of the discovered tools, which the
+	// request already declares as deferred function tools.
+	discoveredTools := make([]openaiapi.Tool, 0, len(result.ToolNames))
+	for _, toolName := range result.ToolNames {
+		for _, tool := range tools {
+			if tool.FunctionTool != nil && tool.FunctionTool.Name == toolName {
+				discoveredTools = append(discoveredTools, convertToOpenAIFunctionTool(tool.FunctionTool))
+				break
+			}
+		}
+	}
+	status := openaiapi.FunctionCallItemStatusIncomplete
+	if part.Status == llmsdk.ToolResultStatusCompleted {
+		status = openaiapi.FunctionCallItemStatusCompleted
+	}
+	return openaiapi.InputItem{Item: &openaiapi.Item{ToolSearchOutputItemParam: &openaiapi.ToolSearchOutputItemParam{
+		Type:      openaiapi.ToolSearchOutputItemParamTypeToolSearchOutput,
+		Execution: ptr.To(openaiapi.ToolSearchExecutionTypeServer),
+		Status:    &status,
+		Tools:     discoveredTools,
+	}}}
+}
+
 func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]openaiapi.InputItem, error) {
 	var inputItems []openaiapi.InputItem
 	for _, part := range toolMessage.Content {
 		if part.ToolResultPart == nil {
-			return nil, fmt.Errorf("tool messages must contain only tool result parts")
+			return nil, llmsdk.NewInvalidInputError("tool messages must contain only tool result parts")
 		}
-		if part.ToolResultPart.Result.WebSearch != nil {
-			continue
-		}
+		// Hosted tool results are replayed through their assistant-message items.
 		result := part.ToolResultPart.Result.Function
 		if result == nil {
-			return nil, llmsdk.NewUnsupportedError(Provider, "tool result has no supported payload")
+			continue
 		}
 
 		toolResultPartContent := partutil.GetCompatiblePartsWithoutSourceParts(result.Content)
@@ -727,9 +787,23 @@ func convertToOpenAIReasoning(reasoning llmsdk.ReasoningOptions) (*openaiapi.Rea
 
 func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 	parts := make([]llmsdk.Part, 0, len(items))
+	// Hosted tool searches have no call_id, so their output is matched to the
+	// preceding search call.
+	var lastToolSearchCallID *string
 
 	for _, item := range items {
 		switch {
+		case item.ToolSearchCall != nil:
+			lastToolSearchCallID = ptr.To(openAIToolSearchCallID(item.ToolSearchCall.CallId, item.ToolSearchCall.Id))
+			parts = append(parts, mapOpenAIToolSearchCall(item.ToolSearchCall))
+
+		case item.ToolSearchOutput != nil:
+			toolCallID := item.ToolSearchOutput.CallId
+			if toolCallID == nil {
+				toolCallID = lastToolSearchCallID
+			}
+			parts = append(parts, mapOpenAIToolSearchOutput(item.ToolSearchOutput, toolCallID))
+
 		case item.OutputMessage != nil:
 			for _, content := range item.OutputMessage.Content {
 				switch {
@@ -830,8 +904,6 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 	return parts, nil
 }
 
-// MARK: - To SDK Delta
-
 // mapOpenAIWebSearchCallStatus maps the provider status, which reports a
 // failed search as "incomplete".
 func mapOpenAIWebSearchCallStatus(status openaiapi.WebSearchToolCallStatus) llmsdk.WebSearchToolCallStatus {
@@ -841,7 +913,90 @@ func mapOpenAIWebSearchCallStatus(status openaiapi.WebSearchToolCallStatus) llms
 	return llmsdk.WebSearchToolCallStatus(status)
 }
 
-func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentDelta, error) {
+func mapOpenAIToolSearchStatus(status openaiapi.FunctionCallStatus) llmsdk.ToolSearchToolCallStatus {
+	if status == openaiapi.FunctionCallStatusIncomplete {
+		return llmsdk.ToolSearchToolCallStatusFailed
+	}
+	return llmsdk.ToolSearchToolCallStatus(status)
+}
+
+func openAIToolSearchCallID(callID *string, id string) string {
+	if callID != nil {
+		return *callID
+	}
+	return id
+}
+
+// openAIToolSearchArgs encodes the search arguments object, falling back to an
+// empty object for anything that is not one.
+func openAIToolSearchArgs(arguments any) json.RawMessage {
+	object, ok := arguments.(map[string]any)
+	if !ok || object == nil {
+		return json.RawMessage(`{}`)
+	}
+	data, err := json.Marshal(object)
+	if err != nil {
+		return json.RawMessage(`{}`)
+	}
+	return data
+}
+
+func mapOpenAIToolSearchCall(item *openaiapi.ToolSearchCall) llmsdk.Part {
+	status := mapOpenAIToolSearchStatus(item.Status)
+	return llmsdk.Part{ToolCallPart: &llmsdk.ToolCallPart{
+		ToolCallID: openAIToolSearchCallID(item.CallId, item.Id),
+		ID:         ptr.To(item.Id),
+		Call: llmsdk.ToolCall{ToolSearch: &llmsdk.ToolSearchToolCall{
+			Args:   openAIToolSearchArgs(item.Arguments),
+			Status: &status,
+		}},
+	}}
+}
+
+func mapOpenAIToolSearchOutput(item *openaiapi.ToolSearchOutput, toolCallID *string) llmsdk.Part {
+	status := llmsdk.ToolResultStatusCompleted
+	if item.Status == openaiapi.FunctionCallOutputStatusEnumIncomplete {
+		status = llmsdk.ToolResultStatusFailed
+	}
+	return llmsdk.Part{ToolResultPart: &llmsdk.ToolResultPart{
+		ToolCallID: openAIToolSearchCallID(toolCallID, item.Id),
+		Result: llmsdk.ToolResult{ToolSearch: &llmsdk.ToolSearchToolResult{
+			ToolNames: mapOpenAIDiscoveredToolNames(item.Tools),
+		}},
+		Status: status,
+	}}
+}
+
+func mapOpenAIDiscoveredToolNames(tools []openaiapi.Tool) []string {
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		switch {
+		case tool.FunctionTool != nil:
+			names = append(names, tool.FunctionTool.Name)
+		case tool.CustomToolParam != nil:
+			names = append(names, tool.CustomToolParam.Name)
+		case tool.NamespaceToolParam != nil:
+			for _, member := range tool.NamespaceToolParam.Tools {
+				switch {
+				case member.Function != nil:
+					names = append(names, member.Function.Name)
+				case member.Custom != nil:
+					names = append(names, member.Custom.Name)
+				}
+			}
+		}
+	}
+	return names
+}
+
+// MARK: - To SDK Delta
+
+// openAIStreamState carries the stream-wide context needed to map events.
+type openAIStreamState struct {
+	lastToolSearchCallID *string
+}
+
+func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent, state *openAIStreamState) (*llmsdk.ContentDelta, error) {
 	switch {
 	case event.ResponseFailed != nil:
 		message := "OpenAI Response Stream failed"
@@ -874,6 +1029,18 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 				},
 			}}, nil
 		}
+		if item.ToolSearchCall != nil {
+			toolCallID := openAIToolSearchCallID(item.ToolSearchCall.CallId, item.ToolSearchCall.Id)
+			state.lastToolSearchCallID = &toolCallID
+			status := mapOpenAIToolSearchStatus(item.ToolSearchCall.Status)
+			return &llmsdk.ContentDelta{Index: event.ResponseOutputItemAdded.OutputIndex, Part: llmsdk.PartDelta{
+				ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+					ToolCallID: &toolCallID,
+					ID:         ptr.To(item.ToolSearchCall.Id),
+					Call:       llmsdk.ToolCallDelta{ToolSearch: &llmsdk.ToolSearchToolCallDelta{Status: &status}},
+				},
+			}}, nil
+		}
 
 		if item.ReasoningItem != nil && item.ReasoningItem.EncryptedContent != nil {
 			return &llmsdk.ContentDelta{
@@ -891,6 +1058,28 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 
 	case event.ResponseOutputItemDone != nil:
 		item := event.ResponseOutputItemDone.Item
+		if item.ToolSearchCall != nil {
+			// Search arguments arrive whole with the completed item.
+			toolCallID := openAIToolSearchCallID(item.ToolSearchCall.CallId, item.ToolSearchCall.Id)
+			state.lastToolSearchCallID = &toolCallID
+			status := mapOpenAIToolSearchStatus(item.ToolSearchCall.Status)
+			args := string(openAIToolSearchArgs(item.ToolSearchCall.Arguments))
+			return &llmsdk.ContentDelta{Index: event.ResponseOutputItemDone.OutputIndex, Part: llmsdk.PartDelta{
+				ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+					ToolCallID: &toolCallID,
+					ID:         ptr.To(item.ToolSearchCall.Id),
+					Call:       llmsdk.ToolCallDelta{ToolSearch: &llmsdk.ToolSearchToolCallDelta{Args: &args, Status: &status}},
+				},
+			}}, nil
+		}
+		if item.ToolSearchOutput != nil {
+			toolCallID := item.ToolSearchOutput.CallId
+			if toolCallID == nil {
+				toolCallID = state.lastToolSearchCallID
+			}
+			part := mapOpenAIToolSearchOutput(item.ToolSearchOutput, toolCallID)
+			return &llmsdk.ContentDelta{Index: event.ResponseOutputItemDone.OutputIndex, Part: partutil.LooselyConvertPartToPartDelta(part)}, nil
+		}
 		if item.WebSearchToolCall == nil {
 			return nil, nil
 		}

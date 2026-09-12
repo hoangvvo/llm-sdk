@@ -39,6 +39,7 @@ test_group!(
 );
 test_group!(anthropic_model(), web_search_tool_mix);
 test_group!(anthropic_model(), image_input);
+test_group!(anthropic_model(), tool_search);
 test_group!(
     anthropic_model(),
     reasoning,

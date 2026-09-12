@@ -263,3 +263,63 @@ fn accumulates_web_search_call_and_result() {
         matches!(response.content[1], Part::ToolResult(ref result) if matches!(result.result, llm_sdk::ToolResult::WebSearch(_)))
     );
 }
+
+#[test]
+fn accumulates_tool_search_call_arguments_and_status() {
+    let mut accumulator = StreamAccumulator::new();
+    accumulator
+        .add_partial(partial(
+            0,
+            PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: Some("ts_1".to_string()),
+                call: llm_sdk::ToolCallDelta::ToolSearch(llm_sdk::ToolSearchToolCallDelta {
+                    args: None,
+                    status: Some(llm_sdk::ToolSearchToolCallStatus::InProgress),
+                }),
+                signature: None,
+                id: None,
+            }),
+        ))
+        .unwrap();
+    accumulator
+        .add_partial(partial(
+            0,
+            PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: None,
+                call: llm_sdk::ToolCallDelta::ToolSearch(llm_sdk::ToolSearchToolCallDelta {
+                    args: Some("{\"query\":".to_string()),
+                    status: None,
+                }),
+                signature: None,
+                id: None,
+            }),
+        ))
+        .unwrap();
+    accumulator
+        .add_partial(partial(
+            0,
+            PartDelta::ToolCall(ToolCallPartDelta {
+                tool_call_id: None,
+                call: llm_sdk::ToolCallDelta::ToolSearch(llm_sdk::ToolSearchToolCallDelta {
+                    args: Some("\"weather\"}".to_string()),
+                    status: Some(llm_sdk::ToolSearchToolCallStatus::Completed),
+                }),
+                signature: None,
+                id: None,
+            }),
+        ))
+        .unwrap();
+    let response = accumulator.compute_response().unwrap();
+    assert_eq!(
+        response.content,
+        vec![Part::ToolCall(llm_sdk::ToolCallPart {
+            tool_call_id: "ts_1".to_string(),
+            call: llm_sdk::ToolCall::ToolSearch(llm_sdk::ToolSearchToolCall {
+                args: json!({"query": "weather"}),
+                status: Some(llm_sdk::ToolSearchToolCallStatus::Completed),
+            }),
+            signature: None,
+            id: None,
+        })]
+    );
+}

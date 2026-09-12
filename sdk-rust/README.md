@@ -100,6 +100,7 @@ cargo run --example generate-text --features examples,openai
 
 ### To 0.4.0
 
+- Update exhaustive matches: `Tool`, `ToolCall`, `ToolResult`, and `ToolCallDelta` add `ToolSearch`.
 - `ReasoningPartDelta.text` is now `String`. Use an empty string for deltas without text.
 - Add the new optional fields to struct literals, or use `..Default::default()` where available.
 - Replace `Tool { name, description, parameters }` with `FunctionTool::new(...)`.

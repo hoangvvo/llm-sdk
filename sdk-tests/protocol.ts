@@ -73,6 +73,8 @@ type TestCaseNames = Readonly<{
   STREAM_IMAGE: "stream_image";
   GENERATE_IMAGE_INPUT: "generate_image_input";
   STREAM_IMAGE_INPUT: "stream_image_input";
+  GENERATE_TOOL_SEARCH: "generate_tool_search";
+  STREAM_TOOL_SEARCH: "stream_tool_search";
   GENERATE_WEB_SEARCH: "generate_web_search";
   STREAM_WEB_SEARCH: "stream_web_search";
   ANTHROPIC_GENERATE_WEB_SEARCH_FAILURE: "anthropic_generate_web_search_failure";
@@ -99,11 +101,17 @@ type TestCaseNames = Readonly<{
   ANTHROPIC_STREAM_REFUSAL: "anthropic_stream_refusal";
   OPENAI_GENERATE: "openai_generate";
   OPENAI_STREAM: "openai_stream";
+  OPENAI_TOOL_SEARCH_GENERATE: "openai_tool_search_generate";
+  OPENAI_TOOL_SEARCH_STREAM: "openai_tool_search_stream";
+  OPENAI_TOOL_SEARCH_REPLAY: "openai_tool_search_replay";
   OPENAI_HTTP_ERROR: "openai_http_error";
   OPENAI_CANCELLED_RESULT: "openai_cancelled_result";
   OPENAI_MALFORMED_STREAM: "openai_malformed_stream";
   ANTHROPIC_GENERATE: "anthropic_generate";
   ANTHROPIC_STREAM: "anthropic_stream";
+  ANTHROPIC_TOOL_SEARCH_GENERATE: "anthropic_tool_search_generate";
+  ANTHROPIC_TOOL_SEARCH_STREAM: "anthropic_tool_search_stream";
+  ANTHROPIC_TOOL_SEARCH_REPLAY: "anthropic_tool_search_replay";
   ANTHROPIC_HTTP_ERROR: "anthropic_http_error";
   ANTHROPIC_MALFORMED_STREAM: "anthropic_malformed_stream";
   GOOGLE_GENERATE: "google_generate";
@@ -125,6 +133,8 @@ const PART_TYPES = new Set([
   "tool_call",
   "web_search_call",
   "web_search_result",
+  "tool_search_call",
+  "tool_search_result",
   "audio",
   "image",
   "reasoning",
@@ -530,6 +540,31 @@ function assertionMatches(assertion: any, part: any): boolean {
           part.call.status === assertion.status) &&
         (assertion.action !== true || isObject(part.call.action))
       );
+    case "tool_search_call":
+      return (
+        (part.type === "tool-call" || part.type === "tool_call") &&
+        part.call?.type === "tool_search" &&
+        typeof part.tool_call_id === "string" &&
+        part.tool_call_id.length > 0 &&
+        isObject(part.call.args) &&
+        (assertion.status === undefined ||
+          part.call.status === assertion.status) &&
+        (assertion.args === undefined ||
+          valueMatches(assertion.args, part.call.args))
+      );
+    case "tool_search_result":
+      return (
+        (part.type === "tool-result" || part.type === "tool_result") &&
+        part.result?.type === "tool_search" &&
+        Array.isArray(part.result.tool_names) &&
+        (assertion.status === undefined || part.status === assertion.status) &&
+        (assertion.error_code === undefined ||
+          regexMatches(assertion.error_code, part.result.error_code)) &&
+        (assertion.tool_names === undefined ||
+          assertion.tool_names.every((name: string) =>
+            part.result.tool_names.includes(name),
+          ))
+      );
     case "web_search_result":
       return (
         (part.type === "tool-result" || part.type === "tool_result") &&
@@ -802,7 +837,10 @@ export function validateOutput({
   }
 
   const expectedToolCalls = expected.content.filter(
-    (part: any) => part.type === "tool_call" || part.type === "web_search_call",
+    (part: any) =>
+      part.type === "tool_call" ||
+      part.type === "web_search_call" ||
+      part.type === "tool_search_call",
   ).length;
   const actualToolCalls = content.filter(
     (part) => part.type === "tool-call" || part.type === "tool_call",

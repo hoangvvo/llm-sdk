@@ -66,6 +66,10 @@ func TestImageInput(t *testing.T) {
 	testcommon.RunTestGroup(t, anthropicModel(t), "image_input")
 }
 
+func TestToolSearch(t *testing.T) {
+	testcommon.RunTestGroup(t, anthropicModel(t), "tool_search")
+}
+
 func TestReasoning(t *testing.T) {
 	testcommon.RunTestGroup(t, anthropicModel(t), "reasoning", reasoningOptions...)
 }

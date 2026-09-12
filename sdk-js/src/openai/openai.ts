@@ -18,6 +18,7 @@ import type {
   AssistantMessage,
   Citation,
   ContentDelta,
+  FunctionTool,
   ImagePart,
   ImagePartDelta,
   LanguageModelInput,
@@ -37,6 +38,9 @@ import type {
   ToolCallPartDelta,
   ToolChoiceOption,
   ToolMessage,
+  ToolResultPart,
+  ToolSearchToolCallStatus,
+  ToolSearchToolResult,
   UserMessage,
   WebSearchAction,
   WebSearchToolCallStatus,
@@ -129,6 +133,7 @@ export class OpenAIModel implements LanguageModel {
     const normalizedOutputIndexes = new Map<number, number>();
     let nextContentIndex = 0;
     let webSearchRequests = 0;
+    const streamState: OpenAIStreamState = {};
 
     for await (const event of stream) {
       if (event.type === "response.refusal.delta") {
@@ -142,7 +147,7 @@ export class OpenAIModel implements LanguageModel {
         webSearchRequests += 1;
       }
 
-      const partDelta = mapOpenAIStreamEvent(event);
+      const partDelta = mapOpenAIStreamEvent(event, streamState);
       if (partDelta) {
         const providerOutputIndex = partDelta.index;
         let normalizedOutputIndex =
@@ -212,7 +217,7 @@ function convertToOpenAICreateParams(
   const params: Omit<OpenAI.Responses.ResponseCreateParams, "stream"> = {
     store: false,
     model: modelId,
-    input: convertToOpenAIInputs(messages),
+    input: convertToOpenAIInputs(messages, tools ?? []),
     max_output_tokens: max_tokens ?? null,
     temperature: temperature ?? null,
     top_p: top_p ?? null,
@@ -260,6 +265,7 @@ function convertToOpenAICreateParams(
 
 function convertToOpenAIInputs(
   messages: Message[],
+  tools: Tool[],
 ): OpenAI.Responses.ResponseInputItem[] {
   return messages
     .map((message): OpenAI.Responses.ResponseInputItem[] => {
@@ -268,7 +274,7 @@ function convertToOpenAIInputs(
           return [convertUserMessageToResponseInputItem(message)];
         }
         case "assistant": {
-          return convertAssistantMessageToResponseInputItems(message);
+          return convertAssistantMessageToResponseInputItems(message, tools);
         }
         case "tool": {
           return convertToolMessageToResponseInputItems(message);
@@ -308,6 +314,7 @@ function convertUserMessageToResponseInputItem(
 
 function convertAssistantMessageToResponseInputItems(
   message: AssistantMessage,
+  tools: Tool[],
 ): OpenAI.Responses.ResponseInputItem[] {
   const messageParts = getCompatiblePartsWithoutSourceParts(message.content);
 
@@ -315,6 +322,9 @@ function convertAssistantMessageToResponseInputItems(
     // OpenAI replays hosted search results through the web_search_call item.
     if (part.type === "tool-result" && part.result.type === "web_search") {
       return [];
+    }
+    if (part.type === "tool-result" && part.result.type === "tool_search") {
+      return [convertToOpenAIToolSearchOutput(part, part.result, tools)];
     }
 
     switch (part.type) {
@@ -362,6 +372,17 @@ function convertAssistantMessageToResponseInputItems(
           },
         ];
       case "tool-call": {
+        if (part.call.type === "tool_search") {
+          return [
+            {
+              type: "tool_search_call",
+              id: part.id ?? part.tool_call_id,
+              arguments: part.call.args,
+              status: "completed",
+              execution: "server",
+            },
+          ];
+        }
         if (part.call.type === "web_search") {
           if (!part.call.action) {
             throw new InvalidInputError(
@@ -377,7 +398,7 @@ function convertAssistantMessageToResponseInputItems(
             },
           ];
         }
-        const responseInputItem: OpenAI.Responses.ResponseInputItem = {
+        const responseInputItem: OpenAI.Responses.ResponseFunctionToolCall = {
           type: "function_call",
           call_id: part.tool_call_id,
           name: part.call.name,
@@ -385,6 +406,19 @@ function convertAssistantMessageToResponseInputItems(
         };
         if (part.id) {
           responseInputItem.id = part.id;
+        }
+        // Calls to deferred tools must be replayed with the namespace OpenAI
+        // assigned them, which for top-level functions is the function name.
+        const functionName = part.call.name;
+        if (
+          tools.some(
+            (tool) =>
+              tool.type === "function" &&
+              tool.name === functionName &&
+              tool.defer_loading,
+          )
+        ) {
+          responseInputItem.namespace = functionName;
         }
         return [responseInputItem];
       }
@@ -408,7 +442,8 @@ function convertToolMessageToResponseInputItems(
         );
       }
 
-      if (part.result.type === "web_search") return [];
+      // Hosted tool results are replayed through their assistant-message items.
+      if (part.result.type !== "function") return [];
 
       const toolResultPartContent = getCompatiblePartsWithoutSourceParts(
         part.result.content,
@@ -427,42 +462,62 @@ function convertToolMessageToResponseInputItems(
         ];
       }
 
-      return toolResultPartContent.map(
-        (
-          toolResultPartPart,
-        ): OpenAI.Responses.ResponseInputItem.FunctionCallOutput => {
-          let output:
-            string | OpenAI.Responses.ResponseFunctionCallOutputItemList;
-
-          switch (toolResultPartPart.type) {
-            case "text":
-              output = toolResultPartPart.text;
-              break;
-            case "image":
-              output = [
-                {
+      // A call has exactly one output item, so every result part becomes an
+      // entry of the same output list.
+      const output: OpenAI.Responses.ResponseFunctionCallOutputItemList =
+        toolResultPartContent.map(
+          (
+            toolResultPartPart,
+          ): OpenAI.Responses.ResponseFunctionCallOutputItem => {
+            switch (toolResultPartPart.type) {
+              case "text":
+                return { type: "input_text", text: toolResultPartPart.text };
+              case "image":
+                return {
                   type: "input_image",
                   image_url: `data:${toolResultPartPart.mime_type};base64,${toolResultPartPart.data}`,
                   detail: "auto",
-                },
-              ];
-              break;
-            default:
-              throw new UnsupportedError(
-                PROVIDER,
-                `Cannot convert tool result part to OpenAI ResponseInputItem.FunctionCallOutput for type ${toolResultPartPart.type}`,
-              );
-          }
+                };
+              default:
+                throw new UnsupportedError(
+                  PROVIDER,
+                  `Cannot convert tool result part to OpenAI ResponseInputItem.FunctionCallOutput for type ${toolResultPartPart.type}`,
+                );
+            }
+          },
+        );
 
-          return {
-            type: "function_call_output",
-            call_id: part.tool_call_id,
-            output,
-          };
+      return [
+        {
+          type: "function_call_output",
+          call_id: part.tool_call_id,
+          output,
         },
-      );
+      ];
     })
     .flat();
+}
+
+function convertToOpenAIToolSearchOutput(
+  part: ToolResultPart,
+  result: ToolSearchToolResult,
+  tools: Tool[],
+): OpenAI.Responses.ResponseInputItem {
+  // OpenAI needs the full definitions of the discovered tools, which the
+  // request already declares as deferred function tools.
+  const discoveredTools = result.tool_names.flatMap((toolName) => {
+    const tool = tools.find(
+      (tool) => tool.type === "function" && tool.name === toolName,
+    );
+    return tool ? [convertToOpenAITool(tool)] : [];
+  });
+  return {
+    type: "tool_search_output",
+    call_id: null,
+    execution: "server",
+    status: part.status === "completed" ? "completed" : "incomplete",
+    tools: discoveredTools,
+  };
 }
 
 function convertToOpenAIWebSearchAction(
@@ -525,13 +580,28 @@ function convertToOpenAITool(tool: Tool): OpenAI.Responses.Tool {
     return webSearchTool;
   }
 
-  return {
+  if (tool.type === "tool_search") {
+    // OpenAI's hosted search has a single algorithm, so strategy is ignored.
+    return { type: "tool_search" };
+  }
+
+  return convertToOpenAIFunctionTool(tool);
+}
+
+function convertToOpenAIFunctionTool(
+  tool: FunctionTool,
+): OpenAI.Responses.FunctionTool {
+  const functionTool: OpenAI.Responses.FunctionTool = {
     type: "function",
     name: tool.name,
     description: tool.description,
     parameters: tool.parameters,
     strict: true,
   };
+  if (tool.defer_loading) {
+    functionTool.defer_loading = true;
+  }
+  return functionTool;
 }
 
 function convertToOpenAIToolChoice(
@@ -628,6 +698,9 @@ function convertToOpenAIReasoning(
 function mapOpenAIOutputItems(
   items: OpenAI.Responses.ResponseOutputItem[],
 ): Part[] {
+  // Hosted tool searches have no call_id, so their output is matched to the
+  // preceding search call.
+  let lastToolSearchCallId: string | undefined;
   return items
     .map((item): Part[] => {
       switch (item.type) {
@@ -655,6 +728,18 @@ function mapOpenAIOutputItems(
             toolCallPart.id = item.id;
           }
           return [toolCallPart];
+        }
+        case "tool_search_call": {
+          lastToolSearchCallId = item.call_id ?? item.id;
+          return [mapOpenAIToolSearchCall(item)];
+        }
+        case "tool_search_output": {
+          return [
+            mapOpenAIToolSearchOutput(
+              item,
+              item.call_id ?? lastToolSearchCallId,
+            ),
+          ];
         }
         case "web_search_call": {
           const call: ToolCallPart = {
@@ -742,6 +827,62 @@ function mapOpenAIWebSearchStatus(
   return status === "incomplete" ? "failed" : status;
 }
 
+function mapOpenAIToolSearchStatus(
+  status: OpenAI.Responses.ResponseToolSearchCall["status"],
+): ToolSearchToolCallStatus {
+  return status === "incomplete" ? "failed" : status;
+}
+
+function mapOpenAIToolSearchCall(
+  item: OpenAI.Responses.ResponseToolSearchCall,
+): ToolCallPart {
+  return {
+    type: "tool-call",
+    tool_call_id: item.call_id ?? item.id,
+    id: item.id,
+    call: {
+      type: "tool_search",
+      args: isRecord(item.arguments) ? item.arguments : {},
+      status: mapOpenAIToolSearchStatus(item.status),
+    },
+  };
+}
+
+function mapOpenAIToolSearchOutput(
+  item: OpenAI.Responses.ResponseToolSearchOutputItem,
+  toolCallId: string | undefined,
+): ToolResultPart {
+  return {
+    type: "tool-result",
+    tool_call_id: toolCallId ?? item.id,
+    result: {
+      type: "tool_search",
+      tool_names: mapOpenAIDiscoveredToolNames(item.tools),
+    },
+    status: item.status === "incomplete" ? "failed" : "completed",
+  };
+}
+
+function mapOpenAIDiscoveredToolNames(
+  tools: OpenAI.Responses.Tool[],
+): string[] {
+  return tools.flatMap((tool): string[] => {
+    switch (tool.type) {
+      case "function":
+      case "custom":
+        return [tool.name];
+      case "namespace":
+        return tool.tools.map((member) => member.name);
+      default:
+        return [];
+    }
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function mapOpenAIOutputText(
   outputText: OpenAI.Responses.ResponseOutputText,
 ): TextPart {
@@ -790,8 +931,13 @@ function isOpenAIURLCitation(
 
 // MARK: To SDK Delta
 
+interface OpenAIStreamState {
+  lastToolSearchCallId?: string;
+}
+
 function mapOpenAIStreamEvent(
   event: OpenAI.Responses.ResponseStreamEvent,
+  state: OpenAIStreamState,
 ): ContentDelta | null {
   // OpenAI event outputs include "output_index" and "content_index".
   // Each item is indexed by "output_index". If an item contains multiple pieces of content (only applicable for text and refusal cases), it will also have a "content_index".
@@ -851,6 +997,21 @@ function mapOpenAIStreamEvent(
           },
         };
       }
+      if (event.item.type === "tool_search_call") {
+        state.lastToolSearchCallId = event.item.call_id ?? event.item.id;
+        return {
+          index: event.output_index,
+          part: {
+            type: "tool-call",
+            tool_call_id: event.item.call_id ?? event.item.id,
+            id: event.item.id,
+            call: {
+              type: "tool_search",
+              status: mapOpenAIToolSearchStatus(event.item.status),
+            },
+          },
+        };
+      }
 
       if (event.item.type === "reasoning") {
         if (event.item.encrypted_content) {
@@ -870,6 +1031,34 @@ function mapOpenAIStreamEvent(
       break;
     }
     case "response.output_item.done": {
+      if (event.item.type === "tool_search_call") {
+        // Search arguments arrive whole with the completed item.
+        state.lastToolSearchCallId = event.item.call_id ?? event.item.id;
+        return {
+          index: event.output_index,
+          part: {
+            type: "tool-call",
+            tool_call_id: event.item.call_id ?? event.item.id,
+            id: event.item.id,
+            call: {
+              type: "tool_search",
+              args: JSON.stringify(
+                isRecord(event.item.arguments) ? event.item.arguments : {},
+              ),
+              status: mapOpenAIToolSearchStatus(event.item.status),
+            },
+          },
+        };
+      }
+      if (event.item.type === "tool_search_output") {
+        return {
+          index: event.output_index,
+          part: mapOpenAIToolSearchOutput(
+            event.item,
+            event.item.call_id ?? state.lastToolSearchCallId,
+          ),
+        };
+      }
       if (event.item.type !== "web_search_call") break;
       const action = (
         event.item as Omit<

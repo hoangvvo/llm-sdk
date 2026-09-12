@@ -677,8 +677,17 @@ fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<CreateChatCompletio
                     .to_string(),
             ));
         }
+        Tool::ToolSearch(_) => {
+            return Err(LanguageModelError::Unsupported(
+                PROVIDER,
+                "Hosted tool search is not supported by this OpenAI Chat Completions adapter; use \
+                 OpenAIModel (Responses API)"
+                    .to_string(),
+            ));
+        }
     };
 
+    // Chat Completions cannot defer tools, so deferred tools are loaded eagerly.
     let function = FunctionObject {
         description: Some(tool.description),
         name: tool.name,

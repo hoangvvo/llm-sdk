@@ -2,19 +2,23 @@ use crate::{
     client_utils, id_utils,
     openai::responses_api::{
         self, Annotation, CreateResponse, CreateResponsePromptCacheRetention, DetailEnum,
-        FunctionCallOutputItemParam, FunctionCallOutputItemParamOutput,
-        FunctionCallOutputItemParamOutputArrayItem, FunctionCallOutputItemParamType, FunctionTool,
-        FunctionToolCall, FunctionToolCallType, FunctionToolType, ImageDetail, ImageGenTool,
-        ImageGenToolCall, ImageGenToolCallType, ImageGenToolType, IncludeEnum, InputContent,
-        InputImageContent, InputImageContentParamAutoParam, InputImageContentType, InputItem,
-        InputMessage, InputMessageRole, InputMessageType, InputTextContent, InputTextContentParam,
-        InputTextContentType, OutputItem, OutputMessage, OutputMessageContent, OutputMessageRole,
-        OutputMessageStatus, OutputMessageType, OutputTextContent, Reasoning, ReasoningItem,
-        ReasoningItemType, ReasoningSummary, Response, ResponseFormatJsonObject,
-        ResponseFormatText, ResponseStreamEvent, ResponseTextParam, ResponseUsage,
-        SummaryTextContent, SummaryTextContentType, TextResponseFormatConfiguration,
+        FunctionCallItemStatus, FunctionCallOutputItemParam, FunctionCallOutputItemParamOutput,
+        FunctionCallOutputItemParamOutputArrayItem, FunctionCallOutputItemParamType,
+        FunctionCallOutputStatusEnum, FunctionCallStatus, FunctionTool, FunctionToolCall,
+        FunctionToolCallType, FunctionToolType, ImageDetail, ImageGenTool, ImageGenToolCall,
+        ImageGenToolCallType, ImageGenToolType, IncludeEnum, InputContent, InputImageContent,
+        InputImageContentParamAutoParam, InputImageContentType, InputItem, InputMessage,
+        InputMessageRole, InputMessageType, InputTextContent, InputTextContentParam,
+        InputTextContentType, NamespaceToolParamToolsItem, OutputItem, OutputMessage,
+        OutputMessageContent, OutputMessageRole, OutputMessageStatus, OutputMessageType,
+        OutputTextContent, Reasoning, ReasoningItem, ReasoningItemType, ReasoningSummary, Response,
+        ResponseFormatJsonObject, ResponseFormatText, ResponseStreamEvent, ResponseTextParam,
+        ResponseUsage, SummaryTextContent, SummaryTextContentType, TextResponseFormatConfiguration,
         TextResponseFormatJsonSchema, Tool as OpenAITool, ToolChoiceFunction,
-        ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam, UrlCitationBody,
+        ToolChoiceFunctionType, ToolChoiceOptions, ToolChoiceParam, ToolSearchCall,
+        ToolSearchCallItemParam, ToolSearchCallItemParamType, ToolSearchExecutionType,
+        ToolSearchOutput, ToolSearchOutputItemParam, ToolSearchOutputItemParamType,
+        ToolSearchToolParam, ToolSearchToolParamType, UrlCitationBody,
         WebSearchApproximateLocationValue, WebSearchApproximateLocationValueType,
         WebSearchTool as OpenAIWebSearchTool, WebSearchToolFilters, WebSearchToolType,
     },
@@ -25,8 +29,10 @@ use crate::{
     LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelServerToolUsage,
     ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions,
     ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
-    TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
-    ToolResultPart, ToolResultStatus, UserMessage,
+    TextPartDelta, Tool, ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta,
+    ToolChoiceOption, ToolMessage, ToolResult, ToolResultPart, ToolResultPartDelta,
+    ToolResultStatus, ToolSearchToolCall, ToolSearchToolCallDelta, ToolSearchToolCallStatus,
+    ToolSearchToolResult, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -216,6 +222,7 @@ impl LanguageModel for OpenAIModel {
                         let mut normalized_output_indexes = HashMap::new();
                         let mut next_content_index = 0_usize;
                         let mut web_search_requests = 0_usize;
+                        let mut stream_state = OpenAIStreamState::default();
 
                         while let Some(event) = chunk_stream.next().await {
                             let event = event?;
@@ -242,7 +249,7 @@ impl LanguageModel for OpenAIModel {
                             }
 
                             let web_search_result = map_openai_stream_web_search_result(&event);
-                            let part_delta = map_openai_stream_event(event)?;
+                            let part_delta = map_openai_stream_event(event, &mut stream_state)?;
                             if let Some(mut part_delta) = part_delta {
                                 let provider_output_index = part_delta.index;
                                 let normalized_output_index = *normalized_output_indexes
@@ -316,6 +323,8 @@ fn convert_to_response_create_params(
         include.push(IncludeEnum::ReasoningEncryptedContent);
     }
 
+    let input_items = convert_to_openai_inputs(messages, tools.as_deref().unwrap_or_default())?;
+
     let mut params = CreateResponse {
         metadata: metadata.map(|metadata| Some(Some(metadata))),
         prompt_cache_key: None,
@@ -354,7 +363,7 @@ fn convert_to_response_create_params(
         conversation: None,
         include: (!include.is_empty()).then_some(include),
         input: Some(responses_api::InputParam::InputParamArray(Some(
-            convert_to_openai_inputs(messages)?,
+            input_items,
         ))),
         instructions: system_prompt,
         parallel_tool_calls: None,
@@ -387,14 +396,17 @@ fn convert_to_response_create_params(
     Ok(params)
 }
 
-fn convert_to_openai_inputs(messages: Vec<Message>) -> LanguageModelResult<Vec<InputItem>> {
+fn convert_to_openai_inputs(
+    messages: Vec<Message>,
+    tools: &[Tool],
+) -> LanguageModelResult<Vec<InputItem>> {
     messages
         .into_iter()
         .try_fold(Vec::new(), |mut acc, message| {
             let mut items = match message {
                 Message::User(user_message) => vec![user_message.try_into()?],
                 Message::Assistant(assistant_message) => {
-                    convert_assistant_message_to_response_input_items(assistant_message)?
+                    convert_assistant_message_to_response_input_items(assistant_message, tools)?
                 }
                 Message::Tool(tool_message) => {
                     convert_tool_message_to_response_input_items(tool_message)?
@@ -453,8 +465,10 @@ impl TryFrom<UserMessage> for InputItem {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn convert_assistant_message_to_response_input_items(
     assistant_message: AssistantMessage,
+    tools: &[Tool],
 ) -> LanguageModelResult<Vec<InputItem>> {
     let message_parts =
         source_part_utils::get_compatible_parts_without_source_parts(assistant_message.content);
@@ -508,26 +522,59 @@ fn convert_assistant_message_to_response_input_items(
                     }),
                 )),
                 Part::ToolCall(tool_call_part) => match tool_call_part.call {
-                    crate::ToolCall::Function(call) => Some(InputItem::Item(
-                        responses_api::Item::FunctionToolCall(FunctionToolCall {
-                            arguments: call.args.to_string(),
-                            call_id: tool_call_part.tool_call_id,
-                            name: call.name,
-                            id: tool_call_part.id,
-                            namespace: None,
-                            status: None,
-                            r#type: FunctionToolCallType::FunctionCall,
+                    ToolCall::Function(call) => {
+                        // Calls to deferred tools must be replayed with the namespace OpenAI
+                        // assigned them, which for top-level functions is the function name.
+                        let namespace = tools
+                            .iter()
+                            .any(|tool| {
+                                matches!(
+                                    tool,
+                                    Tool::Function(function)
+                                        if function.name == call.name
+                                            && function.defer_loading == Some(true)
+                                )
+                            })
+                            .then(|| call.name.clone());
+                        Some(InputItem::Item(responses_api::Item::FunctionToolCall(
+                            FunctionToolCall {
+                                arguments: call.args.to_string(),
+                                call_id: tool_call_part.tool_call_id,
+                                name: call.name,
+                                id: tool_call_part.id,
+                                namespace,
+                                status: None,
+                                r#type: FunctionToolCallType::FunctionCall,
+                            },
+                        )))
+                    }
+                    ToolCall::WebSearch(call) => Some(convert_to_openai_web_search_call(
+                        tool_call_part.tool_call_id,
+                        call,
+                    )?),
+                    ToolCall::ToolSearch(call) => Some(InputItem::Item(
+                        responses_api::Item::ToolSearchCallItemParam(ToolSearchCallItemParam {
+                            arguments: Some(call.args),
+                            call_id: None,
+                            execution: Some(ToolSearchExecutionType::Server),
+                            id: Some(tool_call_part.id.unwrap_or(tool_call_part.tool_call_id)),
+                            status: Some(FunctionCallItemStatus::Completed),
+                            r#type: ToolSearchCallItemParamType::ToolSearchCall,
                         }),
                     )),
-                    crate::ToolCall::WebSearch(call) => {
-                        convert_to_openai_web_search_call(tool_call_part.tool_call_id, call)
-                    }
                 },
                 // OpenAI replays hosted search results through the web_search_call item.
                 Part::ToolResult(ToolResultPart {
-                    result: crate::ToolResult::WebSearch(_),
+                    result: ToolResult::WebSearch(_),
                     ..
                 }) => None,
+                Part::ToolResult(ToolResultPart {
+                    result: ToolResult::ToolSearch(result),
+                    status,
+                    ..
+                }) => Some(convert_to_openai_tool_search_output(
+                    status, &result, tools,
+                )?),
                 _ => Err(LanguageModelError::Unsupported(
                     PROVIDER,
                     format!("Cannot convert part to OpenAI input item for part {part:?}"),
@@ -633,15 +680,58 @@ fn convert_tool_message_to_response_input_items(
         })
 }
 
+fn convert_to_openai_tool_search_output(
+    status: ToolResultStatus,
+    result: &ToolSearchToolResult,
+    tools: &[Tool],
+) -> LanguageModelResult<InputItem> {
+    // OpenAI needs the full definitions of the discovered tools, which the
+    // request already declares as deferred function tools.
+    let discovered_tools = result
+        .tool_names
+        .iter()
+        .filter_map(|tool_name| {
+            tools
+                .iter()
+                .find(
+                    |tool| matches!(tool, Tool::Function(function) if function.name == *tool_name),
+                )
+                .cloned()
+        })
+        .map(convert_to_openai_tool)
+        .collect::<LanguageModelResult<Vec<_>>>()?;
+    Ok(InputItem::Item(
+        responses_api::Item::ToolSearchOutputItemParam(ToolSearchOutputItemParam {
+            call_id: None,
+            execution: Some(ToolSearchExecutionType::Server),
+            id: None,
+            status: Some(if status == ToolResultStatus::Completed {
+                FunctionCallItemStatus::Completed
+            } else {
+                FunctionCallItemStatus::Incomplete
+            }),
+            tools: discovered_tools,
+            r#type: ToolSearchOutputItemParamType::ToolSearchOutput,
+        }),
+    ))
+}
+
 fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<OpenAITool> {
     match tool {
         Tool::Function(tool) => Ok(OpenAITool::FunctionTool(FunctionTool {
-            defer_loading: None,
+            defer_loading: tool.defer_loading.filter(|deferred| *deferred),
             description: Some(tool.description),
             name: tool.name,
             parameters: Some(convert_json_object(tool.parameters)?),
             strict: Some(true),
             r#type: FunctionToolType::Function,
+        })),
+        // OpenAI's hosted search has a single algorithm, so strategy is ignored.
+        Tool::ToolSearch(_) => Ok(OpenAITool::ToolSearchToolParam(ToolSearchToolParam {
+            description: None,
+            execution: None,
+            parameters: None,
+            r#type: ToolSearchToolParamType::ToolSearch,
         })),
         Tool::WebSearch(tool) => {
             let user_location = tool.user_location.map(|location| {
@@ -730,12 +820,14 @@ fn convert_to_openai_reasoning(value: &ReasoningOptions) -> LanguageModelResult<
 }
 
 fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Part>> {
-    items
-        .into_iter()
-        .try_fold(Vec::new(), |mut acc, item| match item {
+    let mut parts = Vec::new();
+    // Hosted tool searches have no call_id, so their output is matched to the
+    // preceding search call.
+    let mut last_tool_search_call_id: Option<String> = None;
+    for item in items {
+        match item {
             OutputItem::OutputMessage(msg) => {
-                acc.extend(map_openai_output_message(msg)?);
-                Ok(acc)
+                parts.extend(map_openai_output_message(msg)?);
             }
             OutputItem::FunctionToolCall(function_tool_call) => {
                 let args = serde_json::from_str(&function_tool_call.arguments).map_err(|e| {
@@ -748,14 +840,25 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                     ToolCallPart::new(function_tool_call.call_id, function_tool_call.name, args);
 
                 tool_call_part.id = function_tool_call.id;
-                let part = Part::ToolCall(tool_call_part);
-
-                acc.push(part);
-                Ok(acc)
+                parts.push(Part::ToolCall(tool_call_part));
+            }
+            OutputItem::ToolSearchCall(item) => {
+                last_tool_search_call_id =
+                    Some(item.call_id.clone().unwrap_or_else(|| item.id.clone()));
+                parts.push(Part::ToolCall(map_openai_tool_search_call(item)));
+            }
+            OutputItem::ToolSearchOutput(item) => {
+                let tool_call_id = item
+                    .call_id
+                    .clone()
+                    .or_else(|| last_tool_search_call_id.clone());
+                parts.push(Part::ToolResult(map_openai_tool_search_output(
+                    item,
+                    tool_call_id,
+                )));
             }
             OutputItem::WebSearchToolCall(web) => {
-                acc.extend(map_openai_web_search_call(web));
-                Ok(acc)
+                parts.extend(map_openai_web_search_call(web));
             }
             OutputItem::ImageGenToolCall(image_gen_call) => {
                 let mut image_part = ImagePart::new(
@@ -773,10 +876,7 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                 {
                     image_part = image_part.with_width(width).with_height(height);
                 }
-                let part: Part = image_part.into();
-
-                acc.push(part);
-                Ok(acc)
+                parts.push(image_part.into());
             }
             OutputItem::ReasoningItem(reasoning_item) => {
                 let summary_text = reasoning_item
@@ -791,13 +891,90 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                 if let Some(signature) = reasoning_item.encrypted_content {
                     reasoning_part = reasoning_part.with_signature(signature);
                 }
-                let part: Part = reasoning_part.into();
-
-                acc.push(part);
-                Ok(acc)
+                parts.push(reasoning_part.into());
             }
-            _ => Ok(acc),
+            _ => {}
+        }
+    }
+    Ok(parts)
+}
+
+fn map_openai_tool_search_status(status: &FunctionCallStatus) -> ToolSearchToolCallStatus {
+    match status {
+        FunctionCallStatus::InProgress => ToolSearchToolCallStatus::InProgress,
+        FunctionCallStatus::Completed => ToolSearchToolCallStatus::Completed,
+        FunctionCallStatus::Incomplete | FunctionCallStatus::Unknown => {
+            ToolSearchToolCallStatus::Failed
+        }
+    }
+}
+
+/// Hosted tool search arguments are always a JSON object.
+fn openai_tool_search_args(arguments: Value) -> Value {
+    match arguments {
+        Value::Object(_) => arguments,
+        _ => Value::Object(serde_json::Map::new()),
+    }
+}
+
+fn map_openai_tool_search_call(item: ToolSearchCall) -> ToolCallPart {
+    let ToolSearchCall {
+        arguments,
+        call_id,
+        id,
+        status,
+        ..
+    } = item;
+    ToolCallPart {
+        tool_call_id: call_id.unwrap_or_else(|| id.clone()),
+        call: ToolCall::ToolSearch(ToolSearchToolCall {
+            args: openai_tool_search_args(arguments),
+            status: Some(map_openai_tool_search_status(&status)),
+        }),
+        signature: None,
+        id: Some(id),
+    }
+}
+
+fn map_openai_tool_search_output(
+    item: ToolSearchOutput,
+    tool_call_id: Option<String>,
+) -> ToolResultPart {
+    let ToolSearchOutput {
+        id, status, tools, ..
+    } = item;
+    ToolResultPart {
+        tool_call_id: tool_call_id.unwrap_or(id),
+        result: ToolResult::ToolSearch(ToolSearchToolResult {
+            tool_names: map_openai_discovered_tool_names(tools),
+            error_code: None,
+        }),
+        status: if matches!(status, FunctionCallOutputStatusEnum::Incomplete) {
+            ToolResultStatus::Failed
+        } else {
+            ToolResultStatus::Completed
+        },
+    }
+}
+
+fn map_openai_discovered_tool_names(tools: Vec<OpenAITool>) -> Vec<String> {
+    tools
+        .into_iter()
+        .flat_map(|tool| match tool {
+            OpenAITool::FunctionTool(function) => vec![function.name],
+            OpenAITool::CustomToolParam(custom) => vec![custom.name],
+            OpenAITool::NamespaceToolParam(namespace) => namespace
+                .tools
+                .into_iter()
+                .filter_map(|member| match member {
+                    NamespaceToolParamToolsItem::Function(function) => Some(function.name),
+                    NamespaceToolParamToolsItem::Custom(custom) => Some(custom.name),
+                    NamespaceToolParamToolsItem::Unknown => None,
+                })
+                .collect(),
+            _ => vec![],
         })
+        .collect()
 }
 
 fn map_openai_output_message(msg: OutputMessage) -> LanguageModelResult<Vec<Part>> {
@@ -870,9 +1047,17 @@ fn map_openai_web_search_call(web: responses_api::WebSearchToolCall) -> Vec<Part
     parts
 }
 
+#[derive(Default)]
+struct OpenAIStreamState {
+    /// Hosted tool searches have no `call_id`, so their output is matched to
+    /// the preceding search call.
+    last_tool_search_call_id: Option<String>,
+}
+
 #[allow(clippy::too_many_lines)]
 fn map_openai_stream_event(
     event: ResponseStreamEvent,
+    state: &mut OpenAIStreamState,
 ) -> LanguageModelResult<Option<ContentDelta>> {
     match event {
         ResponseStreamEvent::ResponseFailed(failed_event) => {
@@ -926,6 +1111,22 @@ fn map_openai_stream_event(
                         }),
                     }))
                 }
+                OutputItem::ToolSearchCall(item) => {
+                    let tool_call_id = item.call_id.unwrap_or_else(|| item.id.clone());
+                    state.last_tool_search_call_id = Some(tool_call_id.clone());
+                    Ok(Some(ContentDelta {
+                        index: usize::try_from(output_item_added_event.output_index).unwrap_or(0),
+                        part: PartDelta::ToolCall(ToolCallPartDelta {
+                            tool_call_id: Some(tool_call_id),
+                            call: ToolCallDelta::ToolSearch(ToolSearchToolCallDelta {
+                                args: None,
+                                status: Some(map_openai_tool_search_status(&item.status)),
+                            }),
+                            signature: None,
+                            id: Some(item.id),
+                        }),
+                    }))
+                }
                 OutputItem::ReasoningItem(reasoning_item) => {
                     if let Some(encrypted_content) = reasoning_item.encrypted_content {
                         let reasoning_part = ReasoningPartDelta {
@@ -947,34 +1148,68 @@ fn map_openai_stream_event(
             }
         }
         ResponseStreamEvent::ResponseOutputItemDone(output_item_done_event) => {
-            if let OutputItem::WebSearchToolCall(web) = output_item_done_event.item {
-                let (action, _) = map_openai_web_search_action(web.action);
-                let status = match web.status {
-                    responses_api::WebSearchToolCallStatus::InProgress => {
-                        crate::WebSearchToolCallStatus::InProgress
-                    }
-                    responses_api::WebSearchToolCallStatus::Searching => {
-                        crate::WebSearchToolCallStatus::Searching
-                    }
-                    responses_api::WebSearchToolCallStatus::Completed => {
-                        crate::WebSearchToolCallStatus::Completed
-                    }
-                    _ => crate::WebSearchToolCallStatus::Failed,
-                };
-                Ok(Some(ContentDelta {
-                    index: usize::try_from(output_item_done_event.output_index).unwrap_or(0),
-                    part: PartDelta::ToolCall(ToolCallPartDelta {
-                        tool_call_id: Some(web.id),
-                        call: crate::ToolCallDelta::WebSearch(crate::WebSearchToolCallDelta {
-                            action,
-                            status: Some(status),
+            let index = usize::try_from(output_item_done_event.output_index).unwrap_or(0);
+            match output_item_done_event.item {
+                OutputItem::WebSearchToolCall(web) => {
+                    let (action, _) = map_openai_web_search_action(web.action);
+                    let status = match web.status {
+                        responses_api::WebSearchToolCallStatus::InProgress => {
+                            crate::WebSearchToolCallStatus::InProgress
+                        }
+                        responses_api::WebSearchToolCallStatus::Searching => {
+                            crate::WebSearchToolCallStatus::Searching
+                        }
+                        responses_api::WebSearchToolCallStatus::Completed => {
+                            crate::WebSearchToolCallStatus::Completed
+                        }
+                        _ => crate::WebSearchToolCallStatus::Failed,
+                    };
+                    Ok(Some(ContentDelta {
+                        index,
+                        part: PartDelta::ToolCall(ToolCallPartDelta {
+                            tool_call_id: Some(web.id),
+                            call: crate::ToolCallDelta::WebSearch(crate::WebSearchToolCallDelta {
+                                action,
+                                status: Some(status),
+                            }),
+                            signature: None,
+                            id: None,
                         }),
-                        signature: None,
-                        id: None,
-                    }),
-                }))
-            } else {
-                Ok(None)
+                    }))
+                }
+                OutputItem::ToolSearchCall(item) => {
+                    // Search arguments arrive whole with the completed item.
+                    let tool_call_id = item.call_id.unwrap_or_else(|| item.id.clone());
+                    state.last_tool_search_call_id = Some(tool_call_id.clone());
+                    Ok(Some(ContentDelta {
+                        index,
+                        part: PartDelta::ToolCall(ToolCallPartDelta {
+                            tool_call_id: Some(tool_call_id),
+                            call: ToolCallDelta::ToolSearch(ToolSearchToolCallDelta {
+                                args: Some(openai_tool_search_args(item.arguments).to_string()),
+                                status: Some(map_openai_tool_search_status(&item.status)),
+                            }),
+                            signature: None,
+                            id: Some(item.id),
+                        }),
+                    }))
+                }
+                OutputItem::ToolSearchOutput(item) => {
+                    let tool_call_id = item
+                        .call_id
+                        .clone()
+                        .or_else(|| state.last_tool_search_call_id.clone());
+                    let result = map_openai_tool_search_output(item, tool_call_id);
+                    Ok(Some(ContentDelta {
+                        index,
+                        part: PartDelta::ToolResult(ToolResultPartDelta {
+                            tool_call_id: result.tool_call_id,
+                            result: result.result,
+                            status: result.status,
+                        }),
+                    }))
+                }
+                _ => Ok(None),
             }
         }
         ResponseStreamEvent::ResponseOutputTextDelta(text_delta_event) => {
@@ -1141,10 +1376,14 @@ fn map_openai_stream_web_search_result(
 fn convert_to_openai_web_search_call(
     tool_call_id: String,
     call: crate::WebSearchToolCall,
-) -> Option<InputItem> {
+) -> LanguageModelResult<InputItem> {
     // Calls without actions cannot be replayed.
-    let action = call.action?;
-    Some(InputItem::Item(responses_api::Item::WebSearchToolCall(
+    let Some(action) = call.action else {
+        return Err(LanguageModelError::InvalidInput(
+            "OpenAI web-search history requires an action".to_string(),
+        ));
+    };
+    Ok(InputItem::Item(responses_api::Item::WebSearchToolCall(
         responses_api::WebSearchToolCall {
             action: convert_to_openai_web_search_action(action),
             id: tool_call_id,

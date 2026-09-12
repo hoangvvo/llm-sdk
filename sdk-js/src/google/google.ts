@@ -442,7 +442,8 @@ function convertToGoogleParts(part: Part): GooglePart[] {
     case "source":
       return part.content.map(convertToGoogleParts).flat();
     case "tool-call": {
-      if (part.call.type === "web_search") return [];
+      // Hosted tool history has no Gemini equivalent and is skipped.
+      if (part.call.type !== "function") return [];
       const googleToolCallPart: GooglePart = {
         functionCall: {
           name: part.call.name,
@@ -456,7 +457,7 @@ function convertToGoogleParts(part: Part): GooglePart[] {
       return [googleToolCallPart];
     }
     case "tool-result": {
-      if (part.result.type === "web_search") return [];
+      if (part.result.type !== "function") return [];
       const functionResponse = convertToGoogleFunctionResponse(
         part.result.content,
         part.status,
@@ -551,12 +552,19 @@ function convertToGoogleTools(tools: Tool[]): GoogleTool[] {
 
   for (const tool of tools) {
     if (tool.type === "function") {
+      // Gemini has no deferred loading, so deferred tools are loaded eagerly.
       functionDeclarations.push({
         name: tool.name,
         description: tool.description,
         parametersJsonSchema: tool.parameters,
       });
       continue;
+    }
+    if (tool.type === "tool_search") {
+      throw new UnsupportedError(
+        PROVIDER,
+        "Google does not support hosted tool search",
+      );
     }
 
     if (

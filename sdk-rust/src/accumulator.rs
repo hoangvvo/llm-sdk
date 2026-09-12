@@ -3,6 +3,7 @@ use crate::{
     FunctionToolCall, ImagePart, LanguageModelError, LanguageModelResult, ModelResponse,
     ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningPart, ReasoningPartDelta, TextPart,
     ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta, ToolResultPart, ToolResultPartDelta,
+    ToolSearchToolCall,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -183,6 +184,14 @@ fn merge_tool_call_delta(
                 existing.status = delta.status;
             }
         }
+        (ToolCallDelta::ToolSearch(existing), ToolCallDelta::ToolSearch(delta)) => {
+            if let Some(args) = delta.args {
+                existing.args.get_or_insert_default().push_str(&args);
+            }
+            if delta.status.is_some() {
+                existing.status = delta.status;
+            }
+        }
         _ => return Err(format!("Tool call type mismatch at index {index}")),
     }
     if delta.signature.is_some() {
@@ -288,6 +297,10 @@ fn create_tool_call_part(data: ToolCallPartDelta, index: usize) -> LanguageModel
         }
         ToolCallDelta::WebSearch(call) => ToolCall::WebSearch(crate::WebSearchToolCall {
             action: call.action,
+            status: call.status,
+        }),
+        ToolCallDelta::ToolSearch(call) => ToolCall::ToolSearch(ToolSearchToolCall {
+            args: parse_tool_call_args(&call.args.unwrap_or_default())?,
             status: call.status,
         }),
     };

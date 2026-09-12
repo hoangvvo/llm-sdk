@@ -167,6 +167,17 @@ function mergeDelta(existing: AccumulatedData, delta: ContentDelta): void {
         if (delta.part.call.status) {
           existingPart.call.status = delta.part.call.status;
         }
+      } else if (
+        existingPart.call.type === "tool_search" &&
+        delta.part.call.type === "tool_search"
+      ) {
+        if (delta.part.call.args) {
+          existingPart.call.args =
+            (existingPart.call.args ?? "") + delta.part.call.args;
+        }
+        if (delta.part.call.status) {
+          existingPart.call.status = delta.part.call.status;
+        }
       }
       if (delta.part.tool_call_id) {
         existingPart.tool_call_id = delta.part.tool_call_id;
@@ -315,6 +326,28 @@ function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
       ...(data.signature ? { signature: data.signature } : {}),
       ...(data.id ? { id: data.id } : {}),
     };
+  }
+  if (data.call.type === "tool_search") {
+    try {
+      return {
+        type: "tool-call",
+        tool_call_id: data.tool_call_id,
+        call: {
+          type: "tool_search",
+          args: JSON.parse(
+            data.call.args?.trim() ? data.call.args : "{}",
+          ) as Record<string, unknown>,
+          ...(data.call.status ? { status: data.call.status } : {}),
+        },
+        ...(data.signature ? { signature: data.signature } : {}),
+        ...(data.id ? { id: data.id } : {}),
+      };
+    } catch (e) {
+      throw new InvariantError(
+        "",
+        `Invalid tool search arguments: ${String(data.call.args)}: ${(e as Error).message}`,
+      );
+    }
   }
   if (!data.call.name) {
     throw new Error(`Missing function name at index ${String(index)}`);

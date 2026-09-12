@@ -362,12 +362,19 @@ fn convert_to_generate_content_parameters(
         let mut function_declarations = Vec::new();
         for tool in tools {
             match tool {
+                // Gemini has no deferred loading, so deferred tools are loaded eagerly.
                 SdkTool::Function(tool) => function_declarations.push(FunctionDeclaration {
                     name: Some(tool.name),
                     description: Some(tool.description),
                     parameters_json_schema: Some(tool.parameters),
                     ..Default::default()
                 }),
+                SdkTool::ToolSearch(_) => {
+                    return Err(LanguageModelError::Unsupported(
+                        PROVIDER,
+                        "Google does not support hosted tool search".to_string(),
+                    ));
+                }
                 SdkTool::WebSearch(tool) => {
                     if tool
                         .allowed_domains
@@ -526,6 +533,7 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
         }],
         Part::Source(source_part) => convert_parts_to_google_parts(source_part.content)?,
         Part::ToolCall(tool_call_part) => {
+            // Hosted tool history has no Gemini equivalent and is skipped.
             let crate::ToolCall::Function(call) = tool_call_part.call else {
                 return Ok(vec![]);
             };

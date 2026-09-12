@@ -105,6 +105,29 @@
         "country": "US",
         "timezone": "America/Los_Angeles"
       }
+    },
+    {
+      "type": "tool_search"
+    },
+    {
+      "type": "function",
+      "name": "lookup_holiday",
+      "description": "Look up the public holidays of a country in a given year",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country code"
+          },
+          "year": {
+            "type": "integer"
+          }
+        },
+        "required": ["country", "year"],
+        "additionalProperties": false
+      },
+      "defer_loading": true
     }
   ],
   "profiles": {
@@ -3024,6 +3047,139 @@
               {
                 "type": "text",
                 "text": "16|[Ss]ixteen"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_tool_search",
+      "groups": ["tool_search"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use tool search to find a tool that lists public holidays, then call it for Vietnam (country code VN) in 2026. Do not answer without calling the holiday tool."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["tool_search", "get_weather", "lookup_holiday"],
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "tool_search_call",
+                "status": "completed"
+              },
+              {
+                "type": "tool_search_result",
+                "status": "completed",
+                "tool_names": ["lookup_holiday"]
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "lookup_holiday",
+                "args": {
+                  "country": {
+                    "$regex": "^(VN|vn|Vn)$"
+                  },
+                  "year": 2026
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "status": "completed",
+                    "tool_call_id": {
+                      "$ref": "stages.0.tool_calls.0.tool_call_id"
+                    },
+                    "result": {
+                      "type": "function",
+                      "name": "lookup_holiday",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "{\"holidays\": [{\"date\": \"2026-09-02\", \"name\": \"National Day\"}]}"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["tool_search", "get_weather", "lookup_holiday"],
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "National Day|September 2|2026-09-02",
+                "aggregate": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stream_tool_search",
+      "groups": ["tool_search"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Use tool search to find a tool that lists public holidays, then call it for Vietnam (country code VN) in 2026. Do not answer without calling the holiday tool."
+                  }
+                ]
+              }
+            ]
+          },
+          "input_tools": ["tool_search", "get_weather", "lookup_holiday"],
+          "expect": {
+            "allow_extra_tool_calls": true,
+            "content": [
+              {
+                "type": "tool_search_call",
+                "status": "completed"
+              },
+              {
+                "type": "tool_search_result",
+                "status": "completed",
+                "tool_names": ["lookup_holiday"]
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "lookup_holiday",
+                "args": {
+                  "country": {
+                    "$regex": "^(VN|vn|Vn)$"
+                  },
+                  "year": 2026
+                }
               }
             ]
           }

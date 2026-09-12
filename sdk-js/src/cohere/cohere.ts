@@ -482,6 +482,12 @@ function convertToCohereTool(tool: Tool): Cohere.ToolV2 {
       "Hosted web search is not supported by the Cohere V2 Chat API",
     );
   }
+  if (tool.type === "tool_search") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "Hosted tool search is not supported by the Cohere V2 Chat API",
+    );
+  }
 
   return {
     type: "function",

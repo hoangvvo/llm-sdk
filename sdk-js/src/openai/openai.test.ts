@@ -34,6 +34,9 @@ suite("OpenAIModel", () => {
     runTestGroup(t, getModel(), "image_generation"),
   );
   test("image_input", (t) => runTestGroup(t, getModel(), "image_input"));
+  test("tool_search", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, getModel(), "tool_search"),
+  );
   test("reasoning", { timeout: 120 * 1000 }, (t) =>
     runTestGroup(t, getModel("o1"), "reasoning", {
       profile: "openai_opaque_reasoning",

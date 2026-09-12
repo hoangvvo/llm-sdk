@@ -129,6 +129,12 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
                         status: call.status,
                     })
                 }
+                crate::ToolCall::ToolSearch(call) => {
+                    crate::ToolCallDelta::ToolSearch(crate::ToolSearchToolCallDelta {
+                        args: Some(call.args.to_string()),
+                        status: call.status,
+                    })
+                }
             },
             tool_call_id: Some(tool_call_part.tool_call_id),
             signature: tool_call_part.signature,

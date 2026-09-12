@@ -2,6 +2,8 @@ package llmsdk
 
 import (
 	"encoding/json"
+
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
 // NewTextPart creates a new text part
@@ -496,14 +498,42 @@ func NewToolChoiceTool(toolName string) *ToolChoiceOption {
 }
 
 // NewFunctionTool creates a function tool.
-func NewFunctionTool(name string, description string, parameters JSONSchema) Tool {
-	return Tool{
-		FunctionTool: &FunctionTool{
-			Name:        name,
-			Description: description,
-			Parameters:  parameters,
-		},
+func NewFunctionTool(name string, description string, parameters JSONSchema, opts ...FunctionToolOption) Tool {
+	functionTool := &FunctionTool{
+		Name:        name,
+		Description: description,
+		Parameters:  parameters,
 	}
+	for _, opt := range opts {
+		opt(functionTool)
+	}
+	return Tool{FunctionTool: functionTool}
+}
+
+type FunctionToolOption func(*FunctionTool)
+
+// WithFunctionToolDeferLoading hides the tool from the model until a tool search discovers it.
+func WithFunctionToolDeferLoading() FunctionToolOption {
+	return func(tool *FunctionTool) {
+		tool.DeferLoading = ptr.To(true)
+	}
+}
+
+type ToolSearchToolOption func(*ToolSearchTool)
+
+// WithToolSearchStrategy selects the search algorithm when the provider offers a choice.
+func WithToolSearchStrategy(strategy ToolSearchStrategy) ToolSearchToolOption {
+	return func(tool *ToolSearchTool) {
+		tool.Strategy = &strategy
+	}
+}
+
+func NewToolSearchTool(opts ...ToolSearchToolOption) Tool {
+	toolSearchTool := &ToolSearchTool{}
+	for _, opt := range opts {
+		opt(toolSearchTool)
+	}
+	return Tool{ToolSearchTool: toolSearchTool}
 }
 
 // WebSearchToolOption configures a web search tool.
