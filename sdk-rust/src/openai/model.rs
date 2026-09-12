@@ -915,7 +915,7 @@ fn map_openai_output_items(items: Vec<OutputItem>) -> LanguageModelResult<Vec<Pa
                 parts.extend(map_openai_web_search_call(web));
             }
             OutputItem::ImageGenToolCall(image_gen_call) => {
-                let mut image_part = ImagePart::new(
+                let mut image_part = ImagePart::from_data(
                     image_gen_call.result.ok_or_else(|| {
                         LanguageModelError::Invariant(
                             PROVIDER,

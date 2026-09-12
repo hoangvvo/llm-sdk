@@ -83,6 +83,10 @@ name = "describe-image"
 required-features = ["examples"]
 
 [[example]]
+name = "describe-image-url"
+required-features = ["examples"]
+
+[[example]]
 name = "generate-audio"
 required-features = ["examples"]
 
@@ -115,6 +119,10 @@ name = "stream-text"
 required-features = ["examples"]
 
 [[example]]
+name = "stream-tool-search"
+required-features = ["examples"]
+
+[[example]]
 name = "stream-web-search"
 required-features = ["examples"]
 
@@ -128,6 +136,18 @@ required-features = ["examples"]
 
 [[example]]
 name = "summarize-audio"
+required-features = ["examples"]
+
+[[example]]
+name = "summarize-file"
+required-features = ["examples"]
+
+[[example]]
+name = "summarize-file-url"
+required-features = ["examples"]
+
+[[example]]
+name = "tool-search"
 required-features = ["examples"]
 
 [[example]]

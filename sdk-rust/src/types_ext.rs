@@ -51,7 +51,7 @@ impl From<String> for TextPart {
 }
 
 impl ImagePart {
-    pub fn new(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn from_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self {
             mime_type: mime_type.into(),
             data: Some(data.into()),
@@ -93,7 +93,7 @@ impl ImagePart {
 }
 
 impl AudioPart {
-    pub fn new(data: impl Into<String>, format: crate::AudioFormat) -> Self {
+    pub fn from_data(data: impl Into<String>, format: crate::AudioFormat) -> Self {
         Self {
             data: Some(data.into()),
             url: None,
@@ -143,7 +143,7 @@ impl AudioPart {
 }
 
 impl FilePart {
-    pub fn new(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+    pub fn from_data(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self {
             mime_type: mime_type.into(),
             data: Some(data.into()),
@@ -416,15 +416,27 @@ impl Part {
     }
 
     pub fn image(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        Self::Image(ImagePart::new(data, mime_type))
+        Self::Image(ImagePart::from_data(data, mime_type))
+    }
+
+    pub fn image_from_url(url: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::Image(ImagePart::from_url(url, mime_type))
     }
 
     pub fn audio(data: impl Into<String>, format: crate::AudioFormat) -> Self {
-        Self::Audio(AudioPart::new(data, format))
+        Self::Audio(AudioPart::from_data(data, format))
+    }
+
+    pub fn audio_from_url(url: impl Into<String>, format: crate::AudioFormat) -> Self {
+        Self::Audio(AudioPart::from_url(url, format))
     }
 
     pub fn file(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        Self::File(FilePart::new(data, mime_type))
+        Self::File(FilePart::from_data(data, mime_type))
+    }
+
+    pub fn file_from_url(url: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::File(FilePart::from_url(url, mime_type))
     }
 
     pub fn source(source: impl Into<String>, title: impl Into<String>, content: Vec<Self>) -> Self {

@@ -2,10 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"io"
 	"log"
-	"net/http"
 	"os"
 
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
@@ -14,26 +11,6 @@ import (
 )
 
 func main() {
-	imageURL := "https://images.unsplash.com/photo-1464809142576-df63ca4ed7f0"
-
-	resp, err := http.Get(imageURL)
-	if err != nil {
-		log.Fatalf("Failed to fetch image: %v", err)
-	}
-	defer resp.Body.Close()
-
-	imageBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read image: %v", err)
-	}
-
-	mimeType := resp.Header.Get("Content-Type")
-	if mimeType == "" {
-		mimeType = "image/jpeg"
-	}
-
-	imageData := base64.StdEncoding.EncodeToString(imageBytes)
-
 	provider := os.Getenv("PROVIDER")
 	if provider == "" {
 		provider = "openai"
@@ -48,11 +25,13 @@ func main() {
 		Messages: []llmsdk.Message{
 			llmsdk.NewUserMessage(
 				llmsdk.NewTextPart("Describe this image"),
-				llmsdk.NewImagePart(imageData, mimeType),
+				llmsdk.NewImagePartFromURL(
+					"https://images.unsplash.com/photo-1464809142576-df63ca4ed7f0",
+					"image/jpeg",
+				),
 			),
 		},
 	})
-
 	if err != nil {
 		log.Fatalf("Generation failed: %v", err)
 	}

@@ -48,6 +48,19 @@ func NewImagePart(data, mimeType string, opts ...ImagePartOption) Part {
 	}
 }
 
+func NewImagePartFromURL(url, mimeType string, opts ...ImagePartOption) Part {
+	imagePart := &ImagePart{
+		URL:      &url,
+		MimeType: mimeType,
+	}
+
+	for _, opt := range opts {
+		opt(imagePart)
+	}
+
+	return Part{ImagePart: imagePart}
+}
+
 type ImagePartOption func(*ImagePart)
 
 func WithImageWidth(width int) ImagePartOption {
@@ -68,13 +81,6 @@ func WithImageID(imageID string) ImagePartOption {
 	}
 }
 
-// WithImageURL references the image by URL instead of inline data.
-func WithImageURL(url string) ImagePartOption {
-	return func(p *ImagePart) {
-		p.URL = &url
-	}
-}
-
 func NewAudioPart(data string, format AudioFormat, opts ...AudioPartOption) Part {
 	audioPart := &AudioPart{
 		Data:   data,
@@ -88,6 +94,19 @@ func NewAudioPart(data string, format AudioFormat, opts ...AudioPartOption) Part
 	return Part{
 		AudioPart: audioPart,
 	}
+}
+
+func NewAudioPartFromURL(url string, format AudioFormat, opts ...AudioPartOption) Part {
+	audioPart := &AudioPart{
+		URL:    &url,
+		Format: format,
+	}
+
+	for _, opt := range opts {
+		opt(audioPart)
+	}
+
+	return Part{AudioPart: audioPart}
 }
 
 type AudioPartOption func(*AudioPart)
@@ -116,13 +135,6 @@ func WithAudioID(audioID string) AudioPartOption {
 	}
 }
 
-// WithAudioURL references the audio by URL instead of inline data.
-func WithAudioURL(url string) AudioPartOption {
-	return func(p *AudioPart) {
-		p.URL = &url
-	}
-}
-
 func NewFilePart(data, mimeType string, opts ...FilePartOption) Part {
 	filePart := &FilePart{
 		Data:     data,
@@ -138,18 +150,24 @@ func NewFilePart(data, mimeType string, opts ...FilePartOption) Part {
 	}
 }
 
+func NewFilePartFromURL(url, mimeType string, opts ...FilePartOption) Part {
+	filePart := &FilePart{
+		URL:      &url,
+		MimeType: mimeType,
+	}
+
+	for _, opt := range opts {
+		opt(filePart)
+	}
+
+	return Part{FilePart: filePart}
+}
+
 type FilePartOption func(*FilePart)
 
 func WithFileFilename(filename string) FilePartOption {
 	return func(p *FilePart) {
 		p.Filename = &filename
-	}
-}
-
-// WithFileURL references the file by URL instead of inline data.
-func WithFileURL(url string) FilePartOption {
-	return func(p *FilePart) {
-		p.URL = &url
 	}
 }
 

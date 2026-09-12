@@ -120,8 +120,13 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`stream-audio`: Stream audio](./examples/stream-audio/main.go)
 - [`generate-image`: Generate image](./examples/generate-image/main.go)
 - [`describe-image`: Describe image](./examples/describe-image/main.go)
+- [`describe-image-url`: Describe image from URL](./examples/describe-image-url/main.go)
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio/main.go)
+- [`summarize-file`: Summarize file](./examples/summarize-file/main.go)
+- [`summarize-file-url`: Summarize file from URL](./examples/summarize-file-url/main.go)
 - [`tool-use`: Function calling](./examples/tool-use/main.go)
+- [`tool-search`: Tool search](./examples/tool-search/main.go)
+- [`stream-tool-search`: Stream tool search](./examples/stream-tool-search/main.go)
 - [`web-search`: Web search](./examples/web-search/main.go)
 - [`stream-web-search`: Stream web search](./examples/stream-web-search/main.go)
 - [`structured-output`: Structured output](./examples/structured-output/main.go)
@@ -138,6 +143,7 @@ go run ./examples/generate-text
 
 ### To 0.4.0
 
+- Use `NewImagePartFromURL`, `NewAudioPartFromURL`, and `NewFilePartFromURL` instead of the `With…URL` options.
 - Rename `AudioOptions.LanguageCode` to `Language`.
 - Replace `Tool{Name, Description, Parameters}` literals with `NewFunctionTool(...)`.
 - `ToolResultPart.IsError` has been replaced with the required `Status` field (`ToolResultStatusCompleted`, `ToolResultStatusFailed`, or `ToolResultStatusCancelled`).

@@ -82,8 +82,13 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`stream-audio`: Stream audio](./examples/stream-audio.rs)
 - [`generate-image`: Generate image](./examples/generate-image.rs)
 - [`describe-image`: Describe image](./examples/describe-image.rs)
+- [`describe-image-url`: Describe image from URL](./examples/describe-image-url.rs)
 - [`summarize-audio`: Summarize audio](./examples/summarize-audio.rs)
+- [`summarize-file`: Summarize file](./examples/summarize-file.rs)
+- [`summarize-file-url`: Summarize file from URL](./examples/summarize-file-url.rs)
 - [`tool-use`: Function calling](./examples/tool-use.rs)
+- [`tool-search`: Tool search](./examples/tool-search.rs)
+- [`stream-tool-search`: Stream tool search](./examples/stream-tool-search.rs)
 - [`web-search`: Web search](./examples/web-search.rs)
 - [`stream-web-search`: Stream web search](./examples/stream-web-search.rs)
 - [`structured-output`: Structured output](./examples/structured-output.rs)
@@ -100,6 +105,7 @@ cargo run --example generate-text --features examples,openai
 
 ### To 0.4.0
 
+- Use `from_data` or `from_url` instead of `new` for `ImagePart`, `AudioPart`, and `FilePart`.
 - Wrap inline `ImagePart.data` and `AudioPart.data` in `Some(...)`; handle `None` for URL-only media. Set `url: None` in inline media literals.
 - Update exhaustive matches: `Part` adds `File`; `Tool`, `ToolCall`, `ToolResult`, and `ToolCallDelta` add `ToolSearch`.
 - `ReasoningPartDelta.text` is now `String`. Use an empty string for deltas without text.

@@ -4,8 +4,11 @@ title: Image understanding
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
 import goDescribeImageCode from "../../../../../sdk-go/examples/describe-image/main.go?raw";
+import goDescribeImageUrlCode from "../../../../../sdk-go/examples/describe-image-url/main.go?raw";
 import jsDescribeImageCode from "../../../../../sdk-js/examples/describe-image.ts?raw";
+import jsDescribeImageUrlCode from "../../../../../sdk-js/examples/describe-image-url.ts?raw";
 import rustDescribeImageCode from "../../../../../sdk-rust/examples/describe-image.rs?raw";
+import rustDescribeImageUrlCode from "../../../../../sdk-rust/examples/describe-image-url.rs?raw";
 import {
   extractGoTypes,
   extractRustTypes,
@@ -30,6 +33,8 @@ Image modality is represented as `ImagePart`s.
   </TabItem>
 </Tabs>
 
+## Send image data
+
 Images can be sent to the model as `ImagePart` objects.
 
 ![describe-image](../../../../assets/examples/describe-image.gif)
@@ -47,5 +52,29 @@ Images can be sent to the model as `ImagePart` objects.
   </TabItem>
   <TabItem label="Go">
     <Code code={goDescribeImageCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Send an image URL
+
+Set `url` on an `ImagePart` to let the provider fetch the image.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsDescribeImageUrlCode}
+      lang="typescript"
+      title="describe-image-url.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={rustDescribeImageUrlCode}
+      lang="rust"
+      title="describe-image-url.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goDescribeImageUrlCode} lang="go" title="main.go" />
   </TabItem>
 </Tabs>

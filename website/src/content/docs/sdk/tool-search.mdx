@@ -3,18 +3,24 @@ title: Tool search
 ---
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goStreamToolSearchCode from "../../../../../sdk-go/examples/stream-tool-search/main.go?raw";
+import goToolSearchCode from "../../../../../sdk-go/examples/tool-search/main.go?raw";
+import jsStreamToolSearchCode from "../../../../../sdk-js/examples/stream-tool-search.ts?raw";
+import jsToolSearchCode from "../../../../../sdk-js/examples/tool-search.ts?raw";
+import rustStreamToolSearchCode from "../../../../../sdk-rust/examples/stream-tool-search.rs?raw";
+import rustToolSearchCode from "../../../../../sdk-rust/examples/tool-search.rs?raw";
 import {
   extractGoTypes,
   extractRustTypes,
   extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
 
-Tool search lets the model find the functions it needs from a large set of tools. Their definitions can be loaded as they are needed, which reduces the amount of tool information included in the prompt.
-
-Tool search is enabled by adding a `ToolSearchTool` to the request. Function tools with `defer_loading` set to `true` are available through search, while the other tools are available to the model from the start. All definitions are still included in the request's `tools` list so the provider can find them. Availability is listed in [Supported providers](../providers).
+Tool search lets the model discover function tools as they are needed.
 
 ## Configure tool search
 
+Add a `ToolSearchTool` and set `defer_loading` on the functions to load through search. Include all function definitions in `tools` on each request.
+
 <Tabs>
   <TabItem label="TypeScript">
     <Code
@@ -50,27 +56,10 @@ Tool search is enabled by adding a `ToolSearchTool` to the request. Function too
     />
   </TabItem>
 </Tabs>
-
-```ts
-const response = await model.generate({
-  messages: [{ role: "user", content: [{ type: "text", text: "..." }] }],
-  tools: [
-    { type: "tool_search" },
-    { type: "function", name: "get_weather", description: "...", parameters },
-    {
-      type: "function",
-      name: "lookup_holiday",
-      description: "...",
-      parameters,
-      defer_loading: true,
-    },
-  ],
-});
-```
 
 ## Search calls and results
 
-When the model searches for tools, its response includes a `ToolCallPart` describing the search and a `ToolResultPart` containing the results. These are the same part types used for [web search](../web-search).
+Search calls and results are returned as `ToolCallPart` and `ToolResultPart` objects.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -108,8 +97,44 @@ When the model searches for tools, its response includes a `ToolCallPart` descri
   </TabItem>
 </Tabs>
 
-The `tool_names` field of `ToolSearchToolResult` identifies the functions found by the search. Including both the search call and its result in the assistant message history allows the model to use that information in later requests. The function definitions must also remain in the `tools` list on each request.
+Preserve search calls and results in the assistant message history. Handle function calls as described in [Function calling](../function-calling).
 
-The provider performs the search and returns its results. If the model then calls one of the functions it found, your application executes it and returns the result as described in [Function calling](../function-calling).
+## Generate with tool search
 
-When streaming, search calls and results arrive as partial responses. The accumulator combines them into the same parts returned by `generate`.
+Use `generate()` with a `ToolSearchTool` and deferred function tools.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code code={jsToolSearchCode} lang="typescript" title="tool-search.ts" />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustToolSearchCode} lang="rust" title="tool-search.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goToolSearchCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Stream with tool search
+
+Tool search can also be streamed using `stream()`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsStreamToolSearchCode}
+      lang="typescript"
+      title="stream-tool-search.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={rustStreamToolSearchCode}
+      lang="rust"
+      title="stream-tool-search.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goStreamToolSearchCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>

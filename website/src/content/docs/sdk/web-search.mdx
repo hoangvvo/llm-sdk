@@ -47,34 +47,55 @@ Web search lets a model retrieve current information with a provider-hosted tool
 
 Hosted searches use the same outer envelopes as function tools, with a nested discriminator:
 
-```ts
-type ToolCallPart = {
-  type: "tool-call";
-  tool_call_id: string;
-  call: FunctionToolCall | WebSearchToolCall;
-};
-
-type ToolResultPart = {
-  type: "tool-result";
-  tool_call_id: string;
-  result: FunctionToolResult | WebSearchToolResult;
-  status: "completed" | "failed" | "cancelled";
-};
-```
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes([
+        "ToolCallPart",
+        "ToolCall",
+        "ToolResultPart",
+        "ToolResult",
+        "ToolResultStatus",
+      ])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes([
+        "ToolCallPart",
+        "ToolCall",
+        "ToolResultPart",
+        "ToolResult",
+        "ToolResultStatus",
+      ])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes([
+        "ToolCallPart",
+        "ToolCall",
+        "ToolResultPart",
+        "ToolResult",
+        "ToolResultStatus",
+      ])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>
 
 `WebSearchToolCall` can expose `search`, `open_page`, or `find_in_page` activity and its status. `WebSearchToolResult.sources` contains normalized URLs and titles when the provider returns source results. Citations remain attached to the generated text because they describe exactly which spans use those sources.
 
-Anthropic source signatures are preserved as opaque `WebSearchSource.signature` values so a response can be sent back to Anthropic without losing provider state. Failed Anthropic searches expose `error_code` because Anthropic requires that result block for exact replay. Google display-only rendered search HTML is intentionally not exposed.
-
-OpenAI always returns the search call, but source result objects are optional in its API response. Anthropic and Google normally return source results. Code should therefore treat `ToolResultPart` as provider-dependent while relying on citations for answer attribution.
-
 `allowed_domains` restricts results to specific domains, while `user_location` provides an approximate location for localized results. OpenAI and Anthropic support both options. Google supports the base web search tool and rejects these options rather than silently ignoring them.
-
-Web search is supported by OpenAI Responses, Anthropic Messages, and Google GenerateContent. It is not supported by the OpenAI Chat Completions, Cohere V2 Chat, or Mistral Chat Completions adapters.
 
 ## Generate with web search
 
-The example defaults to OpenAI. Set `PROVIDER` and `MODEL` to run the same code with another supported provider and model.
+Use `generate()` with a `WebSearchTool`.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -90,7 +111,7 @@ The example defaults to OpenAI. Set `PROVIDER` and `MODEL` to run the same code 
 
 ## Stream with web search
 
-Streaming returns web-search call/status deltas, atomic result deltas when available, and citation deltas with text. The accumulator combines them into the same final parts returned by `generate`.
+Web search can also be streamed using `stream()`.
 
 <Tabs>
   <TabItem label="TypeScript">

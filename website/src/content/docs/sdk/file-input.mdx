@@ -3,15 +3,19 @@ title: File input
 ---
 
 import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import goSummarizeFileCode from "../../../../../sdk-go/examples/summarize-file/main.go?raw";
+import goSummarizeFileUrlCode from "../../../../../sdk-go/examples/summarize-file-url/main.go?raw";
+import jsSummarizeFileCode from "../../../../../sdk-js/examples/summarize-file.ts?raw";
+import jsSummarizeFileUrlCode from "../../../../../sdk-js/examples/summarize-file-url.ts?raw";
+import rustSummarizeFileCode from "../../../../../sdk-rust/examples/summarize-file.rs?raw";
+import rustSummarizeFileUrlCode from "../../../../../sdk-rust/examples/summarize-file-url.rs?raw";
 import {
   extractGoTypes,
   extractRustTypes,
   extractTypescriptTypes,
 } from "../../../utils/extract-types.ts";
 
-`FilePart` represents a document or video included in a message. The `mime_type` field describes its format, and `filename` provides a document name when one is needed.
-
-The file contents can be supplied through `data` or referenced by a `url` that the provider can access. The SDK passes the contents through as provided, so they should be prepared in the format accepted by the model.
+Documents and videos can be sent to the model using a `FilePart`.
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -29,21 +33,46 @@ The file contents can be supplied through `data` or referenced by a `url` that t
   </TabItem>
 </Tabs>
 
-```ts
-const response = await model.generate({
-  messages: [
-    {
-      role: "user",
-      content: [
-        { type: "text", text: "Summarize the attached report." },
-        {
-          type: "file",
-          mime_type: "application/pdf",
-          url: "https://example.com/report.pdf",
-          filename: "report.pdf",
-        },
-      ],
-    },
-  ],
-});
-```
+## Send file data
+
+Set `data` on a `FilePart` to send the file contents directly.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsSummarizeFileCode}
+      lang="typescript"
+      title="summarize-file.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={rustSummarizeFileCode} lang="rust" title="summarize-file.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goSummarizeFileCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
+
+## Send a file URL
+
+Set `url` on a `FilePart` to let the provider fetch the file.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={jsSummarizeFileUrlCode}
+      lang="typescript"
+      title="summarize-file-url.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={rustSummarizeFileUrlCode}
+      lang="rust"
+      title="summarize-file-url.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={goSummarizeFileUrlCode} lang="go" title="main.go" />
+  </TabItem>
+</Tabs>
