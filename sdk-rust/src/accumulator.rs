@@ -329,7 +329,8 @@ fn create_image_part(data: AccumulatedImageData, index: usize) -> LanguageModelR
     }
 
     Ok(Part::Image(ImagePart {
-        data: data.data,
+        data: Some(data.data),
+        url: None,
         mime_type,
         width: data.width,
         height: data.height,
@@ -358,7 +359,8 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
     let concatenated_audio = audio_utils::concatenate_b64_audio_chunks(&data.data_chunks)?;
 
     Ok(Part::Audio(AudioPart {
-        data: concatenated_audio,
+        data: Some(concatenated_audio),
+        url: None,
         format,
         sample_rate: data.sample_rate,
         channels: data.channels,

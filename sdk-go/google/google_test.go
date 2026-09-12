@@ -67,6 +67,13 @@ func TestImageInput(t *testing.T) {
 	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-image"), "image_input")
 }
 
+// URL inputs are forwarded as fileData, but the Gemini Developer API rejects
+// public HTTPS URLs with PERMISSION_DENIED for this project, so only inline
+// files are exercised.
+func TestFileInput(t *testing.T) {
+	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-lite"), "file_input")
+}
+
 func TestAudioGeneration(t *testing.T) {
 	testcommon.RunTestGroup(t, googleModel(t, "gemini-3.1-flash-tts-preview"), "audio_generation", testcommon.WithProfile("google_audio"))
 }

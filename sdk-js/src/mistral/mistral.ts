@@ -281,6 +281,7 @@ function convertToMistralAssistantMessage(
       case "text":
       case "image":
       case "audio":
+      case "file":
       case "reasoning": {
         mistralAssistantMessage.content = mistralAssistantMessage.content ?? [];
         mistralAssistantMessage.content.push(
@@ -353,14 +354,28 @@ function convertToMistralContentChunk(
       return {
         type: "image_url",
         imageUrl: {
-          url: `data:${part.mime_type};base64,${part.data}`,
+          url: part.url ?? `data:${part.mime_type};base64,${part.data ?? ""}`,
         },
       };
     case "audio":
       return {
         type: "input_audio",
-        inputAudio: part.data,
+        // Mistral accepts either raw base64 or a public URL.
+        inputAudio: part.url ?? part.data ?? "",
       };
+    case "file": {
+      const documentChunk: MistralComponents.DocumentURLChunk & {
+        type: "document_url";
+      } = {
+        type: "document_url",
+        documentUrl:
+          part.url ?? `data:${part.mime_type};base64,${part.data ?? ""}`,
+      };
+      if (part.filename) {
+        documentChunk.documentName = part.filename;
+      }
+      return documentChunk;
+    }
     case "reasoning":
       return {
         type: "thinking",

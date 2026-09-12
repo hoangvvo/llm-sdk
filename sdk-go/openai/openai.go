@@ -631,49 +631,44 @@ func convertToolMessageToOpenAIInputItems(toolMessage *llmsdk.ToolMessage) ([]op
 			})
 			continue
 		}
+		// A call has exactly one output item, so every result part becomes an
+		// entry of the same output list.
+		output := make(openaiapi.FunctionCallOutputItemParamOutputArray, 0, len(toolResultPartContent))
 		for _, toolResultPart := range toolResultPartContent {
 			switch {
 			case toolResultPart.TextPart != nil:
-				inputItems = append(inputItems, openaiapi.InputItem{
-					Item: &openaiapi.Item{
-						FunctionCallOutputItemParam: &openaiapi.FunctionCallOutputItemParam{
-							CallId: part.ToolResultPart.ToolCallID,
-							Output: openaiapi.FunctionCallOutputItemParamOutput{
-								FunctionCallOutputItemParamOutputArray: &openaiapi.FunctionCallOutputItemParamOutputArray{
-									openaiapi.FunctionCallOutputItemParamOutputArrayItem{
-										InputText: &openaiapi.InputTextContentParam{
-											Text: toolResultPart.TextPart.Text,
-										},
-									},
-								},
-							},
-							Type: openaiapi.FunctionCallOutputItemParamTypeFunctionCallOutput,
-						},
-					},
+				output = append(output, openaiapi.FunctionCallOutputItemParamOutputArrayItem{
+					InputText: &openaiapi.InputTextContentParam{Text: toolResultPart.TextPart.Text},
 				})
 			case toolResultPart.ImagePart != nil:
-				inputItems = append(inputItems, openaiapi.InputItem{
-					Item: &openaiapi.Item{
-						FunctionCallOutputItemParam: &openaiapi.FunctionCallOutputItemParam{
-							CallId: part.ToolResultPart.ToolCallID,
-							Output: openaiapi.FunctionCallOutputItemParamOutput{
-								FunctionCallOutputItemParamOutputArray: &openaiapi.FunctionCallOutputItemParamOutputArray{
-									openaiapi.FunctionCallOutputItemParamOutputArrayItem{
-										InputImage: &openaiapi.InputImageContentParamAutoParam{
-											ImageUrl: ptr.To(fmt.Sprintf("data:%s;base64,%s", toolResultPart.ImagePart.MimeType, toolResultPart.ImagePart.Data)),
-											Detail:   ptr.To(openaiapi.DetailEnumAuto),
-										},
-									},
-								},
-							},
-							Type: openaiapi.FunctionCallOutputItemParamTypeFunctionCallOutput,
-						},
+				output = append(output, openaiapi.FunctionCallOutputItemParamOutputArrayItem{
+					InputImage: &openaiapi.InputImageContentParamAutoParam{
+						ImageUrl: ptr.To(convertToOpenAIInputImageURL(toolResultPart.ImagePart)),
+						Detail:   ptr.To(openaiapi.DetailEnumAuto),
+					},
+				})
+			case toolResultPart.FilePart != nil:
+				file := convertToOpenAIInputFile(toolResultPart.FilePart)
+				output = append(output, openaiapi.FunctionCallOutputItemParamOutputArrayItem{
+					InputFile: &openaiapi.InputFileContentParam{
+						FileData: file.fileData, FileUrl: file.fileURL, Filename: file.filename,
 					},
 				})
 			default:
-				return nil, fmt.Errorf("cannot convert tool result part to OpenAI ResponseInputItem for type %s", toolResultPart.Type())
+				return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert tool result part to OpenAI ResponseInputItem for type %s", toolResultPart.Type()))
 			}
 		}
+		inputItems = append(inputItems, openaiapi.InputItem{
+			Item: &openaiapi.Item{
+				FunctionCallOutputItemParam: &openaiapi.FunctionCallOutputItemParam{
+					CallId: part.ToolResultPart.ToolCallID,
+					Output: openaiapi.FunctionCallOutputItemParamOutput{
+						FunctionCallOutputItemParamOutputArray: &output,
+					},
+					Type: openaiapi.FunctionCallOutputItemParamTypeFunctionCallOutput,
+				},
+			},
+		})
 	}
 	return inputItems, nil
 }
@@ -692,14 +687,47 @@ func convertToOpenAIResponseInputContent(part llmsdk.Part) (*openaiapi.InputCont
 		return &openaiapi.InputContent{
 			InputImage: &openaiapi.InputImageContent{
 				Detail:   ptr.To(openaiapi.ImageDetailAuto),
-				ImageUrl: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data)),
+				ImageUrl: ptr.To(convertToOpenAIInputImageURL(part.ImagePart)),
 				Type:     openaiapi.InputImageContentTypeInputImage,
+			},
+		}, nil
+
+	case part.FilePart != nil:
+		file := convertToOpenAIInputFile(part.FilePart)
+		return &openaiapi.InputContent{
+			InputFile: &openaiapi.InputFileContent{
+				FileData: file.fileData, FileUrl: file.fileURL, Filename: file.filename,
+				Type: openaiapi.InputFileContentTypeInputFile,
 			},
 		}, nil
 
 	default:
 		return nil, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert part to OpenAI content part for type %s", part.Type()))
 	}
+}
+
+// convertToOpenAIInputImageURL returns the part URL, or a data URL of the inline data.
+func convertToOpenAIInputImageURL(part *llmsdk.ImagePart) string {
+	if part.URL != nil {
+		return *part.URL
+	}
+	return fmt.Sprintf("data:%s;base64,%s", part.MimeType, part.Data)
+}
+
+type openAIInputFile struct {
+	fileData *string
+	fileURL  *string
+	filename *string
+}
+
+func convertToOpenAIInputFile(part *llmsdk.FilePart) openAIInputFile {
+	file := openAIInputFile{filename: part.Filename}
+	if part.URL != nil {
+		file.fileURL = part.URL
+	} else {
+		file.fileData = ptr.To(fmt.Sprintf("data:%s;base64,%s", part.MimeType, part.Data))
+	}
+	return file
 }
 
 // MARK: - To Provider Tools

@@ -415,10 +415,14 @@ func convertUserMessageToOpenAIChatMessage(message *llmsdk.UserMessage) (openaic
 				},
 			})
 		case part.ImagePart != nil:
+			imageURL := fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data)
+			if part.ImagePart.URL != nil {
+				imageURL = *part.ImagePart.URL
+			}
 			openAIContent = append(openAIContent, openaichatapi.ChatCompletionRequestUserMessageContentPart{
 				ImageUrl: &openaichatapi.ChatCompletionRequestMessageContentPartImage{
 					ImageUrl: openaichatapi.ChatCompletionRequestMessageContentPartImageImageUrl{
-						Url: fmt.Sprintf("data:%s;base64,%s", part.ImagePart.MimeType, part.ImagePart.Data),
+						Url: imageURL,
 					},
 				},
 			})
@@ -432,6 +436,16 @@ func convertUserMessageToOpenAIChatMessage(message *llmsdk.UserMessage) (openaic
 					InputAudio: openaichatapi.ChatCompletionRequestMessageContentPartAudioInputAudio{
 						Data:   part.AudioPart.Data,
 						Format: format,
+					},
+				},
+			})
+		case part.FilePart != nil:
+			// Chat Completions has no file URL input.
+			openAIContent = append(openAIContent, openaichatapi.ChatCompletionRequestUserMessageContentPart{
+				File: &openaichatapi.ChatCompletionRequestMessageContentPartFile{
+					File: openaichatapi.ChatCompletionRequestMessageContentPartFileFile{
+						FileData: ptr.To(fmt.Sprintf("data:%s;base64,%s", part.FilePart.MimeType, part.FilePart.Data)),
+						Filename: part.FilePart.Filename,
 					},
 				},
 			})

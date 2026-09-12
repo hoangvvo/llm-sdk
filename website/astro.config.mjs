@@ -44,6 +44,7 @@ export default defineConfig({
             { slug: "sdk/audio-generation" },
             { slug: "sdk/image-understanding" },
             { slug: "sdk/audio-understanding" },
+            { slug: "sdk/file-input" },
             { slug: "sdk/function-calling" },
             { slug: "sdk/web-search" },
             { slug: "sdk/tool-search" },

@@ -101,14 +101,14 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             signature: text_part.signature,
         }),
         Part::Image(image_part) => PartDelta::Image(ImagePartDelta {
-            data: Some(image_part.data),
+            data: image_part.data,
             mime_type: Some(image_part.mime_type),
             width: image_part.width,
             height: image_part.height,
             id: image_part.id,
         }),
         Part::Audio(audio_part) => PartDelta::Audio(AudioPartDelta {
-            data: Some(audio_part.data),
+            data: audio_part.data,
             format: Some(audio_part.format),
             sample_rate: audio_part.sample_rate,
             channels: audio_part.channels,
@@ -150,7 +150,7 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             signature: reasoning_part.signature,
             id: reasoning_part.id,
         }),
-        Part::Source(_) => Err(LanguageModelError::Invariant(
+        Part::File(_) | Part::Source(_) => Err(LanguageModelError::Invariant(
             "",
             "Cannot convert part to part delta".to_string(),
         ))?,

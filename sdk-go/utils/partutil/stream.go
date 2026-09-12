@@ -150,10 +150,11 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 			},
 		}
 	case part.ImagePart != nil:
+		// Deltas only carry inline data; URL-only parts have none to stream.
 		return llmsdk.PartDelta{
 			ImagePartDelta: &llmsdk.ImagePartDelta{
 				MimeType: &part.ImagePart.MimeType,
-				Data:     &part.ImagePart.Data,
+				Data:     optionalString(part.ImagePart.Data),
 				Width:    part.ImagePart.Width,
 				Height:   part.ImagePart.Height,
 				ID:       part.ImagePart.ID,
@@ -162,7 +163,7 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 	case part.AudioPart != nil:
 		return llmsdk.PartDelta{
 			AudioPartDelta: &llmsdk.AudioPartDelta{
-				Data:       &part.AudioPart.Data,
+				Data:       optionalString(part.AudioPart.Data),
 				Format:     &part.AudioPart.Format,
 				SampleRate: part.AudioPart.SampleRate,
 				Channels:   part.AudioPart.Channels,
@@ -173,4 +174,11 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 	default:
 		return llmsdk.PartDelta{}
 	}
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }

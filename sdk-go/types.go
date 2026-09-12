@@ -26,6 +26,7 @@ type Part struct {
 	TextPart       *TextPart       `json:"-"`
 	ImagePart      *ImagePart      `json:"-"`
 	AudioPart      *AudioPart      `json:"-"`
+	FilePart       *FilePart       `json:"-"`
 	SourcePart     *SourcePart     `json:"-"`
 	ToolCallPart   *ToolCallPart   `json:"-"`
 	ToolResultPart *ToolResultPart `json:"-"`
@@ -38,6 +39,7 @@ const (
 	PartTypeText       PartType = "text"
 	PartTypeImage      PartType = "image"
 	PartTypeAudio      PartType = "audio"
+	PartTypeFile       PartType = "file"
 	PartTypeSource     PartType = "source"
 	PartTypeToolCall   PartType = "tool-call"
 	PartTypeToolResult PartType = "tool-result"
@@ -52,6 +54,10 @@ func (p Part) Type() PartType {
 		return PartTypeImage
 	case p.AudioPart != nil:
 		return PartTypeAudio
+	case p.FilePart != nil:
+		return PartTypeFile
+	case p.SourcePart != nil:
+		return PartTypeSource
 	case p.ToolCallPart != nil:
 		return PartTypeToolCall
 	case p.ToolResultPart != nil:
@@ -75,8 +81,10 @@ type TextPart struct {
 type ImagePart struct {
 	// The MIME type of the image. E.g. "image/jpeg", "image/png".
 	MimeType string `json:"mime_type"`
-	// The base64-encoded image data.
-	Data string `json:"data"`
+	// Base64 content; either Data or URL must be provided.
+	Data string `json:"data,omitempty"`
+	// Fetched by the provider; URL support depends on the model.
+	URL *string `json:"url,omitempty"`
 	// The width of the image in pixels.
 	Width *int `json:"width,omitempty"`
 	// The height of the image in pixels.
@@ -87,8 +95,10 @@ type ImagePart struct {
 
 // AudioPart represents a part of the message that contains an audio.
 type AudioPart struct {
-	// The base64-encoded audio data.
-	Data   string      `json:"data"`
+	// Base64 content; either Data or URL must be provided.
+	Data string `json:"data,omitempty"`
+	// Fetched by the provider; URL support depends on the model.
+	URL    *string     `json:"url,omitempty"`
 	Format AudioFormat `json:"format"`
 	// The sample rate of the audio. E.g. 44100, 48000.
 	SampleRate *int `json:"sample_rate,omitempty"`
@@ -98,6 +108,19 @@ type AudioPart struct {
 	Transcript *string `json:"transcript,omitempty"`
 	// The ID of the part, if applicable.
 	ID *string `json:"id,omitempty"`
+}
+
+// FilePart carries document or video input; accepted MIME types depend on the model.
+type FilePart struct {
+	// The MIME type of the file. E.g. "application/pdf", "text/plain", "video/mp4".
+	MimeType string `json:"mime_type"`
+	// The file contents in the format accepted by the model.
+	// Either Data or URL must be provided.
+	Data string `json:"data,omitempty"`
+	// Fetched by the provider; URL support depends on the model.
+	URL *string `json:"url,omitempty"`
+	// Document name; some models require it for inline files.
+	Filename *string `json:"filename,omitempty"`
 }
 
 // SourcePart represents a part of the message that contains a source with structured content.
@@ -391,6 +414,15 @@ func (p Part) MarshalJSON() ([]byte, error) {
 			AudioPart: p.AudioPart,
 		})
 	}
+	if p.FilePart != nil {
+		return json.Marshal(struct {
+			Type PartType `json:"type"`
+			*FilePart
+		}{
+			Type:     PartTypeFile,
+			FilePart: p.FilePart,
+		})
+	}
 	if p.SourcePart != nil {
 		return json.Marshal(struct {
 			Type PartType `json:"type"`
@@ -458,6 +490,12 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.AudioPart = &a
+	case "file":
+		var f FilePart
+		if err := json.Unmarshal(data, &f); err != nil {
+			return err
+		}
+		p.FilePart = &f
 	case "source":
 		var s SourcePart
 		if err := json.Unmarshal(data, &s); err != nil {

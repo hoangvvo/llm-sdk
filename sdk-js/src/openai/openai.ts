@@ -18,6 +18,7 @@ import type {
   AssistantMessage,
   Citation,
   ContentDelta,
+  FilePart,
   FunctionTool,
   ImagePart,
   ImagePartDelta,
@@ -297,11 +298,9 @@ function convertUserMessageToResponseInputItem(
         case "text":
           return { type: "input_text", text: part.text };
         case "image":
-          return {
-            type: "input_image",
-            image_url: `data:${part.mime_type};base64,${part.data}`,
-            detail: "auto",
-          };
+          return convertToOpenAIInputImage(part);
+        case "file":
+          return convertToOpenAIInputFile(part);
         default:
           throw new UnsupportedError(
             PROVIDER,
@@ -310,6 +309,31 @@ function convertUserMessageToResponseInputItem(
       }
     }),
   };
+}
+
+function convertToOpenAIInputImage(
+  part: ImagePart,
+): OpenAI.Responses.ResponseInputImage {
+  return {
+    type: "input_image",
+    image_url: part.url ?? `data:${part.mime_type};base64,${part.data ?? ""}`,
+    detail: "auto",
+  };
+}
+
+function convertToOpenAIInputFile(
+  part: FilePart,
+): OpenAI.Responses.ResponseInputFile {
+  const inputFile: OpenAI.Responses.ResponseInputFile = { type: "input_file" };
+  if (part.url) {
+    inputFile.file_url = part.url;
+  } else {
+    inputFile.file_data = `data:${part.mime_type};base64,${part.data ?? ""}`;
+  }
+  if (part.filename) {
+    inputFile.filename = part.filename;
+  }
+  return inputFile;
 }
 
 function convertAssistantMessageToResponseInputItems(
@@ -368,7 +392,7 @@ function convertAssistantMessageToResponseInputItems(
             id: part.id ?? "",
             type: "image_generation_call",
             status: "completed",
-            result: `data:${part.mime_type};base64,${part.data}`,
+            result: `data:${part.mime_type};base64,${part.data ?? ""}`,
           },
         ];
       case "tool-call": {
@@ -473,11 +497,9 @@ function convertToolMessageToResponseInputItems(
               case "text":
                 return { type: "input_text", text: toolResultPartPart.text };
               case "image":
-                return {
-                  type: "input_image",
-                  image_url: `data:${toolResultPartPart.mime_type};base64,${toolResultPartPart.data}`,
-                  detail: "auto",
-                };
+                return convertToOpenAIInputImage(toolResultPartPart);
+              case "file":
+                return convertToOpenAIInputFile(toolResultPartPart);
               default:
                 throw new UnsupportedError(
                   PROVIDER,

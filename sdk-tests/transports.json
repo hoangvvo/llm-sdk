@@ -1912,6 +1912,266 @@
       ]
     },
     {
+      "name": "openai_media_url_generate",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Describe"
+                  },
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "url": "https://example.com/cat.png"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "url": "https://example.com/doc.pdf"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "data": "JVBERi0xLjQK",
+                    "filename": "inline.pdf"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": {
+                "authorization": "^Bearer test-token$"
+              },
+              "body": {
+                "input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "Describe"
+                      },
+                      {
+                        "type": "input_image",
+                        "image_url": "https://example.com/cat.png",
+                        "detail": "auto"
+                      },
+                      {
+                        "type": "input_file",
+                        "file_url": "https://example.com/doc.pdf"
+                      },
+                      {
+                        "type": "input_file",
+                        "file_data": "data:application/pdf;base64,JVBERi0xLjQK",
+                        "filename": "inline.pdf"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "created_at": 0,
+                "error": null,
+                "id": "resp_1",
+                "incomplete_details": null,
+                "instructions": null,
+                "object": "response",
+                "output": [
+                  {
+                    "type": "message",
+                    "id": "msg_1",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [
+                      {
+                        "type": "output_text",
+                        "text": "Fixture response",
+                        "annotations": [],
+                        "logprobs": []
+                      }
+                    ]
+                  }
+                ],
+                "parallel_tool_calls": false,
+                "status": "completed"
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Fixture response$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_multi_part_tool_result",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Weather?"
+                  }
+                ]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "tool-call",
+                    "tool_call_id": "call_1",
+                    "call": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "args": {
+                        "location": "Hanoi"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": "call_1",
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Sunny"
+                        },
+                        {
+                          "type": "image",
+                          "mime_type": "image/png",
+                          "data": "aW1n"
+                        }
+                      ]
+                    },
+                    "status": "completed"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": {
+                "authorization": "^Bearer test-token$"
+              },
+              "body": {
+                "input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "Weather?"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": "get_weather",
+                    "arguments": "{\"location\":\"Hanoi\"}"
+                  },
+                  {
+                    "type": "function_call_output",
+                    "call_id": "call_1",
+                    "output": [
+                      {
+                        "type": "input_text",
+                        "text": "Sunny"
+                      },
+                      {
+                        "type": "input_image",
+                        "image_url": "data:image/png;base64,aW1n",
+                        "detail": "auto"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "created_at": 0,
+                "error": null,
+                "id": "resp_1",
+                "incomplete_details": null,
+                "instructions": null,
+                "object": "response",
+                "output": [
+                  {
+                    "type": "message",
+                    "id": "msg_1",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [
+                      {
+                        "type": "output_text",
+                        "text": "Fixture response",
+                        "annotations": [],
+                        "logprobs": []
+                      }
+                    ]
+                  }
+                ],
+                "parallel_tool_calls": false,
+                "status": "completed"
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Fixture response$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "anthropic_tool_search_generate",
       "groups": ["anthropic_transport"],
       "stages": [
@@ -2555,6 +2815,221 @@
                 "text": "^Done$"
               }
             ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_media_url_generate",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Describe"
+                  },
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "url": "https://example.com/cat.png"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "url": "https://example.com/doc.pdf"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "text/plain",
+                    "data": "hello",
+                    "filename": "notes.txt"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "headers": {
+                "x-api-key": "^test-token$",
+                "anthropic-version": "^2023-06-01$"
+              },
+              "body": {
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Describe"
+                      },
+                      {
+                        "type": "image",
+                        "source": {
+                          "type": "url",
+                          "url": "https://example.com/cat.png"
+                        }
+                      },
+                      {
+                        "type": "document",
+                        "source": {
+                          "type": "url",
+                          "url": "https://example.com/doc.pdf"
+                        }
+                      },
+                      {
+                        "type": "document",
+                        "source": {
+                          "type": "text",
+                          "media_type": "text/plain",
+                          "data": "hello"
+                        },
+                        "title": "notes.txt"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "test-model",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Fixture response"
+                  }
+                ],
+                "stop_reason": "end_turn",
+                "stop_sequence": null,
+                "usage": {
+                  "input_tokens": 4,
+                  "output_tokens": 1,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Fixture response$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "google_media_url_generate",
+      "groups": ["google_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Describe"
+                  },
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "url": "https://example.com/cat.png"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "data": "JVBERi0xLjQK"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1beta/models/test-model:generateContent(?:\\?.*)?",
+              "body": {
+                "contents": [
+                  {
+                    "role": "user",
+                    "parts": [
+                      {
+                        "text": "Describe"
+                      },
+                      {
+                        "fileData": {
+                          "fileUri": "https://example.com/cat.png",
+                          "mimeType": "image/png"
+                        }
+                      },
+                      {
+                        "inlineData": {
+                          "data": "JVBERi0xLjQK",
+                          "mimeType": "application/pdf"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "candidates": [
+                  {
+                    "content": {
+                      "role": "model",
+                      "parts": [
+                        {
+                          "text": "Fixture response"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "usageMetadata": {
+                  "promptTokenCount": 4,
+                  "candidatesTokenCount": 2,
+                  "totalTokenCount": 6
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Fixture response$"
+              }
+            ],
+            "usage": {
+              "input_tokens": 4,
+              "output_tokens": 2
+            }
           }
         }
       ]

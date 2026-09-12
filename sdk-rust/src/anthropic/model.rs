@@ -1,23 +1,25 @@
 use crate::{
     anthropic::api::{
-        self, Base64ImageSource, Base64ImageSourceMediaType, CacheControlEphemeral,
-        CacheControlEphemeralTtl, ContentBlock, ContentBlockDeltaEvent,
+        self, Base64ImageSource, Base64ImageSourceMediaType, Base64PDFSource,
+        CacheControlEphemeral, CacheControlEphemeralTtl, ContentBlock, ContentBlockDeltaEvent,
         ContentBlockDeltaEventDelta, ContentBlockStartEvent, ContentBlockStartEventContentBlock,
         CreateMessageParams, CreateMessageParamsCacheControl, CreateMessageParamsSystem,
         CreateMessageParamsToolsItem, InputContentBlock, InputMessage, InputMessageContent,
         InputMessageRole, Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage,
-        MessageStartEvent, MessageStreamEvent, OutputConfig, RequestCitationsConfig,
+        MessageStartEvent, MessageStreamEvent, OutputConfig, PlainTextSource,
+        RequestCitationsConfig, RequestDocumentBlock, RequestDocumentBlockSource,
         RequestImageBlock, RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock,
         RequestTextBlockCitationsItem, RequestThinkingBlock, RequestToolResultBlock,
         RequestToolResultBlockContent, RequestToolResultBlockContentArrayItem, RequestToolUseBlock,
         RequestWebSearchResultLocationCitation, StopReason, ThinkingConfigAdaptive,
         ThinkingConfigDisabled, ThinkingConfigEnabled, ThinkingConfigParam, Tool,
         ToolSearchToolBM2520251119, ToolSearchToolBM2520251119Type, ToolSearchToolRegex20251119,
-        ToolSearchToolRegex20251119Type, Usage, UserLocation, WebSearchTool20250305,
+        ToolSearchToolRegex20251119Type, URLImageSource, URLPDFSource, Usage, UserLocation,
+        WebSearchTool20250305,
     },
     client_utils, stream_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
-    CacheRetention, Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel,
+    CacheRetention, Citation, CitationDelta, ContentDelta, FilePart, ImagePart, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
     LanguageModelStream, Message, ModelResponse, ModelServerToolUsage, ModelTokensDetails,
     ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions,
@@ -688,7 +690,10 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
         ))),
         Part::Image(image_part) => Ok(InputContentBlock::Image(create_request_image_block(
             image_part,
-        )?)),
+        ))),
+        Part::File(file_part) => Ok(InputContentBlock::Document(create_request_document_block(
+            file_part,
+        ))),
         Part::Source(source_part) => Ok(InputContentBlock::SearchResult(convert_source_part(
             source_part,
         )?)),
@@ -886,7 +891,10 @@ fn convert_part_to_tool_result_content_block(
             create_request_text_block(text_part),
         )),
         Part::Image(image_part) => Ok(RequestToolResultBlockContentArrayItem::Image(
-            create_request_image_block(image_part)?,
+            create_request_image_block(image_part),
+        )),
+        Part::File(file_part) => Ok(RequestToolResultBlockContentArrayItem::Document(
+            create_request_document_block(file_part),
         )),
         Part::Source(source_part) => Ok(RequestToolResultBlockContentArrayItem::SearchResult(
             convert_source_part(source_part)?,
@@ -926,14 +934,54 @@ fn create_request_text_block(text_part: TextPart) -> RequestTextBlock {
     }
 }
 
-fn create_request_image_block(image_part: ImagePart) -> LanguageModelResult<RequestImageBlock> {
-    Ok(RequestImageBlock {
-        cache_control: None,
-        source: RequestImageBlockSource::Base64(Base64ImageSource {
-            data: image_part.data,
-            media_type: map_anthropic_image_media_type(&image_part.mime_type)?,
+fn create_request_image_block(image_part: ImagePart) -> RequestImageBlock {
+    let ImagePart {
+        mime_type,
+        data,
+        url,
+        ..
+    } = image_part;
+    let source = match url {
+        Some(url) => RequestImageBlockSource::Url(URLImageSource { url }),
+        None => RequestImageBlockSource::Base64(Base64ImageSource {
+            media_type: map_anthropic_image_media_type(&mime_type),
+            data: data.unwrap_or_default(),
         }),
-    })
+    };
+    RequestImageBlock {
+        cache_control: None,
+        source,
+    }
+}
+
+fn create_request_document_block(file_part: FilePart) -> RequestDocumentBlock {
+    let FilePart {
+        mime_type,
+        data,
+        url,
+        filename,
+    } = file_part;
+    let source = if let Some(url) = url {
+        RequestDocumentBlockSource::Url(URLPDFSource { url })
+    } else if mime_type == "text/plain" {
+        RequestDocumentBlockSource::Text(PlainTextSource {
+            data: data.unwrap_or_default(),
+            media_type: mime_type,
+        })
+    } else {
+        RequestDocumentBlockSource::Base64(Base64PDFSource {
+            data: data.unwrap_or_default(),
+            media_type: mime_type,
+        })
+    };
+    RequestDocumentBlock {
+        cache_control: None,
+        citations: None,
+        context: None,
+        source,
+        title: filename,
+        r#type: "document".to_string(),
+    }
 }
 
 fn convert_source_part(
@@ -1514,18 +1562,14 @@ fn map_citation_delta(citation: api::CitationsDeltaCitation) -> Option<CitationD
     }
 }
 
-fn map_anthropic_image_media_type(
-    mime_type: &str,
-) -> LanguageModelResult<Base64ImageSourceMediaType> {
+fn map_anthropic_image_media_type(mime_type: &str) -> Base64ImageSourceMediaType {
     match mime_type {
-        "image/jpeg" => Ok(Base64ImageSourceMediaType::ImageJpeg),
-        "image/png" => Ok(Base64ImageSourceMediaType::ImagePng),
-        "image/gif" => Ok(Base64ImageSourceMediaType::ImageGif),
-        "image/webp" => Ok(Base64ImageSourceMediaType::ImageWebp),
-        _ => Err(LanguageModelError::Unsupported(
-            PROVIDER,
-            format!("Unsupported Anthropic image mime type: {mime_type}"),
-        )),
+        "image/jpeg" => Base64ImageSourceMediaType::ImageJpeg,
+        "image/png" => Base64ImageSourceMediaType::ImagePng,
+        "image/gif" => Base64ImageSourceMediaType::ImageGif,
+        "image/webp" => Base64ImageSourceMediaType::ImageWebp,
+        // Serialized as a missing media_type, which Anthropic rejects.
+        _ => Base64ImageSourceMediaType::Unknown,
     }
 }
 

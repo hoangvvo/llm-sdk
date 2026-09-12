@@ -12,6 +12,7 @@
         { "$ref": "#/definitions/TextPart" },
         { "$ref": "#/definitions/ImagePart" },
         { "$ref": "#/definitions/AudioPart" },
+        { "$ref": "#/definitions/FilePart" },
         { "$ref": "#/definitions/SourcePart" },
         { "$ref": "#/definitions/ToolCallPart" },
         { "$ref": "#/definitions/ToolResultPart" },
@@ -121,7 +122,11 @@
         },
         "data": {
           "type": "string",
-          "description": "The base64-encoded image data."
+          "description": "The base64-encoded image data. Either `data` or `url` must be provided."
+        },
+        "url": {
+          "type": "string",
+          "description": "A URL the media can be fetched from. Providers that cannot fetch URLs for this part reject it; pass `data` instead."
         },
         "width": {
           "type": "number",
@@ -136,7 +141,7 @@
           "description": "ID of the image part, if applicable"
         }
       },
-      "required": ["type", "mime_type", "data"],
+      "required": ["type", "mime_type"],
       "additionalProperties": false
     },
     "AudioPart": {
@@ -146,7 +151,11 @@
         "type": { "const": "audio" },
         "data": {
           "type": "string",
-          "description": "The base64-encoded audio data."
+          "description": "The base64-encoded audio data. Either `data` or `url` must be provided."
+        },
+        "url": {
+          "type": "string",
+          "description": "A URL the media can be fetched from. Providers that cannot fetch URLs for this part reject it; pass `data` instead."
         },
         "format": { "$ref": "#/definitions/AudioFormat" },
         "sample_rate": {
@@ -166,7 +175,7 @@
           "description": "ID of the audio part, if applicable"
         }
       },
-      "required": ["type", "data", "format"],
+      "required": ["type", "format"],
       "additionalProperties": false
     },
     "SourcePart": {
@@ -1052,6 +1061,31 @@
           "description": "Rate multipliers applied to requests whose input exceeds a token threshold."
         }
       },
+      "additionalProperties": false
+    },
+    "FilePart": {
+      "type": "object",
+      "description": "Document or video input; accepted MIME types depend on the model.",
+      "properties": {
+        "type": { "const": "file" },
+        "mime_type": {
+          "type": "string",
+          "description": "The MIME type of the file. E.g. \"application/pdf\", \"text/plain\", \"video/mp4\"."
+        },
+        "data": {
+          "type": "string",
+          "description": "The file contents in the format accepted by the model. Either `data` or `url` must be provided."
+        },
+        "url": {
+          "type": "string",
+          "description": "A URL the file can be fetched from. Providers that cannot fetch URLs for this part reject it; pass `data` instead."
+        },
+        "filename": {
+          "type": "string",
+          "description": "The file name, forwarded to providers that display or require it."
+        }
+      },
+      "required": ["type", "mime_type"],
       "additionalProperties": false
     },
     "ToolSearchToolCallStatus": {

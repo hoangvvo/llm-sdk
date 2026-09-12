@@ -401,7 +401,9 @@ function convertToCohereImageContent(
   return {
     type: "image_url",
     imageUrl: {
-      url: `data:${imagePart.mime_type};base64,${imagePart.data}`,
+      url:
+        imagePart.url ??
+        `data:${imagePart.mime_type};base64,${imagePart.data ?? ""}`,
     },
   };
 }

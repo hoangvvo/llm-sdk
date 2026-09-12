@@ -1,3 +1,4 @@
+use super::chat_api::CreateChatCompletionRequestPromptCacheRetention;
 use super::chat_api::{
     self, ChatCompletionMessageToolCall, ChatCompletionMessageToolCallsItem,
     ChatCompletionNamedToolChoice, ChatCompletionNamedToolChoiceFunction,
@@ -7,6 +8,7 @@ use super::chat_api::{
     ChatCompletionRequestMessageContentPartAudio,
     ChatCompletionRequestMessageContentPartAudioInputAudio,
     ChatCompletionRequestMessageContentPartAudioInputAudioFormat,
+    ChatCompletionRequestMessageContentPartFile, ChatCompletionRequestMessageContentPartFileFile,
     ChatCompletionRequestMessageContentPartImage,
     ChatCompletionRequestMessageContentPartImageImageUrl,
     ChatCompletionRequestMessageContentPartText, ChatCompletionRequestMessageContentPartTextType,
@@ -18,21 +20,21 @@ use super::chat_api::{
     ChatCompletionToolChoiceOption, CompletionUsage, CompletionUsageCompletionTokensDetails,
     CompletionUsagePromptTokensDetails, CreateChatCompletionRequest,
     CreateChatCompletionRequestAudio, CreateChatCompletionRequestAudioFormat,
-    CreateChatCompletionRequestPromptCacheRetention, CreateChatCompletionRequestResponseFormat,
-    CreateChatCompletionRequestToolsItem, CreateChatCompletionResponse,
-    CreateChatCompletionStreamResponse, FunctionObject, ReasoningEffort, ReasoningEffortValue,
-    ResponseFormatJsonObject, ResponseFormatJsonSchema, ResponseFormatJsonSchemaJsonSchema,
-    ResponseFormatJsonSchemaSchema, ResponseFormatText, ResponseModalitiesValueItem,
-    VoiceIdsOrCustomVoice,
+    CreateChatCompletionRequestResponseFormat, CreateChatCompletionRequestToolsItem,
+    CreateChatCompletionResponse, CreateChatCompletionStreamResponse, FunctionObject,
+    ReasoningEffort, ReasoningEffortValue, ResponseFormatJsonObject, ResponseFormatJsonSchema,
+    ResponseFormatJsonSchemaJsonSchema, ResponseFormatJsonSchemaSchema, ResponseFormatText,
+    ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
 };
+use crate::CacheRetention;
 use crate::{
     client_utils, source_part_utils, stream_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AssistantMessage, AudioFormat,
-    AudioOptions, CacheRetention, ContentDelta, LanguageModel, LanguageModelError,
-    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
-    ModelResponse, ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse,
-    ResponseFormatJson, ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool,
-    ToolMessage, ToolResultStatus, UserMessage,
+    AudioOptions, ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput,
+    LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
+    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
+    ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool, ToolMessage,
+    ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -446,6 +448,7 @@ fn convert_to_openai_messages(
     Ok(openai_messages)
 }
 
+#[allow(clippy::too_many_lines)]
 fn convert_user_message(
     user_message: UserMessage,
 ) -> LanguageModelResult<ChatCompletionRequestUserMessage> {
@@ -463,14 +466,34 @@ fn convert_user_message(
                 ));
             }
             Part::Image(image_part) => {
+                let url = image_part.url.unwrap_or_else(|| {
+                    format!(
+                        "data:{};base64,{}",
+                        image_part.mime_type,
+                        image_part.data.unwrap_or_default()
+                    )
+                });
                 content_parts.push(ChatCompletionRequestUserMessageContentPart::ImageUrl(
                     ChatCompletionRequestMessageContentPartImage {
                         image_url: ChatCompletionRequestMessageContentPartImageImageUrl {
                             detail: None,
-                            url: format!(
+                            url,
+                        },
+                    },
+                ));
+            }
+            Part::File(file_part) => {
+                // Chat Completions has no file URL input.
+                content_parts.push(ChatCompletionRequestUserMessageContentPart::File(
+                    ChatCompletionRequestMessageContentPartFile {
+                        file: ChatCompletionRequestMessageContentPartFileFile {
+                            file_data: Some(format!(
                                 "data:{};base64,{}",
-                                image_part.mime_type, image_part.data
-                            ),
+                                file_part.mime_type,
+                                file_part.data.unwrap_or_default()
+                            )),
+                            file_id: None,
+                            filename: file_part.filename,
                         },
                     },
                 ));
@@ -496,7 +519,7 @@ fn convert_user_message(
                 content_parts.push(ChatCompletionRequestUserMessageContentPart::InputAudio(
                     ChatCompletionRequestMessageContentPartAudio {
                         input_audio: ChatCompletionRequestMessageContentPartAudioInputAudio {
-                            data: audio_part.data,
+                            data: audio_part.data.unwrap_or_default(),
                             format,
                         },
                     },
@@ -879,7 +902,8 @@ fn map_openai_message(
         })?;
 
         let mut audio_part = crate::AudioPart {
-            data: data.data,
+            data: Some(data.data),
+            url: None,
             format: audio_format,
             sample_rate: None,
             channels: None,
