@@ -26,6 +26,7 @@ type Part struct {
 	TextPart       *TextPart       `json:"-"`
 	ImagePart      *ImagePart      `json:"-"`
 	AudioPart      *AudioPart      `json:"-"`
+	FilePart       *FilePart       `json:"-"`
 	SourcePart     *SourcePart     `json:"-"`
 	ToolCallPart   *ToolCallPart   `json:"-"`
 	ToolResultPart *ToolResultPart `json:"-"`
@@ -38,6 +39,7 @@ const (
 	PartTypeText       PartType = "text"
 	PartTypeImage      PartType = "image"
 	PartTypeAudio      PartType = "audio"
+	PartTypeFile       PartType = "file"
 	PartTypeSource     PartType = "source"
 	PartTypeToolCall   PartType = "tool-call"
 	PartTypeToolResult PartType = "tool-result"
@@ -52,6 +54,10 @@ func (p Part) Type() PartType {
 		return PartTypeImage
 	case p.AudioPart != nil:
 		return PartTypeAudio
+	case p.FilePart != nil:
+		return PartTypeFile
+	case p.SourcePart != nil:
+		return PartTypeSource
 	case p.ToolCallPart != nil:
 		return PartTypeToolCall
 	case p.ToolResultPart != nil:
@@ -75,8 +81,10 @@ type TextPart struct {
 type ImagePart struct {
 	// The MIME type of the image. E.g. "image/jpeg", "image/png".
 	MimeType string `json:"mime_type"`
-	// The base64-encoded image data.
-	Data string `json:"data"`
+	// Base64 content; either Data or URL must be provided.
+	Data string `json:"data,omitempty"`
+	// Fetched by the provider; URL support depends on the model.
+	URL *string `json:"url,omitempty"`
 	// The width of the image in pixels.
 	Width *int `json:"width,omitempty"`
 	// The height of the image in pixels.
@@ -87,8 +95,10 @@ type ImagePart struct {
 
 // AudioPart represents a part of the message that contains an audio.
 type AudioPart struct {
-	// The base64-encoded audio data.
-	Data   string      `json:"data"`
+	// Base64 content; either Data or URL must be provided.
+	Data string `json:"data,omitempty"`
+	// Fetched by the provider; URL support depends on the model.
+	URL    *string     `json:"url,omitempty"`
 	Format AudioFormat `json:"format"`
 	// The sample rate of the audio. E.g. 44100, 48000.
 	SampleRate *int `json:"sample_rate,omitempty"`
@@ -98,6 +108,19 @@ type AudioPart struct {
 	Transcript *string `json:"transcript,omitempty"`
 	// The ID of the part, if applicable.
 	ID *string `json:"id,omitempty"`
+}
+
+// FilePart carries document or video input; accepted MIME types depend on the model.
+type FilePart struct {
+	// The MIME type of the file. E.g. "application/pdf", "text/plain", "video/mp4".
+	MimeType string `json:"mime_type"`
+	// The file contents in the format accepted by the model.
+	// Either Data or URL must be provided.
+	Data string `json:"data,omitempty"`
+	// Fetched by the provider; URL support depends on the model.
+	URL *string `json:"url,omitempty"`
+	// Document name; some models require it for inline files.
+	Filename *string `json:"filename,omitempty"`
 }
 
 // SourcePart represents a part of the message that contains a source with structured content.
@@ -142,8 +165,9 @@ const (
 )
 
 type ToolCall struct {
-	Function  *FunctionToolCall  `json:"-"`
-	WebSearch *WebSearchToolCall `json:"-"`
+	Function   *FunctionToolCall   `json:"-"`
+	WebSearch  *WebSearchToolCall  `json:"-"`
+	ToolSearch *ToolSearchToolCall `json:"-"`
 }
 
 type FunctionToolCall struct {
@@ -161,7 +185,8 @@ const (
 )
 
 type WebSearchAction struct {
-	Type    string   `json:"type"`
+	Type string `json:"type"`
+	// The search queries. Required for "search" actions.
 	Queries []string `json:"queries,omitempty"`
 	URL     string   `json:"url,omitempty"`
 	Pattern string   `json:"pattern,omitempty"`
@@ -172,9 +197,25 @@ type WebSearchToolCall struct {
 	Status *WebSearchToolCallStatus `json:"status,omitempty"`
 }
 
+type ToolSearchToolCallStatus string
+
+const (
+	ToolSearchToolCallStatusInProgress ToolSearchToolCallStatus = "in_progress"
+	ToolSearchToolCallStatusCompleted  ToolSearchToolCallStatus = "completed"
+	ToolSearchToolCallStatusFailed     ToolSearchToolCallStatus = "failed"
+)
+
+// ToolSearchToolCall is a provider-hosted search over the deferred tools of the request.
+type ToolSearchToolCall struct {
+	// Opaque search arguments; preserve for conversation replay.
+	Args   json.RawMessage           `json:"args"`
+	Status *ToolSearchToolCallStatus `json:"status,omitempty"`
+}
+
 type ToolResult struct {
-	Function  *FunctionToolResult  `json:"-"`
-	WebSearch *WebSearchToolResult `json:"-"`
+	Function   *FunctionToolResult   `json:"-"`
+	WebSearch  *WebSearchToolResult  `json:"-"`
+	ToolSearch *ToolSearchToolResult `json:"-"`
 }
 
 type FunctionToolResult struct {
@@ -194,6 +235,14 @@ type WebSearchToolResult struct {
 	ErrorCode *string           `json:"error_code,omitempty"`
 }
 
+// ToolSearchToolResult identifies discovered tools made available to the model.
+type ToolSearchToolResult struct {
+	// The names of the discovered tools. Each must be declared in the request's tools.
+	ToolNames []string `json:"tool_names"`
+	// Provider error code required to replay a failed hosted tool search.
+	ErrorCode *string `json:"error_code,omitempty"`
+}
+
 func (c ToolCall) MarshalJSON() ([]byte, error) {
 	if c.Function != nil {
 		return json.Marshal(struct {
@@ -206,6 +255,12 @@ func (c ToolCall) MarshalJSON() ([]byte, error) {
 			Type string `json:"type"`
 			*WebSearchToolCall
 		}{Type: "web_search", WebSearchToolCall: c.WebSearch})
+	}
+	if c.ToolSearch != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ToolSearchToolCall
+		}{Type: "tool_search", ToolSearchToolCall: c.ToolSearch})
 	}
 	return nil, fmt.Errorf("tool call has no content")
 }
@@ -230,6 +285,12 @@ func (c *ToolCall) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		c.WebSearch = &value
+	case "tool_search":
+		var value ToolSearchToolCall
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		c.ToolSearch = &value
 	default:
 		return fmt.Errorf("unknown tool call type: %s", tag.Type)
 	}
@@ -252,6 +313,16 @@ func (r ToolResult) MarshalJSON() ([]byte, error) {
 			Type string `json:"type"`
 			*WebSearchToolResult
 		}{Type: "web_search", WebSearchToolResult: &result})
+	}
+	if r.ToolSearch != nil {
+		result := *r.ToolSearch
+		if result.ToolNames == nil {
+			result.ToolNames = []string{}
+		}
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ToolSearchToolResult
+		}{Type: "tool_search", ToolSearchToolResult: &result})
 	}
 	return nil, fmt.Errorf("tool result has no content")
 }
@@ -276,6 +347,12 @@ func (r *ToolResult) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		r.WebSearch = &value
+	case "tool_search":
+		var value ToolSearchToolResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		r.ToolSearch = &value
 	default:
 		return fmt.Errorf("unknown tool result type: %s", tag.Type)
 	}
@@ -335,6 +412,15 @@ func (p Part) MarshalJSON() ([]byte, error) {
 		}{
 			Type:      PartTypeAudio,
 			AudioPart: p.AudioPart,
+		})
+	}
+	if p.FilePart != nil {
+		return json.Marshal(struct {
+			Type PartType `json:"type"`
+			*FilePart
+		}{
+			Type:     PartTypeFile,
+			FilePart: p.FilePart,
 		})
 	}
 	if p.SourcePart != nil {
@@ -404,6 +490,12 @@ func (p *Part) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.AudioPart = &a
+	case "file":
+		var f FilePart
+		if err := json.Unmarshal(data, &f); err != nil {
+			return err
+		}
+		p.FilePart = &f
 	case "source":
 		var s SourcePart
 		if err := json.Unmarshal(data, &s); err != nil {
@@ -481,8 +573,9 @@ type ToolCallPartDelta struct {
 }
 
 type ToolCallDelta struct {
-	Function  *FunctionToolCallDelta  `json:"-"`
-	WebSearch *WebSearchToolCallDelta `json:"-"`
+	Function   *FunctionToolCallDelta   `json:"-"`
+	WebSearch  *WebSearchToolCallDelta  `json:"-"`
+	ToolSearch *ToolSearchToolCallDelta `json:"-"`
 }
 
 type FunctionToolCallDelta struct {
@@ -493,6 +586,12 @@ type FunctionToolCallDelta struct {
 type WebSearchToolCallDelta struct {
 	Action *WebSearchAction         `json:"action,omitempty"`
 	Status *WebSearchToolCallStatus `json:"status,omitempty"`
+}
+
+type ToolSearchToolCallDelta struct {
+	// The partial JSON string of the search arguments.
+	Args   *string                   `json:"args,omitempty"`
+	Status *ToolSearchToolCallStatus `json:"status,omitempty"`
 }
 
 func (c ToolCallDelta) MarshalJSON() ([]byte, error) {
@@ -507,6 +606,12 @@ func (c ToolCallDelta) MarshalJSON() ([]byte, error) {
 			Type string `json:"type"`
 			*WebSearchToolCallDelta
 		}{Type: "web_search", WebSearchToolCallDelta: c.WebSearch})
+	}
+	if c.ToolSearch != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ToolSearchToolCallDelta
+		}{Type: "tool_search", ToolSearchToolCallDelta: c.ToolSearch})
 	}
 	return nil, fmt.Errorf("tool call delta has no content")
 }
@@ -531,6 +636,12 @@ func (c *ToolCallDelta) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		c.WebSearch = &value
+	case "tool_search":
+		var value ToolSearchToolCallDelta
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		c.ToolSearch = &value
 	default:
 		return fmt.Errorf("unknown tool call delta type: %s", tag.Type)
 	}
@@ -570,7 +681,7 @@ type AudioPartDelta struct {
 
 // ReasoningPartDelta represents a delta update for a reasoning part, used in streaming of reasoning messages.
 type ReasoningPartDelta struct {
-	Text      string  `json:"text,omitempty"`
+	Text      string  `json:"text"`
 	Signature *string `json:"signature,omitempty"`
 	ID        *string `json:"id,omitempty"`
 }
@@ -671,6 +782,12 @@ func (p *PartDelta) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		p.ImagePartDelta = &i
+	case "reasoning":
+		var r ReasoningPartDelta
+		if err := json.Unmarshal(data, &r); err != nil {
+			return err
+		}
+		p.ReasoningPartDelta = &r
 	default:
 		return fmt.Errorf("unknown part delta type: %s", temp.Type)
 	}
@@ -930,8 +1047,8 @@ type AudioOptions struct {
 	Format *AudioFormat `json:"format,omitempty"`
 	// The provider-specific voice ID to use for audio generation.
 	Voice *string `json:"voice,omitempty"`
-	// The language code for the audio generation
-	LanguageCode *string `json:"language_code,omitempty"`
+	// The language code for the audio generation.
+	Language *string `json:"language,omitempty"`
 }
 
 // Options for reasoning generation.
@@ -967,15 +1084,17 @@ type JSONSchema map[string]any
 
 // Tool represents a tool that can be used by the model.
 type Tool struct {
-	FunctionTool  *FunctionTool  `json:"-"`
-	WebSearchTool *WebSearchTool `json:"-"`
+	FunctionTool   *FunctionTool   `json:"-"`
+	WebSearchTool  *WebSearchTool  `json:"-"`
+	ToolSearchTool *ToolSearchTool `json:"-"`
 }
 
 type ToolType string
 
 const (
-	ToolTypeFunction  ToolType = "function"
-	ToolTypeWebSearch ToolType = "web_search"
+	ToolTypeFunction   ToolType = "function"
+	ToolTypeWebSearch  ToolType = "web_search"
+	ToolTypeToolSearch ToolType = "tool_search"
 )
 
 func (t Tool) Type() ToolType {
@@ -984,6 +1103,8 @@ func (t Tool) Type() ToolType {
 		return ToolTypeFunction
 	case t.WebSearchTool != nil:
 		return ToolTypeWebSearch
+	case t.ToolSearchTool != nil:
+		return ToolTypeToolSearch
 	default:
 		return ""
 	}
@@ -997,6 +1118,23 @@ type FunctionTool struct {
 	Description string `json:"description"`
 	// The JSON schema of the parameters that the tool accepts. The type must be "object".
 	Parameters JSONSchema `json:"parameters"`
+	// Hide the tool from the model until a tool_search tool discovers it.
+	// Providers without tool search ignore this flag and load the tool eagerly.
+	DeferLoading *bool `json:"defer_loading,omitempty"`
+}
+
+// ToolSearchStrategy is the search algorithm of a hosted tool search.
+type ToolSearchStrategy string
+
+const (
+	ToolSearchStrategyRegex ToolSearchStrategy = "regex"
+	ToolSearchStrategyBM25  ToolSearchStrategy = "bm25"
+)
+
+// ToolSearchTool loads deferred function tools on demand through hosted search.
+type ToolSearchTool struct {
+	// The search algorithm, when the provider offers a choice. Defaults to "bm25".
+	Strategy *ToolSearchStrategy `json:"strategy,omitempty"`
 }
 
 // WebSearchTool represents a provider-hosted web search tool.
@@ -1041,6 +1179,15 @@ func (t Tool) MarshalJSON() ([]byte, error) {
 			WebSearchTool: t.WebSearchTool,
 		})
 	}
+	if t.ToolSearchTool != nil {
+		return json.Marshal(struct {
+			Type ToolType `json:"type"`
+			*ToolSearchTool
+		}{
+			Type:           ToolTypeToolSearch,
+			ToolSearchTool: t.ToolSearchTool,
+		})
+	}
 	return nil, fmt.Errorf("tool has no content")
 }
 
@@ -1066,6 +1213,12 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		t.WebSearchTool = &tool
+	case ToolTypeToolSearch:
+		var tool ToolSearchTool
+		if err := json.Unmarshal(data, &tool); err != nil {
+			return err
+		}
+		t.ToolSearchTool = &tool
 	default:
 		return fmt.Errorf("unknown tool type: %s", temp.Type)
 	}
@@ -1073,6 +1226,7 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ModelTokensDetails preserves provider counts; details may be additional to totals.
 type ModelTokensDetails struct {
 	TextTokens        *int `json:"text_tokens,omitempty"`
 	CachedTextTokens  *int `json:"cached_text_tokens,omitempty"`
@@ -1080,17 +1234,30 @@ type ModelTokensDetails struct {
 	CachedAudioTokens *int `json:"cached_audio_tokens,omitempty"`
 	ImageTokens       *int `json:"image_tokens,omitempty"`
 	CachedImageTokens *int `json:"cached_image_tokens,omitempty"`
-	CachedTokens      *int `json:"cached_tokens,omitempty"`
-	CacheWriteTokens  *int `json:"cache_write_tokens,omitempty"`
-	ReasoningTokens   *int `json:"reasoning_tokens,omitempty"`
+	// Cache reads, billed at the cached-input rate.
+	CachedTokens *int `json:"cached_tokens,omitempty"`
+	// Cache writes, billed separately from cache reads.
+	CacheWriteTokens *int `json:"cache_write_tokens,omitempty"`
+	// The subset of CacheWriteTokens stored with extended retention (see CacheRetention), which some providers bill at a higher rate.
+	ExtendedCacheWriteTokens *int `json:"extended_cache_write_tokens,omitempty"`
+	// The tokens spent on reasoning.
+	ReasoningTokens *int `json:"reasoning_tokens,omitempty"`
+}
+
+// ModelServerToolUsage tracks hosted tool usage billed per request, separately from tokens.
+type ModelServerToolUsage struct {
+	WebSearchRequests *int `json:"web_search_requests,omitempty"`
 }
 
 // ModelUsage represents the token usage of the model.
 type ModelUsage struct {
-	InputTokens         int                 `json:"input_tokens"`
-	OutputTokens        int                 `json:"output_tokens"`
-	InputTokensDetails  *ModelTokensDetails `json:"input_tokens_details,omitempty"`
-	OutputTokensDetails *ModelTokensDetails `json:"output_tokens_details,omitempty"`
+	// Provider-reported input tokens; see ModelUsageCostOptions for cache accounting.
+	InputTokens int `json:"input_tokens"`
+	// Provider-reported output tokens; see ModelUsageCostOptions for reasoning accounting.
+	OutputTokens        int                   `json:"output_tokens"`
+	InputTokensDetails  *ModelTokensDetails   `json:"input_tokens_details,omitempty"`
+	OutputTokensDetails *ModelTokensDetails   `json:"output_tokens_details,omitempty"`
+	ServerToolUse       *ModelServerToolUsage `json:"server_tool_use,omitempty"`
 }
 
 // ModelResponse represents the response generated by the model.
@@ -1140,7 +1307,19 @@ type LanguageModelInput struct {
 	Audio *AudioOptions `json:"audio,omitempty"`
 	// Options for reasoning generation.
 	Reasoning *ReasoningOptions `json:"reasoning,omitempty"`
+	// Opts into the provider's prompt cache and chooses how long entries are kept.
+	// "standard" uses the provider's default retention and "extended" the longest it offers.
+	// Providers without a retention setting ignore this option.
+	CacheRetention *CacheRetention `json:"cache_retention,omitempty"`
 }
+
+// CacheRetention is how long prompt cache entries are kept.
+type CacheRetention string
+
+const (
+	CacheRetentionStandard CacheRetention = "standard"
+	CacheRetentionExtended CacheRetention = "extended"
+)
 
 // LanguageModelPricing represents a metadata property that describes the pricing of the model.
 type LanguageModelPricing struct {
@@ -1150,6 +1329,8 @@ type LanguageModelPricing struct {
 	InputCostPerCachedToken *float64 `json:"input_cost_per_cached_token,omitempty"`
 	// The cost in USD per single cache-write input token.
 	InputCostPerCacheWriteToken *float64 `json:"input_cost_per_cache_write_token,omitempty"`
+	// The cost in USD per single cache-write input token stored with extended retention. Defaults to InputCostPerCacheWriteToken.
+	InputCostPerExtendedCacheWriteToken *float64 `json:"input_cost_per_extended_cache_write_token,omitempty"`
 	// The cost in USD per single cached text token for input.
 	InputCostPerCachedTextToken *float64 `json:"input_cost_per_cached_text_token,omitempty"`
 	// The cost in USD per single text token for output.
@@ -1166,4 +1347,18 @@ type LanguageModelPricing struct {
 	InputCostPerCachedImageToken *float64 `json:"input_cost_per_cached_image_token,omitempty"`
 	// The cost in USD per single image token for output.
 	OutputCostPerImageToken *float64 `json:"output_cost_per_image_token,omitempty"`
+	// The cost in USD per provider-hosted web search request.
+	CostPerWebSearchRequest *float64 `json:"cost_per_web_search_request,omitempty"`
+	// Rate multipliers applied to requests whose input exceeds a token threshold.
+	LongContext *LanguageModelLongContextPricing `json:"long_context,omitempty"`
+}
+
+// LanguageModelLongContextPricing holds rate multipliers applied to requests whose input exceeds a token threshold.
+type LanguageModelLongContextPricing struct {
+	// The request is priced with the multipliers when input_tokens exceeds this value.
+	ThresholdTokens int `json:"threshold_tokens"`
+	// The multiplier applied to every input rate. Defaults to 1.
+	InputCostMultiplier *float64 `json:"input_cost_multiplier,omitempty"`
+	// The multiplier applied to every output rate. Defaults to 1.
+	OutputCostMultiplier *float64 `json:"output_cost_multiplier,omitempty"`
 }

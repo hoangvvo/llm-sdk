@@ -114,14 +114,14 @@ func (m *AnthropicModel) Generate(ctx context.Context, input *llmsdk.LanguageMod
 			return nil, err
 		}
 
-		usage := mapAnthropicUsage(response.Usage)
+		usage := mapAnthropicUsage(anthropicUsageFromMessage(response.Usage))
 
 		result := &llmsdk.ModelResponse{
 			Content: content,
 			Usage:   usage,
 		}
 
-		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
+		if m.metadata != nil && m.metadata.Pricing != nil {
 			cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true, OutputReasoningTokensAreAdditional: false})
 			result.Cost = &cost
 		}
@@ -154,14 +154,26 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 			defer close(errCh)
 			defer sseStream.Close()
 
+			// Hosted search arguments are only usable once complete.
 			type serverToolBlock struct {
 				id    string
+				name  anthropicapi.ResponseServerToolUseBlockName
 				input string
 			}
-			providerToolBlockIndexes := map[int]bool{}
 			serverToolBlocks := map[int]*serverToolBlock{}
 			serverToolCallIndexes := map[string]int{}
-			var streamUsage *llmsdk.ModelUsage
+			// The API may emit several messages in one stream, for example after
+			// a hosted tool search. Their block indexes restart at zero and their
+			// usage is billed separately, so indexes are offset and usages summed.
+			indexOffset := 0
+			maxIndex := -1
+			var completedUsages []*llmsdk.ModelUsage
+			var messageUsage *anthropicUsage
+
+			sendDelta := func(delta llmsdk.ContentDelta) bool {
+				return stream.Send(ctx, responseCh, &llmsdk.PartialModelResponse{Delta: &delta})
+			}
+
 			for sseStream.Next() {
 				event, err := sseStream.Current()
 				if err != nil {
@@ -172,89 +184,109 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 					continue
 				}
 
-				if event.MessageStart != nil {
-					streamUsage = mapAnthropicUsage(event.MessageStart.Message.Usage)
+				switch {
+				case event.MessageStart != nil:
+					if messageUsage != nil {
+						completedUsages = append(completedUsages, mapAnthropicUsage(*messageUsage))
+						indexOffset = maxIndex + 1
+					}
+					usage := anthropicUsageFromMessage(event.MessageStart.Message.Usage)
+					messageUsage = &usage
 					if event.MessageStart.Message.StopReason != nil && *event.MessageStart.Message.StopReason == anthropicapi.StopReasonRefusal {
 						errCh <- llmsdk.NewRefusalError(anthropicRefusalMessage(event.MessageStart.Message.StopDetails))
 						return
 					}
-					continue
-				}
 
-				if event.MessageDelta != nil {
-					if streamUsage != nil {
-						mergeAnthropicMessageDeltaUsage(streamUsage, event.MessageDelta.Usage)
+				case event.MessageDelta != nil:
+					if messageUsage == nil {
+						messageUsage = &anthropicUsage{}
 					}
+					mergeAnthropicMessageDeltaUsage(messageUsage, event.MessageDelta.Usage)
 					if event.MessageDelta.Delta.StopReason != nil && *event.MessageDelta.Delta.StopReason == anthropicapi.StopReasonRefusal {
 						errCh <- llmsdk.NewRefusalError(anthropicRefusalMessage(event.MessageDelta.Delta.StopDetails))
 						return
 					}
-					continue
-				}
 
-				if event.ContentBlockStart != nil {
+				case event.ContentBlockStart != nil:
+					index := event.ContentBlockStart.Index + indexOffset
+					maxIndex = max(maxIndex, index)
 					block := event.ContentBlockStart.ContentBlock
 					if block.ServerToolUse != nil {
-						providerToolBlockIndexes[event.ContentBlockStart.Index] = true
-						if block.ServerToolUse.Name == anthropicapi.ResponseServerToolUseBlockNameWebSearch {
-							serverToolBlocks[event.ContentBlockStart.Index] = &serverToolBlock{id: block.ServerToolUse.Id}
-							serverToolCallIndexes[block.ServerToolUse.Id] = event.ContentBlockStart.Index
+						serverToolBlocks[index] = &serverToolBlock{id: block.ServerToolUse.Id, name: block.ServerToolUse.Name}
+						serverToolCallIndexes[block.ServerToolUse.Id] = index
+						if call := mapAnthropicServerToolUseStart(block.ServerToolUse.Name); call != nil {
+							id := block.ServerToolUse.Id
+							if !sendDelta(llmsdk.ContentDelta{Index: index, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: *call}}}) {
+								return
+							}
 						}
+						continue
 					}
 					if block.WebSearchToolResult != nil {
 						if callIndex, ok := serverToolCallIndexes[block.WebSearchToolResult.ToolUseId]; ok {
 							status := anthropicWebSearchResultStatus(block.WebSearchToolResult)
 							id := block.WebSearchToolResult.ToolUseId
-							responseCh <- &llmsdk.PartialModelResponse{Delta: &llmsdk.ContentDelta{Index: callIndex, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Status: &status}}}}}}
+							if !sendDelta(llmsdk.ContentDelta{Index: callIndex, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Status: &status}}}}}) {
+								return
+							}
 						}
 					}
-					deltas, err := mapAnthropicRawContentBlockStartEvent(*event.ContentBlockStart)
+					if block.ToolSearchToolResult != nil {
+						if callIndex, ok := serverToolCallIndexes[block.ToolSearchToolResult.ToolUseId]; ok {
+							status := anthropicToolSearchResultStatus(block.ToolSearchToolResult)
+							id := block.ToolSearchToolResult.ToolUseId
+							if !sendDelta(llmsdk.ContentDelta{Index: callIndex, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: llmsdk.ToolCallDelta{ToolSearch: &llmsdk.ToolSearchToolCallDelta{Status: &status}}}}}) {
+								return
+							}
+						}
+					}
+					startEvent := *event.ContentBlockStart
+					startEvent.Index = index
+					deltas, err := mapAnthropicRawContentBlockStartEvent(startEvent)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content block start: %w", err)
 						return
 					}
 					for _, delta := range deltas {
-						d := delta
-						responseCh <- &llmsdk.PartialModelResponse{Delta: &d}
+						if !sendDelta(delta) {
+							return
+						}
 					}
-					continue
-				}
 
-				if event.ContentBlockDelta != nil {
-					if block := serverToolBlocks[event.ContentBlockDelta.Index]; block != nil && event.ContentBlockDelta.Delta.InputJsonDelta != nil {
-						block.input += event.ContentBlockDelta.Delta.InputJsonDelta.PartialJson
+				case event.ContentBlockDelta != nil:
+					index := event.ContentBlockDelta.Index + indexOffset
+					if block := serverToolBlocks[index]; block != nil {
+						if event.ContentBlockDelta.Delta.InputJsonDelta != nil {
+							block.input += event.ContentBlockDelta.Delta.InputJsonDelta.PartialJson
+						}
 						continue
 					}
-					if providerToolBlockIndexes[event.ContentBlockDelta.Index] {
-						continue
-					}
-					deltas, err := mapAnthropicRawContentBlockDeltaEvent(*event.ContentBlockDelta)
+					deltaEvent := *event.ContentBlockDelta
+					deltaEvent.Index = index
+					deltas, err := mapAnthropicRawContentBlockDeltaEvent(deltaEvent)
 					if err != nil {
 						errCh <- fmt.Errorf("failed to map content block delta: %w", err)
 						return
 					}
 					for _, delta := range deltas {
-						d := delta
-						responseCh <- &llmsdk.PartialModelResponse{Delta: &d}
+						if !sendDelta(delta) {
+							return
+						}
 					}
-					continue
-				}
 
-				if event.ContentBlockStop != nil {
-					block := serverToolBlocks[event.ContentBlockStop.Index]
+				case event.ContentBlockStop != nil:
+					index := event.ContentBlockStop.Index + indexOffset
+					block := serverToolBlocks[index]
 					if block == nil {
 						continue
 					}
-					delete(serverToolBlocks, event.ContentBlockStop.Index)
-					var input struct {
-						Query string `json:"query"`
-					}
-					if json.Unmarshal([]byte(block.input), &input) == nil && input.Query != "" {
-						action := &llmsdk.WebSearchAction{Type: "search", Queries: []string{input.Query}}
+					delete(serverToolBlocks, index)
+					if call := mapAnthropicServerToolUseStop(block.name, block.input); call != nil {
 						id := block.id
-						responseCh <- &llmsdk.PartialModelResponse{Delta: &llmsdk.ContentDelta{Index: event.ContentBlockStop.Index, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Action: action}}}}}}
+						if !sendDelta(llmsdk.ContentDelta{Index: index, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: *call}}}) {
+							return
+						}
 					}
-					continue
 				}
 			}
 
@@ -262,18 +294,81 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 				errCh <- fmt.Errorf("scanner error: %w", err)
 				return
 			}
-			if streamUsage != nil {
-				partial := &llmsdk.PartialModelResponse{Usage: streamUsage}
+			if messageUsage != nil {
+				completedUsages = append(completedUsages, mapAnthropicUsage(*messageUsage))
+			}
+			if len(completedUsages) > 0 {
+				usage := &llmsdk.ModelUsage{}
+				for _, completed := range completedUsages {
+					usage.Add(completed)
+				}
+				partial := &llmsdk.PartialModelResponse{Usage: usage}
 				if m.metadata != nil && m.metadata.Pricing != nil {
-					cost := streamUsage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true, OutputReasoningTokensAreAdditional: false})
+					cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true, OutputReasoningTokensAreAdditional: false})
 					partial.Cost = &cost
 				}
-				responseCh <- partial
+				if !stream.Send(ctx, responseCh, partial) {
+					return
+				}
 			}
 		}()
 
 		return stream.New(responseCh, errCh), nil
 	})
+}
+
+// Hosted calls exposed in conversation history:
+// - web search
+// - regex or BM25 tool search
+// - other hosted tools are omitted
+func mapAnthropicServerToolUseStart(name anthropicapi.ResponseServerToolUseBlockName) *llmsdk.ToolCallDelta {
+	switch name {
+	case anthropicapi.ResponseServerToolUseBlockNameWebSearch:
+		status := llmsdk.WebSearchToolCallStatusInProgress
+		return &llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Status: &status}}
+	case anthropicapi.ResponseServerToolUseBlockNameToolSearchToolRegex, anthropicapi.ResponseServerToolUseBlockNameToolSearchToolBm25:
+		status := llmsdk.ToolSearchToolCallStatusInProgress
+		return &llmsdk.ToolCallDelta{ToolSearch: &llmsdk.ToolSearchToolCallDelta{Status: &status}}
+	default:
+		return nil
+	}
+}
+
+func mapAnthropicServerToolUseStop(name anthropicapi.ResponseServerToolUseBlockName, input string) *llmsdk.ToolCallDelta {
+	if input == "" {
+		input = "{}"
+	}
+	var parsedInput map[string]any
+	if err := json.Unmarshal([]byte(input), &parsedInput); err != nil {
+		parsedInput = nil
+	}
+	switch name {
+	case anthropicapi.ResponseServerToolUseBlockNameWebSearch:
+		query, ok := parsedInput["query"].(string)
+		if !ok {
+			return nil
+		}
+		return &llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Action: &llmsdk.WebSearchAction{Type: "search", Queries: []string{query}}}}
+	case anthropicapi.ResponseServerToolUseBlockNameToolSearchToolRegex, anthropicapi.ResponseServerToolUseBlockNameToolSearchToolBm25:
+		args := string(anthropicServerToolInputJSON(parsedInput))
+		return &llmsdk.ToolCallDelta{ToolSearch: &llmsdk.ToolSearchToolCallDelta{Args: &args}}
+	default:
+		return nil
+	}
+}
+
+// anthropicServerToolInputJSON encodes a hosted tool input object, falling back
+// to an empty object for anything that is not one.
+func anthropicServerToolInputJSON(input any) json.RawMessage {
+	object, ok := input.(map[string]any)
+	if !ok || object == nil {
+		return json.RawMessage(`{}`)
+	}
+	data, err := json.Marshal(object)
+	if err != nil {
+		return json.RawMessage(`{}`)
+	}
+	return data
 }
 
 func anthropicRefusalMessage(details *anthropicapi.RefusalStopDetails) string {
@@ -364,6 +459,18 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 				tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{WebSearchTool20250305: anthropicWebSearch})
 				continue
 			}
+			if tool.ToolSearchTool != nil {
+				if tool.ToolSearchTool.Strategy != nil && *tool.ToolSearchTool.Strategy == llmsdk.ToolSearchStrategyRegex {
+					tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{ToolSearchToolRegex20251119: &anthropicapi.ToolSearchToolRegex20251119{
+						Type: anthropicapi.ToolSearchToolRegex20251119TypeToolSearchToolRegex20251119, Name: "tool_search_tool_regex",
+					}})
+				} else {
+					tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{ToolSearchToolBM2520251119: &anthropicapi.ToolSearchToolBM2520251119{
+						Type: anthropicapi.ToolSearchToolBM2520251119TypeToolSearchToolBm2520251119, Name: "tool_search_tool_bm25",
+					}})
+				}
+				continue
+			}
 			if tool.FunctionTool == nil {
 				continue
 			}
@@ -377,6 +484,9 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 			if functionTool.Description != "" {
 				anthropicTool.Description = ptr.To(functionTool.Description)
 			}
+			if functionTool.DeferLoading != nil && *functionTool.DeferLoading {
+				anthropicTool.DeferLoading = ptr.To(true)
+			}
 			tools = append(tools, anthropicapi.CreateMessageParamsToolsItem{
 				Tool: &anthropicTool,
 			})
@@ -386,6 +496,15 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 
 	if input.Reasoning != nil {
 		params.Thinking = convertToAnthropicThinkingConfigParam(*input.Reasoning)
+	}
+
+	if input.CacheRetention != nil {
+		// Top-level cache_control caches through the last cacheable block.
+		ephemeral := &anthropicapi.CacheControlEphemeral{}
+		if *input.CacheRetention == llmsdk.CacheRetentionExtended {
+			ephemeral.Ttl = ptr.To(anthropicapi.CacheControlEphemeralTtlN1H)
+		}
+		params.CacheControl = &anthropicapi.CreateMessageParamsCacheControl{Ephemeral: ephemeral}
 	}
 
 	return params, nil
@@ -488,15 +607,11 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 
 	case part.ImagePart != nil:
 		return anthropicapi.InputContentBlock{
-			Image: &anthropicapi.RequestImageBlock{
-				Source: anthropicapi.RequestImageBlockSource{
-					Base64: &anthropicapi.Base64ImageSource{
-						Data:      part.ImagePart.Data,
-						MediaType: anthropicapi.Base64ImageSourceMediaType(part.ImagePart.MimeType),
-					},
-				},
-			},
+			Image: &anthropicapi.RequestImageBlock{Source: convertToAnthropicImageSource(part.ImagePart)},
 		}, nil
+
+	case part.FilePart != nil:
+		return anthropicapi.InputContentBlock{Document: convertToAnthropicDocumentBlock(part.FilePart)}, nil
 
 	case part.SourcePart != nil:
 		textBlocks := make([]anthropicapi.RequestTextBlock, 0, len(part.SourcePart.Content))
@@ -518,6 +633,25 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 		}, nil
 
 	case part.ToolCallPart != nil:
+		if toolSearch := part.ToolCallPart.Call.ToolSearch; toolSearch != nil {
+			var input map[string]any
+			if len(toolSearch.Args) > 0 {
+				if err := json.Unmarshal(toolSearch.Args, &input); err != nil {
+					return anthropicapi.InputContentBlock{}, fmt.Errorf("failed to unmarshal tool search args: %w", err)
+				}
+			}
+			if input == nil {
+				input = map[string]any{}
+			}
+			// Regex searches carry a pattern; anything else replays as a BM25 query.
+			name := anthropicapi.RequestServerToolUseBlockNameToolSearchToolBm25
+			if _, ok := input["pattern"]; ok {
+				name = anthropicapi.RequestServerToolUseBlockNameToolSearchToolRegex
+			}
+			return anthropicapi.InputContentBlock{ServerToolUse: &anthropicapi.RequestServerToolUseBlock{
+				Id: part.ToolCallPart.ToolCallID, Name: name, Input: input,
+			}}, nil
+		}
 		if part.ToolCallPart.Call.WebSearch != nil {
 			input := map[string]any{}
 			if action := part.ToolCallPart.Call.WebSearch.Action; action != nil && action.Type == "search" && len(action.Queries) > 0 {
@@ -549,6 +683,21 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 		}, nil
 
 	case part.ToolResultPart != nil:
+		if toolSearch := part.ToolResultPart.Result.ToolSearch; toolSearch != nil {
+			content := anthropicapi.RequestToolSearchToolResultBlockContent{}
+			if toolSearch.ErrorCode != nil {
+				content.ToolSearchToolResultError = &anthropicapi.RequestToolSearchToolResultError{ErrorCode: anthropicapi.ToolSearchToolResultErrorCode(*toolSearch.ErrorCode)}
+			} else {
+				references := make([]anthropicapi.RequestToolReferenceBlock, 0, len(toolSearch.ToolNames))
+				for _, toolName := range toolSearch.ToolNames {
+					references = append(references, anthropicapi.RequestToolReferenceBlock{Type: "tool_reference", ToolName: toolName})
+				}
+				content.ToolSearchToolSearchResult = &anthropicapi.RequestToolSearchToolSearchResultBlock{ToolReferences: references}
+			}
+			return anthropicapi.InputContentBlock{ToolSearchToolResult: &anthropicapi.RequestToolSearchToolResultBlock{
+				ToolUseId: part.ToolResultPart.ToolCallID, Content: content,
+			}}, nil
+		}
 		if part.ToolResultPart.Result.WebSearch != nil {
 			result := part.ToolResultPart.Result.WebSearch
 			content := anthropicapi.RequestWebSearchToolResultBlockContent{}
@@ -580,7 +729,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			if err != nil {
 				return anthropicapi.InputContentBlock{}, err
 			}
-			if block.Text == nil && block.Image == nil && block.SearchResult == nil {
+			if block.Text == nil && block.Image == nil && block.Document == nil && block.SearchResult == nil {
 				return anthropicapi.InputContentBlock{}, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert tool result part to anthropic content for type %s", subPart.Type()))
 			}
 			contentBlocks = append(contentBlocks, block)
@@ -590,6 +739,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			content = append(content, anthropicapi.RequestToolResultBlockContentArrayItem{
 				Text:         block.Text,
 				Image:        block.Image,
+				Document:     block.Document,
 				SearchResult: block.SearchResult,
 			})
 		}
@@ -606,9 +756,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 		toolResult := anthropicapi.RequestToolResultBlock{
 			ToolUseId: part.ToolResultPart.ToolCallID,
 			Content:   toolResultContent,
-		}
-		if part.ToolResultPart.Status != llmsdk.ToolResultStatusCompleted {
-			toolResult.IsError = ptr.To(true)
+			IsError:   ptr.To(part.ToolResultPart.Status != llmsdk.ToolResultStatusCompleted),
 		}
 		return anthropicapi.InputContentBlock{
 			ToolResult: &toolResult,
@@ -632,6 +780,29 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 	}
 
 	return anthropicapi.InputContentBlock{}, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert part to anthropic content for type %s", part.Type()))
+}
+
+func convertToAnthropicImageSource(image *llmsdk.ImagePart) anthropicapi.RequestImageBlockSource {
+	if image.URL != nil {
+		return anthropicapi.RequestImageBlockSource{Url: &anthropicapi.URLImageSource{Url: *image.URL}}
+	}
+	return anthropicapi.RequestImageBlockSource{Base64: &anthropicapi.Base64ImageSource{
+		Data:      image.Data,
+		MediaType: anthropicapi.Base64ImageSourceMediaType(image.MimeType),
+	}}
+}
+
+func convertToAnthropicDocumentBlock(file *llmsdk.FilePart) *anthropicapi.RequestDocumentBlock {
+	block := &anthropicapi.RequestDocumentBlock{Type: "document", Title: file.Filename}
+	switch {
+	case file.URL != nil:
+		block.Source = anthropicapi.RequestDocumentBlockSource{Url: &anthropicapi.URLPDFSource{Url: *file.URL}}
+	case file.MimeType == "text/plain":
+		block.Source = anthropicapi.RequestDocumentBlockSource{Text: &anthropicapi.PlainTextSource{Data: file.Data, MediaType: "text/plain"}}
+	default:
+		block.Source = anthropicapi.RequestDocumentBlockSource{Base64: &anthropicapi.Base64PDFSource{Data: file.Data, MediaType: file.MimeType}}
+	}
+	return block
 }
 
 func convertToAnthropicToolChoice(option llmsdk.ToolChoiceOption) *anthropicapi.ToolChoice {
@@ -669,10 +840,15 @@ func convertToAnthropicThinkingConfigParam(reasoning llmsdk.ReasoningOptions) *a
 
 func mapAnthropicMessage(content []anthropicapi.ContentBlock) ([]llmsdk.Part, error) {
 	parts := make([]llmsdk.Part, 0, len(content))
-	callStatuses := map[string]llmsdk.WebSearchToolCallStatus{}
+	// Hosted tool calls take their terminal status from the matching result block.
+	webSearchStatuses := map[string]llmsdk.WebSearchToolCallStatus{}
+	toolSearchStatuses := map[string]llmsdk.ToolSearchToolCallStatus{}
 	for _, block := range content {
 		if block.WebSearchToolResult != nil {
-			callStatuses[block.WebSearchToolResult.ToolUseId] = anthropicWebSearchResultStatus(block.WebSearchToolResult)
+			webSearchStatuses[block.WebSearchToolResult.ToolUseId] = anthropicWebSearchResultStatus(block.WebSearchToolResult)
+		}
+		if block.ToolSearchToolResult != nil {
+			toolSearchStatuses[block.ToolSearchToolResult.ToolUseId] = anthropicToolSearchResultStatus(block.ToolSearchToolResult)
 		}
 	}
 
@@ -683,9 +859,13 @@ func mapAnthropicMessage(content []anthropicapi.ContentBlock) ([]llmsdk.Part, er
 		}
 		if part != nil {
 			if part.ToolCallPart != nil && part.ToolCallPart.Call.WebSearch != nil {
-				status, ok := callStatuses[part.ToolCallPart.ToolCallID]
-				if ok {
+				if status, ok := webSearchStatuses[part.ToolCallPart.ToolCallID]; ok {
 					part.ToolCallPart.Call.WebSearch.Status = &status
+				}
+			}
+			if part.ToolCallPart != nil && part.ToolCallPart.Call.ToolSearch != nil {
+				if status, ok := toolSearchStatuses[part.ToolCallPart.ToolCallID]; ok {
+					part.ToolCallPart.Call.ToolSearch.Status = &status
 				}
 			}
 			parts = append(parts, *part)
@@ -700,6 +880,13 @@ func anthropicWebSearchResultStatus(block *anthropicapi.ResponseWebSearchToolRes
 		return llmsdk.WebSearchToolCallStatusFailed
 	}
 	return llmsdk.WebSearchToolCallStatusCompleted
+}
+
+func anthropicToolSearchResultStatus(block *anthropicapi.ResponseToolSearchToolResultBlock) llmsdk.ToolSearchToolCallStatus {
+	if block.Content.ToolSearchToolResultError != nil {
+		return llmsdk.ToolSearchToolCallStatusFailed
+	}
+	return llmsdk.ToolSearchToolCallStatusCompleted
 }
 
 func mapAnthropicContentBlock(block anthropicapi.ContentBlock) (*llmsdk.Part, error) {
@@ -725,17 +912,41 @@ func mapAnthropicContentBlock(block anthropicapi.ContentBlock) (*llmsdk.Part, er
 		return &part, nil
 
 	case block.ServerToolUse != nil:
-		if block.ServerToolUse.Name != anthropicapi.ResponseServerToolUseBlockNameWebSearch {
+		switch block.ServerToolUse.Name {
+		case anthropicapi.ResponseServerToolUseBlockNameToolSearchToolRegex, anthropicapi.ResponseServerToolUseBlockNameToolSearchToolBm25:
+			status := llmsdk.ToolSearchToolCallStatusInProgress
+			part := llmsdk.Part{ToolCallPart: &llmsdk.ToolCallPart{ToolCallID: block.ServerToolUse.Id, Call: llmsdk.ToolCall{ToolSearch: &llmsdk.ToolSearchToolCall{
+				Args: anthropicServerToolInputJSON(block.ServerToolUse.Input), Status: &status,
+			}}}}
+			return &part, nil
+		case anthropicapi.ResponseServerToolUseBlockNameWebSearch:
+			status := llmsdk.WebSearchToolCallStatusInProgress
+			webCall := &llmsdk.WebSearchToolCall{Status: &status}
+			if input, ok := block.ServerToolUse.Input.(map[string]any); ok {
+				if query, ok := input["query"].(string); ok {
+					webCall.Action = &llmsdk.WebSearchAction{Type: "search", Queries: []string{query}}
+				}
+			}
+			part := llmsdk.Part{ToolCallPart: &llmsdk.ToolCallPart{ToolCallID: block.ServerToolUse.Id, Call: llmsdk.ToolCall{WebSearch: webCall}}}
+			return &part, nil
+		default:
+			// Hosted tools the SDK does not model (web fetch, code execution) are ignored.
 			return nil, nil
 		}
-		status := llmsdk.WebSearchToolCallStatusInProgress
-		webCall := &llmsdk.WebSearchToolCall{Status: &status}
-		if input, ok := block.ServerToolUse.Input.(map[string]any); ok {
-			if query, ok := input["query"].(string); ok {
-				webCall.Action = &llmsdk.WebSearchAction{Type: "search", Queries: []string{query}}
+
+	case block.ToolSearchToolResult != nil:
+		result := &llmsdk.ToolSearchToolResult{ToolNames: []string{}}
+		status := llmsdk.ToolResultStatusCompleted
+		if value := block.ToolSearchToolResult.Content.ToolSearchToolSearchResult; value != nil {
+			for _, reference := range value.ToolReferences {
+				result.ToolNames = append(result.ToolNames, reference.ToolName)
 			}
+		} else if value := block.ToolSearchToolResult.Content.ToolSearchToolResultError; value != nil {
+			code := string(value.ErrorCode)
+			result.ErrorCode = &code
+			status = llmsdk.ToolResultStatusFailed
 		}
-		part := llmsdk.Part{ToolCallPart: &llmsdk.ToolCallPart{ToolCallID: block.ServerToolUse.Id, Call: llmsdk.ToolCall{WebSearch: webCall}}}
+		part := llmsdk.Part{ToolResultPart: &llmsdk.ToolResultPart{ToolCallID: block.ToolSearchToolResult.ToolUseId, Result: llmsdk.ToolResult{ToolSearch: result}, Status: status}}
 		return &part, nil
 
 	case block.WebSearchToolResult != nil:
@@ -811,12 +1022,13 @@ func mapAnthropicTextCitations(raw []anthropicapi.ResponseTextBlockCitationsItem
 
 func mapAnthropicRawContentBlockStartEvent(event anthropicapi.ContentBlockStartEvent) ([]llmsdk.ContentDelta, error) {
 	part, err := mapAnthropicContentBlock(anthropicapi.ContentBlock{
-		Text:                event.ContentBlock.Text,
-		Thinking:            event.ContentBlock.Thinking,
-		RedactedThinking:    event.ContentBlock.RedactedThinking,
-		ToolUse:             event.ContentBlock.ToolUse,
-		ServerToolUse:       event.ContentBlock.ServerToolUse,
-		WebSearchToolResult: event.ContentBlock.WebSearchToolResult,
+		Text:                 event.ContentBlock.Text,
+		Thinking:             event.ContentBlock.Thinking,
+		RedactedThinking:     event.ContentBlock.RedactedThinking,
+		ToolUse:              event.ContentBlock.ToolUse,
+		ServerToolUse:        event.ContentBlock.ServerToolUse,
+		WebSearchToolResult:  event.ContentBlock.WebSearchToolResult,
+		ToolSearchToolResult: event.ContentBlock.ToolSearchToolResult,
 	})
 	if err != nil {
 		return nil, err
@@ -905,84 +1117,97 @@ func mapAnthropicCitationDelta(raw anthropicapi.CitationsDeltaCitation) (*llmsdk
 		}
 		citation.StartIndex = ptr.To(raw.SearchResultLocation.StartBlockIndex)
 		citation.EndIndex = ptr.To(raw.SearchResultLocation.EndBlockIndex)
+		return citation, nil
 	}
 
-	return citation, nil
+	// Unknown citation kinds carry no source, so drop them instead of emitting
+	// an empty citation that the accumulator would reject.
+	return nil, nil
 }
 
-func mapAnthropicUsage(usage anthropicapi.Usage) *llmsdk.ModelUsage {
-	result := &llmsdk.ModelUsage{
-		InputTokens:  usage.InputTokens,
-		OutputTokens: usage.OutputTokens,
+// anthropicUsage holds the usage fields shared by message_start and the
+// cumulative message_delta events. Fields of later events overwrite earlier
+// values when present.
+type anthropicUsage struct {
+	InputTokens              *int
+	OutputTokens             *int
+	CacheReadInputTokens     *int
+	CacheCreationInputTokens *int
+	CacheCreation            *anthropicapi.CacheCreation
+	OutputTokensDetails      *anthropicapi.OutputTokensDetails
+	ServerToolUse            *anthropicapi.ServerToolUsage
+}
+
+func anthropicUsageFromMessage(usage anthropicapi.Usage) anthropicUsage {
+	return anthropicUsage{
+		InputTokens:              ptr.To(usage.InputTokens),
+		OutputTokens:             ptr.To(usage.OutputTokens),
+		CacheReadInputTokens:     usage.CacheReadInputTokens,
+		CacheCreationInputTokens: usage.CacheCreationInputTokens,
+		CacheCreation:            usage.CacheCreation,
+		OutputTokensDetails:      usage.OutputTokensDetails,
+		ServerToolUse:            usage.ServerToolUse,
 	}
-	result.InputTokensDetails = mapAnthropicInputTokenDetails(
-		usage.CacheCreationInputTokens,
-		usage.CacheReadInputTokens,
-	)
+}
+
+func mergeAnthropicMessageDeltaUsage(result *anthropicUsage, usage anthropicapi.MessageDeltaUsage) {
+	if usage.InputTokens != nil {
+		result.InputTokens = usage.InputTokens
+	}
+	result.OutputTokens = ptr.To(usage.OutputTokens)
+	if usage.CacheReadInputTokens != nil {
+		result.CacheReadInputTokens = usage.CacheReadInputTokens
+	}
+	if usage.CacheCreationInputTokens != nil {
+		result.CacheCreationInputTokens = usage.CacheCreationInputTokens
+	}
+	if usage.OutputTokensDetails != nil {
+		result.OutputTokensDetails = usage.OutputTokensDetails
+	}
+	if usage.ServerToolUse != nil {
+		result.ServerToolUse = usage.ServerToolUse
+	}
+}
+
+// mapAnthropicUsage maps the raw usage to the SDK usage. Totals stay as
+// Anthropic reports them: input_tokens excludes cached and cache-write tokens.
+func mapAnthropicUsage(usage anthropicUsage) *llmsdk.ModelUsage {
+	value := func(value *int) int {
+		if value == nil {
+			return 0
+		}
+		return *value
+	}
+	result := &llmsdk.ModelUsage{
+		InputTokens:  value(usage.InputTokens),
+		OutputTokens: value(usage.OutputTokens),
+	}
+	inputDetails := &llmsdk.ModelTokensDetails{}
+	hasInputDetails := false
+	if usage.CacheReadInputTokens != nil {
+		inputDetails.CachedTokens = ptr.To(*usage.CacheReadInputTokens)
+		hasInputDetails = true
+	}
+	if usage.CacheCreationInputTokens != nil {
+		inputDetails.CacheWriteTokens = ptr.To(*usage.CacheCreationInputTokens)
+		hasInputDetails = true
+	}
+	if usage.CacheCreation != nil && usage.CacheCreation.Ephemeral1HInputTokens > 0 {
+		inputDetails.ExtendedCacheWriteTokens = ptr.To(usage.CacheCreation.Ephemeral1HInputTokens)
+		hasInputDetails = true
+	}
+	if hasInputDetails {
+		result.InputTokensDetails = inputDetails
+	}
 	if usage.OutputTokensDetails != nil {
 		result.OutputTokensDetails = &llmsdk.ModelTokensDetails{
 			ReasoningTokens: ptr.To(usage.OutputTokensDetails.ThinkingTokens),
+		}
+	}
+	if usage.ServerToolUse != nil && usage.ServerToolUse.WebSearchRequests > 0 {
+		result.ServerToolUse = &llmsdk.ModelServerToolUsage{
+			WebSearchRequests: ptr.To(usage.ServerToolUse.WebSearchRequests),
 		}
 	}
 	return result
-}
-
-func mergeAnthropicMessageDeltaUsage(result *llmsdk.ModelUsage, usage anthropicapi.MessageDeltaUsage) {
-	if usage.InputTokens != nil {
-		result.InputTokens = *usage.InputTokens
-	}
-	result.OutputTokens = usage.OutputTokens
-	if details := mapAnthropicInputTokenDetails(
-		usage.CacheCreationInputTokens,
-		usage.CacheReadInputTokens,
-	); details != nil {
-		if result.InputTokensDetails == nil {
-			result.InputTokensDetails = details
-		} else {
-			if details.CachedTokens != nil {
-				result.InputTokensDetails.CachedTokens = details.CachedTokens
-			}
-			if details.CacheWriteTokens != nil {
-				result.InputTokensDetails.CacheWriteTokens = details.CacheWriteTokens
-			}
-		}
-	}
-	if usage.OutputTokensDetails != nil {
-		result.OutputTokensDetails = &llmsdk.ModelTokensDetails{
-			ReasoningTokens: ptr.To(usage.OutputTokensDetails.ThinkingTokens),
-		}
-	}
-}
-
-func mapAnthropicInputTokenDetails(cacheCreation, cacheRead *int) *llmsdk.ModelTokensDetails {
-	if cacheCreation == nil && cacheRead == nil {
-		return nil
-	}
-	return &llmsdk.ModelTokensDetails{
-		CacheWriteTokens: cacheCreation,
-		CachedTokens:     cacheRead,
-	}
-}
-
-func toInt(value any) (int, bool) {
-	switch v := value.(type) {
-	case float64:
-		return int(v), true
-	case float32:
-		return int(v), true
-	case int:
-		return v, true
-	case int32:
-		return int(v), true
-	case int64:
-		return int(v), true
-	case uint:
-		return int(v), true
-	case uint32:
-		return int(v), true
-	case uint64:
-		return int(v), true
-	default:
-		return 0, false
-	}
 }

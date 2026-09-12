@@ -27,6 +27,7 @@ pub enum Part {
     Text(TextPart),
     Image(ImagePart),
     Audio(AudioPart),
+    File(FilePart),
     Source(SourcePart),
     ToolCall(ToolCallPart),
     ToolResult(ToolResultPart),
@@ -134,8 +135,12 @@ pub struct TextPart {
 pub struct ImagePart {
     /// The MIME type of the image. E.g. "image/jpeg", "image/png".
     pub mime_type: String,
-    /// The base64-encoded image data.
-    pub data: String,
+    /// Base64 content; either `data` or `url` must be provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// Fetched by the provider; URL support depends on the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     /// The width of the image in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<u32>,
@@ -151,8 +156,12 @@ pub struct ImagePart {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct AudioPart {
-    /// The base64-encoded audio data.
-    pub data: String,
+    /// Base64 content; either `data` or `url` must be provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// Fetched by the provider; URL support depends on the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     /// The format of the audio.
     pub format: AudioFormat,
     /// The sample rate of the audio. E.g. 44100, 48000.
@@ -167,6 +176,25 @@ pub struct AudioPart {
     /// The ID of the audio part, if applicable
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+}
+
+/// Document or video input; accepted MIME types depend on the model.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct FilePart {
+    /// The MIME type of the file. E.g. "application/pdf", "text/plain",
+    /// "video/mp4".
+    pub mime_type: String,
+    /// The file contents in the format accepted by the model.
+    /// Either `data` or `url` must be provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// Fetched by the provider; URL support depends on the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Document name; some models require it for inline files.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
 }
 
 /// A part of the message that contains a source with structured content.
@@ -229,6 +257,7 @@ pub enum ToolResultStatus {
 pub enum ToolCall {
     Function(FunctionToolCall),
     WebSearch(WebSearchToolCall),
+    ToolSearch(ToolSearchToolCall),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -266,12 +295,32 @@ pub struct WebSearchToolCall {
     pub status: Option<WebSearchToolCallStatus>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ToolSearchToolCallStatus {
+    InProgress,
+    Completed,
+    Failed,
+}
+
+/// A provider-hosted search over the deferred tools of the request.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolSearchToolCall {
+    /// Opaque search arguments; preserve for conversation replay.
+    pub args: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<ToolSearchToolCallStatus>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ToolResult {
     Function(FunctionToolResult),
     WebSearch(WebSearchToolResult),
+    ToolSearch(ToolSearchToolResult),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -297,6 +346,17 @@ pub struct WebSearchSource {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct WebSearchToolResult {
     pub sources: Vec<WebSearchSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+}
+
+/// Discovered tools made available to the model.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolSearchToolResult {
+    /// Discovered tool names; each must be declared in the request's `tools`.
+    pub tool_names: Vec<String>,
+    /// Provider error code required to replay a failed hosted tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<String>,
 }
@@ -432,6 +492,7 @@ pub struct ToolCallPartDelta {
 pub enum ToolCallDelta {
     Function(FunctionToolCallDelta),
     WebSearch(WebSearchToolCallDelta),
+    ToolSearch(ToolSearchToolCallDelta),
 }
 
 impl Default for ToolCallDelta {
@@ -456,6 +517,16 @@ pub struct WebSearchToolCallDelta {
     pub action: Option<WebSearchAction>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<WebSearchToolCallStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolSearchToolCallDelta {
+    /// The partial JSON string of the search arguments.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<ToolSearchToolCallStatus>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -515,8 +586,7 @@ pub struct AudioPartDelta {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ReasoningPartDelta {
     /// The reasoning text content.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
+    pub text: String,
     /// The reasoning internal signature
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,
@@ -546,6 +616,8 @@ pub enum Tool {
     Function(FunctionTool),
     #[serde(rename = "web_search")]
     WebSearch(WebSearchTool),
+    #[serde(rename = "tool_search")]
+    ToolSearch(ToolSearchTool),
 }
 
 /// Represents a client-executed function tool that can be used by the model.
@@ -559,6 +631,29 @@ pub struct FunctionTool {
     /// The JSON schema of the parameters that the tool accepts. The type must
     /// be "object".
     pub parameters: JSONSchema,
+    /// Hide the tool from the model until a `tool_search` tool discovers it.
+    /// Providers without tool search ignore this flag and load the tool
+    /// eagerly.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub defer_loading: Option<bool>,
+}
+
+/// Loads deferred function tools on demand through hosted search.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolSearchTool {
+    /// The search algorithm, when the provider offers a choice. Defaults to
+    /// "bm25".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<ToolSearchStrategy>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum ToolSearchStrategy {
+    Regex,
+    Bm25,
 }
 
 /// Represents a provider-hosted web search tool.
@@ -603,6 +698,8 @@ pub struct ToolMessage {
     pub content: Vec<Part>,
 }
 
+/// A breakdown of `input_tokens` or `output_tokens`, using the provider's own
+/// counting.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ModelTokensDetails {
@@ -618,24 +715,46 @@ pub struct ModelTokensDetails {
     pub image_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_image_tokens: Option<u32>,
+    /// Cache reads, billed at the cached-input rate.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_tokens: Option<u32>,
+    /// Cache writes, billed separately from cache reads.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_write_tokens: Option<u32>,
+    /// The subset of `cache_write_tokens` stored with extended retention (see `cache_retention`),
+    /// which some providers bill at a higher rate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extended_cache_write_tokens: Option<u32>,
+    /// The tokens spent on reasoning.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_tokens: Option<u32>,
+}
+
+/// Hosted tool usage billed per request, separately from tokens.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ModelServerToolUsage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_search_requests: Option<u32>,
 }
 
 /// Represents the token usage of the model.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ModelUsage {
+    /// The input tokens as reported by the provider. Whether cached and
+    /// cache-write tokens are included depends on the provider; see
+    /// `ModelUsageCostOptions`.
     pub input_tokens: u32,
+    /// The output tokens as reported by the provider. Whether reasoning tokens
+    /// are included depends on the provider; see `ModelUsageCostOptions`.
     pub output_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_tokens_details: Option<ModelTokensDetails>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_tokens_details: Option<ModelTokensDetails>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_tool_use: Option<ModelServerToolUsage>,
 }
 
 /// Represents the response generated by the model.
@@ -768,11 +887,26 @@ pub struct LanguageModelInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<AudioOptions>,
     /// Options for reasoning generation.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ReasoningOptions>,
+    /// Opts into the provider's prompt cache and chooses how long entries are kept.
+    /// `Standard` uses the provider's default retention and `Extended` the longest it offers.
+    /// Providers without a retention setting ignore this option.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_retention: Option<CacheRetention>,
+}
+
+/// How long prompt cache entries are kept.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum CacheRetention {
+    Standard,
+    Extended,
 }
 
 /// A metadata property that describes the pricing of the model.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct LanguageModelPricing {
     /// The cost in USD per single text token for input.
@@ -784,6 +918,9 @@ pub struct LanguageModelPricing {
     /// The cost in USD per single cache-write input token.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_cost_per_cache_write_token: Option<f64>,
+    /// The cost in USD per single cache-write input token stored with extended retention. Defaults to `input_cost_per_cache_write_token`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_cost_per_extended_cache_write_token: Option<f64>,
     /// The cost in USD per single cached text token for input.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_cost_per_cached_text_token: Option<f64>,
@@ -808,4 +945,26 @@ pub struct LanguageModelPricing {
     /// The cost in USD per single image token for output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_cost_per_image_token: Option<f64>,
+    /// The cost in USD per provider-hosted web search request.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_per_web_search_request: Option<f64>,
+    /// Rate multipliers applied to requests whose input exceeds a token
+    /// threshold.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub long_context: Option<LanguageModelLongContextPricing>,
+}
+
+/// Rate multipliers applied to requests whose input exceeds a token threshold.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct LanguageModelLongContextPricing {
+    /// The request is priced with the multipliers when `input_tokens` exceeds
+    /// this value.
+    pub threshold_tokens: u32,
+    /// The multiplier applied to every input rate. Defaults to 1.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_cost_multiplier: Option<f64>,
+    /// The multiplier applied to every output rate. Defaults to 1.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_cost_multiplier: Option<f64>,
 }

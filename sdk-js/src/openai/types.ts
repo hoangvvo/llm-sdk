@@ -33,7 +33,7 @@ export interface OpenAIPatchedResponsesImageGenerationCall {
    */
   type: "image_generation_call";
 
-  output_format: string; // png, jpeg, etc.
+  output_format?: string; // png, jpeg, etc. Undocumented; absent on some responses.
   size?: `${number}x${number}`;
 }
 

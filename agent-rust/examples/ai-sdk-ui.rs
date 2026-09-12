@@ -559,7 +559,7 @@ impl DataStreamProtocolAdapter {
             }
             PartDelta::Reasoning(reasoning_delta) => self.write_for_reasoning_part(
                 delta.index,
-                reasoning_delta.text.clone().unwrap_or_default(),
+                reasoning_delta.text.clone(),
                 reasoning_delta.id.as_deref(),
             ),
             PartDelta::ToolCall(tool_delta) => {
@@ -817,6 +817,7 @@ fn ui_messages_to_messages(messages: &[UIMessage]) -> Result<Vec<Message>, Strin
                             | Part::Reasoning(_)
                             | Part::Audio(_)
                             | Part::Image(_)
+                            | Part::File(_)
                             | Part::ToolCall(_) => {
                                 append_assistant_message(&mut history, converted);
                             }

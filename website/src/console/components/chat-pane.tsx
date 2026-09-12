@@ -305,7 +305,7 @@ function useAudioSource(part: AudioPart): string | null {
     const assignSource = () => {
       try {
         if (part.format === "linear16") {
-          const buffer = base64ToArrayBuffer(part.data);
+          const buffer = base64ToArrayBuffer(part.data ?? "");
           const int16 = new Int16Array(buffer);
           const floatChannel = new Float32Array(int16.length);
           for (let i = 0; i < int16.length; i += 1) {

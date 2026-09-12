@@ -504,9 +504,9 @@ func TestAgent_ForwardsCompletePublicConfiguration(t *testing.T) {
 		&responseSchema,
 	)
 	audio := llmsdk.AudioOptions{
-		Format:       ptr.To(llmsdk.AudioFormatMP3),
-		Voice:        ptr.To("alloy"),
-		LanguageCode: ptr.To("en"),
+		Format:   ptr.To(llmsdk.AudioFormatMP3),
+		Voice:    ptr.To("alloy"),
+		Language: ptr.To("en"),
 	}
 	reasoning := llmsdk.ReasoningOptions{Enabled: true, BudgetTokens: ptr.To(uint32(256))}
 	webSearch := llmsdk.WebSearchTool{AllowedDomains: []string{"example.com"}}

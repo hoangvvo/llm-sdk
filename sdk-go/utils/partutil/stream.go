@@ -1,8 +1,6 @@
 package partutil
 
 import (
-	"slices"
-
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 )
 
@@ -22,9 +20,15 @@ func GuessDeltaIndex(part llmsdk.PartDelta, allContentDeltas []llmsdk.ContentDel
 	// [part0 partial, part0 partial, part1 partial].
 	// For the purpose of this matching, we want only
 	// [part0, part1]
-	uniqueContentDeltas := slices.CompactFunc(slices.Clone(allContentDeltas), func(a, b llmsdk.ContentDelta) bool {
-		return a.Index == b.Index
-	})
+	seenIndexes := map[int]bool{}
+	uniqueContentDeltas := make([]llmsdk.ContentDelta, 0, len(allContentDeltas))
+	for _, contentDelta := range allContentDeltas {
+		if seenIndexes[contentDelta.Index] {
+			continue
+		}
+		seenIndexes[contentDelta.Index] = true
+		uniqueContentDeltas = append(uniqueContentDeltas, contentDelta)
+	}
 
 	if toolCallIndex != nil && part.ToolCallPartDelta != nil {
 		// Providers like OpenAI track tool calls in a separate field, so we
@@ -111,6 +115,17 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 				Signature:  part.ToolCallPart.Signature, ID: part.ToolCallPart.ID,
 			}}
 		}
+		if toolSearch := part.ToolCallPart.Call.ToolSearch; toolSearch != nil {
+			argsStr := string(toolSearch.Args)
+			if argsStr == "" {
+				argsStr = "{}"
+			}
+			return llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolCallID: &part.ToolCallPart.ToolCallID,
+				Call:       llmsdk.ToolCallDelta{ToolSearch: &llmsdk.ToolSearchToolCallDelta{Args: &argsStr, Status: toolSearch.Status}},
+				Signature:  part.ToolCallPart.Signature, ID: part.ToolCallPart.ID,
+			}}
+		}
 		call := part.ToolCallPart.Call.Function
 		if call == nil {
 			return llmsdk.PartDelta{}
@@ -135,10 +150,11 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 			},
 		}
 	case part.ImagePart != nil:
+		// Deltas only carry inline data; URL-only parts have none to stream.
 		return llmsdk.PartDelta{
 			ImagePartDelta: &llmsdk.ImagePartDelta{
 				MimeType: &part.ImagePart.MimeType,
-				Data:     &part.ImagePart.Data,
+				Data:     optionalString(part.ImagePart.Data),
 				Width:    part.ImagePart.Width,
 				Height:   part.ImagePart.Height,
 				ID:       part.ImagePart.ID,
@@ -147,7 +163,7 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 	case part.AudioPart != nil:
 		return llmsdk.PartDelta{
 			AudioPartDelta: &llmsdk.AudioPartDelta{
-				Data:       &part.AudioPart.Data,
+				Data:       optionalString(part.AudioPart.Data),
 				Format:     &part.AudioPart.Format,
 				SampleRate: part.AudioPart.SampleRate,
 				Channels:   part.AudioPart.Channels,
@@ -158,4 +174,11 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 	default:
 		return llmsdk.PartDelta{}
 	}
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }

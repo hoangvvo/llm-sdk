@@ -34,6 +34,13 @@ suite("OpenAIModel", () => {
     runTestGroup(t, getModel(), "image_generation"),
   );
   test("image_input", (t) => runTestGroup(t, getModel(), "image_input"));
+  test("image_url_input", (t) =>
+    runTestGroup(t, getModel(), "image_url_input"));
+  test("file_input", (t) => runTestGroup(t, getModel(), "file_input"));
+  test("file_url_input", (t) => runTestGroup(t, getModel(), "file_url_input"));
+  test("tool_search", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, getModel(), "tool_search"),
+  );
   test("reasoning", { timeout: 120 * 1000 }, (t) =>
     runTestGroup(t, getModel("o1"), "reasoning", {
       profile: "openai_opaque_reasoning",
@@ -47,10 +54,13 @@ suite("OpenAIModel", () => {
       t,
       "openai_transport",
       (baseURL) =>
-        new OpenAIModel({
-          modelId: "test-model",
-          apiKey: "test-token",
-          baseURL: `${baseURL}/v1`,
-        }),
+        new OpenAIModel(
+          {
+            modelId: "test-model",
+            apiKey: "test-token",
+            baseURL: `${baseURL}/v1`,
+          },
+          { pricing: { cost_per_web_search_request: 0.01 } },
+        ),
     ));
 });

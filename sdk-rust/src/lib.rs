@@ -18,6 +18,7 @@ pub mod google;
 mod id_utils;
 mod language_model;
 pub mod llm_sdk_test;
+#[allow(dead_code)]
 #[cfg(feature = "openai")]
 pub mod openai;
 #[allow(dead_code)]

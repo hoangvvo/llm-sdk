@@ -1,10 +1,11 @@
 use crate::{
-    AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FunctionTool,
-    FunctionToolCall, FunctionToolResult, ImagePart, ImagePartDelta, LanguageModelInput, Message,
-    Modality, Part, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatOption,
-    SourcePart, TextPart, TextPartDelta, Tool, ToolCall, ToolCallDelta, ToolCallPart,
-    ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResult, ToolResultPart, ToolResultStatus,
-    UserMessage, WebSearchTool, WebSearchUserLocation,
+    AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FilePart,
+    FunctionTool, FunctionToolCall, FunctionToolResult, ImagePart, ImagePartDelta,
+    LanguageModelInput, Message, Modality, Part, ReasoningOptions, ReasoningPart,
+    ReasoningPartDelta, ResponseFormatOption, SourcePart, TextPart, TextPartDelta, Tool, ToolCall,
+    ToolCallDelta, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResult,
+    ToolResultPart, ToolResultStatus, ToolSearchStrategy, ToolSearchTool, UserMessage,
+    WebSearchTool, WebSearchUserLocation,
 };
 
 impl TextPart {
@@ -53,7 +54,19 @@ impl ImagePart {
     pub fn new(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self {
             mime_type: mime_type.into(),
-            data: data.into(),
+            data: Some(data.into()),
+            url: None,
+            width: None,
+            height: None,
+            id: None,
+        }
+    }
+
+    pub fn from_url(url: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self {
+            mime_type: mime_type.into(),
+            data: None,
+            url: Some(url.into()),
             width: None,
             height: None,
             id: None,
@@ -82,7 +95,20 @@ impl ImagePart {
 impl AudioPart {
     pub fn new(data: impl Into<String>, format: crate::AudioFormat) -> Self {
         Self {
-            data: data.into(),
+            data: Some(data.into()),
+            url: None,
+            format,
+            sample_rate: None,
+            channels: None,
+            transcript: None,
+            id: None,
+        }
+    }
+
+    pub fn from_url(url: impl Into<String>, format: crate::AudioFormat) -> Self {
+        Self {
+            data: None,
+            url: Some(url.into()),
             format,
             sample_rate: None,
             channels: None,
@@ -112,6 +138,32 @@ impl AudioPart {
     #[must_use]
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
+        self
+    }
+}
+
+impl FilePart {
+    pub fn new(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self {
+            mime_type: mime_type.into(),
+            data: Some(data.into()),
+            url: None,
+            filename: None,
+        }
+    }
+
+    pub fn from_url(url: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self {
+            mime_type: mime_type.into(),
+            data: None,
+            url: Some(url.into()),
+            filename: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_filename(mut self, filename: impl Into<String>) -> Self {
+        self.filename = Some(filename.into());
         self
     }
 }
@@ -219,6 +271,12 @@ impl From<AudioPart> for Part {
     }
 }
 
+impl From<FilePart> for Part {
+    fn from(value: FilePart) -> Self {
+        Self::File(value)
+    }
+}
+
 impl From<ToolCallPart> for Part {
     fn from(value: ToolCallPart) -> Self {
         Self::ToolCall(value)
@@ -253,7 +311,28 @@ impl FunctionTool {
             name: name.into(),
             description: description.into(),
             parameters,
+            defer_loading: None,
         }
+    }
+
+    /// Hides the tool from the model until a `tool_search` tool discovers it.
+    #[must_use]
+    pub fn with_defer_loading(mut self, defer_loading: bool) -> Self {
+        self.defer_loading = Some(defer_loading);
+        self
+    }
+}
+
+impl ToolSearchTool {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_strategy(mut self, strategy: ToolSearchStrategy) -> Self {
+        self.strategy = Some(strategy);
+        self
     }
 }
 
@@ -325,6 +404,12 @@ impl From<WebSearchTool> for Tool {
     }
 }
 
+impl From<ToolSearchTool> for Tool {
+    fn from(value: ToolSearchTool) -> Self {
+        Self::ToolSearch(value)
+    }
+}
+
 impl Part {
     pub fn text(text: impl Into<String>) -> Self {
         Self::Text(TextPart::new(text))
@@ -336,6 +421,10 @@ impl Part {
 
     pub fn audio(data: impl Into<String>, format: crate::AudioFormat) -> Self {
         Self::Audio(AudioPart::new(data, format))
+    }
+
+    pub fn file(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::File(FilePart::new(data, mime_type))
     }
 
     pub fn source(source: impl Into<String>, title: impl Into<String>, content: Vec<Self>) -> Self {
@@ -685,8 +774,10 @@ impl ToolCallPartDelta {
 
     #[must_use]
     pub fn with_args(mut self, args: impl Into<String>) -> Self {
-        if let ToolCallDelta::Function(call) = &mut self.call {
-            call.args = Some(args.into());
+        match &mut self.call {
+            ToolCallDelta::Function(call) => call.args = Some(args.into()),
+            ToolCallDelta::ToolSearch(call) => call.args = Some(args.into()),
+            ToolCallDelta::WebSearch(_) => {}
         }
         self
     }
@@ -775,9 +866,17 @@ impl AudioPartDelta {
 }
 
 impl ReasoningPartDelta {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            signature: None,
+            id: None,
+        }
+    }
+
     #[must_use]
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
-        self.text = Some(text.into());
+        self.text = text.into();
         self
     }
 

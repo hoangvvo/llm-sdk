@@ -2,6 +2,8 @@ package llmsdk
 
 import (
 	"encoding/json"
+
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 )
 
 // NewTextPart creates a new text part
@@ -31,7 +33,6 @@ func WithTextSignature(signature string) TextPartOption {
 	}
 }
 
-// NewImagePart creates a new image part
 func NewImagePart(data, mimeType string, opts ...ImagePartOption) Part {
 	imagePart := &ImagePart{
 		Data:     data,
@@ -67,7 +68,13 @@ func WithImageID(imageID string) ImagePartOption {
 	}
 }
 
-// NewAudioPart creates a new audio part
+// WithImageURL references the image by URL instead of inline data.
+func WithImageURL(url string) ImagePartOption {
+	return func(p *ImagePart) {
+		p.URL = &url
+	}
+}
+
 func NewAudioPart(data string, format AudioFormat, opts ...AudioPartOption) Part {
 	audioPart := &AudioPart{
 		Data:   data,
@@ -106,6 +113,43 @@ func WithAudioTranscript(transcript string) AudioPartOption {
 func WithAudioID(audioID string) AudioPartOption {
 	return func(p *AudioPart) {
 		p.ID = &audioID
+	}
+}
+
+// WithAudioURL references the audio by URL instead of inline data.
+func WithAudioURL(url string) AudioPartOption {
+	return func(p *AudioPart) {
+		p.URL = &url
+	}
+}
+
+func NewFilePart(data, mimeType string, opts ...FilePartOption) Part {
+	filePart := &FilePart{
+		Data:     data,
+		MimeType: mimeType,
+	}
+
+	for _, opt := range opts {
+		opt(filePart)
+	}
+
+	return Part{
+		FilePart: filePart,
+	}
+}
+
+type FilePartOption func(*FilePart)
+
+func WithFileFilename(filename string) FilePartOption {
+	return func(p *FilePart) {
+		p.Filename = &filename
+	}
+}
+
+// WithFileURL references the file by URL instead of inline data.
+func WithFileURL(url string) FilePartOption {
+	return func(p *FilePart) {
+		p.URL = &url
 	}
 }
 
@@ -496,14 +540,42 @@ func NewToolChoiceTool(toolName string) *ToolChoiceOption {
 }
 
 // NewFunctionTool creates a function tool.
-func NewFunctionTool(name string, description string, parameters JSONSchema) Tool {
-	return Tool{
-		FunctionTool: &FunctionTool{
-			Name:        name,
-			Description: description,
-			Parameters:  parameters,
-		},
+func NewFunctionTool(name string, description string, parameters JSONSchema, opts ...FunctionToolOption) Tool {
+	functionTool := &FunctionTool{
+		Name:        name,
+		Description: description,
+		Parameters:  parameters,
 	}
+	for _, opt := range opts {
+		opt(functionTool)
+	}
+	return Tool{FunctionTool: functionTool}
+}
+
+type FunctionToolOption func(*FunctionTool)
+
+// WithFunctionToolDeferLoading hides the tool from the model until a tool search discovers it.
+func WithFunctionToolDeferLoading() FunctionToolOption {
+	return func(tool *FunctionTool) {
+		tool.DeferLoading = ptr.To(true)
+	}
+}
+
+type ToolSearchToolOption func(*ToolSearchTool)
+
+// WithToolSearchStrategy selects the search algorithm when the provider offers a choice.
+func WithToolSearchStrategy(strategy ToolSearchStrategy) ToolSearchToolOption {
+	return func(tool *ToolSearchTool) {
+		tool.Strategy = &strategy
+	}
+}
+
+func NewToolSearchTool(opts ...ToolSearchToolOption) Tool {
+	toolSearchTool := &ToolSearchTool{}
+	for _, opt := range opts {
+		opt(toolSearchTool)
+	}
+	return Tool{ToolSearchTool: toolSearchTool}
 }
 
 // WebSearchToolOption configures a web search tool.
@@ -653,6 +725,13 @@ func WithInputAudio(audio *AudioOptions) LanguageModelInputOption {
 func WithInputReasoning(reasoning *ReasoningOptions) LanguageModelInputOption {
 	return func(input *LanguageModelInput) {
 		input.Reasoning = reasoning
+	}
+}
+
+// WithInputCacheRetention sets how long prompt cache entries are kept.
+func WithInputCacheRetention(retention CacheRetention) LanguageModelInputOption {
+	return func(i *LanguageModelInput) {
+		i.CacheRetention = &retention
 	}
 }
 

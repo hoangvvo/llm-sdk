@@ -1,0 +1,49 @@
+---
+title: File input
+---
+
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import {
+  extractGoTypes,
+  extractRustTypes,
+  extractTypescriptTypes,
+} from "../../../utils/extract-types.ts";
+
+`FilePart` represents a document or video included in a message. The `mime_type` field describes its format, and `filename` provides a document name when one is needed.
+
+The file contents can be supplied through `data` or referenced by a `url` that the provider can access. The SDK passes the contents through as provided, so they should be prepared in the format accepted by the model.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["FilePart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={extractRustTypes(["FilePart"])} lang="rust" title="types.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={extractGoTypes(["FilePart"])} lang="go" title="types.go" />
+  </TabItem>
+</Tabs>
+
+```ts
+const response = await model.generate({
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "Summarize the attached report." },
+        {
+          type: "file",
+          mime_type: "application/pdf",
+          url: "https://example.com/report.pdf",
+          filename: "report.pdf",
+        },
+      ],
+    },
+  ],
+});
+```

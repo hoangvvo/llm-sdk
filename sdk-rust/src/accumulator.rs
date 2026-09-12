@@ -3,6 +3,7 @@ use crate::{
     FunctionToolCall, ImagePart, LanguageModelError, LanguageModelResult, ModelResponse,
     ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningPart, ReasoningPartDelta, TextPart,
     ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta, ToolResultPart, ToolResultPartDelta,
+    ToolSearchToolCall,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -141,12 +142,7 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             AccumulatedData::Reasoning(ref mut existing_reasoning),
             PartDelta::Reasoning(reasoning_delta),
         ) => {
-            if let Some(text) = reasoning_delta.text {
-                existing_reasoning
-                    .text
-                    .get_or_insert_default()
-                    .push_str(&text);
-            }
+            existing_reasoning.text.push_str(&reasoning_delta.text);
             if reasoning_delta.signature.is_some() {
                 existing_reasoning.signature = reasoning_delta.signature;
             }
@@ -183,6 +179,14 @@ fn merge_tool_call_delta(
         (ToolCallDelta::WebSearch(existing), ToolCallDelta::WebSearch(delta)) => {
             if delta.action.is_some() {
                 existing.action = delta.action;
+            }
+            if delta.status.is_some() {
+                existing.status = delta.status;
+            }
+        }
+        (ToolCallDelta::ToolSearch(existing), ToolCallDelta::ToolSearch(delta)) => {
+            if let Some(args) = delta.args {
+                existing.args.get_or_insert_default().push_str(&args);
             }
             if delta.status.is_some() {
                 existing.status = delta.status;
@@ -295,6 +299,10 @@ fn create_tool_call_part(data: ToolCallPartDelta, index: usize) -> LanguageModel
             action: call.action,
             status: call.status,
         }),
+        ToolCallDelta::ToolSearch(call) => ToolCall::ToolSearch(ToolSearchToolCall {
+            args: parse_tool_call_args(&call.args.unwrap_or_default())?,
+            status: call.status,
+        }),
     };
     Ok(Part::ToolCall(ToolCallPart {
         tool_call_id,
@@ -321,7 +329,8 @@ fn create_image_part(data: AccumulatedImageData, index: usize) -> LanguageModelR
     }
 
     Ok(Part::Image(ImagePart {
-        data: data.data,
+        data: Some(data.data),
+        url: None,
         mime_type,
         width: data.width,
         height: data.height,
@@ -350,7 +359,8 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
     let concatenated_audio = audio_utils::concatenate_b64_audio_chunks(&data.data_chunks)?;
 
     Ok(Part::Audio(AudioPart {
-        data: concatenated_audio,
+        data: Some(concatenated_audio),
+        url: None,
         format,
         sample_rate: data.sample_rate,
         channels: data.channels,
@@ -364,7 +374,7 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
 }
 
 fn create_reasoning_part(data: ReasoningPartDelta) -> Part {
-    let mut reasoning_part = ReasoningPart::new(data.text.unwrap_or_default());
+    let mut reasoning_part = ReasoningPart::new(data.text);
     if let Some(signature) = data.signature {
         reasoning_part = reasoning_part.with_signature(signature);
     }

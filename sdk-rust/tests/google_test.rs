@@ -86,6 +86,10 @@ test_group!(
 );
 test_group!(google_image_model(), image_generation);
 test_group!(google_image_model(), image_input);
+// URL inputs are forwarded as fileData, but the Gemini Developer API rejects
+// public HTTPS URLs with PERMISSION_DENIED for this project, so only inline
+// files are exercised.
+test_group!(google_model(), file_input);
 test_group!(
     google_audio_model(),
     audio_generation,
@@ -122,6 +126,7 @@ async fn transport() -> Result<(), Box<dyn Error>> {
                 input_cost_per_image_token: None,
                 input_cost_per_cached_image_token: None,
                 output_cost_per_image_token: None,
+                ..Default::default()
             }),
             capabilities: None,
         })

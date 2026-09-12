@@ -78,6 +78,22 @@ func TestImageInput(t *testing.T) {
 	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "image_input")
 }
 
+func TestImageURLInput(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "image_url_input")
+}
+
+func TestFileInput(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "file_input")
+}
+
+func TestFileURLInput(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "file_url_input")
+}
+
+func TestToolSearch(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "tool_search")
+}
+
 func TestReasoning(t *testing.T) {
 	testcommon.RunTestGroup(t, openAIModel(t, "o1"), "reasoning", testcommon.WithProfile("openai_opaque_reasoning"))
 }
@@ -88,9 +104,12 @@ func TestReasoningToolUse(t *testing.T) {
 
 func TestTransport(t *testing.T) {
 	testcommon.RunTransportTestGroup(t, "openai_transport", func(baseURL string) llmsdk.LanguageModel {
+		searchCost := 0.01
 		return openai.NewOpenAIModel("test-model", openai.OpenAIModelOptions{
 			APIKey:  "test-token",
 			BaseURL: baseURL + "/v1",
-		})
+		}).WithMetadata(&llmsdk.LanguageModelMetadata{Pricing: &llmsdk.LanguageModelPricing{
+			CostPerWebSearchRequest: &searchCost,
+		}})
 	})
 }

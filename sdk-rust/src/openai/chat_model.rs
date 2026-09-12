@@ -1,3 +1,4 @@
+use super::chat_api::CreateChatCompletionRequestPromptCacheRetention;
 use super::chat_api::{
     self, ChatCompletionMessageToolCall, ChatCompletionMessageToolCallsItem,
     ChatCompletionNamedToolChoice, ChatCompletionNamedToolChoiceFunction,
@@ -7,6 +8,7 @@ use super::chat_api::{
     ChatCompletionRequestMessageContentPartAudio,
     ChatCompletionRequestMessageContentPartAudioInputAudio,
     ChatCompletionRequestMessageContentPartAudioInputAudioFormat,
+    ChatCompletionRequestMessageContentPartFile, ChatCompletionRequestMessageContentPartFileFile,
     ChatCompletionRequestMessageContentPartImage,
     ChatCompletionRequestMessageContentPartImageImageUrl,
     ChatCompletionRequestMessageContentPartText, ChatCompletionRequestMessageContentPartTextType,
@@ -24,6 +26,7 @@ use super::chat_api::{
     ResponseFormatJsonSchemaJsonSchema, ResponseFormatJsonSchemaSchema, ResponseFormatText,
     ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
 };
+use crate::CacheRetention;
 use crate::{
     client_utils, source_part_utils, stream_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AssistantMessage, AudioFormat,
@@ -331,9 +334,12 @@ fn convert_to_openai_create_params(
     };
 
     Ok(CreateChatCompletionRequest {
-        metadata: None,
+        metadata: input.metadata.map(|metadata| Some(Some(metadata))),
         prompt_cache_key: None,
-        prompt_cache_retention: None,
+        prompt_cache_retention: input.cache_retention.map(|retention| match retention {
+            CacheRetention::Standard => CreateChatCompletionRequestPromptCacheRetention::InMemory,
+            CacheRetention::Extended => CreateChatCompletionRequestPromptCacheRetention::N24H,
+        }),
         safety_identifier: None,
         service_tier: None,
         temperature: input.temperature,
@@ -442,6 +448,7 @@ fn convert_to_openai_messages(
     Ok(openai_messages)
 }
 
+#[allow(clippy::too_many_lines)]
 fn convert_user_message(
     user_message: UserMessage,
 ) -> LanguageModelResult<ChatCompletionRequestUserMessage> {
@@ -459,14 +466,34 @@ fn convert_user_message(
                 ));
             }
             Part::Image(image_part) => {
+                let url = image_part.url.unwrap_or_else(|| {
+                    format!(
+                        "data:{};base64,{}",
+                        image_part.mime_type,
+                        image_part.data.unwrap_or_default()
+                    )
+                });
                 content_parts.push(ChatCompletionRequestUserMessageContentPart::ImageUrl(
                     ChatCompletionRequestMessageContentPartImage {
                         image_url: ChatCompletionRequestMessageContentPartImageImageUrl {
                             detail: None,
-                            url: format!(
+                            url,
+                        },
+                    },
+                ));
+            }
+            Part::File(file_part) => {
+                // Chat Completions has no file URL input.
+                content_parts.push(ChatCompletionRequestUserMessageContentPart::File(
+                    ChatCompletionRequestMessageContentPartFile {
+                        file: ChatCompletionRequestMessageContentPartFileFile {
+                            file_data: Some(format!(
                                 "data:{};base64,{}",
-                                image_part.mime_type, image_part.data
-                            ),
+                                file_part.mime_type,
+                                file_part.data.unwrap_or_default()
+                            )),
+                            file_id: None,
+                            filename: file_part.filename,
                         },
                     },
                 ));
@@ -492,7 +519,7 @@ fn convert_user_message(
                 content_parts.push(ChatCompletionRequestUserMessageContentPart::InputAudio(
                     ChatCompletionRequestMessageContentPartAudio {
                         input_audio: ChatCompletionRequestMessageContentPartAudioInputAudio {
-                            data: audio_part.data,
+                            data: audio_part.data.unwrap_or_default(),
                             format,
                         },
                     },
@@ -601,7 +628,11 @@ fn convert_tool_message(
         match part {
             Part::ToolResult(tool_result_part) => {
                 let crate::ToolResult::Function(function_result) = tool_result_part.result else {
-                    continue;
+                    return Err(LanguageModelError::Unsupported(
+                        PROVIDER,
+                        "OpenAI Chat Completions does not accept hosted web-search results"
+                            .to_string(),
+                    ));
                 };
                 let mut content_parts = Vec::new();
                 let converted_parts = source_part_utils::get_compatible_parts_without_source_parts(
@@ -669,8 +700,17 @@ fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<CreateChatCompletio
                     .to_string(),
             ));
         }
+        Tool::ToolSearch(_) => {
+            return Err(LanguageModelError::Unsupported(
+                PROVIDER,
+                "Hosted tool search is not supported by this OpenAI Chat Completions adapter; use \
+                 OpenAIModel (Responses API)"
+                    .to_string(),
+            ));
+        }
     };
 
+    // Chat Completions cannot defer tools, so deferred tools are loaded eagerly.
     let function = FunctionObject {
         description: Some(tool.description),
         name: tool.name,
@@ -689,7 +729,7 @@ fn convert_to_openai_tool_call(
         tool_call_id,
         call,
         signature: _,
-        id,
+        id: _,
     } = part;
 
     let crate::ToolCall::Function(call) = call else {
@@ -710,7 +750,7 @@ fn convert_to_openai_tool_call(
             arguments,
             name: call.name,
         },
-        id: id.unwrap_or(tool_call_id),
+        id: tool_call_id,
     })
 }
 
@@ -862,7 +902,8 @@ fn map_openai_message(
         })?;
 
         let mut audio_part = crate::AudioPart {
-            data: data.data,
+            data: Some(data.data),
+            url: None,
             format: audio_format,
             sample_rate: None,
             channels: None,
@@ -1031,6 +1072,7 @@ fn map_openai_usage(usage: CompletionUsage) -> ModelUsage {
         output_tokens: u32::try_from(usage.completion_tokens).unwrap_or(0),
         input_tokens_details: None,
         output_tokens_details: None,
+        server_tool_use: None,
     };
 
     if let Some(details) = usage.prompt_tokens_details {

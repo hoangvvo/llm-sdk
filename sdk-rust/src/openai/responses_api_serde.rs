@@ -8,7 +8,8 @@ use super::responses_api::{
     FunctionShellCallItemParam, FunctionShellCallOutputItemParam, FunctionToolCall,
     ImageGenToolCall, InputMessage, Item, LocalShellToolCall, LocalShellToolCallOutput,
     MCPApprovalRequest, MCPApprovalResponse, MCPListTools, MCPToolCall, OutputItem, OutputMessage,
-    ReasoningItem, ToolSearchCallItemParam, ToolSearchOutputItemParam, WebSearchToolCall,
+    ReasoningItem, ToolSearchCall, ToolSearchCallItemParam, ToolSearchOutput,
+    ToolSearchOutputItemParam, WebSearchToolCall,
 };
 
 fn decode_web_search_tool_call(mut value: Value) -> serde_json::Result<WebSearchToolCall> {
@@ -131,6 +132,8 @@ impl<'de> Deserialize<'de> for OutputItem {
                 .map_or_else(|_| Self::Unknown(value), Self::WebSearchToolCall)),
             Some("image_generation_call") => decode!(ImageGenToolCall, ImageGenToolCall),
             Some("reasoning") => decode!(ReasoningItem, ReasoningItem),
+            Some("tool_search_call") => decode!(ToolSearchCall, ToolSearchCall),
+            Some("tool_search_output") => decode!(ToolSearchOutput, ToolSearchOutput),
             _ => Ok(Self::Unknown(value)),
         }
     }

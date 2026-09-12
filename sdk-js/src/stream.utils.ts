@@ -93,7 +93,13 @@ export function looselyConvertPartToPartDelta(part: Part): PartDelta {
                 name: part.call.name,
                 args: JSON.stringify(part.call.args),
               }
-            : { ...part.call },
+            : part.call.type === "tool_search"
+              ? {
+                  type: "tool_search",
+                  args: JSON.stringify(part.call.args),
+                  ...(part.call.status ? { status: part.call.status } : {}),
+                }
+              : { ...part.call },
       };
       if (part.tool_call_id) {
         toolCall.tool_call_id = part.tool_call_id;

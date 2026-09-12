@@ -30,5 +30,8 @@ suite("MistralModel", () => {
   }
 
   test("image_input", (t) => runTestGroup(t, visionModel, "image_input"));
+  test("image_url_input", (t) =>
+    runTestGroup(t, visionModel, "image_url_input"));
+  test("file_url_input", (t) => runTestGroup(t, visionModel, "file_url_input"));
   test("reasoning", (t) => runTestGroup(t, reasoningModel, "reasoning"));
 });

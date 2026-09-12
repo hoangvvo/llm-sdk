@@ -3,6 +3,7 @@ package llmsdk
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"sort"
 
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/audioutil"
@@ -169,12 +170,25 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 			if toolCallPartDelta.Call.WebSearch.Status != nil {
 				existingData.Call.WebSearch.Status = toolCallPartDelta.Call.WebSearch.Status
 			}
+		} else if toolCallPartDelta.Call.ToolSearch != nil {
+			if existingData.Call.ToolSearch == nil {
+				return fmt.Errorf("tool call type mismatch at index %d", delta.Index)
+			}
+			if toolCallPartDelta.Call.ToolSearch.Args != nil {
+				if existingData.Call.ToolSearch.Args == nil {
+					existingData.Call.ToolSearch.Args = new(string)
+				}
+				*existingData.Call.ToolSearch.Args += *toolCallPartDelta.Call.ToolSearch.Args
+			}
+			if toolCallPartDelta.Call.ToolSearch.Status != nil {
+				existingData.Call.ToolSearch.Status = toolCallPartDelta.Call.ToolSearch.Status
+			}
 		}
 	case existing.ToolResult != nil:
 		if delta.Part.ToolResultPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is tool-result", delta.Index)
 		}
-		existing.ToolResult = delta.Part.ToolResultPartDelta
+		*existing.ToolResult = *delta.Part.ToolResultPartDelta
 	case existing.Image != nil:
 		imagePartDelta := delta.Part.ImagePartDelta
 		if imagePartDelta == nil {
@@ -313,6 +327,17 @@ func createToolCallPart(data *ToolCallPartDelta, index int) (Part, error) {
 	if data.Call.WebSearch != nil {
 		return Part{ToolCallPart: &ToolCallPart{ToolCallID: *data.ToolCallID, Call: ToolCall{WebSearch: &WebSearchToolCall{Action: data.Call.WebSearch.Action, Status: data.Call.WebSearch.Status}}, Signature: data.Signature, ID: data.ID}}, nil
 	}
+	if data.Call.ToolSearch != nil {
+		strArgs := ""
+		if data.Call.ToolSearch.Args != nil {
+			strArgs = *data.Call.ToolSearch.Args
+		}
+		args, err := parseToolCallArgs(strArgs)
+		if err != nil {
+			return Part{}, NewInvariantError("", fmt.Sprintf("Invalid tool search arguments: %s: %s", strArgs, err.Error()))
+		}
+		return Part{ToolCallPart: &ToolCallPart{ToolCallID: *data.ToolCallID, Call: ToolCall{ToolSearch: &ToolSearchToolCall{Args: args, Status: data.Call.ToolSearch.Status}}, Signature: data.Signature, ID: data.ID}}, nil
+	}
 	if data.Call.Function == nil || data.Call.Function.Name == nil {
 		return Part{}, NewInvariantError("", fmt.Sprintf("Missing required field tool_name at index %d", index))
 	}
@@ -428,7 +453,7 @@ func createPart(data accumulatedData, index int) (Part, error) {
 type StreamAccumulator struct {
 	accumulatedParts map[int]accumulatedData
 	accumulatedUsage *ModelUsage
-	cost             float64
+	cost             *float64
 }
 
 // NewStreamAccumulator creates a new StreamAccumulator
@@ -476,8 +501,8 @@ func (s *StreamAccumulator) ComputeResponse() (ModelResponse, error) {
 		Usage:   s.accumulatedUsage,
 		Cost:    nil,
 	}
-	if s.cost > 0 {
-		r.Cost = &s.cost
+	if s.cost != nil {
+		r.Cost = ptr.To(*s.cost)
 	}
 	return r, nil
 }
@@ -510,8 +535,8 @@ func (s *StreamAccumulator) Snapshot() ModelResponse {
 		Content: content,
 		Usage:   s.accumulatedUsage,
 	}
-	if s.cost > 0 {
-		response.Cost = &s.cost
+	if s.cost != nil {
+		response.Cost = ptr.To(*s.cost)
 	}
 	return response
 }
@@ -530,7 +555,7 @@ func (s *StreamAccumulator) IsEmpty() bool {
 func (s *StreamAccumulator) Clear() {
 	s.accumulatedParts = make(map[int]accumulatedData)
 	s.accumulatedUsage = nil
-	s.cost = 0
+	s.cost = nil
 }
 
 // processDelta processes a single delta, either merging with existing or creating new
@@ -558,6 +583,9 @@ func (s *StreamAccumulator) processUsage(usage *ModelUsage, cost *float64) {
 		s.accumulatedUsage.Add(usage)
 	}
 	if cost != nil {
-		s.cost += *cost
+		if s.cost == nil {
+			s.cost = ptr.To(0.0)
+		}
+		*s.cost += *cost
 	}
 }

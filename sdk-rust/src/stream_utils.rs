@@ -101,14 +101,14 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             signature: text_part.signature,
         }),
         Part::Image(image_part) => PartDelta::Image(ImagePartDelta {
-            data: Some(image_part.data),
+            data: image_part.data,
             mime_type: Some(image_part.mime_type),
             width: image_part.width,
             height: image_part.height,
             id: image_part.id,
         }),
         Part::Audio(audio_part) => PartDelta::Audio(AudioPartDelta {
-            data: Some(audio_part.data),
+            data: audio_part.data,
             format: Some(audio_part.format),
             sample_rate: audio_part.sample_rate,
             channels: audio_part.channels,
@@ -129,6 +129,12 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
                         status: call.status,
                     })
                 }
+                crate::ToolCall::ToolSearch(call) => {
+                    crate::ToolCallDelta::ToolSearch(crate::ToolSearchToolCallDelta {
+                        args: Some(call.args.to_string()),
+                        status: call.status,
+                    })
+                }
             },
             tool_call_id: Some(tool_call_part.tool_call_id),
             signature: tool_call_part.signature,
@@ -140,11 +146,11 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             status: result.status,
         }),
         Part::Reasoning(reasoning_part) => PartDelta::Reasoning(ReasoningPartDelta {
-            text: Some(reasoning_part.text),
+            text: reasoning_part.text,
             signature: reasoning_part.signature,
             id: reasoning_part.id,
         }),
-        Part::Source(_) => Err(LanguageModelError::Invariant(
+        Part::File(_) | Part::Source(_) => Err(LanguageModelError::Invariant(
             "",
             "Cannot convert part to part delta".to_string(),
         ))?,

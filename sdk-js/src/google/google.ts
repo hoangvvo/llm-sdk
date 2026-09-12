@@ -37,6 +37,7 @@ import type {
   LanguageModelCallOptions,
   LanguageModelMetadata,
 } from "../language-model.ts";
+import type { AudioPart, FilePart, ImagePart } from "../types.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import {
@@ -117,7 +118,10 @@ export class GoogleModel implements LanguageModel {
     );
     const result: ModelResponse = { content };
     if (response.usageMetadata) {
-      const usage = mapGoogleUsageMetadata(response.usageMetadata);
+      const usage = mapGoogleUsageMetadata(
+        response.usageMetadata,
+        candidate.groundingMetadata?.webSearchQueries?.length ?? 0,
+      );
       result.usage = usage;
       if (this.metadata?.pricing) {
         result.cost = calculateCost(usage, this.metadata.pricing, {
@@ -204,7 +208,7 @@ export class GoogleModel implements LanguageModel {
       if (chunk.usageMetadata) {
         streamUsage = mergeModelUsageMax(
           streamUsage,
-          mapGoogleUsageMetadata(chunk.usageMetadata),
+          mapGoogleUsageMetadata(chunk.usageMetadata, webSearchQueries.size),
         );
       }
     }
@@ -258,6 +262,12 @@ export class GoogleModel implements LanguageModel {
     }
 
     if (streamUsage) {
+      // Search queries are only known once the stream ends.
+      if (webSearchQueries.size > 0) {
+        streamUsage.server_tool_use = {
+          web_search_requests: webSearchQueries.size,
+        };
+      }
       const partial: PartialModelResponse = { usage: streamUsage };
       if (this.metadata?.pricing) {
         partial.cost = calculateCost(streamUsage, this.metadata.pricing, {
@@ -275,8 +285,8 @@ function convertToGenerateContentParameters(
   modelId: string,
 ): GenerateContentParameters {
   const {
-    system_prompt,
     messages,
+    system_prompt,
     tools,
     tool_choice,
     response_format,
@@ -300,7 +310,7 @@ function convertToGenerateContentParameters(
   if (system_prompt) {
     config.systemInstruction = system_prompt;
   }
-  if (temperature) {
+  if (typeof temperature === "number") {
     config.temperature = temperature;
   }
   if (typeof top_p === "number") {
@@ -309,16 +319,16 @@ function convertToGenerateContentParameters(
   if (typeof top_k === "number") {
     config.topK = top_k;
   }
-  if (presence_penalty) {
+  if (typeof presence_penalty === "number") {
     config.presencePenalty = presence_penalty;
   }
-  if (frequency_penalty) {
+  if (typeof frequency_penalty === "number") {
     config.frequencyPenalty = frequency_penalty;
   }
-  if (seed) {
+  if (typeof seed === "number") {
     config.seed = seed;
   }
-  if (max_tokens) {
+  if (typeof max_tokens === "number") {
     config.maxOutputTokens = max_tokens;
   }
   if (tools) {
@@ -403,23 +413,13 @@ function convertToGoogleParts(part: Part): GooglePart[] {
           : { text: part.text },
       ];
     case "image":
-      return [
-        {
-          inlineData: {
-            data: part.data,
-            mimeType: part.mime_type,
-          },
-        },
-      ];
+      return [convertToGoogleMediaPart(part, part.mime_type)];
     case "audio":
       return [
-        {
-          inlineData: {
-            data: part.data,
-            mimeType: mapAudioFormatToMimeType(part.format),
-          },
-        },
+        convertToGoogleMediaPart(part, mapAudioFormatToMimeType(part.format)),
       ];
+    case "file":
+      return [convertToGoogleMediaPart(part, part.mime_type)];
     case "reasoning": {
       const googleReasoningPart: GooglePart = {
         text: part.text,
@@ -433,7 +433,8 @@ function convertToGoogleParts(part: Part): GooglePart[] {
     case "source":
       return part.content.map(convertToGoogleParts).flat();
     case "tool-call": {
-      if (part.call.type === "web_search") return [];
+      // Hosted tool history has no Gemini equivalent and is skipped.
+      if (part.call.type !== "function") return [];
       const googleToolCallPart: GooglePart = {
         functionCall: {
           name: part.call.name,
@@ -447,7 +448,7 @@ function convertToGoogleParts(part: Part): GooglePart[] {
       return [googleToolCallPart];
     }
     case "tool-result": {
-      if (part.result.type === "web_search") return [];
+      if (part.result.type !== "function") return [];
       const functionResponse = convertToGoogleFunctionResponse(
         part.result.content,
         part.status,
@@ -486,13 +487,14 @@ function convertToGoogleFunctionResponse(
         break;
       case "image":
       case "audio":
+      case "file":
         functionResponseParts.push({
           inlineData: {
-            data: part.data,
+            data: part.data ?? "",
             mimeType:
-              part.type === "image"
-                ? part.mime_type
-                : mapAudioFormatToMimeType(part.format),
+              part.type === "audio"
+                ? mapAudioFormatToMimeType(part.format)
+                : part.mime_type,
           },
         });
         break;
@@ -536,18 +538,39 @@ function maybeParseJSON(text: string) {
   }
 }
 
+/**
+ * URLs are forwarded as file data, which Gemini resolves for Files API URIs,
+ * YouTube links and public HTTPS URLs of supported MIME types.
+ */
+function convertToGoogleMediaPart(
+  part: ImagePart | AudioPart | FilePart,
+  mimeType: string,
+): GooglePart {
+  if (part.url) {
+    return { fileData: { fileUri: part.url, mimeType } };
+  }
+  return { inlineData: { data: part.data ?? "", mimeType } };
+}
+
 function convertToGoogleTools(tools: Tool[]): GoogleTool[] {
   const functionDeclarations: FunctionDeclaration[] = [];
   const googleTools: GoogleTool[] = [];
 
   for (const tool of tools) {
     if (tool.type === "function") {
+      // Gemini has no deferred loading, so deferred tools are loaded eagerly.
       functionDeclarations.push({
         name: tool.name,
         description: tool.description,
         parametersJsonSchema: tool.parameters,
       });
       continue;
+    }
+    if (tool.type === "tool_search") {
+      throw new UnsupportedError(
+        PROVIDER,
+        "Google does not support hosted tool search",
+      );
     }
 
     if (
@@ -840,6 +863,7 @@ function nextGoogleDeltaIndex(
 
 function mapGoogleUsageMetadata(
   usageMetadata: GenerateContentResponseUsageMetadata,
+  webSearchRequests: number,
 ): ModelUsage {
   const value = (value: number | undefined) =>
     typeof value === "number" && Number.isFinite(value)
@@ -915,10 +939,15 @@ function mapGoogleUsageMetadata(
   outputTokens ??= 0;
   reasoningTokens ??= 0;
 
+  // candidatesTokenCount excludes thoughts. The numbers are kept as reported;
+  // the cost calculation accounts for it.
   const usage: ModelUsage = {
     input_tokens: promptTokens + toolUsePromptTokens,
     output_tokens: outputTokens,
   };
+  if (webSearchRequests > 0) {
+    usage.server_tool_use = { web_search_requests: webSearchRequests };
+  }
   const inputDetails =
     usageMetadata.promptTokensDetails ||
     usageMetadata.toolUsePromptTokensDetails ||

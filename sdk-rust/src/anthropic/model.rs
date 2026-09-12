@@ -1,26 +1,33 @@
 use crate::{
     anthropic::api::{
-        self, Base64ImageSource, Base64ImageSourceMediaType, ContentBlock, ContentBlockDeltaEvent,
+        self, Base64ImageSource, Base64ImageSourceMediaType, Base64PDFSource,
+        CacheControlEphemeral, CacheControlEphemeralTtl, ContentBlock, ContentBlockDeltaEvent,
         ContentBlockDeltaEventDelta, ContentBlockStartEvent, ContentBlockStartEventContentBlock,
-        CreateMessageParams, CreateMessageParamsSystem, CreateMessageParamsToolsItem,
-        InputContentBlock, InputMessage, InputMessageContent, InputMessageRole,
-        Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage, MessageStartEvent,
-        MessageStreamEvent, OutputConfig, RequestCitationsConfig, RequestImageBlock,
-        RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock,
+        CreateMessageParams, CreateMessageParamsCacheControl, CreateMessageParamsSystem,
+        CreateMessageParamsToolsItem, InputContentBlock, InputMessage, InputMessageContent,
+        InputMessageRole, Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage,
+        MessageStartEvent, MessageStreamEvent, OutputConfig, PlainTextSource,
+        RequestCitationsConfig, RequestDocumentBlock, RequestDocumentBlockSource,
+        RequestImageBlock, RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock,
         RequestTextBlockCitationsItem, RequestThinkingBlock, RequestToolResultBlock,
         RequestToolResultBlockContent, RequestToolResultBlockContentArrayItem, RequestToolUseBlock,
         RequestWebSearchResultLocationCitation, StopReason, ThinkingConfigAdaptive,
-        ThinkingConfigDisabled, ThinkingConfigEnabled, ThinkingConfigParam, Tool, Usage,
-        UserLocation, WebSearchTool20250305,
+        ThinkingConfigDisabled, ThinkingConfigEnabled, ThinkingConfigParam, Tool,
+        ToolSearchToolBM2520251119, ToolSearchToolBM2520251119Type, ToolSearchToolRegex20251119,
+        ToolSearchToolRegex20251119Type, URLImageSource, URLPDFSource, Usage, UserLocation,
+        WebSearchTool20250305,
     },
     client_utils, stream_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
-    Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel, LanguageModelError,
-    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
-    ModelResponse, ModelTokensDetails, ModelUsage, ModelUsageCostOptions, Part, PartDelta,
-    PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
-    ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool, ToolCallPart,
-    ToolCallPartDelta, ToolChoiceOption, ToolResultPart, ToolResultStatus,
+    CacheRetention, Citation, CitationDelta, ContentDelta, FilePart, ImagePart, LanguageModel,
+    LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
+    LanguageModelStream, Message, ModelResponse, ModelServerToolUsage, ModelTokensDetails,
+    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions,
+    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
+    TextPartDelta, Tool as SdkTool, ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta,
+    ToolChoiceOption, ToolResult, ToolResultPart, ToolResultStatus, ToolSearchStrategy,
+    ToolSearchToolCall, ToolSearchToolCallDelta, ToolSearchToolCallStatus, ToolSearchToolResult,
+    WebSearchToolCallDelta, WebSearchToolCallStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -29,10 +36,7 @@ use reqwest::{
     Client,
 };
 use serde_json::{Map, Value};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
     input_cache_tokens_are_additional: true,
@@ -178,21 +182,16 @@ impl LanguageModel for AnthropicModel {
                     }
 
                     let content = map_anthropic_message(response.content);
-                    let usage = Some(map_anthropic_usage(&response.usage));
+                    let usage = map_anthropic_usage(&AnthropicUsage::from(&response.usage));
 
-                    let cost =
-                        if let (Some(usage), Some(metadata)) = (usage.as_ref(), self.metadata()) {
-                            metadata
-                                .pricing
-                                .as_ref()
-                                .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
-                        } else {
-                            None
-                        };
+                    let cost = self
+                        .metadata()
+                        .and_then(|metadata| metadata.pricing.as_ref())
+                        .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
 
                     Ok(ModelResponse {
                         content,
-                        usage,
+                        usage: Some(usage),
                         cost,
                     })
                 },
@@ -227,14 +226,22 @@ impl LanguageModel for AnthropicModel {
                     let metadata = self.metadata.clone();
 
                     let stream = try_stream! {
-                        let mut provider_tool_block_indexes = HashSet::new();
-                        let mut server_tool_blocks = HashMap::<i64, (String, String)>::new();
-                        let mut server_tool_call_indexes = HashMap::new();
-                        let mut stream_usage = None;
+                        // Hosted search arguments are only usable once complete.
+                        let mut server_tool_blocks = HashMap::<usize, AnthropicServerToolBlock>::new();
+                        let mut server_tool_call_indexes = HashMap::<String, usize>::new();
+                        // Hosted search can produce multiple billed messages with restarting block indexes.
+                        let mut index_offset = 0_usize;
+                        let mut max_index: Option<usize> = None;
+                        let mut completed_usages: Vec<ModelUsage> = Vec::new();
+                        let mut message_usage: Option<AnthropicUsage> = None;
                         while let Some(event) = chunk_stream.next().await {
                             match event? {
                                 MessageStreamEvent::MessageStart(MessageStartEvent { message }) => {
-                                    stream_usage = Some(map_anthropic_usage(&message.usage));
+                                    if let Some(usage) = message_usage.take() {
+                                        completed_usages.push(map_anthropic_usage(&usage));
+                                        index_offset = max_index.map_or(0, |index| index + 1);
+                                    }
+                                    message_usage = Some(AnthropicUsage::from(&message.usage));
                                     if matches!(message.stop_reason, Some(StopReason::Refusal)) {
                                         Err(LanguageModelError::Refusal(anthropic_refusal_message(
                                             message.stop_details.as_ref(),
@@ -242,9 +249,9 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::MessageDelta(MessageDeltaEvent { delta, usage }) => {
-                                    if let Some(current_usage) = &mut stream_usage {
-                                        merge_anthropic_message_delta_usage(current_usage, &usage);
-                                    }
+                                    message_usage
+                                        .get_or_insert_default()
+                                        .merge_message_delta(&usage);
                                     if matches!(delta.stop_reason, Some(StopReason::Refusal)) {
                                         Err(LanguageModelError::Refusal(anthropic_refusal_message(
                                             delta.stop_details.as_ref(),
@@ -252,31 +259,65 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::ContentBlockStart(ContentBlockStartEvent { content_block, index }) => {
-                                    if let ContentBlockStartEventContentBlock::ServerToolUse(block) = &content_block {
-                                        provider_tool_block_indexes.insert(index);
-                                        server_tool_call_indexes.insert(block.id.clone(), index);
-                                        if matches!(block.name, api::ResponseServerToolUseBlockName::WebSearch) {
-                                            server_tool_blocks.insert(index, (block.id.clone(), String::new()));
+                                    let index = anthropic_block_index(index, index_offset)?;
+                                    max_index = Some(max_index.map_or(index, |max| max.max(index)));
+                                    let content_block = match content_block {
+                                        ContentBlockStartEventContentBlock::ServerToolUse(block) => {
+                                            server_tool_call_indexes.insert(block.id.clone(), index);
+                                            let call = map_anthropic_server_tool_use_start(&block.name);
+                                            let tool_call_id = block.id.clone();
+                                            server_tool_blocks.insert(index, AnthropicServerToolBlock {
+                                                id: block.id,
+                                                name: block.name,
+                                                input: String::new(),
+                                            });
+                                            if let Some(call) = call {
+                                                yield PartialModelResponse {
+                                                    delta: Some(ContentDelta {
+                                                        index,
+                                                        part: PartDelta::ToolCall(ToolCallPartDelta {
+                                                            tool_call_id: Some(tool_call_id),
+                                                            call,
+                                                            signature: None,
+                                                            id: None,
+                                                        }),
+                                                    }),
+                                                    ..Default::default()
+                                                };
+                                            }
+                                            continue;
                                         }
-                                    }
-                                    if let ContentBlockStartEventContentBlock::WebSearchToolResult(block) = &content_block {
-                                        if let Some(call_index) = server_tool_call_indexes.get(&block.tool_use_id) {
+                                        content_block => content_block,
+                                    };
+                                    let server_tool_result = match &content_block {
+                                        ContentBlockStartEventContentBlock::WebSearchToolResult(block) => Some((
+                                            &block.tool_use_id,
+                                            ToolCallDelta::WebSearch(WebSearchToolCallDelta {
+                                                action: None,
+                                                status: Some(anthropic_web_search_call_status(
+                                                    anthropic_web_search_result_status(&block.content),
+                                                )),
+                                            }),
+                                        )),
+                                        ContentBlockStartEventContentBlock::ToolSearchToolResult(block) => Some((
+                                            &block.tool_use_id,
+                                            ToolCallDelta::ToolSearch(ToolSearchToolCallDelta {
+                                                args: None,
+                                                status: Some(anthropic_tool_search_call_status(
+                                                    anthropic_tool_search_result_status(&block.content),
+                                                )),
+                                            }),
+                                        )),
+                                        _ => None,
+                                    };
+                                    if let Some((tool_use_id, call)) = server_tool_result {
+                                        if let Some(call_index) = server_tool_call_indexes.get(tool_use_id) {
                                             yield PartialModelResponse {
                                                 delta: Some(ContentDelta {
-                                                    index: usize::try_from(*call_index).map_err(|_| {
-                                                        LanguageModelError::Invariant(
-                                                            PROVIDER,
-                                                            format!("Anthropic stream content block index out of range: {call_index}"),
-                                                        )
-                                                    })?,
+                                                    index: *call_index,
                                                     part: PartDelta::ToolCall(ToolCallPartDelta {
-                                                        tool_call_id: None,
-                                                        call: crate::ToolCallDelta::WebSearch(
-                                                            crate::WebSearchToolCallDelta {
-                                                                action: None,
-                                                                status: Some(anthropic_web_search_result_status(&block.content)),
-                                                            },
-                                                        ),
+                                                        tool_call_id: Some(tool_use_id.clone()),
+                                                        call,
                                                         signature: None,
                                                         id: None,
                                                     }),
@@ -285,17 +326,7 @@ impl LanguageModel for AnthropicModel {
                                             };
                                         }
                                     }
-                                    let deltas = map_anthropic_content_block_start_event(
-                                        content_block,
-                                        usize::try_from(index).map_err(|_| {
-                                            LanguageModelError::Invariant(
-                                                PROVIDER,
-                                                format!(
-                                                    "Anthropic stream content block index out of range: {index}"
-                                                ),
-                                            )
-                                        })?,
-                                    )?;
+                                    let deltas = map_anthropic_content_block_start_event(content_block, index)?;
                                     for delta in deltas {
                                         yield PartialModelResponse {
                                             delta: Some(delta),
@@ -304,26 +335,14 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::ContentBlockDelta(ContentBlockDeltaEvent { delta, index }) => {
-                                    if let Some((_, input)) = server_tool_blocks.get_mut(&index) {
+                                    let index = anthropic_block_index(index, index_offset)?;
+                                    if let Some(block) = server_tool_blocks.get_mut(&index) {
                                         if let ContentBlockDeltaEventDelta::InputJsonDelta(input_delta) = &delta {
-                                            input.push_str(&input_delta.partial_json);
-                                            continue;
+                                            block.input.push_str(&input_delta.partial_json);
                                         }
-                                    }
-                                    if provider_tool_block_indexes.contains(&index) {
                                         continue;
                                     }
-                                    if let Some(delta) = map_anthropic_content_block_delta_event(
-                                        delta,
-                                        usize::try_from(index).map_err(|_| {
-                                            LanguageModelError::Invariant(
-                                                PROVIDER,
-                                                format!(
-                                                    "Anthropic stream content block index out of range: {index}"
-                                                ),
-                                            )
-                                        })?,
-                                    ) {
+                                    if let Some(delta) = map_anthropic_content_block_delta_event(delta, index) {
                                         yield PartialModelResponse {
                                             delta: Some(delta),
                                             ..Default::default()
@@ -331,43 +350,37 @@ impl LanguageModel for AnthropicModel {
                                     }
                                 }
                                 MessageStreamEvent::ContentBlockStop(event) => {
-                                    if let Some((id, input)) = server_tool_blocks.remove(&event.index) {
-                                        let query = serde_json::from_str::<Value>(&input)
-                                            .ok()
-                                            .and_then(|value| value.get("query")?.as_str().map(str::to_owned));
-                                        if let Some(query) = query {
-                                            yield PartialModelResponse {
-                                                delta: Some(ContentDelta {
-                                                    index: usize::try_from(event.index).map_err(|_| {
-                                                        LanguageModelError::Invariant(
-                                                            PROVIDER,
-                                                            format!("Anthropic stream content block index out of range: {}", event.index),
-                                                        )
-                                                    })?,
-                                                    part: PartDelta::ToolCall(ToolCallPartDelta {
-                                                        tool_call_id: Some(id),
-                                                        call: crate::ToolCallDelta::WebSearch(
-                                                            crate::WebSearchToolCallDelta {
-                                                                action: Some(crate::WebSearchAction::Search {
-                                                                    queries: vec![query],
-                                                                }),
-                                                                status: None,
-                                                            },
-                                                        ),
-                                                        signature: None,
-                                                        id: None,
-                                                    }),
+                                    let index = anthropic_block_index(event.index, index_offset)?;
+                                    let Some(block) = server_tool_blocks.remove(&index) else {
+                                        continue;
+                                    };
+                                    if let Some(call) = map_anthropic_server_tool_use_stop(&block.name, &block.input) {
+                                        yield PartialModelResponse {
+                                            delta: Some(ContentDelta {
+                                                index,
+                                                part: PartDelta::ToolCall(ToolCallPartDelta {
+                                                    tool_call_id: Some(block.id),
+                                                    call,
+                                                    signature: None,
+                                                    id: None,
                                                 }),
-                                                ..Default::default()
-                                            };
-                                        }
+                                            }),
+                                            ..Default::default()
+                                        };
                                     }
                                 }
                                 _ => {}
                             }
                         }
 
-                        if let Some(usage) = stream_usage {
+                        if let Some(usage) = message_usage {
+                            completed_usages.push(map_anthropic_usage(&usage));
+                        }
+                        if !completed_usages.is_empty() {
+                            let mut usage = ModelUsage::default();
+                            for completed_usage in &completed_usages {
+                                usage.add(completed_usage);
+                            }
                             let cost = metadata
                                 .as_ref()
                                 .and_then(|meta| meta.pricing.as_ref())
@@ -388,14 +401,99 @@ impl LanguageModel for AnthropicModel {
     }
 }
 
+/// A hosted tool block whose JSON input is buffered until `content_block_stop`.
+struct AnthropicServerToolBlock {
+    id: String,
+    name: api::ResponseServerToolUseBlockName,
+    input: String,
+}
+
+fn anthropic_block_index(index: i64, offset: usize) -> LanguageModelResult<usize> {
+    usize::try_from(index)
+        .ok()
+        .and_then(|index| index.checked_add(offset))
+        .ok_or_else(|| {
+            LanguageModelError::Invariant(
+                PROVIDER,
+                format!("Anthropic stream content block index out of range: {index}"),
+            )
+        })
+}
+
+/// Hosted calls exposed in conversation history:
+/// - web search
+/// - regex or BM25 tool search
+/// - other hosted tools are omitted
+fn map_anthropic_server_tool_use_start(
+    name: &api::ResponseServerToolUseBlockName,
+) -> Option<ToolCallDelta> {
+    match name {
+        api::ResponseServerToolUseBlockName::WebSearch => {
+            Some(ToolCallDelta::WebSearch(WebSearchToolCallDelta {
+                action: None,
+                status: Some(WebSearchToolCallStatus::InProgress),
+            }))
+        }
+        api::ResponseServerToolUseBlockName::ToolSearchToolRegex
+        | api::ResponseServerToolUseBlockName::ToolSearchToolBm25 => {
+            Some(ToolCallDelta::ToolSearch(ToolSearchToolCallDelta {
+                args: None,
+                status: Some(ToolSearchToolCallStatus::InProgress),
+            }))
+        }
+        _ => None,
+    }
+}
+
+fn map_anthropic_server_tool_use_stop(
+    name: &api::ResponseServerToolUseBlockName,
+    input: &str,
+) -> Option<ToolCallDelta> {
+    let parsed_input =
+        serde_json::from_str::<Value>(if input.is_empty() { "{}" } else { input }).ok();
+    match name {
+        api::ResponseServerToolUseBlockName::WebSearch => {
+            let query = parsed_input.as_ref()?.get("query")?.as_str()?;
+            Some(ToolCallDelta::WebSearch(WebSearchToolCallDelta {
+                action: Some(crate::WebSearchAction::Search {
+                    queries: vec![query.to_string()],
+                }),
+                status: None,
+            }))
+        }
+        api::ResponseServerToolUseBlockName::ToolSearchToolRegex
+        | api::ResponseServerToolUseBlockName::ToolSearchToolBm25 => {
+            Some(ToolCallDelta::ToolSearch(ToolSearchToolCallDelta {
+                args: Some(
+                    anthropic_tool_search_args(parsed_input.unwrap_or(Value::Null)).to_string(),
+                ),
+                status: None,
+            }))
+        }
+        _ => None,
+    }
+}
+
+/// Hosted tool search arguments are always a JSON object.
+fn anthropic_tool_search_args(input: Value) -> Value {
+    match input {
+        Value::Object(_) => input,
+        _ => Value::Object(Map::new()),
+    }
+}
+
 fn anthropic_refusal_message(details: Option<&api::RefusalStopDetails>) -> String {
     details
         .and_then(|details| {
             details.explanation.clone().or_else(|| {
-                details
-                    .category
-                    .as_ref()
-                    .map(|_| "Anthropic policy category refusal".to_string())
+                details.category.as_ref().map(|category| {
+                    let category = match category {
+                        api::RefusalStopDetailsCategory::Cyber => "cyber",
+                        api::RefusalStopDetailsCategory::Bio => "bio",
+                        _ => "unknown",
+                    };
+                    format!("Anthropic policy category: {category}")
+                })
             })
         })
         .unwrap_or_else(|| "Anthropic refused the request".to_string())
@@ -423,6 +521,7 @@ fn convert_to_anthropic_create_params(
         metadata: _,
         audio: _,
         reasoning,
+        cache_retention,
     } = input;
 
     let max_tokens = i64::from(max_tokens.unwrap_or(4096));
@@ -430,7 +529,13 @@ fn convert_to_anthropic_create_params(
     let message_params = convert_to_anthropic_messages(messages)?;
 
     let params = CreateMessageParams {
-        cache_control: None,
+        // Top-level cache_control caches through the last cacheable block.
+        cache_control: cache_retention.map(|retention| {
+            CreateMessageParamsCacheControl::Ephemeral(CacheControlEphemeral {
+                ttl: (retention == CacheRetention::Extended)
+                    .then_some(CacheControlEphemeralTtl::N1H),
+            })
+        }),
         container: None,
         inference_geo: None,
         max_tokens,
@@ -462,12 +567,38 @@ fn convert_tool(tool: SdkTool) -> CreateMessageParamsToolsItem {
             description: Some(tool.description),
             input_schema: Some(tool.parameters),
             cache_control: None,
-            defer_loading: None,
+            defer_loading: tool.defer_loading.filter(|deferred| *deferred),
             eager_input_streaming: None,
             input_examples: None,
             strict: Some(true),
             r#type: None,
         }),
+        SdkTool::ToolSearch(tool) => match tool.strategy {
+            Some(ToolSearchStrategy::Regex) => {
+                CreateMessageParamsToolsItem::ToolSearchToolRegex20251119(
+                    ToolSearchToolRegex20251119 {
+                        allowed_callers: None,
+                        cache_control: None,
+                        defer_loading: None,
+                        name: "tool_search_tool_regex".to_string(),
+                        strict: None,
+                        r#type: ToolSearchToolRegex20251119Type::ToolSearchToolRegex20251119,
+                    },
+                )
+            }
+            Some(ToolSearchStrategy::Bm25) | None => {
+                CreateMessageParamsToolsItem::ToolSearchToolBM2520251119(
+                    ToolSearchToolBM2520251119 {
+                        allowed_callers: None,
+                        cache_control: None,
+                        defer_loading: None,
+                        name: "tool_search_tool_bm25".to_string(),
+                        strict: None,
+                        r#type: ToolSearchToolBM2520251119Type::ToolSearchToolBm2520251119,
+                    },
+                )
+            }
+        },
         SdkTool::WebSearch(tool) => CreateMessageParamsToolsItem::WebSearchTool20250305(
             // The basic version supports both common options without enabling
             // Anthropic's newer code-execution filtering flow.
@@ -551,6 +682,7 @@ fn convert_parts_to_content_blocks(
         .collect()
 }
 
+#[allow(clippy::too_many_lines)]
 fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContentBlock> {
     match part {
         Part::Text(text_part) => Ok(InputContentBlock::Text(create_request_text_block(
@@ -558,7 +690,10 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
         ))),
         Part::Image(image_part) => Ok(InputContentBlock::Image(create_request_image_block(
             image_part,
-        )?)),
+        ))),
+        Part::File(file_part) => Ok(InputContentBlock::Document(create_request_document_block(
+            file_part,
+        ))),
         Part::Source(source_part) => Ok(InputContentBlock::SearchResult(convert_source_part(
             source_part,
         )?)),
@@ -571,6 +706,24 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
                     input: normalize_tool_args(call.args)?,
                     name: call.name,
                 }))
+            }
+            crate::ToolCall::ToolSearch(call) => {
+                let input = normalize_tool_args(call.args)?;
+                // Regex searches carry a pattern; anything else replays as a BM25 query.
+                let name = if input.get("pattern").is_some() {
+                    api::RequestServerToolUseBlockName::ToolSearchToolRegex
+                } else {
+                    api::RequestServerToolUseBlockName::ToolSearchToolBm25
+                };
+                Ok(InputContentBlock::ServerToolUse(
+                    api::RequestServerToolUseBlock {
+                        cache_control: None,
+                        caller: None,
+                        id: tool_call.tool_call_id,
+                        input,
+                        name,
+                    },
+                ))
             }
             crate::ToolCall::WebSearch(call) => {
                 let input = match call.action {
@@ -631,6 +784,13 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
                     },
                 ))
             }
+            crate::ToolResult::ToolSearch(result) => Ok(InputContentBlock::ToolSearchToolResult(
+                api::RequestToolSearchToolResultBlock {
+                    cache_control: None,
+                    content: convert_tool_search_result_content(result),
+                    tool_use_id: tool_result.tool_call_id,
+                },
+            )),
         },
         Part::Reasoning(reasoning_part) => Ok(convert_reasoning_part(reasoning_part)),
         Part::Audio(_) => Err(LanguageModelError::Unsupported(
@@ -638,6 +798,38 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
             "Anthropic does not support audio parts".to_string(),
         )),
     }
+}
+
+fn convert_tool_search_result_content(
+    result: ToolSearchToolResult,
+) -> api::RequestToolSearchToolResultBlockContent {
+    if let Some(code) = result.error_code {
+        return api::RequestToolSearchToolResultBlockContent::ToolSearchToolResultError(
+            api::RequestToolSearchToolResultError {
+                error_code: match code.as_str() {
+                    "unavailable" => api::ToolSearchToolResultErrorCode::Unavailable,
+                    "too_many_requests" => api::ToolSearchToolResultErrorCode::TooManyRequests,
+                    "execution_time_exceeded" => {
+                        api::ToolSearchToolResultErrorCode::ExecutionTimeExceeded
+                    }
+                    _ => api::ToolSearchToolResultErrorCode::InvalidToolInput,
+                },
+            },
+        );
+    }
+    api::RequestToolSearchToolResultBlockContent::ToolSearchToolSearchResult(
+        api::RequestToolSearchToolSearchResultBlock {
+            tool_references: result
+                .tool_names
+                .into_iter()
+                .map(|tool_name| api::RequestToolReferenceBlock {
+                    cache_control: None,
+                    tool_name,
+                    r#type: "tool_reference".to_string(),
+                })
+                .collect(),
+        },
+    )
 }
 
 fn convert_reasoning_part(reasoning_part: ReasoningPart) -> InputContentBlock {
@@ -686,7 +878,7 @@ fn convert_tool_result_part(
     Ok(RequestToolResultBlock {
         cache_control: None,
         content,
-        is_error: (tool_result.status != ToolResultStatus::Completed).then_some(true),
+        is_error: Some(tool_result.status != ToolResultStatus::Completed),
         tool_use_id: tool_result.tool_call_id,
     })
 }
@@ -699,7 +891,10 @@ fn convert_part_to_tool_result_content_block(
             create_request_text_block(text_part),
         )),
         Part::Image(image_part) => Ok(RequestToolResultBlockContentArrayItem::Image(
-            create_request_image_block(image_part)?,
+            create_request_image_block(image_part),
+        )),
+        Part::File(file_part) => Ok(RequestToolResultBlockContentArrayItem::Document(
+            create_request_document_block(file_part),
         )),
         Part::Source(source_part) => Ok(RequestToolResultBlockContentArrayItem::SearchResult(
             convert_source_part(source_part)?,
@@ -739,14 +934,54 @@ fn create_request_text_block(text_part: TextPart) -> RequestTextBlock {
     }
 }
 
-fn create_request_image_block(image_part: ImagePart) -> LanguageModelResult<RequestImageBlock> {
-    Ok(RequestImageBlock {
-        cache_control: None,
-        source: RequestImageBlockSource::Base64(Base64ImageSource {
-            data: image_part.data,
-            media_type: map_anthropic_image_media_type(&image_part.mime_type)?,
+fn create_request_image_block(image_part: ImagePart) -> RequestImageBlock {
+    let ImagePart {
+        mime_type,
+        data,
+        url,
+        ..
+    } = image_part;
+    let source = match url {
+        Some(url) => RequestImageBlockSource::Url(URLImageSource { url }),
+        None => RequestImageBlockSource::Base64(Base64ImageSource {
+            media_type: map_anthropic_image_media_type(&mime_type),
+            data: data.unwrap_or_default(),
         }),
-    })
+    };
+    RequestImageBlock {
+        cache_control: None,
+        source,
+    }
+}
+
+fn create_request_document_block(file_part: FilePart) -> RequestDocumentBlock {
+    let FilePart {
+        mime_type,
+        data,
+        url,
+        filename,
+    } = file_part;
+    let source = if let Some(url) = url {
+        RequestDocumentBlockSource::Url(URLPDFSource { url })
+    } else if mime_type == "text/plain" {
+        RequestDocumentBlockSource::Text(PlainTextSource {
+            data: data.unwrap_or_default(),
+            media_type: mime_type,
+        })
+    } else {
+        RequestDocumentBlockSource::Base64(Base64PDFSource {
+            data: data.unwrap_or_default(),
+            media_type: mime_type,
+        })
+    };
+    RequestDocumentBlock {
+        cache_control: None,
+        citations: None,
+        context: None,
+        source,
+        title: filename,
+        r#type: "document".to_string(),
+    }
 }
 
 fn convert_source_part(
@@ -820,23 +1055,32 @@ fn convert_to_anthropic_thinking_config(reasoning: &ReasoningOptions) -> Thinkin
 
 fn map_anthropic_message(content: Vec<ContentBlock>) -> Vec<Part> {
     let mut parts = Vec::new();
-    let call_statuses: HashMap<String, crate::WebSearchToolCallStatus> = content
+    let call_statuses: HashMap<String, ToolResultStatus> = content
         .iter()
         .filter_map(|block| match block {
             ContentBlock::WebSearchToolResult(result) => Some((
                 result.tool_use_id.clone(),
                 anthropic_web_search_result_status(&result.content),
             )),
+            ContentBlock::ToolSearchToolResult(result) => Some((
+                result.tool_use_id.clone(),
+                anthropic_tool_search_result_status(&result.content),
+            )),
             _ => None,
         })
         .collect();
     for block in content {
-        if let Some(part) = map_content_block(block) {
-            let mut part = part;
+        if let Some(mut part) = map_content_block(block) {
             if let Part::ToolCall(call) = &mut part {
                 if let Some(status) = call_statuses.get(&call.tool_call_id) {
-                    if let crate::ToolCall::WebSearch(web) = &mut call.call {
-                        web.status = Some(status.clone());
+                    match &mut call.call {
+                        ToolCall::WebSearch(web) => {
+                            web.status = Some(anthropic_web_search_call_status(*status));
+                        }
+                        ToolCall::ToolSearch(search) => {
+                            search.status = Some(anthropic_tool_search_call_status(*status));
+                        }
+                        ToolCall::Function(_) => {}
                     }
                 }
             }
@@ -848,17 +1092,47 @@ fn map_anthropic_message(content: Vec<ContentBlock>) -> Vec<Part> {
 
 fn anthropic_web_search_result_status(
     content: &api::ResponseWebSearchToolResultBlockContent,
-) -> crate::WebSearchToolCallStatus {
+) -> ToolResultStatus {
     if matches!(
         content,
         api::ResponseWebSearchToolResultBlockContent::ResponseWebSearchToolResultError(_)
     ) {
-        crate::WebSearchToolCallStatus::Failed
+        ToolResultStatus::Failed
     } else {
-        crate::WebSearchToolCallStatus::Completed
+        ToolResultStatus::Completed
     }
 }
 
+fn anthropic_tool_search_result_status(
+    content: &api::ResponseToolSearchToolResultBlockContent,
+) -> ToolResultStatus {
+    if matches!(
+        content,
+        api::ResponseToolSearchToolResultBlockContent::ToolSearchToolResultError(_)
+    ) {
+        ToolResultStatus::Failed
+    } else {
+        ToolResultStatus::Completed
+    }
+}
+
+fn anthropic_web_search_call_status(status: ToolResultStatus) -> WebSearchToolCallStatus {
+    if status == ToolResultStatus::Failed {
+        WebSearchToolCallStatus::Failed
+    } else {
+        WebSearchToolCallStatus::Completed
+    }
+}
+
+fn anthropic_tool_search_call_status(status: ToolResultStatus) -> ToolSearchToolCallStatus {
+    if status == ToolResultStatus::Failed {
+        ToolSearchToolCallStatus::Failed
+    } else {
+        ToolSearchToolCallStatus::Completed
+    }
+}
+
+#[allow(clippy::too_many_lines)]
 fn map_content_block(block: ContentBlock) -> Option<Part> {
     match block {
         ContentBlock::Text(text_block) => Some(Part::Text(map_text_block(text_block))),
@@ -869,24 +1143,88 @@ fn map_content_block(block: ContentBlock) -> Option<Part> {
             Some(Part::Reasoning(map_redacted_thinking_block(redacted_block)))
         }
         ContentBlock::ToolUse(tool_use) => Some(Part::ToolCall(map_tool_use_block(tool_use))),
-        ContentBlock::ServerToolUse(block)
-            if matches!(block.name, api::ResponseServerToolUseBlockName::WebSearch) =>
-        {
-            let action = block
-                .input
-                .get("query")
-                .and_then(Value::as_str)
-                .map(|query| crate::WebSearchAction::Search {
-                    queries: vec![query.to_string()],
-                });
-            Some(Part::ToolCall(ToolCallPart {
-                tool_call_id: block.id,
-                call: crate::ToolCall::WebSearch(crate::WebSearchToolCall {
-                    action,
-                    status: Some(crate::WebSearchToolCallStatus::InProgress),
+        ContentBlock::ServerToolUse(block) => match block.name {
+            api::ResponseServerToolUseBlockName::WebSearch => {
+                let action = block
+                    .input
+                    .get("query")
+                    .and_then(Value::as_str)
+                    .map(|query| crate::WebSearchAction::Search {
+                        queries: vec![query.to_string()],
+                    });
+                Some(Part::ToolCall(ToolCallPart {
+                    tool_call_id: block.id,
+                    call: ToolCall::WebSearch(crate::WebSearchToolCall {
+                        action,
+                        status: Some(WebSearchToolCallStatus::InProgress),
+                    }),
+                    signature: None,
+                    id: None,
+                }))
+            }
+            api::ResponseServerToolUseBlockName::ToolSearchToolRegex
+            | api::ResponseServerToolUseBlockName::ToolSearchToolBm25 => {
+                Some(Part::ToolCall(ToolCallPart {
+                    tool_call_id: block.id,
+                    call: ToolCall::ToolSearch(ToolSearchToolCall {
+                        args: anthropic_tool_search_args(block.input),
+                        status: Some(ToolSearchToolCallStatus::InProgress),
+                    }),
+                    signature: None,
+                    id: None,
+                }))
+            }
+            // Hosted tools the SDK does not model (web fetch, code execution, ...)
+            // are ignored.
+            _ => None,
+        },
+        ContentBlock::ToolSearchToolResult(block) => {
+            let (tool_names, error_code) = match block.content {
+                api::ResponseToolSearchToolResultBlockContent::ToolSearchToolSearchResult(
+                    result,
+                ) => (
+                    result
+                        .tool_references
+                        .into_iter()
+                        .map(|reference| reference.tool_name)
+                        .collect(),
+                    None,
+                ),
+                api::ResponseToolSearchToolResultBlockContent::ToolSearchToolResultError(error) => {
+                    (
+                        vec![],
+                        Some(
+                            match error.error_code {
+                                api::ToolSearchToolResultErrorCode::InvalidToolInput => {
+                                    "invalid_tool_input"
+                                }
+                                api::ToolSearchToolResultErrorCode::Unavailable => "unavailable",
+                                api::ToolSearchToolResultErrorCode::TooManyRequests => {
+                                    "too_many_requests"
+                                }
+                                api::ToolSearchToolResultErrorCode::ExecutionTimeExceeded => {
+                                    "execution_time_exceeded"
+                                }
+                                api::ToolSearchToolResultErrorCode::Unknown => "unknown",
+                            }
+                            .to_string(),
+                        ),
+                    )
+                }
+                api::ResponseToolSearchToolResultBlockContent::Unknown => (vec![], None),
+            };
+            let status = if error_code.is_some() {
+                ToolResultStatus::Failed
+            } else {
+                ToolResultStatus::Completed
+            };
+            Some(Part::ToolResult(ToolResultPart {
+                tool_call_id: block.tool_use_id,
+                result: ToolResult::ToolSearch(ToolSearchToolResult {
+                    tool_names,
+                    error_code,
                 }),
-                signature: None,
-                id: None,
+                status,
             }))
         }
         ContentBlock::WebSearchToolResult(block) => {
@@ -1017,59 +1355,100 @@ fn map_tool_use_block(block: api::ResponseToolUseBlock) -> ToolCallPart {
     }
 }
 
-fn map_anthropic_usage(usage: &Usage) -> ModelUsage {
-    let mut input_tokens_details = ModelTokensDetails::default();
-    if let Some(value) = usage.cache_read_input_tokens {
-        input_tokens_details.cached_tokens = Some(u32::try_from(value).unwrap_or(0));
-    }
-    if let Some(value) = usage.cache_creation_input_tokens {
-        input_tokens_details.cache_write_tokens = Some(u32::try_from(value).unwrap_or(0));
-    }
+/// The usage fields shared by `message_start` and the cumulative
+/// `message_delta` events. Fields of later events overwrite earlier values when
+/// present.
+#[derive(Default)]
+struct AnthropicUsage {
+    input_tokens: Option<i64>,
+    output_tokens: Option<i64>,
+    cache_read_input_tokens: Option<i64>,
+    cache_creation_input_tokens: Option<i64>,
+    cache_creation_1h_input_tokens: Option<i64>,
+    thinking_tokens: Option<i64>,
+    web_search_requests: Option<i64>,
+}
 
-    let output_tokens_details =
-        usage
-            .output_tokens_details
-            .as_ref()
-            .map(|details| ModelTokensDetails {
-                reasoning_tokens: Some(u32::try_from(details.thinking_tokens).unwrap_or(0)),
-                ..Default::default()
-            });
-
-    ModelUsage {
-        input_tokens: u32::try_from(usage.input_tokens).unwrap_or(0),
-        output_tokens: u32::try_from(usage.output_tokens).unwrap_or(0),
-        input_tokens_details: if usage.cache_read_input_tokens.is_some()
-            || usage.cache_creation_input_tokens.is_some()
-        {
-            Some(input_tokens_details)
-        } else {
-            None
-        },
-        output_tokens_details,
+impl From<&Usage> for AnthropicUsage {
+    fn from(usage: &Usage) -> Self {
+        Self {
+            input_tokens: Some(usage.input_tokens),
+            output_tokens: Some(usage.output_tokens),
+            cache_read_input_tokens: usage.cache_read_input_tokens,
+            cache_creation_input_tokens: usage.cache_creation_input_tokens,
+            cache_creation_1h_input_tokens: usage
+                .cache_creation
+                .as_ref()
+                .map(|cache_creation| cache_creation.ephemeral_1_h_input_tokens),
+            thinking_tokens: usage
+                .output_tokens_details
+                .as_ref()
+                .map(|details| details.thinking_tokens),
+            web_search_requests: usage
+                .server_tool_use
+                .as_ref()
+                .map(|server_tool_use| server_tool_use.web_search_requests),
+        }
     }
 }
 
-fn merge_anthropic_message_delta_usage(current: &mut ModelUsage, usage: &MessageDeltaUsage) {
-    if let Some(value) = usage.input_tokens {
-        current.input_tokens = u32::try_from(value).unwrap_or(0);
-    }
-    current.output_tokens = u32::try_from(usage.output_tokens).unwrap_or(0);
-
-    if usage.cache_read_input_tokens.is_some() || usage.cache_creation_input_tokens.is_some() {
-        let details = current.input_tokens_details.get_or_insert_default();
+impl AnthropicUsage {
+    fn merge_message_delta(&mut self, usage: &MessageDeltaUsage) {
+        if let Some(value) = usage.input_tokens {
+            self.input_tokens = Some(value);
+        }
+        self.output_tokens = Some(usage.output_tokens);
         if let Some(value) = usage.cache_read_input_tokens {
-            details.cached_tokens = Some(u32::try_from(value).unwrap_or(0));
+            self.cache_read_input_tokens = Some(value);
         }
         if let Some(value) = usage.cache_creation_input_tokens {
-            details.cache_write_tokens = Some(u32::try_from(value).unwrap_or(0));
+            self.cache_creation_input_tokens = Some(value);
+        }
+        if let Some(details) = &usage.output_tokens_details {
+            self.thinking_tokens = Some(details.thinking_tokens);
+        }
+        if let Some(server_tool_use) = &usage.server_tool_use {
+            self.web_search_requests = Some(server_tool_use.web_search_requests);
         }
     }
+}
 
-    if let Some(output_details) = &usage.output_tokens_details {
-        current
-            .output_tokens_details
-            .get_or_insert_default()
-            .reasoning_tokens = Some(u32::try_from(output_details.thinking_tokens).unwrap_or(0));
+/// Anthropic reports `input_tokens` without the cached and cache-write tokens.
+/// The numbers are kept as reported; the cost calculation accounts for it.
+fn map_anthropic_usage(usage: &AnthropicUsage) -> ModelUsage {
+    let count = |value: i64| u32::try_from(value).unwrap_or(0);
+
+    let mut input_tokens_details = ModelTokensDetails::default();
+    if let Some(value) = usage.cache_read_input_tokens {
+        input_tokens_details.cached_tokens = Some(count(value));
+    }
+    if let Some(value) = usage.cache_creation_input_tokens {
+        input_tokens_details.cache_write_tokens = Some(count(value));
+    }
+    if let Some(value) = usage
+        .cache_creation_1h_input_tokens
+        .filter(|value| *value > 0)
+    {
+        input_tokens_details.extended_cache_write_tokens = Some(count(value));
+    }
+
+    ModelUsage {
+        input_tokens: count(usage.input_tokens.unwrap_or(0)),
+        output_tokens: count(usage.output_tokens.unwrap_or(0)),
+        input_tokens_details: (input_tokens_details != ModelTokensDetails::default())
+            .then_some(input_tokens_details),
+        output_tokens_details: usage
+            .thinking_tokens
+            .map(|thinking_tokens| ModelTokensDetails {
+                reasoning_tokens: Some(count(thinking_tokens)),
+                ..Default::default()
+            }),
+        server_tool_use: usage
+            .web_search_requests
+            .filter(|requests| *requests > 0)
+            .map(|requests| ModelServerToolUsage {
+                web_search_requests: Some(count(requests)),
+            }),
     }
 }
 
@@ -1117,14 +1496,14 @@ fn map_anthropic_content_block_delta_event(
         }
         ContentBlockDeltaEventDelta::ThinkingDelta(delta) => {
             PartDelta::Reasoning(ReasoningPartDelta {
-                text: Some(delta.thinking),
+                text: delta.thinking,
                 signature: None,
                 id: None,
             })
         }
         ContentBlockDeltaEventDelta::SignatureDelta(delta) => {
             PartDelta::Reasoning(ReasoningPartDelta {
-                text: None,
+                text: String::new(),
                 signature: Some(delta.signature),
                 id: None,
             })
@@ -1183,18 +1562,14 @@ fn map_citation_delta(citation: api::CitationsDeltaCitation) -> Option<CitationD
     }
 }
 
-fn map_anthropic_image_media_type(
-    mime_type: &str,
-) -> LanguageModelResult<Base64ImageSourceMediaType> {
+fn map_anthropic_image_media_type(mime_type: &str) -> Base64ImageSourceMediaType {
     match mime_type {
-        "image/jpeg" => Ok(Base64ImageSourceMediaType::ImageJpeg),
-        "image/png" => Ok(Base64ImageSourceMediaType::ImagePng),
-        "image/gif" => Ok(Base64ImageSourceMediaType::ImageGif),
-        "image/webp" => Ok(Base64ImageSourceMediaType::ImageWebp),
-        _ => Err(LanguageModelError::Unsupported(
-            PROVIDER,
-            format!("Unsupported Anthropic image mime type: {mime_type}"),
-        )),
+        "image/jpeg" => Base64ImageSourceMediaType::ImageJpeg,
+        "image/png" => Base64ImageSourceMediaType::ImagePng,
+        "image/gif" => Base64ImageSourceMediaType::ImageGif,
+        "image/webp" => Base64ImageSourceMediaType::ImageWebp,
+        // Serialized as a missing media_type, which Anthropic rejects.
+        _ => Base64ImageSourceMediaType::Unknown,
     }
 }
 

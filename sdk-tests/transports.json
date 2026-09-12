@@ -16,6 +16,7 @@
             ],
             "tools": [{ "type": "web_search" }],
             "max_tokens": 17,
+            "cache_retention": "extended",
             "temperature": 0.2,
             "top_p": 0.8
           },
@@ -35,6 +36,7 @@
                 ],
                 "instructions": "Be exact",
                 "max_output_tokens": 17,
+                "prompt_cache_retention": "24h",
                 "store": false,
                 "stream": false,
                 "temperature": 0.2,
@@ -62,11 +64,27 @@
                       "query": "test query",
                       "queries": ["test query"],
                       "sources": [
-                        {
-                          "type": "url",
-                          "url": "https://example.com/source"
-                        }
+                        { "type": "url", "url": "https://example.com/source" }
                       ]
+                    }
+                  },
+                  {
+                    "type": "web_search_call",
+                    "id": "ws_open",
+                    "status": "completed",
+                    "action": {
+                      "type": "open_page",
+                      "url": "https://example.com/source"
+                    }
+                  },
+                  {
+                    "type": "web_search_call",
+                    "id": "ws_find",
+                    "status": "completed",
+                    "action": {
+                      "type": "find_in_page",
+                      "url": "https://example.com/source",
+                      "pattern": "fixture"
                     }
                   },
                   {
@@ -111,6 +129,16 @@
                 "status": "completed",
                 "source": "^https://example\\.com/source$"
               },
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
               { "type": "text", "text": "^Fixture response$" }
             ],
             "usage": {
@@ -120,8 +148,10 @@
                 "cached_tokens": 1,
                 "cache_write_tokens": 2
               },
-              "output_tokens_details": { "reasoning_tokens": 0 }
-            }
+              "output_tokens_details": { "reasoning_tokens": 0 },
+              "server_tool_use": { "web_search_requests": 1 }
+            },
+            "cost": 0.01
           }
         }
       ]
@@ -183,10 +213,7 @@
                         "query": "test query",
                         "queries": ["test query"],
                         "sources": [
-                          {
-                            "type": "url",
-                            "url": "https://example.com/source"
-                          }
+                          { "type": "url", "url": "https://example.com/source" }
                         ]
                       }
                     }
@@ -194,11 +221,44 @@
                 },
                 {
                   "data": {
+                    "type": "response.output_item.done",
+                    "output_index": 1,
+                    "item": {
+                      "type": "web_search_call",
+                      "id": "ws_open",
+                      "status": "completed",
+                      "action": {
+                        "type": "open_page",
+                        "url": "https://example.com/source"
+                      }
+                    },
+                    "sequence_number": 2
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.output_item.done",
+                    "output_index": 2,
+                    "item": {
+                      "type": "web_search_call",
+                      "id": "ws_find",
+                      "status": "completed",
+                      "action": {
+                        "type": "find_in_page",
+                        "url": "https://example.com/source",
+                        "pattern": "fixture"
+                      }
+                    },
+                    "sequence_number": 3
+                  }
+                },
+                {
+                  "data": {
                     "type": "response.output_text.delta",
                     "item_id": "msg_1",
-                    "output_index": 1,
+                    "output_index": 3,
                     "content_index": 0,
-                    "sequence_number": 2,
+                    "sequence_number": 4,
                     "delta": "Fixture response",
                     "logprobs": []
                   }
@@ -206,7 +266,7 @@
                 {
                   "data": {
                     "type": "response.completed",
-                    "sequence_number": 3,
+                    "sequence_number": 5,
                     "response": {
                       "created_at": 0,
                       "error": null,
@@ -246,6 +306,16 @@
                 "status": "completed",
                 "source": "^https://example\\.com/source$"
               },
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
+              {
+                "type": "web_search_call",
+                "status": "completed",
+                "action": true
+              },
               { "type": "text", "text": "^Fixture response$" }
             ],
             "usage": {
@@ -255,13 +325,15 @@
                 "cached_tokens": 0,
                 "cache_write_tokens": 0
               },
-              "output_tokens_details": { "reasoning_tokens": 0 }
+              "output_tokens_details": { "reasoning_tokens": 0 },
+              "server_tool_use": { "web_search_requests": 1 }
             },
             "stream": {
               "partials": 3,
               "deltas": 2,
               "usage_updates": { "exact": 1 }
-            }
+            },
+            "cost": 0.01
           }
         }
       ]
@@ -280,7 +352,8 @@
               }
             ],
             "tools": [{ "type": "web_search", "max_uses": 1 }],
-            "max_tokens": 17
+            "max_tokens": 17,
+            "cache_retention": "extended"
           },
           "transport": {
             "request": {
@@ -293,6 +366,7 @@
               "body": {
                 "model": "test-model",
                 "max_tokens": 17,
+                "cache_control": { "type": "ephemeral", "ttl": "1h" },
                 "messages": [
                   {
                     "role": "user",
@@ -625,7 +699,8 @@
               "output_tokens_details": {
                 "text_tokens": 2,
                 "reasoning_tokens": 1
-              }
+              },
+              "server_tool_use": { "web_search_requests": 1 }
             }
           }
         }
@@ -854,7 +929,8 @@
               "output_tokens_details": {
                 "text_tokens": 2,
                 "reasoning_tokens": 1
-              }
+              },
+              "server_tool_use": { "web_search_requests": 1 }
             },
             "stream": {
               "partials": 4,
@@ -1154,6 +1230,1805 @@
             "error": {
               "kind": "^(?:syntax_error|api_error|invariant|transport|error)$",
               "message": "JSON|json|parse|decode|unmarshal|SSE|sse|stream"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_tool_search_generate",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Find holidays"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "tool_search"
+              },
+              {
+                "type": "function",
+                "name": "lookup_holiday",
+                "description": "Look up the public holidays of a country in a given year",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "type": "string"
+                    },
+                    "year": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["country", "year"],
+                  "additionalProperties": false
+                },
+                "defer_loading": true
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": {
+                "authorization": "^Bearer test-token$"
+              },
+              "body": {
+                "model": "test-model",
+                "stream": false,
+                "tools": [
+                  {
+                    "type": "tool_search"
+                  },
+                  {
+                    "type": "function",
+                    "name": "lookup_holiday",
+                    "defer_loading": true
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "created_at": 0,
+                "error": null,
+                "id": "resp_1",
+                "incomplete_details": null,
+                "instructions": null,
+                "object": "response",
+                "output": [
+                  {
+                    "id": "tsc_1",
+                    "type": "tool_search_call",
+                    "status": "completed",
+                    "arguments": {
+                      "paths": ["lookup_holiday"]
+                    },
+                    "call_id": null,
+                    "execution": "server"
+                  },
+                  {
+                    "id": "tso_1",
+                    "type": "tool_search_output",
+                    "status": "completed",
+                    "call_id": null,
+                    "execution": "server",
+                    "tools": [
+                      {
+                        "type": "function",
+                        "defer_loading": true,
+                        "name": "lookup_holiday",
+                        "description": "Look up the public holidays of a country in a given year",
+                        "parameters": {
+                          "type": "object",
+                          "properties": {
+                            "country": {
+                              "type": "string"
+                            },
+                            "year": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": ["country", "year"],
+                          "additionalProperties": false
+                        },
+                        "strict": true
+                      }
+                    ]
+                  },
+                  {
+                    "id": "fc_1",
+                    "type": "function_call",
+                    "status": "completed",
+                    "arguments": "{\"country\":\"VN\",\"year\":2026}",
+                    "call_id": "call_1",
+                    "name": "lookup_holiday",
+                    "namespace": "lookup_holiday"
+                  }
+                ],
+                "parallel_tool_calls": false,
+                "status": "completed",
+                "usage": {
+                  "input_tokens": 10,
+                  "output_tokens": 5,
+                  "total_tokens": 15,
+                  "input_tokens_details": {
+                    "cached_tokens": 0,
+                    "cache_write_tokens": 0
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 0
+                  }
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "tool_search_call",
+                "status": "completed",
+                "args": {
+                  "paths": ["lookup_holiday"]
+                }
+              },
+              {
+                "type": "tool_search_result",
+                "status": "completed",
+                "tool_names": ["lookup_holiday"]
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "lookup_holiday",
+                "args": {
+                  "country": "VN",
+                  "year": 2026
+                }
+              }
+            ],
+            "usage": {
+              "input_tokens": 10,
+              "output_tokens": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_tool_search_stream",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Find holidays"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "tool_search"
+              },
+              {
+                "type": "function",
+                "name": "lookup_holiday",
+                "description": "Look up the public holidays of a country in a given year",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "type": "string"
+                    },
+                    "year": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["country", "year"],
+                  "additionalProperties": false
+                },
+                "defer_loading": true
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": {
+                "authorization": "^Bearer test-token$"
+              },
+              "body": {
+                "model": "test-model",
+                "stream": true,
+                "tools": [
+                  {
+                    "type": "tool_search"
+                  },
+                  {
+                    "type": "function",
+                    "name": "lookup_holiday",
+                    "defer_loading": true
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "text/event-stream"
+              },
+              "events": [
+                {
+                  "data": {
+                    "type": "response.output_item.added",
+                    "output_index": 0,
+                    "sequence_number": 0,
+                    "item": {
+                      "id": "tsc_1",
+                      "type": "tool_search_call",
+                      "status": "in_progress",
+                      "arguments": {},
+                      "call_id": null,
+                      "execution": "server"
+                    }
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.output_item.done",
+                    "output_index": 0,
+                    "sequence_number": 1,
+                    "item": {
+                      "id": "tsc_1",
+                      "type": "tool_search_call",
+                      "status": "completed",
+                      "arguments": {
+                        "paths": ["lookup_holiday"]
+                      },
+                      "call_id": null,
+                      "execution": "server"
+                    }
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.output_item.added",
+                    "output_index": 1,
+                    "sequence_number": 2,
+                    "item": {
+                      "id": "tso_1",
+                      "type": "tool_search_output",
+                      "status": "in_progress",
+                      "call_id": null,
+                      "execution": "server",
+                      "tools": [
+                        {
+                          "type": "function",
+                          "defer_loading": true,
+                          "name": "lookup_holiday",
+                          "description": "Look up the public holidays of a country in a given year",
+                          "parameters": {
+                            "type": "object",
+                            "properties": {
+                              "country": {
+                                "type": "string"
+                              },
+                              "year": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": ["country", "year"],
+                            "additionalProperties": false
+                          },
+                          "strict": true
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.output_item.done",
+                    "output_index": 1,
+                    "sequence_number": 3,
+                    "item": {
+                      "id": "tso_1",
+                      "type": "tool_search_output",
+                      "status": "completed",
+                      "call_id": null,
+                      "execution": "server",
+                      "tools": [
+                        {
+                          "type": "function",
+                          "defer_loading": true,
+                          "name": "lookup_holiday",
+                          "description": "Look up the public holidays of a country in a given year",
+                          "parameters": {
+                            "type": "object",
+                            "properties": {
+                              "country": {
+                                "type": "string"
+                              },
+                              "year": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": ["country", "year"],
+                            "additionalProperties": false
+                          },
+                          "strict": true
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.output_item.added",
+                    "output_index": 2,
+                    "sequence_number": 4,
+                    "item": {
+                      "id": "fc_1",
+                      "type": "function_call",
+                      "status": "in_progress",
+                      "arguments": "",
+                      "call_id": "call_1",
+                      "name": "lookup_holiday",
+                      "namespace": "lookup_holiday"
+                    }
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.function_call_arguments.delta",
+                    "output_index": 2,
+                    "item_id": "fc_1",
+                    "sequence_number": 5,
+                    "delta": "{\"country\":\"VN\","
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.function_call_arguments.delta",
+                    "output_index": 2,
+                    "item_id": "fc_1",
+                    "sequence_number": 6,
+                    "delta": "\"year\":2026}"
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.output_item.done",
+                    "output_index": 2,
+                    "sequence_number": 7,
+                    "item": {
+                      "id": "fc_1",
+                      "type": "function_call",
+                      "status": "completed",
+                      "arguments": "{\"country\":\"VN\",\"year\":2026}",
+                      "call_id": "call_1",
+                      "name": "lookup_holiday",
+                      "namespace": "lookup_holiday"
+                    }
+                  }
+                },
+                {
+                  "data": {
+                    "type": "response.completed",
+                    "sequence_number": 8,
+                    "response": {
+                      "created_at": 0,
+                      "error": null,
+                      "id": "resp_1",
+                      "incomplete_details": null,
+                      "instructions": null,
+                      "object": "response",
+                      "output": [],
+                      "parallel_tool_calls": false,
+                      "status": "completed",
+                      "usage": {
+                        "input_tokens": 10,
+                        "output_tokens": 5,
+                        "total_tokens": 15,
+                        "input_tokens_details": {
+                          "cached_tokens": 0,
+                          "cache_write_tokens": 0
+                        },
+                        "output_tokens_details": {
+                          "reasoning_tokens": 0
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "raw_data": "[DONE]"
+                }
+              ]
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "tool_search_call",
+                "status": "completed",
+                "args": {
+                  "paths": ["lookup_holiday"]
+                }
+              },
+              {
+                "type": "tool_search_result",
+                "status": "completed",
+                "tool_names": ["lookup_holiday"]
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "lookup_holiday",
+                "args": {
+                  "country": "VN",
+                  "year": 2026
+                }
+              }
+            ],
+            "usage": {
+              "input_tokens": 10,
+              "output_tokens": 5
+            },
+            "stream": {
+              "usage_updates": {
+                "exact": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_tool_search_replay",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Find holidays"
+                  }
+                ]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "tool-call",
+                    "tool_call_id": "tsc_1",
+                    "id": "tsc_1",
+                    "call": {
+                      "type": "tool_search",
+                      "args": {
+                        "paths": ["lookup_holiday"]
+                      },
+                      "status": "completed"
+                    }
+                  },
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": "tsc_1",
+                    "result": {
+                      "type": "tool_search",
+                      "tool_names": ["lookup_holiday"]
+                    },
+                    "status": "completed"
+                  },
+                  {
+                    "type": "tool-call",
+                    "tool_call_id": "call_1",
+                    "id": "fc_1",
+                    "call": {
+                      "type": "function",
+                      "name": "lookup_holiday",
+                      "args": {
+                        "country": "VN",
+                        "year": 2026
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": "call_1",
+                    "result": {
+                      "type": "function",
+                      "name": "lookup_holiday",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "National Day"
+                        }
+                      ]
+                    },
+                    "status": "completed"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "tool_search"
+              },
+              {
+                "type": "function",
+                "name": "lookup_holiday",
+                "description": "Look up the public holidays of a country in a given year",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "type": "string"
+                    },
+                    "year": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["country", "year"],
+                  "additionalProperties": false
+                },
+                "defer_loading": true
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": {
+                "authorization": "^Bearer test-token$"
+              },
+              "body": {
+                "model": "test-model",
+                "input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "Find holidays"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "tool_search_call",
+                    "id": "tsc_1",
+                    "arguments": {
+                      "paths": ["lookup_holiday"]
+                    },
+                    "status": "completed",
+                    "execution": "server"
+                  },
+                  {
+                    "type": "tool_search_output",
+                    "execution": "server",
+                    "status": "completed",
+                    "tools": [
+                      {
+                        "type": "function",
+                        "name": "lookup_holiday",
+                        "defer_loading": true
+                      }
+                    ]
+                  },
+                  {
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "id": "fc_1",
+                    "name": "lookup_holiday",
+                    "arguments": "{\"country\":\"VN\",\"year\":2026}",
+                    "namespace": "lookup_holiday"
+                  },
+                  {
+                    "type": "function_call_output",
+                    "call_id": "call_1",
+                    "output": [
+                      {
+                        "type": "input_text",
+                        "text": "National Day"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "created_at": 0,
+                "error": null,
+                "id": "resp_1",
+                "incomplete_details": null,
+                "instructions": null,
+                "object": "response",
+                "output": [
+                  {
+                    "type": "message",
+                    "id": "msg_1",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [
+                      {
+                        "type": "output_text",
+                        "text": "Done",
+                        "annotations": [],
+                        "logprobs": []
+                      }
+                    ]
+                  }
+                ],
+                "parallel_tool_calls": false,
+                "status": "completed"
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Done$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_media_url_generate",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Describe"
+                  },
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "url": "https://example.com/cat.png"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "url": "https://example.com/doc.pdf"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "data": "JVBERi0xLjQK",
+                    "filename": "inline.pdf"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": {
+                "authorization": "^Bearer test-token$"
+              },
+              "body": {
+                "input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "Describe"
+                      },
+                      {
+                        "type": "input_image",
+                        "image_url": "https://example.com/cat.png",
+                        "detail": "auto"
+                      },
+                      {
+                        "type": "input_file",
+                        "file_url": "https://example.com/doc.pdf"
+                      },
+                      {
+                        "type": "input_file",
+                        "file_data": "data:application/pdf;base64,JVBERi0xLjQK",
+                        "filename": "inline.pdf"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "created_at": 0,
+                "error": null,
+                "id": "resp_1",
+                "incomplete_details": null,
+                "instructions": null,
+                "object": "response",
+                "output": [
+                  {
+                    "type": "message",
+                    "id": "msg_1",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [
+                      {
+                        "type": "output_text",
+                        "text": "Fixture response",
+                        "annotations": [],
+                        "logprobs": []
+                      }
+                    ]
+                  }
+                ],
+                "parallel_tool_calls": false,
+                "status": "completed"
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Fixture response$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "openai_multi_part_tool_result",
+      "groups": ["openai_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Weather?"
+                  }
+                ]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "tool-call",
+                    "tool_call_id": "call_1",
+                    "call": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "args": {
+                        "location": "Hanoi"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": "call_1",
+                    "result": {
+                      "type": "function",
+                      "name": "get_weather",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Sunny"
+                        },
+                        {
+                          "type": "image",
+                          "mime_type": "image/png",
+                          "data": "aW1n"
+                        }
+                      ]
+                    },
+                    "status": "completed"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/responses",
+              "headers": {
+                "authorization": "^Bearer test-token$"
+              },
+              "body": {
+                "input": [
+                  {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "input_text",
+                        "text": "Weather?"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": "get_weather",
+                    "arguments": "{\"location\":\"Hanoi\"}"
+                  },
+                  {
+                    "type": "function_call_output",
+                    "call_id": "call_1",
+                    "output": [
+                      {
+                        "type": "input_text",
+                        "text": "Sunny"
+                      },
+                      {
+                        "type": "input_image",
+                        "image_url": "data:image/png;base64,aW1n",
+                        "detail": "auto"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "created_at": 0,
+                "error": null,
+                "id": "resp_1",
+                "incomplete_details": null,
+                "instructions": null,
+                "object": "response",
+                "output": [
+                  {
+                    "type": "message",
+                    "id": "msg_1",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [
+                      {
+                        "type": "output_text",
+                        "text": "Fixture response",
+                        "annotations": [],
+                        "logprobs": []
+                      }
+                    ]
+                  }
+                ],
+                "parallel_tool_calls": false,
+                "status": "completed"
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Fixture response$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_tool_search_generate",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Find holidays"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "tool_search"
+              },
+              {
+                "type": "function",
+                "name": "lookup_holiday",
+                "description": "Look up the public holidays of a country in a given year",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "type": "string"
+                    },
+                    "year": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["country", "year"],
+                  "additionalProperties": false
+                },
+                "defer_loading": true
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "headers": {
+                "x-api-key": "^test-token$",
+                "anthropic-version": "^2023-06-01$"
+              },
+              "body": {
+                "model": "test-model",
+                "tools": [
+                  {
+                    "type": "tool_search_tool_bm25_20251119",
+                    "name": "tool_search_tool_bm25"
+                  },
+                  {
+                    "name": "lookup_holiday",
+                    "defer_loading": true
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "test-model",
+                "content": [
+                  {
+                    "type": "server_tool_use",
+                    "id": "srvtoolu_1",
+                    "name": "tool_search_tool_bm25",
+                    "input": {
+                      "query": "holiday"
+                    }
+                  },
+                  {
+                    "type": "tool_search_tool_result",
+                    "tool_use_id": "srvtoolu_1",
+                    "content": {
+                      "type": "tool_search_tool_search_result",
+                      "tool_references": [
+                        {
+                          "type": "tool_reference",
+                          "tool_name": "lookup_holiday"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "tool_use",
+                    "id": "toolu_1",
+                    "name": "lookup_holiday",
+                    "input": {
+                      "country": "VN",
+                      "year": 2026
+                    }
+                  }
+                ],
+                "stop_reason": "tool_use",
+                "stop_sequence": null,
+                "usage": {
+                  "input_tokens": 4,
+                  "output_tokens": 6,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "tool_search_call",
+                "status": "completed",
+                "args": {
+                  "query": "holiday"
+                }
+              },
+              {
+                "type": "tool_search_result",
+                "status": "completed",
+                "tool_names": ["lookup_holiday"]
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "lookup_holiday",
+                "args": {
+                  "country": "VN",
+                  "year": 2026
+                }
+              }
+            ],
+            "usage": {
+              "input_tokens": 4,
+              "output_tokens": 6
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_tool_search_stream",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "stream",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Find holidays"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "tool_search"
+              },
+              {
+                "type": "function",
+                "name": "lookup_holiday",
+                "description": "Look up the public holidays of a country in a given year",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "type": "string"
+                    },
+                    "year": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["country", "year"],
+                  "additionalProperties": false
+                },
+                "defer_loading": true
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "headers": {
+                "x-api-key": "^test-token$",
+                "anthropic-version": "^2023-06-01$"
+              },
+              "body": {
+                "model": "test-model",
+                "stream": true,
+                "tools": [
+                  {
+                    "type": "tool_search_tool_bm25_20251119",
+                    "name": "tool_search_tool_bm25"
+                  },
+                  {
+                    "name": "lookup_holiday",
+                    "defer_loading": true
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "text/event-stream"
+              },
+              "events": [
+                {
+                  "event": "message_start",
+                  "data": {
+                    "type": "message_start",
+                    "message": {
+                      "id": "msg_1",
+                      "type": "message",
+                      "role": "assistant",
+                      "model": "test-model",
+                      "content": [],
+                      "stop_reason": null,
+                      "stop_sequence": null,
+                      "usage": {
+                        "input_tokens": 4,
+                        "output_tokens": 1,
+                        "cache_creation_input_tokens": 0,
+                        "cache_read_input_tokens": 0
+                      }
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_start",
+                  "data": {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {
+                      "type": "server_tool_use",
+                      "id": "srvtoolu_1",
+                      "name": "tool_search_tool_bm25",
+                      "input": {}
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_delta",
+                  "data": {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {
+                      "type": "input_json_delta",
+                      "partial_json": "{\"query\":"
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_delta",
+                  "data": {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {
+                      "type": "input_json_delta",
+                      "partial_json": "\"holiday\"}"
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_stop",
+                  "data": {
+                    "type": "content_block_stop",
+                    "index": 0
+                  }
+                },
+                {
+                  "event": "message_delta",
+                  "data": {
+                    "type": "message_delta",
+                    "delta": {
+                      "stop_reason": "tool_use",
+                      "stop_sequence": null
+                    },
+                    "usage": {
+                      "output_tokens": 3
+                    }
+                  }
+                },
+                {
+                  "event": "message_stop",
+                  "data": {
+                    "type": "message_stop"
+                  }
+                },
+                {
+                  "event": "message_start",
+                  "data": {
+                    "type": "message_start",
+                    "message": {
+                      "id": "msg_2",
+                      "type": "message",
+                      "role": "assistant",
+                      "model": "test-model",
+                      "content": [],
+                      "stop_reason": null,
+                      "stop_sequence": null,
+                      "usage": {
+                        "input_tokens": 6,
+                        "output_tokens": 1,
+                        "cache_creation_input_tokens": 0,
+                        "cache_read_input_tokens": 0
+                      }
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_start",
+                  "data": {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {
+                      "type": "tool_search_tool_result",
+                      "tool_use_id": "srvtoolu_1",
+                      "content": {
+                        "type": "tool_search_tool_search_result",
+                        "tool_references": [
+                          {
+                            "type": "tool_reference",
+                            "tool_name": "lookup_holiday"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_stop",
+                  "data": {
+                    "type": "content_block_stop",
+                    "index": 0
+                  }
+                },
+                {
+                  "event": "content_block_start",
+                  "data": {
+                    "type": "content_block_start",
+                    "index": 1,
+                    "content_block": {
+                      "type": "tool_use",
+                      "id": "toolu_1",
+                      "name": "lookup_holiday",
+                      "input": {}
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_delta",
+                  "data": {
+                    "type": "content_block_delta",
+                    "index": 1,
+                    "delta": {
+                      "type": "input_json_delta",
+                      "partial_json": "{\"country\":\"VN\",\"year\":2026}"
+                    }
+                  }
+                },
+                {
+                  "event": "content_block_stop",
+                  "data": {
+                    "type": "content_block_stop",
+                    "index": 1
+                  }
+                },
+                {
+                  "event": "message_delta",
+                  "data": {
+                    "type": "message_delta",
+                    "delta": {
+                      "stop_reason": "tool_use",
+                      "stop_sequence": null
+                    },
+                    "usage": {
+                      "output_tokens": 4
+                    }
+                  }
+                },
+                {
+                  "event": "message_stop",
+                  "data": {
+                    "type": "message_stop"
+                  }
+                }
+              ]
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "tool_search_call",
+                "status": "completed",
+                "args": {
+                  "query": "holiday"
+                }
+              },
+              {
+                "type": "tool_search_result",
+                "status": "completed",
+                "tool_names": ["lookup_holiday"]
+              },
+              {
+                "type": "tool_call",
+                "tool_name": "lookup_holiday",
+                "args": {
+                  "country": "VN",
+                  "year": 2026
+                }
+              }
+            ],
+            "usage": {
+              "input_tokens": 10,
+              "output_tokens": 7
+            },
+            "stream": {
+              "usage_updates": {
+                "exact": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_tool_search_replay",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Find holidays"
+                  }
+                ]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "tool-call",
+                    "tool_call_id": "srvtoolu_1",
+                    "call": {
+                      "type": "tool_search",
+                      "args": {
+                        "query": "holiday"
+                      },
+                      "status": "completed"
+                    }
+                  },
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": "srvtoolu_1",
+                    "result": {
+                      "type": "tool_search",
+                      "tool_names": ["lookup_holiday"]
+                    },
+                    "status": "completed"
+                  },
+                  {
+                    "type": "tool-call",
+                    "tool_call_id": "toolu_1",
+                    "call": {
+                      "type": "function",
+                      "name": "lookup_holiday",
+                      "args": {
+                        "country": "VN",
+                        "year": 2026
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "tool-result",
+                    "tool_call_id": "toolu_1",
+                    "result": {
+                      "type": "function",
+                      "name": "lookup_holiday",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "National Day"
+                        }
+                      ]
+                    },
+                    "status": "completed"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "type": "tool_search"
+              },
+              {
+                "type": "function",
+                "name": "lookup_holiday",
+                "description": "Look up the public holidays of a country in a given year",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "type": "string"
+                    },
+                    "year": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["country", "year"],
+                  "additionalProperties": false
+                },
+                "defer_loading": true
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "headers": {
+                "x-api-key": "^test-token$",
+                "anthropic-version": "^2023-06-01$"
+              },
+              "body": {
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Find holidays"
+                      }
+                    ]
+                  },
+                  {
+                    "role": "assistant",
+                    "content": [
+                      {
+                        "type": "server_tool_use",
+                        "id": "srvtoolu_1",
+                        "name": "tool_search_tool_bm25",
+                        "input": {
+                          "query": "holiday"
+                        }
+                      },
+                      {
+                        "type": "tool_search_tool_result",
+                        "tool_use_id": "srvtoolu_1",
+                        "content": {
+                          "type": "tool_search_tool_search_result",
+                          "tool_references": [
+                            {
+                              "type": "tool_reference",
+                              "tool_name": "lookup_holiday"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "type": "tool_use",
+                        "id": "toolu_1",
+                        "name": "lookup_holiday",
+                        "input": {
+                          "country": "VN",
+                          "year": 2026
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "tool_result",
+                        "tool_use_id": "toolu_1",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "National Day"
+                          }
+                        ],
+                        "is_error": false
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "test-model",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Done"
+                  }
+                ],
+                "stop_reason": "end_turn",
+                "stop_sequence": null,
+                "usage": {
+                  "input_tokens": 4,
+                  "output_tokens": 1,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Done$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "anthropic_media_url_generate",
+      "groups": ["anthropic_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Describe"
+                  },
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "url": "https://example.com/cat.png"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "url": "https://example.com/doc.pdf"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "text/plain",
+                    "data": "hello",
+                    "filename": "notes.txt"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1/messages",
+              "headers": {
+                "x-api-key": "^test-token$",
+                "anthropic-version": "^2023-06-01$"
+              },
+              "body": {
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Describe"
+                      },
+                      {
+                        "type": "image",
+                        "source": {
+                          "type": "url",
+                          "url": "https://example.com/cat.png"
+                        }
+                      },
+                      {
+                        "type": "document",
+                        "source": {
+                          "type": "url",
+                          "url": "https://example.com/doc.pdf"
+                        }
+                      },
+                      {
+                        "type": "document",
+                        "source": {
+                          "type": "text",
+                          "media_type": "text/plain",
+                          "data": "hello"
+                        },
+                        "title": "notes.txt"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "test-model",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Fixture response"
+                  }
+                ],
+                "stop_reason": "end_turn",
+                "stop_sequence": null,
+                "usage": {
+                  "input_tokens": 4,
+                  "output_tokens": 1,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Fixture response$"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "google_media_url_generate",
+      "groups": ["google_transport"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Describe"
+                  },
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "url": "https://example.com/cat.png"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "data": "JVBERi0xLjQK"
+                  }
+                ]
+              }
+            ]
+          },
+          "transport": {
+            "request": {
+              "method": "POST",
+              "path": "/v1beta/models/test-model:generateContent(?:\\?.*)?",
+              "body": {
+                "contents": [
+                  {
+                    "role": "user",
+                    "parts": [
+                      {
+                        "text": "Describe"
+                      },
+                      {
+                        "fileData": {
+                          "fileUri": "https://example.com/cat.png",
+                          "mimeType": "image/png"
+                        }
+                      },
+                      {
+                        "inlineData": {
+                          "data": "JVBERi0xLjQK",
+                          "mimeType": "application/pdf"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "response": {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "candidates": [
+                  {
+                    "content": {
+                      "role": "model",
+                      "parts": [
+                        {
+                          "text": "Fixture response"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "usageMetadata": {
+                  "promptTokenCount": 4,
+                  "candidatesTokenCount": 2,
+                  "totalTokenCount": 6
+                }
+              }
+            }
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "^Fixture response$"
+              }
+            ],
+            "usage": {
+              "input_tokens": 4,
+              "output_tokens": 2
             }
           }
         }

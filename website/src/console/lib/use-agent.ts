@@ -599,10 +599,18 @@ function reduceContentDelta(
                       name: part.call.name ?? "unknown",
                       args: {},
                     }
-                  : { ...part.call },
+                  : part.call.type === "tool_search"
+                    ? {
+                        type: "tool_search",
+                        args: {},
+                        ...(part.call.status
+                          ? { status: part.call.status }
+                          : {}),
+                      }
+                    : { ...part.call },
               tool_call_id: part.tool_call_id ?? "",
             };
-      const call =
+      const call: ToolCallPart["call"] =
         previousToolCall.call.type === "function" &&
         part.call.type === "function"
           ? {
@@ -612,7 +620,13 @@ function reduceContentDelta(
             }
           : part.call.type === "web_search"
             ? { ...previousToolCall.call, ...part.call }
-            : previousToolCall.call;
+            : previousToolCall.call.type === "tool_search" &&
+                part.call.type === "tool_search"
+              ? {
+                  ...previousToolCall.call,
+                  ...(part.call.status ? { status: part.call.status } : {}),
+                }
+              : previousToolCall.call;
       next[index] = {
         ...previousToolCall,
         call,

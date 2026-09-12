@@ -21,6 +21,7 @@ import type {
   AudioPart,
   AudioPartDelta,
   ContentDelta,
+  FilePart,
   ImagePart,
   LanguageModelInput,
   Message,
@@ -190,6 +191,8 @@ function convertToOpenAICreateParams(
     modalities,
     audio,
     reasoning,
+    cache_retention,
+    metadata,
   } = input;
   const params: Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> = {
     model: modelId,
@@ -241,6 +244,17 @@ function convertToOpenAICreateParams(
         );
     }
   }
+  if (cache_retention) {
+    // prompt_cache_retention is deprecated in favor of prompt_cache_options,
+    // which the generated Go and Rust clients do not expose yet.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    params.prompt_cache_retention =
+      cache_retention === "extended" ? "24h" : "in_memory";
+  }
+  if (metadata) {
+    params.metadata = metadata;
+  }
+
   return params;
 }
 
@@ -368,6 +382,8 @@ function convertToOpenAIContentPart(
       return convertToOpenAIContentPartImage(part);
     case "audio":
       return convertToOpenAIContentPartInputAudio(part);
+    case "file":
+      return convertToOpenAIContentPartFile(part);
     default:
       throw new UnsupportedError(
         PROVIDER,
@@ -391,21 +407,35 @@ function convertToOpenAIContentPartImage(
   return {
     type: "image_url",
     image_url: {
-      url: `data:${part.mime_type};base64,${part.data}`,
+      url: part.url ?? `data:${part.mime_type};base64,${part.data ?? ""}`,
     },
   };
+}
+
+function convertToOpenAIContentPartFile(
+  part: FilePart,
+): OpenAI.Chat.ChatCompletionContentPart.File {
+  // Chat Completions has no file URL input.
+  const file: OpenAI.Chat.ChatCompletionContentPart.File["file"] = {
+    file_data: `data:${part.mime_type};base64,${part.data ?? ""}`,
+  };
+  if (part.filename) {
+    file.filename = part.filename;
+  }
+  return { type: "file", file };
 }
 
 function convertToOpenAIContentPartInputAudio(
   part: AudioPart,
 ): OpenAI.Chat.ChatCompletionContentPartInputAudio {
   let inputAudio: OpenAI.Chat.ChatCompletionContentPartInputAudio.InputAudio;
+  const data = part.data ?? "";
   switch (part.format) {
     case "mp3":
-      inputAudio = { data: part.data, format: "mp3" };
+      inputAudio = { data, format: "mp3" };
       break;
     case "wav":
-      inputAudio = { data: part.data, format: "wav" };
+      inputAudio = { data, format: "wav" };
       break;
     default:
       throw new UnsupportedError(
@@ -478,6 +508,14 @@ function convertToOpenAITool(
     );
   }
 
+  if (tool.type === "tool_search") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "Hosted tool search is not supported by this OpenAI Chat Completions adapter; use OpenAIModel (Responses API)",
+    );
+  }
+
+  // Chat Completions cannot defer tools, so deferred tools are loaded eagerly.
   return {
     type: "function",
     function: {

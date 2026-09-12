@@ -41,7 +41,7 @@ async fn main() {
         _ => None,
     }) {
         let audio_bytes = BASE64_STANDARD
-            .decode(&audio_part.data)
+            .decode(audio_part.data.as_deref().unwrap_or_default())
             .expect("invalid base64 audio data");
 
         play(&audio_bytes).expect("ffplay playback failed");

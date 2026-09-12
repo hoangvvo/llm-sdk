@@ -116,7 +116,7 @@ Three message types are defined in the SDK: `UserMessage`, `AssistantMessage`, a
 
 ## Part
 
-The following `Part` types are implemented in the SDK: [`TextPart`](#text-part), [`ImagePart`](#image-part), [`AudioPart`](#audio-part), [`SourcePart`](#source-part) (for citation), [`ToolCallPart`](#tool-call-part), and [`ToolResultPart`](#tool-result-part).
+The following `Part` types are implemented in the SDK: [`TextPart`](#text-part), [`ImagePart`](#image-part), [`AudioPart`](#audio-part), [`FilePart`](#file-part), [`SourcePart`](#source-part) (for citation), [`ToolCallPart`](#tool-call-part), [`ToolResultPart`](#tool-result-part), and [`ReasoningPart`](#reasoning-part).
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -196,6 +196,24 @@ The following `Part` types are implemented in the SDK: [`TextPart`](#text-part),
   </TabItem>
 </Tabs>
 
+### File Part
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["FilePart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={extractRustTypes(["FilePart"])} lang="rust" title="types.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={extractGoTypes(["FilePart"])} lang="go" title="types.go" />
+  </TabItem>
+</Tabs>
+
 ### Source Part
 
 <Tabs>
@@ -222,9 +240,9 @@ The following `Part` types are implemented in the SDK: [`TextPart`](#text-part),
 
 <Aside>
   Tool calls are implemented as a `Part` instead of being a property of the
-  `AssistantMessage`. The nested `call.type` discriminates client function calls
-  from provider-hosted web search without combining two discriminators at the
-  same object level.
+  `AssistantMessage`. Each `ToolCallPart` contains a `call` whose `type`
+  identifies a function call, web search, or tool search. Function calls are
+  executed by your application, while searches are performed by the provider.
 </Aside>
 
 <Tabs>
@@ -272,9 +290,11 @@ The following `Part` types are implemented in the SDK: [`TextPart`](#text-part),
 ### Tool Result Part
 
 <Aside>
-  `ToolResultPart.result` mirrors the call union. Function results contain an
-  array of `Part`, enabling multimodal results; web-search results contain
-  normalized source metadata.
+  A `ToolResultPart` contains the result of a tool call. Its `result` field
+  describes the type of result and its contents. Function results contain an
+  array of `Part`, so they can include text, images, and other content. Web
+  search results contain source information, while tool search results contain
+  the names of the tools found.
 </Aside>
 
 <Tabs>
@@ -376,6 +396,7 @@ The response from the language model is represented as a `ModelResponse` that in
         "ModelResponse",
         "ModelUsage",
         "ModelTokensDetails",
+        "ModelServerToolUsage",
       ])}
       lang="typescript"
       title="types.ts"
@@ -387,6 +408,7 @@ The response from the language model is represented as a `ModelResponse` that in
         "ModelResponse",
         "ModelUsage",
         "ModelTokensDetails",
+        "ModelServerToolUsage",
       ])}
       lang="rust"
       title="types.rs"
@@ -398,6 +420,7 @@ The response from the language model is represented as a `ModelResponse` that in
         "ModelResponse",
         "ModelUsage",
         "ModelTokensDetails",
+        "ModelServerToolUsage",
       ])}
       lang="go"
       title="types.go"

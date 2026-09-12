@@ -29,6 +29,8 @@ suite("OpenAIChatModel", () => {
   }
 
   test("image_input", (t) => runTestGroup(t, model, "image_input"));
+  test("image_url_input", (t) => runTestGroup(t, model, "image_url_input"));
+  test("file_input", (t) => runTestGroup(t, model, "file_input"));
   test(TEST_CASE_NAMES.GENERATE_AUDIO, (t) =>
     runTestCase(t, audioModel, TEST_CASE_NAMES.GENERATE_AUDIO, {
       profile: "openai_audio_mp3",

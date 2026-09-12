@@ -12,6 +12,7 @@
         { "$ref": "#/definitions/TextPart" },
         { "$ref": "#/definitions/ImagePart" },
         { "$ref": "#/definitions/AudioPart" },
+        { "$ref": "#/definitions/FilePart" },
         { "$ref": "#/definitions/SourcePart" },
         { "$ref": "#/definitions/ToolCallPart" },
         { "$ref": "#/definitions/ToolResultPart" },
@@ -92,7 +93,6 @@
       ],
       "additionalProperties": false
     },
-
     "TextPart": {
       "type": "object",
       "description": "A part of the message that contains text.",
@@ -122,7 +122,11 @@
         },
         "data": {
           "type": "string",
-          "description": "The base64-encoded image data."
+          "description": "The base64-encoded image data. Either `data` or `url` must be provided."
+        },
+        "url": {
+          "type": "string",
+          "description": "A URL the media can be fetched from. Providers that cannot fetch URLs for this part reject it; pass `data` instead."
         },
         "width": {
           "type": "number",
@@ -131,9 +135,13 @@
         "height": {
           "type": "number",
           "description": "The height of the image in pixels."
+        },
+        "id": {
+          "type": "string",
+          "description": "ID of the image part, if applicable"
         }
       },
-      "required": ["type", "mime_type", "data"],
+      "required": ["type", "mime_type"],
       "additionalProperties": false
     },
     "AudioPart": {
@@ -143,7 +151,11 @@
         "type": { "const": "audio" },
         "data": {
           "type": "string",
-          "description": "The base64-encoded audio data."
+          "description": "The base64-encoded audio data. Either `data` or `url` must be provided."
+        },
+        "url": {
+          "type": "string",
+          "description": "A URL the media can be fetched from. Providers that cannot fetch URLs for this part reject it; pass `data` instead."
         },
         "format": { "$ref": "#/definitions/AudioFormat" },
         "sample_rate": {
@@ -163,7 +175,7 @@
           "description": "ID of the audio part, if applicable"
         }
       },
-      "required": ["type", "data", "format"],
+      "required": ["type", "format"],
       "additionalProperties": false
     },
     "SourcePart": {
@@ -201,6 +213,10 @@
         "id": {
           "type": "string",
           "description": "The ID of the tool call part, if applicable. This is different from tool_call_id which is used to match tool results."
+        },
+        "signature": {
+          "type": "string",
+          "description": "The provider-specific signature used to preserve reasoning/tool continuity."
         }
       },
       "required": ["type", "tool_call_id", "call"],
@@ -210,7 +226,8 @@
       "description": "The provider-independent payload of a tool invocation.",
       "oneOf": [
         { "$ref": "#/definitions/FunctionToolCall" },
-        { "$ref": "#/definitions/WebSearchToolCall" }
+        { "$ref": "#/definitions/WebSearchToolCall" },
+        { "$ref": "#/definitions/ToolSearchToolCall" }
       ]
     },
     "FunctionToolCall": {
@@ -218,7 +235,10 @@
       "properties": {
         "type": { "const": "function" },
         "name": { "type": "string" },
-        "args": { "type": "object", "additionalProperties": true }
+        "args": {
+          "type": "object",
+          "additionalProperties": true
+        }
       },
       "required": ["type", "name", "args"],
       "additionalProperties": false
@@ -238,7 +258,10 @@
       "type": "object",
       "properties": {
         "type": { "const": "search" },
-        "queries": { "type": "array", "items": { "type": "string" } }
+        "queries": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
       "required": ["type", "queries"],
       "additionalProperties": false
@@ -291,7 +314,8 @@
       "description": "The provider-independent payload of a tool result.",
       "oneOf": [
         { "$ref": "#/definitions/FunctionToolResult" },
-        { "$ref": "#/definitions/WebSearchToolResult" }
+        { "$ref": "#/definitions/WebSearchToolResult" },
+        { "$ref": "#/definitions/ToolSearchToolResult" }
       ]
     },
     "FunctionToolResult": {
@@ -490,6 +514,10 @@
         "id": {
           "type": "string",
           "description": "The ID of the tool call part, if applicable. This is different from tool_call_id which is used to match tool results."
+        },
+        "signature": {
+          "type": "string",
+          "description": "The provider-specific signature used to preserve reasoning/tool continuity."
         }
       },
       "required": ["type", "call"],
@@ -498,7 +526,8 @@
     "ToolCallDelta": {
       "oneOf": [
         { "$ref": "#/definitions/FunctionToolCallDelta" },
-        { "$ref": "#/definitions/WebSearchToolCallDelta" }
+        { "$ref": "#/definitions/WebSearchToolCallDelta" },
+        { "$ref": "#/definitions/ToolSearchToolCallDelta" }
       ]
     },
     "FunctionToolCallDelta": {
@@ -553,6 +582,10 @@
         "height": {
           "type": "number",
           "description": "The height of the image in pixels."
+        },
+        "id": {
+          "type": "string",
+          "description": "ID of the image part, if applicable"
         }
       },
       "required": ["type"],
@@ -631,7 +664,8 @@
       "description": "Represents a tool that can be used by the model.",
       "oneOf": [
         { "$ref": "#/definitions/FunctionTool" },
-        { "$ref": "#/definitions/WebSearchTool" }
+        { "$ref": "#/definitions/WebSearchTool" },
+        { "$ref": "#/definitions/ToolSearchTool" }
       ]
     },
     "FunctionTool": {
@@ -657,6 +691,10 @@
               }
             }
           ]
+        },
+        "defer_loading": {
+          "type": "boolean",
+          "description": "Hide the tool from the model until a `tool_search` tool discovers it. Providers without tool search ignore this flag and load the tool eagerly."
         }
       },
       "required": ["type", "name", "description", "parameters"],
@@ -677,9 +715,7 @@
           "minimum": 1,
           "description": "Limits the number of searches the provider may perform when supported."
         },
-        "user_location": {
-          "$ref": "#/definitions/WebSearchUserLocation"
-        }
+        "user_location": { "$ref": "#/definitions/WebSearchUserLocation" }
       },
       "required": ["type"],
       "additionalProperties": false
@@ -716,20 +752,41 @@
         "cached_audio_tokens": { "type": "number" },
         "image_tokens": { "type": "number" },
         "cached_image_tokens": { "type": "number" },
-        "cached_tokens": { "type": "number" },
-        "cache_write_tokens": { "type": "number" },
-        "reasoning_tokens": { "type": "number" }
+        "cached_tokens": {
+          "type": "number",
+          "description": "The tokens read from the prompt cache."
+        },
+        "cache_write_tokens": {
+          "type": "number",
+          "description": "The tokens written to the prompt cache."
+        },
+        "extended_cache_write_tokens": {
+          "type": "number",
+          "description": "The subset of `cache_write_tokens` stored with extended retention (see `cache_retention`), which some providers bill at a higher rate."
+        },
+        "reasoning_tokens": {
+          "type": "number",
+          "description": "The tokens spent on reasoning."
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "A breakdown of `input_tokens` or `output_tokens`, using the provider's own counting."
     },
     "ModelUsage": {
       "type": "object",
       "description": "Represents the token usage of the model.",
       "properties": {
-        "input_tokens": { "type": "number" },
-        "output_tokens": { "type": "number" },
+        "input_tokens": {
+          "type": "number",
+          "description": "The input tokens as reported by the provider. Whether cached and cache-write tokens are included depends on the provider."
+        },
+        "output_tokens": {
+          "type": "number",
+          "description": "The output tokens as reported by the provider. Whether reasoning tokens are included depends on the provider."
+        },
         "input_tokens_details": { "$ref": "#/definitions/ModelTokensDetails" },
-        "output_tokens_details": { "$ref": "#/definitions/ModelTokensDetails" }
+        "output_tokens_details": { "$ref": "#/definitions/ModelTokensDetails" },
+        "server_tool_use": { "$ref": "#/definitions/ModelServerToolUsage" }
       },
       "required": ["input_tokens", "output_tokens"],
       "additionalProperties": false
@@ -767,21 +824,27 @@
     "ToolChoiceAuto": {
       "type": "object",
       "description": "The model will automatically choose the tool to use or not use any tools.",
-      "properties": { "type": { "const": "auto" } },
+      "properties": {
+        "type": { "const": "auto" }
+      },
       "required": ["type"],
       "additionalProperties": false
     },
     "ToolChoiceNone": {
       "type": "object",
       "description": "The model will not use any tools.",
-      "properties": { "type": { "const": "none" } },
+      "properties": {
+        "type": { "const": "none" }
+      },
       "required": ["type"],
       "additionalProperties": false
     },
     "ToolChoiceRequired": {
       "type": "object",
       "description": "The model will be forced to use a tool.",
-      "properties": { "type": { "const": "required" } },
+      "properties": {
+        "type": { "const": "required" }
+      },
       "required": ["type"],
       "additionalProperties": false
     },
@@ -801,7 +864,9 @@
     "ResponseFormatText": {
       "type": "object",
       "description": "Specifies that the model response should be in plain text format.",
-      "properties": { "type": { "const": "text" } },
+      "properties": {
+        "type": { "const": "text" }
+      },
       "required": ["type"],
       "additionalProperties": false
     },
@@ -922,6 +987,10 @@
           "$ref": "#/definitions/ReasoningOptions",
           "description": "Options for reasoning generation."
         },
+        "cache_retention": {
+          "$ref": "#/definitions/CacheRetention",
+          "description": "Opts into the provider's prompt cache and chooses how long entries are kept. \"standard\" uses the provider's default retention and \"extended\" the longest it offers. Providers without a retention setting ignore this option."
+        },
         "metadata": {
           "type": "object",
           "description": "A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.",
@@ -946,6 +1015,10 @@
         "input_cost_per_cache_write_token": {
           "type": "number",
           "description": "The cost in USD per single cache-write input token."
+        },
+        "input_cost_per_extended_cache_write_token": {
+          "type": "number",
+          "description": "The cost in USD per single cache-write input token stored with extended retention. Defaults to `input_cost_per_cache_write_token`."
         },
         "input_cost_per_cached_text_token": {
           "type": "number",
@@ -978,9 +1051,142 @@
         "output_cost_per_image_token": {
           "type": "number",
           "description": "The cost in USD per single image token for output."
+        },
+        "cost_per_web_search_request": {
+          "type": "number",
+          "description": "The cost in USD per provider-hosted web search request."
+        },
+        "long_context": {
+          "$ref": "#/definitions/LanguageModelLongContextPricing",
+          "description": "Rate multipliers applied to requests whose input exceeds a token threshold."
         }
       },
       "additionalProperties": false
+    },
+    "FilePart": {
+      "type": "object",
+      "description": "Document or video input; accepted MIME types depend on the model.",
+      "properties": {
+        "type": { "const": "file" },
+        "mime_type": {
+          "type": "string",
+          "description": "The MIME type of the file. E.g. \"application/pdf\", \"text/plain\", \"video/mp4\"."
+        },
+        "data": {
+          "type": "string",
+          "description": "The file contents in the format accepted by the model. Either `data` or `url` must be provided."
+        },
+        "url": {
+          "type": "string",
+          "description": "A URL the file can be fetched from. Providers that cannot fetch URLs for this part reject it; pass `data` instead."
+        },
+        "filename": {
+          "type": "string",
+          "description": "The file name, forwarded to providers that display or require it."
+        }
+      },
+      "required": ["type", "mime_type"],
+      "additionalProperties": false
+    },
+    "ToolSearchToolCallStatus": {
+      "type": "string",
+      "enum": ["in_progress", "completed", "failed"]
+    },
+    "ToolSearchToolCall": {
+      "type": "object",
+      "description": "A provider-hosted search over the deferred tools of the request.",
+      "properties": {
+        "type": { "const": "tool_search" },
+        "args": {
+          "type": "object",
+          "description": "The provider-native search arguments, e.g. { \"query\": \"weather\" }, { \"pattern\": \"weather|forecast\" }, or { \"paths\": [\"get_weather\"] }.",
+          "additionalProperties": true
+        },
+        "status": { "$ref": "#/definitions/ToolSearchToolCallStatus" }
+      },
+      "required": ["type", "args"],
+      "additionalProperties": false
+    },
+    "ToolSearchToolResult": {
+      "type": "object",
+      "description": "Discovered tools made available to the model.",
+      "properties": {
+        "type": { "const": "tool_search" },
+        "tool_names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Discovered tool names; each must be declared in the request's `tools`."
+        },
+        "error_code": {
+          "type": "string",
+          "description": "Provider error code required to replay a failed hosted tool search."
+        }
+      },
+      "required": ["type", "tool_names"],
+      "additionalProperties": false
+    },
+    "ToolSearchToolCallDelta": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "tool_search" },
+        "args": {
+          "type": "string",
+          "description": "The partial JSON string of the search arguments."
+        },
+        "status": { "$ref": "#/definitions/ToolSearchToolCallStatus" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ToolSearchStrategy": {
+      "type": "string",
+      "enum": ["regex", "bm25"]
+    },
+    "ToolSearchTool": {
+      "type": "object",
+      "description": "Loads deferred function tools on demand through hosted search.",
+      "properties": {
+        "type": { "const": "tool_search" },
+        "strategy": {
+          "$ref": "#/definitions/ToolSearchStrategy",
+          "description": "The search algorithm, when the provider offers a choice. Defaults to \"bm25\"."
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ModelServerToolUsage": {
+      "type": "object",
+      "description": "Hosted tool usage billed per request, separately from tokens.",
+      "properties": {
+        "web_search_requests": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "LanguageModelLongContextPricing": {
+      "type": "object",
+      "description": "Rate multipliers applied to requests whose input exceeds a token threshold.",
+      "properties": {
+        "threshold_tokens": {
+          "type": "number",
+          "description": "The request is priced with the multipliers when `input_tokens` exceeds this value."
+        },
+        "input_cost_multiplier": {
+          "type": "number",
+          "description": "The multiplier applied to every input rate. Defaults to 1."
+        },
+        "output_cost_multiplier": {
+          "type": "number",
+          "description": "The multiplier applied to every output rate. Defaults to 1."
+        }
+      },
+      "required": ["threshold_tokens"],
+      "additionalProperties": false
+    },
+    "CacheRetention": {
+      "type": "string",
+      "enum": ["standard", "extended"],
+      "description": "How long prompt cache entries are kept."
     }
   }
 }

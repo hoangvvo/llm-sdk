@@ -1,5 +1,7 @@
 package stream
 
+import "context"
+
 // Stream represents a generic stream of data.
 type Stream[T any] struct {
 	C    <-chan T
@@ -50,4 +52,16 @@ func (s *Stream[T]) Current() T {
 // Err returns the error encountered during streaming, if any.
 func (s *Stream[T]) Err() error {
 	return s.err
+}
+
+// Send delivers value to ch unless ctx is cancelled first. It reports whether
+// the value was delivered so producers can stop instead of blocking forever
+// once the consumer has gone away.
+func Send[T any](ctx context.Context, ch chan<- T, value T) bool {
+	select {
+	case ch <- value:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }

@@ -401,7 +401,9 @@ function convertToCohereImageContent(
   return {
     type: "image_url",
     imageUrl: {
-      url: `data:${imagePart.mime_type};base64,${imagePart.data}`,
+      url:
+        imagePart.url ??
+        `data:${imagePart.mime_type};base64,${imagePart.data ?? ""}`,
     },
   };
 }
@@ -480,6 +482,12 @@ function convertToCohereTool(tool: Tool): Cohere.ToolV2 {
     throw new UnsupportedError(
       PROVIDER,
       "Hosted web search is not supported by the Cohere V2 Chat API",
+    );
+  }
+  if (tool.type === "tool_search") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "Hosted tool search is not supported by the Cohere V2 Chat API",
     );
   }
 

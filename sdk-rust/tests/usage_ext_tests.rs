@@ -1,4 +1,4 @@
-use llm_sdk::{LanguageModelPricing, ModelUsage, ModelUsageCostOptions};
+use llm_sdk::{LanguageModelPricing, ModelTokensDetails, ModelUsage, ModelUsageCostOptions};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -49,4 +49,42 @@ fn shared_usage_cost_cases() {
             test_case.expected_cost
         );
     }
+}
+
+#[test]
+fn merges_cumulative_partial_usage_without_erasing_known_counts() {
+    let mut usage = ModelUsage {
+        input_tokens: 10,
+        output_tokens: 0,
+        input_tokens_details: Some(ModelTokensDetails {
+            cached_tokens: Some(2),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    usage.merge_max(&ModelUsage {
+        input_tokens: 0,
+        output_tokens: 5,
+        output_tokens_details: Some(ModelTokensDetails {
+            reasoning_tokens: Some(1),
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
+    assert_eq!(
+        usage,
+        ModelUsage {
+            input_tokens: 10,
+            output_tokens: 5,
+            input_tokens_details: Some(ModelTokensDetails {
+                cached_tokens: Some(2),
+                ..Default::default()
+            }),
+            output_tokens_details: Some(ModelTokensDetails {
+                reasoning_tokens: Some(1),
+                ..Default::default()
+            }),
+            server_tool_use: None,
+        }
+    );
 }

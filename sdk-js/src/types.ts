@@ -10,6 +10,7 @@ export type Part =
   | TextPart
   | ImagePart
   | AudioPart
+  | FilePart
   | SourcePart
   | ToolCallPart
   | ToolResultPart
@@ -87,9 +88,13 @@ export interface ImagePart {
    */
   mime_type: string;
   /**
-   * The base64-encoded image data.
+   * Base64 content; either `data` or `url` must be provided.
    */
-  data: string;
+  data?: string;
+  /**
+   * Fetched by the provider; URL support depends on the model.
+   */
+  url?: string;
   /**
    * The width of the image in pixels.
    */
@@ -109,9 +114,13 @@ export interface ImagePart {
 export interface AudioPart {
   type: "audio";
   /**
-   * The base64-encoded audio data.
+   * Base64 content; either `data` or `url` must be provided.
    */
-  data: string;
+  data?: string;
+  /**
+   * Fetched by the provider; URL support depends on the model.
+   */
+  url?: string;
   format: AudioFormat;
   /**
    * The sample rate of the audio. E.g. 44100, 48000.
@@ -129,6 +138,29 @@ export interface AudioPart {
    * ID of the audio part, if applicable
    */
   id?: string;
+}
+/**
+ * Document or video input; accepted MIME types depend on the model.
+ */
+export interface FilePart {
+  type: "file";
+  /**
+   * The MIME type of the file. E.g. "application/pdf", "text/plain", "video/mp4".
+   */
+  mime_type: string;
+  /**
+   * The file contents in the format accepted by the model.
+   * Either `data` or `url` must be provided.
+   */
+  data?: string;
+  /**
+   * Fetched by the provider; URL support depends on the model.
+   */
+  url?: string;
+  /**
+   * Document name; some models require it for inline files.
+   */
+  filename?: string;
 }
 /**
  * A part of the message that contains a source with structured content.
@@ -169,7 +201,8 @@ export interface ToolCallPart {
    */
   id?: string;
 }
-export type ToolCall = FunctionToolCall | WebSearchToolCall;
+export type ToolCall =
+  FunctionToolCall | WebSearchToolCall | ToolSearchToolCall;
 export interface FunctionToolCall {
   type: "function";
   name: string;
@@ -186,6 +219,18 @@ export interface WebSearchToolCall {
   action?: WebSearchAction;
   status?: WebSearchToolCallStatus;
 }
+export type ToolSearchToolCallStatus = "in_progress" | "completed" | "failed";
+/**
+ * A provider-hosted search over the deferred tools of the request.
+ */
+export interface ToolSearchToolCall {
+  type: "tool_search";
+  /**
+   * Opaque search arguments; preserve for conversation replay.
+   */
+  args: Record<string, unknown>;
+  status?: ToolSearchToolCallStatus;
+}
 /**
  * A part of the message that represents the result of a tool call.
  */
@@ -201,7 +246,8 @@ export interface ToolResultPart {
    */
   status: ToolResultStatus;
 }
-export type ToolResult = FunctionToolResult | WebSearchToolResult;
+export type ToolResult =
+  FunctionToolResult | WebSearchToolResult | ToolSearchToolResult;
 export interface FunctionToolResult {
   type: "function";
   name: string;
@@ -218,6 +264,18 @@ export interface WebSearchToolResult {
   type: "web_search";
   sources: WebSearchSource[];
   /** Provider error code required to replay a failed hosted-search result. */
+  error_code?: string;
+}
+/**
+ * Discovered tools made available to the model.
+ */
+export interface ToolSearchToolResult {
+  type: "tool_search";
+  /**
+   * Discovered tool names; each must be declared in the request's `tools`.
+   */
+  tool_names: string[];
+  /** Provider error code required to replay a failed hosted tool search. */
   error_code?: string;
 }
 /**
@@ -318,7 +376,8 @@ export interface ToolCallPartDelta {
    */
   id?: string;
 }
-export type ToolCallDelta = FunctionToolCallDelta | WebSearchToolCallDelta;
+export type ToolCallDelta =
+  FunctionToolCallDelta | WebSearchToolCallDelta | ToolSearchToolCallDelta;
 export interface FunctionToolCallDelta {
   type: "function";
   name?: string;
@@ -329,6 +388,12 @@ export interface WebSearchToolCallDelta {
   type: "web_search";
   action?: WebSearchAction;
   status?: WebSearchToolCallStatus;
+}
+export interface ToolSearchToolCallDelta {
+  type: "tool_search";
+  /** The partial JSON string of the search arguments. */
+  args?: string;
+  status?: ToolSearchToolCallStatus;
 }
 /** An atomic delta containing a hosted or client tool result. */
 export interface ToolResultPartDelta {
@@ -454,7 +519,7 @@ export type JSONSchema = Record<string, unknown>;
 /**
  * Represents a tool that can be used by the model.
  */
-export type Tool = FunctionTool | WebSearchTool;
+export type Tool = FunctionTool | WebSearchTool | ToolSearchTool;
 /**
  * Represents a client-executed function tool that can be used by the model.
  */
@@ -472,6 +537,11 @@ export interface FunctionTool {
    * The JSON schema of the parameters that the tool accepts. The type must be "object".
    */
   parameters: JSONSchema;
+  /**
+   * Hide the tool from the model until a `tool_search` tool discovers it.
+   * Providers without tool search ignore this flag and load the tool eagerly.
+   */
+  defer_loading?: boolean;
 }
 /**
  * Represents a provider-hosted web search tool.
@@ -491,6 +561,17 @@ export interface WebSearchTool {
    */
   user_location?: WebSearchUserLocation;
 }
+/**
+ * Loads deferred function tools on demand through hosted search.
+ */
+export interface ToolSearchTool {
+  type: "tool_search";
+  /**
+   * The search algorithm, when the provider offers a choice. Defaults to "bm25".
+   */
+  strategy?: ToolSearchStrategy;
+}
+export type ToolSearchStrategy = "regex" | "bm25";
 /**
  * An approximate user location used to localize web search results.
  */
@@ -520,6 +601,9 @@ export interface ToolMessage {
   role: "tool";
   content: Part[];
 }
+/**
+ * A breakdown of `input_tokens` or `output_tokens`, using the provider's own counting.
+ */
 export interface ModelTokensDetails {
   text_tokens?: number;
   cached_text_tokens?: number;
@@ -527,18 +611,46 @@ export interface ModelTokensDetails {
   cached_audio_tokens?: number;
   image_tokens?: number;
   cached_image_tokens?: number;
+  /**
+   * Cache reads, billed at the cached-input rate.
+   */
   cached_tokens?: number;
+  /**
+   * Cache writes, billed separately from cache reads.
+   */
   cache_write_tokens?: number;
+  /**
+   * The subset of `cache_write_tokens` stored with extended retention (see `cache_retention`), which some providers bill at a higher rate.
+   */
+  extended_cache_write_tokens?: number;
+  /**
+   * The tokens spent on reasoning.
+   */
   reasoning_tokens?: number;
+}
+/**
+ * Hosted tool usage billed per request, separately from tokens.
+ */
+export interface ModelServerToolUsage {
+  web_search_requests?: number;
 }
 /**
  * Represents the token usage of the model.
  */
 export interface ModelUsage {
+  /**
+   * The input tokens as reported by the provider. Whether cached and
+   * cache-write tokens are included depends on the provider; see `ModelUsageCostOptions`.
+   */
   input_tokens: number;
+  /**
+   * The output tokens as reported by the provider. Whether reasoning tokens
+   * are included depends on the provider; see `ModelUsageCostOptions`.
+   */
   output_tokens: number;
   input_tokens_details?: ModelTokensDetails;
   output_tokens_details?: ModelTokensDetails;
+  server_tool_use?: ModelServerToolUsage;
 }
 /**
  * Represents the response generated by the model.
@@ -694,10 +806,20 @@ export interface LanguageModelInput {
    */
   reasoning?: ReasoningOptions;
   /**
+   * Opts into the provider's prompt cache and chooses how long entries are kept.
+   * "standard" uses the provider's default retention and "extended" the longest it offers.
+   * Providers without a retention setting ignore this option.
+   */
+  cache_retention?: CacheRetention;
+  /**
    * A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.
    */
   metadata?: Record<string, string>;
 }
+/**
+ * How long prompt cache entries are kept.
+ */
+export type CacheRetention = "standard" | "extended";
 /**
  * A metadata property that describes the pricing of the model.
  */
@@ -714,6 +836,10 @@ export interface LanguageModelPricing {
    * The cost in USD per single cache-write input token.
    */
   input_cost_per_cache_write_token?: number;
+  /**
+   * The cost in USD per single cache-write input token stored with extended retention. Defaults to `input_cost_per_cache_write_token`.
+   */
+  input_cost_per_extended_cache_write_token?: number;
   /**
    * The cost in USD per single cached text token for input.
    */
@@ -746,4 +872,29 @@ export interface LanguageModelPricing {
    * The cost in USD per single image token for output.
    */
   output_cost_per_image_token?: number;
+  /**
+   * The cost in USD per provider-hosted web search request.
+   */
+  cost_per_web_search_request?: number;
+  /**
+   * Rate multipliers applied to requests whose input exceeds a token threshold.
+   */
+  long_context?: LanguageModelLongContextPricing;
+}
+/**
+ * Rate multipliers applied to requests whose input exceeds a token threshold.
+ */
+export interface LanguageModelLongContextPricing {
+  /**
+   * The request is priced with the multipliers when `input_tokens` exceeds this value.
+   */
+  threshold_tokens: number;
+  /**
+   * The multiplier applied to every input rate. Defaults to 1.
+   */
+  input_cost_multiplier?: number;
+  /**
+   * The multiplier applied to every output rate. Defaults to 1.
+   */
+  output_cost_multiplier?: number;
 }

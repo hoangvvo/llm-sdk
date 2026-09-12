@@ -57,6 +57,8 @@ test_group!(
 );
 test_group!(openai_model(), source_input, Some(no_reasoning_options()));
 test_group!(openai_model(), image_input);
+test_group!(openai_model(), image_url_input);
+test_group!(openai_model(), file_input);
 
 test_set!(
     openai_audio_model(),

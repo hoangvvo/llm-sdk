@@ -25,9 +25,10 @@ The accompanying [Console app](https://llm-sdk.hoangvvo.com/console/chat/) demon
 - Supports multiple LLM providers with a unified API.
 - Handles multiple modalities: Text, Image, and Audio. Supports streaming.
 - Supports multi-modality function calling (image/audio returned from tools).
-- Supports provider-hosted web search with normalized citations.
+- Accepts images, audio, and files (PDF, documents, video) inline or by URL.
+- Supports provider-hosted web search with normalized citations, and hosted tool search with deferred tools.
 - Supports citations (RAG) and reasoning for supported models.
-- Reports token usage and calculates the cost of a request when provided with the model’s pricing information.
+- Reports token usage as the provider counts it (with cached, cache-write, reasoning, and per-modality breakdowns) and calculates the cost of a request, including hosted web searches and long-context pricing tiers, when provided with the model’s pricing information.
 - Unified serialization across JS, Rust, and Go (systems in different languages can work together).
 - Integrates OpenTelemetry for tracing.
 - _Zero abstraction_: the agent library is a thin for-loop around the SDK. No overcomplex abstractions like chains, graphs, or hidden prompt templates.
@@ -52,7 +53,7 @@ See [Supported providers](./website/src/content/docs/sdk/providers.mdx).
 - `LanguageModelInput`: captures conversation history, sampling parameters, tool definitions, response-format hints, and modality toggles. The SDK adapts this shape to each provider’s API.
 - `ModelResponse` / `PartialModelResponse`: normalized outputs (with usage/cost when available) that you can forward directly to other services.
 - `Message`: building blocks for conversations. Messages represent user, assistant, or tool turns, with a list of parts, each representing a chunk of content in a specific modality:
-  - `Part`: `TextPart`, `ImagePart`, `AudioPart`, `SourcePart` (for citation), `ToolCallPart`, `ToolResultPart`, and `ReasoningPart`.
+  - `Part`: `TextPart`, `ImagePart`, `AudioPart`, `FilePart`, `SourcePart` (for citation), `ToolCallPart`, `ToolResultPart`, and `ReasoningPart`.
 - Tool semantics: function calling and tool-result envelopes share the same schema across providers. The SDK normalizes call IDs, arguments, and terminal statuses so agent runtimes can hydrate rich tool events without per-provider branching.
 
 ## LLM Agent
