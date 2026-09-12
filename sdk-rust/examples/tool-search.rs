@@ -63,14 +63,15 @@ async fn main() {
     )])];
 
     for _ in 0..10 {
-        // Keep all tool definitions available on every request, including deferred
-        // ones.
+        // Keep all tool definitions available on every request, including
+        // deferred ones.
         let response = model
             .generate(LanguageModelInput::new(messages.clone()).with_tools(tools.clone()))
             .await
             .expect("Generation failed");
 
-        // Preserve the complete response, including hosted search calls and results.
+        // Preserve the complete response, including hosted search calls and
+        // results.
         messages.push(Message::assistant(response.content.clone()));
 
         let mut tool_results: Vec<Part> = Vec::new();
@@ -79,8 +80,8 @@ async fn main() {
                 Part::ToolCall(part) => match part.call {
                     ToolCall::ToolSearch(call) => println!("tool search: {call:#?}"),
                     ToolCall::Function(call) => {
-                        // The provider executes tool search; the application executes function
-                        // calls.
+                        // The provider executes tool search; the application
+                        // executes function calls.
                         assert_eq!(call.name, "lookup_holiday", "Unknown tool");
                         let args: LookupHolidayArgs = serde_json::from_value(call.args)
                             .expect("Failed to parse lookup_holiday args");
