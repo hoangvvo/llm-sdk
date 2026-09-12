@@ -169,7 +169,8 @@ export interface ToolCallPart {
    */
   id?: string;
 }
-export type ToolCall = FunctionToolCall | WebSearchToolCall;
+export type ToolCall =
+  FunctionToolCall | WebSearchToolCall | ToolSearchToolCall;
 export interface FunctionToolCall {
   type: "function";
   name: string;
@@ -186,6 +187,18 @@ export interface WebSearchToolCall {
   action?: WebSearchAction;
   status?: WebSearchToolCallStatus;
 }
+export type ToolSearchToolCallStatus = "in_progress" | "completed" | "failed";
+/**
+ * A provider-hosted search over the deferred tools of the request.
+ */
+export interface ToolSearchToolCall {
+  type: "tool_search";
+  /**
+   * Opaque search arguments; preserve for conversation replay.
+   */
+  args: Record<string, unknown>;
+  status?: ToolSearchToolCallStatus;
+}
 /**
  * A part of the message that represents the result of a tool call.
  */
@@ -201,7 +214,8 @@ export interface ToolResultPart {
    */
   status: ToolResultStatus;
 }
-export type ToolResult = FunctionToolResult | WebSearchToolResult;
+export type ToolResult =
+  FunctionToolResult | WebSearchToolResult | ToolSearchToolResult;
 export interface FunctionToolResult {
   type: "function";
   name: string;
@@ -218,6 +232,18 @@ export interface WebSearchToolResult {
   type: "web_search";
   sources: WebSearchSource[];
   /** Provider error code required to replay a failed hosted-search result. */
+  error_code?: string;
+}
+/**
+ * Discovered tools made available to the model.
+ */
+export interface ToolSearchToolResult {
+  type: "tool_search";
+  /**
+   * Discovered tool names; each must be declared in the request's `tools`.
+   */
+  tool_names: string[];
+  /** Provider error code required to replay a failed hosted tool search. */
   error_code?: string;
 }
 /**
@@ -318,7 +344,8 @@ export interface ToolCallPartDelta {
    */
   id?: string;
 }
-export type ToolCallDelta = FunctionToolCallDelta | WebSearchToolCallDelta;
+export type ToolCallDelta =
+  FunctionToolCallDelta | WebSearchToolCallDelta | ToolSearchToolCallDelta;
 export interface FunctionToolCallDelta {
   type: "function";
   name?: string;
@@ -329,6 +356,12 @@ export interface WebSearchToolCallDelta {
   type: "web_search";
   action?: WebSearchAction;
   status?: WebSearchToolCallStatus;
+}
+export interface ToolSearchToolCallDelta {
+  type: "tool_search";
+  /** The partial JSON string of the search arguments. */
+  args?: string;
+  status?: ToolSearchToolCallStatus;
 }
 /** An atomic delta containing a hosted or client tool result. */
 export interface ToolResultPartDelta {
@@ -454,7 +487,7 @@ export type JSONSchema = Record<string, unknown>;
 /**
  * Represents a tool that can be used by the model.
  */
-export type Tool = FunctionTool | WebSearchTool;
+export type Tool = FunctionTool | WebSearchTool | ToolSearchTool;
 /**
  * Represents a client-executed function tool that can be used by the model.
  */
@@ -472,6 +505,11 @@ export interface FunctionTool {
    * The JSON schema of the parameters that the tool accepts. The type must be "object".
    */
   parameters: JSONSchema;
+  /**
+   * Hide the tool from the model until a `tool_search` tool discovers it.
+   * Providers without tool search ignore this flag and load the tool eagerly.
+   */
+  defer_loading?: boolean;
 }
 /**
  * Represents a provider-hosted web search tool.
@@ -491,6 +529,17 @@ export interface WebSearchTool {
    */
   user_location?: WebSearchUserLocation;
 }
+/**
+ * Loads deferred function tools on demand through hosted search.
+ */
+export interface ToolSearchTool {
+  type: "tool_search";
+  /**
+   * The search algorithm, when the provider offers a choice. Defaults to "bm25".
+   */
+  strategy?: ToolSearchStrategy;
+}
+export type ToolSearchStrategy = "regex" | "bm25";
 /**
  * An approximate user location used to localize web search results.
  */

@@ -462,12 +462,10 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 			parts,
 		), nil
 	case part.ToolCallPart != nil:
-		if part.ToolCallPart.Call.WebSearch != nil {
-			return []googleapi.Part{}, nil
-		}
+		// Hosted tool history has no Gemini equivalent and is skipped.
 		call := part.ToolCallPart.Call.Function
 		if call == nil {
-			return nil, llmsdk.NewUnsupportedError(Provider, "tool call has no supported payload")
+			return []googleapi.Part{}, nil
 		}
 		var args map[string]any
 		if err := json.Unmarshal(call.Args, &args); err != nil {
@@ -485,12 +483,9 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 		}
 		return []googleapi.Part{googlePart}, nil
 	case part.ToolResultPart != nil:
-		if part.ToolResultPart.Result.WebSearch != nil {
-			return []googleapi.Part{}, nil
-		}
 		result := part.ToolResultPart.Result.Function
 		if result == nil {
-			return nil, llmsdk.NewUnsupportedError(Provider, "tool result has no supported payload")
+			return []googleapi.Part{}, nil
 		}
 		response, parts, err := convertToGoogleFunctionResponse(result.Content, part.ToolResultPart.Status)
 		if err != nil {
@@ -573,7 +568,10 @@ func convertToGoogleTools(tools []llmsdk.Tool) ([]googleapi.Tool, error) {
 
 	for _, tool := range tools {
 		switch {
+		case tool.ToolSearchTool != nil:
+			return nil, llmsdk.NewUnsupportedError(Provider, "Google does not support hosted tool search")
 		case tool.FunctionTool != nil:
+			// Gemini has no deferred loading, so deferred tools are loaded eagerly.
 			functionDeclarations = append(functionDeclarations, googleapi.FunctionDeclaration{
 				Name:                 &tool.FunctionTool.Name,
 				Description:          &tool.FunctionTool.Description,

@@ -4,7 +4,7 @@ use crate::{
     Modality, Part, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatOption,
     SourcePart, TextPart, TextPartDelta, Tool, ToolCall, ToolCallDelta, ToolCallPart,
     ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResult, ToolResultPart, ToolResultStatus,
-    UserMessage, WebSearchTool, WebSearchUserLocation,
+    ToolSearchStrategy, ToolSearchTool, UserMessage, WebSearchTool, WebSearchUserLocation,
 };
 
 impl TextPart {
@@ -253,7 +253,28 @@ impl FunctionTool {
             name: name.into(),
             description: description.into(),
             parameters,
+            defer_loading: None,
         }
+    }
+
+    /// Hides the tool from the model until a `tool_search` tool discovers it.
+    #[must_use]
+    pub fn with_defer_loading(mut self, defer_loading: bool) -> Self {
+        self.defer_loading = Some(defer_loading);
+        self
+    }
+}
+
+impl ToolSearchTool {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_strategy(mut self, strategy: ToolSearchStrategy) -> Self {
+        self.strategy = Some(strategy);
+        self
     }
 }
 
@@ -322,6 +343,12 @@ impl From<FunctionTool> for Tool {
 impl From<WebSearchTool> for Tool {
     fn from(value: WebSearchTool) -> Self {
         Self::WebSearch(value)
+    }
+}
+
+impl From<ToolSearchTool> for Tool {
+    fn from(value: ToolSearchTool) -> Self {
+        Self::ToolSearch(value)
     }
 }
 
@@ -685,8 +712,10 @@ impl ToolCallPartDelta {
 
     #[must_use]
     pub fn with_args(mut self, args: impl Into<String>) -> Self {
-        if let ToolCallDelta::Function(call) = &mut self.call {
-            call.args = Some(args.into());
+        match &mut self.call {
+            ToolCallDelta::Function(call) => call.args = Some(args.into()),
+            ToolCallDelta::ToolSearch(call) => call.args = Some(args.into()),
+            ToolCallDelta::WebSearch(_) => {}
         }
         self
     }

@@ -141,6 +141,7 @@ node examples/generate-text.ts
 - Move function calls to `call: { type: "function", name, args }`; check `call.type` before reading function fields.
 - Move function results to `result: { type: "function", name, content }`; check `result.type` before reading function fields.
 - Move `ToolCallPartDelta.tool_name` and `args` to `call.name` and `call.args`, with `call.type: "function"`.
+- Update exhaustive switches: `Tool`, `ToolCall`, `ToolResult`, and `ToolCallDelta` add `tool_search`.
 
 ### To 0.4.0
 

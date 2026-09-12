@@ -491,6 +491,14 @@ function convertToOpenAITool(
     );
   }
 
+  if (tool.type === "tool_search") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "Hosted tool search is not supported by this OpenAI Chat Completions adapter; use OpenAIModel (Responses API)",
+    );
+  }
+
+  // Chat Completions cannot defer tools, so deferred tools are loaded eagerly.
   return {
     type: "function",
     function: {

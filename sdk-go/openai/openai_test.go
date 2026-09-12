@@ -78,6 +78,10 @@ func TestImageInput(t *testing.T) {
 	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "image_input")
 }
 
+func TestToolSearch(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "tool_search")
+}
+
 func TestReasoning(t *testing.T) {
 	testcommon.RunTestGroup(t, openAIModel(t, "o1"), "reasoning", testcommon.WithProfile("openai_opaque_reasoning"))
 }

@@ -217,7 +217,8 @@
       "description": "The provider-independent payload of a tool invocation.",
       "oneOf": [
         { "$ref": "#/definitions/FunctionToolCall" },
-        { "$ref": "#/definitions/WebSearchToolCall" }
+        { "$ref": "#/definitions/WebSearchToolCall" },
+        { "$ref": "#/definitions/ToolSearchToolCall" }
       ]
     },
     "FunctionToolCall": {
@@ -304,7 +305,8 @@
       "description": "The provider-independent payload of a tool result.",
       "oneOf": [
         { "$ref": "#/definitions/FunctionToolResult" },
-        { "$ref": "#/definitions/WebSearchToolResult" }
+        { "$ref": "#/definitions/WebSearchToolResult" },
+        { "$ref": "#/definitions/ToolSearchToolResult" }
       ]
     },
     "FunctionToolResult": {
@@ -515,7 +517,8 @@
     "ToolCallDelta": {
       "oneOf": [
         { "$ref": "#/definitions/FunctionToolCallDelta" },
-        { "$ref": "#/definitions/WebSearchToolCallDelta" }
+        { "$ref": "#/definitions/WebSearchToolCallDelta" },
+        { "$ref": "#/definitions/ToolSearchToolCallDelta" }
       ]
     },
     "FunctionToolCallDelta": {
@@ -652,7 +655,8 @@
       "description": "Represents a tool that can be used by the model.",
       "oneOf": [
         { "$ref": "#/definitions/FunctionTool" },
-        { "$ref": "#/definitions/WebSearchTool" }
+        { "$ref": "#/definitions/WebSearchTool" },
+        { "$ref": "#/definitions/ToolSearchTool" }
       ]
     },
     "FunctionTool": {
@@ -678,6 +682,10 @@
               }
             }
           ]
+        },
+        "defer_loading": {
+          "type": "boolean",
+          "description": "Hide the tool from the model until a `tool_search` tool discovers it. Providers without tool search ignore this flag and load the tool eagerly."
         }
       },
       "required": ["type", "name", "description", "parameters"],
@@ -1044,6 +1052,73 @@
           "description": "Rate multipliers applied to requests whose input exceeds a token threshold."
         }
       },
+      "additionalProperties": false
+    },
+    "ToolSearchToolCallStatus": {
+      "type": "string",
+      "enum": ["in_progress", "completed", "failed"]
+    },
+    "ToolSearchToolCall": {
+      "type": "object",
+      "description": "A provider-hosted search over the deferred tools of the request.",
+      "properties": {
+        "type": { "const": "tool_search" },
+        "args": {
+          "type": "object",
+          "description": "The provider-native search arguments, e.g. { \"query\": \"weather\" }, { \"pattern\": \"weather|forecast\" }, or { \"paths\": [\"get_weather\"] }.",
+          "additionalProperties": true
+        },
+        "status": { "$ref": "#/definitions/ToolSearchToolCallStatus" }
+      },
+      "required": ["type", "args"],
+      "additionalProperties": false
+    },
+    "ToolSearchToolResult": {
+      "type": "object",
+      "description": "Discovered tools made available to the model.",
+      "properties": {
+        "type": { "const": "tool_search" },
+        "tool_names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Discovered tool names; each must be declared in the request's `tools`."
+        },
+        "error_code": {
+          "type": "string",
+          "description": "Provider error code required to replay a failed hosted tool search."
+        }
+      },
+      "required": ["type", "tool_names"],
+      "additionalProperties": false
+    },
+    "ToolSearchToolCallDelta": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "tool_search" },
+        "args": {
+          "type": "string",
+          "description": "The partial JSON string of the search arguments."
+        },
+        "status": { "$ref": "#/definitions/ToolSearchToolCallStatus" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "ToolSearchStrategy": {
+      "type": "string",
+      "enum": ["regex", "bm25"]
+    },
+    "ToolSearchTool": {
+      "type": "object",
+      "description": "Loads deferred function tools on demand through hosted search.",
+      "properties": {
+        "type": { "const": "tool_search" },
+        "strategy": {
+          "$ref": "#/definitions/ToolSearchStrategy",
+          "description": "The search algorithm, when the provider offers a choice. Defaults to \"bm25\"."
+        }
+      },
+      "required": ["type"],
       "additionalProperties": false
     },
     "ModelServerToolUsage": {

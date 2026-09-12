@@ -142,8 +142,9 @@ const (
 )
 
 type ToolCall struct {
-	Function  *FunctionToolCall  `json:"-"`
-	WebSearch *WebSearchToolCall `json:"-"`
+	Function   *FunctionToolCall   `json:"-"`
+	WebSearch  *WebSearchToolCall  `json:"-"`
+	ToolSearch *ToolSearchToolCall `json:"-"`
 }
 
 type FunctionToolCall struct {
@@ -173,9 +174,25 @@ type WebSearchToolCall struct {
 	Status *WebSearchToolCallStatus `json:"status,omitempty"`
 }
 
+type ToolSearchToolCallStatus string
+
+const (
+	ToolSearchToolCallStatusInProgress ToolSearchToolCallStatus = "in_progress"
+	ToolSearchToolCallStatusCompleted  ToolSearchToolCallStatus = "completed"
+	ToolSearchToolCallStatusFailed     ToolSearchToolCallStatus = "failed"
+)
+
+// ToolSearchToolCall is a provider-hosted search over the deferred tools of the request.
+type ToolSearchToolCall struct {
+	// Opaque search arguments; preserve for conversation replay.
+	Args   json.RawMessage           `json:"args"`
+	Status *ToolSearchToolCallStatus `json:"status,omitempty"`
+}
+
 type ToolResult struct {
-	Function  *FunctionToolResult  `json:"-"`
-	WebSearch *WebSearchToolResult `json:"-"`
+	Function   *FunctionToolResult   `json:"-"`
+	WebSearch  *WebSearchToolResult  `json:"-"`
+	ToolSearch *ToolSearchToolResult `json:"-"`
 }
 
 type FunctionToolResult struct {
@@ -195,6 +212,14 @@ type WebSearchToolResult struct {
 	ErrorCode *string           `json:"error_code,omitempty"`
 }
 
+// ToolSearchToolResult identifies discovered tools made available to the model.
+type ToolSearchToolResult struct {
+	// The names of the discovered tools. Each must be declared in the request's tools.
+	ToolNames []string `json:"tool_names"`
+	// Provider error code required to replay a failed hosted tool search.
+	ErrorCode *string `json:"error_code,omitempty"`
+}
+
 func (c ToolCall) MarshalJSON() ([]byte, error) {
 	if c.Function != nil {
 		return json.Marshal(struct {
@@ -207,6 +232,12 @@ func (c ToolCall) MarshalJSON() ([]byte, error) {
 			Type string `json:"type"`
 			*WebSearchToolCall
 		}{Type: "web_search", WebSearchToolCall: c.WebSearch})
+	}
+	if c.ToolSearch != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ToolSearchToolCall
+		}{Type: "tool_search", ToolSearchToolCall: c.ToolSearch})
 	}
 	return nil, fmt.Errorf("tool call has no content")
 }
@@ -231,6 +262,12 @@ func (c *ToolCall) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		c.WebSearch = &value
+	case "tool_search":
+		var value ToolSearchToolCall
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		c.ToolSearch = &value
 	default:
 		return fmt.Errorf("unknown tool call type: %s", tag.Type)
 	}
@@ -253,6 +290,16 @@ func (r ToolResult) MarshalJSON() ([]byte, error) {
 			Type string `json:"type"`
 			*WebSearchToolResult
 		}{Type: "web_search", WebSearchToolResult: &result})
+	}
+	if r.ToolSearch != nil {
+		result := *r.ToolSearch
+		if result.ToolNames == nil {
+			result.ToolNames = []string{}
+		}
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ToolSearchToolResult
+		}{Type: "tool_search", ToolSearchToolResult: &result})
 	}
 	return nil, fmt.Errorf("tool result has no content")
 }
@@ -277,6 +324,12 @@ func (r *ToolResult) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		r.WebSearch = &value
+	case "tool_search":
+		var value ToolSearchToolResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		r.ToolSearch = &value
 	default:
 		return fmt.Errorf("unknown tool result type: %s", tag.Type)
 	}
@@ -482,8 +535,9 @@ type ToolCallPartDelta struct {
 }
 
 type ToolCallDelta struct {
-	Function  *FunctionToolCallDelta  `json:"-"`
-	WebSearch *WebSearchToolCallDelta `json:"-"`
+	Function   *FunctionToolCallDelta   `json:"-"`
+	WebSearch  *WebSearchToolCallDelta  `json:"-"`
+	ToolSearch *ToolSearchToolCallDelta `json:"-"`
 }
 
 type FunctionToolCallDelta struct {
@@ -494,6 +548,12 @@ type FunctionToolCallDelta struct {
 type WebSearchToolCallDelta struct {
 	Action *WebSearchAction         `json:"action,omitempty"`
 	Status *WebSearchToolCallStatus `json:"status,omitempty"`
+}
+
+type ToolSearchToolCallDelta struct {
+	// The partial JSON string of the search arguments.
+	Args   *string                   `json:"args,omitempty"`
+	Status *ToolSearchToolCallStatus `json:"status,omitempty"`
 }
 
 func (c ToolCallDelta) MarshalJSON() ([]byte, error) {
@@ -508,6 +568,12 @@ func (c ToolCallDelta) MarshalJSON() ([]byte, error) {
 			Type string `json:"type"`
 			*WebSearchToolCallDelta
 		}{Type: "web_search", WebSearchToolCallDelta: c.WebSearch})
+	}
+	if c.ToolSearch != nil {
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			*ToolSearchToolCallDelta
+		}{Type: "tool_search", ToolSearchToolCallDelta: c.ToolSearch})
 	}
 	return nil, fmt.Errorf("tool call delta has no content")
 }
@@ -532,6 +598,12 @@ func (c *ToolCallDelta) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		c.WebSearch = &value
+	case "tool_search":
+		var value ToolSearchToolCallDelta
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		c.ToolSearch = &value
 	default:
 		return fmt.Errorf("unknown tool call delta type: %s", tag.Type)
 	}
@@ -974,15 +1046,17 @@ type JSONSchema map[string]any
 
 // Tool represents a tool that can be used by the model.
 type Tool struct {
-	FunctionTool  *FunctionTool  `json:"-"`
-	WebSearchTool *WebSearchTool `json:"-"`
+	FunctionTool   *FunctionTool   `json:"-"`
+	WebSearchTool  *WebSearchTool  `json:"-"`
+	ToolSearchTool *ToolSearchTool `json:"-"`
 }
 
 type ToolType string
 
 const (
-	ToolTypeFunction  ToolType = "function"
-	ToolTypeWebSearch ToolType = "web_search"
+	ToolTypeFunction   ToolType = "function"
+	ToolTypeWebSearch  ToolType = "web_search"
+	ToolTypeToolSearch ToolType = "tool_search"
 )
 
 func (t Tool) Type() ToolType {
@@ -991,6 +1065,8 @@ func (t Tool) Type() ToolType {
 		return ToolTypeFunction
 	case t.WebSearchTool != nil:
 		return ToolTypeWebSearch
+	case t.ToolSearchTool != nil:
+		return ToolTypeToolSearch
 	default:
 		return ""
 	}
@@ -1004,6 +1080,23 @@ type FunctionTool struct {
 	Description string `json:"description"`
 	// The JSON schema of the parameters that the tool accepts. The type must be "object".
 	Parameters JSONSchema `json:"parameters"`
+	// Hide the tool from the model until a tool_search tool discovers it.
+	// Providers without tool search ignore this flag and load the tool eagerly.
+	DeferLoading *bool `json:"defer_loading,omitempty"`
+}
+
+// ToolSearchStrategy is the search algorithm of a hosted tool search.
+type ToolSearchStrategy string
+
+const (
+	ToolSearchStrategyRegex ToolSearchStrategy = "regex"
+	ToolSearchStrategyBM25  ToolSearchStrategy = "bm25"
+)
+
+// ToolSearchTool loads deferred function tools on demand through hosted search.
+type ToolSearchTool struct {
+	// The search algorithm, when the provider offers a choice. Defaults to "bm25".
+	Strategy *ToolSearchStrategy `json:"strategy,omitempty"`
 }
 
 // WebSearchTool represents a provider-hosted web search tool.
@@ -1048,6 +1141,15 @@ func (t Tool) MarshalJSON() ([]byte, error) {
 			WebSearchTool: t.WebSearchTool,
 		})
 	}
+	if t.ToolSearchTool != nil {
+		return json.Marshal(struct {
+			Type ToolType `json:"type"`
+			*ToolSearchTool
+		}{
+			Type:           ToolTypeToolSearch,
+			ToolSearchTool: t.ToolSearchTool,
+		})
+	}
 	return nil, fmt.Errorf("tool has no content")
 }
 
@@ -1073,6 +1175,12 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		t.WebSearchTool = &tool
+	case ToolTypeToolSearch:
+		var tool ToolSearchTool
+		if err := json.Unmarshal(data, &tool); err != nil {
+			return err
+		}
+		t.ToolSearchTool = &tool
 	default:
 		return fmt.Errorf("unknown tool type: %s", temp.Type)
 	}

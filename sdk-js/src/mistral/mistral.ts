@@ -409,6 +409,12 @@ function convertToMistralTool(
       "Hosted web search is not supported by Mistral Chat Completions; Mistral exposes it through Agents/Conversations",
     );
   }
+  if (tool.type === "tool_search") {
+    throw new UnsupportedError(
+      PROVIDER,
+      "Hosted tool search is not supported by Mistral Chat Completions",
+    );
+  }
 
   return {
     type: "function",

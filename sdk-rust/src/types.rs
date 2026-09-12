@@ -229,6 +229,7 @@ pub enum ToolResultStatus {
 pub enum ToolCall {
     Function(FunctionToolCall),
     WebSearch(WebSearchToolCall),
+    ToolSearch(ToolSearchToolCall),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -266,12 +267,32 @@ pub struct WebSearchToolCall {
     pub status: Option<WebSearchToolCallStatus>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ToolSearchToolCallStatus {
+    InProgress,
+    Completed,
+    Failed,
+}
+
+/// A provider-hosted search over the deferred tools of the request.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolSearchToolCall {
+    /// Opaque search arguments; preserve for conversation replay.
+    pub args: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<ToolSearchToolCallStatus>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ToolResult {
     Function(FunctionToolResult),
     WebSearch(WebSearchToolResult),
+    ToolSearch(ToolSearchToolResult),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -297,6 +318,17 @@ pub struct WebSearchSource {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct WebSearchToolResult {
     pub sources: Vec<WebSearchSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+}
+
+/// Discovered tools made available to the model.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolSearchToolResult {
+    /// Discovered tool names; each must be declared in the request's `tools`.
+    pub tool_names: Vec<String>,
+    /// Provider error code required to replay a failed hosted tool search.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<String>,
 }
@@ -432,6 +464,7 @@ pub struct ToolCallPartDelta {
 pub enum ToolCallDelta {
     Function(FunctionToolCallDelta),
     WebSearch(WebSearchToolCallDelta),
+    ToolSearch(ToolSearchToolCallDelta),
 }
 
 impl Default for ToolCallDelta {
@@ -456,6 +489,16 @@ pub struct WebSearchToolCallDelta {
     pub action: Option<WebSearchAction>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<WebSearchToolCallStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolSearchToolCallDelta {
+    /// The partial JSON string of the search arguments.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<ToolSearchToolCallStatus>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -545,6 +588,8 @@ pub enum Tool {
     Function(FunctionTool),
     #[serde(rename = "web_search")]
     WebSearch(WebSearchTool),
+    #[serde(rename = "tool_search")]
+    ToolSearch(ToolSearchTool),
 }
 
 /// Represents a client-executed function tool that can be used by the model.
@@ -558,6 +603,29 @@ pub struct FunctionTool {
     /// The JSON schema of the parameters that the tool accepts. The type must
     /// be "object".
     pub parameters: JSONSchema,
+    /// Hide the tool from the model until a `tool_search` tool discovers it.
+    /// Providers without tool search ignore this flag and load the tool
+    /// eagerly.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub defer_loading: Option<bool>,
+}
+
+/// Loads deferred function tools on demand through hosted search.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct ToolSearchTool {
+    /// The search algorithm, when the provider offers a choice. Defaults to
+    /// "bm25".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<ToolSearchStrategy>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum ToolSearchStrategy {
+    Regex,
+    Bm25,
 }
 
 /// Represents a provider-hosted web search tool.

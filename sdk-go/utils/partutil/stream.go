@@ -115,6 +115,17 @@ func LooselyConvertPartToPartDelta(part llmsdk.Part) llmsdk.PartDelta {
 				Signature:  part.ToolCallPart.Signature, ID: part.ToolCallPart.ID,
 			}}
 		}
+		if toolSearch := part.ToolCallPart.Call.ToolSearch; toolSearch != nil {
+			argsStr := string(toolSearch.Args)
+			if argsStr == "" {
+				argsStr = "{}"
+			}
+			return llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
+				ToolCallID: &part.ToolCallPart.ToolCallID,
+				Call:       llmsdk.ToolCallDelta{ToolSearch: &llmsdk.ToolSearchToolCallDelta{Args: &argsStr, Status: toolSearch.Status}},
+				Signature:  part.ToolCallPart.Signature, ID: part.ToolCallPart.ID,
+			}}
+		}
 		call := part.ToolCallPart.Call.Function
 		if call == nil {
 			return llmsdk.PartDelta{}

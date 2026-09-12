@@ -282,9 +282,13 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 	if input.Tools != nil {
 		var tools []openaichatapi.CreateChatCompletionRequestToolsItem
 		for _, tool := range input.Tools {
+			if tool.ToolSearchTool != nil {
+				return nil, llmsdk.NewUnsupportedError(Provider, "Hosted tool search is not supported by this OpenAI Chat Completions adapter; use OpenAIModel (Responses API)")
+			}
 			if tool.FunctionTool == nil {
 				return nil, llmsdk.NewUnsupportedError(Provider, "hosted web search is not supported by this OpenAI Chat Completions adapter; use OpenAIModel (Responses API)")
 			}
+			// Chat Completions cannot defer tools, so deferred tools are loaded eagerly.
 			functionTool := tool.FunctionTool
 			openAITool := openaichatapi.ChatCompletionTool{
 				Function: openaichatapi.FunctionObject{
