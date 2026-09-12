@@ -29,5 +29,7 @@ suite("CohereModel", () => {
   }
 
   test("image_input", (t) => runTestGroup(t, visionModel, "image_input"));
+  test("image_url_input", (t) =>
+    runTestGroup(t, visionModel, "image_url_input"));
   test("reasoning", (t) => runTestGroup(t, reasoningModel, "reasoning"));
 });

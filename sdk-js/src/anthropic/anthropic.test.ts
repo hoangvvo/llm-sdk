@@ -35,6 +35,10 @@ suite("AnthropicModel", () => {
     runTestGroup(t, getModel(), "web_search_tool_mix"),
   );
   test("image_input", (t) => runTestGroup(t, getModel(), "image_input"));
+  test("image_url_input", (t) =>
+    runTestGroup(t, getModel(), "image_url_input"));
+  test("file_input", (t) => runTestGroup(t, getModel(), "file_input"));
+  test("file_url_input", (t) => runTestGroup(t, getModel(), "file_url_input"));
   test("tool_search", { timeout: 120 * 1000 }, (t) =>
     runTestGroup(t, getModel(), "tool_search"),
   );

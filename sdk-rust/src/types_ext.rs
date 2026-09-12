@@ -1,10 +1,11 @@
 use crate::{
-    AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FunctionTool,
-    FunctionToolCall, FunctionToolResult, ImagePart, ImagePartDelta, LanguageModelInput, Message,
-    Modality, Part, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatOption,
-    SourcePart, TextPart, TextPartDelta, Tool, ToolCall, ToolCallDelta, ToolCallPart,
-    ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResult, ToolResultPart, ToolResultStatus,
-    ToolSearchStrategy, ToolSearchTool, UserMessage, WebSearchTool, WebSearchUserLocation,
+    AssistantMessage, AudioOptions, AudioPart, AudioPartDelta, CitationDelta, FilePart,
+    FunctionTool, FunctionToolCall, FunctionToolResult, ImagePart, ImagePartDelta,
+    LanguageModelInput, Message, Modality, Part, ReasoningOptions, ReasoningPart,
+    ReasoningPartDelta, ResponseFormatOption, SourcePart, TextPart, TextPartDelta, Tool, ToolCall,
+    ToolCallDelta, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResult,
+    ToolResultPart, ToolResultStatus, ToolSearchStrategy, ToolSearchTool, UserMessage,
+    WebSearchTool, WebSearchUserLocation,
 };
 
 impl TextPart {
@@ -53,7 +54,19 @@ impl ImagePart {
     pub fn new(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self {
             mime_type: mime_type.into(),
-            data: data.into(),
+            data: Some(data.into()),
+            url: None,
+            width: None,
+            height: None,
+            id: None,
+        }
+    }
+
+    pub fn from_url(url: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self {
+            mime_type: mime_type.into(),
+            data: None,
+            url: Some(url.into()),
             width: None,
             height: None,
             id: None,
@@ -82,7 +95,20 @@ impl ImagePart {
 impl AudioPart {
     pub fn new(data: impl Into<String>, format: crate::AudioFormat) -> Self {
         Self {
-            data: data.into(),
+            data: Some(data.into()),
+            url: None,
+            format,
+            sample_rate: None,
+            channels: None,
+            transcript: None,
+            id: None,
+        }
+    }
+
+    pub fn from_url(url: impl Into<String>, format: crate::AudioFormat) -> Self {
+        Self {
+            data: None,
+            url: Some(url.into()),
             format,
             sample_rate: None,
             channels: None,
@@ -112,6 +138,32 @@ impl AudioPart {
     #[must_use]
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
+        self
+    }
+}
+
+impl FilePart {
+    pub fn new(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self {
+            mime_type: mime_type.into(),
+            data: Some(data.into()),
+            url: None,
+            filename: None,
+        }
+    }
+
+    pub fn from_url(url: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self {
+            mime_type: mime_type.into(),
+            data: None,
+            url: Some(url.into()),
+            filename: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_filename(mut self, filename: impl Into<String>) -> Self {
+        self.filename = Some(filename.into());
         self
     }
 }
@@ -216,6 +268,12 @@ impl From<ImagePart> for Part {
 impl From<AudioPart> for Part {
     fn from(value: AudioPart) -> Self {
         Self::Audio(value)
+    }
+}
+
+impl From<FilePart> for Part {
+    fn from(value: FilePart) -> Self {
+        Self::File(value)
     }
 }
 
@@ -363,6 +421,10 @@ impl Part {
 
     pub fn audio(data: impl Into<String>, format: crate::AudioFormat) -> Self {
         Self::Audio(AudioPart::new(data, format))
+    }
+
+    pub fn file(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
+        Self::File(FilePart::new(data, mime_type))
     }
 
     pub fn source(source: impl Into<String>, title: impl Into<String>, content: Vec<Self>) -> Self {

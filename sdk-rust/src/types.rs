@@ -27,6 +27,7 @@ pub enum Part {
     Text(TextPart),
     Image(ImagePart),
     Audio(AudioPart),
+    File(FilePart),
     Source(SourcePart),
     ToolCall(ToolCallPart),
     ToolResult(ToolResultPart),
@@ -134,8 +135,12 @@ pub struct TextPart {
 pub struct ImagePart {
     /// The MIME type of the image. E.g. "image/jpeg", "image/png".
     pub mime_type: String,
-    /// The base64-encoded image data.
-    pub data: String,
+    /// Base64 content; either `data` or `url` must be provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// Fetched by the provider; URL support depends on the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     /// The width of the image in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<u32>,
@@ -151,8 +156,12 @@ pub struct ImagePart {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct AudioPart {
-    /// The base64-encoded audio data.
-    pub data: String,
+    /// Base64 content; either `data` or `url` must be provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// Fetched by the provider; URL support depends on the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     /// The format of the audio.
     pub format: AudioFormat,
     /// The sample rate of the audio. E.g. 44100, 48000.
@@ -167,6 +176,25 @@ pub struct AudioPart {
     /// The ID of the audio part, if applicable
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+}
+
+/// Document or video input; accepted MIME types depend on the model.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct FilePart {
+    /// The MIME type of the file. E.g. "application/pdf", "text/plain",
+    /// "video/mp4".
+    pub mime_type: String,
+    /// The file contents in the format accepted by the model.
+    /// Either `data` or `url` must be provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// Fetched by the provider; URL support depends on the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Document name; some models require it for inline files.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
 }
 
 /// A part of the message that contains a source with structured content.
@@ -693,8 +721,8 @@ pub struct ModelTokensDetails {
     /// Cache writes, billed separately from cache reads.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_write_tokens: Option<u32>,
-    /// The subset of `cache_write_tokens` stored with extended retention (see
-    /// `cache_retention`), which some providers bill at a higher rate.
+    /// The subset of `cache_write_tokens` stored with extended retention (see `cache_retention`),
+    /// which some providers bill at a higher rate.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extended_cache_write_tokens: Option<u32>,
     /// The tokens spent on reasoning.
@@ -861,10 +889,9 @@ pub struct LanguageModelInput {
     /// Options for reasoning generation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ReasoningOptions>,
-    /// Opts into the provider's prompt cache and chooses how long entries are
-    /// kept. `Standard` uses the provider's default retention and
-    /// `Extended` the longest it offers. Providers without a retention
-    /// setting ignore this option.
+    /// Opts into the provider's prompt cache and chooses how long entries are kept.
+    /// `Standard` uses the provider's default retention and `Extended` the longest it offers.
+    /// Providers without a retention setting ignore this option.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_retention: Option<CacheRetention>,
 }
@@ -891,8 +918,7 @@ pub struct LanguageModelPricing {
     /// The cost in USD per single cache-write input token.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_cost_per_cache_write_token: Option<f64>,
-    /// The cost in USD per single cache-write input token stored with extended
-    /// retention. Defaults to `input_cost_per_cache_write_token`.
+    /// The cost in USD per single cache-write input token stored with extended retention. Defaults to `input_cost_per_cache_write_token`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_cost_per_extended_cache_write_token: Option<f64>,
     /// The cost in USD per single cached text token for input.

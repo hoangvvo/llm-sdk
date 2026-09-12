@@ -33,7 +33,7 @@ if (!audioPart) {
   throw new Error("Audio part not found in response");
 }
 
-await play(Buffer.from(audioPart.data, "base64"));
+await play(Buffer.from(audioPart.data ?? "", "base64"));
 
 async function play(audio: Buffer) {
   const player = spawn(

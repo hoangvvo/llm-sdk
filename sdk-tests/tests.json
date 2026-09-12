@@ -3054,6 +3054,112 @@
       ]
     },
     {
+      "name": "generate_image_url_input",
+      "groups": ["image_url_input"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Which programming language logo is this? Answer with the name only."
+                  },
+                  {
+                    "type": "image",
+                    "mime_type": "image/png",
+                    "url": "https://raw.githubusercontent.com/github/explore/main/topics/python/python.png"
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Python|python"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_file_input",
+      "groups": ["file_input"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What is the secret code in the attached PDF? Answer with one word."
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "data": "JVBERi0xLjQKMSAwIG9iaiA8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4gZW5kb2JqCjIgMCBvYmogPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4gZW5kb2JqCjMgMCBvYmogPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMTQ0XSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4gPj4gPj4gZW5kb2JqCjQgMCBvYmogPDwgL0xlbmd0aCA2MCA+PiBzdHJlYW0KQlQgL0YxIDI0IFRmIDIwIDYwIFRkIChTZWNyZXQgY29kZTogUEVMSUNBTikgVGogRVQKZW5kc3RyZWFtIGVuZG9iago1IDAgb2JqIDw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PiBlbmRvYmoKdHJhaWxlciA8PCAvUm9vdCAxIDAgUiA+PgolJUVPRgo=",
+                    "filename": "secret.pdf"
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "PELICAN|Pelican|pelican"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_file_url_input",
+      "groups": ["file_url_input"],
+      "stages": [
+        {
+          "type": "generate",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What is the text in the attached PDF? Reply with the text only."
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+                  }
+                ]
+              }
+            ]
+          },
+          "expect": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Dummy|dummy"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "generate_tool_search",
       "groups": ["tool_search"],
       "stages": [

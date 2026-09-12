@@ -66,6 +66,18 @@ func TestImageInput(t *testing.T) {
 	testcommon.RunTestGroup(t, anthropicModel(t), "image_input")
 }
 
+func TestImageURLInput(t *testing.T) {
+	testcommon.RunTestGroup(t, anthropicModel(t), "image_url_input")
+}
+
+func TestFileInput(t *testing.T) {
+	testcommon.RunTestGroup(t, anthropicModel(t), "file_input")
+}
+
+func TestFileURLInput(t *testing.T) {
+	testcommon.RunTestGroup(t, anthropicModel(t), "file_url_input")
+}
+
 func TestToolSearch(t *testing.T) {
 	testcommon.RunTestGroup(t, anthropicModel(t), "tool_search")
 }

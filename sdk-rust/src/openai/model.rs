@@ -6,7 +6,8 @@ use crate::{
         FunctionCallOutputItemParamOutputArrayItem, FunctionCallOutputItemParamType,
         FunctionCallOutputStatusEnum, FunctionCallStatus, FunctionTool, FunctionToolCall,
         FunctionToolCallType, FunctionToolType, ImageDetail, ImageGenTool, ImageGenToolCall,
-        ImageGenToolCallType, ImageGenToolType, IncludeEnum, InputContent, InputImageContent,
+        ImageGenToolCallType, ImageGenToolType, IncludeEnum, InputContent, InputFileContent,
+        InputFileContentParam, InputFileContentType, InputImageContent,
         InputImageContentParamAutoParam, InputImageContentType, InputItem, InputMessage,
         InputMessageRole, InputMessageType, InputTextContent, InputTextContentParam,
         InputTextContentType, NamespaceToolParamToolsItem, OutputItem, OutputMessage,
@@ -24,7 +25,7 @@ use crate::{
     },
     source_part_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
-    AssistantMessage, CacheRetention, Citation, CitationDelta, ContentDelta, ImagePart,
+    AssistantMessage, CacheRetention, Citation, CitationDelta, ContentDelta, FilePart, ImagePart,
     ImagePartDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
     LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelServerToolUsage,
     ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions,
@@ -442,11 +443,19 @@ impl TryFrom<UserMessage> for InputItem {
                                     InputContent::InputImage(InputImageContent {
                                         detail: Some(ImageDetail::Auto),
                                         file_id: None,
-                                        image_url: Some(format!(
-                                            "data:{};base64,{}",
-                                            image_part.mime_type, image_part.data
-                                        )),
+                                        image_url: Some(convert_to_openai_image_url(image_part)),
                                         r#type: InputImageContentType::InputImage,
+                                    })
+                                }
+                                Part::File(file_part) => {
+                                    let file = convert_to_openai_input_file(file_part);
+                                    InputContent::InputFile(InputFileContent {
+                                        detail: None,
+                                        file_data: file.file_data,
+                                        file_id: None,
+                                        file_url: file.file_url,
+                                        filename: file.filename,
+                                        r#type: InputFileContentType::InputFile,
                                     })
                                 }
                                 _ => Err(LanguageModelError::Unsupported(
@@ -462,6 +471,49 @@ impl TryFrom<UserMessage> for InputItem {
                 ),
             },
         )))
+    }
+}
+
+/// Converts a media part to the `image_url` of an `OpenAI` input image.
+fn convert_to_openai_image_url(image_part: ImagePart) -> String {
+    image_part.url.unwrap_or_else(|| {
+        format!(
+            "data:{};base64,{}",
+            image_part.mime_type,
+            image_part.data.unwrap_or_default()
+        )
+    })
+}
+
+/// The fields shared by the `input_file` content of user messages and tool
+/// results.
+struct OpenAIInputFile {
+    file_data: Option<String>,
+    file_url: Option<String>,
+    filename: Option<String>,
+}
+
+fn convert_to_openai_input_file(file_part: FilePart) -> OpenAIInputFile {
+    let FilePart {
+        mime_type,
+        data,
+        url,
+        filename,
+    } = file_part;
+    match url {
+        Some(url) => OpenAIInputFile {
+            file_data: None,
+            file_url: Some(url),
+            filename,
+        },
+        None => OpenAIInputFile {
+            file_data: Some(format!(
+                "data:{mime_type};base64,{}",
+                data.unwrap_or_default()
+            )),
+            file_url: None,
+            filename,
+        },
     }
 }
 
@@ -515,7 +567,8 @@ fn convert_assistant_message_to_response_input_items(
                         status: responses_api::ImageGenToolCallStatus::Completed,
                         result: Some(format!(
                             "data:{};base64,{}",
-                            image_part.mime_type, image_part.data
+                            image_part.mime_type,
+                            image_part.data.unwrap_or_default()
                         )),
                         size: None,
                         r#type: ImageGenToolCallType::ImageGenerationCall,
@@ -590,94 +643,92 @@ fn convert_assistant_message_to_response_input_items(
 fn convert_tool_message_to_response_input_items(
     tool_message: ToolMessage,
 ) -> LanguageModelResult<Vec<InputItem>> {
-    tool_message
-        .content
-        .into_iter()
-        .try_fold(Vec::new(), |mut acc, part| {
-            if let Part::ToolResult(ToolResultPart {
-                result: crate::ToolResult::Function(result),
-                tool_call_id,
-                status,
-                ..
-            }) = part
-            {
-                let tool_result_part_content =
-                    source_part_utils::get_compatible_parts_without_source_parts(result.content);
+    let mut items = Vec::new();
+    for part in tool_message.content {
+        let Part::ToolResult(ToolResultPart {
+            tool_call_id,
+            result,
+            status,
+        }) = part
+        else {
+            return Err(LanguageModelError::InvalidInput(
+                "Tool messages must contain only tool result parts".to_string(),
+            ));
+        };
 
-                if tool_result_part_content.is_empty() {
-                    acc.push(InputItem::Item(
-                        responses_api::Item::FunctionCallOutputItemParam(
-                            FunctionCallOutputItemParam {
-                                call_id: tool_call_id,
-                                output: FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputString(Some(
-                                    if status == ToolResultStatus::Cancelled {
-                                        CANCELLED_TOOL_RESULT_FALLBACK_CONTENT.to_string()
-                                    } else {
-                                        String::new()
-                                    },
-                                )),
-                                id: None,
-                                status: None,
-                                r#type: FunctionCallOutputItemParamType::FunctionCallOutput,
-                            },
-                        ),
-                    ));
-                    return Ok(acc);
-                }
+        // Hosted tool results are replayed through their assistant-message items.
+        let ToolResult::Function(result) = result else {
+            continue;
+        };
 
-                let items = tool_result_part_content
+        let tool_result_part_content =
+            source_part_utils::get_compatible_parts_without_source_parts(result.content);
+
+        let output = if tool_result_part_content.is_empty() {
+            FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputString(Some(
+                if status == ToolResultStatus::Cancelled {
+                    CANCELLED_TOOL_RESULT_FALLBACK_CONTENT.to_string()
+                } else {
+                    String::new()
+                },
+            ))
+        } else {
+            // A call has exactly one output item, so every result part becomes an
+            // entry of the same output list.
+            FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputArray(Some(
+                tool_result_part_content
                     .into_iter()
-                    .map(|tool_result_part_part| {
-                        let output = match tool_result_part_part {
-                            Part::Text(text_part) => FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputArray(Some(vec![
-                                FunctionCallOutputItemParamOutputArrayItem::InputText(
-                                    InputTextContentParam {
-                                        text: text_part.text,
-                                    },
-                                ),
-                            ])),
-                            Part::Image(image_part) => FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputArray(Some(vec![
-                                FunctionCallOutputItemParamOutputArrayItem::InputImage(
-                                    InputImageContentParamAutoParam {
-                                        detail: Some(DetailEnum::Auto),
-                                        file_id: None,
-                                        image_url: Some(format!(
-                                            "data:{};base64,{}",
-                                            image_part.mime_type, image_part.data
-                                        )),
-                                    },
-                                ),
-                            ])),
-                            _ => Err(LanguageModelError::Unsupported(
-                                PROVIDER,
-                                format!(
-                                    "Cannot convert tool result part to OpenAI input item for \
-                                     part {tool_result_part_part:?}"
-                                ),
-                            ))?,
-                        };
+                    .map(convert_to_openai_function_call_output_item)
+                    .collect::<LanguageModelResult<Vec<_>>>()?,
+            ))
+        };
 
-                        Ok(InputItem::Item(responses_api::Item::FunctionCallOutputItemParam(
-                            FunctionCallOutputItemParam {
-                                call_id: tool_call_id.clone(),
-                                output,
-                                id: None,
-                                status: None,
-                                r#type: FunctionCallOutputItemParamType::FunctionCallOutput,
-                            },
-                        )))
-                    })
-                    .collect::<LanguageModelResult<Vec<_>>>()?;
+        items.push(InputItem::Item(
+            responses_api::Item::FunctionCallOutputItemParam(FunctionCallOutputItemParam {
+                call_id: tool_call_id,
+                output,
+                id: None,
+                status: None,
+                r#type: FunctionCallOutputItemParamType::FunctionCallOutput,
+            }),
+        ));
+    }
+    Ok(items)
+}
 
-                acc.extend(items);
-
-                Ok(acc)
-            } else {
-                Err(LanguageModelError::InvalidInput(
-                    "Tool messages must contain only tool result parts".to_string(),
-                ))
-            }
-        })
+fn convert_to_openai_function_call_output_item(
+    part: Part,
+) -> LanguageModelResult<FunctionCallOutputItemParamOutputArrayItem> {
+    match part {
+        Part::Text(text_part) => Ok(FunctionCallOutputItemParamOutputArrayItem::InputText(
+            InputTextContentParam {
+                text: text_part.text,
+            },
+        )),
+        Part::Image(image_part) => Ok(FunctionCallOutputItemParamOutputArrayItem::InputImage(
+            InputImageContentParamAutoParam {
+                detail: Some(DetailEnum::Auto),
+                file_id: None,
+                image_url: Some(convert_to_openai_image_url(image_part)),
+            },
+        )),
+        Part::File(file_part) => {
+            let file = convert_to_openai_input_file(file_part);
+            Ok(FunctionCallOutputItemParamOutputArrayItem::InputFile(
+                InputFileContentParam {
+                    detail: None,
+                    file_data: file.file_data,
+                    file_id: None,
+                    file_url: file.file_url,
+                    filename: file.filename,
+                },
+            ))
+        }
+        _ => Err(LanguageModelError::Unsupported(
+            PROVIDER,
+            format!("Cannot convert tool result part to OpenAI input item for part {part:?}"),
+        )),
+    }
 }
 
 fn convert_to_openai_tool_search_output(

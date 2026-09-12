@@ -100,7 +100,8 @@ cargo run --example generate-text --features examples,openai
 
 ### To 0.4.0
 
-- Update exhaustive matches: `Tool`, `ToolCall`, `ToolResult`, and `ToolCallDelta` add `ToolSearch`.
+- Wrap inline `ImagePart.data` and `AudioPart.data` in `Some(...)`; handle `None` for URL-only media. Set `url: None` in inline media literals.
+- Update exhaustive matches: `Part` adds `File`; `Tool`, `ToolCall`, `ToolResult`, and `ToolCallDelta` add `ToolSearch`.
 - `ReasoningPartDelta.text` is now `String`. Use an empty string for deltas without text.
 - Add the new optional fields to struct literals, or use `..Default::default()` where available.
 - Replace `Tool { name, description, parameters }` with `FunctionTool::new(...)`.

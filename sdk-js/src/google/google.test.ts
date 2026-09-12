@@ -42,6 +42,12 @@ suite("GoogleModel", () => {
   test("image_input", { timeout: 120 * 1000 }, (t) =>
     runTestGroup(t, getModel("gemini-3.1-flash-image"), "image_input"),
   );
+  // URL inputs are forwarded as fileData, but the Gemini Developer API rejects
+  // public HTTPS URLs with PERMISSION_DENIED for this project, so the URL
+  // groups are not exercised here.
+  test("file_input", { timeout: 120 * 1000 }, (t) =>
+    runTestGroup(t, getModel(), "file_input"),
+  );
   test("audio_generation", (t) =>
     runTestGroup(
       t,

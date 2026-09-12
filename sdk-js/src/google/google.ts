@@ -37,6 +37,7 @@ import type {
   LanguageModelCallOptions,
   LanguageModelMetadata,
 } from "../language-model.ts";
+import type { AudioPart, FilePart, ImagePart } from "../types.ts";
 import { traceLanguageModel } from "../opentelemetry.ts";
 import { getCompatiblePartsWithoutSourceParts } from "../source-part.utils.ts";
 import {
@@ -412,23 +413,13 @@ function convertToGoogleParts(part: Part): GooglePart[] {
           : { text: part.text },
       ];
     case "image":
-      return [
-        {
-          inlineData: {
-            data: part.data,
-            mimeType: part.mime_type,
-          },
-        },
-      ];
+      return [convertToGoogleMediaPart(part, part.mime_type)];
     case "audio":
       return [
-        {
-          inlineData: {
-            data: part.data,
-            mimeType: mapAudioFormatToMimeType(part.format),
-          },
-        },
+        convertToGoogleMediaPart(part, mapAudioFormatToMimeType(part.format)),
       ];
+    case "file":
+      return [convertToGoogleMediaPart(part, part.mime_type)];
     case "reasoning": {
       const googleReasoningPart: GooglePart = {
         text: part.text,
@@ -496,13 +487,14 @@ function convertToGoogleFunctionResponse(
         break;
       case "image":
       case "audio":
+      case "file":
         functionResponseParts.push({
           inlineData: {
-            data: part.data,
+            data: part.data ?? "",
             mimeType:
-              part.type === "image"
-                ? part.mime_type
-                : mapAudioFormatToMimeType(part.format),
+              part.type === "audio"
+                ? mapAudioFormatToMimeType(part.format)
+                : part.mime_type,
           },
         });
         break;
@@ -544,6 +536,20 @@ function maybeParseJSON(text: string) {
   } catch {
     return { data: text };
   }
+}
+
+/**
+ * URLs are forwarded as file data, which Gemini resolves for Files API URIs,
+ * YouTube links and public HTTPS URLs of supported MIME types.
+ */
+function convertToGoogleMediaPart(
+  part: ImagePart | AudioPart | FilePart,
+  mimeType: string,
+): GooglePart {
+  if (part.url) {
+    return { fileData: { fileUri: part.url, mimeType } };
+  }
+  return { inlineData: { data: part.data ?? "", mimeType } };
 }
 
 function convertToGoogleTools(tools: Tool[]): GoogleTool[] {

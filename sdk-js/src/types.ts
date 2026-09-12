@@ -10,6 +10,7 @@ export type Part =
   | TextPart
   | ImagePart
   | AudioPart
+  | FilePart
   | SourcePart
   | ToolCallPart
   | ToolResultPart
@@ -87,9 +88,13 @@ export interface ImagePart {
    */
   mime_type: string;
   /**
-   * The base64-encoded image data.
+   * Base64 content; either `data` or `url` must be provided.
    */
-  data: string;
+  data?: string;
+  /**
+   * Fetched by the provider; URL support depends on the model.
+   */
+  url?: string;
   /**
    * The width of the image in pixels.
    */
@@ -109,9 +114,13 @@ export interface ImagePart {
 export interface AudioPart {
   type: "audio";
   /**
-   * The base64-encoded audio data.
+   * Base64 content; either `data` or `url` must be provided.
    */
-  data: string;
+  data?: string;
+  /**
+   * Fetched by the provider; URL support depends on the model.
+   */
+  url?: string;
   format: AudioFormat;
   /**
    * The sample rate of the audio. E.g. 44100, 48000.
@@ -129,6 +138,29 @@ export interface AudioPart {
    * ID of the audio part, if applicable
    */
   id?: string;
+}
+/**
+ * Document or video input; accepted MIME types depend on the model.
+ */
+export interface FilePart {
+  type: "file";
+  /**
+   * The MIME type of the file. E.g. "application/pdf", "text/plain", "video/mp4".
+   */
+  mime_type: string;
+  /**
+   * The file contents in the format accepted by the model.
+   * Either `data` or `url` must be provided.
+   */
+  data?: string;
+  /**
+   * Fetched by the provider; URL support depends on the model.
+   */
+  url?: string;
+  /**
+   * Document name; some models require it for inline files.
+   */
+  filename?: string;
 }
 /**
  * A part of the message that contains a source with structured content.

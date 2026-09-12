@@ -78,6 +78,18 @@ func TestImageInput(t *testing.T) {
 	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "image_input")
 }
 
+func TestImageURLInput(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "image_url_input")
+}
+
+func TestFileInput(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "file_input")
+}
+
+func TestFileURLInput(t *testing.T) {
+	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "file_url_input")
+}
+
 func TestToolSearch(t *testing.T) {
 	testcommon.RunTestGroup(t, openAIModel(t, "gpt-5.6-sol"), "tool_search")
 }

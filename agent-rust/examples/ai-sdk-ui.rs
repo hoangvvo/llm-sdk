@@ -817,6 +817,7 @@ fn ui_messages_to_messages(messages: &[UIMessage]) -> Result<Vec<Message>, Strin
                             | Part::Reasoning(_)
                             | Part::Audio(_)
                             | Part::Image(_)
+                            | Part::File(_)
                             | Part::ToolCall(_) => {
                                 append_assistant_message(&mut history, converted);
                             }

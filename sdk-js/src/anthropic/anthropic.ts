@@ -17,6 +17,7 @@ import type {
   Message,
   ModelResponse,
   ModelTokensDetails,
+  FilePart,
   ModelUsage,
   Part,
   PartDelta,
@@ -427,6 +428,8 @@ function convertToAnthropicContentBlockParam(
       return convertToAnthropicTextBlockParam(part);
     case "image":
       return convertToAnthropicImageBlockParam(part);
+    case "file":
+      return convertToAnthropicDocumentBlockParam(part);
     case "source":
       return convertToAnthropicSearchResultBlockParam(part);
     case "tool-call":
@@ -483,23 +486,50 @@ function convertToAnthropicImageBlockParam(
 
 function convertToAnthropicImageSource(
   part: ImagePart,
-): Anthropic.Messages.Base64ImageSource {
-  switch (part.mime_type) {
-    case "image/jpeg":
-    case "image/png":
-    case "image/gif":
-    case "image/webp":
-      return {
-        data: part.data,
-        type: "base64",
-        media_type: part.mime_type,
-      };
-    default:
-      throw new UnsupportedError(
-        PROVIDER,
-        `Cannot convert image MIME type ${part.mime_type} to Anthropic image source`,
-      );
+): Anthropic.Messages.Base64ImageSource | Anthropic.Messages.URLImageSource {
+  if (part.url) {
+    return { type: "url", url: part.url };
   }
+  return {
+    type: "base64",
+    media_type:
+      part.mime_type as Anthropic.Messages.Base64ImageSource["media_type"],
+    data: part.data ?? "",
+  };
+}
+
+function convertToAnthropicDocumentBlockParam(
+  part: FilePart,
+): Anthropic.Messages.DocumentBlockParam {
+  const block: Anthropic.Messages.DocumentBlockParam = {
+    type: "document",
+    source: convertToAnthropicDocumentSource(part),
+  };
+  if (part.filename) {
+    block.title = part.filename;
+  }
+  return block;
+}
+
+function convertToAnthropicDocumentSource(
+  part: FilePart,
+): Anthropic.Messages.DocumentBlockParam["source"] {
+  if (part.url !== undefined) {
+    return { type: "url", url: part.url };
+  }
+  if (part.mime_type === "text/plain") {
+    return {
+      type: "text",
+      media_type: "text/plain",
+      data: part.data ?? "",
+    };
+  }
+  return {
+    type: "base64",
+    media_type:
+      part.mime_type as Anthropic.Messages.Base64PDFSource["media_type"],
+    data: part.data ?? "",
+  };
 }
 
 function convertToAnthropicSearchResultBlockParam(
@@ -602,6 +632,7 @@ function convertToAnthropicToolResultBlockParam(
             if (
               blockParam.type !== "text" &&
               blockParam.type !== "image" &&
+              blockParam.type !== "document" &&
               blockParam.type !== "search_result"
             ) {
               throw new UnsupportedError(

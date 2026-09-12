@@ -33,7 +33,6 @@ func WithTextSignature(signature string) TextPartOption {
 	}
 }
 
-// NewImagePart creates a new image part
 func NewImagePart(data, mimeType string, opts ...ImagePartOption) Part {
 	imagePart := &ImagePart{
 		Data:     data,
@@ -69,7 +68,13 @@ func WithImageID(imageID string) ImagePartOption {
 	}
 }
 
-// NewAudioPart creates a new audio part
+// WithImageURL references the image by URL instead of inline data.
+func WithImageURL(url string) ImagePartOption {
+	return func(p *ImagePart) {
+		p.URL = &url
+	}
+}
+
 func NewAudioPart(data string, format AudioFormat, opts ...AudioPartOption) Part {
 	audioPart := &AudioPart{
 		Data:   data,
@@ -108,6 +113,43 @@ func WithAudioTranscript(transcript string) AudioPartOption {
 func WithAudioID(audioID string) AudioPartOption {
 	return func(p *AudioPart) {
 		p.ID = &audioID
+	}
+}
+
+// WithAudioURL references the audio by URL instead of inline data.
+func WithAudioURL(url string) AudioPartOption {
+	return func(p *AudioPart) {
+		p.URL = &url
+	}
+}
+
+func NewFilePart(data, mimeType string, opts ...FilePartOption) Part {
+	filePart := &FilePart{
+		Data:     data,
+		MimeType: mimeType,
+	}
+
+	for _, opt := range opts {
+		opt(filePart)
+	}
+
+	return Part{
+		FilePart: filePart,
+	}
+}
+
+type FilePartOption func(*FilePart)
+
+func WithFileFilename(filename string) FilePartOption {
+	return func(p *FilePart) {
+		p.Filename = &filename
+	}
+}
+
+// WithFileURL references the file by URL instead of inline data.
+func WithFileURL(url string) FilePartOption {
+	return func(p *FilePart) {
+		p.URL = &url
 	}
 }
 

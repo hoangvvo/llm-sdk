@@ -434,19 +434,11 @@ func convertToGoogleParts(part llmsdk.Part) ([]googleapi.Part, error) {
 			ThoughtSignature: part.TextPart.Signature,
 		}}, nil
 	case part.ImagePart != nil:
-		return []googleapi.Part{{
-			InlineData: &googleapi.Blob{
-				Data:     &part.ImagePart.Data,
-				MimeType: &part.ImagePart.MimeType,
-			},
-		}}, nil
+		return []googleapi.Part{convertToGoogleMediaPart(part, part.ImagePart.MimeType)}, nil
 	case part.AudioPart != nil:
-		return []googleapi.Part{{
-			InlineData: &googleapi.Blob{
-				Data:     &part.AudioPart.Data,
-				MimeType: ptr.To(partutil.MapAudioFormatToMimeType(part.AudioPart.Format)),
-			},
-		}}, nil
+		return []googleapi.Part{convertToGoogleMediaPart(part, partutil.MapAudioFormatToMimeType(part.AudioPart.Format))}, nil
+	case part.FilePart != nil:
+		return []googleapi.Part{convertToGoogleMediaPart(part, part.FilePart.MimeType)}, nil
 	case part.ReasoningPart != nil:
 		return []googleapi.Part{{
 			Text:             &part.ReasoningPart.Text,
@@ -511,18 +503,21 @@ func convertToGoogleFunctionResponse(parts []llmsdk.Part, status llmsdk.ToolResu
 		switch {
 		case part.TextPart != nil:
 			textParts = append(textParts, *part.TextPart)
-		case part.ImagePart != nil:
+		case part.ImagePart != nil, part.AudioPart != nil, part.FilePart != nil:
+			// Function responses only accept inline data.
+			var data, mimeType string
+			switch {
+			case part.ImagePart != nil:
+				data, mimeType = part.ImagePart.Data, part.ImagePart.MimeType
+			case part.AudioPart != nil:
+				data, mimeType = part.AudioPart.Data, partutil.MapAudioFormatToMimeType(part.AudioPart.Format)
+			default:
+				data, mimeType = part.FilePart.Data, part.FilePart.MimeType
+			}
 			functionResponseParts = append(functionResponseParts, googleapi.FunctionResponsePart{
 				InlineData: &googleapi.FunctionResponseBlob{
-					Data:     &part.ImagePart.Data,
-					MimeType: &part.ImagePart.MimeType,
-				},
-			})
-		case part.AudioPart != nil:
-			functionResponseParts = append(functionResponseParts, googleapi.FunctionResponsePart{
-				InlineData: &googleapi.FunctionResponseBlob{
-					Data:     &part.AudioPart.Data,
-					MimeType: ptr.To(partutil.MapAudioFormatToMimeType(part.AudioPart.Format)),
+					Data:     &data,
+					MimeType: &mimeType,
 				},
 			})
 		default:
@@ -560,6 +555,26 @@ func convertToGoogleFunctionResponse(parts []llmsdk.Part, status llmsdk.ToolResu
 		return responses
 	}()
 	return map[string]any{key: response}, functionResponseParts, nil
+}
+
+// convertToGoogleMediaPart forwards URLs as file data, which Gemini resolves
+// for Files API URIs, YouTube links and public HTTPS URLs of supported MIME
+// types. Inline data is sent as-is.
+func convertToGoogleMediaPart(part llmsdk.Part, mimeType string) googleapi.Part {
+	var data string
+	var url *string
+	switch {
+	case part.ImagePart != nil:
+		data, url = part.ImagePart.Data, part.ImagePart.URL
+	case part.AudioPart != nil:
+		data, url = part.AudioPart.Data, part.AudioPart.URL
+	case part.FilePart != nil:
+		data, url = part.FilePart.Data, part.FilePart.URL
+	}
+	if url != nil {
+		return googleapi.Part{FileData: &googleapi.FileData{FileUri: url, MimeType: &mimeType}}
+	}
+	return googleapi.Part{InlineData: &googleapi.Blob{Data: &data, MimeType: &mimeType}}
 }
 
 func convertToGoogleTools(tools []llmsdk.Tool) ([]googleapi.Tool, error) {

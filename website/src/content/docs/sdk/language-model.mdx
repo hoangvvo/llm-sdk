@@ -116,7 +116,7 @@ Three message types are defined in the SDK: `UserMessage`, `AssistantMessage`, a
 
 ## Part
 
-The following `Part` types are implemented in the SDK: [`TextPart`](#text-part), [`ImagePart`](#image-part), [`AudioPart`](#audio-part), [`SourcePart`](#source-part) (for citation), [`ToolCallPart`](#tool-call-part), and [`ToolResultPart`](#tool-result-part).
+The following `Part` types are implemented in the SDK: [`TextPart`](#text-part), [`ImagePart`](#image-part), [`AudioPart`](#audio-part), [`FilePart`](#file-part), [`SourcePart`](#source-part) (for citation), [`ToolCallPart`](#tool-call-part), [`ToolResultPart`](#tool-result-part), and [`ReasoningPart`](#reasoning-part).
 
 <Tabs>
   <TabItem label="TypeScript">
@@ -193,6 +193,24 @@ The following `Part` types are implemented in the SDK: [`TextPart`](#text-part),
       lang="go"
       title="types.go"
     />
+  </TabItem>
+</Tabs>
+
+### File Part
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes(["FilePart"])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code code={extractRustTypes(["FilePart"])} lang="rust" title="types.rs" />
+  </TabItem>
+  <TabItem label="Go">
+    <Code code={extractGoTypes(["FilePart"])} lang="go" title="types.go" />
   </TabItem>
 </Tabs>
 

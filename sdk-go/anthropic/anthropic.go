@@ -607,15 +607,11 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 
 	case part.ImagePart != nil:
 		return anthropicapi.InputContentBlock{
-			Image: &anthropicapi.RequestImageBlock{
-				Source: anthropicapi.RequestImageBlockSource{
-					Base64: &anthropicapi.Base64ImageSource{
-						Data:      part.ImagePart.Data,
-						MediaType: anthropicapi.Base64ImageSourceMediaType(part.ImagePart.MimeType),
-					},
-				},
-			},
+			Image: &anthropicapi.RequestImageBlock{Source: convertToAnthropicImageSource(part.ImagePart)},
 		}, nil
+
+	case part.FilePart != nil:
+		return anthropicapi.InputContentBlock{Document: convertToAnthropicDocumentBlock(part.FilePart)}, nil
 
 	case part.SourcePart != nil:
 		textBlocks := make([]anthropicapi.RequestTextBlock, 0, len(part.SourcePart.Content))
@@ -733,7 +729,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			if err != nil {
 				return anthropicapi.InputContentBlock{}, err
 			}
-			if block.Text == nil && block.Image == nil && block.SearchResult == nil {
+			if block.Text == nil && block.Image == nil && block.Document == nil && block.SearchResult == nil {
 				return anthropicapi.InputContentBlock{}, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert tool result part to anthropic content for type %s", subPart.Type()))
 			}
 			contentBlocks = append(contentBlocks, block)
@@ -743,6 +739,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 			content = append(content, anthropicapi.RequestToolResultBlockContentArrayItem{
 				Text:         block.Text,
 				Image:        block.Image,
+				Document:     block.Document,
 				SearchResult: block.SearchResult,
 			})
 		}
@@ -783,6 +780,29 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 	}
 
 	return anthropicapi.InputContentBlock{}, llmsdk.NewUnsupportedError(Provider, fmt.Sprintf("cannot convert part to anthropic content for type %s", part.Type()))
+}
+
+func convertToAnthropicImageSource(image *llmsdk.ImagePart) anthropicapi.RequestImageBlockSource {
+	if image.URL != nil {
+		return anthropicapi.RequestImageBlockSource{Url: &anthropicapi.URLImageSource{Url: *image.URL}}
+	}
+	return anthropicapi.RequestImageBlockSource{Base64: &anthropicapi.Base64ImageSource{
+		Data:      image.Data,
+		MediaType: anthropicapi.Base64ImageSourceMediaType(image.MimeType),
+	}}
+}
+
+func convertToAnthropicDocumentBlock(file *llmsdk.FilePart) *anthropicapi.RequestDocumentBlock {
+	block := &anthropicapi.RequestDocumentBlock{Type: "document", Title: file.Filename}
+	switch {
+	case file.URL != nil:
+		block.Source = anthropicapi.RequestDocumentBlockSource{Url: &anthropicapi.URLPDFSource{Url: *file.URL}}
+	case file.MimeType == "text/plain":
+		block.Source = anthropicapi.RequestDocumentBlockSource{Text: &anthropicapi.PlainTextSource{Data: file.Data, MediaType: "text/plain"}}
+	default:
+		block.Source = anthropicapi.RequestDocumentBlockSource{Base64: &anthropicapi.Base64PDFSource{Data: file.Data, MediaType: file.MimeType}}
+	}
+	return block
 }
 
 func convertToAnthropicToolChoice(option llmsdk.ToolChoiceOption) *anthropicapi.ToolChoice {

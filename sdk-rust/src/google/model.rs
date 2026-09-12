@@ -1,5 +1,5 @@
 use super::api::{
-    Blob, Content, FunctionCall, FunctionCallingConfig, FunctionCallingConfigMode,
+    Blob, Content, FileData, FunctionCall, FunctionCallingConfig, FunctionCallingConfigMode,
     FunctionDeclaration, FunctionResponse, FunctionResponseBlob, FunctionResponsePart,
     GenerateContentRequest, GenerateContentResponse, GenerationConfig,
     GenerationConfigResponseModalitiesItem, GoogleSearch, GroundingChunk, GroundingMetadata,
@@ -509,22 +509,21 @@ fn convert_to_google_parts(part: Part) -> LanguageModelResult<Vec<GooglePart>> {
             thought_signature: text_part.signature,
             ..Default::default()
         }],
-        Part::Image(image_part) => vec![GooglePart {
-            inline_data: Some(Blob {
-                data: Some(image_part.data),
-                mime_type: Some(image_part.mime_type),
-            }),
-            ..Default::default()
-        }],
-        Part::Audio(audio_part) => vec![GooglePart {
-            inline_data: Some(Blob {
-                data: Some(audio_part.data),
-                mime_type: Some(audio_part_utils::map_audio_format_to_mime_type(
-                    &audio_part.format,
-                )),
-            }),
-            ..Default::default()
-        }],
+        Part::Image(image_part) => vec![convert_to_google_media_part(
+            image_part.data,
+            image_part.url,
+            image_part.mime_type,
+        )],
+        Part::Audio(audio_part) => vec![convert_to_google_media_part(
+            audio_part.data,
+            audio_part.url,
+            audio_part_utils::map_audio_format_to_mime_type(&audio_part.format),
+        )],
+        Part::File(file_part) => vec![convert_to_google_media_part(
+            file_part.data,
+            file_part.url,
+            file_part.mime_type,
+        )],
         Part::Reasoning(reasoning_part) => vec![GooglePart {
             text: Some(reasoning_part.text),
             thought: Some(true),
@@ -594,20 +593,24 @@ fn convert_to_google_function_response(
     for part in compatible_parts {
         match part {
             Part::Text(text_part) => text_parts.push(text_part.text),
-            Part::Image(image_part) => function_response_parts.push(FunctionResponsePart {
-                inline_data: Some(FunctionResponseBlob {
-                    data: Some(image_part.data),
-                    mime_type: Some(image_part.mime_type),
-                }),
-            }),
-            Part::Audio(audio_part) => function_response_parts.push(FunctionResponsePart {
-                inline_data: Some(FunctionResponseBlob {
-                    data: Some(audio_part.data),
-                    mime_type: Some(audio_part_utils::map_audio_format_to_mime_type(
-                        &audio_part.format,
-                    )),
-                }),
-            }),
+            Part::Image(image_part) => {
+                function_response_parts.push(convert_to_google_function_response_part(
+                    image_part.data,
+                    image_part.mime_type,
+                ));
+            }
+            Part::Audio(audio_part) => {
+                function_response_parts.push(convert_to_google_function_response_part(
+                    audio_part.data,
+                    audio_part_utils::map_audio_format_to_mime_type(&audio_part.format),
+                ));
+            }
+            Part::File(file_part) => {
+                function_response_parts.push(convert_to_google_function_response_part(
+                    file_part.data,
+                    file_part.mime_type,
+                ));
+            }
             unsupported_part => {
                 return Err(LanguageModelError::InvalidInput(format!(
                     "Google model tool result does not support part type {unsupported_part:?}"
@@ -645,6 +648,46 @@ fn convert_to_google_function_response(
         result,
         (!function_response_parts.is_empty()).then_some(function_response_parts),
     ))
+}
+
+/// URLs are forwarded as file data, which Gemini resolves for Files API URIs,
+/// `YouTube` links and public HTTPS URLs of supported MIME types.
+/// URLs are forwarded as file data, which Gemini resolves for Files API URIs,
+/// `YouTube` links and public HTTPS URLs of supported MIME types.
+fn convert_to_google_media_part(
+    data: Option<String>,
+    url: Option<String>,
+    mime_type: String,
+) -> GooglePart {
+    match url {
+        Some(url) => GooglePart {
+            file_data: Some(FileData {
+                mime_type: Some(mime_type),
+                file_uri: Some(url),
+            }),
+            ..Default::default()
+        },
+        None => GooglePart {
+            inline_data: Some(Blob {
+                data: Some(data.unwrap_or_default()),
+                mime_type: Some(mime_type),
+            }),
+            ..Default::default()
+        },
+    }
+}
+
+/// Function responses only accept inline data.
+fn convert_to_google_function_response_part(
+    data: Option<String>,
+    mime_type: String,
+) -> FunctionResponsePart {
+    FunctionResponsePart {
+        inline_data: Some(FunctionResponseBlob {
+            data: Some(data.unwrap_or_default()),
+            mime_type: Some(mime_type),
+        }),
+    }
 }
 
 fn convert_to_google_function_calling_config(
@@ -845,7 +888,8 @@ fn map_google_part(part: GooglePart) -> LanguageModelResult<Option<Part>> {
         if let (Some(data), Some(mime_type)) = (inline_data.data, inline_data.mime_type) {
             if mime_type.starts_with("image/") {
                 Ok(Some(Part::Image(ImagePart {
-                    data,
+                    data: Some(data),
+                    url: None,
                     mime_type,
                     width: None,
                     height: None,
@@ -860,7 +904,8 @@ fn map_google_part(part: GooglePart) -> LanguageModelResult<Option<Part>> {
                         )
                     })?;
                 Ok(Some(Part::Audio(AudioPart {
-                    data,
+                    data: Some(data),
+                    url: None,
                     format,
                     sample_rate: None,
                     channels: None,
