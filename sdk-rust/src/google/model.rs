@@ -382,8 +382,9 @@ fn convert_to_generate_content_parameters(
                         .is_some_and(|domains| !domains.is_empty())
                         || tool.user_location.is_some()
                     {
-                        // GoogleSearch has no equivalent fields. Reject these options
-                        // instead of silently broadening or de-localizing the search.
+                        // GoogleSearch has no equivalent fields. Reject these
+                        // options instead of silently
+                        // broadening or de-localizing the search.
                         return Err(LanguageModelError::Unsupported(
                             PROVIDER,
                             "Google Search does not support allowed_domains or user_location"
@@ -410,7 +411,8 @@ fn convert_to_generate_content_parameters(
         }
     }
 
-    // Google requires invocation data when web search and function tools are mixed.
+    // Google requires invocation data when web search and function tools are
+    // mixed.
     if has_google_search && has_function_declarations {
         params
             .tool_config
@@ -624,8 +626,8 @@ fn convert_to_google_function_response(
         .map(|text| serde_json::from_str(&text).unwrap_or_else(|_| json!({ "data": text })))
         .collect();
 
-    // Use "output" key to specify function output and "error" key to specify error
-    // details, as per Google API specification
+    // Use "output" key to specify function output and "error" key to specify
+    // error details, as per Google API specification
     let mut result = HashMap::new();
     let key = if status == ToolResultStatus::Completed {
         "output"
@@ -1017,11 +1019,13 @@ fn map_google_content_to_delta(
                         .iter()
                         .any(|delta| matches!(delta.part, PartDelta::Text(_)))
                     {
-                        // Multiple text parts in one chunk are distinct provider parts.
+                        // Multiple text parts in one chunk are distinct
+                        // provider parts.
                         next_google_delta_index(existing_deltas, &deltas)
                     } else {
-                        // Part indexes are local to an incremental chunk. Reuse the
-                        // existing text stream when a later chunk starts again at zero.
+                        // Part indexes are local to an incremental chunk. Reuse
+                        // the existing text stream when
+                        // a later chunk starts again at zero.
                         let all_content_deltas = existing_deltas
                             .iter()
                             .chain(deltas.iter())

@@ -49,8 +49,9 @@ impl ModelUsage {
             pricing.output_cost_per_audio_token,
             pricing.output_cost_per_image_token,
         ]);
-        // Unattributed tokens are assumed to be text. The highest configured rate is
-        // only a fallback for models, such as TTS, that do not define a text rate.
+        // Unattributed tokens are assumed to be text. The highest configured
+        // rate is only a fallback for models, such as TTS, that do not
+        // define a text rate.
         let input_base_price = pricing.input_cost_per_text_token.unwrap_or(input_max_price);
         let output_base_price = pricing
             .output_cost_per_text_token
@@ -212,7 +213,8 @@ impl ModelUsage {
                 cache_base_text,
                 cache_write_price,
             );
-            // One-hour cache writes are a subset of the cache writes charged above.
+            // One-hour cache writes are a subset of the cache writes charged
+            // above.
             input_cost += adjustment(
                 details.extended_cache_write_tokens.unwrap_or(0),
                 cache_write_price,

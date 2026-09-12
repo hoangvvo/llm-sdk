@@ -300,8 +300,8 @@ For less important or long-tail info, use archival_memory_search before answerin
             }),
     );
 
-    // Four independent sessions (agent cannot see prior turns except via memory)
-    // Turn 1: store a core memory
+    // Four independent sessions (agent cannot see prior turns except via
+    // memory) Turn 1: store a core memory
     run_turn(&agent, "Remember that my favorite color is blue.", "res1").await;
 
     // Turn 2: recall using core memory (no prior messages)

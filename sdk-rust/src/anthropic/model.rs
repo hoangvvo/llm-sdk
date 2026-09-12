@@ -709,7 +709,8 @@ fn convert_part_to_content_block(part: Part) -> LanguageModelResult<InputContent
             }
             crate::ToolCall::ToolSearch(call) => {
                 let input = normalize_tool_args(call.args)?;
-                // Regex searches carry a pattern; anything else replays as a BM25 query.
+                // Regex searches carry a pattern; anything else replays as a
+                // BM25 query.
                 let name = if input.get("pattern").is_some() {
                     api::RequestServerToolUseBlockName::ToolSearchToolRegex
                 } else {
@@ -1042,7 +1043,8 @@ fn convert_to_anthropic_thinking_config(reasoning: &ReasoningOptions) -> Thinkin
         return ThinkingConfigParam::Disabled(ThinkingConfigDisabled {});
     }
 
-    // Without an explicit token budget, let Anthropic choose the thinking depth.
+    // Without an explicit token budget, let Anthropic choose the thinking
+    // depth.
     let Some(budget_tokens) = reasoning.budget_tokens else {
         return ThinkingConfigParam::Adaptive(ThinkingConfigAdaptive::default());
     };

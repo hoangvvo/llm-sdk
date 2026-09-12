@@ -779,7 +779,8 @@ fn ui_message_part_to_parts(part: &UIMessagePart) -> Result<Vec<Part>, String> {
     match part {
         UIMessagePart::Text(part) => Ok(vec![Part::text(&part.text)]),
         UIMessagePart::Custom => {
-            // Provider-specific custom content has no portable llm-sdk equivalent.
+            // Provider-specific custom content has no portable llm-sdk
+            // equivalent.
             Ok(Vec::new())
         }
         UIMessagePart::Reasoning(part) => Ok(vec![Part::reasoning(part.text.clone())]),
