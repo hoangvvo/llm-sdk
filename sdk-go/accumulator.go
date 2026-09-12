@@ -3,6 +3,7 @@ package llmsdk
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hoangvvo/llm-sdk/sdk-go/utils/ptr"
 	"sort"
 
 	"github.com/hoangvvo/llm-sdk/sdk-go/utils/audioutil"
@@ -174,7 +175,7 @@ func mergeDelta(existing accumulatedData, delta ContentDelta) error {
 		if delta.Part.ToolResultPartDelta == nil {
 			return fmt.Errorf("type mismatch at index %d: existing type is tool-result", delta.Index)
 		}
-		existing.ToolResult = delta.Part.ToolResultPartDelta
+		*existing.ToolResult = *delta.Part.ToolResultPartDelta
 	case existing.Image != nil:
 		imagePartDelta := delta.Part.ImagePartDelta
 		if imagePartDelta == nil {
@@ -428,7 +429,7 @@ func createPart(data accumulatedData, index int) (Part, error) {
 type StreamAccumulator struct {
 	accumulatedParts map[int]accumulatedData
 	accumulatedUsage *ModelUsage
-	cost             float64
+	cost             *float64
 }
 
 // NewStreamAccumulator creates a new StreamAccumulator
@@ -476,8 +477,8 @@ func (s *StreamAccumulator) ComputeResponse() (ModelResponse, error) {
 		Usage:   s.accumulatedUsage,
 		Cost:    nil,
 	}
-	if s.cost > 0 {
-		r.Cost = &s.cost
+	if s.cost != nil {
+		r.Cost = ptr.To(*s.cost)
 	}
 	return r, nil
 }
@@ -510,8 +511,8 @@ func (s *StreamAccumulator) Snapshot() ModelResponse {
 		Content: content,
 		Usage:   s.accumulatedUsage,
 	}
-	if s.cost > 0 {
-		response.Cost = &s.cost
+	if s.cost != nil {
+		response.Cost = ptr.To(*s.cost)
 	}
 	return response
 }
@@ -530,7 +531,7 @@ func (s *StreamAccumulator) IsEmpty() bool {
 func (s *StreamAccumulator) Clear() {
 	s.accumulatedParts = make(map[int]accumulatedData)
 	s.accumulatedUsage = nil
-	s.cost = 0
+	s.cost = nil
 }
 
 // processDelta processes a single delta, either merging with existing or creating new
@@ -558,6 +559,9 @@ func (s *StreamAccumulator) processUsage(usage *ModelUsage, cost *float64) {
 		s.accumulatedUsage.Add(usage)
 	}
 	if cost != nil {
-		s.cost += *cost
+		if s.cost == nil {
+			s.cost = ptr.To(0.0)
+		}
+		*s.cost += *cost
 	}
 }

@@ -114,14 +114,14 @@ func (m *AnthropicModel) Generate(ctx context.Context, input *llmsdk.LanguageMod
 			return nil, err
 		}
 
-		usage := mapAnthropicUsage(response.Usage)
+		usage := mapAnthropicUsage(anthropicUsageFromMessage(response.Usage))
 
 		result := &llmsdk.ModelResponse{
 			Content: content,
 			Usage:   usage,
 		}
 
-		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
+		if m.metadata != nil && m.metadata.Pricing != nil {
 			cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true, OutputReasoningTokensAreAdditional: false})
 			result.Cost = &cost
 		}
@@ -161,7 +161,7 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 			providerToolBlockIndexes := map[int]bool{}
 			serverToolBlocks := map[int]*serverToolBlock{}
 			serverToolCallIndexes := map[string]int{}
-			var streamUsage *llmsdk.ModelUsage
+			var streamUsage *anthropicUsage
 			for sseStream.Next() {
 				event, err := sseStream.Current()
 				if err != nil {
@@ -173,7 +173,8 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 				}
 
 				if event.MessageStart != nil {
-					streamUsage = mapAnthropicUsage(event.MessageStart.Message.Usage)
+					usage := anthropicUsageFromMessage(event.MessageStart.Message.Usage)
+					streamUsage = &usage
 					if event.MessageStart.Message.StopReason != nil && *event.MessageStart.Message.StopReason == anthropicapi.StopReasonRefusal {
 						errCh <- llmsdk.NewRefusalError(anthropicRefusalMessage(event.MessageStart.Message.StopDetails))
 						return
@@ -263,9 +264,9 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 				return
 			}
 			if streamUsage != nil {
-				partial := &llmsdk.PartialModelResponse{Usage: streamUsage}
+				partial := &llmsdk.PartialModelResponse{Usage: mapAnthropicUsage(*streamUsage)}
 				if m.metadata != nil && m.metadata.Pricing != nil {
-					cost := streamUsage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true, OutputReasoningTokensAreAdditional: false})
+					cost := partial.Usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true, OutputReasoningTokensAreAdditional: false})
 					partial.Cost = &cost
 				}
 				responseCh <- partial
@@ -386,6 +387,15 @@ func convertToAnthropicCreateParams(input *llmsdk.LanguageModelInput, modelID st
 
 	if input.Reasoning != nil {
 		params.Thinking = convertToAnthropicThinkingConfigParam(*input.Reasoning)
+	}
+
+	if input.CacheRetention != nil {
+		// Top-level cache_control caches through the last cacheable block.
+		ephemeral := &anthropicapi.CacheControlEphemeral{}
+		if *input.CacheRetention == llmsdk.CacheRetentionExtended {
+			ephemeral.Ttl = ptr.To(anthropicapi.CacheControlEphemeralTtlN1H)
+		}
+		params.CacheControl = &anthropicapi.CreateMessageParamsCacheControl{Ephemeral: ephemeral}
 	}
 
 	return params, nil
@@ -606,9 +616,7 @@ func convertPartToAnthropicContentBlock(part llmsdk.Part) (anthropicapi.InputCon
 		toolResult := anthropicapi.RequestToolResultBlock{
 			ToolUseId: part.ToolResultPart.ToolCallID,
 			Content:   toolResultContent,
-		}
-		if part.ToolResultPart.Status != llmsdk.ToolResultStatusCompleted {
-			toolResult.IsError = ptr.To(true)
+			IsError:   ptr.To(part.ToolResultPart.Status != llmsdk.ToolResultStatusCompleted),
 		}
 		return anthropicapi.InputContentBlock{
 			ToolResult: &toolResult,
@@ -905,84 +913,97 @@ func mapAnthropicCitationDelta(raw anthropicapi.CitationsDeltaCitation) (*llmsdk
 		}
 		citation.StartIndex = ptr.To(raw.SearchResultLocation.StartBlockIndex)
 		citation.EndIndex = ptr.To(raw.SearchResultLocation.EndBlockIndex)
+		return citation, nil
 	}
 
-	return citation, nil
+	// Unknown citation kinds carry no source, so drop them instead of emitting
+	// an empty citation that the accumulator would reject.
+	return nil, nil
 }
 
-func mapAnthropicUsage(usage anthropicapi.Usage) *llmsdk.ModelUsage {
-	result := &llmsdk.ModelUsage{
-		InputTokens:  usage.InputTokens,
-		OutputTokens: usage.OutputTokens,
+// anthropicUsage holds the usage fields shared by message_start and the
+// cumulative message_delta events. Fields of later events overwrite earlier
+// values when present.
+type anthropicUsage struct {
+	InputTokens              *int
+	OutputTokens             *int
+	CacheReadInputTokens     *int
+	CacheCreationInputTokens *int
+	CacheCreation            *anthropicapi.CacheCreation
+	OutputTokensDetails      *anthropicapi.OutputTokensDetails
+	ServerToolUse            *anthropicapi.ServerToolUsage
+}
+
+func anthropicUsageFromMessage(usage anthropicapi.Usage) anthropicUsage {
+	return anthropicUsage{
+		InputTokens:              ptr.To(usage.InputTokens),
+		OutputTokens:             ptr.To(usage.OutputTokens),
+		CacheReadInputTokens:     usage.CacheReadInputTokens,
+		CacheCreationInputTokens: usage.CacheCreationInputTokens,
+		CacheCreation:            usage.CacheCreation,
+		OutputTokensDetails:      usage.OutputTokensDetails,
+		ServerToolUse:            usage.ServerToolUse,
 	}
-	result.InputTokensDetails = mapAnthropicInputTokenDetails(
-		usage.CacheCreationInputTokens,
-		usage.CacheReadInputTokens,
-	)
+}
+
+func mergeAnthropicMessageDeltaUsage(result *anthropicUsage, usage anthropicapi.MessageDeltaUsage) {
+	if usage.InputTokens != nil {
+		result.InputTokens = usage.InputTokens
+	}
+	result.OutputTokens = ptr.To(usage.OutputTokens)
+	if usage.CacheReadInputTokens != nil {
+		result.CacheReadInputTokens = usage.CacheReadInputTokens
+	}
+	if usage.CacheCreationInputTokens != nil {
+		result.CacheCreationInputTokens = usage.CacheCreationInputTokens
+	}
+	if usage.OutputTokensDetails != nil {
+		result.OutputTokensDetails = usage.OutputTokensDetails
+	}
+	if usage.ServerToolUse != nil {
+		result.ServerToolUse = usage.ServerToolUse
+	}
+}
+
+// mapAnthropicUsage maps the raw usage to the SDK usage. Totals stay as
+// Anthropic reports them: input_tokens excludes cached and cache-write tokens.
+func mapAnthropicUsage(usage anthropicUsage) *llmsdk.ModelUsage {
+	value := func(value *int) int {
+		if value == nil {
+			return 0
+		}
+		return *value
+	}
+	result := &llmsdk.ModelUsage{
+		InputTokens:  value(usage.InputTokens),
+		OutputTokens: value(usage.OutputTokens),
+	}
+	inputDetails := &llmsdk.ModelTokensDetails{}
+	hasInputDetails := false
+	if usage.CacheReadInputTokens != nil {
+		inputDetails.CachedTokens = ptr.To(*usage.CacheReadInputTokens)
+		hasInputDetails = true
+	}
+	if usage.CacheCreationInputTokens != nil {
+		inputDetails.CacheWriteTokens = ptr.To(*usage.CacheCreationInputTokens)
+		hasInputDetails = true
+	}
+	if usage.CacheCreation != nil && usage.CacheCreation.Ephemeral1HInputTokens > 0 {
+		inputDetails.ExtendedCacheWriteTokens = ptr.To(usage.CacheCreation.Ephemeral1HInputTokens)
+		hasInputDetails = true
+	}
+	if hasInputDetails {
+		result.InputTokensDetails = inputDetails
+	}
 	if usage.OutputTokensDetails != nil {
 		result.OutputTokensDetails = &llmsdk.ModelTokensDetails{
 			ReasoningTokens: ptr.To(usage.OutputTokensDetails.ThinkingTokens),
+		}
+	}
+	if usage.ServerToolUse != nil && usage.ServerToolUse.WebSearchRequests > 0 {
+		result.ServerToolUse = &llmsdk.ModelServerToolUsage{
+			WebSearchRequests: ptr.To(usage.ServerToolUse.WebSearchRequests),
 		}
 	}
 	return result
-}
-
-func mergeAnthropicMessageDeltaUsage(result *llmsdk.ModelUsage, usage anthropicapi.MessageDeltaUsage) {
-	if usage.InputTokens != nil {
-		result.InputTokens = *usage.InputTokens
-	}
-	result.OutputTokens = usage.OutputTokens
-	if details := mapAnthropicInputTokenDetails(
-		usage.CacheCreationInputTokens,
-		usage.CacheReadInputTokens,
-	); details != nil {
-		if result.InputTokensDetails == nil {
-			result.InputTokensDetails = details
-		} else {
-			if details.CachedTokens != nil {
-				result.InputTokensDetails.CachedTokens = details.CachedTokens
-			}
-			if details.CacheWriteTokens != nil {
-				result.InputTokensDetails.CacheWriteTokens = details.CacheWriteTokens
-			}
-		}
-	}
-	if usage.OutputTokensDetails != nil {
-		result.OutputTokensDetails = &llmsdk.ModelTokensDetails{
-			ReasoningTokens: ptr.To(usage.OutputTokensDetails.ThinkingTokens),
-		}
-	}
-}
-
-func mapAnthropicInputTokenDetails(cacheCreation, cacheRead *int) *llmsdk.ModelTokensDetails {
-	if cacheCreation == nil && cacheRead == nil {
-		return nil
-	}
-	return &llmsdk.ModelTokensDetails{
-		CacheWriteTokens: cacheCreation,
-		CachedTokens:     cacheRead,
-	}
-}
-
-func toInt(value any) (int, bool) {
-	switch v := value.(type) {
-	case float64:
-		return int(v), true
-	case float32:
-		return int(v), true
-	case int:
-		return v, true
-	case int32:
-		return int(v), true
-	case int64:
-		return int(v), true
-	case uint:
-		return int(v), true
-	case uint32:
-		return int(v), true
-	case uint64:
-		return int(v), true
-	default:
-		return 0, false
-	}
 }

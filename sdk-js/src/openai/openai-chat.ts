@@ -190,6 +190,8 @@ function convertToOpenAICreateParams(
     modalities,
     audio,
     reasoning,
+    cache_retention,
+    metadata,
   } = input;
   const params: Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> = {
     model: modelId,
@@ -241,6 +243,17 @@ function convertToOpenAICreateParams(
         );
     }
   }
+  if (cache_retention) {
+    // prompt_cache_retention is deprecated in favor of prompt_cache_options,
+    // which the generated Go and Rust clients do not expose yet.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    params.prompt_cache_retention =
+      cache_retention === "extended" ? "24h" : "in_memory";
+  }
+  if (metadata) {
+    params.metadata = metadata;
+  }
+
   return params;
 }
 

@@ -1,11 +1,15 @@
-use crate::{LanguageModelPricing, ModelTokensDetails, ModelUsage};
+use crate::{LanguageModelPricing, ModelServerToolUsage, ModelTokensDetails, ModelUsage};
 
+/// Counting conventions needed to price unmodified provider usage.
 pub struct ModelUsageCostOptions {
+    /// True when `input_tokens` excludes cache reads and writes.
     pub input_cache_tokens_are_additional: bool,
+    /// True when `output_tokens` excludes reasoning tokens.
     pub output_reasoning_tokens_are_additional: bool,
 }
 
 impl ModelUsage {
+    /// Estimates USD charges using the provider's counting conventions.
     #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn calculate_cost(
@@ -92,8 +96,8 @@ impl ModelUsage {
         );
         let output_tokens = self.output_tokens.max(output_detail_tokens);
 
-        let mut cost = f64::from(input_tokens) * input_base_price
-            + f64::from(output_tokens) * output_base_price;
+        let mut input_cost = f64::from(input_tokens) * input_base_price;
+        let mut output_cost = f64::from(output_tokens) * output_base_price;
         let adjustment = |tokens: u32, regular_price: f64, category_price: f64| {
             f64::from(tokens) * (category_price - regular_price)
         };
@@ -118,24 +122,24 @@ impl ModelUsage {
             .unwrap_or(output_text_price);
 
         if let Some(details) = input_details {
-            cost += adjustment(
+            input_cost += adjustment(
                 details.audio_tokens.unwrap_or(0),
                 input_base_price,
                 input_audio_price,
             );
-            cost += adjustment(
+            input_cost += adjustment(
                 details.image_tokens.unwrap_or(0),
                 input_base_price,
                 input_image_price,
             );
         }
         if let Some(details) = output_details {
-            cost += adjustment(
+            output_cost += adjustment(
                 details.audio_tokens.unwrap_or(0),
                 output_base_price,
                 output_audio_price,
             );
-            cost += adjustment(
+            output_cost += adjustment(
                 details.image_tokens.unwrap_or(0),
                 output_base_price,
                 output_image_price,
@@ -164,17 +168,17 @@ impl ModelUsage {
                     .input_cost_per_cached_image_token
                     .or(pricing.input_cost_per_cached_token)
                     .unwrap_or(input_image_price);
-                cost += adjustment(
+                input_cost += adjustment(
                     details.cached_text_tokens.unwrap_or(0),
                     cache_base_text,
                     cached_text_price,
                 );
-                cost += adjustment(
+                input_cost += adjustment(
                     details.cached_audio_tokens.unwrap_or(0),
                     cache_base_audio,
                     cached_audio_price,
                 );
-                cost += adjustment(
+                input_cost += adjustment(
                     details.cached_image_tokens.unwrap_or(0),
                     cache_base_image,
                     cached_image_price,
@@ -194,26 +198,35 @@ impl ModelUsage {
                         input_base_price
                     }
                 });
-                cost += adjustment(
+                input_cost += adjustment(
                     details.cached_tokens.unwrap_or(0),
                     cache_base_text,
                     cached_price,
                 );
             }
-            cost += adjustment(
+            let cache_write_price = pricing
+                .input_cost_per_cache_write_token
+                .unwrap_or(input_text_price);
+            input_cost += adjustment(
                 details.cache_write_tokens.unwrap_or(0),
                 cache_base_text,
+                cache_write_price,
+            );
+            // One-hour cache writes are a subset of the cache writes charged above.
+            input_cost += adjustment(
+                details.extended_cache_write_tokens.unwrap_or(0),
+                cache_write_price,
                 pricing
-                    .input_cost_per_cache_write_token
-                    .unwrap_or(input_text_price),
+                    .input_cost_per_extended_cache_write_token
+                    .unwrap_or(cache_write_price),
             );
         }
 
         if let Some(details) = output_details {
             if options.output_reasoning_tokens_are_additional {
-                cost += f64::from(details.reasoning_tokens.unwrap_or(0)) * output_text_price;
+                output_cost += f64::from(details.reasoning_tokens.unwrap_or(0)) * output_text_price;
             } else {
-                cost += adjustment(
+                output_cost += adjustment(
                     details.reasoning_tokens.unwrap_or(0),
                     output_base_price,
                     output_text_price,
@@ -221,93 +234,127 @@ impl ModelUsage {
             }
         }
 
-        cost
+        if let Some(long_context) = &pricing.long_context {
+            if input_tokens > long_context.threshold_tokens {
+                input_cost *= long_context.input_cost_multiplier.unwrap_or(1.0);
+                output_cost *= long_context.output_cost_multiplier.unwrap_or(1.0);
+            }
+        }
+
+        let web_search_requests = self
+            .server_tool_use
+            .as_ref()
+            .and_then(|usage| usage.web_search_requests)
+            .unwrap_or(0);
+        input_cost
+            + output_cost
+            + f64::from(web_search_requests)
+                * pricing.cost_per_web_search_request.unwrap_or(0.0).max(0.0)
     }
 
+    /// Sums the usage of a separate request into this usage.
     pub fn add(&mut self, other: &Self) {
-        self.input_tokens += other.input_tokens;
-        self.output_tokens += other.output_tokens;
+        self.input_tokens = self.input_tokens.saturating_add(other.input_tokens);
+        self.output_tokens = self.output_tokens.saturating_add(other.output_tokens);
 
-        if let Some(other_input_details) = &other.input_tokens_details {
-            let self_input_details = self.input_tokens_details.get_or_insert_default();
-            if let Some(text_tokens) = other_input_details.text_tokens {
-                self_input_details.text_tokens =
-                    Some(self_input_details.text_tokens.unwrap_or(0) + text_tokens);
-            }
-            if let Some(audio_tokens) = other_input_details.audio_tokens {
-                self_input_details.audio_tokens =
-                    Some(self_input_details.audio_tokens.unwrap_or(0) + audio_tokens);
-            }
-            if let Some(image_tokens) = other_input_details.image_tokens {
-                self_input_details.image_tokens =
-                    Some(self_input_details.image_tokens.unwrap_or(0) + image_tokens);
-            }
-            if let Some(cached_text_tokens) = other_input_details.cached_text_tokens {
-                self_input_details.cached_text_tokens =
-                    Some(self_input_details.cached_text_tokens.unwrap_or(0) + cached_text_tokens);
-            }
-            if let Some(cached_audio_tokens) = other_input_details.cached_audio_tokens {
-                self_input_details.cached_audio_tokens =
-                    Some(self_input_details.cached_audio_tokens.unwrap_or(0) + cached_audio_tokens);
-            }
-            if let Some(cached_image_tokens) = other_input_details.cached_image_tokens {
-                self_input_details.cached_image_tokens =
-                    Some(self_input_details.cached_image_tokens.unwrap_or(0) + cached_image_tokens);
-            }
-            if let Some(cached_tokens) = other_input_details.cached_tokens {
-                self_input_details.cached_tokens =
-                    Some(self_input_details.cached_tokens.unwrap_or(0) + cached_tokens);
-            }
-            if let Some(cache_write_tokens) = other_input_details.cache_write_tokens {
-                self_input_details.cache_write_tokens =
-                    Some(self_input_details.cache_write_tokens.unwrap_or(0) + cache_write_tokens);
-            }
-            if let Some(reasoning_tokens) = other_input_details.reasoning_tokens {
-                self_input_details.reasoning_tokens =
-                    Some(self_input_details.reasoning_tokens.unwrap_or(0) + reasoning_tokens);
-            }
+        if let Some(other_details) = &other.input_tokens_details {
+            self.input_tokens_details
+                .get_or_insert_default()
+                .add(other_details);
         }
+        if let Some(other_details) = &other.output_tokens_details {
+            self.output_tokens_details
+                .get_or_insert_default()
+                .add(other_details);
+        }
+        if let Some(other_usage) = &other.server_tool_use {
+            self.server_tool_use
+                .get_or_insert_default()
+                .add(other_usage);
+        }
+    }
 
-        if let Some(other_output_details) = &other.output_tokens_details {
-            let self_output_details = self.output_tokens_details.get_or_insert_default();
-            if let Some(text_tokens) = other_output_details.text_tokens {
-                self_output_details.text_tokens =
-                    Some(self_output_details.text_tokens.unwrap_or(0) + text_tokens);
-            }
-            if let Some(audio_tokens) = other_output_details.audio_tokens {
-                self_output_details.audio_tokens =
-                    Some(self_output_details.audio_tokens.unwrap_or(0) + audio_tokens);
-            }
-            if let Some(image_tokens) = other_output_details.image_tokens {
-                self_output_details.image_tokens =
-                    Some(self_output_details.image_tokens.unwrap_or(0) + image_tokens);
-            }
-            if let Some(cached_text_tokens) = other_output_details.cached_text_tokens {
-                self_output_details.cached_text_tokens =
-                    Some(self_output_details.cached_text_tokens.unwrap_or(0) + cached_text_tokens);
-            }
-            if let Some(cached_audio_tokens) = other_output_details.cached_audio_tokens {
-                self_output_details.cached_audio_tokens = Some(
-                    self_output_details.cached_audio_tokens.unwrap_or(0) + cached_audio_tokens,
-                );
-            }
-            if let Some(cached_image_tokens) = other_output_details.cached_image_tokens {
-                self_output_details.cached_image_tokens = Some(
-                    self_output_details.cached_image_tokens.unwrap_or(0) + cached_image_tokens,
-                );
-            }
-            if let Some(cached_tokens) = other_output_details.cached_tokens {
-                self_output_details.cached_tokens =
-                    Some(self_output_details.cached_tokens.unwrap_or(0) + cached_tokens);
-            }
-            if let Some(cache_write_tokens) = other_output_details.cache_write_tokens {
-                self_output_details.cache_write_tokens =
-                    Some(self_output_details.cache_write_tokens.unwrap_or(0) + cache_write_tokens);
-            }
-            if let Some(reasoning_tokens) = other_output_details.reasoning_tokens {
-                self_output_details.reasoning_tokens =
-                    Some(self_output_details.reasoning_tokens.unwrap_or(0) + reasoning_tokens);
-            }
+    /// Merges a cumulative usage snapshot of the same request, such as the
+    /// usage reported by a later stream chunk, keeping the highest known
+    /// counts.
+    pub fn merge_max(&mut self, other: &Self) {
+        self.input_tokens = self.input_tokens.max(other.input_tokens);
+        self.output_tokens = self.output_tokens.max(other.output_tokens);
+
+        if let Some(other_details) = &other.input_tokens_details {
+            self.input_tokens_details
+                .get_or_insert_default()
+                .merge_max(other_details);
         }
+        if let Some(other_details) = &other.output_tokens_details {
+            self.output_tokens_details
+                .get_or_insert_default()
+                .merge_max(other_details);
+        }
+        if let Some(other_usage) = &other.server_tool_use {
+            self.server_tool_use
+                .get_or_insert_default()
+                .merge_max(other_usage);
+        }
+    }
+}
+
+impl ModelTokensDetails {
+    /// Sums the counts of another breakdown into this one.
+    pub fn add(&mut self, other: &Self) {
+        sum_count(&mut self.text_tokens, other.text_tokens);
+        sum_count(&mut self.audio_tokens, other.audio_tokens);
+        sum_count(&mut self.image_tokens, other.image_tokens);
+        sum_count(&mut self.cached_text_tokens, other.cached_text_tokens);
+        sum_count(&mut self.cached_audio_tokens, other.cached_audio_tokens);
+        sum_count(&mut self.cached_image_tokens, other.cached_image_tokens);
+        sum_count(&mut self.cached_tokens, other.cached_tokens);
+        sum_count(&mut self.cache_write_tokens, other.cache_write_tokens);
+        sum_count(
+            &mut self.extended_cache_write_tokens,
+            other.extended_cache_write_tokens,
+        );
+        sum_count(&mut self.reasoning_tokens, other.reasoning_tokens);
+    }
+
+    /// Keeps the highest known count of every field.
+    pub fn merge_max(&mut self, other: &Self) {
+        max_count(&mut self.text_tokens, other.text_tokens);
+        max_count(&mut self.audio_tokens, other.audio_tokens);
+        max_count(&mut self.image_tokens, other.image_tokens);
+        max_count(&mut self.cached_text_tokens, other.cached_text_tokens);
+        max_count(&mut self.cached_audio_tokens, other.cached_audio_tokens);
+        max_count(&mut self.cached_image_tokens, other.cached_image_tokens);
+        max_count(&mut self.cached_tokens, other.cached_tokens);
+        max_count(&mut self.cache_write_tokens, other.cache_write_tokens);
+        max_count(
+            &mut self.extended_cache_write_tokens,
+            other.extended_cache_write_tokens,
+        );
+        max_count(&mut self.reasoning_tokens, other.reasoning_tokens);
+    }
+}
+
+impl ModelServerToolUsage {
+    /// Sums the counts of another server tool usage into this one.
+    pub fn add(&mut self, other: &Self) {
+        sum_count(&mut self.web_search_requests, other.web_search_requests);
+    }
+
+    /// Keeps the highest known count of every field.
+    pub fn merge_max(&mut self, other: &Self) {
+        max_count(&mut self.web_search_requests, other.web_search_requests);
+    }
+}
+
+fn sum_count(current: &mut Option<u32>, incoming: Option<u32>) {
+    if let Some(incoming) = incoming {
+        *current = Some(current.unwrap_or(0).saturating_add(incoming));
+    }
+}
+
+fn max_count(current: &mut Option<u32>, incoming: Option<u32>) {
+    if let Some(incoming) = incoming {
+        *current = Some(current.unwrap_or(0).max(incoming));
     }
 }

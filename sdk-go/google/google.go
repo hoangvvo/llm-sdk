@@ -118,18 +118,23 @@ func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 			return nil, llmsdk.NewInvariantError(Provider, "no candidates returned")
 		}
 
-		if response.Candidates[0].Content == nil {
-			return nil, llmsdk.NewInvariantError(Provider, "candidate content is missing")
+		var candidateParts []googleapi.Part
+		if response.Candidates[0].Content != nil {
+			candidateParts = response.Candidates[0].Content.Parts
 		}
 
-		content, err := mapGoogleContent(response.Candidates[0].Content.Parts, response.Candidates[0].GroundingMetadata)
+		content, err := mapGoogleContent(candidateParts, response.Candidates[0].GroundingMetadata)
 		if err != nil {
 			return nil, err
 		}
 
 		var usage *llmsdk.ModelUsage
 		if response.UsageMetadata != nil {
-			usage = mapGoogleUsageMetadata(*response.UsageMetadata)
+			webSearchRequests := 0
+			if response.Candidates[0].GroundingMetadata != nil {
+				webSearchRequests = len(response.Candidates[0].GroundingMetadata.WebSearchQueries)
+			}
+			usage = mapGoogleUsageMetadata(*response.UsageMetadata, webSearchRequests)
 		}
 
 		result := &llmsdk.ModelResponse{
@@ -188,9 +193,9 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					continue
 				}
 				if streamEvent.UsageMetadata != nil {
-					streamUsage = mergeGoogleUsageMax(
+					streamUsage = llmsdk.MergeModelUsageMax(
 						streamUsage,
-						mapGoogleUsageMetadata(*streamEvent.UsageMetadata),
+						mapGoogleUsageMetadata(*streamEvent.UsageMetadata, len(webSearchQueries)),
 					)
 				}
 				if len(streamEvent.Candidates) == 0 {
@@ -236,7 +241,9 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 				allContentDeltas = append(allContentDeltas, incomingContentDeltas...)
 				for _, delta := range incomingContentDeltas {
 					partial := &llmsdk.PartialModelResponse{Delta: &delta}
-					responseCh <- partial
+					if !stream.Send(ctx, responseCh, partial) {
+						return
+					}
 				}
 
 			}
@@ -248,7 +255,7 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 						maxIndex = delta.Index
 					}
 				}
-				id := fmt.Sprintf("call_%s", randutil.String(10))
+				id := randutil.String(10)
 				status := llmsdk.WebSearchToolCallStatusCompleted
 				queries := make([]string, 0, len(webSearchQueries))
 				for query := range webSearchQueries {
@@ -259,7 +266,9 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					webCall.Action = &llmsdk.WebSearchAction{Type: "search", Queries: queries}
 				}
 				callDelta := &llmsdk.ContentDelta{Index: maxIndex + 1, Part: llmsdk.PartDelta{ToolCallPartDelta: &llmsdk.ToolCallPartDelta{ToolCallID: &id, Call: llmsdk.ToolCallDelta{WebSearch: &llmsdk.WebSearchToolCallDelta{Status: &status, Action: webCall.Action}}}}}
-				responseCh <- &llmsdk.PartialModelResponse{Delta: callDelta}
+				if !stream.Send(ctx, responseCh, &llmsdk.PartialModelResponse{Delta: callDelta}) {
+					return
+				}
 				sources := []llmsdk.WebSearchSource{}
 				for _, chunk := range groundingChunks {
 					if chunk.Web != nil && chunk.Web.Uri != nil {
@@ -267,7 +276,9 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 					}
 				}
 				resultDelta := &llmsdk.ContentDelta{Index: maxIndex + 2, Part: llmsdk.PartDelta{ToolResultPartDelta: &llmsdk.ToolResultPartDelta{ToolCallID: id, Result: llmsdk.ToolResult{WebSearch: &llmsdk.WebSearchToolResult{Sources: sources}}, Status: llmsdk.ToolResultStatusCompleted}}}
-				responseCh <- &llmsdk.PartialModelResponse{Delta: resultDelta}
+				if !stream.Send(ctx, responseCh, &llmsdk.PartialModelResponse{Delta: resultDelta}) {
+					return
+				}
 			}
 
 			if err := sseStream.Err(); err != nil {
@@ -275,11 +286,17 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 				return
 			}
 			if streamUsage != nil {
+				// Search queries are only known once the stream ends.
+				if len(webSearchQueries) > 0 {
+					streamUsage.ServerToolUse = &llmsdk.ModelServerToolUsage{WebSearchRequests: ptr.To(len(webSearchQueries))}
+				}
 				partial := &llmsdk.PartialModelResponse{Usage: streamUsage}
 				if m.metadata != nil && m.metadata.Pricing != nil {
 					partial.Cost = ptr.To(streamUsage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: true}))
 				}
-				responseCh <- partial
+				if !stream.Send(ctx, responseCh, partial) {
+					return
+				}
 			}
 		}()
 
@@ -634,7 +651,7 @@ func convertToGoogleSpeechConfig(audio llmsdk.AudioOptions) *googleapi.SpeechCon
 				VoiceName: audio.Voice,
 			},
 		},
-		LanguageCode: audio.LanguageCode,
+		LanguageCode: audio.Language,
 	}
 }
 
@@ -684,7 +701,7 @@ func mapGoogleContent(parts []googleapi.Part, groundingMetadata *googleapi.Groun
 		}
 	}
 	if groundingMetadata != nil && (len(groundingMetadata.WebSearchQueries) > 0 || len(groundingMetadata.GroundingChunks) > 0) {
-		id := fmt.Sprintf("call_%s", randutil.String(10))
+		id := randutil.String(10)
 		status := llmsdk.WebSearchToolCallStatusCompleted
 		call := &llmsdk.WebSearchToolCall{Status: &status}
 		if len(groundingMetadata.WebSearchQueries) > 0 {
@@ -748,7 +765,7 @@ func mapGooglePart(part googleapi.Part) (*llmsdk.Part, error) {
 		if part.FunctionCall.Id != nil {
 			toolCallID = *part.FunctionCall.Id
 		} else {
-			toolCallID = fmt.Sprintf("call_%s", randutil.String(10))
+			toolCallID = randutil.String(10)
 		}
 		args, err := json.Marshal(part.FunctionCall.Args)
 		if err != nil {
@@ -862,48 +879,8 @@ func nextGoogleDeltaIndex(existingContentDeltas, incomingContentDeltas []llmsdk.
 	return maxIndex + 1
 }
 
-func mergeGoogleUsageMax(current, incoming *llmsdk.ModelUsage) *llmsdk.ModelUsage {
-	if current == nil {
-		return incoming
-	}
-	current.InputTokens = max(current.InputTokens, incoming.InputTokens)
-	current.OutputTokens = max(current.OutputTokens, incoming.OutputTokens)
-	current.InputTokensDetails = mergeGoogleTokenDetailsMax(current.InputTokensDetails, incoming.InputTokensDetails)
-	current.OutputTokensDetails = mergeGoogleTokenDetailsMax(current.OutputTokensDetails, incoming.OutputTokensDetails)
-	return current
-}
-
-func mergeGoogleTokenDetailsMax(current, incoming *llmsdk.ModelTokensDetails) *llmsdk.ModelTokensDetails {
-	if current == nil {
-		return incoming
-	}
-	if incoming == nil {
-		return current
-	}
-	merge := func(target **int, value *int) {
-		if value == nil {
-			return
-		}
-		if *target == nil {
-			*target = ptr.To(*value)
-		} else {
-			**target = max(**target, *value)
-		}
-	}
-	merge(&current.TextTokens, incoming.TextTokens)
-	merge(&current.AudioTokens, incoming.AudioTokens)
-	merge(&current.ImageTokens, incoming.ImageTokens)
-	merge(&current.CachedTextTokens, incoming.CachedTextTokens)
-	merge(&current.CachedAudioTokens, incoming.CachedAudioTokens)
-	merge(&current.CachedImageTokens, incoming.CachedImageTokens)
-	merge(&current.CachedTokens, incoming.CachedTokens)
-	merge(&current.CacheWriteTokens, incoming.CacheWriteTokens)
-	merge(&current.ReasoningTokens, incoming.ReasoningTokens)
-	return current
-}
-
 // mapGoogleUsageMetadata maps Google usage metadata to SDK usage
-func mapGoogleUsageMetadata(usageMetadata googleapi.UsageMetadata) *llmsdk.ModelUsage {
+func mapGoogleUsageMetadata(usageMetadata googleapi.UsageMetadata, webSearchRequests int) *llmsdk.ModelUsage {
 	value := func(value *int) (int, bool) {
 		if value == nil {
 			return 0, false
@@ -971,6 +948,9 @@ func mapGoogleUsageMetadata(usageMetadata googleapi.UsageMetadata) *llmsdk.Model
 	usage := &llmsdk.ModelUsage{
 		InputTokens:  promptTokens + toolUsePromptTokens,
 		OutputTokens: outputTokens,
+	}
+	if webSearchRequests > 0 {
+		usage.ServerToolUse = &llmsdk.ModelServerToolUsage{WebSearchRequests: ptr.To(webSearchRequests)}
 	}
 
 	if len(usageMetadata.PromptTokensDetails) > 0 || len(usageMetadata.ToolUsePromptTokensDetails) > 0 || len(usageMetadata.CacheTokensDetails) > 0 {

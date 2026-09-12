@@ -59,6 +59,12 @@ func SumModelTokensDetails(detailsList []ModelTokensDetails) *ModelTokensDetails
 			}
 			*result.CacheWriteTokens += *details.CacheWriteTokens
 		}
+		if details.ExtendedCacheWriteTokens != nil {
+			if result.ExtendedCacheWriteTokens == nil {
+				result.ExtendedCacheWriteTokens = ptr.To(0)
+			}
+			*result.ExtendedCacheWriteTokens += *details.ExtendedCacheWriteTokens
+		}
 		if details.ReasoningTokens != nil {
 			if result.ReasoningTokens == nil {
 				result.ReasoningTokens = ptr.To(0)
@@ -70,11 +76,35 @@ func SumModelTokensDetails(detailsList []ModelTokensDetails) *ModelTokensDetails
 	return result
 }
 
+// SumModelServerToolUsage sums multiple ModelServerToolUsage into one
+func SumModelServerToolUsage(usages []ModelServerToolUsage) *ModelServerToolUsage {
+	if len(usages) == 0 {
+		return nil
+	}
+
+	result := &ModelServerToolUsage{}
+
+	for _, usage := range usages {
+		if usage.WebSearchRequests != nil {
+			if result.WebSearchRequests == nil {
+				result.WebSearchRequests = ptr.To(0)
+			}
+			*result.WebSearchRequests += *usage.WebSearchRequests
+		}
+	}
+
+	return result
+}
+
+// ModelUsageCostOptions specifies counting conventions for unmodified provider usage.
 type ModelUsageCostOptions struct {
-	InputCacheTokensAreAdditional      bool
+	// True when InputTokens excludes cache reads and writes.
+	InputCacheTokensAreAdditional bool
+	// True when OutputTokens excludes reasoning tokens.
 	OutputReasoningTokensAreAdditional bool
 }
 
+// CalculateCost estimates USD charges using the provider's counting conventions.
 func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options ModelUsageCostOptions) float64 {
 	if pricing == nil {
 		return 0
@@ -154,7 +184,10 @@ func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options Mo
 	}
 	outputTokens := maxInt(usage.OutputTokens, outputDetailTokens)
 
-	cost := float64(inputTokens)*inputBasePrice + float64(outputTokens)*outputBasePrice
+	// Input and output are tracked separately so long-context multipliers can
+	// apply to each side.
+	inputCost := float64(inputTokens) * inputBasePrice
+	outputCost := float64(outputTokens) * outputBasePrice
 	adjustment := func(tokens int, regularPrice, categoryPrice float64) float64 {
 		return float64(tokens) * (categoryPrice - regularPrice)
 	}
@@ -185,12 +218,12 @@ func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options Mo
 	}
 
 	if inputDetails != nil {
-		cost += adjustment(value(inputDetails.AudioTokens), inputBasePrice, inputAudioPrice)
-		cost += adjustment(value(inputDetails.ImageTokens), inputBasePrice, inputImagePrice)
+		inputCost += adjustment(value(inputDetails.AudioTokens), inputBasePrice, inputAudioPrice)
+		inputCost += adjustment(value(inputDetails.ImageTokens), inputBasePrice, inputImagePrice)
 	}
 	if outputDetails != nil {
-		cost += adjustment(value(outputDetails.AudioTokens), outputBasePrice, outputAudioPrice)
-		cost += adjustment(value(outputDetails.ImageTokens), outputBasePrice, outputImagePrice)
+		outputCost += adjustment(value(outputDetails.AudioTokens), outputBasePrice, outputAudioPrice)
+		outputCost += adjustment(value(outputDetails.ImageTokens), outputBasePrice, outputImagePrice)
 	}
 
 	cacheBaseText, cacheBaseAudio, cacheBaseImage := 0.0, 0.0, 0.0
@@ -223,9 +256,9 @@ func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options Mo
 			if pricing.InputCostPerCachedImageToken != nil {
 				cachedImagePrice = *pricing.InputCostPerCachedImageToken
 			}
-			cost += adjustment(value(inputDetails.CachedTextTokens), cacheBaseText, cachedTextPrice)
-			cost += adjustment(value(inputDetails.CachedAudioTokens), cacheBaseAudio, cachedAudioPrice)
-			cost += adjustment(value(inputDetails.CachedImageTokens), cacheBaseImage, cachedImagePrice)
+			inputCost += adjustment(value(inputDetails.CachedTextTokens), cacheBaseText, cachedTextPrice)
+			inputCost += adjustment(value(inputDetails.CachedAudioTokens), cacheBaseAudio, cachedAudioPrice)
+			inputCost += adjustment(value(inputDetails.CachedImageTokens), cacheBaseImage, cachedImagePrice)
 		} else {
 			cachedPrice := inputBasePrice
 			if pricing.InputCostPerCachedToken != nil {
@@ -233,22 +266,44 @@ func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options Mo
 			} else if pricing.InputCostPerCachedTextToken != nil || pricing.InputCostPerCachedAudioToken != nil || pricing.InputCostPerCachedImageToken != nil {
 				cachedPrice = maxPrice(pricing.InputCostPerCachedTextToken, pricing.InputCostPerCachedAudioToken, pricing.InputCostPerCachedImageToken)
 			}
-			cost += adjustment(value(inputDetails.CachedTokens), cacheBaseText, cachedPrice)
+			inputCost += adjustment(value(inputDetails.CachedTokens), cacheBaseText, cachedPrice)
 		}
 
 		cacheWritePrice := inputTextPrice
 		if pricing.InputCostPerCacheWriteToken != nil {
 			cacheWritePrice = *pricing.InputCostPerCacheWriteToken
 		}
-		cost += adjustment(value(inputDetails.CacheWriteTokens), cacheBaseText, cacheWritePrice)
+		inputCost += adjustment(value(inputDetails.CacheWriteTokens), cacheBaseText, cacheWritePrice)
+
+		// One-hour cache writes are a subset of the cache writes, billed at
+		// their own rate when the pricing defines one.
+		extendedCacheWritePrice := cacheWritePrice
+		if pricing.InputCostPerExtendedCacheWriteToken != nil {
+			extendedCacheWritePrice = *pricing.InputCostPerExtendedCacheWriteToken
+		}
+		inputCost += adjustment(value(inputDetails.ExtendedCacheWriteTokens), cacheWritePrice, extendedCacheWritePrice)
 	}
 
 	if outputDetails != nil {
 		if options.OutputReasoningTokensAreAdditional {
-			cost += float64(value(outputDetails.ReasoningTokens)) * outputTextPrice
+			outputCost += float64(value(outputDetails.ReasoningTokens)) * outputTextPrice
 		} else {
-			cost += adjustment(value(outputDetails.ReasoningTokens), outputBasePrice, outputTextPrice)
+			outputCost += adjustment(value(outputDetails.ReasoningTokens), outputBasePrice, outputTextPrice)
 		}
+	}
+
+	if longContext := pricing.LongContext; longContext != nil && inputTokens > longContext.ThresholdTokens {
+		if longContext.InputCostMultiplier != nil {
+			inputCost *= *longContext.InputCostMultiplier
+		}
+		if longContext.OutputCostMultiplier != nil {
+			outputCost *= *longContext.OutputCostMultiplier
+		}
+	}
+
+	cost := inputCost + outputCost
+	if usage.ServerToolUse != nil && pricing.CostPerWebSearchRequest != nil {
+		cost += float64(value(usage.ServerToolUse.WebSearchRequests)) * *pricing.CostPerWebSearchRequest
 	}
 
 	return cost
@@ -283,5 +338,68 @@ func (u *ModelUsage) Add(other *ModelUsage) *ModelUsage {
 	}
 	u.OutputTokensDetails = SumModelTokensDetails(tokenDetails)
 
+	serverToolUsages := []ModelServerToolUsage{}
+	if u.ServerToolUse != nil {
+		serverToolUsages = append(serverToolUsages, *u.ServerToolUse)
+	}
+	if other.ServerToolUse != nil {
+		serverToolUsages = append(serverToolUsages, *other.ServerToolUse)
+	}
+	u.ServerToolUse = SumModelServerToolUsage(serverToolUsages)
+
 	return u
+}
+
+// MergeModelUsageMax merges cumulative usage snapshots of the same request,
+// such as the usage reported by successive stream chunks, keeping the highest
+// known counts. The merged result is written into current when it is non-nil.
+func MergeModelUsageMax(current, incoming *ModelUsage) *ModelUsage {
+	if current == nil {
+		return incoming
+	}
+	if incoming == nil {
+		return current
+	}
+	current.InputTokens = max(current.InputTokens, incoming.InputTokens)
+	current.OutputTokens = max(current.OutputTokens, incoming.OutputTokens)
+	current.InputTokensDetails = mergeModelTokensDetailsMax(current.InputTokensDetails, incoming.InputTokensDetails)
+	current.OutputTokensDetails = mergeModelTokensDetailsMax(current.OutputTokensDetails, incoming.OutputTokensDetails)
+	if incoming.ServerToolUse != nil {
+		if current.ServerToolUse == nil {
+			current.ServerToolUse = &ModelServerToolUsage{}
+		}
+		mergeCountMax(&current.ServerToolUse.WebSearchRequests, incoming.ServerToolUse.WebSearchRequests)
+	}
+	return current
+}
+
+func mergeCountMax(target **int, value *int) {
+	if value == nil {
+		return
+	}
+	if *target == nil {
+		*target = ptr.To(*value)
+	} else {
+		**target = max(**target, *value)
+	}
+}
+
+func mergeModelTokensDetailsMax(current, incoming *ModelTokensDetails) *ModelTokensDetails {
+	if current == nil {
+		return incoming
+	}
+	if incoming == nil {
+		return current
+	}
+	mergeCountMax(&current.TextTokens, incoming.TextTokens)
+	mergeCountMax(&current.AudioTokens, incoming.AudioTokens)
+	mergeCountMax(&current.ImageTokens, incoming.ImageTokens)
+	mergeCountMax(&current.CachedTextTokens, incoming.CachedTextTokens)
+	mergeCountMax(&current.CachedAudioTokens, incoming.CachedAudioTokens)
+	mergeCountMax(&current.CachedImageTokens, incoming.CachedImageTokens)
+	mergeCountMax(&current.CachedTokens, incoming.CachedTokens)
+	mergeCountMax(&current.CacheWriteTokens, incoming.CacheWriteTokens)
+	mergeCountMax(&current.ExtendedCacheWriteTokens, incoming.ExtendedCacheWriteTokens)
+	mergeCountMax(&current.ReasoningTokens, incoming.ReasoningTokens)
+	return current
 }

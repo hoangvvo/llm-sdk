@@ -122,6 +122,7 @@ async fn transport() -> Result<(), Box<dyn Error>> {
                 input_cost_per_image_token: None,
                 input_cost_per_cached_image_token: None,
                 output_cost_per_image_token: None,
+                ..Default::default()
             }),
             capabilities: None,
         })

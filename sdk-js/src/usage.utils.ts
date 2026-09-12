@@ -1,5 +1,6 @@
 import type {
   LanguageModelPricing,
+  ModelServerToolUsage,
   ModelTokensDetails,
   ModelUsage,
 } from "./types.ts";
@@ -13,14 +14,27 @@ const MODEL_TOKEN_DETAIL_KEYS = [
   "cached_image_tokens",
   "cached_tokens",
   "cache_write_tokens",
+  "extended_cache_write_tokens",
   "reasoning_tokens",
 ] as const;
 
+const SERVER_TOOL_USAGE_KEYS = ["web_search_requests"] as const;
+
+/**
+ * Counting conventions needed to price unmodified provider usage.
+ */
 export interface ModelUsageCostOptions {
+  /**
+   * True when `input_tokens` excludes cache reads and writes.
+   */
   input_cache_tokens_are_additional: boolean;
+  /**
+   * True when `output_tokens` excludes reasoning tokens.
+   */
   output_reasoning_tokens_are_additional: boolean;
 }
 
+/** Estimates USD charges using the provider's counting conventions. */
 export function calculateCost(
   usage: ModelUsage,
   pricing: LanguageModelPricing,
@@ -82,7 +96,8 @@ export function calculateCost(
         : value(outputDetails?.reasoning_tokens)),
   );
 
-  let cost = inputTokens * inputBasePrice + outputTokens * outputBasePrice;
+  let inputCost = inputTokens * inputBasePrice;
+  let outputCost = outputTokens * outputBasePrice;
 
   const adjustment = (
     tokens: number,
@@ -99,22 +114,22 @@ export function calculateCost(
   const outputImagePrice =
     pricing.output_cost_per_image_token ?? outputTextPrice;
 
-  cost += adjustment(
+  inputCost += adjustment(
     value(inputDetails?.audio_tokens),
     inputBasePrice,
     inputAudioPrice,
   );
-  cost += adjustment(
+  inputCost += adjustment(
     value(inputDetails?.image_tokens),
     inputBasePrice,
     inputImagePrice,
   );
-  cost += adjustment(
+  outputCost += adjustment(
     value(outputDetails?.audio_tokens),
     outputBasePrice,
     outputAudioPrice,
   );
-  cost += adjustment(
+  outputCost += adjustment(
     value(outputDetails?.image_tokens),
     outputBasePrice,
     outputImagePrice,
@@ -136,21 +151,21 @@ export function calculateCost(
       ? inputImagePrice
       : inputBasePrice;
   if (hasCachedModalities) {
-    cost += adjustment(
+    inputCost += adjustment(
       value(inputDetails.cached_text_tokens),
       cacheBaseText,
       pricing.input_cost_per_cached_text_token ??
         pricing.input_cost_per_cached_token ??
         inputTextPrice,
     );
-    cost += adjustment(
+    inputCost += adjustment(
       value(inputDetails.cached_audio_tokens),
       cacheBaseAudio,
       pricing.input_cost_per_cached_audio_token ??
         pricing.input_cost_per_cached_token ??
         inputAudioPrice,
     );
-    cost += adjustment(
+    inputCost += adjustment(
       value(inputDetails.cached_image_tokens),
       cacheBaseImage,
       pricing.input_cost_per_cached_image_token ??
@@ -170,51 +185,77 @@ export function calculateCost(
     const cachedPrice =
       pricing.input_cost_per_cached_token ??
       (hasCachedModalityPrice ? cachedModalityPrice : inputBasePrice);
-    cost += adjustment(
+    inputCost += adjustment(
       value(inputDetails?.cached_tokens),
       cacheBaseText,
       cachedPrice,
     );
   }
 
-  cost += adjustment(
+  const cacheWritePrice =
+    pricing.input_cost_per_cache_write_token ?? inputTextPrice;
+  inputCost += adjustment(
     value(inputDetails?.cache_write_tokens),
     cacheBaseText,
-    pricing.input_cost_per_cache_write_token ?? inputTextPrice,
+    cacheWritePrice,
+  );
+  // Extended-retention cache writes are a subset of the cache writes charged above.
+  inputCost += adjustment(
+    value(inputDetails?.extended_cache_write_tokens),
+    cacheWritePrice,
+    pricing.input_cost_per_extended_cache_write_token ?? cacheWritePrice,
   );
 
   if (options.output_reasoning_tokens_are_additional) {
-    cost += value(outputDetails?.reasoning_tokens) * outputTextPrice;
+    outputCost += value(outputDetails?.reasoning_tokens) * outputTextPrice;
   } else {
-    cost += adjustment(
+    outputCost += adjustment(
       value(outputDetails?.reasoning_tokens),
       outputBasePrice,
       outputTextPrice,
     );
   }
 
-  return cost;
+  const longContext = pricing.long_context;
+  if (longContext && inputTokens > longContext.threshold_tokens) {
+    inputCost *= longContext.input_cost_multiplier ?? 1;
+    outputCost *= longContext.output_cost_multiplier ?? 1;
+  }
+
+  return (
+    inputCost +
+    outputCost +
+    value(usage.server_tool_use?.web_search_requests) *
+      value(pricing.cost_per_web_search_request)
+  );
 }
 
 export function sumModelUsage(usages: ModelUsage[]): ModelUsage {
-  const result = usages.reduce<ModelUsage>(
-    (acc, curr) => ({
-      input_tokens: acc.input_tokens + curr.input_tokens,
-      output_tokens: acc.output_tokens + curr.output_tokens,
-    }),
-    { input_tokens: 0, output_tokens: 0 },
-  );
-  const inputDetails = usages.flatMap((usage) =>
-    usage.input_tokens_details ? [usage.input_tokens_details] : [],
-  );
-  const outputDetails = usages.flatMap((usage) =>
-    usage.output_tokens_details ? [usage.output_tokens_details] : [],
-  );
+  const result: ModelUsage = { input_tokens: 0, output_tokens: 0 };
+  const inputDetails: ModelTokensDetails[] = [];
+  const outputDetails: ModelTokensDetails[] = [];
+  const serverToolUsages: ModelServerToolUsage[] = [];
+  for (const usage of usages) {
+    result.input_tokens += usage.input_tokens;
+    result.output_tokens += usage.output_tokens;
+    if (usage.input_tokens_details) {
+      inputDetails.push(usage.input_tokens_details);
+    }
+    if (usage.output_tokens_details) {
+      outputDetails.push(usage.output_tokens_details);
+    }
+    if (usage.server_tool_use) {
+      serverToolUsages.push(usage.server_tool_use);
+    }
+  }
   if (inputDetails.length > 0) {
     result.input_tokens_details = sumModelTokensDetails(inputDetails);
   }
   if (outputDetails.length > 0) {
     result.output_tokens_details = sumModelTokensDetails(outputDetails);
+  }
+  if (serverToolUsages.length > 0) {
+    result.server_tool_use = sumModelServerToolUsage(serverToolUsages);
   }
   return result;
 }
@@ -234,19 +275,39 @@ export function sumModelTokensDetails(
   return result;
 }
 
+export function sumModelServerToolUsage(
+  usages: ModelServerToolUsage[],
+): ModelServerToolUsage {
+  const result: ModelServerToolUsage = {};
+  for (const usage of usages) {
+    for (const key of SERVER_TOOL_USAGE_KEYS) {
+      const value = usage[key];
+      if (value !== undefined) {
+        result[key] = (result[key] ?? 0) + value;
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Merges cumulative usage snapshots of the same request, such as the usage
+ * reported by successive stream chunks, keeping the highest known counts.
+ */
 export function mergeModelUsageMax(
   current: ModelUsage | undefined,
   incoming: ModelUsage,
 ): ModelUsage {
   if (!current) return incoming;
 
-  const mergeDetails = (
-    current: ModelTokensDetails | undefined,
-    incoming: ModelTokensDetails | undefined,
-  ) => {
+  const mergeCounts = <K extends string>(
+    current: Partial<Record<K, number>> | undefined,
+    incoming: Partial<Record<K, number>> | undefined,
+    keys: readonly K[],
+  ): Partial<Record<K, number>> | undefined => {
     if (!current && !incoming) return undefined;
-    const result: ModelTokensDetails = {};
-    for (const key of MODEL_TOKEN_DETAIL_KEYS) {
+    const result: Partial<Record<K, number>> = {};
+    for (const key of keys) {
       const currentValue = current?.[key];
       const incomingValue = incoming?.[key];
       if (currentValue !== undefined || incomingValue !== undefined) {
@@ -260,15 +321,23 @@ export function mergeModelUsageMax(
     input_tokens: Math.max(current.input_tokens, incoming.input_tokens),
     output_tokens: Math.max(current.output_tokens, incoming.output_tokens),
   };
-  const inputDetails = mergeDetails(
+  const inputDetails = mergeCounts(
     current.input_tokens_details,
     incoming.input_tokens_details,
+    MODEL_TOKEN_DETAIL_KEYS,
   );
   if (inputDetails) result.input_tokens_details = inputDetails;
-  const outputDetails = mergeDetails(
+  const outputDetails = mergeCounts(
     current.output_tokens_details,
     incoming.output_tokens_details,
+    MODEL_TOKEN_DETAIL_KEYS,
   );
   if (outputDetails) result.output_tokens_details = outputDetails;
+  const serverToolUse = mergeCounts(
+    current.server_tool_use,
+    incoming.server_tool_use,
+    SERVER_TOOL_USAGE_KEYS,
+  );
+  if (serverToolUse) result.server_tool_use = serverToolUse;
   return result;
 }

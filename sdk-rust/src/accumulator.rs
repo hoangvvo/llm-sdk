@@ -141,12 +141,7 @@ fn merge_delta(existing: &mut AccumulatedData, delta: ContentDelta) -> Result<()
             AccumulatedData::Reasoning(ref mut existing_reasoning),
             PartDelta::Reasoning(reasoning_delta),
         ) => {
-            if let Some(text) = reasoning_delta.text {
-                existing_reasoning
-                    .text
-                    .get_or_insert_default()
-                    .push_str(&text);
-            }
+            existing_reasoning.text.push_str(&reasoning_delta.text);
             if reasoning_delta.signature.is_some() {
                 existing_reasoning.signature = reasoning_delta.signature;
             }
@@ -364,7 +359,7 @@ fn create_audio_part(data: AccumulatedAudioData) -> LanguageModelResult<Part> {
 }
 
 fn create_reasoning_part(data: ReasoningPartDelta) -> Part {
-    let mut reasoning_part = ReasoningPart::new(data.text.unwrap_or_default());
+    let mut reasoning_part = ReasoningPart::new(data.text);
     if let Some(signature) = data.signature {
         reasoning_part = reasoning_part.with_signature(signature);
     }

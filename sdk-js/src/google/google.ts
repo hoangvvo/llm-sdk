@@ -117,7 +117,10 @@ export class GoogleModel implements LanguageModel {
     );
     const result: ModelResponse = { content };
     if (response.usageMetadata) {
-      const usage = mapGoogleUsageMetadata(response.usageMetadata);
+      const usage = mapGoogleUsageMetadata(
+        response.usageMetadata,
+        candidate.groundingMetadata?.webSearchQueries?.length ?? 0,
+      );
       result.usage = usage;
       if (this.metadata?.pricing) {
         result.cost = calculateCost(usage, this.metadata.pricing, {
@@ -204,7 +207,7 @@ export class GoogleModel implements LanguageModel {
       if (chunk.usageMetadata) {
         streamUsage = mergeModelUsageMax(
           streamUsage,
-          mapGoogleUsageMetadata(chunk.usageMetadata),
+          mapGoogleUsageMetadata(chunk.usageMetadata, webSearchQueries.size),
         );
       }
     }
@@ -258,6 +261,12 @@ export class GoogleModel implements LanguageModel {
     }
 
     if (streamUsage) {
+      // Search queries are only known once the stream ends.
+      if (webSearchQueries.size > 0) {
+        streamUsage.server_tool_use = {
+          web_search_requests: webSearchQueries.size,
+        };
+      }
       const partial: PartialModelResponse = { usage: streamUsage };
       if (this.metadata?.pricing) {
         partial.cost = calculateCost(streamUsage, this.metadata.pricing, {
@@ -275,8 +284,8 @@ function convertToGenerateContentParameters(
   modelId: string,
 ): GenerateContentParameters {
   const {
-    system_prompt,
     messages,
+    system_prompt,
     tools,
     tool_choice,
     response_format,
@@ -300,7 +309,7 @@ function convertToGenerateContentParameters(
   if (system_prompt) {
     config.systemInstruction = system_prompt;
   }
-  if (temperature) {
+  if (typeof temperature === "number") {
     config.temperature = temperature;
   }
   if (typeof top_p === "number") {
@@ -309,16 +318,16 @@ function convertToGenerateContentParameters(
   if (typeof top_k === "number") {
     config.topK = top_k;
   }
-  if (presence_penalty) {
+  if (typeof presence_penalty === "number") {
     config.presencePenalty = presence_penalty;
   }
-  if (frequency_penalty) {
+  if (typeof frequency_penalty === "number") {
     config.frequencyPenalty = frequency_penalty;
   }
-  if (seed) {
+  if (typeof seed === "number") {
     config.seed = seed;
   }
-  if (max_tokens) {
+  if (typeof max_tokens === "number") {
     config.maxOutputTokens = max_tokens;
   }
   if (tools) {
@@ -840,6 +849,7 @@ function nextGoogleDeltaIndex(
 
 function mapGoogleUsageMetadata(
   usageMetadata: GenerateContentResponseUsageMetadata,
+  webSearchRequests: number,
 ): ModelUsage {
   const value = (value: number | undefined) =>
     typeof value === "number" && Number.isFinite(value)
@@ -915,10 +925,15 @@ function mapGoogleUsageMetadata(
   outputTokens ??= 0;
   reasoningTokens ??= 0;
 
+  // candidatesTokenCount excludes thoughts. The numbers are kept as reported;
+  // the cost calculation accounts for it.
   const usage: ModelUsage = {
     input_tokens: promptTokens + toolUsePromptTokens,
     output_tokens: outputTokens,
   };
+  if (webSearchRequests > 0) {
+    usage.server_tool_use = { web_search_requests: webSearchRequests };
+  }
   const inputDetails =
     usageMetadata.promptTokensDetails ||
     usageMetadata.toolUsePromptTokensDetails ||

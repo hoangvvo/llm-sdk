@@ -257,8 +257,8 @@ An example server that exposes an API to interact with the agent can be found in
 
 ### To 0.4.0
 
-- `AgentItemTool.IsError` has been replaced with the required `Status` field, and `AgentResponse` now includes a terminal `Status`.
-- SDK tool calls and results in model content now use the `Call` and `Result` unions. Update code that inspects `AgentItemModelResponse.Content` or supplies SDK messages to check `Call.Function`/`Call.WebSearch` and `Result.Function`/`Result.WebSearch`; `AgentItemTool` keeps its flat `ToolName`/`Input`/`Output` shape.
+- Replace `AgentItemTool.IsError` with `Status`.
+- Read SDK function calls and results through `Call.Function` and `Result.Function`. Check for nil before accessing function fields in SDK messages or `AgentItemModelResponse.Content`.
 
 ### To 0.3.0
 

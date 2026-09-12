@@ -202,7 +202,9 @@ func (m *OpenAIChatModel) Stream(ctx context.Context, input *llmsdk.LanguageMode
 
 					for _, delta := range incomingDeltas {
 						d := delta
-						responseCh <- &llmsdk.PartialModelResponse{Delta: &d}
+						if !stream.Send(ctx, responseCh, &llmsdk.PartialModelResponse{Delta: &d}) {
+							return
+						}
 					}
 				}
 
@@ -212,7 +214,9 @@ func (m *OpenAIChatModel) Stream(ctx context.Context, input *llmsdk.LanguageMode
 					if m.metadata != nil && m.metadata.Pricing != nil {
 						partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: false}))
 					}
-					responseCh <- partial
+					if !stream.Send(ctx, responseCh, partial) {
+						return
+					}
 				}
 			}
 
@@ -332,6 +336,13 @@ func convertToOpenAIChatCreateParams(input *llmsdk.LanguageModelInput, modelID s
 		}
 	}
 
+	if input.CacheRetention != nil {
+		retention := openaichatapi.CreateChatCompletionRequestPromptCacheRetentionInMemory
+		if *input.CacheRetention == llmsdk.CacheRetentionExtended {
+			retention = openaichatapi.CreateChatCompletionRequestPromptCacheRetentionN24H
+		}
+		params.PromptCacheRetention = &retention
+	}
 	if len(input.Metadata) > 0 {
 		metadata := openaichatapi.Metadata{}
 		for k, v := range input.Metadata {
@@ -909,5 +920,6 @@ func isModelTokensDetailsEmpty(details *llmsdk.ModelTokensDetails) bool {
 		details.CachedImageTokens == nil &&
 		details.CachedTokens == nil &&
 		details.CacheWriteTokens == nil &&
+		details.ExtendedCacheWriteTokens == nil &&
 		details.ReasoningTokens == nil
 }

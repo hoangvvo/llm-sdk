@@ -71,9 +71,13 @@
       "usage": {
         "input_tokens": 0,
         "output_tokens": 10,
-        "output_tokens_details": { "reasoning_tokens": 5 }
+        "output_tokens_details": {
+          "reasoning_tokens": 5
+        }
       },
-      "pricing": { "output_cost_per_text_token": 3 },
+      "pricing": {
+        "output_cost_per_text_token": 3
+      },
       "options": {
         "input_cache_tokens_are_additional": false,
         "output_reasoning_tokens_are_additional": false
@@ -85,9 +89,13 @@
       "usage": {
         "input_tokens": 0,
         "output_tokens": 10,
-        "output_tokens_details": { "reasoning_tokens": 5 }
+        "output_tokens_details": {
+          "reasoning_tokens": 5
+        }
       },
-      "pricing": { "output_cost_per_text_token": 3 },
+      "pricing": {
+        "output_cost_per_text_token": 3
+      },
       "options": {
         "input_cache_tokens_are_additional": false,
         "output_reasoning_tokens_are_additional": true
@@ -99,9 +107,13 @@
       "usage": {
         "input_tokens": 40,
         "output_tokens": 0,
-        "input_tokens_details": { "cache_write_tokens": 20 }
+        "input_tokens_details": {
+          "cache_write_tokens": 20
+        }
       },
-      "pricing": { "input_cost_per_text_token": 2 },
+      "pricing": {
+        "input_cost_per_text_token": 2
+      },
       "options": {
         "input_cache_tokens_are_additional": true,
         "output_reasoning_tokens_are_additional": false
@@ -109,11 +121,75 @@
       "expected_cost": 120
     },
     {
+      "name": "additional extended cache writes use their own rate",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 0,
+        "input_tokens_details": {
+          "cache_write_tokens": 40,
+          "extended_cache_write_tokens": 10
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_cache_write_token": 2.5,
+        "input_cost_per_extended_cache_write_token": 4
+      },
+      "options": {
+        "input_cache_tokens_are_additional": true,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 315
+    },
+    {
+      "name": "included extended cache writes use their own rate",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 0,
+        "input_tokens_details": {
+          "cache_write_tokens": 40,
+          "extended_cache_write_tokens": 10
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_cache_write_token": 2.5,
+        "input_cost_per_extended_cache_write_token": 4
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 235
+    },
+    {
+      "name": "extended cache write rate falls back to the cache write rate",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 0,
+        "input_tokens_details": {
+          "cache_write_tokens": 40,
+          "extended_cache_write_tokens": 10
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "input_cost_per_cache_write_token": 2.5
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 220
+    },
+    {
       "name": "reported modality tokens adjust the aggregate text cost",
       "usage": {
         "input_tokens": 100,
         "output_tokens": 0,
-        "input_tokens_details": { "audio_tokens": 20 }
+        "input_tokens_details": {
+          "audio_tokens": 20
+        }
       },
       "pricing": {
         "input_cost_per_text_token": 2,
@@ -130,8 +206,12 @@
       "usage": {
         "input_tokens": 100,
         "output_tokens": 10,
-        "input_tokens_details": { "audio_tokens": 0 },
-        "output_tokens_details": { "audio_tokens": 0 }
+        "input_tokens_details": {
+          "audio_tokens": 0
+        },
+        "output_tokens_details": {
+          "audio_tokens": 0
+        }
       },
       "pricing": {
         "input_cost_per_text_token": 2,
@@ -147,7 +227,10 @@
     },
     {
       "name": "unattributed aggregate tokens default to text",
-      "usage": { "input_tokens": 100, "output_tokens": 10 },
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 10
+      },
       "pricing": {
         "input_cost_per_text_token": 2,
         "input_cost_per_audio_token": 3,
@@ -162,8 +245,13 @@
     },
     {
       "name": "specialized rate is used when no text rate exists",
-      "usage": { "input_tokens": 0, "output_tokens": 1000 },
-      "pricing": { "output_cost_per_audio_token": 0.00002 },
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 1000
+      },
+      "pricing": {
+        "output_cost_per_audio_token": 2e-5
+      },
       "options": {
         "input_cache_tokens_are_additional": false,
         "output_reasoning_tokens_are_additional": false
@@ -175,7 +263,9 @@
       "usage": {
         "input_tokens": 0,
         "output_tokens": 0,
-        "input_tokens_details": { "audio_tokens": 20 }
+        "input_tokens_details": {
+          "audio_tokens": 20
+        }
       },
       "pricing": {
         "input_cost_per_text_token": 2,
@@ -192,7 +282,10 @@
       "usage": {
         "input_tokens": 100,
         "output_tokens": 0,
-        "input_tokens_details": { "audio_tokens": 20, "image_tokens": 10 }
+        "input_tokens_details": {
+          "audio_tokens": 20,
+          "image_tokens": 10
+        }
       },
       "pricing": {
         "input_cost_per_text_token": 2,
@@ -210,7 +303,9 @@
       "usage": {
         "input_tokens": 100,
         "output_tokens": 0,
-        "input_tokens_details": { "audio_tokens": 20 }
+        "input_tokens_details": {
+          "audio_tokens": 20
+        }
       },
       "pricing": {
         "input_cost_per_text_token": 2,
@@ -221,6 +316,95 @@
         "output_reasoning_tokens_are_additional": false
       },
       "expected_cost": 160
+    },
+    {
+      "name": "web search requests are billed per request",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 10,
+        "server_tool_use": {
+          "web_search_requests": 2
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "output_cost_per_text_token": 3,
+        "cost_per_web_search_request": 0.01
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 230.02
+    },
+    {
+      "name": "long context multipliers apply above the threshold",
+      "usage": {
+        "input_tokens": 300,
+        "output_tokens": 10,
+        "server_tool_use": {
+          "web_search_requests": 1
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "output_cost_per_text_token": 3,
+        "cost_per_web_search_request": 0.01,
+        "long_context": {
+          "threshold_tokens": 200,
+          "input_cost_multiplier": 2,
+          "output_cost_multiplier": 1.5
+        }
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 1245.01
+    },
+    {
+      "name": "long context multipliers do not apply at the threshold",
+      "usage": {
+        "input_tokens": 200,
+        "output_tokens": 10
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "output_cost_per_text_token": 3,
+        "long_context": {
+          "threshold_tokens": 200,
+          "input_cost_multiplier": 2,
+          "output_cost_multiplier": 1.5
+        }
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": false
+      },
+      "expected_cost": 430
+    },
+    {
+      "name": "additional reasoning is multiplied for long context",
+      "usage": {
+        "input_tokens": 300,
+        "output_tokens": 10,
+        "output_tokens_details": {
+          "reasoning_tokens": 10
+        }
+      },
+      "pricing": {
+        "input_cost_per_text_token": 2,
+        "output_cost_per_text_token": 3,
+        "long_context": {
+          "threshold_tokens": 200,
+          "output_cost_multiplier": 1.5
+        }
+      },
+      "options": {
+        "input_cache_tokens_are_additional": false,
+        "output_reasoning_tokens_are_additional": true
+      },
+      "expected_cost": 690
     }
   ]
 }

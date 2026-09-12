@@ -1268,6 +1268,10 @@ function ModelDetails({ option }: { option: ModelOption }) {
         ["Input text token", pricing.input_cost_per_text_token],
         ["Input cached token", pricing.input_cost_per_cached_token],
         ["Input cache-write token", pricing.input_cost_per_cache_write_token],
+        [
+          "Input extended cache-write token",
+          pricing.input_cost_per_extended_cache_write_token,
+        ],
         ["Input cached text token", pricing.input_cost_per_cached_text_token],
         ["Output text token", pricing.output_cost_per_text_token],
         ["Input audio token", pricing.input_cost_per_audio_token],
@@ -1276,6 +1280,7 @@ function ModelDetails({ option }: { option: ModelOption }) {
         ["Input image token", pricing.input_cost_per_image_token],
         ["Input cached image token", pricing.input_cost_per_cached_image_token],
         ["Output image token", pricing.output_cost_per_image_token],
+        ["Web search request", pricing.cost_per_web_search_request],
       ]
     : [];
   const hasPricing = pricing ? hasAnyPricing(pricing) : false;
@@ -1388,6 +1393,7 @@ function hasAnyPricing(pricing: LanguageModelPricing | undefined): boolean {
     pricing.input_cost_per_text_token,
     pricing.input_cost_per_cached_token,
     pricing.input_cost_per_cache_write_token,
+    pricing.input_cost_per_extended_cache_write_token,
     pricing.input_cost_per_cached_text_token,
     pricing.output_cost_per_text_token,
     pricing.input_cost_per_audio_token,
@@ -1396,5 +1402,6 @@ function hasAnyPricing(pricing: LanguageModelPricing | undefined): boolean {
     pricing.input_cost_per_image_token,
     pricing.input_cost_per_cached_image_token,
     pricing.output_cost_per_image_token,
+    pricing.cost_per_web_search_request,
   ].some((value) => value !== undefined);
 }

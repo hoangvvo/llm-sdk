@@ -1,7 +1,8 @@
 {
   "customUntaggedDeserializers": ["Item", "OutputItem"],
   "optionalProperties": {
-    "InputImageContent": ["detail"]
+    "InputImageContent": ["detail"],
+    "ResponseUsageInputTokensDetails": ["cache_write_tokens"]
   },
   "rustSerde": {
     "serialize": ["CreateResponse"],

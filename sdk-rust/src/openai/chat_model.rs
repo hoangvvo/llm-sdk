@@ -18,20 +18,21 @@ use super::chat_api::{
     ChatCompletionToolChoiceOption, CompletionUsage, CompletionUsageCompletionTokensDetails,
     CompletionUsagePromptTokensDetails, CreateChatCompletionRequest,
     CreateChatCompletionRequestAudio, CreateChatCompletionRequestAudioFormat,
-    CreateChatCompletionRequestResponseFormat, CreateChatCompletionRequestToolsItem,
-    CreateChatCompletionResponse, CreateChatCompletionStreamResponse, FunctionObject,
-    ReasoningEffort, ReasoningEffortValue, ResponseFormatJsonObject, ResponseFormatJsonSchema,
-    ResponseFormatJsonSchemaJsonSchema, ResponseFormatJsonSchemaSchema, ResponseFormatText,
-    ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
+    CreateChatCompletionRequestPromptCacheRetention, CreateChatCompletionRequestResponseFormat,
+    CreateChatCompletionRequestToolsItem, CreateChatCompletionResponse,
+    CreateChatCompletionStreamResponse, FunctionObject, ReasoningEffort, ReasoningEffortValue,
+    ResponseFormatJsonObject, ResponseFormatJsonSchema, ResponseFormatJsonSchemaJsonSchema,
+    ResponseFormatJsonSchemaSchema, ResponseFormatText, ResponseModalitiesValueItem,
+    VoiceIdsOrCustomVoice,
 };
 use crate::{
     client_utils, source_part_utils, stream_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AssistantMessage, AudioFormat,
-    AudioOptions, ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput,
-    LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
-    ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool, ToolMessage,
-    ToolResultStatus, UserMessage,
+    AudioOptions, CacheRetention, ContentDelta, LanguageModel, LanguageModelError,
+    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
+    ModelResponse, ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse,
+    ResponseFormatJson, ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool,
+    ToolMessage, ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -331,9 +332,12 @@ fn convert_to_openai_create_params(
     };
 
     Ok(CreateChatCompletionRequest {
-        metadata: None,
+        metadata: input.metadata.map(|metadata| Some(Some(metadata))),
         prompt_cache_key: None,
-        prompt_cache_retention: None,
+        prompt_cache_retention: input.cache_retention.map(|retention| match retention {
+            CacheRetention::Standard => CreateChatCompletionRequestPromptCacheRetention::InMemory,
+            CacheRetention::Extended => CreateChatCompletionRequestPromptCacheRetention::N24H,
+        }),
         safety_identifier: None,
         service_tier: None,
         temperature: input.temperature,
@@ -601,7 +605,11 @@ fn convert_tool_message(
         match part {
             Part::ToolResult(tool_result_part) => {
                 let crate::ToolResult::Function(function_result) = tool_result_part.result else {
-                    continue;
+                    return Err(LanguageModelError::Unsupported(
+                        PROVIDER,
+                        "OpenAI Chat Completions does not accept hosted web-search results"
+                            .to_string(),
+                    ));
                 };
                 let mut content_parts = Vec::new();
                 let converted_parts = source_part_utils::get_compatible_parts_without_source_parts(
@@ -689,7 +697,7 @@ fn convert_to_openai_tool_call(
         tool_call_id,
         call,
         signature: _,
-        id,
+        id: _,
     } = part;
 
     let crate::ToolCall::Function(call) = call else {
@@ -710,7 +718,7 @@ fn convert_to_openai_tool_call(
             arguments,
             name: call.name,
         },
-        id: id.unwrap_or(tool_call_id),
+        id: tool_call_id,
     })
 }
 
@@ -1031,6 +1039,7 @@ fn map_openai_usage(usage: CompletionUsage) -> ModelUsage {
         output_tokens: u32::try_from(usage.completion_tokens).unwrap_or(0),
         input_tokens_details: None,
         output_tokens_details: None,
+        server_tool_use: None,
     };
 
     if let Some(details) = usage.prompt_tokens_details {

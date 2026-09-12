@@ -129,7 +129,13 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 
 		var usage *llmsdk.ModelUsage
 		if response.Usage != nil {
-			usage = mapOpenAIUsage(*response.Usage)
+			webSearchRequests := 0
+			for _, item := range response.Output {
+				if item.WebSearchToolCall != nil && item.WebSearchToolCall.Action.Search != nil {
+					webSearchRequests++
+				}
+			}
+			usage = mapOpenAIUsage(*response.Usage, webSearchRequests)
 		}
 
 		result := &llmsdk.ModelResponse{
@@ -175,6 +181,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 			refusal := ""
 			normalizedOutputIndexes := map[int]int{}
 			nextContentIndex := 0
+			webSearchRequests := 0
 
 			for sseStream.Next() {
 				streamEvent, err := sseStream.Current()
@@ -188,6 +195,9 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 
 				if streamEvent.ResponseRefusalDelta != nil {
 					refusal += streamEvent.ResponseRefusalDelta.Delta
+				}
+				if done := streamEvent.ResponseOutputItemDone; done != nil && done.Item.WebSearchToolCall != nil && done.Item.WebSearchToolCall.Action.Search != nil {
+					webSearchRequests++
 				}
 
 				partDelta, err := mapOpenAIStreamEvent(*streamEvent)
@@ -205,22 +215,28 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 						normalizedOutputIndexes[providerOutputIndex] = normalizedOutputIndex
 					}
 					partDelta.Index = normalizedOutputIndex
-					responseCh <- &llmsdk.PartialModelResponse{Delta: partDelta}
+					if !stream.Send(ctx, responseCh, &llmsdk.PartialModelResponse{Delta: partDelta}) {
+						return
+					}
 				}
 
 				if resultDelta := mapOpenAIStreamWebSearchResult(*streamEvent, nextContentIndex); resultDelta != nil {
 					nextContentIndex++
-					responseCh <- &llmsdk.PartialModelResponse{Delta: resultDelta}
+					if !stream.Send(ctx, responseCh, &llmsdk.PartialModelResponse{Delta: resultDelta}) {
+						return
+					}
 				}
 
 				if streamEvent.ResponseCompleted != nil {
 					if streamEvent.ResponseCompleted.Response.Usage != nil {
-						usage := mapOpenAIUsage(*streamEvent.ResponseCompleted.Response.Usage)
+						usage := mapOpenAIUsage(*streamEvent.ResponseCompleted.Response.Usage, webSearchRequests)
 						partial := &llmsdk.PartialModelResponse{Usage: usage}
 						if m.metadata != nil && m.metadata.Pricing != nil {
 							partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: false}))
 						}
-						responseCh <- partial
+						if !stream.Send(ctx, responseCh, partial) {
+							return
+						}
 					}
 				}
 			}
@@ -249,6 +265,20 @@ func convertToResponseCreateParams(input *llmsdk.LanguageModelInput, modelID str
 
 	params := &openaiapi.CreateResponse{}
 	params.Store = ptr.To(false)
+	if input.CacheRetention != nil {
+		retention := openaiapi.CreateResponsePromptCacheRetentionInMemory
+		if *input.CacheRetention == llmsdk.CacheRetentionExtended {
+			retention = openaiapi.CreateResponsePromptCacheRetentionN24H
+		}
+		params.PromptCacheRetention = &retention
+	}
+	if len(input.Metadata) > 0 {
+		metadata := openaiapi.Metadata{}
+		for k, v := range input.Metadata {
+			metadata[k] = v
+		}
+		params.Metadata = &metadata
+	}
 	params.Instructions = input.SystemPrompt
 	params.Temperature = input.Temperature
 	params.TopP = input.TopP
@@ -732,7 +762,7 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 
 		case item.WebSearchToolCall != nil:
 			web := item.WebSearchToolCall
-			status := llmsdk.WebSearchToolCallStatus(web.Status)
+			status := mapOpenAIWebSearchCallStatus(web.Status)
 			call := llmsdk.Part{ToolCallPart: &llmsdk.ToolCallPart{
 				ToolCallID: web.Id,
 				Call: llmsdk.ToolCall{WebSearch: &llmsdk.WebSearchToolCall{
@@ -762,7 +792,7 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 				width, height = parseOpenAIImageSize(string(*responseOutputItemImageGenerationCall.Size))
 			}
 
-			mimeType := ""
+			mimeType := "image/png"
 			if responseOutputItemImageGenerationCall.OutputFormat != nil {
 				mimeType = "image/" + string(*responseOutputItemImageGenerationCall.OutputFormat)
 			}
@@ -782,10 +812,11 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 			))
 
 		case item.ReasoningItem != nil:
-			var summary = ""
+			summaryTexts := make([]string, 0, len(item.ReasoningItem.Summary))
 			for _, s := range item.ReasoningItem.Summary {
-				summary += s.Text + "\n"
+				summaryTexts = append(summaryTexts, s.Text)
 			}
+			summary := strings.Join(summaryTexts, "\n")
 
 			reasoningOpts := []llmsdk.ReasoningPartOption{}
 			if item.ReasoningItem.EncryptedContent != nil {
@@ -801,11 +832,23 @@ func mapOpenAIOutputItems(items []openaiapi.OutputItem) ([]llmsdk.Part, error) {
 
 // MARK: - To SDK Delta
 
+// mapOpenAIWebSearchCallStatus maps the provider status, which reports a
+// failed search as "incomplete".
+func mapOpenAIWebSearchCallStatus(status openaiapi.WebSearchToolCallStatus) llmsdk.WebSearchToolCallStatus {
+	if string(status) == "incomplete" {
+		return llmsdk.WebSearchToolCallStatusFailed
+	}
+	return llmsdk.WebSearchToolCallStatus(status)
+}
+
 func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentDelta, error) {
 	switch {
 	case event.ResponseFailed != nil:
-		// Handle failed response - convert to error
-		return nil, llmsdk.NewInvariantError(Provider, "stream event failed")
+		message := "OpenAI Response Stream failed"
+		if event.ResponseFailed.Response.Error.Message != "" {
+			message += ": " + event.ResponseFailed.Response.Error.Message
+		}
+		return nil, llmsdk.NewInvariantError(Provider, message)
 
 	case event.ResponseOutputItemAdded != nil:
 		item := event.ResponseOutputItemAdded.Item
@@ -823,7 +866,7 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 			}, nil
 		}
 		if item.WebSearchToolCall != nil {
-			status := llmsdk.WebSearchToolCallStatus(item.WebSearchToolCall.Status)
+			status := mapOpenAIWebSearchCallStatus(item.WebSearchToolCall.Status)
 			return &llmsdk.ContentDelta{Index: event.ResponseOutputItemAdded.OutputIndex, Part: llmsdk.PartDelta{
 				ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
 					ToolCallID: ptr.To(item.WebSearchToolCall.Id),
@@ -832,7 +875,7 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 			}}, nil
 		}
 
-		if item.ReasoningItem != nil {
+		if item.ReasoningItem != nil && item.ReasoningItem.EncryptedContent != nil {
 			return &llmsdk.ContentDelta{
 				Index: event.ResponseOutputItemAdded.OutputIndex,
 				Part: llmsdk.PartDelta{
@@ -851,7 +894,7 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 		if item.WebSearchToolCall == nil {
 			return nil, nil
 		}
-		status := llmsdk.WebSearchToolCallStatus(item.WebSearchToolCall.Status)
+		status := mapOpenAIWebSearchCallStatus(item.WebSearchToolCall.Status)
 		return &llmsdk.ContentDelta{Index: event.ResponseOutputItemDone.OutputIndex, Part: llmsdk.PartDelta{
 			ToolCallPartDelta: &llmsdk.ToolCallPartDelta{
 				ToolCallID: ptr.To(item.WebSearchToolCall.Id),
@@ -912,7 +955,7 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 		if responseImageGenCallPartialImageEvent.Size != nil {
 			width, height = parseOpenAIImageSize(string(*responseImageGenCallPartialImageEvent.Size))
 		}
-		mimeType := ""
+		mimeType := "image/png"
 		if responseImageGenCallPartialImageEvent.OutputFormat != nil {
 			mimeType = "image/" + string(*responseImageGenCallPartialImageEvent.OutputFormat)
 		}
@@ -928,6 +971,12 @@ func mapOpenAIStreamEvent(event openaiapi.ResponseStreamEvent) (*llmsdk.ContentD
 					ID:       &responseImageGenCallPartialImageEvent.ItemId,
 				},
 			},
+		}, nil
+
+	case event.ResponseReasoningTextDelta != nil:
+		return &llmsdk.ContentDelta{
+			Index: event.ResponseReasoningTextDelta.OutputIndex,
+			Part:  llmsdk.NewReasoningPartDelta(event.ResponseReasoningTextDelta.Delta),
 		}, nil
 
 	case event.ResponseReasoningSummaryTextDelta != nil:
@@ -1013,18 +1062,22 @@ func mapOpenAIURLCitation(value openaiapi.UrlCitationBody) llmsdk.Citation {
 
 // MARK: - To SDK Usage
 
-func mapOpenAIUsage(usage openaiapi.ResponseUsage) *llmsdk.ModelUsage {
-	return &llmsdk.ModelUsage{
+func mapOpenAIUsage(usage openaiapi.ResponseUsage, webSearchRequests int) *llmsdk.ModelUsage {
+	result := &llmsdk.ModelUsage{
 		InputTokens:  usage.InputTokens,
 		OutputTokens: usage.OutputTokens,
 		InputTokensDetails: &llmsdk.ModelTokensDetails{
 			CachedTokens:     ptr.To(usage.InputTokensDetails.CachedTokens),
-			CacheWriteTokens: ptr.To(usage.InputTokensDetails.CacheWriteTokens),
+			CacheWriteTokens: usage.InputTokensDetails.CacheWriteTokens,
 		},
 		OutputTokensDetails: &llmsdk.ModelTokensDetails{
 			ReasoningTokens: ptr.To(usage.OutputTokensDetails.ReasoningTokens),
 		},
 	}
+	if webSearchRequests > 0 {
+		result.ServerToolUse = &llmsdk.ModelServerToolUsage{WebSearchRequests: ptr.To(webSearchRequests)}
+	}
+	return result
 }
 
 // image size from openai is in the format of {number}x{number}, we parse it into width, height if available

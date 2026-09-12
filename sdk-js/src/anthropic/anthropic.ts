@@ -105,12 +105,12 @@ export class AnthropicModel implements LanguageModel {
     });
     const serverToolBlocks = new Map<number, { id: string; input: string }>();
     const serverToolCallIndexes = new Map<string, number>();
-    let streamUsage: ModelUsage | undefined;
+    let streamUsage: AnthropicUsageLike | undefined;
 
     for await (const chunk of stream) {
       switch (chunk.type) {
         case "message_start": {
-          streamUsage = mapAnthropicUsage(chunk.message.usage);
+          streamUsage = { ...chunk.message.usage };
           if (chunk.message.stop_reason === "refusal") {
             throw new RefusalError(
               anthropicRefusalMessage(chunk.message.stop_details),
@@ -120,10 +120,7 @@ export class AnthropicModel implements LanguageModel {
         }
         case "message_delta": {
           if (streamUsage) {
-            streamUsage = mergeAnthropicMessageDeltaUsage(
-              streamUsage,
-              chunk.usage,
-            );
+            streamUsage = mergeAnthropicUsage(streamUsage, chunk.usage);
           }
           if (chunk.delta.stop_reason === "refusal") {
             throw new RefusalError(
@@ -220,9 +217,10 @@ export class AnthropicModel implements LanguageModel {
     }
 
     if (streamUsage) {
-      const event: PartialModelResponse = { usage: streamUsage };
+      const usage = mapAnthropicUsage(streamUsage);
+      const event: PartialModelResponse = { usage };
       if (this.metadata?.pricing) {
-        event.cost = calculateCost(streamUsage, this.metadata.pricing, {
+        event.cost = calculateCost(usage, this.metadata.pricing, {
           input_cache_tokens_are_additional: true,
           output_reasoning_tokens_are_additional: false,
         });
@@ -258,6 +256,7 @@ function convertToAnthropicCreateParams(
     tools,
     tool_choice,
     reasoning,
+    cache_retention,
   } = input;
 
   const maxTokens = max_tokens ?? 4096;
@@ -299,6 +298,13 @@ function convertToAnthropicCreateParams(
   }
   if (reasoning) {
     params.thinking = convertToAnthropicThinkingConfigParam(reasoning);
+  }
+  if (cache_retention) {
+    // Top-level cache_control caches through the last cacheable block.
+    params.cache_control = {
+      type: "ephemeral",
+      ...(cache_retention === "extended" ? { ttl: "1h" } : {}),
+    };
   }
 
   return params;
@@ -853,13 +859,58 @@ function mapAnthropicRawContentBlockDelta(
 
 // MARK: To SDK Usage
 
-function mapAnthropicUsage(usage: Anthropic.Usage): ModelUsage {
+/**
+ * The usage fields shared by `message_start` and the cumulative `message_delta`
+ * events. Fields of later events overwrite earlier values when present.
+ */
+type AnthropicUsageLike = Partial<{
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_input_tokens: number | null;
+  cache_creation_input_tokens: number | null;
+  cache_creation: Anthropic.Messages.CacheCreation | null;
+  output_tokens_details: Anthropic.Messages.OutputTokensDetails | null;
+  server_tool_use: Anthropic.Messages.ServerToolUsage | null;
+}>;
+
+function mergeAnthropicUsage(
+  current: AnthropicUsageLike,
+  incoming: AnthropicUsageLike,
+): AnthropicUsageLike {
+  const result: AnthropicUsageLike = { ...current };
+  for (const key of Object.keys(incoming) as (keyof AnthropicUsageLike)[]) {
+    const value = incoming[key];
+    if (value !== undefined && value !== null) {
+      (result as Record<string, unknown>)[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
+ * Anthropic reports `input_tokens` without the cached and cache-write tokens.
+ * The numbers are kept as reported; the cost calculation accounts for it.
+ */
+function mapAnthropicUsage(usage: AnthropicUsageLike): ModelUsage {
   const result: ModelUsage = {
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
+    input_tokens: usage.input_tokens ?? 0,
+    output_tokens: usage.output_tokens ?? 0,
   };
-  const inputDetails = mapAnthropicInputTokenDetails(usage);
-  if (inputDetails) {
+  const inputDetails: ModelTokensDetails = {};
+  if (typeof usage.cache_read_input_tokens === "number") {
+    inputDetails.cached_tokens = usage.cache_read_input_tokens;
+  }
+  if (typeof usage.cache_creation_input_tokens === "number") {
+    inputDetails.cache_write_tokens = usage.cache_creation_input_tokens;
+  }
+  if (
+    usage.cache_creation &&
+    usage.cache_creation.ephemeral_1h_input_tokens > 0
+  ) {
+    inputDetails.extended_cache_write_tokens =
+      usage.cache_creation.ephemeral_1h_input_tokens;
+  }
+  if (Object.keys(inputDetails).length > 0) {
     result.input_tokens_details = inputDetails;
   }
   if (typeof usage.output_tokens_details?.thinking_tokens === "number") {
@@ -867,47 +918,10 @@ function mapAnthropicUsage(usage: Anthropic.Usage): ModelUsage {
       reasoning_tokens: usage.output_tokens_details.thinking_tokens,
     };
   }
-  return result;
-}
-
-function mergeAnthropicMessageDeltaUsage(
-  current: ModelUsage,
-  usage: Anthropic.MessageDeltaUsage,
-): ModelUsage {
-  const result: ModelUsage = {
-    ...current,
-    input_tokens:
-      typeof usage.input_tokens === "number"
-        ? usage.input_tokens
-        : current.input_tokens,
-    output_tokens: usage.output_tokens,
-  };
-  const inputDetails = mapAnthropicInputTokenDetails(usage);
-  if (inputDetails) {
-    result.input_tokens_details = {
-      ...current.input_tokens_details,
-      ...inputDetails,
-    };
-  }
-  if (typeof usage.output_tokens_details?.thinking_tokens === "number") {
-    result.output_tokens_details = {
-      ...current.output_tokens_details,
-      reasoning_tokens: usage.output_tokens_details.thinking_tokens,
+  if (usage.server_tool_use && usage.server_tool_use.web_search_requests > 0) {
+    result.server_tool_use = {
+      web_search_requests: usage.server_tool_use.web_search_requests,
     };
   }
   return result;
-}
-
-function mapAnthropicInputTokenDetails(usage: {
-  cache_creation_input_tokens?: number | null;
-  cache_read_input_tokens?: number | null;
-}): ModelTokensDetails | undefined {
-  const result: ModelTokensDetails = {};
-  if (typeof usage.cache_read_input_tokens === "number") {
-    result.cached_tokens = usage.cache_read_input_tokens;
-  }
-  if (typeof usage.cache_creation_input_tokens === "number") {
-    result.cache_write_tokens = usage.cache_creation_input_tokens;
-  }
-  return Object.keys(result).length > 0 ? result : undefined;
 }

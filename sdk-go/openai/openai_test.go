@@ -88,9 +88,12 @@ func TestReasoningToolUse(t *testing.T) {
 
 func TestTransport(t *testing.T) {
 	testcommon.RunTransportTestGroup(t, "openai_transport", func(baseURL string) llmsdk.LanguageModel {
+		searchCost := 0.01
 		return openai.NewOpenAIModel("test-model", openai.OpenAIModelOptions{
 			APIKey:  "test-token",
 			BaseURL: baseURL + "/v1",
-		})
+		}).WithMetadata(&llmsdk.LanguageModelMetadata{Pricing: &llmsdk.LanguageModelPricing{
+			CostPerWebSearchRequest: &searchCost,
+		}})
 	})
 }
