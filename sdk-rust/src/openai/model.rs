@@ -576,8 +576,10 @@ fn convert_assistant_message_to_response_input_items(
                 )),
                 Part::ToolCall(tool_call_part) => match tool_call_part.call {
                     ToolCall::Function(call) => {
-                        // Calls to deferred tools must be replayed with the namespace OpenAI
-                        // assigned them, which for top-level functions is the function name.
+                        // Calls to deferred tools must be replayed with the
+                        // namespace OpenAI
+                        // assigned them, which for top-level functions is the
+                        // function name.
                         let namespace = tools
                             .iter()
                             .any(|tool| {
@@ -656,7 +658,8 @@ fn convert_tool_message_to_response_input_items(
             ));
         };
 
-        // Hosted tool results are replayed through their assistant-message items.
+        // Hosted tool results are replayed through their assistant-message
+        // items.
         let ToolResult::Function(result) = result else {
             continue;
         };
@@ -673,8 +676,8 @@ fn convert_tool_message_to_response_input_items(
                 },
             ))
         } else {
-            // A call has exactly one output item, so every result part becomes an
-            // entry of the same output list.
+            // A call has exactly one output item, so every result part becomes
+            // an entry of the same output list.
             FunctionCallOutputItemParamOutput::FunctionCallOutputItemParamOutputArray(Some(
                 tool_result_part_content
                     .into_iter()

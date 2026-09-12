@@ -176,7 +176,8 @@ async fn run_stream(
         match event? {
             AgentStreamEvent::Partial(_) => {}
             AgentStreamEvent::Item(item_event) => {
-                // Persist generated items so later iterations operate on the full history.
+                // Persist generated items so later iterations operate on the
+                // full history.
                 transcript.push(item_event.item.clone());
                 log_item(&item_event.item);
             }

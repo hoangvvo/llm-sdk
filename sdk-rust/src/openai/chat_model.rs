@@ -1,4 +1,3 @@
-use super::chat_api::CreateChatCompletionRequestPromptCacheRetention;
 use super::chat_api::{
     self, ChatCompletionMessageToolCall, ChatCompletionMessageToolCallsItem,
     ChatCompletionNamedToolChoice, ChatCompletionNamedToolChoiceFunction,
@@ -20,21 +19,21 @@ use super::chat_api::{
     ChatCompletionToolChoiceOption, CompletionUsage, CompletionUsageCompletionTokensDetails,
     CompletionUsagePromptTokensDetails, CreateChatCompletionRequest,
     CreateChatCompletionRequestAudio, CreateChatCompletionRequestAudioFormat,
-    CreateChatCompletionRequestResponseFormat, CreateChatCompletionRequestToolsItem,
-    CreateChatCompletionResponse, CreateChatCompletionStreamResponse, FunctionObject,
-    ReasoningEffort, ReasoningEffortValue, ResponseFormatJsonObject, ResponseFormatJsonSchema,
-    ResponseFormatJsonSchemaJsonSchema, ResponseFormatJsonSchemaSchema, ResponseFormatText,
-    ResponseModalitiesValueItem, VoiceIdsOrCustomVoice,
+    CreateChatCompletionRequestPromptCacheRetention, CreateChatCompletionRequestResponseFormat,
+    CreateChatCompletionRequestToolsItem, CreateChatCompletionResponse,
+    CreateChatCompletionStreamResponse, FunctionObject, ReasoningEffort, ReasoningEffortValue,
+    ResponseFormatJsonObject, ResponseFormatJsonSchema, ResponseFormatJsonSchemaJsonSchema,
+    ResponseFormatJsonSchemaSchema, ResponseFormatText, ResponseModalitiesValueItem,
+    VoiceIdsOrCustomVoice,
 };
-use crate::CacheRetention;
 use crate::{
     client_utils, source_part_utils, stream_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AssistantMessage, AudioFormat,
-    AudioOptions, ContentDelta, LanguageModel, LanguageModelError, LanguageModelInput,
-    LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
-    ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool, ToolMessage,
-    ToolResultStatus, UserMessage,
+    AudioOptions, CacheRetention, ContentDelta, LanguageModel, LanguageModelError,
+    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
+    ModelResponse, ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse,
+    ResponseFormatJson, ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool,
+    ToolMessage, ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -393,9 +392,9 @@ fn convert_to_openai_create_params(
 fn serialize_openai_chat_request(
     request: &CreateChatCompletionRequest,
 ) -> LanguageModelResult<Value> {
-    // OpenAI reuses content-part schemas both directly and inside tagged unions.
-    // Serializing through Value canonicalizes the union discriminator to one key
-    // before reqwest writes the request body.
+    // OpenAI reuses content-part schemas both directly and inside tagged
+    // unions. Serializing through Value canonicalizes the union
+    // discriminator to one key before reqwest writes the request body.
     serde_json::to_value(request).map_err(|error| {
         LanguageModelError::Invariant(
             PROVIDER,
@@ -710,7 +709,8 @@ fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<CreateChatCompletio
         }
     };
 
-    // Chat Completions cannot defer tools, so deferred tools are loaded eagerly.
+    // Chat Completions cannot defer tools, so deferred tools are loaded
+    // eagerly.
     let function = FunctionObject {
         description: Some(tool.description),
         name: tool.name,

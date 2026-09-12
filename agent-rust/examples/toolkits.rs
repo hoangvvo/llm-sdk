@@ -872,8 +872,8 @@ async fn main() -> Result<(), BoxError> {
             .add_toolkit(LostAndFoundToolkit),
     );
 
-    // Create a RunSession explicitly so the ToolkitSession persists across multiple
-    // turns.
+    // Create a RunSession explicitly so the ToolkitSession persists across
+    // multiple turns.
     let session = agent
         .create_session(RiftContext {
             visitor_id: "aurora-shift",

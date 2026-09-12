@@ -62,7 +62,8 @@ impl AgentFunctionTool<TracingContext> for WeatherTool {
     ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn Error + Send + Sync>>> {
         Box::pin(async move {
             let params: WeatherArgs = serde_json::from_value(args)?;
-            // Attach a child span so downstream work is correlated with the agent span.
+            // Attach a child span so downstream work is correlated with the
+            // agent span.
             let span = info_span!("tools.get_weather", city = %params.city);
             let _guard = span.enter();
 
