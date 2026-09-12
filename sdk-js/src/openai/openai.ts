@@ -39,6 +39,7 @@ import type {
   ToolMessage,
   UserMessage,
   WebSearchAction,
+  WebSearchToolCallStatus,
 } from "../types.ts";
 import { calculateCost } from "../usage.utils.ts";
 import type { OpenAIModelOptions } from "./options.ts";
@@ -98,7 +99,11 @@ export class OpenAIModel implements LanguageModel {
     };
 
     if (response.usage) {
-      result.usage = mapOpenAIUsage(response.usage);
+      const webSearchRequests = response.output.filter(
+        (item) =>
+          item.type === "web_search_call" && item.action.type === "search",
+      ).length;
+      result.usage = mapOpenAIUsage(response.usage, webSearchRequests);
       if (this.metadata?.pricing) {
         result.cost = calculateCost(result.usage, this.metadata.pricing, {
           input_cache_tokens_are_additional: false,
@@ -123,10 +128,18 @@ export class OpenAIModel implements LanguageModel {
     let refusal = "";
     const normalizedOutputIndexes = new Map<number, number>();
     let nextContentIndex = 0;
+    let webSearchRequests = 0;
 
     for await (const event of stream) {
       if (event.type === "response.refusal.delta") {
         refusal += event.delta;
+      }
+      if (
+        event.type === "response.output_item.done" &&
+        event.item.type === "web_search_call" &&
+        event.item.action.type === "search"
+      ) {
+        webSearchRequests += 1;
       }
 
       const partDelta = mapOpenAIStreamEvent(event);
@@ -158,7 +171,7 @@ export class OpenAIModel implements LanguageModel {
 
       if (event.type === "response.completed") {
         if (event.response.usage) {
-          const usage = mapOpenAIUsage(event.response.usage);
+          const usage = mapOpenAIUsage(event.response.usage, webSearchRequests);
           const partial: PartialModelResponse = { usage };
           if (this.metadata?.pricing) {
             partial.cost = calculateCost(usage, this.metadata.pricing, {
@@ -192,6 +205,8 @@ function convertToOpenAICreateParams(
     tool_choice,
     modalities,
     reasoning,
+    cache_retention,
+    metadata,
   } = input;
 
   const params: Omit<OpenAI.Responses.ResponseCreateParams, "stream"> = {
@@ -226,6 +241,16 @@ function convertToOpenAICreateParams(
   if (reasoning) {
     params.include = [...(params.include ?? []), "reasoning.encrypted_content"];
     params.reasoning = convertToOpenAIReasoning(reasoning);
+  }
+  if (cache_retention) {
+    // prompt_cache_retention is deprecated in favor of prompt_cache_options,
+    // which the generated Go and Rust clients do not expose yet.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    params.prompt_cache_retention =
+      cache_retention === "extended" ? "24h" : "in_memory";
+  }
+  if (metadata) {
+    params.metadata = metadata;
   }
 
   return params;
@@ -637,7 +662,7 @@ function mapOpenAIOutputItems(
             tool_call_id: item.id,
             call: {
               type: "web_search",
-              status: item.status,
+              status: mapOpenAIWebSearchStatus(item.status),
               action: mapOpenAIWebSearchAction(item.action),
             },
           };
@@ -678,7 +703,7 @@ function mapOpenAIOutputItems(
           const imagePart: ImagePart = {
             type: "image",
             data: patchedItem.result,
-            mime_type: `image/${patchedItem.output_format}`,
+            mime_type: `image/${patchedItem.output_format ?? "png"}`,
           };
           if (typeof width === "number") {
             imagePart.width = width;
@@ -709,6 +734,12 @@ function mapOpenAIOutputItems(
       }
     })
     .flat();
+}
+
+function mapOpenAIWebSearchStatus(
+  status: OpenAI.Responses.ResponseFunctionWebSearch["status"],
+): WebSearchToolCallStatus {
+  return status === "incomplete" ? "failed" : status;
 }
 
 function mapOpenAIOutputText(
@@ -814,7 +845,7 @@ function mapOpenAIStreamEvent(
             tool_call_id: event.item.id,
             call: {
               type: "web_search",
-              status: event.item.status,
+              status: mapOpenAIWebSearchStatus(event.item.status),
               ...(action && { action: mapOpenAIWebSearchAction(action) }),
             },
           },
@@ -855,7 +886,7 @@ function mapOpenAIStreamEvent(
           tool_call_id: event.item.id,
           call: {
             type: "web_search",
-            status: event.item.status,
+            status: mapOpenAIWebSearchStatus(event.item.status),
             ...(action && { action: mapOpenAIWebSearchAction(action) }),
           },
         },
@@ -1013,8 +1044,11 @@ function mapOpenAIStreamWebSearchResult(
 
 // MARK: To SDK Usage
 
-function mapOpenAIUsage(usage: OpenAI.Responses.ResponseUsage): ModelUsage {
-  return {
+function mapOpenAIUsage(
+  usage: OpenAI.Responses.ResponseUsage,
+  webSearchRequests: number,
+): ModelUsage {
+  const result: ModelUsage = {
     input_tokens: usage.input_tokens,
     output_tokens: usage.output_tokens,
     input_tokens_details: {
@@ -1025,4 +1059,8 @@ function mapOpenAIUsage(usage: OpenAI.Responses.ResponseUsage): ModelUsage {
       reasoning_tokens: usage.output_tokens_details.reasoning_tokens,
     },
   };
+  if (webSearchRequests > 0) {
+    result.server_tool_use = { web_search_requests: webSearchRequests };
+  }
+  return result;
 }

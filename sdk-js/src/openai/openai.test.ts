@@ -47,10 +47,13 @@ suite("OpenAIModel", () => {
       t,
       "openai_transport",
       (baseURL) =>
-        new OpenAIModel({
-          modelId: "test-model",
-          apiKey: "test-token",
-          baseURL: `${baseURL}/v1`,
-        }),
+        new OpenAIModel(
+          {
+            modelId: "test-model",
+            apiKey: "test-token",
+            baseURL: `${baseURL}/v1`,
+          },
+          { pricing: { cost_per_web_search_request: 0.01 } },
+        ),
     ));
 });

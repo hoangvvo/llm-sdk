@@ -11,9 +11,9 @@ use crate::{
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AudioPart, Citation, CitationDelta,
     ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
     LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelTokensDetails, ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse,
-    ReasoningPart, ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool,
-    ToolChoiceOption, ToolResultStatus,
+    ModelServerToolUsage, ModelTokensDetails, ModelUsage, ModelUsageCostOptions, Part, PartDelta,
+    PartialModelResponse, ReasoningPart, ResponseFormatOption, TextPart, TextPartDelta,
+    Tool as SdkTool, ToolChoiceOption, ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -96,6 +96,12 @@ impl GoogleModel {
             })?;
             headers.insert(header_name, header_value);
         }
+        headers.insert(
+            "x-goog-api-key",
+            HeaderValue::from_str(&self.api_key).map_err(|error| {
+                LanguageModelError::InvalidInput(format!("Invalid Google API key: {error}"))
+            })?,
+        );
 
         Ok(headers)
     }
@@ -126,10 +132,7 @@ impl LanguageModel for GoogleModel {
                 |input| async move {
                     let params = convert_to_generate_content_parameters(input, &self.model_id)?;
 
-                    let url = format!(
-                        "{}/models/{}:generateContent?key={}",
-                        self.base_url, self.model_id, self.api_key
-                    );
+                    let url = format!("{}/models/{}:generateContent", self.base_url, self.model_id);
 
                     let headers = self.request_headers()?;
                     let response: GenerateContentResponse =
@@ -150,9 +153,14 @@ impl LanguageModel for GoogleModel {
                         candidate.grounding_metadata.as_ref(),
                     )?;
 
+                    let web_search_requests = candidate
+                        .grounding_metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata.web_search_queries.as_ref())
+                        .map_or(0, Vec::len);
                     let usage = response
                         .usage_metadata
-                        .map(|u| map_google_usage_metadata(&u));
+                        .map(|u| map_google_usage_metadata(&u, web_search_requests));
 
                     let cost = if let (Some(usage), Some(pricing)) = (
                         usage.as_ref(),
@@ -174,6 +182,7 @@ impl LanguageModel for GoogleModel {
         })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn stream(
         &self,
         input: LanguageModelInput,
@@ -188,8 +197,8 @@ impl LanguageModel for GoogleModel {
                     let metadata = self.metadata.clone();
 
                     let url = format!(
-                        "{}/models/{}:streamGenerateContent?key={}&alt=sse",
-                        self.base_url, self.model_id, self.api_key
+                        "{}/models/{}:streamGenerateContent?alt=sse",
+                        self.base_url, self.model_id
                     );
 
                     let headers = self.request_headers()?;
@@ -208,7 +217,7 @@ impl LanguageModel for GoogleModel {
                         let mut grounding_chunks: Vec<GroundingChunk> = Vec::new();
                         let mut web_search_queries: Vec<String> = Vec::new();
                         let mut stream_text_part_mappings: HashMap<usize, usize> = HashMap::new();
-                        let mut stream_usage = None;
+                        let mut stream_usage: Option<ModelUsage> = None;
 
                         while let Some(chunk) = chunk_stream.next().await {
                             let response = chunk?;
@@ -236,7 +245,11 @@ impl LanguageModel for GoogleModel {
                                         &mut grounding_chunks,
                                         &stream_text_part_mappings,
                                     );
-                                    web_search_queries.extend(queries);
+                                    for query in queries {
+                                        if !web_search_queries.contains(&query) {
+                                            web_search_queries.push(query);
+                                        }
+                                    }
                                     incoming_deltas.extend(citation_deltas);
                                 }
 
@@ -252,16 +265,30 @@ impl LanguageModel for GoogleModel {
                             }
 
                             if let Some(usage_metadata) = response.usage_metadata {
-                                let incoming_usage = map_google_usage_metadata(&usage_metadata);
+                                let incoming_usage = map_google_usage_metadata(&usage_metadata, web_search_queries.len());
                                 if let Some(current_usage) = stream_usage.as_mut() {
-                                    merge_google_usage_max(current_usage, incoming_usage);
+                                    current_usage.merge_max(&incoming_usage);
                                 } else {
                                     stream_usage = Some(incoming_usage);
                                 }
                             }
                         }
 
-                        if let Some(usage) = stream_usage {
+                        let web_search_requests = web_search_queries.len();
+                        if !web_search_queries.is_empty() || !grounding_chunks.is_empty() {
+                            let index = all_content_deltas.iter().map(|delta| delta.index).max().map_or(0, |value| value + 1);
+                            for delta in map_google_web_search_deltas(web_search_queries, grounding_chunks, index) {
+                                yield PartialModelResponse { delta: Some(delta), usage: None, cost: None };
+                            }
+                        }
+
+                        if let Some(mut usage) = stream_usage {
+                            // Search queries are only known once the stream ends.
+                            if web_search_requests > 0 {
+                                usage.server_tool_use = Some(ModelServerToolUsage {
+                                    web_search_requests: Some(u32::try_from(web_search_requests).unwrap_or(u32::MAX)),
+                                });
+                            }
                             let cost = metadata
                                 .as_ref()
                                 .and_then(|m| m.pricing.as_ref())
@@ -271,13 +298,6 @@ impl LanguageModel for GoogleModel {
                                 usage: Some(usage),
                                 cost,
                             };
-                        }
-
-                        if !web_search_queries.is_empty() || !grounding_chunks.is_empty() {
-                            let index = all_content_deltas.iter().map(|delta| delta.index).max().map_or(0, |value| value + 1);
-                            for delta in map_google_web_search_deltas(web_search_queries, grounding_chunks, index) {
-                                yield PartialModelResponse { delta: Some(delta), usage: None, cost: None };
-                            }
                         }
                     };
 
@@ -419,17 +439,15 @@ fn convert_to_generate_content_parameters(
     }
 
     if let Some(audio) = input.audio {
-        if let Some(voice) = audio.voice {
-            config.speech_config = Some(SpeechConfig {
-                voice_config: Some(VoiceConfig {
-                    prebuilt_voice_config: Some(PrebuiltVoiceConfig {
-                        voice_name: Some(voice),
-                    }),
+        config.speech_config = Some(SpeechConfig {
+            voice_config: Some(VoiceConfig {
+                prebuilt_voice_config: Some(PrebuiltVoiceConfig {
+                    voice_name: audio.voice,
                 }),
-                language_code: audio.language,
-                ..Default::default()
-            });
-        }
+            }),
+            language_code: audio.language,
+            ..Default::default()
+        });
     }
 
     if let Some(reasoning) = input.reasoning {
@@ -988,46 +1006,7 @@ fn next_google_delta_index(
         .map_or(0, |index| index + 1)
 }
 
-fn merge_google_usage_max(current: &mut ModelUsage, incoming: ModelUsage) {
-    current.input_tokens = current.input_tokens.max(incoming.input_tokens);
-    current.output_tokens = current.output_tokens.max(incoming.output_tokens);
-    merge_google_token_details_max(
-        &mut current.input_tokens_details,
-        incoming.input_tokens_details,
-    );
-    merge_google_token_details_max(
-        &mut current.output_tokens_details,
-        incoming.output_tokens_details,
-    );
-}
-
-fn merge_google_token_details_max(
-    current: &mut Option<ModelTokensDetails>,
-    incoming: Option<ModelTokensDetails>,
-) {
-    let Some(incoming) = incoming else {
-        return;
-    };
-    let current = current.get_or_insert_default();
-    macro_rules! merge {
-        ($field:ident) => {
-            if let Some(value) = incoming.$field {
-                current.$field = Some(current.$field.unwrap_or(0).max(value));
-            }
-        };
-    }
-    merge!(text_tokens);
-    merge!(audio_tokens);
-    merge!(image_tokens);
-    merge!(cached_text_tokens);
-    merge!(cached_audio_tokens);
-    merge!(cached_image_tokens);
-    merge!(cached_tokens);
-    merge!(cache_write_tokens);
-    merge!(reasoning_tokens);
-}
-
-fn map_google_usage_metadata(usage: &UsageMetadata) -> ModelUsage {
+fn map_google_usage_metadata(usage: &UsageMetadata, web_search_requests: usize) -> ModelUsage {
     let value =
         |value: Option<i64>| value.map(|value| u32::try_from(value.max(0)).unwrap_or(u32::MAX));
     let sum_token_counts = |details: Option<&Vec<ModalityTokenCount>>| {
@@ -1119,11 +1098,16 @@ fn map_google_usage_metadata(usage: &UsageMetadata) -> ModelUsage {
             .reasoning_tokens = Some(reasoning_tokens);
     }
 
+    // candidatesTokenCount excludes thoughts. The numbers are kept as reported;
+    // the cost calculation accounts for it.
     ModelUsage {
         input_tokens: prompt_tokens.saturating_add(tool_use_prompt_tokens),
         output_tokens,
         input_tokens_details,
         output_tokens_details,
+        server_tool_use: (web_search_requests > 0).then(|| ModelServerToolUsage {
+            web_search_requests: Some(u32::try_from(web_search_requests).unwrap_or(u32::MAX)),
+        }),
     }
 }
 

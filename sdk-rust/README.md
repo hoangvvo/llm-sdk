@@ -100,11 +100,13 @@ cargo run --example generate-text --features examples,openai
 
 ### To 0.4.0
 
+- `ReasoningPartDelta.text` is now `String`. Use an empty string for deltas without text.
+- Add the new optional fields to struct literals, or use `..Default::default()` where available.
 - Replace `Tool { name, description, parameters }` with `FunctionTool::new(...)`.
 - `ToolResultPart::is_error` has been replaced with the required `status` field (`Completed`, `Failed`, or `Cancelled`).
-- Function tool calls now store `tool_name` and `args` in `call`. Match `ToolCall::Function(call)` before accessing `call.name` and `call.args` because the enum can now contain a provider-hosted web search call.
-- Function tool results now store `tool_name` and `content` in `result`. Match `ToolResult::Function(result)` before accessing `result.name` and `result.content` because the enum can now contain a provider-hosted web search result.
-- `ToolCallPartDelta.tool_name` and `args` have moved to its `ToolCallDelta::Function` value, matching `ToolCallPart`. The `ToolCallPart::new`, `ToolResultPart::new`, and builder APIs retain their existing function-tool signatures.
+- Match `ToolCall::Function(call)` to read `call.name` and `call.args` in place of `tool_name` and `args`.
+- Match `ToolResult::Function(result)` to read `result.name` and `result.content` in place of `tool_name` and `content`.
+- Move `ToolCallPartDelta.tool_name` and `args` into `ToolCallDelta::Function` as `name` and `args`.
 
 ### To 0.2.0
 

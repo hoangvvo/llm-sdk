@@ -140,7 +140,7 @@ pub fn loosely_convert_part_to_part_delta(part: Part) -> LanguageModelResult<Par
             status: result.status,
         }),
         Part::Reasoning(reasoning_part) => PartDelta::Reasoning(ReasoningPartDelta {
-            text: Some(reasoning_part.text),
+            text: reasoning_part.text,
             signature: reasoning_part.signature,
             id: reasoning_part.id,
         }),

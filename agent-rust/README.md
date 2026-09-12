@@ -243,8 +243,9 @@ An example server that exposes an API to interact with the agent can be found in
 
 ### To 0.4.0
 
-- `AgentItemTool::is_error` has been replaced with the required `status` field, `AgentResponse` now includes a terminal `status`, and `run`/`run_stream` now require `RunOptions`.
-- SDK tool calls and results in model content now use the `ToolCall` and `ToolResult` enums. Update code that inspects `AgentItem::Model(response).content` or supplies SDK messages to match their `Function` and `WebSearch` variants; `AgentItemTool` keeps its flat `tool_name`/`input`/`output` shape.
+- Replace `AgentItemTool.is_error` with `status`; add `status` to `AgentResponse` literals.
+- Pass `RunOptions` to `run` and `run_stream`.
+- Match `ToolCall::Function` and `ToolResult::Function` before reading function fields in SDK messages or model responses. Handle hosted search variants in exhaustive matches.
 
 ### To 0.3.0
 

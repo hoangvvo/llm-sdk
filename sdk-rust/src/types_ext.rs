@@ -775,9 +775,17 @@ impl AudioPartDelta {
 }
 
 impl ReasoningPartDelta {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            signature: None,
+            id: None,
+        }
+    }
+
     #[must_use]
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
-        self.text = Some(text.into());
+        self.text = text.into();
         self
     }
 

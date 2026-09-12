@@ -1,13 +1,13 @@
 use crate::{
     client_utils, id_utils,
     openai::responses_api::{
-        self, Annotation, CreateResponse, DetailEnum, FunctionCallOutputItemParam,
-        FunctionCallOutputItemParamOutput, FunctionCallOutputItemParamOutputArrayItem,
-        FunctionCallOutputItemParamType, FunctionTool, FunctionToolCall, FunctionToolCallType,
-        FunctionToolType, ImageDetail, ImageGenTool, ImageGenToolCall, ImageGenToolCallType,
-        ImageGenToolType, IncludeEnum, InputContent, InputImageContent,
-        InputImageContentParamAutoParam, InputImageContentType, InputItem, InputMessage,
-        InputMessageRole, InputMessageType, InputTextContent, InputTextContentParam,
+        self, Annotation, CreateResponse, CreateResponsePromptCacheRetention, DetailEnum,
+        FunctionCallOutputItemParam, FunctionCallOutputItemParamOutput,
+        FunctionCallOutputItemParamOutputArrayItem, FunctionCallOutputItemParamType, FunctionTool,
+        FunctionToolCall, FunctionToolCallType, FunctionToolType, ImageDetail, ImageGenTool,
+        ImageGenToolCall, ImageGenToolCallType, ImageGenToolType, IncludeEnum, InputContent,
+        InputImageContent, InputImageContentParamAutoParam, InputImageContentType, InputItem,
+        InputMessage, InputMessageRole, InputMessageType, InputTextContent, InputTextContentParam,
         InputTextContentType, OutputItem, OutputMessage, OutputMessageContent, OutputMessageRole,
         OutputMessageStatus, OutputMessageType, OutputTextContent, Reasoning, ReasoningItem,
         ReasoningItemType, ReasoningSummary, Response, ResponseFormatJsonObject,
@@ -20,13 +20,13 @@ use crate::{
     },
     source_part_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
-    AssistantMessage, Citation, CitationDelta, ContentDelta, ImagePart, ImagePartDelta,
-    LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
-    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelUsage,
-    ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions, ReasoningPart,
-    ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart, TextPartDelta, Tool,
-    ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage, ToolResultPart,
-    ToolResultStatus, UserMessage,
+    AssistantMessage, CacheRetention, Citation, CitationDelta, ContentDelta, ImagePart,
+    ImagePartDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
+    LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelServerToolUsage,
+    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions,
+    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
+    TextPartDelta, Tool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
+    ToolResultPart, ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -157,11 +157,15 @@ impl LanguageModel for OpenAIModel {
                         header_map,
                     )
                     .await?;
-                    let output = json.output;
-                    let usage = json.usage;
-
-                    let content = map_openai_output_items(output)?;
-                    let usage = usage.map(|usage| map_openai_response_usage(&usage));
+                    let web_search_requests = json
+                        .output
+                        .iter()
+                        .filter(|item| is_billable_web_search(item))
+                        .count();
+                    let content = map_openai_output_items(json.output)?;
+                    let usage = json
+                        .usage
+                        .map(|usage| map_openai_response_usage(&usage, web_search_requests));
 
                     let cost = if let (Some(usage), Some(pricing)) = (
                         usage.as_ref(),
@@ -211,13 +215,20 @@ impl LanguageModel for OpenAIModel {
                         let mut refusal = String::new();
                         let mut normalized_output_indexes = HashMap::new();
                         let mut next_content_index = 0_usize;
+                        let mut web_search_requests = 0_usize;
 
                         while let Some(event) = chunk_stream.next().await {
                             let event = event?;
 
+                            if let ResponseStreamEvent::ResponseOutputItemDone(ref done_event) = event {
+                                if is_billable_web_search(&done_event.item) {
+                                    web_search_requests += 1;
+                                }
+                            }
+
                             if let ResponseStreamEvent::ResponseCompleted(ref completed_event) = event {
                                 if let Some(usage) = &completed_event.response.usage {
-                                    let usage = map_openai_response_usage(usage);
+                                    let usage = map_openai_response_usage(usage, web_search_requests);
                                     yield PartialModelResponse {
                                         delta: None,
                                         cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS)),
@@ -288,10 +299,12 @@ fn convert_to_response_create_params(
         tool_choice,
         modalities,
         reasoning,
+        metadata,
+        cache_retention,
         ..
     } = input;
 
-    let include_reasoning_encrypted = reasoning.as_ref().is_some_and(|r| r.enabled);
+    let include_reasoning_encrypted = reasoning.is_some();
     let include_web_search_sources = tools
         .as_ref()
         .is_some_and(|tools| tools.iter().any(|tool| matches!(tool, Tool::WebSearch(_))));
@@ -304,9 +317,12 @@ fn convert_to_response_create_params(
     }
 
     let mut params = CreateResponse {
-        metadata: None,
+        metadata: metadata.map(|metadata| Some(Some(metadata))),
         prompt_cache_key: None,
-        prompt_cache_retention: None,
+        prompt_cache_retention: cache_retention.map(|retention| match retention {
+            CacheRetention::Standard => CreateResponsePromptCacheRetention::InMemory,
+            CacheRetention::Extended => CreateResponsePromptCacheRetention::N24H,
+        }),
         safety_identifier: None,
         service_tier: None,
         temperature,
@@ -859,10 +875,13 @@ fn map_openai_stream_event(
     event: ResponseStreamEvent,
 ) -> LanguageModelResult<Option<ContentDelta>> {
     match event {
-        ResponseStreamEvent::ResponseFailed(_) => Err(LanguageModelError::Invariant(
-            PROVIDER,
-            "OpenAI stream event failed".to_string(),
-        )),
+        ResponseStreamEvent::ResponseFailed(failed_event) => {
+            let message = failed_event.response.error.flatten().map_or_else(
+                || "OpenAI Response Stream failed".to_string(),
+                |error| format!("OpenAI Response Stream failed: {}", error.message),
+            );
+            Err(LanguageModelError::Invariant(PROVIDER, message))
+        }
         ResponseStreamEvent::ResponseOutputItemAdded(output_item_added_event) => {
             match output_item_added_event.item {
                 OutputItem::FunctionToolCall(function_tool_call) => {
@@ -911,7 +930,7 @@ fn map_openai_stream_event(
                     if let Some(encrypted_content) = reasoning_item.encrypted_content {
                         let reasoning_part = ReasoningPartDelta {
                             signature: Some(encrypted_content),
-                            text: None,
+                            text: String::new(),
                             id: Some(reasoning_item.id),
                         };
                         let reasoning_part = PartDelta::Reasoning(reasoning_part);
@@ -1059,13 +1078,20 @@ fn map_openai_stream_event(
                 part: image_part,
             }))
         }
+        ResponseStreamEvent::ResponseReasoningTextDelta(reasoning_text_delta_event) => {
+            Ok(Some(ContentDelta {
+                index: usize::try_from(reasoning_text_delta_event.output_index).unwrap_or(0),
+                part: PartDelta::Reasoning(ReasoningPartDelta::new(
+                    reasoning_text_delta_event.delta,
+                )),
+            }))
+        }
         ResponseStreamEvent::ResponseReasoningSummaryTextDelta(
             reasoning_summary_text_delta_event,
         ) => {
-            let reasoning_part = PartDelta::Reasoning(ReasoningPartDelta {
-                text: Some(reasoning_summary_text_delta_event.delta),
-                ..Default::default()
-            });
+            let reasoning_part = PartDelta::Reasoning(ReasoningPartDelta::new(
+                reasoning_summary_text_delta_event.delta,
+            ));
             Ok(Some(ContentDelta {
                 index: usize::try_from(reasoning_summary_text_delta_event.output_index)
                     .unwrap_or(0),
@@ -1248,7 +1274,17 @@ fn parse_openai_image_size(size: Option<&String>) -> Option<(u32, u32)> {
     Some((width.parse().ok()?, height.parse().ok()?))
 }
 
-fn map_openai_response_usage(value: &ResponseUsage) -> ModelUsage {
+fn is_billable_web_search(item: &OutputItem) -> bool {
+    let OutputItem::WebSearchToolCall(web) = item else {
+        return false;
+    };
+    matches!(
+        web.action,
+        responses_api::WebSearchToolCallAction::Search(_)
+    )
+}
+
+fn map_openai_response_usage(value: &ResponseUsage, web_search_requests: usize) -> ModelUsage {
     ModelUsage {
         input_tokens: u32::try_from(value.input_tokens).unwrap_or(0),
         output_tokens: u32::try_from(value.output_tokens).unwrap_or(0),
@@ -1256,9 +1292,10 @@ fn map_openai_response_usage(value: &ResponseUsage) -> ModelUsage {
             cached_tokens: Some(
                 u32::try_from(value.input_tokens_details.cached_tokens).unwrap_or(0),
             ),
-            cache_write_tokens: Some(
-                u32::try_from(value.input_tokens_details.cache_write_tokens).unwrap_or(0),
-            ),
+            cache_write_tokens: value
+                .input_tokens_details
+                .cache_write_tokens
+                .map(|tokens| u32::try_from(tokens).unwrap_or(0)),
             ..Default::default()
         }),
         output_tokens_details: Some(crate::ModelTokensDetails {
@@ -1266,6 +1303,9 @@ fn map_openai_response_usage(value: &ResponseUsage) -> ModelUsage {
                 u32::try_from(value.output_tokens_details.reasoning_tokens).unwrap_or(0),
             ),
             ..Default::default()
+        }),
+        server_tool_use: (web_search_requests > 0).then(|| ModelServerToolUsage {
+            web_search_requests: Some(u32::try_from(web_search_requests).unwrap_or(u32::MAX)),
         }),
     }
 }

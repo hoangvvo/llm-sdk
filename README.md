@@ -27,7 +27,7 @@ The accompanying [Console app](https://llm-sdk.hoangvvo.com/console/chat/) demon
 - Supports multi-modality function calling (image/audio returned from tools).
 - Supports provider-hosted web search with normalized citations.
 - Supports citations (RAG) and reasoning for supported models.
-- Reports token usage and calculates the cost of a request when provided with the model’s pricing information.
+- Reports token usage as the provider counts it (with cached, cache-write, reasoning, and per-modality breakdowns) and calculates the cost of a request, including hosted web searches and long-context pricing tiers, when provided with the model’s pricing information.
 - Unified serialization across JS, Rust, and Go (systems in different languages can work together).
 - Integrates OpenTelemetry for tracing.
 - _Zero abstraction_: the agent library is a thin for-loop around the SDK. No overcomplex abstractions like chains, graphs, or hidden prompt templates.

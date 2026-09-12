@@ -559,7 +559,7 @@ impl DataStreamProtocolAdapter {
             }
             PartDelta::Reasoning(reasoning_delta) => self.write_for_reasoning_part(
                 delta.index,
-                reasoning_delta.text.clone().unwrap_or_default(),
+                reasoning_delta.text.clone(),
                 reasoning_delta.id.as_deref(),
             ),
             PartDelta::ToolCall(tool_delta) => {

@@ -656,6 +656,13 @@ func WithInputReasoning(reasoning *ReasoningOptions) LanguageModelInputOption {
 	}
 }
 
+// WithInputCacheRetention sets how long prompt cache entries are kept.
+func WithInputCacheRetention(retention CacheRetention) LanguageModelInputOption {
+	return func(i *LanguageModelInput) {
+		i.CacheRetention = &retention
+	}
+}
+
 // NewResponseFormatText creates a text response format
 func NewResponseFormatText() *ResponseFormatOption {
 	return &ResponseFormatOption{Text: &ResponseFormatText{}}

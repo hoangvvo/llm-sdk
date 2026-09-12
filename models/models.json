@@ -6,10 +6,11 @@
       "model_id": "gpt-5.6-sol",
       "metadata": {
         "pricing": {
-          "input_cost_per_text_token": 5e-6,
-          "input_cost_per_cached_token": 5e-7,
-          "input_cost_per_cache_write_token": 6.25e-6,
-          "output_cost_per_text_token": 3e-5
+          "input_cost_per_text_token": 4e-6,
+          "input_cost_per_cached_token": 4e-7,
+          "input_cost_per_cache_write_token": 5e-6,
+          "output_cost_per_text_token": 2e-5,
+          "cost_per_web_search_request": 0.01
         },
         "capabilities": {
           "text_input": true,
@@ -37,7 +38,13 @@
           "input_cost_per_text_token": 2e-6,
           "input_cost_per_cached_token": 2e-7,
           "input_cost_per_cache_write_token": 2.5e-6,
-          "output_cost_per_text_token": 1.2e-5
+          "output_cost_per_text_token": 1.2e-5,
+          "cost_per_web_search_request": 0.01,
+          "long_context": {
+            "threshold_tokens": 272000,
+            "input_cost_multiplier": 2,
+            "output_cost_multiplier": 1.5
+          }
         },
         "capabilities": {
           "text_input": true,
@@ -162,6 +169,61 @@
       }
     },
     {
+      "provider": "openai",
+      "model_id": "gpt-6-astra",
+      "metadata": {
+        "pricing": {
+          "input_cost_per_text_token": 1e-5,
+          "input_cost_per_cached_token": 1e-6,
+          "input_cost_per_cache_write_token": 1.25e-5,
+          "output_cost_per_text_token": 5e-5,
+          "cost_per_web_search_request": 0.01
+        },
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": true
+        }
+      },
+      "default_reasoning": {
+        "enabled": true
+      }
+    },
+    {
+      "provider": "openai",
+      "model_id": "gpt-5.5",
+      "metadata": {
+        "pricing": {
+          "input_cost_per_text_token": 5e-6,
+          "input_cost_per_cached_token": 5e-7,
+          "output_cost_per_text_token": 3e-5,
+          "cost_per_web_search_request": 0.01
+        },
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": true
+        }
+      },
+      "default_reasoning": {
+        "enabled": true
+      }
+    },
+    {
       "provider": "anthropic",
       "model_id": "claude-fable-5",
       "metadata": {
@@ -169,7 +231,9 @@
           "input_cost_per_text_token": 1e-5,
           "input_cost_per_cached_token": 1e-6,
           "input_cost_per_cache_write_token": 1.25e-5,
-          "output_cost_per_text_token": 5e-5
+          "input_cost_per_extended_cache_write_token": 2e-5,
+          "output_cost_per_text_token": 5e-5,
+          "cost_per_web_search_request": 0.01
         },
         "capabilities": {
           "text_input": true,
@@ -196,7 +260,9 @@
           "input_cost_per_text_token": 5e-6,
           "input_cost_per_cached_token": 5e-7,
           "input_cost_per_cache_write_token": 6.25e-6,
-          "output_cost_per_text_token": 2.5e-5
+          "input_cost_per_extended_cache_write_token": 1e-5,
+          "output_cost_per_text_token": 2.5e-5,
+          "cost_per_web_search_request": 0.01
         },
         "capabilities": {
           "text_input": true,
@@ -223,7 +289,9 @@
           "input_cost_per_text_token": 2e-6,
           "input_cost_per_cached_token": 2e-7,
           "input_cost_per_cache_write_token": 2.5e-6,
-          "output_cost_per_text_token": 1e-5
+          "input_cost_per_extended_cache_write_token": 4e-6,
+          "output_cost_per_text_token": 1e-5,
+          "cost_per_web_search_request": 0.01
         },
         "capabilities": {
           "text_input": true,
@@ -250,7 +318,9 @@
           "input_cost_per_text_token": 1e-6,
           "input_cost_per_cached_token": 1e-7,
           "input_cost_per_cache_write_token": 1.25e-6,
-          "output_cost_per_text_token": 5e-6
+          "input_cost_per_extended_cache_write_token": 2e-6,
+          "output_cost_per_text_token": 5e-6,
+          "cost_per_web_search_request": 0.01
         },
         "capabilities": {
           "text_input": true,
@@ -271,6 +341,64 @@
       }
     },
     {
+      "provider": "anthropic",
+      "model_id": "claude-fable-5-1",
+      "metadata": {
+        "pricing": {
+          "input_cost_per_text_token": 1e-5,
+          "input_cost_per_cached_token": 2.5e-7,
+          "input_cost_per_cache_write_token": 1.25e-5,
+          "input_cost_per_extended_cache_write_token": 2e-5,
+          "output_cost_per_text_token": 5e-5,
+          "cost_per_web_search_request": 0.01
+        },
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": true
+        }
+      },
+      "default_reasoning": {
+        "enabled": true
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model_id": "claude-opus-5",
+      "metadata": {
+        "pricing": {
+          "input_cost_per_text_token": 5e-6,
+          "input_cost_per_cached_token": 5e-7,
+          "input_cost_per_cache_write_token": 6.25e-6,
+          "input_cost_per_extended_cache_write_token": 1e-5,
+          "output_cost_per_text_token": 2.5e-5,
+          "cost_per_web_search_request": 0.01
+        },
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": false,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": true,
+          "reasoning": true
+        }
+      },
+      "default_reasoning": {
+        "enabled": true
+      }
+    },
+    {
       "provider": "google",
       "model_id": "gemini-3.1-pro-preview",
       "metadata": {
@@ -279,7 +407,13 @@
           "input_cost_per_audio_token": 2e-6,
           "input_cost_per_image_token": 2e-6,
           "input_cost_per_cached_token": 2e-7,
-          "output_cost_per_text_token": 1.2e-5
+          "output_cost_per_text_token": 1.2e-5,
+          "cost_per_web_search_request": 0.014,
+          "long_context": {
+            "threshold_tokens": 200000,
+            "input_cost_multiplier": 2,
+            "output_cost_multiplier": 1.5
+          }
         },
         "capabilities": {
           "text_input": true,
@@ -307,7 +441,8 @@
           "input_cost_per_audio_token": 1.5e-6,
           "input_cost_per_image_token": 1.5e-6,
           "input_cost_per_cached_token": 1.5e-7,
-          "output_cost_per_text_token": 9e-6
+          "output_cost_per_text_token": 9e-6,
+          "cost_per_web_search_request": 0.014
         },
         "capabilities": {
           "text_input": true,
@@ -337,7 +472,8 @@
           "input_cost_per_audio_token": 5e-7,
           "input_cost_per_cached_text_token": 2.5e-8,
           "input_cost_per_cached_image_token": 2.5e-8,
-          "input_cost_per_cached_audio_token": 5e-8
+          "input_cost_per_cached_audio_token": 5e-8,
+          "cost_per_web_search_request": 0.014
         },
         "capabilities": {
           "text_input": true,
@@ -374,9 +510,9 @@
           "audio_input": false,
           "audio_output": false,
           "function_calling": false,
-          "structured_output": true,
+          "structured_output": false,
           "citation": false,
-          "reasoning": false
+          "reasoning": true
         }
       },
       "default_modalities": ["text", "image"]
@@ -406,6 +542,61 @@
       "default_audio": {
         "format": "linear16",
         "voice": "Zephyr"
+      }
+    },
+    {
+      "provider": "google",
+      "model_id": "gemini-3.8-flash",
+      "metadata": {
+        "pricing": {
+          "input_cost_per_text_token": 7.5e-7,
+          "input_cost_per_cached_token": 7.5e-8,
+          "output_cost_per_text_token": 3.75e-6,
+          "cost_per_web_search_request": 0.014
+        },
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": true,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": true
+        }
+      },
+      "default_reasoning": {
+        "enabled": true
+      }
+    },
+    {
+      "provider": "google",
+      "model_id": "gemini-3.5-flash-lite",
+      "metadata": {
+        "pricing": {
+          "input_cost_per_text_token": 3e-7,
+          "input_cost_per_cached_token": 3e-8,
+          "input_cost_per_audio_token": 3e-7,
+          "output_cost_per_text_token": 2.5e-6,
+          "cost_per_web_search_request": 0.014
+        },
+        "capabilities": {
+          "text_input": true,
+          "text_output": true,
+          "image_input": true,
+          "image_output": false,
+          "audio_input": true,
+          "audio_output": false,
+          "function_calling": true,
+          "structured_output": true,
+          "citation": false,
+          "reasoning": true
+        }
+      },
+      "default_reasoning": {
+        "enabled": true
       }
     },
     {
@@ -445,29 +636,6 @@
           "function_calling": true,
           "structured_output": true,
           "citation": true,
-          "reasoning": false
-        }
-      }
-    },
-    {
-      "provider": "mistral",
-      "model_id": "magistral-medium-latest",
-      "metadata": {
-        "pricing": {
-          "input_cost_per_text_token": 2e-6,
-          "input_cost_per_cached_token": 2e-7,
-          "output_cost_per_text_token": 5e-6
-        },
-        "capabilities": {
-          "text_input": true,
-          "text_output": true,
-          "image_input": true,
-          "image_output": false,
-          "audio_input": false,
-          "audio_output": false,
-          "function_calling": true,
-          "structured_output": true,
-          "citation": true,
           "reasoning": true
         }
       }
@@ -491,13 +659,13 @@
           "function_calling": true,
           "structured_output": true,
           "citation": true,
-          "reasoning": false
+          "reasoning": true
         }
       }
     },
     {
       "provider": "mistral",
-      "model_id": "magistral-small-latest",
+      "model_id": "mistral-large-latest",
       "metadata": {
         "pricing": {
           "input_cost_per_text_token": 5e-7,
@@ -507,14 +675,14 @@
         "capabilities": {
           "text_input": true,
           "text_output": true,
-          "image_input": false,
+          "image_input": true,
           "image_output": false,
           "audio_input": false,
           "audio_output": false,
           "function_calling": true,
           "structured_output": true,
-          "citation": true,
-          "reasoning": true
+          "citation": false,
+          "reasoning": false
         }
       }
     }

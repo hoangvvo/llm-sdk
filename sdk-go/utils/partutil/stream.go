@@ -1,8 +1,6 @@
 package partutil
 
 import (
-	"slices"
-
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 )
 
@@ -22,9 +20,15 @@ func GuessDeltaIndex(part llmsdk.PartDelta, allContentDeltas []llmsdk.ContentDel
 	// [part0 partial, part0 partial, part1 partial].
 	// For the purpose of this matching, we want only
 	// [part0, part1]
-	uniqueContentDeltas := slices.CompactFunc(slices.Clone(allContentDeltas), func(a, b llmsdk.ContentDelta) bool {
-		return a.Index == b.Index
-	})
+	seenIndexes := map[int]bool{}
+	uniqueContentDeltas := make([]llmsdk.ContentDelta, 0, len(allContentDeltas))
+	for _, contentDelta := range allContentDeltas {
+		if seenIndexes[contentDelta.Index] {
+			continue
+		}
+		seenIndexes[contentDelta.Index] = true
+		uniqueContentDeltas = append(uniqueContentDeltas, contentDelta)
+	}
 
 	if toolCallIndex != nil && part.ToolCallPartDelta != nil {
 		// Providers like OpenAI track tool calls in a separate field, so we

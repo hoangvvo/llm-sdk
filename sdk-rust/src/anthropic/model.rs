@@ -1,12 +1,13 @@
 use crate::{
     anthropic::api::{
-        self, Base64ImageSource, Base64ImageSourceMediaType, ContentBlock, ContentBlockDeltaEvent,
+        self, Base64ImageSource, Base64ImageSourceMediaType, CacheControlEphemeral,
+        CacheControlEphemeralTtl, ContentBlock, ContentBlockDeltaEvent,
         ContentBlockDeltaEventDelta, ContentBlockStartEvent, ContentBlockStartEventContentBlock,
-        CreateMessageParams, CreateMessageParamsSystem, CreateMessageParamsToolsItem,
-        InputContentBlock, InputMessage, InputMessageContent, InputMessageRole,
-        Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage, MessageStartEvent,
-        MessageStreamEvent, OutputConfig, RequestCitationsConfig, RequestImageBlock,
-        RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock,
+        CreateMessageParams, CreateMessageParamsCacheControl, CreateMessageParamsSystem,
+        CreateMessageParamsToolsItem, InputContentBlock, InputMessage, InputMessageContent,
+        InputMessageRole, Message as AnthropicMessage, MessageDeltaEvent, MessageDeltaUsage,
+        MessageStartEvent, MessageStreamEvent, OutputConfig, RequestCitationsConfig,
+        RequestImageBlock, RequestImageBlockSource, RequestSearchResultBlock, RequestTextBlock,
         RequestTextBlockCitationsItem, RequestThinkingBlock, RequestToolResultBlock,
         RequestToolResultBlockContent, RequestToolResultBlockContentArrayItem, RequestToolUseBlock,
         RequestWebSearchResultLocationCitation, StopReason, ThinkingConfigAdaptive,
@@ -15,12 +16,13 @@ use crate::{
     },
     client_utils, stream_utils,
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT,
-    Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel, LanguageModelError,
-    LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
-    ModelResponse, ModelTokensDetails, ModelUsage, ModelUsageCostOptions, Part, PartDelta,
-    PartialModelResponse, ReasoningOptions, ReasoningPart, ReasoningPartDelta, ResponseFormatJson,
-    ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool, ToolCallPart,
-    ToolCallPartDelta, ToolChoiceOption, ToolResultPart, ToolResultStatus,
+    CacheRetention, Citation, CitationDelta, ContentDelta, ImagePart, LanguageModel,
+    LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
+    LanguageModelStream, Message, ModelResponse, ModelServerToolUsage, ModelTokensDetails,
+    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions,
+    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
+    TextPartDelta, Tool as SdkTool, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
+    ToolResultPart, ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -178,21 +180,16 @@ impl LanguageModel for AnthropicModel {
                     }
 
                     let content = map_anthropic_message(response.content);
-                    let usage = Some(map_anthropic_usage(&response.usage));
+                    let usage = map_anthropic_usage(&AnthropicUsage::from(&response.usage));
 
-                    let cost =
-                        if let (Some(usage), Some(metadata)) = (usage.as_ref(), self.metadata()) {
-                            metadata
-                                .pricing
-                                .as_ref()
-                                .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
-                        } else {
-                            None
-                        };
+                    let cost = self
+                        .metadata()
+                        .and_then(|metadata| metadata.pricing.as_ref())
+                        .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
 
                     Ok(ModelResponse {
                         content,
-                        usage,
+                        usage: Some(usage),
                         cost,
                     })
                 },
@@ -234,7 +231,7 @@ impl LanguageModel for AnthropicModel {
                         while let Some(event) = chunk_stream.next().await {
                             match event? {
                                 MessageStreamEvent::MessageStart(MessageStartEvent { message }) => {
-                                    stream_usage = Some(map_anthropic_usage(&message.usage));
+                                    stream_usage = Some(AnthropicUsage::from(&message.usage));
                                     if matches!(message.stop_reason, Some(StopReason::Refusal)) {
                                         Err(LanguageModelError::Refusal(anthropic_refusal_message(
                                             message.stop_details.as_ref(),
@@ -243,7 +240,7 @@ impl LanguageModel for AnthropicModel {
                                 }
                                 MessageStreamEvent::MessageDelta(MessageDeltaEvent { delta, usage }) => {
                                     if let Some(current_usage) = &mut stream_usage {
-                                        merge_anthropic_message_delta_usage(current_usage, &usage);
+                                        current_usage.merge_message_delta(&usage);
                                     }
                                     if matches!(delta.stop_reason, Some(StopReason::Refusal)) {
                                         Err(LanguageModelError::Refusal(anthropic_refusal_message(
@@ -368,6 +365,7 @@ impl LanguageModel for AnthropicModel {
                         }
 
                         if let Some(usage) = stream_usage {
+                            let usage = map_anthropic_usage(&usage);
                             let cost = metadata
                                 .as_ref()
                                 .and_then(|meta| meta.pricing.as_ref())
@@ -392,10 +390,14 @@ fn anthropic_refusal_message(details: Option<&api::RefusalStopDetails>) -> Strin
     details
         .and_then(|details| {
             details.explanation.clone().or_else(|| {
-                details
-                    .category
-                    .as_ref()
-                    .map(|_| "Anthropic policy category refusal".to_string())
+                details.category.as_ref().map(|category| {
+                    let category = match category {
+                        api::RefusalStopDetailsCategory::Cyber => "cyber",
+                        api::RefusalStopDetailsCategory::Bio => "bio",
+                        _ => "unknown",
+                    };
+                    format!("Anthropic policy category: {category}")
+                })
             })
         })
         .unwrap_or_else(|| "Anthropic refused the request".to_string())
@@ -423,6 +425,7 @@ fn convert_to_anthropic_create_params(
         metadata: _,
         audio: _,
         reasoning,
+        cache_retention,
     } = input;
 
     let max_tokens = i64::from(max_tokens.unwrap_or(4096));
@@ -430,7 +433,13 @@ fn convert_to_anthropic_create_params(
     let message_params = convert_to_anthropic_messages(messages)?;
 
     let params = CreateMessageParams {
-        cache_control: None,
+        // Top-level cache_control caches through the last cacheable block.
+        cache_control: cache_retention.map(|retention| {
+            CreateMessageParamsCacheControl::Ephemeral(CacheControlEphemeral {
+                ttl: (retention == CacheRetention::Extended)
+                    .then_some(CacheControlEphemeralTtl::N1H),
+            })
+        }),
         container: None,
         inference_geo: None,
         max_tokens,
@@ -686,7 +695,7 @@ fn convert_tool_result_part(
     Ok(RequestToolResultBlock {
         cache_control: None,
         content,
-        is_error: (tool_result.status != ToolResultStatus::Completed).then_some(true),
+        is_error: Some(tool_result.status != ToolResultStatus::Completed),
         tool_use_id: tool_result.tool_call_id,
     })
 }
@@ -1017,59 +1026,100 @@ fn map_tool_use_block(block: api::ResponseToolUseBlock) -> ToolCallPart {
     }
 }
 
-fn map_anthropic_usage(usage: &Usage) -> ModelUsage {
-    let mut input_tokens_details = ModelTokensDetails::default();
-    if let Some(value) = usage.cache_read_input_tokens {
-        input_tokens_details.cached_tokens = Some(u32::try_from(value).unwrap_or(0));
-    }
-    if let Some(value) = usage.cache_creation_input_tokens {
-        input_tokens_details.cache_write_tokens = Some(u32::try_from(value).unwrap_or(0));
-    }
+/// The usage fields shared by `message_start` and the cumulative
+/// `message_delta` events. Fields of later events overwrite earlier values when
+/// present.
+#[derive(Default)]
+struct AnthropicUsage {
+    input_tokens: Option<i64>,
+    output_tokens: Option<i64>,
+    cache_read_input_tokens: Option<i64>,
+    cache_creation_input_tokens: Option<i64>,
+    cache_creation_1h_input_tokens: Option<i64>,
+    thinking_tokens: Option<i64>,
+    web_search_requests: Option<i64>,
+}
 
-    let output_tokens_details =
-        usage
-            .output_tokens_details
-            .as_ref()
-            .map(|details| ModelTokensDetails {
-                reasoning_tokens: Some(u32::try_from(details.thinking_tokens).unwrap_or(0)),
-                ..Default::default()
-            });
-
-    ModelUsage {
-        input_tokens: u32::try_from(usage.input_tokens).unwrap_or(0),
-        output_tokens: u32::try_from(usage.output_tokens).unwrap_or(0),
-        input_tokens_details: if usage.cache_read_input_tokens.is_some()
-            || usage.cache_creation_input_tokens.is_some()
-        {
-            Some(input_tokens_details)
-        } else {
-            None
-        },
-        output_tokens_details,
+impl From<&Usage> for AnthropicUsage {
+    fn from(usage: &Usage) -> Self {
+        Self {
+            input_tokens: Some(usage.input_tokens),
+            output_tokens: Some(usage.output_tokens),
+            cache_read_input_tokens: usage.cache_read_input_tokens,
+            cache_creation_input_tokens: usage.cache_creation_input_tokens,
+            cache_creation_1h_input_tokens: usage
+                .cache_creation
+                .as_ref()
+                .map(|cache_creation| cache_creation.ephemeral_1_h_input_tokens),
+            thinking_tokens: usage
+                .output_tokens_details
+                .as_ref()
+                .map(|details| details.thinking_tokens),
+            web_search_requests: usage
+                .server_tool_use
+                .as_ref()
+                .map(|server_tool_use| server_tool_use.web_search_requests),
+        }
     }
 }
 
-fn merge_anthropic_message_delta_usage(current: &mut ModelUsage, usage: &MessageDeltaUsage) {
-    if let Some(value) = usage.input_tokens {
-        current.input_tokens = u32::try_from(value).unwrap_or(0);
-    }
-    current.output_tokens = u32::try_from(usage.output_tokens).unwrap_or(0);
-
-    if usage.cache_read_input_tokens.is_some() || usage.cache_creation_input_tokens.is_some() {
-        let details = current.input_tokens_details.get_or_insert_default();
+impl AnthropicUsage {
+    fn merge_message_delta(&mut self, usage: &MessageDeltaUsage) {
+        if let Some(value) = usage.input_tokens {
+            self.input_tokens = Some(value);
+        }
+        self.output_tokens = Some(usage.output_tokens);
         if let Some(value) = usage.cache_read_input_tokens {
-            details.cached_tokens = Some(u32::try_from(value).unwrap_or(0));
+            self.cache_read_input_tokens = Some(value);
         }
         if let Some(value) = usage.cache_creation_input_tokens {
-            details.cache_write_tokens = Some(u32::try_from(value).unwrap_or(0));
+            self.cache_creation_input_tokens = Some(value);
+        }
+        if let Some(details) = &usage.output_tokens_details {
+            self.thinking_tokens = Some(details.thinking_tokens);
+        }
+        if let Some(server_tool_use) = &usage.server_tool_use {
+            self.web_search_requests = Some(server_tool_use.web_search_requests);
         }
     }
+}
 
-    if let Some(output_details) = &usage.output_tokens_details {
-        current
-            .output_tokens_details
-            .get_or_insert_default()
-            .reasoning_tokens = Some(u32::try_from(output_details.thinking_tokens).unwrap_or(0));
+/// Anthropic reports `input_tokens` without the cached and cache-write tokens.
+/// The numbers are kept as reported; the cost calculation accounts for it.
+fn map_anthropic_usage(usage: &AnthropicUsage) -> ModelUsage {
+    let count = |value: i64| u32::try_from(value).unwrap_or(0);
+
+    let mut input_tokens_details = ModelTokensDetails::default();
+    if let Some(value) = usage.cache_read_input_tokens {
+        input_tokens_details.cached_tokens = Some(count(value));
+    }
+    if let Some(value) = usage.cache_creation_input_tokens {
+        input_tokens_details.cache_write_tokens = Some(count(value));
+    }
+    if let Some(value) = usage
+        .cache_creation_1h_input_tokens
+        .filter(|value| *value > 0)
+    {
+        input_tokens_details.extended_cache_write_tokens = Some(count(value));
+    }
+
+    ModelUsage {
+        input_tokens: count(usage.input_tokens.unwrap_or(0)),
+        output_tokens: count(usage.output_tokens.unwrap_or(0)),
+        input_tokens_details: (input_tokens_details != ModelTokensDetails::default())
+            .then_some(input_tokens_details),
+        output_tokens_details: usage
+            .thinking_tokens
+            .map(|thinking_tokens| ModelTokensDetails {
+                reasoning_tokens: Some(count(thinking_tokens)),
+                ..Default::default()
+            }),
+        server_tool_use: usage
+            .web_search_requests
+            .filter(|requests| *requests > 0)
+            .map(|requests| ModelServerToolUsage {
+                web_search_requests: Some(count(requests)),
+            }),
     }
 }
 
@@ -1117,14 +1167,14 @@ fn map_anthropic_content_block_delta_event(
         }
         ContentBlockDeltaEventDelta::ThinkingDelta(delta) => {
             PartDelta::Reasoning(ReasoningPartDelta {
-                text: Some(delta.thinking),
+                text: delta.thinking,
                 signature: None,
                 id: None,
             })
         }
         ContentBlockDeltaEventDelta::SignatureDelta(delta) => {
             PartDelta::Reasoning(ReasoningPartDelta {
-                text: None,
+                text: String::new(),
                 signature: Some(delta.signature),
                 id: None,
             })

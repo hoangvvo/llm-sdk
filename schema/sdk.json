@@ -92,7 +92,6 @@
       ],
       "additionalProperties": false
     },
-
     "TextPart": {
       "type": "object",
       "description": "A part of the message that contains text.",
@@ -131,6 +130,10 @@
         "height": {
           "type": "number",
           "description": "The height of the image in pixels."
+        },
+        "id": {
+          "type": "string",
+          "description": "ID of the image part, if applicable"
         }
       },
       "required": ["type", "mime_type", "data"],
@@ -201,6 +204,10 @@
         "id": {
           "type": "string",
           "description": "The ID of the tool call part, if applicable. This is different from tool_call_id which is used to match tool results."
+        },
+        "signature": {
+          "type": "string",
+          "description": "The provider-specific signature used to preserve reasoning/tool continuity."
         }
       },
       "required": ["type", "tool_call_id", "call"],
@@ -218,7 +225,10 @@
       "properties": {
         "type": { "const": "function" },
         "name": { "type": "string" },
-        "args": { "type": "object", "additionalProperties": true }
+        "args": {
+          "type": "object",
+          "additionalProperties": true
+        }
       },
       "required": ["type", "name", "args"],
       "additionalProperties": false
@@ -238,7 +248,10 @@
       "type": "object",
       "properties": {
         "type": { "const": "search" },
-        "queries": { "type": "array", "items": { "type": "string" } }
+        "queries": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
       "required": ["type", "queries"],
       "additionalProperties": false
@@ -490,6 +503,10 @@
         "id": {
           "type": "string",
           "description": "The ID of the tool call part, if applicable. This is different from tool_call_id which is used to match tool results."
+        },
+        "signature": {
+          "type": "string",
+          "description": "The provider-specific signature used to preserve reasoning/tool continuity."
         }
       },
       "required": ["type", "call"],
@@ -553,6 +570,10 @@
         "height": {
           "type": "number",
           "description": "The height of the image in pixels."
+        },
+        "id": {
+          "type": "string",
+          "description": "ID of the image part, if applicable"
         }
       },
       "required": ["type"],
@@ -677,9 +698,7 @@
           "minimum": 1,
           "description": "Limits the number of searches the provider may perform when supported."
         },
-        "user_location": {
-          "$ref": "#/definitions/WebSearchUserLocation"
-        }
+        "user_location": { "$ref": "#/definitions/WebSearchUserLocation" }
       },
       "required": ["type"],
       "additionalProperties": false
@@ -716,20 +735,41 @@
         "cached_audio_tokens": { "type": "number" },
         "image_tokens": { "type": "number" },
         "cached_image_tokens": { "type": "number" },
-        "cached_tokens": { "type": "number" },
-        "cache_write_tokens": { "type": "number" },
-        "reasoning_tokens": { "type": "number" }
+        "cached_tokens": {
+          "type": "number",
+          "description": "The tokens read from the prompt cache."
+        },
+        "cache_write_tokens": {
+          "type": "number",
+          "description": "The tokens written to the prompt cache."
+        },
+        "extended_cache_write_tokens": {
+          "type": "number",
+          "description": "The subset of `cache_write_tokens` stored with extended retention (see `cache_retention`), which some providers bill at a higher rate."
+        },
+        "reasoning_tokens": {
+          "type": "number",
+          "description": "The tokens spent on reasoning."
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "A breakdown of `input_tokens` or `output_tokens`, using the provider's own counting."
     },
     "ModelUsage": {
       "type": "object",
       "description": "Represents the token usage of the model.",
       "properties": {
-        "input_tokens": { "type": "number" },
-        "output_tokens": { "type": "number" },
+        "input_tokens": {
+          "type": "number",
+          "description": "The input tokens as reported by the provider. Whether cached and cache-write tokens are included depends on the provider."
+        },
+        "output_tokens": {
+          "type": "number",
+          "description": "The output tokens as reported by the provider. Whether reasoning tokens are included depends on the provider."
+        },
         "input_tokens_details": { "$ref": "#/definitions/ModelTokensDetails" },
-        "output_tokens_details": { "$ref": "#/definitions/ModelTokensDetails" }
+        "output_tokens_details": { "$ref": "#/definitions/ModelTokensDetails" },
+        "server_tool_use": { "$ref": "#/definitions/ModelServerToolUsage" }
       },
       "required": ["input_tokens", "output_tokens"],
       "additionalProperties": false
@@ -767,21 +807,27 @@
     "ToolChoiceAuto": {
       "type": "object",
       "description": "The model will automatically choose the tool to use or not use any tools.",
-      "properties": { "type": { "const": "auto" } },
+      "properties": {
+        "type": { "const": "auto" }
+      },
       "required": ["type"],
       "additionalProperties": false
     },
     "ToolChoiceNone": {
       "type": "object",
       "description": "The model will not use any tools.",
-      "properties": { "type": { "const": "none" } },
+      "properties": {
+        "type": { "const": "none" }
+      },
       "required": ["type"],
       "additionalProperties": false
     },
     "ToolChoiceRequired": {
       "type": "object",
       "description": "The model will be forced to use a tool.",
-      "properties": { "type": { "const": "required" } },
+      "properties": {
+        "type": { "const": "required" }
+      },
       "required": ["type"],
       "additionalProperties": false
     },
@@ -801,7 +847,9 @@
     "ResponseFormatText": {
       "type": "object",
       "description": "Specifies that the model response should be in plain text format.",
-      "properties": { "type": { "const": "text" } },
+      "properties": {
+        "type": { "const": "text" }
+      },
       "required": ["type"],
       "additionalProperties": false
     },
@@ -922,6 +970,10 @@
           "$ref": "#/definitions/ReasoningOptions",
           "description": "Options for reasoning generation."
         },
+        "cache_retention": {
+          "$ref": "#/definitions/CacheRetention",
+          "description": "Opts into the provider's prompt cache and chooses how long entries are kept. \"standard\" uses the provider's default retention and \"extended\" the longest it offers. Providers without a retention setting ignore this option."
+        },
         "metadata": {
           "type": "object",
           "description": "A set of key/value pairs that store additional information about the request. This is forwarded to the model provider if supported.",
@@ -946,6 +998,10 @@
         "input_cost_per_cache_write_token": {
           "type": "number",
           "description": "The cost in USD per single cache-write input token."
+        },
+        "input_cost_per_extended_cache_write_token": {
+          "type": "number",
+          "description": "The cost in USD per single cache-write input token stored with extended retention. Defaults to `input_cost_per_cache_write_token`."
         },
         "input_cost_per_cached_text_token": {
           "type": "number",
@@ -978,9 +1034,50 @@
         "output_cost_per_image_token": {
           "type": "number",
           "description": "The cost in USD per single image token for output."
+        },
+        "cost_per_web_search_request": {
+          "type": "number",
+          "description": "The cost in USD per provider-hosted web search request."
+        },
+        "long_context": {
+          "$ref": "#/definitions/LanguageModelLongContextPricing",
+          "description": "Rate multipliers applied to requests whose input exceeds a token threshold."
         }
       },
       "additionalProperties": false
+    },
+    "ModelServerToolUsage": {
+      "type": "object",
+      "description": "Hosted tool usage billed per request, separately from tokens.",
+      "properties": {
+        "web_search_requests": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "LanguageModelLongContextPricing": {
+      "type": "object",
+      "description": "Rate multipliers applied to requests whose input exceeds a token threshold.",
+      "properties": {
+        "threshold_tokens": {
+          "type": "number",
+          "description": "The request is priced with the multipliers when `input_tokens` exceeds this value."
+        },
+        "input_cost_multiplier": {
+          "type": "number",
+          "description": "The multiplier applied to every input rate. Defaults to 1."
+        },
+        "output_cost_multiplier": {
+          "type": "number",
+          "description": "The multiplier applied to every output rate. Defaults to 1."
+        }
+      },
+      "required": ["threshold_tokens"],
+      "additionalProperties": false
+    },
+    "CacheRetention": {
+      "type": "string",
+      "enum": ["standard", "extended"],
+      "description": "How long prompt cache entries are kept."
     }
   }
 }

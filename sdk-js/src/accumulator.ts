@@ -326,7 +326,9 @@ function createToolCallPart(data: ToolCallPartDelta, index: number): Part {
       call: {
         type: "function",
         name: data.call.name,
-        args: JSON.parse(data.call.args ?? "{}") as Record<string, unknown>,
+        args: JSON.parse(
+          data.call.args?.trim() ? data.call.args : "{}",
+        ) as Record<string, unknown>,
       },
     };
     if (data.signature) {
@@ -547,9 +549,8 @@ export class StreamAccumulator {
     };
     this.#accumulatedUsage = sumModelUsage([this.#accumulatedUsage, usage]);
 
-    if (cost) {
-      this.#accumulatedCost = this.#accumulatedCost ?? 0;
-      this.#accumulatedCost += cost;
+    if (cost !== undefined) {
+      this.#accumulatedCost = (this.#accumulatedCost ?? 0) + cost;
     }
   }
 }
