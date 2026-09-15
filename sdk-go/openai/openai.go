@@ -721,11 +721,13 @@ type openAIInputFile struct {
 }
 
 func convertToOpenAIInputFile(part *llmsdk.FilePart) openAIInputFile {
-	file := openAIInputFile{filename: part.Filename}
+	var file openAIInputFile
 	if part.URL != nil {
+		// OpenAI rejects filenames alongside file URLs; they belong to inline data.
 		file.fileURL = part.URL
 	} else {
 		file.fileData = ptr.To(fmt.Sprintf("data:%s;base64,%s", part.MimeType, part.Data))
+		file.filename = part.Filename
 	}
 	return file
 }

@@ -504,7 +504,8 @@ fn convert_to_openai_input_file(file_part: FilePart) -> OpenAIInputFile {
         Some(url) => OpenAIInputFile {
             file_data: None,
             file_url: Some(url),
-            filename,
+            // OpenAI rejects filenames alongside file URLs; they belong to inline data.
+            filename: None,
         },
         None => OpenAIInputFile {
             file_data: Some(format!(

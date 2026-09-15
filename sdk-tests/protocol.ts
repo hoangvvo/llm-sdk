@@ -968,5 +968,10 @@ export function validateTransportRequest(
       ].join("\n"),
     );
   }
+  for (const path of expected.body_absent ?? []) {
+    if (readPath(path, actual.body) !== undefined) {
+      fail(`Expected transport request body to omit ${JSON.stringify(path)}`);
+    }
+  }
   return { ok: true };
 }

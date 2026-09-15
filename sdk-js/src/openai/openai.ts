@@ -326,12 +326,13 @@ function convertToOpenAIInputFile(
 ): OpenAI.Responses.ResponseInputFile {
   const inputFile: OpenAI.Responses.ResponseInputFile = { type: "input_file" };
   if (part.url) {
+    // OpenAI rejects filenames alongside file URLs; they belong to inline data.
     inputFile.file_url = part.url;
   } else {
     inputFile.file_data = `data:${part.mime_type};base64,${part.data ?? ""}`;
-  }
-  if (part.filename) {
-    inputFile.filename = part.filename;
+    if (part.filename) {
+      inputFile.filename = part.filename;
+    }
   }
   return inputFile;
 }

@@ -1934,7 +1934,8 @@
                   {
                     "type": "file",
                     "mime_type": "application/pdf",
-                    "url": "https://example.com/doc.pdf"
+                    "url": "https://example.com/doc.pdf",
+                    "filename": "remote.pdf"
                   },
                   {
                     "type": "file",
@@ -1980,7 +1981,14 @@
                     ]
                   }
                 ]
-              }
+              },
+              "body_absent": [
+                "input.0.content.2.filename",
+                "input.0.content.2.file_id",
+                "input.0.content.2.file_data",
+                "input.0.content.3.file_id",
+                "input.0.content.3.file_url"
+              ]
             },
             "response": {
               "headers": {
@@ -2069,6 +2077,18 @@
                       "name": "get_weather",
                       "content": [
                         {
+                          "type": "file",
+                          "mime_type": "application/pdf",
+                          "url": "https://example.com/doc.pdf",
+                          "filename": "remote.pdf"
+                        },
+                        {
+                          "type": "file",
+                          "mime_type": "application/pdf",
+                          "data": "JVBERi0xLjQK",
+                          "filename": "inline.pdf"
+                        },
+                        {
                           "type": "text",
                           "text": "Sunny"
                         },
@@ -2115,6 +2135,15 @@
                     "call_id": "call_1",
                     "output": [
                       {
+                        "type": "input_file",
+                        "file_url": "https://example.com/doc.pdf"
+                      },
+                      {
+                        "type": "input_file",
+                        "file_data": "data:application/pdf;base64,JVBERi0xLjQK",
+                        "filename": "inline.pdf"
+                      },
+                      {
                         "type": "input_text",
                         "text": "Sunny"
                       },
@@ -2126,7 +2155,14 @@
                     ]
                   }
                 ]
-              }
+              },
+              "body_absent": [
+                "input.2.output.0.filename",
+                "input.2.output.0.file_id",
+                "input.2.output.0.file_data",
+                "input.2.output.1.file_id",
+                "input.2.output.1.file_url"
+              ]
             },
             "response": {
               "headers": {
@@ -2842,7 +2878,8 @@
                   {
                     "type": "file",
                     "mime_type": "application/pdf",
-                    "url": "https://example.com/doc.pdf"
+                    "url": "https://example.com/doc.pdf",
+                    "filename": "remote.pdf"
                   },
                   {
                     "type": "file",
@@ -2883,7 +2920,8 @@
                         "source": {
                           "type": "url",
                           "url": "https://example.com/doc.pdf"
-                        }
+                        },
+                        "title": "remote.pdf"
                       },
                       {
                         "type": "document",
@@ -2960,6 +2998,12 @@
                     "type": "file",
                     "mime_type": "application/pdf",
                     "data": "JVBERi0xLjQK"
+                  },
+                  {
+                    "type": "file",
+                    "mime_type": "application/pdf",
+                    "url": "https://example.com/doc.pdf",
+                    "filename": "remote.pdf"
                   }
                 ]
               }
@@ -2988,11 +3032,21 @@
                           "data": "JVBERi0xLjQK",
                           "mimeType": "application/pdf"
                         }
+                      },
+                      {
+                        "fileData": {
+                          "fileUri": "https://example.com/doc.pdf",
+                          "mimeType": "application/pdf"
+                        }
                       }
                     ]
                   }
                 ]
-              }
+              },
+              "body_absent": [
+                "contents.0.parts.3.filename",
+                "contents.0.parts.3.fileData.filename"
+              ]
             },
             "response": {
               "headers": {

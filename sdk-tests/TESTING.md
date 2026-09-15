@@ -20,6 +20,10 @@ expectations. `transport-server.mjs` replays the response and validates the
 captured request. Language suites should only register a transport group and
 provide a model factory configured with the replay server URL.
 
+Use `request.body_absent` to list dot-separated body paths that must be omitted
+(for example, `input.0.content.0.file_id`). Explicit `null` values also fail this
+check, so fixtures can catch mutually exclusive parameters.
+
 Keep provider HTTP shapes in these central fixtures instead of duplicating them
 across JS, Go, and Rust transport tests. Use `tests.json` for live portable
 behavior and `transports.json` for deterministic provider protocol coverage.
