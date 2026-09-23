@@ -266,11 +266,6 @@ func (s *RunSession[C]) process(
 			return
 		}
 
-		if len(content) == 0 {
-			errCh <- NewInvariantError("no assistant content found to process")
-			return
-		}
-
 		var allToolCallParts []*llmsdk.ToolCallPart
 		var toolCallParts []*llmsdk.ToolCallPart
 		for _, part := range content {
