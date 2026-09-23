@@ -227,7 +227,6 @@ where
             }
 
             let content = content
-                .filter(|v| !v.is_empty())
                 .ok_or_else(|| AgentError::invariant(
                     "No assistant content found to process.".to_string(),
                 ))?;

@@ -521,6 +521,86 @@ async fn run_rejects_empty_input_without_calling_model() {
 }
 
 #[tokio::test]
+async fn complete_silent_turns_with_and_without_tools() -> Result<(), DynError> {
+    let tool = MockTool::new(
+        "react",
+        AgentToolResult {
+            content: vec![Part::text("Reaction added")],
+            is_error: false,
+        },
+    );
+    let model = Arc::new(MockLanguageModel::new());
+    model.enqueue_stream(vec![PartialModelResponse {
+        delta: Some(ContentDelta {
+            index: 0,
+            part: PartDelta::ToolCall(
+                ToolCallPartDelta::default()
+                    .with_tool_call_id("reaction_1")
+                    .with_tool_name("react")
+                    .with_args(r#"{"emoji":"thumbs_up"}"#),
+            ),
+        }),
+        ..Default::default()
+    }]);
+    model.enqueue_stream(vec![PartialModelResponse {
+        usage: Some(ModelUsage::default()),
+        ..Default::default()
+    }]);
+    let session = Arc::new(
+        RunSession::new(
+            Arc::new(AgentParams::new("test_agent", model.clone()).add_tool(tool.clone())),
+            (),
+        )
+        .await?,
+    );
+    let events = session
+        .run_stream(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "React with a thumbs-up",
+                )]))],
+            },
+            RunOptions::default(),
+        )?
+        .try_collect::<Vec<_>>()
+        .await?;
+    let response = events
+        .into_iter()
+        .find_map(|event| match event {
+            AgentStreamEvent::Response(response) => Some(response),
+            _ => None,
+        })
+        .ok_or("stream omitted its completed response")?;
+    assert_eq!(response.status, AgentResponseStatus::Completed);
+    assert!(response.content.is_empty());
+    assert_eq!(tool.recorded_calls(), vec![json!({"emoji": "thumbs_up"})]);
+    assert!(response.output.iter().any(|item| matches!(item,
+        AgentItem::Tool(result) if result.status == ToolResultStatus::Completed
+            && result.output == vec![Part::text("Reaction added")]
+    )));
+
+    model.enqueue_generate(ModelResponse::default());
+    let response = session
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "No response needed",
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .await?;
+    assert_eq!(response.status, AgentResponseStatus::Completed);
+    assert!(response.content.is_empty());
+    assert_eq!(tool.recorded_calls(), vec![json!({"emoji": "thumbs_up"})]);
+    Arc::try_unwrap(session)
+        .map_err(|_| "run retained the session after completion")?
+        .close()
+        .await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn run_returns_cancelled_without_calling_model_when_token_already_cancelled() {
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {
