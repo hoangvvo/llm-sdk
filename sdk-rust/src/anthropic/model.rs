@@ -22,11 +22,11 @@ use crate::{
     CacheRetention, Citation, CitationDelta, ContentDelta, FilePart, ImagePart, LanguageModel,
     LanguageModelError, LanguageModelInput, LanguageModelMetadata, LanguageModelResult,
     LanguageModelStream, Message, ModelResponse, ModelServerToolUsage, ModelTokensDetails,
-    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions,
-    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
-    TextPartDelta, Tool as SdkTool, ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta,
-    ToolChoiceOption, ToolResult, ToolResultPart, ToolResultStatus, ToolSearchStrategy,
-    ToolSearchToolCall, ToolSearchToolCallDelta, ToolSearchToolCallStatus, ToolSearchToolResult,
+    ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningOptions, ReasoningPart,
+    ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart, TextPartDelta,
+    Tool as SdkTool, ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta, ToolChoiceOption,
+    ToolResult, ToolResultPart, ToolResultStatus, ToolSearchStrategy, ToolSearchToolCall,
+    ToolSearchToolCallDelta, ToolSearchToolCallStatus, ToolSearchToolResult,
     WebSearchToolCallDelta, WebSearchToolCallStatus,
 };
 use async_stream::try_stream;
@@ -37,11 +37,6 @@ use reqwest::{
 };
 use serde_json::{Map, Value};
 use std::{collections::HashMap, sync::Arc};
-
-const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
-    input_cache_tokens_are_additional: true,
-    output_reasoning_tokens_are_additional: false,
-};
 
 const PROVIDER: &str = "anthropic";
 const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
@@ -187,7 +182,7 @@ impl LanguageModel for AnthropicModel {
                     let cost = self
                         .metadata()
                         .and_then(|metadata| metadata.pricing.as_ref())
-                        .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
+                        .map(|pricing| usage.calculate_cost(pricing));
 
                     Ok(ModelResponse {
                         content,
@@ -384,7 +379,7 @@ impl LanguageModel for AnthropicModel {
                             let cost = metadata
                                 .as_ref()
                                 .and_then(|meta| meta.pricing.as_ref())
-                                .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
+                                .map(|pricing| usage.calculate_cost(pricing));
                             yield PartialModelResponse {
                                 delta: None,
                                 usage: Some(usage),
@@ -1415,10 +1410,18 @@ impl AnthropicUsage {
     }
 }
 
-/// Anthropic reports `input_tokens` without the cached and cache-write tokens.
-/// The numbers are kept as reported; the cost calculation accounts for it.
+/// Anthropic reports `input_tokens` without the cache reads and writes, so they
+/// are added back to match the inclusive `ModelUsage::input_tokens`.
 fn map_anthropic_usage(usage: &AnthropicUsage) -> ModelUsage {
     let count = |value: i64| u32::try_from(value).unwrap_or(0);
+    let input_tokens = [
+        usage.input_tokens,
+        usage.cache_read_input_tokens,
+        usage.cache_creation_input_tokens,
+    ]
+    .into_iter()
+    .flatten()
+    .fold(0_u32, |total, value| total.saturating_add(count(value)));
 
     let mut input_tokens_details = ModelTokensDetails::default();
     if let Some(value) = usage.cache_read_input_tokens {
@@ -1435,7 +1438,7 @@ fn map_anthropic_usage(usage: &AnthropicUsage) -> ModelUsage {
     }
 
     ModelUsage {
-        input_tokens: count(usage.input_tokens.unwrap_or(0)),
+        input_tokens,
         output_tokens: count(usage.output_tokens.unwrap_or(0)),
         input_tokens_details: (input_tokens_details != ModelTokensDetails::default())
             .then_some(input_tokens_details),

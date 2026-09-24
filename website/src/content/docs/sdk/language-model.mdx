@@ -386,45 +386,26 @@ Certain parts include `Citation`s, which language models can use to cite `Source
 The response from the language model is represented as a `ModelResponse` that includes:
 
 - `content`: An array of `Part` that represents the generated content, which usually comes from the `AssistantMessage`.
-- `usage`: Token usage information, if available.
+- `usage`: Token usage information, if available. See [Usage](#usage).
 - `cost`: The estimated cost of the request, if the model's pricing information is provided.
 
 <Tabs>
   <TabItem label="TypeScript">
     <Code
-      code={extractTypescriptTypes([
-        "ModelResponse",
-        "ModelUsage",
-        "ModelTokensDetails",
-        "ModelServerToolUsage",
-      ])}
+      code={extractTypescriptTypes(["ModelResponse"])}
       lang="typescript"
       title="types.ts"
     />
   </TabItem>
   <TabItem label="Rust">
     <Code
-      code={extractRustTypes([
-        "ModelResponse",
-        "ModelUsage",
-        "ModelTokensDetails",
-        "ModelServerToolUsage",
-      ])}
+      code={extractRustTypes(["ModelResponse"])}
       lang="rust"
       title="types.rs"
     />
   </TabItem>
   <TabItem label="Go">
-    <Code
-      code={extractGoTypes([
-        "ModelResponse",
-        "ModelUsage",
-        "ModelTokensDetails",
-        "ModelServerToolUsage",
-      ])}
-      lang="go"
-      title="types.go"
-    />
+    <Code code={extractGoTypes(["ModelResponse"])} lang="go" title="types.go" />
   </TabItem>
 </Tabs>
 
@@ -458,3 +439,55 @@ For streaming calls, the response is represented as a series of `PartialModelRes
 </Tabs>
 
 All SDKs provide the `StreamAccumulator` utility to help build the final `ModelResponse` from a stream of `PartialModelResponse`.
+
+## Usage
+
+`ModelUsage` reports token usage with the same meaning for every provider. The library converts provider counts that use different conventions, so a single cost calculation works across providers. It includes:
+
+- `input_tokens`: The total input tokens, including tokens read from and written to the prompt cache.
+- `output_tokens`: The total output tokens, including reasoning tokens.
+- `input_tokens_details` and `output_tokens_details`: A `ModelTokensDetails` breakdown of each total. Every count is a subset of its total:
+  - `text_tokens`, `audio_tokens`, and `image_tokens`: The tokens of each modality.
+  - `cached_text_tokens`, `cached_audio_tokens`, and `cached_image_tokens`: The cache reads of each modality.
+  - `cached_tokens`: The tokens read from the prompt cache.
+  - `cache_write_tokens`: The tokens written to the prompt cache. `extended_cache_write_tokens` is the subset stored with extended `cache_retention`.
+  - `reasoning_tokens`: The tokens spent on reasoning.
+- `server_tool_use`: Hosted tool usage billed per request, such as `web_search_requests`.
+
+The uncached input tokens are `input_tokens - cached_tokens - cache_write_tokens`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    <Code
+      code={extractTypescriptTypes([
+        "ModelUsage",
+        "ModelTokensDetails",
+        "ModelServerToolUsage",
+      ])}
+      lang="typescript"
+      title="types.ts"
+    />
+  </TabItem>
+  <TabItem label="Rust">
+    <Code
+      code={extractRustTypes([
+        "ModelUsage",
+        "ModelTokensDetails",
+        "ModelServerToolUsage",
+      ])}
+      lang="rust"
+      title="types.rs"
+    />
+  </TabItem>
+  <TabItem label="Go">
+    <Code
+      code={extractGoTypes([
+        "ModelUsage",
+        "ModelTokensDetails",
+        "ModelServerToolUsage",
+      ])}
+      lang="go"
+      title="types.go"
+    />
+  </TabItem>
+</Tabs>

@@ -754,11 +754,11 @@
         "cached_image_tokens": { "type": "number" },
         "cached_tokens": {
           "type": "number",
-          "description": "The tokens read from the prompt cache."
+          "description": "The subset of `input_tokens` read from the prompt cache."
         },
         "cache_write_tokens": {
           "type": "number",
-          "description": "The tokens written to the prompt cache."
+          "description": "The subset of `input_tokens` written to the prompt cache."
         },
         "extended_cache_write_tokens": {
           "type": "number",
@@ -766,23 +766,23 @@
         },
         "reasoning_tokens": {
           "type": "number",
-          "description": "The tokens spent on reasoning."
+          "description": "The subset of `output_tokens` spent on reasoning."
         }
       },
       "additionalProperties": false,
-      "description": "A breakdown of `input_tokens` or `output_tokens`, using the provider's own counting."
+      "description": "A breakdown of `input_tokens` or `output_tokens`. Every count is a subset of that total."
     },
     "ModelUsage": {
       "type": "object",
-      "description": "Represents the token usage of the model.",
+      "description": "Represents the token usage of the model, normalized to the same meaning for every provider: totals include their cache and reasoning subsets.",
       "properties": {
         "input_tokens": {
           "type": "number",
-          "description": "The input tokens as reported by the provider. Whether cached and cache-write tokens are included depends on the provider."
+          "description": "The total input tokens, including cache reads (`cached_tokens`) and cache writes (`cache_write_tokens`) on every provider. Uncached input is `input_tokens - cached_tokens - cache_write_tokens`."
         },
         "output_tokens": {
           "type": "number",
-          "description": "The output tokens as reported by the provider. Whether reasoning tokens are included depends on the provider."
+          "description": "The total output tokens, including `reasoning_tokens` on every provider."
         },
         "input_tokens_details": { "$ref": "#/definitions/ModelTokensDetails" },
         "output_tokens_details": { "$ref": "#/definitions/ModelTokensDetails" },

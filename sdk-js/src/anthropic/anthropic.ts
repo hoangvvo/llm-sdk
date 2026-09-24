@@ -88,10 +88,7 @@ export class AnthropicModel implements LanguageModel {
     const result: ModelResponse = { content, usage };
 
     if (this.metadata?.pricing) {
-      result.cost = calculateCost(usage, this.metadata.pricing, {
-        input_cache_tokens_are_additional: true,
-        output_reasoning_tokens_are_additional: false,
-      });
+      result.cost = calculateCost(usage, this.metadata.pricing);
     }
 
     return result;
@@ -255,10 +252,7 @@ export class AnthropicModel implements LanguageModel {
       const usage = sumModelUsage(completedUsages);
       const event: PartialModelResponse = { usage };
       if (this.metadata?.pricing) {
-        event.cost = calculateCost(usage, this.metadata.pricing, {
-          input_cache_tokens_are_additional: true,
-          output_reasoning_tokens_are_additional: false,
-        });
+        event.cost = calculateCost(usage, this.metadata.pricing);
       }
       yield event;
     }
@@ -1104,12 +1098,15 @@ function mergeAnthropicUsage(
 }
 
 /**
- * Anthropic reports `input_tokens` without the cached and cache-write tokens.
- * The numbers are kept as reported; the cost calculation accounts for it.
+ * Anthropic reports `input_tokens` without the cache reads and writes, so they
+ * are added back to match the inclusive `ModelUsage.input_tokens`.
  */
 function mapAnthropicUsage(usage: AnthropicUsageLike): ModelUsage {
   const result: ModelUsage = {
-    input_tokens: usage.input_tokens ?? 0,
+    input_tokens:
+      (usage.input_tokens ?? 0) +
+      (usage.cache_read_input_tokens ?? 0) +
+      (usage.cache_creation_input_tokens ?? 0),
     output_tokens: usage.output_tokens ?? 0,
   };
   const inputDetails: ModelTokensDetails = {};

@@ -124,10 +124,7 @@ export class GoogleModel implements LanguageModel {
       );
       result.usage = usage;
       if (this.metadata?.pricing) {
-        result.cost = calculateCost(usage, this.metadata.pricing, {
-          input_cache_tokens_are_additional: false,
-          output_reasoning_tokens_are_additional: true,
-        });
+        result.cost = calculateCost(usage, this.metadata.pricing);
       }
     }
 
@@ -270,10 +267,7 @@ export class GoogleModel implements LanguageModel {
       }
       const partial: PartialModelResponse = { usage: streamUsage };
       if (this.metadata?.pricing) {
-        partial.cost = calculateCost(streamUsage, this.metadata.pricing, {
-          input_cache_tokens_are_additional: false,
-          output_reasoning_tokens_are_additional: true,
-        });
+        partial.cost = calculateCost(streamUsage, this.metadata.pricing);
       }
       yield partial;
     }
@@ -939,11 +933,11 @@ function mapGoogleUsageMetadata(
   outputTokens ??= 0;
   reasoningTokens ??= 0;
 
-  // candidatesTokenCount excludes thoughts. The numbers are kept as reported;
-  // the cost calculation accounts for it.
+  // candidatesTokenCount excludes thoughts, so they are added back to match
+  // the inclusive `ModelUsage.output_tokens`.
   const usage: ModelUsage = {
     input_tokens: promptTokens + toolUsePromptTokens,
-    output_tokens: outputTokens,
+    output_tokens: outputTokens + reasoningTokens,
   };
   if (webSearchRequests > 0) {
     usage.server_tool_use = { web_search_requests: webSearchRequests };

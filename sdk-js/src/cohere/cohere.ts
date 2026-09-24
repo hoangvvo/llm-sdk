@@ -74,10 +74,7 @@ export class CohereModel implements LanguageModel {
       const usage = mapCohereUsage(response.usage);
       result.usage = usage;
       if (this.metadata?.pricing) {
-        result.cost = calculateCost(usage, this.metadata.pricing, {
-          input_cache_tokens_are_additional: false,
-          output_reasoning_tokens_are_additional: false,
-        });
+        result.cost = calculateCost(usage, this.metadata.pricing);
       }
     }
 
@@ -144,10 +141,7 @@ export class CohereModel implements LanguageModel {
           if (usage) {
             const partial: PartialModelResponse = { usage };
             if (this.metadata?.pricing) {
-              partial.cost = calculateCost(usage, this.metadata.pricing, {
-                input_cache_tokens_are_additional: false,
-                output_reasoning_tokens_are_additional: false,
-              });
+              partial.cost = calculateCost(usage, this.metadata.pricing);
             }
             yield partial;
           }

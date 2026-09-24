@@ -143,7 +143,7 @@ func (m *GoogleModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		}
 
 		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-			cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: true})
+			cost := usage.CalculateCost(m.metadata.Pricing)
 			result.Cost = &cost
 		}
 
@@ -292,7 +292,7 @@ func (m *GoogleModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 				}
 				partial := &llmsdk.PartialModelResponse{Usage: streamUsage}
 				if m.metadata != nil && m.metadata.Pricing != nil {
-					partial.Cost = ptr.To(streamUsage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: true}))
+					partial.Cost = ptr.To(streamUsage.CalculateCost(m.metadata.Pricing))
 				}
 				if !stream.Send(ctx, responseCh, partial) {
 					return
@@ -958,9 +958,11 @@ func mapGoogleUsageMetadata(usageMetadata googleapi.UsageMetadata, webSearchRequ
 		}
 	}
 
+	// candidatesTokenCount excludes thoughts, so they are added back to match
+	// the inclusive ModelUsage.OutputTokens.
 	usage := &llmsdk.ModelUsage{
 		InputTokens:  promptTokens + toolUsePromptTokens,
-		OutputTokens: outputTokens,
+		OutputTokens: outputTokens + reasoningTokens,
 	}
 	if webSearchRequests > 0 {
 		usage.ServerToolUse = &llmsdk.ModelServerToolUsage{WebSearchRequests: ptr.To(webSearchRequests)}

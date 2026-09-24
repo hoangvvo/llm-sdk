@@ -144,7 +144,7 @@ func (m *OpenAIModel) Generate(ctx context.Context, input *llmsdk.LanguageModelI
 		}
 
 		if m.metadata != nil && m.metadata.Pricing != nil && usage != nil {
-			cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: false})
+			cost := usage.CalculateCost(m.metadata.Pricing)
 			result.Cost = &cost
 		}
 
@@ -233,7 +233,7 @@ func (m *OpenAIModel) Stream(ctx context.Context, input *llmsdk.LanguageModelInp
 						usage := mapOpenAIUsage(*streamEvent.ResponseCompleted.Response.Usage, webSearchRequests)
 						partial := &llmsdk.PartialModelResponse{Usage: usage}
 						if m.metadata != nil && m.metadata.Pricing != nil {
-							partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: false, OutputReasoningTokensAreAdditional: false}))
+							partial.Cost = ptr.To(usage.CalculateCost(m.metadata.Pricing))
 						}
 						if !stream.Send(ctx, responseCh, partial) {
 							return

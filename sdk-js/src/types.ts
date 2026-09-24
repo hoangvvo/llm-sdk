@@ -602,7 +602,7 @@ export interface ToolMessage {
   content: Part[];
 }
 /**
- * A breakdown of `input_tokens` or `output_tokens`, using the provider's own counting.
+ * A breakdown of `input_tokens` or `output_tokens`. Every count is a subset of that total.
  */
 export interface ModelTokensDetails {
   text_tokens?: number;
@@ -612,11 +612,11 @@ export interface ModelTokensDetails {
   image_tokens?: number;
   cached_image_tokens?: number;
   /**
-   * Cache reads, billed at the cached-input rate.
+   * The subset of `input_tokens` read from the prompt cache.
    */
   cached_tokens?: number;
   /**
-   * Cache writes, billed separately from cache reads.
+   * The subset of `input_tokens` written to the prompt cache.
    */
   cache_write_tokens?: number;
   /**
@@ -624,7 +624,7 @@ export interface ModelTokensDetails {
    */
   extended_cache_write_tokens?: number;
   /**
-   * The tokens spent on reasoning.
+   * The subset of `output_tokens` spent on reasoning.
    */
   reasoning_tokens?: number;
 }
@@ -635,17 +635,15 @@ export interface ModelServerToolUsage {
   web_search_requests?: number;
 }
 /**
- * Represents the token usage of the model.
+ * Represents the token usage of the model, normalized to the same meaning for every provider: totals include their cache and reasoning subsets.
  */
 export interface ModelUsage {
   /**
-   * The input tokens as reported by the provider. Whether cached and
-   * cache-write tokens are included depends on the provider; see `ModelUsageCostOptions`.
+   * The total input tokens, including cache reads (`cached_tokens`) and cache writes (`cache_write_tokens`) on every provider. Uncached input is `input_tokens - cached_tokens - cache_write_tokens`.
    */
   input_tokens: number;
   /**
-   * The output tokens as reported by the provider. Whether reasoning tokens
-   * are included depends on the provider; see `ModelUsageCostOptions`.
+   * The total output tokens, including `reasoning_tokens` on every provider.
    */
   output_tokens: number;
   input_tokens_details?: ModelTokensDetails;

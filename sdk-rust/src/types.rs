@@ -698,8 +698,8 @@ pub struct ToolMessage {
     pub content: Vec<Part>,
 }
 
-/// A breakdown of `input_tokens` or `output_tokens`, using the provider's own
-/// counting.
+/// A breakdown of `input_tokens` or `output_tokens`. Every count is a subset of
+/// that total.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ModelTokensDetails {
@@ -715,17 +715,17 @@ pub struct ModelTokensDetails {
     pub image_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_image_tokens: Option<u32>,
-    /// Cache reads, billed at the cached-input rate.
+    /// The subset of `input_tokens` read from the prompt cache.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_tokens: Option<u32>,
-    /// Cache writes, billed separately from cache reads.
+    /// The subset of `input_tokens` written to the prompt cache.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_write_tokens: Option<u32>,
     /// The subset of `cache_write_tokens` stored with extended retention (see
     /// `cache_retention`), which some providers bill at a higher rate.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extended_cache_write_tokens: Option<u32>,
-    /// The tokens spent on reasoning.
+    /// The subset of `output_tokens` spent on reasoning.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_tokens: Option<u32>,
 }
@@ -738,16 +738,16 @@ pub struct ModelServerToolUsage {
     pub web_search_requests: Option<u32>,
 }
 
-/// Represents the token usage of the model.
+/// Represents the token usage of the model, normalized to the same meaning
+/// for every provider: totals include their cache and reasoning subsets.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ModelUsage {
-    /// The input tokens as reported by the provider. Whether cached and
-    /// cache-write tokens are included depends on the provider; see
-    /// `ModelUsageCostOptions`.
+    /// The total input tokens, including cache reads (`cached_tokens`) and
+    /// cache writes (`cache_write_tokens`) on every provider. Uncached input is
+    /// `input_tokens - cached_tokens - cache_write_tokens`.
     pub input_tokens: u32,
-    /// The output tokens as reported by the provider. Whether reasoning tokens
-    /// are included depends on the provider; see `ModelUsageCostOptions`.
+    /// The total output tokens, including `reasoning_tokens` on every provider.
     pub output_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_tokens_details: Option<ModelTokensDetails>,

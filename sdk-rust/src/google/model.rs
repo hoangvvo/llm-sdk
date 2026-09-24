@@ -11,9 +11,9 @@ use crate::{
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AudioPart, Citation, CitationDelta,
     ContentDelta, ImagePart, LanguageModel, LanguageModelError, LanguageModelInput,
     LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message, ModelResponse,
-    ModelServerToolUsage, ModelTokensDetails, ModelUsage, ModelUsageCostOptions, Part, PartDelta,
-    PartialModelResponse, ReasoningPart, ResponseFormatOption, TextPart, TextPartDelta,
-    Tool as SdkTool, ToolChoiceOption, ToolResultStatus,
+    ModelServerToolUsage, ModelTokensDetails, ModelUsage, Part, PartDelta, PartialModelResponse,
+    ReasoningPart, ResponseFormatOption, TextPart, TextPartDelta, Tool as SdkTool,
+    ToolChoiceOption, ToolResultStatus,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -25,11 +25,6 @@ use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
 
 const PROVIDER: &str = "google";
-const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
-    input_cache_tokens_are_additional: false,
-    output_reasoning_tokens_are_additional: true,
-};
-
 pub struct GoogleModel {
     model_id: String,
     api_key: String,
@@ -166,7 +161,7 @@ impl LanguageModel for GoogleModel {
                         usage.as_ref(),
                         self.metadata().and_then(|m| m.pricing.as_ref()),
                     ) {
-                        Some(usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
+                        Some(usage.calculate_cost(pricing))
                     } else {
                         None
                     };
@@ -292,7 +287,7 @@ impl LanguageModel for GoogleModel {
                             let cost = metadata
                                 .as_ref()
                                 .and_then(|m| m.pricing.as_ref())
-                                .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
+                                .map(|pricing| usage.calculate_cost(pricing));
                             yield PartialModelResponse {
                                 delta: None,
                                 usage: Some(usage),
@@ -1155,11 +1150,11 @@ fn map_google_usage_metadata(usage: &UsageMetadata, web_search_requests: usize) 
             .reasoning_tokens = Some(reasoning_tokens);
     }
 
-    // candidatesTokenCount excludes thoughts. The numbers are kept as reported;
-    // the cost calculation accounts for it.
+    // candidatesTokenCount excludes thoughts, so they are added back to match
+    // the inclusive `ModelUsage::output_tokens`.
     ModelUsage {
         input_tokens: prompt_tokens.saturating_add(tool_use_prompt_tokens),
-        output_tokens,
+        output_tokens: output_tokens.saturating_add(reasoning_tokens),
         input_tokens_details,
         output_tokens_details,
         server_tool_use: (web_search_requests > 0).then(|| ModelServerToolUsage {

@@ -28,12 +28,11 @@ use crate::{
     AssistantMessage, CacheRetention, Citation, CitationDelta, ContentDelta, FilePart, ImagePart,
     ImagePartDelta, LanguageModel, LanguageModelError, LanguageModelInput, LanguageModelMetadata,
     LanguageModelResult, LanguageModelStream, Message, ModelResponse, ModelServerToolUsage,
-    ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse, ReasoningOptions,
-    ReasoningPart, ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart,
-    TextPartDelta, Tool, ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta,
-    ToolChoiceOption, ToolMessage, ToolResult, ToolResultPart, ToolResultPartDelta,
-    ToolResultStatus, ToolSearchToolCall, ToolSearchToolCallDelta, ToolSearchToolCallStatus,
-    ToolSearchToolResult, UserMessage,
+    ModelUsage, Part, PartDelta, PartialModelResponse, ReasoningOptions, ReasoningPart,
+    ReasoningPartDelta, ResponseFormatJson, ResponseFormatOption, TextPart, TextPartDelta, Tool,
+    ToolCall, ToolCallDelta, ToolCallPart, ToolCallPartDelta, ToolChoiceOption, ToolMessage,
+    ToolResult, ToolResultPart, ToolResultPartDelta, ToolResultStatus, ToolSearchToolCall,
+    ToolSearchToolCallDelta, ToolSearchToolCallStatus, ToolSearchToolResult, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -43,11 +42,6 @@ use reqwest::{
 };
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
-
-const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
-    input_cache_tokens_are_additional: false,
-    output_reasoning_tokens_are_additional: false,
-};
 
 const PROVIDER: &str = "openai";
 
@@ -178,7 +172,7 @@ impl LanguageModel for OpenAIModel {
                         usage.as_ref(),
                         self.metadata().and_then(|m| m.pricing.as_ref()),
                     ) {
-                        Some(usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
+                        Some(usage.calculate_cost(pricing))
                     } else {
                         None
                     };
@@ -239,7 +233,7 @@ impl LanguageModel for OpenAIModel {
                                     let usage = map_openai_response_usage(usage, web_search_requests);
                                     yield PartialModelResponse {
                                         delta: None,
-                                        cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS)),
+                                        cost: metadata.as_ref().and_then(|m| m.pricing.as_ref()).map(|pricing| usage.calculate_cost(pricing)),
                                         usage: Some(usage),
                                     }
                                 }

@@ -31,9 +31,9 @@ use crate::{
     tool_result_utils::CANCELLED_TOOL_RESULT_FALLBACK_CONTENT, AssistantMessage, AudioFormat,
     AudioOptions, CacheRetention, ContentDelta, LanguageModel, LanguageModelError,
     LanguageModelInput, LanguageModelMetadata, LanguageModelResult, LanguageModelStream, Message,
-    ModelResponse, ModelUsage, ModelUsageCostOptions, Part, PartDelta, PartialModelResponse,
-    ResponseFormatJson, ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool,
-    ToolMessage, ToolResultStatus, UserMessage,
+    ModelResponse, ModelUsage, Part, PartDelta, PartialModelResponse, ResponseFormatJson,
+    ResponseFormatOption, Tool, ToolCallPart, ToolChoiceOption, ToolChoiceTool, ToolMessage,
+    ToolResultStatus, UserMessage,
 };
 use async_stream::try_stream;
 use futures::{future::BoxFuture, StreamExt};
@@ -43,11 +43,6 @@ use reqwest::{
 };
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
-
-const USAGE_COST_OPTIONS: ModelUsageCostOptions = ModelUsageCostOptions {
-    input_cache_tokens_are_additional: false,
-    output_reasoning_tokens_are_additional: false,
-};
 
 const PROVIDER: &str = "openai";
 const OPENAI_AUDIO_SAMPLE_RATE: u32 = 24_000;
@@ -194,7 +189,7 @@ impl LanguageModel for OpenAIChatModel {
                         usage.as_ref(),
                         self.metadata().and_then(|m| m.pricing.as_ref()),
                     ) {
-                        Some(usage.calculate_cost(pricing, &USAGE_COST_OPTIONS))
+                        Some(usage.calculate_cost(pricing))
                     } else {
                         None
                     };
@@ -275,7 +270,7 @@ impl LanguageModel for OpenAIChatModel {
                                 let cost = metadata
                                     .as_ref()
                                     .and_then(|m| m.pricing.as_ref())
-                                    .map(|pricing| usage.calculate_cost(pricing, &USAGE_COST_OPTIONS));
+                                    .map(|pricing| usage.calculate_cost(pricing));
 
                                 yield PartialModelResponse {
                                     delta: None,

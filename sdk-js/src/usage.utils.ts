@@ -21,24 +21,12 @@ const MODEL_TOKEN_DETAIL_KEYS = [
 const SERVER_TOOL_USAGE_KEYS = ["web_search_requests"] as const;
 
 /**
- * Counting conventions needed to price unmodified provider usage.
+ * Estimates USD charges. Cache reads, cache writes and reasoning tokens are
+ * priced as subsets of `input_tokens` and `output_tokens`.
  */
-export interface ModelUsageCostOptions {
-  /**
-   * True when `input_tokens` excludes cache reads and writes.
-   */
-  input_cache_tokens_are_additional: boolean;
-  /**
-   * True when `output_tokens` excludes reasoning tokens.
-   */
-  output_reasoning_tokens_are_additional: boolean;
-}
-
-/** Estimates USD charges using the provider's counting conventions. */
 export function calculateCost(
   usage: ModelUsage,
   pricing: LanguageModelPricing,
-  options: ModelUsageCostOptions,
 ) {
   const inputDetails = usage.input_tokens_details;
   const outputDetails = usage.output_tokens_details;
@@ -80,20 +68,16 @@ export function calculateCost(
       value(inputDetails.cached_audio_tokens) +
       value(inputDetails.cached_image_tokens)
     : value(inputDetails?.cached_tokens);
-  const includedCacheTokens = options.input_cache_tokens_are_additional
-    ? 0
-    : cachedReadTokens + value(inputDetails?.cache_write_tokens);
+  const cacheTokens =
+    cachedReadTokens + value(inputDetails?.cache_write_tokens);
   const inputTokens = Math.max(
     value(usage.input_tokens),
     modalityTotal(inputDetails),
-    includedCacheTokens,
+    cacheTokens,
   );
   const outputTokens = Math.max(
     value(usage.output_tokens),
-    modalityTotal(outputDetails) +
-      (options.output_reasoning_tokens_are_additional
-        ? 0
-        : value(outputDetails?.reasoning_tokens)),
+    modalityTotal(outputDetails) + value(outputDetails?.reasoning_tokens),
   );
 
   let inputCost = inputTokens * inputBasePrice;
@@ -135,21 +119,15 @@ export function calculateCost(
     outputImagePrice,
   );
 
-  const cacheBaseText = options.input_cache_tokens_are_additional
-    ? 0
-    : inputHasModalityBreakdown
-      ? inputTextPrice
-      : inputBasePrice;
-  const cacheBaseAudio = options.input_cache_tokens_are_additional
-    ? 0
-    : inputHasModalityBreakdown
-      ? inputAudioPrice
-      : inputBasePrice;
-  const cacheBaseImage = options.input_cache_tokens_are_additional
-    ? 0
-    : inputHasModalityBreakdown
-      ? inputImagePrice
-      : inputBasePrice;
+  const cacheBaseText = inputHasModalityBreakdown
+    ? inputTextPrice
+    : inputBasePrice;
+  const cacheBaseAudio = inputHasModalityBreakdown
+    ? inputAudioPrice
+    : inputBasePrice;
+  const cacheBaseImage = inputHasModalityBreakdown
+    ? inputImagePrice
+    : inputBasePrice;
   if (hasCachedModalities) {
     inputCost += adjustment(
       value(inputDetails.cached_text_tokens),
@@ -206,15 +184,11 @@ export function calculateCost(
     pricing.input_cost_per_extended_cache_write_token ?? cacheWritePrice,
   );
 
-  if (options.output_reasoning_tokens_are_additional) {
-    outputCost += value(outputDetails?.reasoning_tokens) * outputTextPrice;
-  } else {
-    outputCost += adjustment(
-      value(outputDetails?.reasoning_tokens),
-      outputBasePrice,
-      outputTextPrice,
-    );
-  }
+  outputCost += adjustment(
+    value(outputDetails?.reasoning_tokens),
+    outputBasePrice,
+    outputTextPrice,
+  );
 
   const longContext = pricing.long_context;
   if (longContext && inputTokens > longContext.threshold_tokens) {

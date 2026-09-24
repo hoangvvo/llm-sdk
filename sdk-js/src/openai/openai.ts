@@ -110,10 +110,7 @@ export class OpenAIModel implements LanguageModel {
       ).length;
       result.usage = mapOpenAIUsage(response.usage, webSearchRequests);
       if (this.metadata?.pricing) {
-        result.cost = calculateCost(result.usage, this.metadata.pricing, {
-          input_cache_tokens_are_additional: false,
-          output_reasoning_tokens_are_additional: false,
-        });
+        result.cost = calculateCost(result.usage, this.metadata.pricing);
       }
     }
 
@@ -180,10 +177,7 @@ export class OpenAIModel implements LanguageModel {
           const usage = mapOpenAIUsage(event.response.usage, webSearchRequests);
           const partial: PartialModelResponse = { usage };
           if (this.metadata?.pricing) {
-            partial.cost = calculateCost(usage, this.metadata.pricing, {
-              input_cache_tokens_are_additional: false,
-              output_reasoning_tokens_are_additional: false,
-            });
+            partial.cost = calculateCost(usage, this.metadata.pricing);
           }
           yield partial;
         }
