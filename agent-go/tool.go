@@ -25,11 +25,12 @@ type AgentFunctionTool[C any] interface {
 	Execute(ctx context.Context, params json.RawMessage, contextVal C, runState *RunState) (AgentToolResult, error)
 }
 
-// AgentTool is the union of agent-executed function tools and provider-hosted
-// web search tools.
+// AgentTool is the union of agent-executed function tools and provider-hosted tools.
 type AgentTool[C any] struct {
-	FunctionTool  AgentFunctionTool[C]  `json:"-"`
-	WebSearchTool *llmsdk.WebSearchTool `json:"-"`
+	FunctionTool   AgentFunctionTool[C]   `json:"-"`
+	WebSearchTool  *llmsdk.WebSearchTool  `json:"-"`
+	ToolSearchTool *llmsdk.ToolSearchTool `json:"-"`
+	deferLoading   bool
 }
 
 func NewAgentFunctionTool[C any](tool AgentFunctionTool[C]) AgentTool[C] {
@@ -38,6 +39,16 @@ func NewAgentFunctionTool[C any](tool AgentFunctionTool[C]) AgentTool[C] {
 
 func NewAgentWebSearchTool[C any](tool llmsdk.WebSearchTool) AgentTool[C] {
 	return AgentTool[C]{WebSearchTool: &tool}
+}
+
+func NewAgentToolSearchTool[C any](tool llmsdk.ToolSearchTool) AgentTool[C] {
+	return AgentTool[C]{ToolSearchTool: &tool}
+}
+
+// WithDeferLoading hides a function until hosted tool search discovers it.
+func (t AgentTool[C]) WithDeferLoading(deferLoading bool) AgentTool[C] {
+	t.deferLoading = deferLoading
+	return t
 }
 
 func FunctionTools[C any](tools ...AgentFunctionTool[C]) []AgentTool[C] {
@@ -56,11 +67,22 @@ func (t AgentTool[C]) Name() string {
 	if t.WebSearchTool != nil {
 		return "web_search"
 	}
+	if t.ToolSearchTool != nil {
+		return "tool_search"
+	}
 	return ""
 }
 
 func (t AgentTool[C]) ToLanguageModelTool() llmsdk.Tool {
 	if t.FunctionTool != nil {
+		if t.deferLoading {
+			return llmsdk.NewFunctionTool(
+				t.FunctionTool.Name(),
+				t.FunctionTool.Description(),
+				t.FunctionTool.Parameters(),
+				llmsdk.WithFunctionToolDeferLoading(),
+			)
+		}
 		return llmsdk.NewFunctionTool(
 			t.FunctionTool.Name(),
 			t.FunctionTool.Description(),
@@ -69,6 +91,9 @@ func (t AgentTool[C]) ToLanguageModelTool() llmsdk.Tool {
 	}
 	if t.WebSearchTool != nil {
 		return llmsdk.Tool{WebSearchTool: t.WebSearchTool}
+	}
+	if t.ToolSearchTool != nil {
+		return llmsdk.Tool{ToolSearchTool: t.ToolSearchTool}
 	}
 	return llmsdk.Tool{}
 }

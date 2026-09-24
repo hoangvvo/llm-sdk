@@ -707,6 +707,7 @@ export class RunSession<TContext> {
                 name: tool.name,
                 description: tool.description,
                 parameters: tool.parameters,
+                ...(tool.defer_loading ? { defer_loading: true } : {}),
               }
             : tool,
         );

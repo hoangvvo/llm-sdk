@@ -1,0 +1,68 @@
+{
+  "prompt": "Find record 42",
+  "model_responses": [
+    {
+      "content": [
+        {
+          "type": "tool-call",
+          "tool_call_id": "search_1",
+          "call": {
+            "type": "tool_search",
+            "args": { "query": "record lookup" },
+            "status": "completed"
+          }
+        },
+        {
+          "type": "tool-result",
+          "tool_call_id": "search_1",
+          "result": { "type": "tool_search", "tool_names": ["lookup"] },
+          "status": "completed"
+        },
+        {
+          "type": "tool-call",
+          "tool_call_id": "call_1",
+          "call": {
+            "type": "function",
+            "name": "lookup",
+            "args": { "record": "42" }
+          }
+        }
+      ]
+    },
+    { "content": [{ "type": "text", "text": "Record found" }] }
+  ],
+  "expected_tools": [
+    {
+      "type": "function",
+      "name": "direct",
+      "description": "Mock tool direct",
+      "parameters": { "type": "object", "properties": {} }
+    },
+    {
+      "type": "function",
+      "name": "lookup",
+      "description": "Mock tool lookup",
+      "parameters": { "type": "object", "properties": {} },
+      "defer_loading": true
+    },
+    { "type": "tool_search" }
+  ],
+  "expected_function_args": { "record": "42" },
+  "function_result": "Record 42",
+  "expected_tool_message": {
+    "role": "tool",
+    "content": [
+      {
+        "type": "tool-result",
+        "tool_call_id": "call_1",
+        "result": {
+          "type": "function",
+          "name": "lookup",
+          "content": [{ "type": "text", "text": "Record 42" }]
+        },
+        "status": "completed"
+      }
+    ]
+  },
+  "expected_final_content": [{ "type": "text", "text": "Record found" }]
+}

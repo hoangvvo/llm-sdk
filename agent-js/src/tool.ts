@@ -1,4 +1,9 @@
-import type { JSONSchema, Part, WebSearchTool } from "@hoangvvo/llm-sdk";
+import type {
+  JSONSchema,
+  Part,
+  ToolSearchTool,
+  WebSearchTool,
+} from "@hoangvvo/llm-sdk";
 import type { RunState } from "./run.ts";
 
 /**
@@ -26,6 +31,10 @@ export interface AgentFunctionTool<
    */
   parameters: JSONSchema;
   /**
+   * Hide the function until a hosted tool search discovers it.
+   */
+  defer_loading?: boolean;
+  /**
    * The function that will be called to execute the tool with given parameters and context.
    *
    * If the tool throws an error, the agent will be interrupted and the error will be propagated.
@@ -40,13 +49,13 @@ export interface AgentFunctionTool<
 
 /**
  * Agent tool available to the model. This can either be an agent-executed
- * function tool or a provider-hosted web search tool.
+ * function tool or a provider-hosted tool.
  */
 export type AgentTool<
   TContext,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TArgs extends Record<string, unknown> = any,
-> = AgentFunctionTool<TContext, TArgs> | WebSearchTool;
+> = AgentFunctionTool<TContext, TArgs> | WebSearchTool | ToolSearchTool;
 
 export interface AgentToolResult {
   content: Part[];
@@ -69,6 +78,10 @@ export function tool<TContext, TArgs extends Record<string, unknown>>(params: {
    * The JSON schema of the parameters that the tool accepts. The type must be "object".
    */
   parameters: JSONSchema;
+  /**
+   * Hide the function until a hosted tool search discovers it.
+   */
+  defer_loading?: boolean;
   /**
    * The function that will be called to execute the tool with given parameters and context.
    *

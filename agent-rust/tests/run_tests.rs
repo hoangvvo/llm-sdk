@@ -10,15 +10,15 @@ use tokio_util::sync::CancellationToken;
 type DynError = Box<dyn std::error::Error + Send + Sync>;
 use futures::{future::BoxFuture, StreamExt, TryStreamExt};
 use llm_agent::{
-    AgentError, AgentFunctionTool, AgentItem, AgentItemTool, AgentParams, AgentResponse,
-    AgentStreamEvent, AgentStreamItemEvent, AgentTool, AgentToolResult, InstructionParam,
-    RunSession, RunSessionRequest, RunState, Toolkit, ToolkitSession,
+    AgentError, AgentFunctionTool, AgentFunctionToolExt, AgentItem, AgentItemTool, AgentParams,
+    AgentResponse, AgentStreamEvent, AgentStreamItemEvent, AgentTool, AgentToolResult,
+    InstructionParam, RunSession, RunSessionRequest, RunState, Toolkit, ToolkitSession,
 };
 use llm_sdk::{
     llm_sdk_test::{MockGenerateResult, MockLanguageModel, MockStreamResult},
     ContentDelta, JSONSchema, LanguageModelError, Message, ModelResponse, ModelUsage, Part,
     PartDelta, PartialModelResponse, ReasoningPartDelta, TextPartDelta, Tool, ToolCallPartDelta,
-    WebSearchTool,
+    ToolSearchTool, WebSearchTool,
 };
 use serde_json::{json, Value};
 
@@ -1672,6 +1672,89 @@ async fn run_passes_provider_hosted_tools_to_model() {
     let inputs = model.tracked_generate_inputs();
     assert_eq!(inputs.len(), 1);
     assert_eq!(inputs[0].tools, Some(vec![Tool::WebSearch(web_search)]));
+}
+
+#[tokio::test]
+async fn run_discovers_deferred_tools_and_executes_selected_function() {
+    let fixture: Value = serde_json::from_str(
+        &std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../agent-tests/deferred-tools.json"
+        ))
+        .expect("shared agent fixture is readable"),
+    )
+    .expect("shared agent fixture parses");
+    let model = Arc::new(MockLanguageModel::new());
+    let model_responses: Vec<ModelResponse> =
+        serde_json::from_value(fixture["model_responses"].clone())
+            .expect("shared model responses parse");
+    for response in model_responses {
+        model.enqueue_generate(response);
+    }
+
+    let direct = MockTool::new(
+        "direct",
+        AgentToolResult {
+            content: vec![],
+            is_error: false,
+        },
+    );
+    let lookup = MockTool::new(
+        "lookup",
+        AgentToolResult {
+            content: vec![Part::text(
+                fixture["function_result"]
+                    .as_str()
+                    .expect("function result is text"),
+            )],
+            is_error: false,
+        },
+    );
+    let session = new_run_session(
+        Arc::new(
+            AgentParams::new("test_agent", model.clone())
+                .add_tool(direct.clone())
+                .add_tool(lookup.clone().with_defer_loading(true))
+                .add_tool(ToolSearchTool::default()),
+        ),
+        (),
+    )
+    .await;
+
+    let response = session
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    fixture["prompt"].as_str().expect("prompt is text"),
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .await
+        .expect("run succeeds");
+
+    let expected_content: Vec<Part> =
+        serde_json::from_value(fixture["expected_final_content"].clone())
+            .expect("shared final content parses");
+    assert_eq!(response.content, expected_content);
+    assert_eq!(
+        lookup.recorded_calls(),
+        vec![fixture["expected_function_args"].clone()]
+    );
+    assert!(direct.recorded_calls().is_empty());
+
+    let inputs = model.tracked_generate_inputs();
+    assert_eq!(inputs.len(), 2);
+    let tools: Option<Vec<Tool>> = Some(
+        serde_json::from_value(fixture["expected_tools"].clone())
+            .expect("shared expected tools parse"),
+    );
+    assert_eq!(inputs[0].tools, tools);
+    assert_eq!(inputs[1].tools, tools);
+    let expected_tool_message: Message =
+        serde_json::from_value(fixture["expected_tool_message"].clone())
+            .expect("shared tool message parses");
+    assert_eq!(inputs[1].messages.last(), Some(&expected_tool_message));
 }
 
 #[tokio::test]

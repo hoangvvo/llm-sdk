@@ -1,6 +1,6 @@
 use crate::RunState;
 use futures::future::BoxFuture;
-use llm_sdk::{FunctionTool, JSONSchema, Part, Tool, WebSearchTool};
+use llm_sdk::{FunctionTool, JSONSchema, Part, Tool, ToolSearchTool, WebSearchTool};
 use serde_json::Value;
 use std::{error::Error, fmt::Debug, sync::Arc};
 
@@ -41,16 +41,45 @@ impl<TCtx> Debug for dyn AgentFunctionTool<TCtx> {
 }
 
 pub enum AgentTool<TCtx> {
-    Function(Arc<dyn AgentFunctionTool<TCtx>>),
+    Function {
+        tool: Arc<dyn AgentFunctionTool<TCtx>>,
+        defer_loading: bool,
+    },
     WebSearch(WebSearchTool),
+    ToolSearch(ToolSearchTool),
 }
+
+/// A function tool with agent-specific loading behavior.
+pub struct ConfiguredFunctionTool<T> {
+    tool: T,
+    defer_loading: bool,
+}
+
+/// Configures how a function is presented to the model when registered with an
+/// agent.
+pub trait AgentFunctionToolExt<TCtx>: AgentFunctionTool<TCtx> + Sized {
+    /// Defers the function definition until hosted tool search discovers it.
+    #[must_use]
+    fn with_defer_loading(self, defer_loading: bool) -> ConfiguredFunctionTool<Self> {
+        ConfiguredFunctionTool {
+            tool: self,
+            defer_loading,
+        }
+    }
+}
+
+impl<TCtx, T> AgentFunctionToolExt<TCtx> for T where T: AgentFunctionTool<TCtx> {}
 
 #[doc(hidden)]
 pub struct AgentToolArg;
 #[doc(hidden)]
 pub struct WebSearchToolArg;
 #[doc(hidden)]
+pub struct ToolSearchToolArg;
+#[doc(hidden)]
 pub struct FunctionToolArg;
+#[doc(hidden)]
+pub struct ConfiguredFunctionToolArg;
 
 #[doc(hidden)]
 pub trait IntoAgentTool<TCtx, TArg> {
@@ -62,7 +91,10 @@ impl<TCtx> AgentTool<TCtx> {
     where
         T: AgentFunctionTool<TCtx> + 'static,
     {
-        Self::Function(Arc::new(tool))
+        Self::Function {
+            tool: Arc::new(tool),
+            defer_loading: false,
+        }
     }
 
     #[must_use]
@@ -73,15 +105,16 @@ impl<TCtx> AgentTool<TCtx> {
     #[must_use]
     pub fn name(&self) -> String {
         match self {
-            Self::Function(tool) => tool.name(),
+            Self::Function { tool, .. } => tool.name(),
             Self::WebSearch(_) => "web_search".to_string(),
+            Self::ToolSearch(_) => "tool_search".to_string(),
         }
     }
 
     pub(crate) fn as_function_tool(&self) -> Option<&Arc<dyn AgentFunctionTool<TCtx>>> {
         match self {
-            Self::Function(tool) => Some(tool),
-            Self::WebSearch(_) => None,
+            Self::Function { tool, .. } => Some(tool),
+            Self::WebSearch(_) | Self::ToolSearch(_) => None,
         }
     }
 }
@@ -89,8 +122,15 @@ impl<TCtx> AgentTool<TCtx> {
 impl<TCtx> Clone for AgentTool<TCtx> {
     fn clone(&self) -> Self {
         match self {
-            Self::Function(tool) => Self::Function(Arc::clone(tool)),
+            Self::Function {
+                tool,
+                defer_loading,
+            } => Self::Function {
+                tool: Arc::clone(tool),
+                defer_loading: *defer_loading,
+            },
             Self::WebSearch(tool) => Self::WebSearch(tool.clone()),
+            Self::ToolSearch(tool) => Self::ToolSearch(tool.clone()),
         }
     }
 }
@@ -107,6 +147,24 @@ impl<TCtx> From<WebSearchTool> for AgentTool<TCtx> {
     }
 }
 
+impl<TCtx> From<ToolSearchTool> for AgentTool<TCtx> {
+    fn from(value: ToolSearchTool) -> Self {
+        Self::ToolSearch(value)
+    }
+}
+
+impl<TCtx, T> From<ConfiguredFunctionTool<T>> for AgentTool<TCtx>
+where
+    T: AgentFunctionTool<TCtx> + 'static,
+{
+    fn from(value: ConfiguredFunctionTool<T>) -> Self {
+        Self::Function {
+            tool: Arc::new(value.tool),
+            defer_loading: value.defer_loading,
+        }
+    }
+}
+
 impl<TCtx> IntoAgentTool<TCtx, AgentToolArg> for AgentTool<TCtx> {
     fn into_agent_tool(self) -> Self {
         self
@@ -114,6 +172,21 @@ impl<TCtx> IntoAgentTool<TCtx, AgentToolArg> for AgentTool<TCtx> {
 }
 
 impl<TCtx> IntoAgentTool<TCtx, WebSearchToolArg> for WebSearchTool {
+    fn into_agent_tool(self) -> AgentTool<TCtx> {
+        self.into()
+    }
+}
+
+impl<TCtx> IntoAgentTool<TCtx, ToolSearchToolArg> for ToolSearchTool {
+    fn into_agent_tool(self) -> AgentTool<TCtx> {
+        self.into()
+    }
+}
+
+impl<TCtx, T> IntoAgentTool<TCtx, ConfiguredFunctionToolArg> for ConfiguredFunctionTool<T>
+where
+    T: AgentFunctionTool<TCtx> + 'static,
+{
     fn into_agent_tool(self) -> AgentTool<TCtx> {
         self.into()
     }
@@ -131,10 +204,20 @@ where
 impl<TCtx> From<&AgentTool<TCtx>> for Tool {
     fn from(agent_tool: &AgentTool<TCtx>) -> Self {
         match agent_tool {
-            AgentTool::Function(tool) => {
-                FunctionTool::new(tool.name(), tool.description(), tool.parameters()).into()
+            AgentTool::Function {
+                tool,
+                defer_loading,
+            } => {
+                let function =
+                    FunctionTool::new(tool.name(), tool.description(), tool.parameters());
+                Self::Function(if *defer_loading {
+                    function.with_defer_loading(true)
+                } else {
+                    function
+                })
             }
             AgentTool::WebSearch(tool) => Self::WebSearch(tool.clone()),
+            AgentTool::ToolSearch(tool) => Self::ToolSearch(tool.clone()),
         }
     }
 }
