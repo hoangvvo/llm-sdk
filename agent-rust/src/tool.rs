@@ -57,7 +57,7 @@ pub struct ConfiguredFunctionTool<T> {
 
 /// Configures how a function is presented to the model when registered with an
 /// agent.
-pub trait AgentFunctionToolExt<TCtx>: AgentFunctionTool<TCtx> + Sized {
+pub trait AgentFunctionToolExt: Sized {
     /// Defers the function definition until hosted tool search discovers it.
     #[must_use]
     fn with_defer_loading(self, defer_loading: bool) -> ConfiguredFunctionTool<Self> {
@@ -68,7 +68,7 @@ pub trait AgentFunctionToolExt<TCtx>: AgentFunctionTool<TCtx> + Sized {
     }
 }
 
-impl<TCtx, T> AgentFunctionToolExt<TCtx> for T where T: AgentFunctionTool<TCtx> {}
+impl<T> AgentFunctionToolExt for T {}
 
 #[doc(hidden)]
 pub struct AgentToolArg;

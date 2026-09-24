@@ -272,7 +272,7 @@ impl AgentFunctionTool<CustomerContext> for LookupOrderTool {
     }
 }
 
-impl AgentFunctionTool<()> for MockTool {
+impl<TCtx> AgentFunctionTool<TCtx> for MockTool {
     fn name(&self) -> String {
         self.name.clone()
     }
@@ -288,7 +288,7 @@ impl AgentFunctionTool<()> for MockTool {
     fn execute<'a>(
         &'a self,
         args: Value,
-        _context: &(),
+        _context: &TCtx,
         state: &'a RunState,
     ) -> BoxFuture<'a, Result<AgentToolResult, Box<dyn std::error::Error + Send + Sync>>> {
         Box::pin(async move {
