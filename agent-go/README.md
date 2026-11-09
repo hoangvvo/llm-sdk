@@ -10,8 +10,6 @@ go get github.com/hoangvvo/llm-sdk/agent-go
 
 ## Usage
 
-A completed run can have empty `content`, including after a tool action that needs no reply. Check the response status and keep its output items when continuing the conversation.
-
 ```go
 package main
 

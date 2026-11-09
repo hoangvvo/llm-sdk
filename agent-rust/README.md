@@ -14,8 +14,6 @@ Enable the provider features you use (`openai`, `anthropic`, or `google`). Appli
 
 ## Usage
 
-A completed run can have empty `content`, including after a tool action that needs no reply. Check the response status and keep its output items when continuing the conversation.
-
 ```rust
 use dotenvy::dotenv;
 use llm_agent::{

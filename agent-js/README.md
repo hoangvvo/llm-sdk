@@ -23,8 +23,6 @@ npm install @modelcontextprotocol/sdk
 
 ## Usage
 
-A completed run can have empty `content`, including after a tool action that needs no reply. Check the response status and keep its output items when continuing the conversation.
-
 ```typescript
 import { Agent, tool, type AgentItem } from "@hoangvvo/llm-agent";
 import { typeboxTool } from "@hoangvvo/llm-agent/typebox";
