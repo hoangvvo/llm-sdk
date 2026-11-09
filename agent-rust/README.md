@@ -7,10 +7,7 @@ The agent library to build LLM applications that work with any LLM providers.
 ```bash
 cargo add llm-agent --features openai,tls-ring
 cargo add llm-sdk-rs --features openai
-cargo add rustls --no-default-features --features ring,std,tls12
 ```
-
-Enable the provider features you use (`openai`, `anthropic`, or `google`). Applications using the default HTTP client must select a process-wide Rustls crypto provider once at startup, as shown below.
 
 ## Usage
 
@@ -146,9 +143,6 @@ impl AgentFunctionTool<MyContext> for SendMessageTool {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Rustls provider already selected");
 
     // Define the model to use for the Agent
     let model = Arc::new(OpenAIModel::new(

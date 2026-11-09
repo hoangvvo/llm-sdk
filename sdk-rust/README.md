@@ -9,8 +9,6 @@ cargo add llm-sdk-rs --features openai
 cargo add rustls --no-default-features --features ring,std,tls12
 ```
 
-Provider modules are enabled with the `openai`, `anthropic`, and `google` Cargo features. The default `tls-ring` feature selects the Ring dependency; use `--no-default-features --features openai,tls-aws-lc` to choose AWS-LC instead.
-
 Applications using the default HTTP client select the process-wide Rustls provider once at
 startup. A custom `reqwest::Client` supplied through model options owns its own TLS setup.
 
@@ -51,9 +49,6 @@ use llm_sdk::{LanguageModelInput, Message, Part};
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Rustls provider already selected");
 
     let model = get_model("gpt-5.6-terra");
 
@@ -108,7 +103,6 @@ cargo run --example generate-text --features examples,openai
 
 ### To 0.4.0
 
-- Enable the Cargo features for the providers you import (`openai`, `anthropic`, or `google`) and select a Rustls crypto provider at application startup.
 - Token usage is normalized across providers: input totals include cache reads and cache writes, and output totals include reasoning tokens. Update cost calculations that previously added these subsets to the totals.
 - Use `from_data` or `from_url` instead of `new` for `ImagePart`, `AudioPart`, and `FilePart`.
 - Wrap inline `ImagePart.data` and `AudioPart.data` in `Some(...)`; handle `None` for URL-only media. Set `url: None` in inline media literals.
