@@ -18,8 +18,6 @@ The accompanying [Console app](https://llm-sdk.hoangvvo.com/console/chat/) demon
 
 ![Console Chat Application screenshot](./website/assets/console-chat.png)
 
-> **Status**: both libraries are currently `v0`. Both SDK and Agent APIs may change between minor releases; check each package’s migration notes before upgrading. Feedback and contributions are welcome.
-
 ## Why use llm-sdk
 
 - Supports multiple LLM providers with a unified API.
@@ -28,7 +26,7 @@ The accompanying [Console app](https://llm-sdk.hoangvvo.com/console/chat/) demon
 - Accepts images, audio, and files (PDF, documents, video) inline or by URL.
 - Supports provider-hosted web search with normalized citations, and hosted tool search with deferred tools.
 - Supports citations (RAG) and reasoning for supported models.
-- Normalizes token usage across providers: input totals include cache reads and writes, and output totals include reasoning tokens, with per-modality breakdowns and calculates the cost of a request, including hosted web searches and long-context pricing tiers, when provided with the model’s pricing information.
+- Reports token usage as the provider counts it (with cached, cache-write, reasoning, and per-modality breakdowns) and calculates the cost of a request, including hosted web searches and long-context pricing tiers, when provided with the model’s pricing information.
 - Unified serialization across JS, Rust, and Go (systems in different languages can work together).
 - Integrates OpenTelemetry for tracing.
 - _Zero abstraction_: the agent library is a thin for-loop around the SDK. No overcomplex abstractions like chains, graphs, or hidden prompt templates.
@@ -111,15 +109,15 @@ This section is designed to outline the differences for those considering migrat
 
 ### Vercel AI SDK
 
-| Feature       | llm-sdk                                                                                                                          | Vercel AI SDK                                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Providers     | OpenAI, Anthropic, Google; Cohere and Mistral in JavaScript. Supports OpenAI Chat Completions-compatible APIs.                   | [Built-in and community providers](https://ai-sdk.dev/providers/ai-sdk-providers)                                    |
-| Modality      | `TextPart`, `ImagePart`, `AudioPart` (with `channels`, `sample_rate`, `format` metadata), and `FilePart` for documents and video | Text, image, and file inputs; generated text and files, depending on the model                                       |
-| APIs          | `generate` and `stream` for supported text, image, and audio model inputs/outputs                                                | `generateText` / `streamText`, plus dedicated image and speech generation APIs                                       |
-| Language      | JavaScript/TypeScript, Rust, Go with consistent wire formats                                                                     | JavaScript/TypeScript                                                                                                |
-| Function Call | Function tools with structured text, image, audio, and source results, plus provider-hosted search tools                         | [Typed tool calls and configurable model-facing results](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling) |
-| Citations     | `SourcePart` and `Citation`, including normalized web-search sources                                                             | [Sources and citations from supported providers](https://ai-sdk.dev/docs/ai-sdk-core/generating-text)                |
-| Ease of Use   | Primitive model APIs and an explicit agent loop                                                                                  | Framework integrations and type-safe utilities                                                                       |
+| Feature       | llm-sdk                                                                                                                                                  | Vercel AI SDK                                                                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Providers     | OpenAI, Anthropic, Google, Cohere, Mistral. Supports providers with OpenAI chat completions-compatible APIs                                              | ✅ 25 providers + many community-supported ones                                                                                               |
+| Modality      | `TextPart`, `ImagePart` (with height, width metadata), `AudioPart` (with `channels`, `sample_rate`, `format` metadata), `FilePart` (documents and video) | `TextPart`, `ImagePart`, `FilePart` (no content-specific metadata)                                                                            |
+| APIs          | Single method for text, image, and audio inputs/outputs via the completions API.                                                                         | `generateText` for text (via completions API), `generateImage` for images (via image generation API), `generateAudio` for audio (via TTS API) |
+| Language      | ✅ JavaScript/TypeScript, Rust, Go with consistent wire formats                                                                                          | JavaScript/TypeScript                                                                                                                         |
+| Function Call | ✅ Allows text, image, audio, and source (citation) tool results; supports provider-hosted web search and tool search                                    | Only JSON object tool results                                                                                                                 |
+| Citations     | ✅ Supported via `SourcePart` and `Citation`                                                                                                             | Not supported                                                                                                                                 |
+| Ease of Use   | Primitive APIs                                                                                                                                           | ✅ Includes framework integrations, type-safe utilities                                                                                       |
 
 ## License
 

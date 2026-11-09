@@ -9,9 +9,6 @@ when several shared cases exercise the same behavior area.
 Node.js must be on `PATH` when running the Go or Rust SDK tests. Run each SDK's
 normal test command; no separate shared-test build step is required.
 
-CI runs the SDK core and provider transport suites without live API calls.
-Agent suites generate Cobertura coverage and upload it to GitHub Code Quality.
-
 ## Transport tests
 
 Provider wire fixtures live in `transports.json`. Each fixture defines the SDK
