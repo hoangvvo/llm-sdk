@@ -5,10 +5,14 @@
 
 import {
   LanguageModelError,
+  type ModelResponse,
+  type Part,
   type PartDelta,
   type PartialModelResponse,
+  type Tool,
 } from "@hoangvvo/llm-sdk";
 import { MockLanguageModel } from "@hoangvvo/llm-sdk/test";
+import { readFileSync } from "node:fs";
 import test, { suite, type TestContext } from "node:test";
 import { setTimeout } from "node:timers/promises";
 import {
@@ -20,6 +24,7 @@ import {
   AgentToolExecutionError,
 } from "./errors.ts";
 import { RunSession, type RunState } from "./run.ts";
+import { tool } from "./tool.ts";
 import type { AgentFunctionTool, AgentTool } from "./tool.ts";
 import type { Toolkit, ToolkitSession } from "./toolkit.ts";
 import type { AgentResponse, AgentStreamEvent } from "./types.ts";
@@ -1600,6 +1605,79 @@ suite("RunSession#run", () => {
     t.assert.deepStrictEqual(model.trackedGenerateInputs[0]?.tools, [
       webSearchTool,
     ]);
+  });
+
+  test("discovers deferred tools and executes the selected function", async (t: TestContext) => {
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL("../../agent-tests/deferred-tools.json", import.meta.url),
+        "utf8",
+      ),
+    ) as {
+      prompt: string;
+      model_responses: ModelResponse[];
+      expected_tools: Tool[];
+      expected_function_args: Record<string, unknown>;
+      function_result: string;
+      expected_tool_message: unknown;
+      expected_final_content: Part[];
+    };
+    const model = new MockLanguageModel();
+    model.enqueueGenerateResult(
+      ...fixture.model_responses.map((response) => ({ response })),
+    );
+
+    const directExecute = t.mock.fn(() => ({ content: [], is_error: false }));
+    const lookupExecute = t.mock.fn((args: Record<string, unknown>) => {
+      t.assert.deepStrictEqual(args, fixture.expected_function_args);
+      return {
+        content: [{ type: "text" as const, text: fixture.function_result }],
+        is_error: false,
+      };
+    });
+    const session = await RunSession.create({
+      name: "test_agent",
+      model,
+      context: {},
+      tools: [
+        tool({
+          name: "direct",
+          description: "Mock tool direct",
+          parameters: { type: "object", properties: {} },
+          execute: directExecute,
+        }),
+        tool({
+          name: "lookup",
+          description: "Mock tool lookup",
+          parameters: { type: "object", properties: {} },
+          defer_loading: true,
+          execute: lookupExecute,
+        }),
+        { type: "tool_search" },
+      ],
+    });
+
+    const response = await session.run({
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [{ type: "text", text: fixture.prompt }],
+        },
+      ],
+    });
+
+    t.assert.deepStrictEqual(response.content, fixture.expected_final_content);
+    t.assert.strictEqual(lookupExecute.mock.callCount(), 1);
+    t.assert.strictEqual(directExecute.mock.callCount(), 0);
+    t.assert.strictEqual(model.trackedGenerateInputs.length, 2);
+    for (const input of model.trackedGenerateInputs) {
+      t.assert.deepStrictEqual(input.tools, fixture.expected_tools);
+    }
+    t.assert.deepStrictEqual(
+      model.trackedGenerateInputs[1]?.messages.at(-1),
+      fixture.expected_tool_message,
+    );
   });
 
   test("throws LanguageModelError when non-streaming generation fails", async (t: TestContext) => {

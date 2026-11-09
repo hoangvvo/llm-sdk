@@ -1,4 +1,4 @@
-use llm_sdk::{LanguageModelPricing, ModelTokensDetails, ModelUsage, ModelUsageCostOptions};
+use llm_sdk::{LanguageModelPricing, ModelTokensDetails, ModelUsage};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -11,14 +11,7 @@ struct UsageCostCase {
     name: String,
     usage: ModelUsage,
     pricing: LanguageModelPricing,
-    options: UsageCostCaseOptions,
     expected_cost: f64,
-}
-
-#[derive(Deserialize)]
-struct UsageCostCaseOptions {
-    input_cache_tokens_are_additional: bool,
-    output_reasoning_tokens_are_additional: bool,
 }
 
 #[test]
@@ -30,17 +23,7 @@ fn shared_usage_cost_cases() {
     .expect("shared usage cost cases must be valid JSON");
 
     for test_case in suite.test_cases {
-        let actual = test_case.usage.calculate_cost(
-            &test_case.pricing,
-            &ModelUsageCostOptions {
-                input_cache_tokens_are_additional: test_case
-                    .options
-                    .input_cache_tokens_are_additional,
-                output_reasoning_tokens_are_additional: test_case
-                    .options
-                    .output_reasoning_tokens_are_additional,
-            },
-        );
+        let actual = test_case.usage.calculate_cost(&test_case.pricing);
         let tolerance = (test_case.expected_cost.abs() * 1e-12).max(1e-12);
         assert!(
             (actual - test_case.expected_cost).abs() <= tolerance,

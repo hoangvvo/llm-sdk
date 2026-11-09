@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -1405,6 +1406,84 @@ func TestRun_PassesProviderHostedToolsToModel(t *testing.T) {
 	expected := []llmsdk.Tool{{WebSearchTool: &webSearchTool}}
 	if diff := cmp.Diff(expected, inputs[0].Tools); diff != "" {
 		t.Fatalf("hosted tools mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestRun_DiscoversDeferredToolsAndExecutesSelectedFunction(t *testing.T) {
+	data, err := os.ReadFile("../agent-tests/deferred-tools.json")
+	if err != nil {
+		t.Fatalf("read shared agent fixture: %v", err)
+	}
+	var fixture struct {
+		Prompt               string                 `json:"prompt"`
+		ModelResponses       []llmsdk.ModelResponse `json:"model_responses"`
+		ExpectedTools        []llmsdk.Tool          `json:"expected_tools"`
+		ExpectedFunctionArgs json.RawMessage        `json:"expected_function_args"`
+		FunctionResult       string                 `json:"function_result"`
+		ExpectedToolMessage  llmsdk.Message         `json:"expected_tool_message"`
+		ExpectedFinalContent []llmsdk.Part          `json:"expected_final_content"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatalf("parse shared agent fixture: %v", err)
+	}
+
+	model := llmsdktest.NewMockLanguageModel()
+	for _, response := range fixture.ModelResponses {
+		model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(response))
+	}
+	direct := NewMockTool[struct{}]("direct", llmagent.AgentToolResult{}, nil)
+	lookup := NewMockTool[struct{}]("lookup", llmagent.AgentToolResult{
+		Content: []llmsdk.Part{llmsdk.NewTextPart(fixture.FunctionResult)},
+	}, nil)
+	agent := llmagent.NewAgent("test_agent", model, llmagent.WithTools[struct{}](
+		llmagent.NewAgentFunctionTool[struct{}](direct),
+		llmagent.NewAgentFunctionTool[struct{}](lookup).WithDeferLoading(true),
+		llmagent.NewAgentToolSearchTool[struct{}](llmsdk.ToolSearchTool{}),
+	))
+	response, err := agent.Run(t.Context(), llmagent.AgentRequest[struct{}]{
+		Context: struct{}{},
+		Input: []llmagent.AgentItem{
+			llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart(fixture.Prompt))),
+		},
+	})
+	if err != nil {
+		t.Fatalf("run agent: %v", err)
+	}
+
+	if diff := cmp.Diff(fixture.ExpectedFinalContent, response.Content); diff != "" {
+		t.Errorf("final content mismatch (-want +got):\n%s", diff)
+	}
+	if len(lookup.AllCalls) != 1 {
+		t.Errorf("expected one lookup call, got %d", len(lookup.AllCalls))
+	} else {
+		var actualArgs, expectedArgs map[string]any
+		if err := json.Unmarshal(lookup.AllCalls[0], &actualArgs); err != nil {
+			t.Fatalf("parse lookup arguments: %v", err)
+		}
+		if err := json.Unmarshal(fixture.ExpectedFunctionArgs, &expectedArgs); err != nil {
+			t.Fatalf("parse expected arguments: %v", err)
+		}
+		if diff := cmp.Diff(expectedArgs, actualArgs); diff != "" {
+			t.Errorf("lookup arguments mismatch (-want +got):\n%s", diff)
+		}
+	}
+	if len(direct.AllCalls) != 0 {
+		t.Errorf("direct function was called: %q", direct.AllCalls)
+	}
+	inputs := model.TrackedGenerateInputs()
+	if len(inputs) != 2 {
+		t.Fatalf("expected two model calls, got %d", len(inputs))
+	}
+	for _, input := range inputs {
+		if diff := cmp.Diff(fixture.ExpectedTools, input.Tools); diff != "" {
+			t.Errorf("model tools mismatch (-want +got):\n%s", diff)
+		}
+	}
+	if len(inputs[1].Messages) == 0 {
+		t.Fatal("second model input lacks messages")
+	}
+	if diff := cmp.Diff(fixture.ExpectedToolMessage, inputs[1].Messages[len(inputs[1].Messages)-1]); diff != "" {
+		t.Errorf("tool result mismatch (-want +got):\n%s", diff)
 	}
 }
 

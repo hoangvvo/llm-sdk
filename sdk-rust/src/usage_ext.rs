@@ -1,22 +1,11 @@
 use crate::{LanguageModelPricing, ModelServerToolUsage, ModelTokensDetails, ModelUsage};
 
-/// Counting conventions needed to price unmodified provider usage.
-pub struct ModelUsageCostOptions {
-    /// True when `input_tokens` excludes cache reads and writes.
-    pub input_cache_tokens_are_additional: bool,
-    /// True when `output_tokens` excludes reasoning tokens.
-    pub output_reasoning_tokens_are_additional: bool,
-}
-
 impl ModelUsage {
-    /// Estimates USD charges using the provider's counting conventions.
+    /// Estimates USD charges. Cache reads, cache writes and reasoning tokens
+    /// are priced as subsets of `input_tokens` and `output_tokens`.
     #[allow(clippy::too_many_lines)]
     #[must_use]
-    pub fn calculate_cost(
-        &self,
-        pricing: &LanguageModelPricing,
-        options: &ModelUsageCostOptions,
-    ) -> f64 {
+    pub fn calculate_cost(&self, pricing: &LanguageModelPricing) -> f64 {
         let max_price =
             |prices: &[Option<f64>]| prices.iter().flatten().copied().fold(0.0_f64, f64::max);
         let has_modality_breakdown = |details: Option<&ModelTokensDetails>| {
@@ -73,27 +62,19 @@ impl ModelUsage {
                 details.cached_tokens.unwrap_or(0)
             }
         });
-        let included_cache_tokens = if options.input_cache_tokens_are_additional {
-            0
-        } else {
-            cached_read_tokens.saturating_add(
-                input_details
-                    .and_then(|details| details.cache_write_tokens)
-                    .unwrap_or(0),
-            )
-        };
+        let cache_tokens = cached_read_tokens.saturating_add(
+            input_details
+                .and_then(|details| details.cache_write_tokens)
+                .unwrap_or(0),
+        );
         let input_tokens = self
             .input_tokens
             .max(modality_total(input_details))
-            .max(included_cache_tokens);
+            .max(cache_tokens);
         let output_detail_tokens = modality_total(output_details).saturating_add(
-            if options.output_reasoning_tokens_are_additional {
-                0
-            } else {
-                output_details
-                    .and_then(|details| details.reasoning_tokens)
-                    .unwrap_or(0)
-            },
+            output_details
+                .and_then(|details| details.reasoning_tokens)
+                .unwrap_or(0),
         );
         let output_tokens = self.output_tokens.max(output_detail_tokens);
 
@@ -147,14 +128,12 @@ impl ModelUsage {
             );
         }
 
-        let (cache_base_text, cache_base_audio, cache_base_image) =
-            if options.input_cache_tokens_are_additional {
-                (0.0, 0.0, 0.0)
-            } else if input_has_modality_breakdown {
-                (input_text_price, input_audio_price, input_image_price)
-            } else {
-                (input_base_price, input_base_price, input_base_price)
-            };
+        let (cache_base_text, cache_base_audio, cache_base_image) = if input_has_modality_breakdown
+        {
+            (input_text_price, input_audio_price, input_image_price)
+        } else {
+            (input_base_price, input_base_price, input_base_price)
+        };
         if let Some(details) = input_details {
             if has_cached_modalities {
                 let cached_text_price = pricing
@@ -225,15 +204,11 @@ impl ModelUsage {
         }
 
         if let Some(details) = output_details {
-            if options.output_reasoning_tokens_are_additional {
-                output_cost += f64::from(details.reasoning_tokens.unwrap_or(0)) * output_text_price;
-            } else {
-                output_cost += adjustment(
-                    details.reasoning_tokens.unwrap_or(0),
-                    output_base_price,
-                    output_text_price,
-                );
-            }
+            output_cost += adjustment(
+                details.reasoning_tokens.unwrap_or(0),
+                output_base_price,
+                output_text_price,
+            );
         }
 
         if let Some(long_context) = &pricing.long_context {

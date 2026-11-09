@@ -88,10 +88,7 @@ export class MistralModel implements LanguageModel {
     const usage = mapMistralUsageInfo(response.usage);
     result.usage = usage;
     if (this.metadata?.pricing) {
-      result.cost = calculateCost(usage, this.metadata.pricing, {
-        input_cache_tokens_are_additional: false,
-        output_reasoning_tokens_are_additional: false,
-      });
+      result.cost = calculateCost(usage, this.metadata.pricing);
     }
 
     return result;
@@ -138,10 +135,7 @@ export class MistralModel implements LanguageModel {
     if (streamUsage) {
       const event: PartialModelResponse = { usage: streamUsage };
       if (this.metadata?.pricing) {
-        event.cost = calculateCost(streamUsage, this.metadata.pricing, {
-          input_cache_tokens_are_additional: false,
-          output_reasoning_tokens_are_additional: false,
-        });
+        event.cost = calculateCost(streamUsage, this.metadata.pricing);
       }
       yield event;
     }

@@ -12,7 +12,6 @@ export {
 export * from "./types.ts";
 export {
   calculateCost,
-  type ModelUsageCostOptions,
   mergeModelUsageMax,
   sumModelServerToolUsage,
   sumModelTokensDetails,

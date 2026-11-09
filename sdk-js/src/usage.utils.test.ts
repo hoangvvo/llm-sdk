@@ -2,17 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { LanguageModelPricing, ModelUsage } from "./types.ts";
-import {
-  calculateCost,
-  mergeModelUsageMax,
-  type ModelUsageCostOptions,
-} from "./usage.utils.ts";
+import { calculateCost, mergeModelUsageMax } from "./usage.utils.ts";
 
 interface UsageCostCase {
   name: string;
   usage: ModelUsage;
   pricing: LanguageModelPricing;
-  options: ModelUsageCostOptions;
   expected_cost: number;
 }
 
@@ -25,11 +20,7 @@ const suite = JSON.parse(
 
 for (const testCase of suite.test_cases) {
   test(`calculateCost: ${testCase.name}`, () => {
-    const actual = calculateCost(
-      testCase.usage,
-      testCase.pricing,
-      testCase.options,
-    );
+    const actual = calculateCost(testCase.usage, testCase.pricing);
     const tolerance = Math.max(1e-12, Math.abs(testCase.expected_cost) * 1e-12);
     assert.ok(
       Math.abs(actual - testCase.expected_cost) <= tolerance,

@@ -96,16 +96,9 @@ func SumModelServerToolUsage(usages []ModelServerToolUsage) *ModelServerToolUsag
 	return result
 }
 
-// ModelUsageCostOptions specifies counting conventions for unmodified provider usage.
-type ModelUsageCostOptions struct {
-	// True when InputTokens excludes cache reads and writes.
-	InputCacheTokensAreAdditional bool
-	// True when OutputTokens excludes reasoning tokens.
-	OutputReasoningTokensAreAdditional bool
-}
-
-// CalculateCost estimates USD charges using the provider's counting conventions.
-func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options ModelUsageCostOptions) float64 {
+// CalculateCost estimates USD charges. Cache reads, cache writes and reasoning
+// tokens are priced as subsets of InputTokens and OutputTokens.
+func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing) float64 {
 	if pricing == nil {
 		return 0
 	}
@@ -170,16 +163,13 @@ func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options Mo
 			cachedReadTokens = value(inputDetails.CachedTokens)
 		}
 	}
-	includedCacheTokens := 0
-	if !options.InputCacheTokensAreAdditional {
-		includedCacheTokens = cachedReadTokens
-		if inputDetails != nil {
-			includedCacheTokens += value(inputDetails.CacheWriteTokens)
-		}
+	cacheTokens := cachedReadTokens
+	if inputDetails != nil {
+		cacheTokens += value(inputDetails.CacheWriteTokens)
 	}
-	inputTokens := maxInt(usage.InputTokens, modalityTotal(inputDetails), includedCacheTokens)
+	inputTokens := maxInt(usage.InputTokens, modalityTotal(inputDetails), cacheTokens)
 	outputDetailTokens := modalityTotal(outputDetails)
-	if !options.OutputReasoningTokensAreAdditional && outputDetails != nil {
+	if outputDetails != nil {
 		outputDetailTokens += value(outputDetails.ReasoningTokens)
 	}
 	outputTokens := maxInt(usage.OutputTokens, outputDetailTokens)
@@ -226,12 +216,9 @@ func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options Mo
 		outputCost += adjustment(value(outputDetails.ImageTokens), outputBasePrice, outputImagePrice)
 	}
 
-	cacheBaseText, cacheBaseAudio, cacheBaseImage := 0.0, 0.0, 0.0
-	if !options.InputCacheTokensAreAdditional {
-		cacheBaseText, cacheBaseAudio, cacheBaseImage = inputBasePrice, inputBasePrice, inputBasePrice
-		if inputHasModalityBreakdown {
-			cacheBaseText, cacheBaseAudio, cacheBaseImage = inputTextPrice, inputAudioPrice, inputImagePrice
-		}
+	cacheBaseText, cacheBaseAudio, cacheBaseImage := inputBasePrice, inputBasePrice, inputBasePrice
+	if inputHasModalityBreakdown {
+		cacheBaseText, cacheBaseAudio, cacheBaseImage = inputTextPrice, inputAudioPrice, inputImagePrice
 	}
 	if inputDetails != nil {
 		if hasCachedModalities {
@@ -285,11 +272,7 @@ func (usage *ModelUsage) CalculateCost(pricing *LanguageModelPricing, options Mo
 	}
 
 	if outputDetails != nil {
-		if options.OutputReasoningTokensAreAdditional {
-			outputCost += float64(value(outputDetails.ReasoningTokens)) * outputTextPrice
-		} else {
-			outputCost += adjustment(value(outputDetails.ReasoningTokens), outputBasePrice, outputTextPrice)
-		}
+		outputCost += adjustment(value(outputDetails.ReasoningTokens), outputBasePrice, outputTextPrice)
 	}
 
 	if longContext := pricing.LongContext; longContext != nil && inputTokens > longContext.ThresholdTokens {

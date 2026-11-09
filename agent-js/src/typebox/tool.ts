@@ -17,6 +17,10 @@ export function typeboxTool<TContext, TSchema extends TObject>(params: {
    */
   parameters: TSchema;
   /**
+   * Hide the function until a hosted tool search discovers it.
+   */
+  defer_loading?: boolean;
+  /**
    * The function that will be called to execute the tool with given parameters and context.
    *
    * If the tool throws an error, the agent will be interrupted and the error will be propagated.

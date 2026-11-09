@@ -102,10 +102,7 @@ export class OpenAIChatModel implements LanguageModel {
     if (response.usage) {
       result.usage = mapOpenAIUsage(response.usage);
       if (this.metadata?.pricing) {
-        result.cost = calculateCost(result.usage, this.metadata.pricing, {
-          input_cache_tokens_are_additional: false,
-          output_reasoning_tokens_are_additional: false,
-        });
+        result.cost = calculateCost(result.usage, this.metadata.pricing);
       }
     }
 
@@ -157,10 +154,7 @@ export class OpenAIChatModel implements LanguageModel {
         const usage = mapOpenAIUsage(chunk.usage);
         const event: PartialModelResponse = { usage };
         if (this.metadata?.pricing) {
-          event.cost = calculateCost(usage, this.metadata.pricing, {
-            input_cache_tokens_are_additional: false,
-            output_reasoning_tokens_are_additional: false,
-          });
+          event.cost = calculateCost(usage, this.metadata.pricing);
         }
         yield event;
       }

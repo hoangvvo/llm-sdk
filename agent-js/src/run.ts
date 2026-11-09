@@ -284,10 +284,6 @@ export class RunSession<TContext> {
       }
     }
 
-    if (!content.length) {
-      throw new AgentInvariantError("No content in the assistant message.");
-    }
-
     const allToolCallParts = content.filter(
       (part) => part.type === "tool-call",
     );
@@ -711,6 +707,7 @@ export class RunSession<TContext> {
                 name: tool.name,
                 description: tool.description,
                 parameters: tool.parameters,
+                ...(tool.defer_loading ? { defer_loading: true } : {}),
               }
             : tool,
         );

@@ -1226,7 +1226,7 @@ func (t *Tool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ModelTokensDetails preserves provider counts; details may be additional to totals.
+// ModelTokensDetails is a breakdown of InputTokens or OutputTokens. Every count is a subset of that total.
 type ModelTokensDetails struct {
 	TextTokens        *int `json:"text_tokens,omitempty"`
 	CachedTextTokens  *int `json:"cached_text_tokens,omitempty"`
@@ -1234,13 +1234,13 @@ type ModelTokensDetails struct {
 	CachedAudioTokens *int `json:"cached_audio_tokens,omitempty"`
 	ImageTokens       *int `json:"image_tokens,omitempty"`
 	CachedImageTokens *int `json:"cached_image_tokens,omitempty"`
-	// Cache reads, billed at the cached-input rate.
+	// The subset of InputTokens read from the prompt cache.
 	CachedTokens *int `json:"cached_tokens,omitempty"`
-	// Cache writes, billed separately from cache reads.
+	// The subset of InputTokens written to the prompt cache.
 	CacheWriteTokens *int `json:"cache_write_tokens,omitempty"`
 	// The subset of CacheWriteTokens stored with extended retention (see CacheRetention), which some providers bill at a higher rate.
 	ExtendedCacheWriteTokens *int `json:"extended_cache_write_tokens,omitempty"`
-	// The tokens spent on reasoning.
+	// The subset of OutputTokens spent on reasoning.
 	ReasoningTokens *int `json:"reasoning_tokens,omitempty"`
 }
 
@@ -1249,11 +1249,11 @@ type ModelServerToolUsage struct {
 	WebSearchRequests *int `json:"web_search_requests,omitempty"`
 }
 
-// ModelUsage represents the token usage of the model.
+// ModelUsage represents the token usage of the model, normalized to the same meaning for every provider: totals include their cache and reasoning subsets.
 type ModelUsage struct {
-	// Provider-reported input tokens; see ModelUsageCostOptions for cache accounting.
+	// The total input tokens, including cache reads (CachedTokens) and cache writes (CacheWriteTokens) on every provider. Uncached input is InputTokens - CachedTokens - CacheWriteTokens.
 	InputTokens int `json:"input_tokens"`
-	// Provider-reported output tokens; see ModelUsageCostOptions for reasoning accounting.
+	// The total output tokens, including ReasoningTokens on every provider.
 	OutputTokens        int                   `json:"output_tokens"`
 	InputTokensDetails  *ModelTokensDetails   `json:"input_tokens_details,omitempty"`
 	OutputTokensDetails *ModelTokensDetails   `json:"output_tokens_details,omitempty"`

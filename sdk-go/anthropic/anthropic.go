@@ -122,7 +122,7 @@ func (m *AnthropicModel) Generate(ctx context.Context, input *llmsdk.LanguageMod
 		}
 
 		if m.metadata != nil && m.metadata.Pricing != nil {
-			cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true, OutputReasoningTokensAreAdditional: false})
+			cost := usage.CalculateCost(m.metadata.Pricing)
 			result.Cost = &cost
 		}
 
@@ -304,7 +304,7 @@ func (m *AnthropicModel) Stream(ctx context.Context, input *llmsdk.LanguageModel
 				}
 				partial := &llmsdk.PartialModelResponse{Usage: usage}
 				if m.metadata != nil && m.metadata.Pricing != nil {
-					cost := usage.CalculateCost(m.metadata.Pricing, llmsdk.ModelUsageCostOptions{InputCacheTokensAreAdditional: true, OutputReasoningTokensAreAdditional: false})
+					cost := usage.CalculateCost(m.metadata.Pricing)
 					partial.Cost = &cost
 				}
 				if !stream.Send(ctx, responseCh, partial) {
@@ -1169,8 +1169,9 @@ func mergeAnthropicMessageDeltaUsage(result *anthropicUsage, usage anthropicapi.
 	}
 }
 
-// mapAnthropicUsage maps the raw usage to the SDK usage. Totals stay as
-// Anthropic reports them: input_tokens excludes cached and cache-write tokens.
+// mapAnthropicUsage maps the raw usage to the SDK usage. Anthropic reports
+// input_tokens without the cache reads and writes, so they are added back to
+// match the inclusive ModelUsage.InputTokens.
 func mapAnthropicUsage(usage anthropicUsage) *llmsdk.ModelUsage {
 	value := func(value *int) int {
 		if value == nil {
@@ -1179,7 +1180,7 @@ func mapAnthropicUsage(usage anthropicUsage) *llmsdk.ModelUsage {
 		return *value
 	}
 	result := &llmsdk.ModelUsage{
-		InputTokens:  value(usage.InputTokens),
+		InputTokens:  value(usage.InputTokens) + value(usage.CacheReadInputTokens) + value(usage.CacheCreationInputTokens),
 		OutputTokens: value(usage.OutputTokens),
 	}
 	inputDetails := &llmsdk.ModelTokensDetails{}

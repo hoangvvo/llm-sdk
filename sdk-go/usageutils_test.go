@@ -15,13 +15,7 @@ type usageCostCase struct {
 	Name         string                      `json:"name"`
 	Usage        llmsdk.ModelUsage           `json:"usage"`
 	Pricing      llmsdk.LanguageModelPricing `json:"pricing"`
-	Options      usageCostCaseOptions        `json:"options"`
 	ExpectedCost float64                     `json:"expected_cost"`
-}
-
-type usageCostCaseOptions struct {
-	InputCacheTokensAreAdditional      bool `json:"input_cache_tokens_are_additional"`
-	OutputReasoningTokensAreAdditional bool `json:"output_reasoning_tokens_are_additional"`
 }
 
 func TestSharedUsageCostCases(t *testing.T) {
@@ -42,10 +36,7 @@ func TestSharedUsageCostCases(t *testing.T) {
 
 	for _, testCase := range suite.TestCases {
 		t.Run(testCase.Name, func(t *testing.T) {
-			actual := testCase.Usage.CalculateCost(&testCase.Pricing, llmsdk.ModelUsageCostOptions{
-				InputCacheTokensAreAdditional:      testCase.Options.InputCacheTokensAreAdditional,
-				OutputReasoningTokensAreAdditional: testCase.Options.OutputReasoningTokensAreAdditional,
-			})
+			actual := testCase.Usage.CalculateCost(&testCase.Pricing)
 			tolerance := math.Max(1e-12, math.Abs(testCase.ExpectedCost)*1e-12)
 			if math.Abs(actual-testCase.ExpectedCost) > tolerance {
 				t.Fatalf("cost = %v, want %v", actual, testCase.ExpectedCost)
