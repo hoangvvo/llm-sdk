@@ -162,6 +162,116 @@ func mustNewRunSession[C any](t *testing.T, params *llmagent.AgentParams[C], con
 	return session
 }
 
+func TestRun_CompletesSilentResponses(t *testing.T) {
+	for _, mode := range []string{"generate", "empty stream", "usage-only stream"} {
+		for _, withTools := range []bool{false, true} {
+			name := "without tools"
+			if withTools {
+				name = "after a tool action"
+			}
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				model := llmsdktest.NewMockLanguageModel()
+				tool := NewMockTool[struct{}]("react", llmagent.AgentToolResult{
+					Content: []llmsdk.Part{llmsdk.NewTextPart("Reaction added")},
+				}, nil)
+				var usage *llmsdk.ModelUsage
+				if mode == "usage-only stream" {
+					usage = &llmsdk.ModelUsage{InputTokens: 2}
+				}
+				if mode == "generate" {
+					if withTools {
+						model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{
+							Content: []llmsdk.Part{llmsdk.NewToolCallPart("reaction_1", "react", map[string]any{"emoji": "thumbs_up"})},
+						}))
+					}
+					model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(llmsdk.ModelResponse{}))
+				} else {
+					if withTools {
+						model.EnqueueStreamResult(llmsdktest.NewMockStreamResultPartials([]llmsdk.PartialModelResponse{
+							{Delta: &llmsdk.ContentDelta{Index: 0, Part: llmsdk.NewToolCallPartDelta(
+								llmsdk.WithToolCallPartDeltaToolCallID("reaction_1"),
+								llmsdk.WithToolCallPartDeltaToolName("react"),
+								llmsdk.WithToolCallPartDeltaArgs(`{"emoji":"thumbs_up"}`),
+							)}},
+						}))
+					}
+					var partials []llmsdk.PartialModelResponse
+					if usage != nil {
+						partials = []llmsdk.PartialModelResponse{{Usage: usage}}
+					}
+					model.EnqueueStreamResult(llmsdktest.NewMockStreamResultPartials(partials))
+				}
+				params := &llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10}
+				if withTools {
+					params.Tools = llmagent.FunctionTools[struct{}](tool)
+				}
+				session := mustNewRunSession(t, params, struct{}{})
+				t.Cleanup(func() {
+					if err := session.Close(context.Background()); err != nil {
+						t.Errorf("close session: %v", err)
+					}
+				})
+				request := llmagent.RunSessionRequest{Input: []llmagent.AgentItem{
+					llmagent.NewAgentItemMessage(llmsdk.NewUserMessage(llmsdk.NewTextPart("No reply needed"))),
+				}}
+				var response *llmagent.AgentResponse
+				inputs := 0
+				if mode == "generate" {
+					var err error
+					response, err = session.Run(t.Context(), request)
+					if err != nil {
+						t.Fatal(err)
+					}
+					inputs = len(model.TrackedGenerateInputs())
+				} else {
+					stream, err := session.RunStream(t.Context(), request)
+					if err != nil {
+						t.Fatal(err)
+					}
+					responses := 0
+					for stream.Next() {
+						if event := stream.Current(); event.Response != nil {
+							response = event.Response
+							responses++
+						}
+					}
+					if err := stream.Err(); err != nil {
+						t.Fatal(err)
+					}
+					if responses != 1 {
+						t.Fatalf("expected one completed response, got %d", responses)
+					}
+					inputs = len(model.TrackedStreamInputs())
+				}
+				if response == nil || response.Status != llmagent.AgentResponseStatusCompleted || len(response.Content) != 0 {
+					t.Fatalf("expected a completed silent response, got %#v", response)
+				}
+				wantOutput, wantCalls, wantInputs := 1, 0, 1
+				if withTools {
+					wantOutput, wantCalls, wantInputs = 3, 1, 2
+				}
+				if len(response.Output) != wantOutput || len(tool.AllCalls) != wantCalls || inputs != wantInputs {
+					t.Fatalf("unexpected output/model/tool counts: %d/%d/%d", len(response.Output), inputs, len(tool.AllCalls))
+				}
+				finalModel := response.Output[len(response.Output)-1].Model
+				if finalModel == nil || len(finalModel.Content) != 0 || !cmp.Equal(finalModel.Usage, usage) {
+					t.Fatalf("empty model response or usage lost: %#v", finalModel)
+				}
+				if withTools {
+					var args map[string]any
+					if err := json.Unmarshal(tool.AllCalls[0], &args); err != nil {
+						t.Fatal(err)
+					}
+					result := response.Output[1].Tool
+					if !cmp.Equal(args, map[string]any{"emoji": "thumbs_up"}) || result == nil || result.Status != llmsdk.ToolResultStatusCompleted || !cmp.Equal(result.Output, []llmsdk.Part{llmsdk.NewTextPart("Reaction added")}) {
+						t.Fatalf("tool action or result lost: args=%v result=%#v", args, result)
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestRun_RejectsEmptyInputWithoutCallingModel(t *testing.T) {
 	model := llmsdktest.NewMockLanguageModel()
 	session := mustNewRunSession(

@@ -522,81 +522,119 @@ async fn run_rejects_empty_input_without_calling_model() {
 
 #[tokio::test]
 async fn complete_silent_turns_with_and_without_tools() -> Result<(), DynError> {
-    let tool = MockTool::new(
-        "react",
-        AgentToolResult {
-            content: vec![Part::text("Reaction added")],
-            is_error: false,
-        },
-    );
-    let model = Arc::new(MockLanguageModel::new());
-    model.enqueue_stream(vec![PartialModelResponse {
-        delta: Some(ContentDelta {
-            index: 0,
-            part: PartDelta::ToolCall(
-                ToolCallPartDelta::default()
-                    .with_tool_call_id("reaction_1")
-                    .with_tool_name("react")
-                    .with_args(r#"{"emoji":"thumbs_up"}"#),
-            ),
-        }),
-        ..Default::default()
-    }]);
-    model.enqueue_stream(vec![PartialModelResponse {
-        usage: Some(ModelUsage::default()),
-        ..Default::default()
-    }]);
-    let session = Arc::new(
-        RunSession::new(
-            Arc::new(AgentParams::new("test_agent", model.clone()).add_tool(tool.clone())),
-            (),
-        )
-        .await?,
-    );
-    let events = session
-        .run_stream(
-            RunSessionRequest {
+    for (streaming, usage_only) in [(false, false), (true, false), (true, true)] {
+        for with_tools in [false, true] {
+            let tool = MockTool::new(
+                "react",
+                AgentToolResult {
+                    content: vec![Part::text("Reaction added")],
+                    is_error: false,
+                },
+            );
+            let model = Arc::new(MockLanguageModel::new());
+            let usage = usage_only.then_some(ModelUsage {
+                input_tokens: 2,
+                ..Default::default()
+            });
+            if streaming {
+                if with_tools {
+                    model.enqueue_stream(vec![PartialModelResponse {
+                        delta: Some(ContentDelta {
+                            index: 0,
+                            part: PartDelta::ToolCall(
+                                ToolCallPartDelta::default()
+                                    .with_tool_call_id("reaction_1")
+                                    .with_tool_name("react")
+                                    .with_args(r#"{"emoji":"thumbs_up"}"#),
+                            ),
+                        }),
+                        ..Default::default()
+                    }]);
+                }
+                model.enqueue_stream(if usage_only {
+                    vec![PartialModelResponse {
+                        usage: usage.clone(),
+                        ..Default::default()
+                    }]
+                } else {
+                    vec![]
+                });
+            } else {
+                if with_tools {
+                    model.enqueue_generate(ModelResponse {
+                        content: vec![Part::tool_call(
+                            "reaction_1",
+                            "react",
+                            json!({"emoji": "thumbs_up"}),
+                        )],
+                        ..Default::default()
+                    });
+                }
+                model.enqueue_generate(ModelResponse::default());
+            }
+            let mut params = AgentParams::new("test_agent", model.clone());
+            if with_tools {
+                params = params.add_tool(tool.clone());
+            }
+            let session = new_run_session(Arc::new(params), ()).await;
+            let request = RunSessionRequest {
                 input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                    "React with a thumbs-up",
+                    "No reply needed",
                 )]))],
-            },
-            RunOptions::default(),
-        )?
-        .try_collect::<Vec<_>>()
-        .await?;
-    let response = events
-        .into_iter()
-        .find_map(|event| match event {
-            AgentStreamEvent::Response(response) => Some(response),
-            _ => None,
-        })
-        .ok_or("stream omitted its completed response")?;
-    assert_eq!(response.status, AgentResponseStatus::Completed);
-    assert!(response.content.is_empty());
-    assert_eq!(tool.recorded_calls(), vec![json!({"emoji": "thumbs_up"})]);
-    assert!(response.output.iter().any(|item| matches!(item,
-        AgentItem::Tool(result) if result.status == ToolResultStatus::Completed
-            && result.output == vec![Part::text("Reaction added")]
-    )));
-
-    model.enqueue_generate(ModelResponse::default());
-    let response = session
-        .run(
-            RunSessionRequest {
-                input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                    "No response needed",
-                )]))],
-            },
-            RunOptions::default(),
-        )
-        .await?;
-    assert_eq!(response.status, AgentResponseStatus::Completed);
-    assert!(response.content.is_empty());
-    assert_eq!(tool.recorded_calls(), vec![json!({"emoji": "thumbs_up"})]);
-    Arc::try_unwrap(session)
-        .map_err(|_| "run retained the session after completion")?
-        .close()
-        .await?;
+            };
+            let response = if streaming {
+                let events = session
+                    .run_stream(request, RunOptions::default())?
+                    .try_collect::<Vec<_>>()
+                    .await?;
+                let mut responses = events.into_iter().filter_map(|event| match event {
+                    AgentStreamEvent::Response(response) => Some(response),
+                    _ => None,
+                });
+                let response = responses
+                    .next()
+                    .ok_or("stream omitted its completed response")?;
+                assert!(
+                    responses.next().is_none(),
+                    "stream completed more than once"
+                );
+                response
+            } else {
+                session.run(request, RunOptions::default()).await?
+            };
+            assert_eq!(response.status, AgentResponseStatus::Completed);
+            assert!(response.content.is_empty());
+            assert_eq!(response.output.len(), if with_tools { 3 } else { 1 });
+            match response.output.last() {
+                Some(AgentItem::Model(final_model)) => {
+                    assert!(final_model.content.is_empty());
+                    assert_eq!(final_model.usage, usage);
+                }
+                _ => panic!("empty model response was not recorded"),
+            }
+            assert_eq!(
+                tool.recorded_calls(),
+                if with_tools {
+                    vec![json!({"emoji": "thumbs_up"})]
+                } else {
+                    vec![]
+                },
+            );
+            if with_tools {
+                assert!(matches!(&response.output[1],
+                    AgentItem::Tool(result) if result.status == ToolResultStatus::Completed
+                        && result.output == vec![Part::text("Reaction added")]
+                ));
+            }
+            let inputs = if streaming {
+                model.tracked_stream_inputs()
+            } else {
+                model.tracked_generate_inputs()
+            };
+            assert_eq!(inputs.len(), if with_tools { 2 } else { 1 });
+            close_run_session(session).await;
+        }
+    }
     Ok(())
 }
 
