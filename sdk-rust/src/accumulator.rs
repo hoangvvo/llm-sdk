@@ -56,12 +56,9 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             signature: text_delta.signature,
             citations: text_delta
                 .citation
-                .map(|citation| {
-                    let mut map = BTreeMap::new();
-                    map.insert(0, citation);
-                    map
-                })
-                .unwrap_or_default(),
+                .into_iter()
+                .map(|citation| (0, citation))
+                .collect(),
         }),
         PartDelta::ToolCall(tool_delta) => AccumulatedData::ToolCall(tool_delta),
         PartDelta::ToolResult(result_delta) => AccumulatedData::ToolResult(result_delta),
@@ -73,7 +70,7 @@ fn initialize_accumulated_data(delta: ContentDelta) -> AccumulatedData {
             id: image_delta.id,
         }),
         PartDelta::Audio(audio_delta) => AccumulatedData::Audio(AccumulatedAudioData {
-            data_chunks: audio_delta.data.map(|data| vec![data]).unwrap_or_default(),
+            data_chunks: audio_delta.data.into_iter().collect(),
             format: audio_delta.format,
             sample_rate: audio_delta.sample_rate,
             channels: audio_delta.channels,
