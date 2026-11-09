@@ -151,7 +151,7 @@ The `RunState` created per run (not exported directly) stitches these items toge
   </TabItem>
 </Tabs>
 
-The `content` field is what you typically show to the user; `output` is the full list of items generated during the run and is the piece you should append to the next request's `input` when continuing the conversation. The `status` field distinguishes a completed run from a cancelled one.
+The `content` field is what you typically show to the user; `output` is the full list of items generated during the run and is the piece you should append to the next request's `input` when continuing the conversation. The `status` field distinguishes a completed run from a cancelled one. A completed response may have empty `content`, including after a tool action that needs no reply. Preserve its `output` items even when there is nothing to display; an empty response does not mean the run failed.
 
 ```mermaid
 flowchart TD

@@ -143,6 +143,7 @@ go run ./examples/generate-text
 
 ### To 0.4.0
 
+- Token usage is normalized across providers: input totals include cache reads and cache writes, and output totals include reasoning tokens. Update cost calculations that previously added these subsets to the totals.
 - Use `NewImagePartFromURL`, `NewAudioPartFromURL`, and `NewFilePartFromURL` instead of the `With…URL` options.
 - Rename `AudioOptions.LanguageCode` to `Language`.
 - Replace `Tool{Name, Description, Parameters}` literals with `NewFunctionTool(...)`.

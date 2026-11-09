@@ -9,6 +9,8 @@ cargo add llm-sdk-rs --features openai
 cargo add rustls --no-default-features --features ring,std,tls12
 ```
 
+Provider modules are enabled with the `openai`, `anthropic`, and `google` Cargo features. The default `tls-ring` feature selects the Ring dependency; use `--no-default-features --features openai,tls-aws-lc` to choose AWS-LC instead.
+
 Applications using the default HTTP client select the process-wide Rustls provider once at
 startup. A custom `reqwest::Client` supplied through model options owns its own TLS setup.
 
@@ -46,13 +48,14 @@ Below is an example to generate text:
 use dotenvy::dotenv;
 use llm_sdk::{LanguageModelInput, Message, Part};
 
-mod common;
-
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Rustls provider already selected");
 
-    let model = common::get_model("openai", "gpt-5.6-terra");
+    let model = get_model("gpt-5.6-terra");
 
     let response = model
         .generate(LanguageModelInput {
@@ -94,8 +97,8 @@ Find examples in the [examples](./examples/) folder to learn how to:
 - [`structured-output`: Structured output](./examples/structured-output.rs)
 - [`generate-reasoning`: Reasoning](./examples/generate-reasoning.rs)
 - [`stream-reasoning`: Stream reasoning](./examples/stream-reasoning.rs)
-- [`generate-citations`: Generate citations](./examples/generate-citations.rs)
-- [`stream-citations`: Stream citations](./examples/stream-citations.rs)
+- [`generate-citations`: Generate citations](./examples/generate_citations.rs)
+- [`stream-citations`: Stream citations](./examples/stream_citations.rs)
 
 ```bash
 cargo run --example generate-text --features examples,openai
@@ -105,6 +108,8 @@ cargo run --example generate-text --features examples,openai
 
 ### To 0.4.0
 
+- Enable the Cargo features for the providers you import (`openai`, `anthropic`, or `google`) and select a Rustls crypto provider at application startup.
+- Token usage is normalized across providers: input totals include cache reads and cache writes, and output totals include reasoning tokens. Update cost calculations that previously added these subsets to the totals.
 - Use `from_data` or `from_url` instead of `new` for `ImagePart`, `AudioPart`, and `FilePart`.
 - Wrap inline `ImagePart.data` and `AudioPart.data` in `Some(...)`; handle `None` for URL-only media. Set `url: None` in inline media literals.
 - Update exhaustive matches: `Part` adds `File`; `Tool`, `ToolCall`, `ToolResult`, and `ToolCallDelta` add `ToolSearch`.

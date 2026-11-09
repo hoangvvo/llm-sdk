@@ -8,10 +8,10 @@ The agent library to build LLM applications that work with any LLM providers.
 npm install @hoangvvo/llm-agent
 ```
 
-To use [zod](https://github.com/colinhacks/zod) or [typebox](https://github.com/sinclairzx81/typebox) for tool definition, install the following packages:
+These integrations are optional peer dependencies. To use [zod](https://github.com/colinhacks/zod) or [typebox](https://github.com/sinclairzx81/typebox) for tool definition, install the following packages:
 
 ```bash
-npm install zod zod-to-json-schema
+npm install zod@^3.25.76 zod-to-json-schema
 npm install typebox
 ```
 
@@ -22,6 +22,8 @@ npm install @modelcontextprotocol/sdk
 ```
 
 ## Usage
+
+A completed run can have empty `content`, including after a tool action that needs no reply. Check the response status and keep its output items when continuing the conversation.
 
 ```typescript
 import { Agent, tool, type AgentItem } from "@hoangvvo/llm-agent";
@@ -65,7 +67,7 @@ const getTimeTool = tool({
 });
 
 // Create an agent tool using zod with type inference
-// npm install zod zod-to-json-schema
+// npm install zod@^3.25.76 zod-to-json-schema
 const sendMessageTool = zodTool({
   name: "send_message",
   description: "Send a text message",
@@ -201,6 +203,7 @@ Find examples in the [examples](./examples/) folder:
 - [`memory`: Memory pattern (core + archival)](./examples/memory.ts)
 - [`planner-executor`: Plan TODOs and execute](./examples/planner-executor.ts)
 - [`require-approval`: Human-in-the-loop approval](./examples/require-approval.ts)
+- [`cancellation`: Cancel model turns and tool execution](./examples/cancellation.ts)
 
 ```bash
 node examples/agent.ts

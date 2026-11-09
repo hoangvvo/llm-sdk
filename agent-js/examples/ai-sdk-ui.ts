@@ -738,12 +738,15 @@ class DataStreamProtocolAdapter {
   }
 
   #writeForToolCallPartDelta(index: number, part: ToolCallPartDelta): void {
+    const call = part.call;
+    if (call && call.type !== "function") return;
+
     let existingToolCallState = this.#toolCallStateMap.get(index);
     if (!existingToolCallState) {
       this.#flushStates();
       existingToolCallState = {
         toolCallId: part.tool_call_id ?? "",
-        toolName: part.tool_name ?? "",
+        toolName: call?.name ?? "",
         argsBuffer: "",
         didEmitStart: false,
       };
@@ -753,7 +756,7 @@ class DataStreamProtocolAdapter {
     existingToolCallState.toolCallId =
       part.tool_call_id ?? existingToolCallState.toolCallId;
     existingToolCallState.toolName =
-      part.tool_name ?? existingToolCallState.toolName;
+      call?.name ?? existingToolCallState.toolName;
 
     if (
       !existingToolCallState.didEmitStart &&
@@ -768,12 +771,12 @@ class DataStreamProtocolAdapter {
       });
     }
 
-    if (part.args) {
-      existingToolCallState.argsBuffer += part.args;
+    if (call?.args) {
+      existingToolCallState.argsBuffer += call.args;
       this.#writer.write({
         type: "tool-input-delta",
         toolCallId: existingToolCallState.toolCallId,
-        inputTextDelta: part.args,
+        inputTextDelta: call.args,
       });
     }
   }

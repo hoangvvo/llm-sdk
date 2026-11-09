@@ -5,11 +5,16 @@ The agent library to build LLM applications that work with any LLM providers.
 ## Installation
 
 ```bash
-cargo add llm-agent
-cargo add tokio-util
+cargo add llm-agent --features openai,tls-ring
+cargo add llm-sdk-rs --features openai
+cargo add rustls --no-default-features --features ring,std,tls12
 ```
 
+Enable the provider features you use (`openai`, `anthropic`, or `google`). Applications using the default HTTP client must select a process-wide Rustls crypto provider once at startup, as shown below.
+
 ## Usage
+
+A completed run can have empty `content`, including after a tool action that needs no reply. Check the response status and keep its output items when continuing the conversation.
 
 ```rust
 use dotenvy::dotenv;
@@ -143,14 +148,19 @@ impl AgentFunctionTool<MyContext> for SendMessageTool {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Rustls provider already selected");
 
     // Define the model to use for the Agent
-    let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
-        api_key: env::var("OPENAI_API_KEY")
-            .expect("OPENAI_API_KEY environment variable must be set"),
-        model_id: "gpt-5.6-terra".to_string(),
-        ..Default::default()
-    }));
+    let model = Arc::new(OpenAIModel::new(
+        "gpt-5.6-terra",
+        OpenAIModelOptions {
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY environment variable must be set"),
+            ..Default::default()
+        },
+    ));
 
     // Create the Agent
     let my_assistant = Agent::<MyContext>::builder("Mai", model)
@@ -232,6 +242,7 @@ Find examples in the [examples](./examples/) folder:
 - [`memory`: Memory pattern (core + archival)](./examples/memory.rs)
 - [`planner-executor`: Plan TODOs and execute](./examples/planner-executor.rs)
 - [`require-approval`: Human-in-the-loop approval](./examples/require-approval.rs)
+- [`cancellation`: Cancel model turns and tool execution](./examples/cancellation.rs)
 
 ```bash
 cargo run --example agent --features examples,openai
