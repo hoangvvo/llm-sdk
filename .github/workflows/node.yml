@@ -29,6 +29,8 @@ jobs:
         run: npm ci
       - name: Type-check repository scripts
         run: npx tsc -p tsconfig.json
+      - name: Test release preparation and validation
+        run: node --test scripts/release.test.ts
       - name: Lint repository support code
         run: npx eslint scripts website
       - name: Build SDK

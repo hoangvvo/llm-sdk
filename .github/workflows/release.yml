@@ -1,170 +1,234 @@
 name: Release
-run-name: Release ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
+run-name: Release ${{ inputs.module || github.event.pull_request.head.ref }} ${{ inputs.version }}
+
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version to release (e.g., 1.2.3)"
-        required: true
       module:
         type: choice
-        description: "module to release"
+        description: Module to release
         required: true
-        options:
-          - sdk-js
-          - agent-js
-          - sdk-rust
-          - agent-rust
-          - sdk-go
-          - agent-go
+        options: [sdk-js, agent-js, sdk-rust, agent-rust, sdk-go, agent-go]
+      version:
+        description: Version to release (e.g., 1.2.3)
+        required: true
+  pull_request:
+    branches: [main]
+    types: [closed]
 
 permissions:
-  packages: write
-  contents: write
-  id-token: write
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.module || github.event.pull_request.head.ref }}
+  cancel-in-progress: false
 
 jobs:
-  validate:
+  prepare:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_MODULE: ${{ inputs.module }}
+      RELEASE_VERSION: ${{ inputs.version }}
     steps:
-      - name: Validate version format
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Validate release request
+        id: release
+        run: node scripts/release.ts info
+      - name: Find existing release PR
+        id: pr
+        env:
+          BRANCH: ${{ steps.release.outputs.branch }}
         run: |
-          if [[ ! ${{ github.event.inputs.version }} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Version must be in the format X.Y.Z"
-            exit 1
-          fi
+          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          if [[ -n "$url" ]]; then echo "$url" >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        if: steps.pr.outputs.url == '' && endsWith(inputs.module, '-rust')
+        with:
+          toolchain: stable
+      - uses: actions/setup-go@v6
+        if: steps.pr.outputs.url == '' && endsWith(inputs.module, '-go')
+        with:
+          go-version: 1.25.x
+          cache: false
+      - name: Prepare versions and SDK dependencies
+        if: steps.pr.outputs.url == ''
+        run: node scripts/release.ts prepare
+      - name: Update npm lockfile
+        if: steps.pr.outputs.url == '' && endsWith(inputs.module, '-js')
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Update Cargo lockfile
+        if: steps.pr.outputs.url == '' && endsWith(inputs.module, '-rust')
+        run: cargo update --workspace
+      - name: Update Go checksums
+        if: steps.pr.outputs.url == '' && inputs.module == 'agent-go'
+        env:
+          GOWORK: "off"
+        run: go -C agent-go mod tidy
+      - name: Open release PR
+        if: steps.pr.outputs.url == ''
+        env:
+          BRANCH: ${{ steps.release.outputs.branch }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          git diff --check
+          git switch -c "$BRANCH"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/releases "$RELEASE_MODULE"
+          for file in package-lock.json Cargo.lock go.work.sum; do
+            if [[ -f "$file" ]]; then git add "$file"; fi
+          done
+          git commit -m "release: $TAG"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --title "Release $TAG" --body '' >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'release-')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.release.outputs.ready }}
+      module: ${{ steps.release.outputs.module }}
+      version: ${{ steps.release.outputs.version }}
+      registry: ${{ steps.release.outputs.registry }}
+      package: ${{ steps.release.outputs.package }}
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Verify merged release PR and versions
+        id: release
+        run: node scripts/release.ts merged
 
   publish-npm:
-    needs: validate
-    name: Publish to npm
+    needs: verify
+    if: needs.verify.outputs.ready == 'true' && needs.verify.outputs.registry == 'npm'
     runs-on: ubuntu-latest
-    if: endsWith(github.event.inputs.module, '-js')
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.PAT }}
-      - uses: actions/setup-node@v4
+          ref: ${{ needs.verify.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org/
-          cache: "npm"
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Version
-        run: npm version ${{ github.event.inputs.version }} --workspace=${{ github.event.inputs.module }} --no-git-tag-version --allow-same-version
-      - name: Commit version
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if [[ -n $(git status --porcelain) ]]; then
-            echo "Changes detected, committing locally..."
-            git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
-          else
-            echo "No changes detected, skipping commit"
-          fi
-      - name: Resolve npm package name
-        id: npm-package
-        run: |
-          package_name=$(npm run env --workspace=${{ github.event.inputs.module }} | grep "^npm_package_name=" | cut -d "=" -f 2-)
-          echo "name=$package_name" >> "$GITHUB_OUTPUT"
-      - name: Check if npm version already exists
-        id: npm-version
-        run: |
-          if npm view "${{ steps.npm-package.outputs.name }}@${{ github.event.inputs.version }}" version >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
       - name: Publish to npm
-        if: steps.npm-version.outputs.exists != 'true'
-        run: npm publish --workspace=${{ github.event.inputs.module }}
-      - name: Skip npm publish
-        if: steps.npm-version.outputs.exists == 'true'
-        run: echo "npm version already exists, skipping publish"
-      - name: Push version commit
-        run: git push
+        env:
+          PACKAGE: ${{ needs.verify.outputs.package }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          MODULE: ${{ needs.verify.outputs.module }}
+          RELEASE_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          status=$(curl --silent --show-error --output /tmp/npm-version.json --write-out '%{http_code}' "https://registry.npmjs.org/$PACKAGE/$VERSION")
+          case "$status" in
+            200)
+              if [[ $(jq -r '.gitHead // empty' /tmp/npm-version.json) != "$RELEASE_COMMIT" ]]; then
+                echo "$PACKAGE@$VERSION was published from another commit" >&2
+                exit 1
+              fi
+              echo "$PACKAGE@$VERSION is already published from this commit"
+              ;;
+            404) npm publish --workspace="$MODULE" ;;
+            *) echo "npm registry check failed: HTTP $status" >&2; exit 1 ;;
+          esac
 
   publish-crates:
-    needs: validate
-    name: Publish to crates.io
+    needs: verify
+    if: needs.verify.outputs.ready == 'true' && needs.verify.outputs.registry == 'crates'
     runs-on: ubuntu-latest
-    if: endsWith(github.event.inputs.module, '-rust')
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.PAT }}
+          ref: ${{ needs.verify.outputs.commit }}
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: false
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
-      - name: Set version for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
-        run: |
-          sed -i 's/^version = ".*"/version = "${{ github.event.inputs.version }}"/' ./${{ github.event.inputs.module }}/Cargo.toml
-      - name: Commit version
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if [[ -n $(git status --porcelain) ]]; then
-            echo "Changes detected, committing locally..."
-            git commit -am "version(${{ github.event.inputs.module }}): ${{ github.event.inputs.version }}"
-          else
-            echo "No changes detected, skipping commit"
-          fi
-      - name: Resolve crate name
-        id: crate
-        run: |
-          crate_name=$(cargo read-manifest --manifest-path ./${{ github.event.inputs.module }}/Cargo.toml | jq -r .name)
-          echo "name=$crate_name" >> "$GITHUB_OUTPUT"
-      - name: Check if crate version already exists
-        id: crate-version
-        run: |
-          if curl -fsS "https://crates.io/api/v1/crates/${{ steps.crate.outputs.name }}/${{ github.event.inputs.version }}" >/dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
       - name: Publish to crates.io
-        if: steps.crate-version.outputs.exists != 'true'
-        run: cargo publish --manifest-path ./${{ github.event.inputs.module }}/Cargo.toml --token ${{ steps.auth.outputs.token }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-      - name: Skip crates.io publish
-        if: steps.crate-version.outputs.exists == 'true'
-        run: echo "crate version already exists, skipping publish"
-      - name: Push version commit
-        run: git push
+          PACKAGE: ${{ needs.verify.outputs.package }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          MODULE: ${{ needs.verify.outputs.module }}
+          RELEASE_COMMIT: ${{ needs.verify.outputs.commit }}
+        run: |
+          status=$(curl --silent --show-error --output /tmp/crate-version.json --write-out '%{http_code}' "https://crates.io/api/v1/crates/$PACKAGE/$VERSION")
+          case "$status" in
+            200)
+              curl --fail --location --silent --show-error --output /tmp/published.crate "https://crates.io/api/v1/crates/$PACKAGE/$VERSION/download"
+              published_commit=$(tar -xOf /tmp/published.crate "$PACKAGE-$VERSION/.cargo_vcs_info.json" | jq -r '.git.sha1')
+              if [[ "$published_commit" != "$RELEASE_COMMIT" ]]; then
+                echo "$PACKAGE@$VERSION was published from another commit" >&2
+                exit 1
+              fi
+              echo "$PACKAGE@$VERSION is already published from this commit"
+              ;;
+            404) cargo publish --locked --manifest-path "$MODULE/Cargo.toml" ;;
+            *) echo "crates.io registry check failed: HTTP $status" >&2; exit 1 ;;
+          esac
 
   release:
-    needs: [validate, publish-npm, publish-crates]
+    needs: [verify, publish-npm, publish-crates]
     if: |
-      !cancelled() && 
-      needs.validate.result == 'success' &&
+      !cancelled() && needs.verify.result == 'success' && needs.verify.outputs.ready == 'true' &&
       (needs.publish-npm.result == 'success' || needs.publish-npm.result == 'skipped') &&
       (needs.publish-crates.result == 'success' || needs.publish-crates.result == 'skipped')
-    name: Create GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
+          ref: ${{ needs.verify.outputs.commit }}
           fetch-depth: 0
-      - name: Resolve previous package tag
-        id: previous-tag
+          persist-credentials: false
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE: ${{ needs.verify.outputs.module }}
+          TAG: ${{ needs.verify.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.verify.outputs.commit }}
         run: |
-          module_tag_prefix="${{ github.event.inputs.module }}/v"
-          current_tag="${module_tag_prefix}${{ github.event.inputs.version }}"
-          previous_tag=$(git tag --list "${module_tag_prefix}*" --sort=-version:refname | grep -Fvx "$current_tag" | head -n 1)
-
-          if [[ -n "$previous_tag" ]]; then
-            echo "Using previous tag: $previous_tag"
-            echo "tag=$previous_tag" >> "$GITHUB_OUTPUT"
-          else
-            echo "No previous tag found for $module_tag_prefix"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$TAG already has a GitHub release"
+            exit 0
           fi
-      - name: Create release ${{ github.event.inputs.module }}/${{ github.event.inputs.version }}
-        uses: ncipollo/release-action@v1
-        with:
-          tag: "${{ github.event.inputs.module }}/v${{ github.event.inputs.version }}"
-          generateReleaseNotes: true
-          generateReleaseNotesPreviousTag: ${{ steps.previous-tag.outputs.tag }}
+          previous=$(git tag --list "$MODULE/v*" --sort=-version:refname | { grep -Fvx "$TAG" || true; } | head -n 1)
+          args=(--repo "$GITHUB_REPOSITORY" --target "$RELEASE_COMMIT" --generate-notes)
+          if [[ -n "$previous" ]]; then args+=(--notes-start-tag "$previous"); fi
+          gh release create "$TAG" "${args[@]}"
