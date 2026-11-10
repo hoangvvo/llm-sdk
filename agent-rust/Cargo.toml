@@ -16,7 +16,7 @@ license = "MIT"
 name = "llm-agent"
 readme = "README.md"
 repository = "https://github.com/hoangvvo/llm-sdk"
-version = "0.3.0"
+version = "0.4.0"
 
 [lib]
 name = "llm_agent"
@@ -38,7 +38,7 @@ tls-ring = ["llm-sdk-rs/tls-ring"]
 [dependencies]
 async-stream = "0.3.6"
 futures = "0.3"
-llm-sdk-rs = { version = ">=0.3, <1.0", path = "../sdk-rust", default-features = false }
+llm-sdk-rs = { version = ">=0.4.0, <1.0", path = "../sdk-rust", default-features = false }
 opentelemetry = { version = "0.32", default-features = false, features = [
   "trace",
 ] }
