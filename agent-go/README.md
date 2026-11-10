@@ -239,13 +239,14 @@ Find examples in the [examples](./examples/) folder:
 - [`agent`: Simple Example](./examples/agent/main.go)
 - [`instructions`: Static and dynamic instructions](./examples/instructions/main.go)
 - [`tools`: Executable tools](./examples/tools/main.go)
-- [`toolkits`: Dynamic, stateful tools and instructions](./examples/toolkit/main.go)
+- [`toolkits`: Dynamic, stateful tools and instructions](./examples/toolkits/main.go)
 - [`structured-output`: Structured Output](./examples/structured-output/main.go)
 - [`agents-delegation`: Multi-agent Delegation](./examples/agents-delegation/main.go)
 - [`artifacts`: Artifacts/Canvas feature](./examples/artifacts/main.go)
 - [`memory`: Memory pattern (core + archival)](./examples/memory/main.go)
 - [`planner-executor`: Plan TODOs and execute](./examples/planner-executor/main.go)
 - [`require-approval`: Human-in-the-loop approval](./examples/require-approval/main.go)
+- [`cancellation`: Cancel model turns and tool execution](./examples/cancellation/main.go)
 
 ```bash
 go run ./examples/agent
