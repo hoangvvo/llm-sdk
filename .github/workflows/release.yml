@@ -12,6 +12,9 @@ on:
       version:
         description: Version to release (e.g., 1.2.3)
         required: true
+      publish_commit:
+        description: Retry publishing a merged release (full commit SHA)
+        required: false
   pull_request:
     branches: [main]
     types: [closed]
@@ -25,7 +28,7 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish_commit == ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -96,10 +99,13 @@ jobs:
           gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --title "Release $TAG" --body '' >> "$GITHUB_STEP_SUMMARY"
 
   verify:
-    if: github.event_name == 'pull_request' && github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'release-')
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'release-')) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish_commit != '')
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       ready: ${{ steps.release.outputs.ready }}
       module: ${{ steps.release.outputs.module }}
@@ -111,7 +117,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v6
@@ -120,7 +126,17 @@ jobs:
           package-manager-cache: false
       - name: Verify merged release PR and versions
         id: release
-        run: node scripts/release.ts merged
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_MODULE: ${{ inputs.module }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_COMMIT: ${{ inputs.publish_commit }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]; then
+            node scripts/release.ts retry
+          else
+            node scripts/release.ts merged
+          fi
 
   publish-npm:
     needs: verify
@@ -186,11 +202,12 @@ jobs:
           VERSION: ${{ needs.verify.outputs.version }}
           MODULE: ${{ needs.verify.outputs.module }}
           RELEASE_COMMIT: ${{ needs.verify.outputs.commit }}
+          CRATES_USER_AGENT: llm-sdk releases (https://github.com/${{ github.repository }})
         run: |
-          status=$(curl --silent --show-error --output /tmp/crate-version.json --write-out '%{http_code}' "https://crates.io/api/v1/crates/$PACKAGE/$VERSION")
+          status=$(curl --silent --show-error --user-agent "$CRATES_USER_AGENT" --output /tmp/crate-version.json --write-out '%{http_code}' "https://crates.io/api/v1/crates/$PACKAGE/$VERSION")
           case "$status" in
             200)
-              curl --fail --location --silent --show-error --output /tmp/published.crate "https://crates.io/api/v1/crates/$PACKAGE/$VERSION/download"
+              curl --fail --location --silent --show-error --user-agent "$CRATES_USER_AGENT" --output /tmp/published.crate "https://crates.io/api/v1/crates/$PACKAGE/$VERSION/download"
               published_commit=$(tar -xOf /tmp/published.crate "$PACKAGE-$VERSION/.cargo_vcs_info.json" | jq -r '.git.sha1')
               if [[ "$published_commit" != "$RELEASE_COMMIT" ]]; then
                 echo "$PACKAGE@$VERSION was published from another commit" >&2
