@@ -521,6 +521,99 @@ async fn run_rejects_empty_input_without_calling_model() {
 }
 
 #[tokio::test]
+async fn shared_silent_response_cases() -> Result<(), DynError> {
+    #[derive(serde::Deserialize)]
+    struct Fixture {
+        input: Vec<AgentItem>,
+        tool: FixtureTool,
+        test_cases: Vec<FixtureCase>,
+    }
+    #[derive(serde::Deserialize)]
+    struct FixtureTool {
+        name: String,
+        result: Vec<Part>,
+    }
+    #[derive(serde::Deserialize)]
+    struct FixtureCase {
+        name: String,
+        method: String,
+        use_tool: bool,
+        model_responses: Vec<ModelResponse>,
+        model_streams: Vec<Vec<PartialModelResponse>>,
+        expected_response: AgentResponse,
+        expected_tool_calls: Vec<Value>,
+        expected_model_calls: usize,
+    }
+    let fixture: Fixture = serde_json::from_str(&std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../agent-tests/silent-responses.json"
+    ))?)?;
+    for test_case in fixture.test_cases {
+        let model = Arc::new(MockLanguageModel::new());
+        for response in test_case.model_responses {
+            model.enqueue_generate(response);
+        }
+        for partials in test_case.model_streams {
+            model.enqueue_stream(partials);
+        }
+        let tool = MockTool::new(
+            &fixture.tool.name,
+            AgentToolResult {
+                content: fixture.tool.result.clone(),
+                is_error: false,
+            },
+        );
+        let mut params = AgentParams::new("test_agent", model.clone());
+        if test_case.use_tool {
+            params = params.add_tool(tool.clone());
+        }
+        let session = new_run_session(Arc::new(params), ()).await;
+        let request = RunSessionRequest {
+            input: fixture.input.clone(),
+        };
+        let response = if test_case.method == "generate" {
+            session.run(request, RunOptions::default()).await?
+        } else {
+            let events = session
+                .run_stream(request, RunOptions::default())?
+                .try_collect::<Vec<_>>()
+                .await?;
+            let mut responses = events.into_iter().filter_map(|event| match event {
+                AgentStreamEvent::Response(response) => Some(response),
+                _ => None,
+            });
+            let response = responses.next().ok_or("stream omitted its response")?;
+            assert!(
+                responses.next().is_none(),
+                "{}: duplicate response",
+                test_case.name
+            );
+            response
+        };
+        assert_eq!(response, test_case.expected_response, "{}", test_case.name);
+        assert_eq!(
+            tool.recorded_calls(),
+            test_case.expected_tool_calls,
+            "{}",
+            test_case.name
+        );
+        let inputs = if test_case.method == "generate" {
+            model.tracked_generate_inputs()
+        } else {
+            model.tracked_stream_inputs()
+        };
+        assert_eq!(
+            inputs.len(),
+            test_case.expected_model_calls,
+            "{}",
+            test_case.name
+        );
+        close_run_session(session).await;
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn run_returns_cancelled_without_calling_model_when_token_already_cancelled() {
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {

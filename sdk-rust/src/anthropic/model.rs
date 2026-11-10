@@ -1171,8 +1171,8 @@ fn map_content_block(block: ContentBlock) -> Option<Part> {
                     id: None,
                 }))
             }
-            // Hosted tools the SDK does not model (web fetch, code execution, ...)
-            // are ignored.
+            // Hosted tools the SDK does not model (web fetch, code execution,
+            // ...) are ignored.
             _ => None,
         },
         ContentBlock::ToolSearchToolResult(block) => {

@@ -47,7 +47,7 @@ impl<'de> Deserialize<'de> for Item {
             Some("mcp_call") => decode!(MCPToolCall, MCPToolCall),
             Some("file_search_call") => decode!(FileSearchToolCall, FileSearchToolCall),
             Some("web_search_call") => Ok(decode_web_search_tool_call(value.clone())
-                .map_or_else(|_| Self::Unknown(value), Self::WebSearchToolCall)),
+                .map_or(Self::Unknown(value), Self::WebSearchToolCall)),
             Some("function_call") => decode!(FunctionToolCall, FunctionToolCall),
             Some("image_generation_call") => decode!(ImageGenToolCall, ImageGenToolCall),
             Some("local_shell_call_output") => {
@@ -129,7 +129,7 @@ impl<'de> Deserialize<'de> for OutputItem {
             Some("message") => decode!(OutputMessage, OutputMessage),
             Some("function_call") => decode!(FunctionToolCall, FunctionToolCall),
             Some("web_search_call") => Ok(decode_web_search_tool_call(value.clone())
-                .map_or_else(|_| Self::Unknown(value), Self::WebSearchToolCall)),
+                .map_or(Self::Unknown(value), Self::WebSearchToolCall)),
             Some("image_generation_call") => decode!(ImageGenToolCall, ImageGenToolCall),
             Some("reasoning") => decode!(ReasoningItem, ReasoningItem),
             Some("tool_search_call") => decode!(ToolSearchCall, ToolSearchCall),

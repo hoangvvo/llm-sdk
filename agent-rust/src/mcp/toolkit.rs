@@ -152,10 +152,7 @@ where
     fn new(service: &Arc<MCPRunningService<TCtx>>, tool: Tool) -> Self {
         let parameters =
             Value::Object(Arc::try_unwrap(tool.input_schema).unwrap_or_else(|arc| (*arc).clone()));
-        let description = tool
-            .description
-            .map(std::borrow::Cow::into_owned)
-            .unwrap_or_default();
+        let description = tool.description.unwrap_or_default().into_owned();
         Self {
             service: Arc::downgrade(service),
             name: tool.name.into_owned(),
