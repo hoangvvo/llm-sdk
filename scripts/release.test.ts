@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test, { type TestContext } from "node:test";
 import {
   mergedRelease,
@@ -271,4 +273,43 @@ test("rejects a changed manifest or a tag for another commit", (t) => {
   assert.throws(() =>
     verifyRelease(root, release, next, "owner/repo", [releasePR(next)]),
   );
+});
+
+test("retries publication using the original merged PR and commit", (t) => {
+  const { root, commit } = prepared(t),
+    pr = releasePR(commit);
+  const gh = join(root, "bin", "gh");
+  write(
+    root,
+    "bin/gh",
+    `#!/usr/bin/env node\nprocess.stdout.write(${JSON.stringify(JSON.stringify([[pr]]))});\n`,
+  );
+  chmodSync(gh, 0o755);
+  const retry = (version: string, releaseCommit: string) =>
+    execFileSync(
+      process.execPath,
+      [fileURLToPath(new URL("./release.ts", import.meta.url)), "retry"],
+      {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          PATH: `${join(root, "bin")}:${process.env["PATH"] ?? ""}`,
+          GITHUB_OUTPUT: "",
+          GITHUB_REPOSITORY: "owner/repo",
+          RELEASE_MODULE: "sdk-js",
+          RELEASE_VERSION: version,
+          RELEASE_COMMIT: releaseCommit,
+        },
+      },
+    );
+  assert.match(
+    retry("0.7.0", commit),
+    new RegExp(`ready=true\\ncommit=${commit}`),
+  );
+  assert.throws(() => retry("0.7.0", "main"), /full commit SHA/);
+  assert.throws(() => retry("0.8.0", commit), /merged release PR/);
+  write(root, "bin/gh", '#!/usr/bin/env node\nprocess.stdout.write("[[]]");\n');
+  assert.throws(() => retry("0.7.0", commit), /merged release PR/);
 });

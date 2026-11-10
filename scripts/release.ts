@@ -182,8 +182,7 @@ export function verifyRelease(
   repository: string,
   prs: ReleasePR[],
 ): void {
-  if (!/^[a-f0-9]{40}$/.test(commit))
-    throw new Error("A full commit SHA is required");
+  validateCommit(commit);
   git(root, "merge-base", "--is-ancestor", commit, "origin/main");
   if (
     !prs.some((pr) => {
@@ -222,6 +221,10 @@ export function verifyRelease(
   )
     throw new Error("Release tag points to another commit");
 }
+function validateCommit(commit: string): void {
+  if (!/^[a-f0-9]{40}$/.test(commit))
+    throw new Error("A full commit SHA is required");
+}
 function output(values: Record<string, string>): void {
   const text = Object.entries(values)
     .map(([key, value]) => `${key}=${value}\n`)
@@ -259,7 +262,26 @@ function main(): void {
     process.env["RELEASE_MODULE"] ?? "",
     process.env["RELEASE_VERSION"] ?? "",
   );
-  if (process.argv[2] === "prepare") prepareRelease(root, release);
+  if (process.argv[2] === "retry") {
+    const commit = process.env["RELEASE_COMMIT"] ?? "",
+      repository = process.env["GITHUB_REPOSITORY"] ?? "";
+    validateCommit(commit);
+    const prs = JSON.parse(
+      execFileSync(
+        "gh",
+        [
+          "api",
+          `repos/${repository}/commits/${commit}/pulls`,
+          "--paginate",
+          "--slurp",
+        ],
+        { encoding: "utf8" },
+      ),
+    ) as ReleasePR[][];
+    verifyRelease(root, release, commit, repository, prs.flat());
+    output({ ready: "true", commit, ...releaseInfo(release) });
+    return;
+  } else if (process.argv[2] === "prepare") prepareRelease(root, release);
   else if (process.argv[2] !== "info")
     throw new Error("Unknown release command");
   output(releaseInfo(release));
