@@ -1,6 +1,7 @@
 package llmagent_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	llmagent "github.com/hoangvvo/llm-sdk/agent-go"
 	llmsdk "github.com/hoangvvo/llm-sdk/sdk-go"
 	"github.com/hoangvvo/llm-sdk/sdk-go/llmsdktest"
@@ -160,6 +162,106 @@ func mustNewRunSession[C any](t *testing.T, params *llmagent.AgentParams[C], con
 		t.Fatalf("failed to create run session: %v", err)
 	}
 	return session
+}
+
+func TestRun_SharedSilentResponses(t *testing.T) {
+	data, err := os.ReadFile("../agent-tests/silent-responses.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, data); err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Input []llmagent.AgentItem `json:"input"`
+		Tool  struct {
+			Name   string        `json:"name"`
+			Result []llmsdk.Part `json:"result"`
+		} `json:"tool"`
+		Cases []struct {
+			Name               string                          `json:"name"`
+			Method             string                          `json:"method"`
+			UseTool            bool                            `json:"use_tool"`
+			ModelResponses     []llmsdk.ModelResponse          `json:"model_responses"`
+			ModelStreams       [][]llmsdk.PartialModelResponse `json:"model_streams"`
+			ExpectedResponse   llmagent.AgentResponse          `json:"expected_response"`
+			ExpectedToolCalls  []map[string]any                `json:"expected_tool_calls"`
+			ExpectedModelCalls int                             `json:"expected_model_calls"`
+		} `json:"test_cases"`
+	}
+	if err := json.Unmarshal(compact.Bytes(), &fixture); err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range fixture.Cases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			model := llmsdktest.NewMockLanguageModel()
+			for _, response := range testCase.ModelResponses {
+				model.EnqueueGenerateResult(llmsdktest.NewMockGenerateResultResponse(response))
+			}
+			for _, partials := range testCase.ModelStreams {
+				model.EnqueueStreamResult(llmsdktest.NewMockStreamResultPartials(partials))
+			}
+			var calls []map[string]any
+			tool := NewMockTool[struct{}](fixture.Tool.Name, llmagent.AgentToolResult{},
+				func(_ context.Context, args json.RawMessage, _ struct{}, _ *llmagent.RunState) (llmagent.AgentToolResult, error) {
+					var call map[string]any
+					if err := json.Unmarshal(args, &call); err != nil {
+						return llmagent.AgentToolResult{}, err
+					}
+					calls = append(calls, call)
+					return llmagent.AgentToolResult{Content: fixture.Tool.Result}, nil
+				})
+			params := &llmagent.AgentParams[struct{}]{Name: "test_agent", Model: model, MaxTurns: 10}
+			if testCase.UseTool {
+				params.Tools = llmagent.FunctionTools[struct{}](tool)
+			}
+			session := mustNewRunSession(t, params, struct{}{})
+			t.Cleanup(func() {
+				if err := session.Close(context.Background()); err != nil {
+					t.Errorf("close session: %v", err)
+				}
+			})
+			request := llmagent.RunSessionRequest{Input: fixture.Input}
+			var response *llmagent.AgentResponse
+			inputs := 0
+			if testCase.Method == "generate" {
+				response, err = session.Run(t.Context(), request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				inputs = len(model.TrackedGenerateInputs())
+			} else {
+				stream, err := session.RunStream(t.Context(), request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				responses := 0
+				for stream.Next() {
+					if event := stream.Current(); event.Response != nil {
+						response = event.Response
+						responses++
+					}
+				}
+				if err := stream.Err(); err != nil {
+					t.Fatal(err)
+				}
+				if responses != 1 {
+					t.Fatalf("expected one response, got %d", responses)
+				}
+				inputs = len(model.TrackedStreamInputs())
+			}
+			if diff := cmp.Diff(&testCase.ExpectedResponse, response, cmpopts.EquateEmpty()); diff != "" {
+				t.Fatalf("response mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(testCase.ExpectedToolCalls, calls, cmpopts.EquateEmpty()); diff != "" {
+				t.Fatalf("tool calls mismatch (-want +got):\n%s", diff)
+			}
+			if inputs != testCase.ExpectedModelCalls {
+				t.Fatalf("expected %d model calls, got %d", testCase.ExpectedModelCalls, inputs)
+			}
+		})
+	}
 }
 
 func TestRun_RejectsEmptyInputWithoutCallingModel(t *testing.T) {

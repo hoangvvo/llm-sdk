@@ -5,20 +5,18 @@
 - **LLM SDK** – cross-language clients (JavaScript, Rust, Go) that talk to multiple LLM providers through one `LanguageModel` interface.
 - **LLM Agent** – a minimal, transparent agent library that orchestrates model generations and tool executions using the SDK under the hood.
 
-| Package                         | Language              | Version                                                                                                                                       | Link                                                                  |
-| ------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `@hoangvvo/llm-sdk`             | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-sdk?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-sdk)           | [NPM](https://www.npmjs.com/package/@hoangvvo/llm-sdk)                |
-| `llm-sdk-rs`                    | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-sdk-rs?style=flat-square)](https://crates.io/crates/llm-sdk-rs)                             | [crates.io](https://crates.io/crates/llm-sdk-rs)                      |
-| `github.com/hoangvvo/llm-sdk`   | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/sdk-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/sdk-go)     | [pkg.go.dev](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/sdk-go)   |
-| `@hoangvvo/llm-agent`           | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-agent?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-agent)       | [NPM](https://www.npmjs.com/package/@hoangvvo/llm-agent)              |
-| `llm-agent`                     | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-agent?style=flat-square)](https://crates.io/crates/llm-agent)                               | [crates.io](https://crates.io/crates/llm-agent)                       |
-| `github.com/hoangvvo/llm-agent` | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/agent-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) | [pkg.go.dev](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) |
+| Package                                | Language              | Version                                                                                                                                       | Link                                                                  |
+| -------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `@hoangvvo/llm-sdk`                    | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-sdk?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-sdk)           | [NPM](https://www.npmjs.com/package/@hoangvvo/llm-sdk)                |
+| `llm-sdk-rs`                           | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-sdk-rs?style=flat-square)](https://crates.io/crates/llm-sdk-rs)                             | [crates.io](https://crates.io/crates/llm-sdk-rs)                      |
+| `github.com/hoangvvo/llm-sdk/sdk-go`   | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/sdk-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/sdk-go)     | [pkg.go.dev](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/sdk-go)   |
+| `@hoangvvo/llm-agent`                  | JavaScript/TypeScript | [![npm version](https://img.shields.io/npm/v/@hoangvvo/llm-agent?style=flat-square)](https://www.npmjs.com/package/@hoangvvo/llm-agent)       | [NPM](https://www.npmjs.com/package/@hoangvvo/llm-agent)              |
+| `llm-agent`                            | Rust                  | [![crates.io](https://img.shields.io/crates/v/llm-agent?style=flat-square)](https://crates.io/crates/llm-agent)                               | [crates.io](https://crates.io/crates/llm-agent)                       |
+| `github.com/hoangvvo/llm-sdk/agent-go` | Go                    | [![Go Reference](https://pkg.go.dev/badge/github.com/hoangvvo/llm-sdk/agent-go.svg)](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) | [pkg.go.dev](https://pkg.go.dev/github.com/hoangvvo/llm-sdk/agent-go) |
 
 The accompanying [Console app](https://llm-sdk.hoangvvo.com/console/chat/) demonstrates the libraries end-to-end.
 
 ![Console Chat Application screenshot](./website/assets/console-chat.png)
-
-> **Status**: both libraries are currently `v0`. The SDK library APIs are largely stable; the Agent library APIs may evolve. Feedback and contributions are welcome.
 
 ## Why use llm-sdk
 
@@ -41,7 +39,7 @@ Choose the language that fits your service and get the same capabilities:
 - [Rust](./sdk-rust)
 - [Go](./sdk-go)
 
-Each implements the TypeScript reference specification in [`schema/sdk.ts`](./schema/sdk.ts). Request/response payloads (`LanguageModelInput`, `ModelResponse`, tool events, etc.) keep identical field names when serialized to JSON so services can interoperate across languages.
+Each implements the shared JSON Schema in [`schema/sdk.json`](./schema/sdk.json). Request/response payloads (`LanguageModelInput`, `ModelResponse`, tool events, etc.) keep identical field names when serialized to JSON so services can interoperate across languages.
 
 ### Supported providers
 
@@ -71,7 +69,7 @@ Read the full documentation on [llm-sdk.hoangvvo.com](https://llm-sdk.hoangvvo.c
 
 - [SDK Overview](https://llm-sdk.hoangvvo.com/sdk)
 - [Language Model basics](https://llm-sdk.hoangvvo.com/sdk/language-model)
-- [Agent concepts](https://llm-sdk.hoangvvo.com/agent/agent)
+- [Agent concepts](https://llm-sdk.hoangvvo.com/agent/)
 - [Agent run](https://llm-sdk.hoangvvo.com/agent/run)
 
 Also check out some agent patterns, including:
@@ -111,15 +109,15 @@ This section is designed to outline the differences for those considering migrat
 
 ### Vercel AI SDK
 
-| Feature       | llm-sdk                                                                                                                  | Vercel AI SDK                                                                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Providers     | OpenAI, Anthropic, Google, Cohere, Mistral. Supports providers with OpenAI chat completions-compatible APIs              | ✅ 25 providers + many community-supported ones                                                                                               |
-| Modality      | `TextPart`, `ImagePart` (with height, width metadata), `AudioPart` (with `channels`, `sample_rate`, `encoding` metadata) | `TextPart`, `ImagePart`, `FilePart` (no content-specific metadata)                                                                            |
-| APIs          | Single method for text, image, and audio inputs/outputs via the completions API.                                         | `generateText` for text (via completions API), `generateImage` for images (via image generation API), `generateAudio` for audio (via TTS API) |
-| Language      | ✅ JavaScript/TypeScript, Rust, Go with consistent wire formats                                                          | JavaScript/TypeScript                                                                                                                         |
-| Function Call | ✅ Allows text, image, source (citation) tool results                                                                    | Only JSON object tool results                                                                                                                 |
-| Citations     | ✅ Supported via `SourcePart` and `Citation`                                                                             | Not supported                                                                                                                                 |
-| Ease of Use   | Primitive APIs                                                                                                           | ✅ Includes framework integrations, type-safe utilities                                                                                       |
+| Feature       | llm-sdk                                                                                                                                                  | Vercel AI SDK                                                                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Providers     | OpenAI, Anthropic, Google, Cohere, Mistral. Supports providers with OpenAI chat completions-compatible APIs                                              | ✅ 25 providers + many community-supported ones                                                                                               |
+| Modality      | `TextPart`, `ImagePart` (with height, width metadata), `AudioPart` (with `channels`, `sample_rate`, `format` metadata), `FilePart` (documents and video) | `TextPart`, `ImagePart`, `FilePart` (no content-specific metadata)                                                                            |
+| APIs          | Single method for text, image, and audio inputs/outputs via the completions API.                                                                         | `generateText` for text (via completions API), `generateImage` for images (via image generation API), `generateAudio` for audio (via TTS API) |
+| Language      | ✅ JavaScript/TypeScript, Rust, Go with consistent wire formats                                                                                          | JavaScript/TypeScript                                                                                                                         |
+| Function Call | ✅ Allows text, image, audio, and source (citation) tool results; supports provider-hosted web search and tool search                                    | Only JSON object tool results                                                                                                                 |
+| Citations     | ✅ Supported via `SourcePart` and `Citation`                                                                                                             | Not supported                                                                                                                                 |
+| Ease of Use   | Primitive APIs                                                                                                                                           | ✅ Includes framework integrations, type-safe utilities                                                                                       |
 
 ## License
 

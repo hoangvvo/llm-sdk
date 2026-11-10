@@ -498,7 +498,8 @@ fn convert_to_openai_input_file(file_part: FilePart) -> OpenAIInputFile {
         Some(url) => OpenAIInputFile {
             file_data: None,
             file_url: Some(url),
-            // OpenAI rejects filenames alongside file URLs; they belong to inline data.
+            // OpenAI rejects filenames alongside file URLs; they belong to
+            // inline data.
             filename: None,
         },
         None => OpenAIInputFile {
@@ -527,8 +528,8 @@ fn convert_assistant_message_to_response_input_items(
                 Part::Text(text_part) => {
                     Some(InputItem::Item(responses_api::Item::OutputMessage(
                         OutputMessage {
-                            // Output messages require an ID, but the SDK does not expose provider
-                            // IDs.
+                            // Output messages require an ID, but the SDK does
+                            // not expose provider IDs.
                             id: format!("msg_{}", id_utils::generate_string(15)),
                             role: OutputMessageRole::Assistant,
                             content: vec![OutputMessageContent::OutputText(OutputTextContent {
@@ -613,7 +614,8 @@ fn convert_assistant_message_to_response_input_items(
                         }),
                     )),
                 },
-                // OpenAI replays hosted search results through the web_search_call item.
+                // OpenAI replays hosted search results through the
+                // web_search_call item.
                 Part::ToolResult(ToolResultPart {
                     result: ToolResult::WebSearch(_),
                     ..
@@ -775,7 +777,8 @@ fn convert_to_openai_tool(tool: Tool) -> LanguageModelResult<OpenAITool> {
             strict: Some(true),
             r#type: FunctionToolType::Function,
         })),
-        // OpenAI's hosted search has a single algorithm, so strategy is ignored.
+        // OpenAI's hosted search has a single algorithm, so strategy is
+        // ignored.
         Tool::ToolSearch(_) => Ok(OpenAITool::ToolSearchToolParam(ToolSearchToolParam {
             description: None,
             execution: None,

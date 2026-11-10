@@ -357,7 +357,8 @@ fn convert_to_generate_content_parameters(
         let mut function_declarations = Vec::new();
         for tool in tools {
             match tool {
-                // Gemini has no deferred loading, so deferred tools are loaded eagerly.
+                // Gemini has no deferred loading, so deferred tools are loaded
+                // eagerly.
                 SdkTool::Function(tool) => function_declarations.push(FunctionDeclaration {
                     name: Some(tool.name),
                     description: Some(tool.description),

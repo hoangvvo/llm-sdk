@@ -14,7 +14,8 @@ async fn main() {
     let response = model
         .generate(LanguageModelInput::new([Message::user([
             Part::text("Summarize the attached PDF."),
-            // The provider fetches this URL; no download or base64 encoding is needed here.
+            // The provider fetches this URL; no download or base64 encoding is
+            // needed here.
             Part::file_from_url(
                 "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
                 "application/pdf",

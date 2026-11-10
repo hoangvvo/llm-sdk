@@ -20,7 +20,8 @@ pub(super) fn convert_mcp_content(contents: Vec<Content>) -> Result<Vec<Part>, B
                     .map_err(|err| Box::new(err) as BoxedError)?;
                 parts.push(Part::audio(audio.data, format));
             }
-            // Resource links and embedded resources are skipped to keep parity with other SDKs.
+            // Resource links and embedded resources are skipped to keep parity
+            // with other SDKs.
             RawContent::Resource(_) | RawContent::ResourceLink(_) => {}
         }
     }

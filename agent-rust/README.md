@@ -5,8 +5,8 @@ The agent library to build LLM applications that work with any LLM providers.
 ## Installation
 
 ```bash
-cargo add llm-agent
-cargo add tokio-util
+cargo add llm-agent --features openai,tls-ring
+cargo add llm-sdk-rs --features openai
 ```
 
 ## Usage
@@ -145,12 +145,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
     // Define the model to use for the Agent
-    let model = Arc::new(OpenAIModel::new(OpenAIModelOptions {
-        api_key: env::var("OPENAI_API_KEY")
-            .expect("OPENAI_API_KEY environment variable must be set"),
-        model_id: "gpt-5.6-terra".to_string(),
-        ..Default::default()
-    }));
+    let model = Arc::new(OpenAIModel::new(
+        "gpt-5.6-terra",
+        OpenAIModelOptions {
+            api_key: env::var("OPENAI_API_KEY")
+                .expect("OPENAI_API_KEY environment variable must be set"),
+            ..Default::default()
+        },
+    ));
 
     // Create the Agent
     let my_assistant = Agent::<MyContext>::builder("Mai", model)
@@ -232,6 +234,7 @@ Find examples in the [examples](./examples/) folder:
 - [`memory`: Memory pattern (core + archival)](./examples/memory.rs)
 - [`planner-executor`: Plan TODOs and execute](./examples/planner-executor.rs)
 - [`require-approval`: Human-in-the-loop approval](./examples/require-approval.rs)
+- [`cancellation`: Cancel model turns and tool execution](./examples/cancellation.rs)
 
 ```bash
 cargo run --example agent --features examples,openai

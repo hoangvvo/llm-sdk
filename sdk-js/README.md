@@ -8,7 +8,7 @@ A JavaScript library that enables the development of applications that can inter
 npm install @hoangvvo/llm-sdk
 ```
 
-You also need to install the provider-specific packages:
+Provider integrations are optional peer dependencies. Install only the provider packages you use:
 
 ```bash
 npm install openai
@@ -141,6 +141,7 @@ node examples/generate-text.ts
 
 ### To 0.6.0
 
+- Token usage is normalized across providers: input totals include cache reads and cache writes, and output totals include reasoning tokens. Update cost calculations that previously added these subsets to the totals.
 - Function tools now require `type: "function"`.
 - `ToolResultPart.is_error` has been replaced with the required `status` field (`"completed"`, `"failed"`, or `"cancelled"`).
 - Move function calls to `call: { type: "function", name, args }`; check `call.type` before reading function fields.

@@ -61,9 +61,9 @@ pub fn guess_delta_index(
     let matching_delta = unique_content_deltas.iter().rev().find(|content_delta| {
         match (&content_delta.part, part) {
             // For text and audio parts, they are the matching delta
-            // if their types are the same. This is because providers that do not
-            // provide indexes like only have 1 part for each type (e.g openai has only 1
-            // message.content or 1 message.audio)
+            // if their types are the same. This is because providers that do
+            // not provide indexes like only have 1 part for each type (e.g
+            // openai has only 1 message.content or 1 message.audio)
             (PartDelta::Text(_), PartDelta::Text(_))
             | (PartDelta::Audio(_), PartDelta::Audio(_)) => true,
 
