@@ -41,8 +41,6 @@ jobs:
     if: endsWith(github.event.inputs.module, '-js')
     steps:
       - uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.PAT }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -94,8 +92,6 @@ jobs:
     if: endsWith(github.event.inputs.module, '-rust')
     steps:
       - uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.PAT }}
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
       - name: Set version for ${{ github.event.inputs.module }}@${{ github.event.inputs.version }}
