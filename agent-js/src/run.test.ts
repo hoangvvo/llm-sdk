@@ -27,7 +27,7 @@ import { RunSession, type RunState } from "./run.ts";
 import { tool } from "./tool.ts";
 import type { AgentFunctionTool, AgentTool } from "./tool.ts";
 import type { Toolkit, ToolkitSession } from "./toolkit.ts";
-import type { AgentResponse, AgentStreamEvent } from "./types.ts";
+import type { AgentItem, AgentResponse, AgentStreamEvent } from "./types.ts";
 
 function createMockTool<TContext = any>(
   name: string,
@@ -130,114 +130,77 @@ function isResponseEvent(
   return event.event === "response";
 }
 
-suite("RunSession silent responses", () => {
-  for (const mode of ["generate", "empty stream", "usage-only stream"]) {
-    for (const withTools of [false, true]) {
-      test(`${mode} completes ${withTools ? "after a tool action" : "without tools"}`, async (t: TestContext) => {
-        const model = new MockLanguageModel();
-        const usage =
-          mode === "usage-only stream"
-            ? { input_tokens: 2, output_tokens: 0 }
-            : undefined;
-        const execute = t.mock.fn((args: Record<string, unknown>) => {
-          t.assert.deepStrictEqual(args, { emoji: "thumbs_up" });
-          return {
-            content: [{ type: "text" as const, text: "Reaction added" }],
-            is_error: false,
-          };
-        });
-        if (mode === "generate") {
-          if (withTools) {
-            model.enqueueGenerateResult({
-              response: {
-                content: [
-                  {
-                    type: "tool-call",
-                    tool_call_id: "reaction_1",
-                    call: {
-                      type: "function",
-                      name: "react",
-                      args: { emoji: "thumbs_up" },
-                    },
-                  },
-                ],
-              },
-            });
-          }
-          model.enqueueGenerateResult({ response: { content: [] } });
-        } else {
-          if (withTools) {
-            model.enqueueStreamResult({
-              partials: [
-                createPartialResponse({
-                  type: "tool-call",
-                  tool_call_id: "reaction_1",
-                  call: {
-                    type: "function",
-                    name: "react",
-                    args: '{"emoji":"thumbs_up"}',
-                  },
-                }),
-              ],
-            });
-          }
-          model.enqueueStreamResult({ partials: usage ? [{ usage }] : [] });
-        }
-        const session = await RunSession.create({
-          name: "test_agent",
-          model,
-          tools: withTools ? [createMockTool("react", null, execute)] : [],
-          context: {},
-        });
-        try {
-          const request = {
-            input: [
-              {
-                type: "message" as const,
-                role: "user" as const,
-                content: [{ type: "text" as const, text: "No reply needed" }],
-              },
-            ],
-          };
-          let response: AgentResponse;
-          if (mode === "generate") {
-            response = await session.run(request);
-          } else {
-            const events = await Array.fromAsync(session.runStream(request));
-            const responses = events.filter(isResponseEvent);
-            t.assert.strictEqual(responses.length, 1);
-            const completed = responses[0];
-            t.assert.ok(completed);
-            response = completed;
-          }
-          t.assert.strictEqual(response.status, "completed");
-          t.assert.deepStrictEqual(response.content, []);
-          t.assert.strictEqual(response.output.length, withTools ? 3 : 1);
-          const finalItem = response.output.at(-1);
-          t.assert.ok(finalItem?.type === "model");
-          t.assert.deepStrictEqual(finalItem.content, []);
-          t.assert.deepStrictEqual(finalItem.usage, usage);
-          t.assert.strictEqual(execute.mock.callCount(), withTools ? 1 : 0);
-          if (withTools) {
-            t.assert.deepStrictEqual(response.output[1], {
-              type: "tool",
-              tool_call_id: "reaction_1",
-              tool_name: "react",
-              input: { emoji: "thumbs_up" },
-              output: [{ type: "text", text: "Reaction added" }],
-              status: "completed",
-            });
-          }
-          const inputs =
-            mode === "generate"
-              ? model.trackedGenerateInputs
-              : model.trackedStreamInputs;
-          t.assert.strictEqual(inputs.length, withTools ? 2 : 1);
-        } finally {
-          await session.close();
-        }
+suite("shared silent-response cases", () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL("../../agent-tests/silent-responses.json", import.meta.url),
+      "utf8",
+    ),
+  ) as {
+    input: AgentItem[];
+    tool: { name: string; result: Part[] };
+    test_cases: {
+      name: string;
+      method: "generate" | "stream";
+      use_tool: boolean;
+      model_responses: ModelResponse[];
+      model_streams: PartialModelResponse[][];
+      expected_response: AgentResponse;
+      expected_tool_calls: Record<string, unknown>[];
+      expected_model_calls: number;
+    }[];
+  };
+  for (const testCase of fixture.test_cases) {
+    test(testCase.name, async (t: TestContext) => {
+      const model = new MockLanguageModel();
+      model.enqueueGenerateResult(
+        ...testCase.model_responses.map((response) => ({ response })),
+      );
+      model.enqueueStreamResult(
+        ...testCase.model_streams.map((partials) => ({ partials })),
+      );
+      const calls: Record<string, unknown>[] = [];
+      const session = await RunSession.create({
+        name: "test_agent",
+        model,
+        tools: testCase.use_tool
+          ? [
+              createMockTool(fixture.tool.name, null, (args) => {
+                calls.push(args);
+                return { content: fixture.tool.result, is_error: false };
+              }),
+            ]
+          : [],
+        context: {},
       });
-    }
+      try {
+        const request = { input: fixture.input };
+        let response: AgentResponse;
+        if (testCase.method === "generate") {
+          response = await session.run(request);
+        } else {
+          const events = await Array.fromAsync(session.runStream(request));
+          const responses = events.filter(isResponseEvent);
+          t.assert.strictEqual(responses.length, 1);
+          const completed = responses[0];
+          t.assert.ok(completed);
+          response = {
+            content: completed.content,
+            output: completed.output,
+            status: completed.status,
+          };
+        }
+        t.assert.deepStrictEqual(response, testCase.expected_response);
+        t.assert.deepStrictEqual(calls, testCase.expected_tool_calls);
+        const inputs =
+          testCase.method === "generate"
+            ? model.trackedGenerateInputs
+            : model.trackedStreamInputs;
+        t.assert.strictEqual(inputs.length, testCase.expected_model_calls);
+      } finally {
+        await session.close();
+      }
+    });
   }
 });
 

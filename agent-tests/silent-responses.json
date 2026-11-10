@@ -1,0 +1,327 @@
+{
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "No reply needed"
+        }
+      ]
+    }
+  ],
+  "tool": {
+    "name": "react",
+    "result": [
+      {
+        "type": "text",
+        "text": "Reaction added"
+      }
+    ]
+  },
+  "test_cases": [
+    {
+      "name": "generate_without_tools",
+      "method": "generate",
+      "use_tool": false,
+      "model_responses": [
+        {
+          "content": []
+        }
+      ],
+      "model_streams": [],
+      "expected_response": {
+        "content": [],
+        "output": [
+          {
+            "type": "model",
+            "content": []
+          }
+        ],
+        "status": "completed"
+      },
+      "expected_tool_calls": [],
+      "expected_model_calls": 1
+    },
+    {
+      "name": "generate_after_tool",
+      "method": "generate",
+      "use_tool": true,
+      "model_responses": [
+        {
+          "content": [
+            {
+              "type": "tool-call",
+              "tool_call_id": "reaction_1",
+              "call": {
+                "type": "function",
+                "name": "react",
+                "args": {
+                  "emoji": "thumbs_up"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "content": []
+        }
+      ],
+      "model_streams": [],
+      "expected_response": {
+        "content": [],
+        "output": [
+          {
+            "type": "model",
+            "content": [
+              {
+                "type": "tool-call",
+                "tool_call_id": "reaction_1",
+                "call": {
+                  "type": "function",
+                  "name": "react",
+                  "args": {
+                    "emoji": "thumbs_up"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "tool",
+            "tool_call_id": "reaction_1",
+            "tool_name": "react",
+            "input": {
+              "emoji": "thumbs_up"
+            },
+            "output": [
+              {
+                "type": "text",
+                "text": "Reaction added"
+              }
+            ],
+            "status": "completed"
+          },
+          {
+            "type": "model",
+            "content": []
+          }
+        ],
+        "status": "completed"
+      },
+      "expected_tool_calls": [
+        {
+          "emoji": "thumbs_up"
+        }
+      ],
+      "expected_model_calls": 2
+    },
+    {
+      "name": "empty_stream_without_tools",
+      "method": "stream",
+      "use_tool": false,
+      "model_responses": [],
+      "model_streams": [[]],
+      "expected_response": {
+        "content": [],
+        "output": [
+          {
+            "type": "model",
+            "content": []
+          }
+        ],
+        "status": "completed"
+      },
+      "expected_tool_calls": [],
+      "expected_model_calls": 1
+    },
+    {
+      "name": "empty_stream_after_tool",
+      "method": "stream",
+      "use_tool": true,
+      "model_responses": [],
+      "model_streams": [
+        [
+          {
+            "delta": {
+              "index": 0,
+              "part": {
+                "type": "tool-call",
+                "tool_call_id": "reaction_1",
+                "call": {
+                  "type": "function",
+                  "name": "react",
+                  "args": "{\"emoji\":\"thumbs_up\"}"
+                }
+              }
+            }
+          }
+        ],
+        []
+      ],
+      "expected_response": {
+        "content": [],
+        "output": [
+          {
+            "type": "model",
+            "content": [
+              {
+                "type": "tool-call",
+                "tool_call_id": "reaction_1",
+                "call": {
+                  "type": "function",
+                  "name": "react",
+                  "args": {
+                    "emoji": "thumbs_up"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "tool",
+            "tool_call_id": "reaction_1",
+            "tool_name": "react",
+            "input": {
+              "emoji": "thumbs_up"
+            },
+            "output": [
+              {
+                "type": "text",
+                "text": "Reaction added"
+              }
+            ],
+            "status": "completed"
+          },
+          {
+            "type": "model",
+            "content": []
+          }
+        ],
+        "status": "completed"
+      },
+      "expected_tool_calls": [
+        {
+          "emoji": "thumbs_up"
+        }
+      ],
+      "expected_model_calls": 2
+    },
+    {
+      "name": "usage_only_stream_without_tools",
+      "method": "stream",
+      "use_tool": false,
+      "model_responses": [],
+      "model_streams": [
+        [
+          {
+            "usage": {
+              "input_tokens": 2,
+              "output_tokens": 0
+            }
+          }
+        ]
+      ],
+      "expected_response": {
+        "content": [],
+        "output": [
+          {
+            "type": "model",
+            "content": [],
+            "usage": {
+              "input_tokens": 2,
+              "output_tokens": 0
+            }
+          }
+        ],
+        "status": "completed"
+      },
+      "expected_tool_calls": [],
+      "expected_model_calls": 1
+    },
+    {
+      "name": "usage_only_stream_after_tool",
+      "method": "stream",
+      "use_tool": true,
+      "model_responses": [],
+      "model_streams": [
+        [
+          {
+            "delta": {
+              "index": 0,
+              "part": {
+                "type": "tool-call",
+                "tool_call_id": "reaction_1",
+                "call": {
+                  "type": "function",
+                  "name": "react",
+                  "args": "{\"emoji\":\"thumbs_up\"}"
+                }
+              }
+            }
+          }
+        ],
+        [
+          {
+            "usage": {
+              "input_tokens": 2,
+              "output_tokens": 0
+            }
+          }
+        ]
+      ],
+      "expected_response": {
+        "content": [],
+        "output": [
+          {
+            "type": "model",
+            "content": [
+              {
+                "type": "tool-call",
+                "tool_call_id": "reaction_1",
+                "call": {
+                  "type": "function",
+                  "name": "react",
+                  "args": {
+                    "emoji": "thumbs_up"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "tool",
+            "tool_call_id": "reaction_1",
+            "tool_name": "react",
+            "input": {
+              "emoji": "thumbs_up"
+            },
+            "output": [
+              {
+                "type": "text",
+                "text": "Reaction added"
+              }
+            ],
+            "status": "completed"
+          },
+          {
+            "type": "model",
+            "content": [],
+            "usage": {
+              "input_tokens": 2,
+              "output_tokens": 0
+            }
+          }
+        ],
+        "status": "completed"
+      },
+      "expected_tool_calls": [
+        {
+          "emoji": "thumbs_up"
+        }
+      ],
+      "expected_model_calls": 2
+    }
+  ]
+}

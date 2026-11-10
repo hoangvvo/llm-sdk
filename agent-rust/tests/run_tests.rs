@@ -521,119 +521,94 @@ async fn run_rejects_empty_input_without_calling_model() {
 }
 
 #[tokio::test]
-async fn complete_silent_turns_with_and_without_tools() -> Result<(), DynError> {
-    for (streaming, usage_only) in [(false, false), (true, false), (true, true)] {
-        for with_tools in [false, true] {
-            let tool = MockTool::new(
-                "react",
-                AgentToolResult {
-                    content: vec![Part::text("Reaction added")],
-                    is_error: false,
-                },
-            );
-            let model = Arc::new(MockLanguageModel::new());
-            let usage = usage_only.then_some(ModelUsage {
-                input_tokens: 2,
-                ..Default::default()
-            });
-            if streaming {
-                if with_tools {
-                    model.enqueue_stream(vec![PartialModelResponse {
-                        delta: Some(ContentDelta {
-                            index: 0,
-                            part: PartDelta::ToolCall(
-                                ToolCallPartDelta::default()
-                                    .with_tool_call_id("reaction_1")
-                                    .with_tool_name("react")
-                                    .with_args(r#"{"emoji":"thumbs_up"}"#),
-                            ),
-                        }),
-                        ..Default::default()
-                    }]);
-                }
-                model.enqueue_stream(if usage_only {
-                    vec![PartialModelResponse {
-                        usage: usage.clone(),
-                        ..Default::default()
-                    }]
-                } else {
-                    vec![]
-                });
-            } else {
-                if with_tools {
-                    model.enqueue_generate(ModelResponse {
-                        content: vec![Part::tool_call(
-                            "reaction_1",
-                            "react",
-                            json!({"emoji": "thumbs_up"}),
-                        )],
-                        ..Default::default()
-                    });
-                }
-                model.enqueue_generate(ModelResponse::default());
-            }
-            let mut params = AgentParams::new("test_agent", model.clone());
-            if with_tools {
-                params = params.add_tool(tool.clone());
-            }
-            let session = new_run_session(Arc::new(params), ()).await;
-            let request = RunSessionRequest {
-                input: vec![AgentItem::Message(Message::user(vec![Part::text(
-                    "No reply needed",
-                )]))],
-            };
-            let response = if streaming {
-                let events = session
-                    .run_stream(request, RunOptions::default())?
-                    .try_collect::<Vec<_>>()
-                    .await?;
-                let mut responses = events.into_iter().filter_map(|event| match event {
-                    AgentStreamEvent::Response(response) => Some(response),
-                    _ => None,
-                });
-                let response = responses
-                    .next()
-                    .ok_or("stream omitted its completed response")?;
-                assert!(
-                    responses.next().is_none(),
-                    "stream completed more than once"
-                );
-                response
-            } else {
-                session.run(request, RunOptions::default()).await?
-            };
-            assert_eq!(response.status, AgentResponseStatus::Completed);
-            assert!(response.content.is_empty());
-            assert_eq!(response.output.len(), if with_tools { 3 } else { 1 });
-            match response.output.last() {
-                Some(AgentItem::Model(final_model)) => {
-                    assert!(final_model.content.is_empty());
-                    assert_eq!(final_model.usage, usage);
-                }
-                _ => panic!("empty model response was not recorded"),
-            }
-            assert_eq!(
-                tool.recorded_calls(),
-                if with_tools {
-                    vec![json!({"emoji": "thumbs_up"})]
-                } else {
-                    vec![]
-                },
-            );
-            if with_tools {
-                assert!(matches!(&response.output[1],
-                    AgentItem::Tool(result) if result.status == ToolResultStatus::Completed
-                        && result.output == vec![Part::text("Reaction added")]
-                ));
-            }
-            let inputs = if streaming {
-                model.tracked_stream_inputs()
-            } else {
-                model.tracked_generate_inputs()
-            };
-            assert_eq!(inputs.len(), if with_tools { 2 } else { 1 });
-            close_run_session(session).await;
+async fn shared_silent_response_cases() -> Result<(), DynError> {
+    #[derive(serde::Deserialize)]
+    struct Fixture {
+        input: Vec<AgentItem>,
+        tool: FixtureTool,
+        test_cases: Vec<FixtureCase>,
+    }
+    #[derive(serde::Deserialize)]
+    struct FixtureTool {
+        name: String,
+        result: Vec<Part>,
+    }
+    #[derive(serde::Deserialize)]
+    struct FixtureCase {
+        name: String,
+        method: String,
+        use_tool: bool,
+        model_responses: Vec<ModelResponse>,
+        model_streams: Vec<Vec<PartialModelResponse>>,
+        expected_response: AgentResponse,
+        expected_tool_calls: Vec<Value>,
+        expected_model_calls: usize,
+    }
+    let fixture: Fixture = serde_json::from_str(&std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../agent-tests/silent-responses.json"
+    ))?)?;
+    for test_case in fixture.test_cases {
+        let model = Arc::new(MockLanguageModel::new());
+        for response in test_case.model_responses {
+            model.enqueue_generate(response);
         }
+        for partials in test_case.model_streams {
+            model.enqueue_stream(partials);
+        }
+        let tool = MockTool::new(
+            &fixture.tool.name,
+            AgentToolResult {
+                content: fixture.tool.result.clone(),
+                is_error: false,
+            },
+        );
+        let mut params = AgentParams::new("test_agent", model.clone());
+        if test_case.use_tool {
+            params = params.add_tool(tool.clone());
+        }
+        let session = new_run_session(Arc::new(params), ()).await;
+        let request = RunSessionRequest {
+            input: fixture.input.clone(),
+        };
+        let response = if test_case.method == "generate" {
+            session.run(request, RunOptions::default()).await?
+        } else {
+            let events = session
+                .run_stream(request, RunOptions::default())?
+                .try_collect::<Vec<_>>()
+                .await?;
+            let mut responses = events.into_iter().filter_map(|event| match event {
+                AgentStreamEvent::Response(response) => Some(response),
+                _ => None,
+            });
+            let response = responses.next().ok_or("stream omitted its response")?;
+            assert!(
+                responses.next().is_none(),
+                "{}: duplicate response",
+                test_case.name
+            );
+            response
+        };
+        assert_eq!(response, test_case.expected_response, "{}", test_case.name);
+        assert_eq!(
+            tool.recorded_calls(),
+            test_case.expected_tool_calls,
+            "{}",
+            test_case.name
+        );
+        let inputs = if test_case.method == "generate" {
+            model.tracked_generate_inputs()
+        } else {
+            model.tracked_stream_inputs()
+        };
+        assert_eq!(
+            inputs.len(),
+            test_case.expected_model_calls,
+            "{}",
+            test_case.name
+        );
+        close_run_session(session).await;
     }
     Ok(())
 }
