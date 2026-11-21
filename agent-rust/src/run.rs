@@ -8,6 +8,7 @@ use crate::{
 };
 use async_stream::try_stream;
 use futures::{future, lock::Mutex, stream::StreamExt};
+use llm_budget::budget::AtomicBudget;
 use llm_sdk::{
     boxed_stream::BoxedStream, LanguageModelInput, Message, ModelResponse, Part, StreamAccumulator,
     Tool, ToolCallPart, ToolResultPart, ToolResultStatus,
@@ -358,7 +359,12 @@ where
         let RunSessionRequest { input } = request;
 
         opentelemetry::trace_agent_run(&self.params.name, AgentSpanMethod::Run, async move {
-            let state = RunState::new(input, self.params.max_turns, options.cancellation_token);
+            let state = RunState::new(
+                input,
+                self.params.max_turns,
+                self.params.max_cost_usd,
+                options.cancellation_token,
+            );
             let mut tools = self.get_function_tools();
 
             let result: Result<AgentResponse, AgentError> = async {
@@ -417,6 +423,7 @@ where
         let state = Arc::new(RunState::new(
             input,
             self.params.max_turns,
+            self.params.max_cost_usd,
             options.cancellation_token,
         ));
 
@@ -719,6 +726,7 @@ struct ProcessResponse {
 
 pub struct RunState {
     max_turns: usize,
+    budget: Option<AtomicBudget>,
     input: Vec<AgentItem>,
     cancellation_token: CancellationToken,
 
@@ -730,9 +738,15 @@ pub struct RunState {
 
 impl RunState {
     #[must_use]
-    fn new(input: Vec<AgentItem>, max_turns: usize, cancellation_token: CancellationToken) -> Self {
+    fn new(
+        input: Vec<AgentItem>,
+        max_turns: usize,
+        max_cost_usd: Option<f64>,
+        cancellation_token: CancellationToken,
+    ) -> Self {
         Self {
             max_turns,
+            budget: max_cost_usd.and_then(|limit| AtomicBudget::new(limit).ok()),
             input,
             cancellation_token,
             current_turn: Arc::new(Mutex::new(0)),
@@ -753,6 +767,12 @@ impl RunState {
         *current_turn += 1;
         if *current_turn > self.max_turns {
             return Err(AgentError::max_turns_exceeded(self.max_turns));
+        }
+        if let Some(budget) = self.budget.as_ref().filter(|budget| budget.is_exhausted()) {
+            return Err(AgentError::max_cost_exceeded(
+                budget.limit_usd(),
+                budget.spent_usd(),
+            ));
         }
         Ok(())
     }
@@ -778,6 +798,9 @@ impl RunState {
     /// Append a model response to the run state and return the created item and
     /// its index.
     async fn append_model_response(&self, response: ModelResponse) -> (AgentItem, usize) {
+        if let (Some(budget), Some(cost)) = (&self.budget, response.cost) {
+            budget.charge_force(cost);
+        }
         let mut output = self.output.lock().await;
         let item = AgentItem::Model(response);
         output.push(item.clone());
