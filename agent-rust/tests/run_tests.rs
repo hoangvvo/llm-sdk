@@ -1560,6 +1560,59 @@ async fn run_throws_max_turns_exceeded_error() {
 }
 
 #[tokio::test]
+async fn run_throws_max_cost_exceeded_error() {
+    let tool = MockTool::new(
+        "test_tool",
+        AgentToolResult {
+            content: vec![Part::text("Tool result")],
+            is_error: false,
+        },
+    );
+
+    let model = Arc::new(MockLanguageModel::new());
+    for id in ["call_1", "call_2", "call_3"] {
+        model.enqueue_generate(ModelResponse {
+            content: vec![Part::tool_call(id, "test_tool", json!({}))],
+            cost: Some(0.6),
+            ..Default::default()
+        });
+    }
+
+    let session = new_run_session(
+        Arc::new(
+            AgentParams::new("test_agent", model)
+                .add_tool(tool)
+                .max_cost_usd(1.0),
+        ),
+        (),
+    )
+    .await;
+
+    let result = session
+        .run(
+            RunSessionRequest {
+                input: vec![AgentItem::Message(Message::user(vec![Part::text(
+                    "Keep using tools",
+                )]))],
+            },
+            RunOptions::default(),
+        )
+        .await;
+
+    match result {
+        Err(AgentError::MaxCostExceeded {
+            max_cost_usd,
+            spent_usd,
+            ..
+        }) => {
+            assert!((max_cost_usd - 1.0).abs() < 1e-9);
+            assert!((spent_usd - 1.2).abs() < 1e-9);
+        }
+        other => panic!("expected max cost exceeded error, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn run_throws_invariant_error_when_tool_not_found() {
     let model = Arc::new(MockLanguageModel::new());
     model.enqueue_generate(ModelResponse {

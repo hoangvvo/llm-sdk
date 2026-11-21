@@ -8,6 +8,7 @@ use std::sync::Arc;
 /// - `tools`: `vec![]`
 /// - `response_format`: `ResponseFormatOption::Text`
 /// - `max_turns`: 10
+/// - `max_cost_usd`: `None`
 /// - `temperature`: `None`
 /// - `top_p`: `None`
 /// - `top_k`: `None`
@@ -33,6 +34,8 @@ pub struct AgentParams<TCtx> {
     pub response_format: ResponseFormatOption,
     /// Max number of turns for agent to run to protect against infinite loops.
     pub max_turns: usize,
+    /// Max USD a single run may spend, summed from `ModelResponse::cost`.
+    pub max_cost_usd: Option<f64>,
     /// Amount of randomness injected into the response. Ranges from 0.0 to 1.0
     pub temperature: Option<f64>,
     /// An alternative to sampling with temperature, called nucleus sampling,
@@ -72,6 +75,7 @@ where
             toolkits: Vec::new(),
             response_format: ResponseFormatOption::Text,
             max_turns: 10,
+            max_cost_usd: None,
             temperature: None,
             top_p: None,
             top_k: None,
@@ -132,6 +136,13 @@ where
     #[must_use]
     pub fn max_turns(mut self, max_turns: usize) -> Self {
         self.max_turns = max_turns;
+        self
+    }
+
+    /// Set the max USD a single run may spend
+    #[must_use]
+    pub fn max_cost_usd(mut self, max_cost_usd: f64) -> Self {
+        self.max_cost_usd = Some(max_cost_usd);
         self
     }
 

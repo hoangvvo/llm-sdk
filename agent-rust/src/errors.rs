@@ -38,6 +38,12 @@ pub enum AgentError {
         max_turns: usize,
         snapshot: Option<Box<AgentRunSnapshot>>,
     },
+    #[error("The maximum cost (${max_cost_usd}) has been exceeded: ${spent_usd} spent.")]
+    MaxCostExceeded {
+        max_cost_usd: f64,
+        spent_usd: f64,
+        snapshot: Option<Box<AgentRunSnapshot>>,
+    },
 }
 
 impl AgentError {
@@ -90,6 +96,15 @@ impl AgentError {
     }
 
     #[must_use]
+    pub fn max_cost_exceeded(max_cost_usd: f64, spent_usd: f64) -> Self {
+        Self::MaxCostExceeded {
+            max_cost_usd,
+            spent_usd,
+            snapshot: None,
+        }
+    }
+
+    #[must_use]
     pub fn snapshot(&self) -> Option<&AgentRunSnapshot> {
         match self {
             Self::LanguageModel { snapshot, .. }
@@ -97,7 +112,8 @@ impl AgentError {
             | Self::ToolExecution { snapshot, .. }
             | Self::Init { snapshot, .. }
             | Self::Cleanup { snapshot, .. }
-            | Self::MaxTurnsExceeded { snapshot, .. } => snapshot.as_deref(),
+            | Self::MaxTurnsExceeded { snapshot, .. }
+            | Self::MaxCostExceeded { snapshot, .. } => snapshot.as_deref(),
         }
     }
 
@@ -108,7 +124,8 @@ impl AgentError {
             | Self::ToolExecution { snapshot, .. }
             | Self::Init { snapshot, .. }
             | Self::Cleanup { snapshot, .. }
-            | Self::MaxTurnsExceeded { snapshot, .. } => snapshot,
+            | Self::MaxTurnsExceeded { snapshot, .. }
+            | Self::MaxCostExceeded { snapshot, .. } => snapshot,
         };
         if snapshot.is_none() {
             *snapshot = Some(Box::new(value));
